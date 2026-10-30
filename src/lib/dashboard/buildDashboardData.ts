@@ -1230,6 +1230,8 @@ export function buildDashboardData(
         )
       : buildStockKpis(stockJobs, period?.label ?? null);
 
+  /** ใบในงวดที่ไม่ใช่ใบขอชั่วคราว — ถังอายุ/ภาระงานโหมดมีงวดนับชุดเดียวกับคงเหลือ (cohort ERP) */
+  const periodStockReal = stockJobs.filter((j) => !isPrequestJob(j));
   const workStatusKpis = buildWorkStatusKpis(
     openRemainingJobs,
     period?.label ?? null,
@@ -1251,11 +1253,13 @@ export function buildDashboardData(
     workStatusKpis,
     prequestKpi,
     activityTrend,
-    unitOverview: buildUnitOverview(openRemainingJobs, today),
-    ageDaysBreakdown: buildAgeDaysBreakdown(period ? stockJobs : openRemainingJobs, today),
-    ageDaysRequestTotal: (period ? stockJobs : openRemainingJobs).length,
+    // โหมดมีงวด: คงเหลือ = cohort ของ ERP (ไม่มีใบขอชั่วคราว) — ภาระงานตามรหัสไซต์ต้องชุดเดียวกัน (QA 30 ต.ค. 2569: 132 กับ 114)
+    unitOverview: buildUnitOverview(period ? openRemainingJobs.filter((j) => !isPrequestJob(j)) : openRemainingJobs, today),
+    // โหมดมีงวด: ชุดเดียวกับคงเหลือ (cohort ERP · ไม่มีใบขอชั่วคราว) — เดิมถังด่วนรวม 132 แต่ชิปคงเหลือ 114 (QA 30 ต.ค. 2569)
+    ageDaysBreakdown: buildAgeDaysBreakdown(period ? periodStockReal : openRemainingJobs, today),
+    ageDaysRequestTotal: (period ? periodStockReal : openRemainingJobs).length,
     ageDaysPositionTotal: period
-      ? stockJobs.reduce((sum, j) => sum + positionBreakdownFromJob(j).remainingPositions, 0)
+      ? periodStockReal.reduce((sum, j) => sum + positionBreakdownFromJob(j).remainingPositions, 0)
       : openRemainingPositions,
     closedBreakdown,
     fulfillmentBreakdown,

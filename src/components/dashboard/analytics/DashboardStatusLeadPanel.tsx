@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -39,13 +39,18 @@ export default function DashboardStatusLeadPanel({
   const [kind, setKind] = useState<RequestLeadKind | null>(null);
   const [person, setPerson] = useState<string | null>(null);
   const [shown, setShown] = useState(PAGE);
+  /** กดกล่องแล้วแผงอยู่ไกลลงไป — เลื่อนจอมาให้เห็น (QA 30 ต.ค. 2569 · แผง remount ทุกครั้งที่เปลี่ยนกล่อง) */
+  const rootRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    rootRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, []);
   const keyers = useMemo(() => buildKeyerRows(panel.rows), [panel.rows]);
   const rows = panel.rows.filter((r) => (!kind || r.kind === kind) && (!person || (r.submittedBy || NO_KEYER) === person));
   const visible = rows.slice(0, shown);
   const max = Math.max(1, ...STATUS_LEAD_ORDER.map((k) => panel.kinds[k].positions));
 
   return (
-    <div className={cn('space-y-3 rounded-2xl border p-4', DASH.card)} data-testid="dashboard-status-lead">
+    <div ref={rootRef} className={cn('scroll-mt-20 space-y-3 rounded-2xl border p-4', DASH.card)} data-testid="dashboard-status-lead">
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
         <div>
           <p className={cn('text-sm font-medium', DASH.cellStrong)}>ใบขอเร่งด่วนแค่ไหน</p>

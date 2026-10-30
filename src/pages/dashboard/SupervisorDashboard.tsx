@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { lockedBuOf } from '@/lib/userViewableBus';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import DashboardShell from '@/components/dashboard/analytics/DashboardShell';
 import DetailListDialog from '@/components/shared/DetailListDialog';
 import type { DateRangeYmd } from '@/components/shared/DateRangeCalendarPicker';
@@ -746,7 +746,31 @@ const SupervisorDashboard: React.FC = () => {
    * กล่องที่กดอยู่ — การ์ดเร่งด่วนเปลี่ยนเป็นใบของกล่องนั้น · null = การ์ดเร่งด่วนแบบเดิม
    * สถานะทำงาน / ใบขอชั่วคราว (29 ต.ค. 2569 "ทำเลย") · เข้ามา หาได้แล้ว ยกเลิก คงเหลือ (ร่าง 2 "อันนั้นแก้เลย")
    */
-  const [statusPick, setStatusPick] = useState<{ kpiId: string; label: string } | null>(null);
+  /**
+   * กล่องที่กดจำใน URL (`?pick=`) — กดเลขใบขอไปหน้าใบแล้วกดกลับ แผงยังอยู่ (QA 30 ต.ค. 2569 เคยหาย)
+   * ชื่อกล่องอ่านจากชุดกล่องปัจจุบัน
+   */
+  const [searchParams, setSearchParams] = useSearchParams();
+  const pickId = searchParams.get('pick');
+  const statusPick = useMemo(() => {
+    if (!pickId) return null;
+    const all = [...data.kpis, ...(data.workStatusKpis ?? []), ...(data.prequestKpi ? [data.prequestKpi] : [])];
+    const kpi = all.find((k) => k.id === pickId);
+    return kpi ? { kpiId: pickId, label: kpi.label } : null;
+  }, [pickId, data]);
+  const setStatusPick = useCallback(
+    (next: string | null) =>
+      setSearchParams(
+        (prev) => {
+          const p = new URLSearchParams(prev);
+          if (next) p.set('pick', next);
+          else p.delete('pick');
+          return p;
+        },
+        { replace: true },
+      ),
+    [setSearchParams],
+  );
   /**
    * แผงของกล่องที่กด — ชุดใบเดียวกับเลขบนกล่องเป๊ะ (การนับของหน้าไม่เปลี่ยน)
    *  - สถานะทำงาน = ใบจริงที่ยังต้องหา (`buildWorkStatusKpis` ตัดใบขอชั่วคราวออก) · ใบขอชั่วคราว = ส่วนที่ตัดออก
@@ -806,7 +830,7 @@ const SupervisorDashboard: React.FC = () => {
        */
       const cohortReady = throughputRecords.length > 0;
       /** ร่าง 2 (เจ้าของ 29 ต.ค. 2569 "อันนั้นแก้เลย"): ไม่เด้งป๊อป — การ์ดเร่งด่วนเปลี่ยนเป็นใบของกล่องนี้ (`statusPickPanel`) */
-      const togglePick = () => setStatusPick((cur) => (cur?.kpiId === kpiId ? null : { kpiId, label }));
+      const togglePick = () => setStatusPick(pickId === kpiId ? null : kpiId);
       if (cohortReady && (kpiId === 'total_requests' || kpiId === 'closed' || kpiId === 'cancelled')) {
         togglePick();
         return;
@@ -869,7 +893,7 @@ const SupervisorDashboard: React.FC = () => {
       }
       openJobList(label, filterJobsForDashboardKpi(scopedJobs, kpiId));
     },
-    [openJobList, openClosedJobList, openControlList, throughputRecords, controlRecords, scopedJobs, scopedClosedJobs, jobsWithoutAgeFilter, siamrajPrimary, dbSource, period, dateRange],
+    [pickId, setStatusPick, openJobList, openClosedJobList, openControlList, throughputRecords, controlRecords, scopedJobs, scopedClosedJobs, jobsWithoutAgeFilter, siamrajPrimary, dbSource, period, dateRange],
   );
 
   const handleCohortClick = useCallback(
@@ -901,8 +925,9 @@ const SupervisorDashboard: React.FC = () => {
    */
   const slaCohort = useMemo(() => {
     // ใบปิดยังไม่มา (โหมดทั้งหมดดึง ~40 วิ) = ใช้ชุดเดิม (ใบยังไม่ปิด + "กำลังดึง") — ไม่งั้นช่อง "คิด SLA ไม่ได้" บวมชั่วคราว
-    // โหมดเลือกช่วงคงชุดเดิม (ตัดตามวันขอในช่วงอยู่แล้ว)
-    if (cohortScope.records.length === 0 || period || !closedAllJobs) {
+    // โหมดเลือกช่วงก็ใช้ชุดของการ์ด (QA 30 ต.ค. 2569: เดือนนี้ตารางเคยรวม 303 ใบ แต่การ์ดเข้ามา 180 —
+    // ชุดเดิมรวมใบที่ปิดในช่วงแต่ยื่นก่อนช่วง) · ใบในชุดที่หาใบไม่เจอ = "คิด SLA ไม่ได้" ยอดรวมเท่าการ์ด
+    if (cohortScope.records.length === 0 || (!period && !closedAllJobs)) {
       return {
         records: slaControlRecords,
         extraUnknown: {} as Partial<Record<RequestLeadKind, number>>,

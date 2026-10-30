@@ -54,7 +54,7 @@ describe('buildStatusLeadPanel', () => {
   });
   it('จอ: กดกล่องสถานะไม่เด้งป๊อป · การ์ดเร่งด่วนสลับเป็นแผงสถานะ · รายการเลื่อนในกล่อง · มีปุ่มกลับแบบเดิม', () => {
     const page = readFileSync('src/pages/dashboard/SupervisorDashboard.tsx', 'utf8');
-    expect(page).toContain('const togglePick = () => setStatusPick((cur) => (cur?.kpiId === kpiId ? null : { kpiId, label }));');
+    expect(page).toContain('const togglePick = () => setStatusPick(pickId === kpiId ? null : kpiId);');
     const shell = readFileSync('src/components/dashboard/analytics/DashboardShell.tsx', 'utf8');
     expect(shell).toContain('<DashboardStatusLeadPanel');
     expect(shell).toContain('selected={statusPick?.kpiId === kpi.id}');
@@ -156,5 +156,21 @@ describe('ใบขอชั่วคราวแยกกล่อง · "ท�
     const leaves = data.workStatusKpis.filter((k) => k.id !== 'work_status_total').reduce((n, k) => n + k.value, 0);
     expect([total?.value, total?.secondaryCount, leaves]).toEqual([2, 1, 2]);
     expect(data.prequestKpi).toMatchObject({ id: 'work_status_prequest', label: 'ใบขอชั่วคราว', value: 3, secondaryCount: 1 });
+  });
+});
+
+describe('QA 30 ต.ค. 2569 ก้อน 3 Dashboard', () => {
+  it('กล่องที่กดจำใน URL (?pick=) · แผงเลื่อนจอมาให้เห็น · ป๊อปรายการใช้สีธีม (โหมดมืดอ่านได้)', () => {
+    const page = readFileSync('src/pages/dashboard/SupervisorDashboard.tsx', 'utf8');
+    expect(page).toContain("searchParams.get('pick')");
+    const panel = readFileSync('src/components/dashboard/analytics/DashboardStatusLeadPanel.tsx', 'utf8');
+    expect(panel).toContain("rootRef.current?.scrollIntoView");
+    const dlg = readFileSync('src/components/shared/DetailListDialog.tsx', 'utf8');
+    expect(dlg).toContain('rounded-2xl border border-border bg-card p-3.5');
+  });
+  it('โหมดมีงวด: ถังอายุ/ภาระงาน = ชุดเดียวกับคงเหลือ (ไม่มีใบขอชั่วคราว)', () => {
+    const src = readFileSync('src/lib/dashboard/buildDashboardData.ts', 'utf8');
+    expect(src).toContain('buildAgeDaysBreakdown(period ? periodStockReal : openRemainingJobs, today)');
+    expect(src).toContain('buildUnitOverview(period ? openRemainingJobs.filter((j) => !isPrequestJob(j)) : openRemainingJobs, today)');
   });
 });

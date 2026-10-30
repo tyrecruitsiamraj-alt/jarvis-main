@@ -70,8 +70,9 @@ const DetailListDialog: React.FC<DetailListDialogProps> = ({
                   key={item.id}
                   onClick={item.onClick}
                   className={cn(
-                    'flex flex-col gap-2 rounded-2xl border border-white/70 bg-white/45 p-3.5 sm:flex-row sm:items-start sm:justify-between',
-                    item.onClick && 'cursor-pointer transition-colors hover:bg-white/70',
+                    // สีจากธีม — เดิม bg-white/45 ไม่มีคู่โหมดมืด ตัวหนังสืออ่านไม่ออก (QA 30 ต.ค. 2569)
+                    'flex flex-col gap-2 rounded-2xl border border-border bg-card p-3.5 sm:flex-row sm:items-start sm:justify-between',
+                    item.onClick && 'cursor-pointer transition-colors hover:bg-muted',
                   )}
                 >
                   <div className="min-w-0 flex-1">
