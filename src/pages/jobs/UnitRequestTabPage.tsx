@@ -320,7 +320,7 @@ const UnitRequestTabPage: React.FC<{ tab: UnitRequestSubTab }> = ({ tab }) => {
                 ผู้สมัคร {summary.total} คน
               </span>
               {job ? (
-                <span className="text-muted-foreground">· ต้องการ {jobPositionUnits(job)} ตำแหน่ง</span>
+                <span className="text-muted-foreground">· ต้องการ {jobPositionUnits(job)} อัตรา</span>
               ) : null}
               <span className="text-muted-foreground">· สนใจแล้ว {summary.interested}</span>
               <span className="text-muted-foreground">· ยังไม่โทร {summary.waiting}</span>

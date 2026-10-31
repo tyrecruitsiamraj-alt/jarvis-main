@@ -220,7 +220,7 @@ const BoardDashboard: React.FC<{
           foot={
             ledger
               ? boardOpen && boardOpen.prePositions > 0
-                ? `ERP ${fmt(ledger.openNow)} · ใบขอล่วงหน้า ${fmt(boardOpen.prePositions)}`
+                ? `ERP ${fmt(ledger.openNow)} · ใบขอชั่วคราว ${fmt(boardOpen.prePositions)}`
                 : `ยกเลิกในช่วง ${fmt(cancelledNow)} อัตรา`
               : undefined
           }

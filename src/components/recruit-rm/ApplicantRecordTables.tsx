@@ -127,7 +127,7 @@ export const ContactsTable: React.FC<{ logs: ContactLog[] }> = ({ logs }) => (
     {logs.map((l) => (
       <tr key={l.id} className="border-b border-border/50 last:border-0">
         <Td className={cn('whitespace-nowrap font-medium', l.ok ? TONE.success.value : TONE.danger.value)}>
-          {l.ok ? 'ติดต่อสำเร็จ' : 'ติดต่อไม่สำเร็จ'}
+          {l.ok ? 'ติดต่อได้' : 'ติดต่อไม่ได้'}
           {isAppointmentFailedContact(l) ? (
             <span className={cn('block text-xs font-normal', TONE.danger.value)}>นัดหมายไม่สำเร็จ</span>
           ) : null}

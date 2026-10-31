@@ -28,7 +28,7 @@ const PrequestBadge: React.FC<{
         TONE.violet.chip,
         className,
       )}
-      title="ใบขอล่วงหน้า — ยังไม่การันตีว่าจะเปิดงานจริง"
+      title="ใบขอชั่วคราว — ยังไม่การันตีว่าจะเปิดงานจริง"
     >
       {PREQUEST_LABEL}
     </span>

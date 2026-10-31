@@ -108,7 +108,7 @@ describe('หน้าหลักโฉม 3 ก้อน', () => {
     expect(screen.getByText('418')).toBeTruthy();
     expect(document.body.textContent).toContain('381 + 213 − 140 − 58 = 396');
     expect(document.body.textContent).toContain('หาได้แล้วที่ไม่มีวันแจ้งเข้า −4 (ประมาณการ)');
-    expect(document.body.textContent).toContain('ใบขอล่วงหน้าฝั่งเรา +26');
+    expect(document.body.textContent).toContain('ใบขอชั่วคราวฝั่งเรา +26');
     expect(document.body.textContent).toContain('= 418');
     // ก้อนวันนี้นับเป็นคน + เทียบเมื่อวาน
     expect(screen.getByText('ไปถึงงาน')).toBeTruthy();

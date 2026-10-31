@@ -522,25 +522,25 @@ export const JOB_AGE_URGENCY_META: Record<
   { label: string; chipCls: string; barCls: string; dotCls: string }
 > = {
   fresh: {
-    label: 'ยังไม่ด่วน',
+    label: 'ค้าง 1–7 วัน',
     chipCls: 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300',
     barCls: 'bg-emerald-400',
     dotCls: 'bg-emerald-500',
   },
   warming: {
-    label: 'เริ่มด่วน',
+    label: 'ค้าง 8–30 วัน',
     chipCls: 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-950/70 dark:text-amber-300',
     barCls: 'bg-amber-400',
     dotCls: 'bg-amber-500',
   },
   urgent: {
-    label: 'ด่วน',
+    label: 'ค้าง 31–60 วัน',
     chipCls: 'border-orange-300 bg-orange-50 text-orange-800 dark:border-orange-800 dark:bg-orange-950/70 dark:text-orange-300',
     barCls: 'bg-orange-500',
     dotCls: 'bg-orange-500',
   },
   critical: {
-    label: 'ด่วนมาก',
+    label: 'ค้างเกิน 60 วัน',
     chipCls: 'border-red-300 bg-red-50 text-red-800 dark:border-red-800 dark:bg-red-950/70 dark:text-red-300',
     barCls: 'bg-red-500',
     dotCls: 'bg-red-500',

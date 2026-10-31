@@ -53,7 +53,7 @@ export default function DashboardStatusLeadPanel({
     <div ref={rootRef} className={cn('scroll-mt-20 space-y-3 rounded-2xl border p-4', DASH.card)} data-testid="dashboard-status-lead">
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
         <div>
-          <p className={cn('text-sm font-medium', DASH.cellStrong)}>ใบขอเร่งด่วนแค่ไหน</p>
+          <p className={cn('text-sm font-medium', DASH.cellStrong)}>ชนิดใบขอ</p>
           <p className={cn('text-[11px]', DASH.muted)}>{label}</p>
           {note ? <p className={cn('text-[11px]', DASH.muted)}>{note}</p> : null}
         </div>

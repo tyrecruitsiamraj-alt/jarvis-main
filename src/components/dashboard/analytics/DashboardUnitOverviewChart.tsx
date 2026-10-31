@@ -69,7 +69,7 @@ const DashboardUnitOverviewChart: React.FC<Props> = ({ items, periodLabel, onSit
             ตำแหน่งที่รอดำเนินการต่อรหัสไซต์ · {periodLabel}
           </p>
           <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
-            รวมรอดำเนินการ {openTotal.toLocaleString('th-TH')} ตำแหน่ง ·{' '}
+            รวมรอดำเนินการ {openTotal.toLocaleString('th-TH')} อัตรา ·{' '}
             {activeUnits.length.toLocaleString('th-TH')} ไซต์
           </p>
         </div>

@@ -82,10 +82,10 @@ export const MOCK_DASHBOARD_DATA: DashboardData = {
   previousPeriodLabel: 'เดือนที่แล้ว',
   activityTrendLabel: 'ม.ค. 2026 – ก.ค. 2026',
   kpis: [
-    { id: 'total_requests', label: 'ใบขอทั้งหมด', value: 52, secondaryCount: 20, secondaryLabel: 'ใบขอ', description: '52 ตำแหน่ง · 20 ใบขอ', trendPercent: null },
-    { id: 'closed', label: 'ปิดใบขอ', value: 24, secondaryCount: 12, secondaryLabel: 'ใบขอที่มีการหาได้', description: 'หาได้แล้ว · 24 ตำแหน่ง', trendPercent: null },
-    { id: 'cancelled', label: 'ยกเลิก', value: 3, secondaryCount: 2, secondaryLabel: 'ใบขอ', description: '3 ตำแหน่ง · 2 ใบขอ', trendPercent: null },
-    { id: 'remaining', label: 'เหลือหา', value: 25, secondaryCount: 11, secondaryLabel: 'ใบขอ', description: '25 ตำแหน่ง · 11 ใบขอ', trendPercent: null },
+    { id: 'total_requests', label: 'ใบขอทั้งหมด', value: 52, secondaryCount: 20, secondaryLabel: 'ใบขอ', description: '52 อัตรา · 20 ใบขอ', trendPercent: null },
+    { id: 'closed', label: 'ปิดใบขอ', value: 24, secondaryCount: 12, secondaryLabel: 'ใบขอที่มีการหาได้', description: 'หาได้แล้ว · 24 อัตรา', trendPercent: null },
+    { id: 'cancelled', label: 'ยกเลิก', value: 3, secondaryCount: 2, secondaryLabel: 'ใบขอ', description: '3 อัตรา · 2 ใบขอ', trendPercent: null },
+    { id: 'remaining', label: 'เหลือหา', value: 25, secondaryCount: 11, secondaryLabel: 'ใบขอ', description: '25 อัตรา · 11 ใบขอ', trendPercent: null },
   ],
   workStatusKpis: [
     { id: 'work_status_total', label: 'ทั้งหมด', value: 25, secondaryCount: 20, secondaryLabel: 'ใบขอ', description: 'ผลรวมสถานะ = 25 อัตรา · 20 ใบ', trendPercent: null },
@@ -103,9 +103,9 @@ export const MOCK_DASHBOARD_DATA: DashboardData = {
   flowView,
   executiveInsights: {
     sentences: [
-      'งานค้างเพิ่มขึ้น 1 ตำแหน่ง เทียบต้นงวด',
+      'งานค้างเพิ่มขึ้น 1 อัตรา เทียบต้นงวด',
       'ใบขอลาออกคิดเป็น 34.6% ของความต้องการรวมเดือนนี้',
-      'ทีมหาได้แล้ว 24 ตำแหน่ง แต่ปิดครบใบขอได้เพียง 9 ใบ',
+      'ทีมหาได้แล้ว 24 อัตรา แต่ปิดครบใบขอได้เพียง 9 ใบ',
       'การหางานค้างเก่าช่วย 25% ของการหาได้ในงวดนี้',
       'หน่วยงานที่เกิน SLA มากที่สุด: ศูนย์การค้าเซ็นทรัล (2 ใบ)',
     ],

@@ -15,10 +15,11 @@ describe('คำผลโทรชุดเดียว: ไป / ไม่ไ�
 });
 
 describe('ชนิดใบขอ = ฉุกเฉิน/ล่วงหน้า · อายุใบขอไม่ซ้ำคำ', () => {
-  it('การ์ด/ตัวกรอง/Pre-Check ใช้ ฉุกเฉิน · 16–30 วัน = ด่วน', () => {
+  // 31 ต.ค. 2569 เจ้าของ Choice "อายุใบใช้ ค้าง" แทน "ด่วน" (`uiWords.ts`)
+  it('การ์ด/ตัวกรอง/Pre-Check ใช้ ฉุกเฉิน · 16–30 วัน = ค้าง 16–30 วัน', () => {
     expect(read('src/components/jobs/BoardJobCard.tsx')).toContain('>ฉุกเฉิน</span>');
     expect(read('src/lib/boardFilters.ts')).toContain("v === 'urgent' ? 'ฉุกเฉิน' : 'ล่วงหน้า'");
-    expect(read('src/components/dashboard/analytics/DashboardAgeOverview.tsx')).toContain("'16-30': { urgency: 'ด่วน'");
+    expect(read('src/components/dashboard/analytics/DashboardAgeOverview.tsx')).toContain("'16-30': { urgency: 'ค้าง 16–30 วัน'");
   });
 });
 

@@ -86,7 +86,7 @@ const HomeResultBlock: React.FC<{
             {result.undatedFilled > 0 ? (
               <span className={TONE.warn.value}> · หาได้แล้วที่ไม่มีวันแจ้งเข้า −{fmt(result.undatedFilled)} (ประมาณการ)</span>
             ) : null}
-            {result.boardPre > 0 ? <> · ใบขอล่วงหน้าฝั่งเรา +{fmt(result.boardPre)}</> : null}
+            {result.boardPre > 0 ? <> · ใบขอชั่วคราวฝั่งเรา +{fmt(result.boardPre)}</> : null}
             {result.undatedFilled > 0 || result.boardPre > 0 ? <> = {fmt(byEquation)}</> : null}
             {result.unexplained !== 0 ? (
               <span className={TONE.warn.value}>

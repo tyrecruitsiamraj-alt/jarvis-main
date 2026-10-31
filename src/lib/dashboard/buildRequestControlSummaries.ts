@@ -384,7 +384,7 @@ export function buildLifecycleInsights(
 
   const peak = [...trend].sort((a, b) => b.resignation - a.resignation)[0];
   if (peak && peak.resignation > 0) {
-    insights.push(`เดือนที่ลาออกสูงสุด: ${peak.label} (${peak.resignation} ตำแหน่ง)`);
+    insights.push(`เดือนที่ลาออกสูงสุด: ${peak.label} (${peak.resignation} อัตรา)`);
   }
 
   if (trend.length >= 2) {
@@ -393,8 +393,8 @@ export function buildLifecycleInsights(
     const delta = cur.resignation - prev.resignation;
     insights.push(
       delta >= 0
-        ? `แนวโน้มลาออกเพิ่มจากเดือนก่อน (+${delta} ตำแหน่ง)`
-        : `แนวโน้มลาออกลดจากเดือนก่อน (${delta} ตำแหน่ง)`,
+        ? `แนวโน้มลาออกเพิ่มจากเดือนก่อน (+${delta} อัตรา)`
+        : `แนวโน้มลาออกลดจากเดือนก่อน (${delta} อัตรา)`,
     );
   }
 
@@ -458,11 +458,11 @@ export function buildExecutiveInsights(
 
   if (summary.netBacklogChange > 0) {
     sentences.push(
-      `งานค้างเพิ่มขึ้น ${summary.netBacklogChange.toLocaleString('th-TH')} ตำแหน่ง เทียบต้นงวด`,
+      `งานค้างเพิ่มขึ้น ${summary.netBacklogChange.toLocaleString('th-TH')} อัตรา เทียบต้นงวด`,
     );
   } else if (summary.netBacklogChange < 0) {
     sentences.push(
-      `งานค้างลดลง ${Math.abs(summary.netBacklogChange).toLocaleString('th-TH')} ตำแหน่ง เทียบต้นงวด`,
+      `งานค้างลดลง ${Math.abs(summary.netBacklogChange).toLocaleString('th-TH')} อัตรา เทียบต้นงวด`,
     );
   } else if (summary.totalWorkloadPositions > 0) {
     sentences.push('งานค้างคงที่เทียบต้นงวด');
@@ -476,7 +476,7 @@ export function buildExecutiveInsights(
 
   if (summary.filledPositionsThisPeriod > 0) {
     sentences.push(
-      `ทีมหาได้แล้ว ${summary.filledPositionsThisPeriod.toLocaleString('th-TH')} ตำแหน่ง แต่ปิดครบใบขอได้เพียง ${summary.fullyClosedRequestsThisPeriod.toLocaleString('th-TH')} ใบ`,
+      `ทีมหาได้แล้ว ${summary.filledPositionsThisPeriod.toLocaleString('th-TH')} อัตรา แต่ปิดครบใบขอได้เพียง ${summary.fullyClosedRequestsThisPeriod.toLocaleString('th-TH')} ใบ`,
     );
   }
 

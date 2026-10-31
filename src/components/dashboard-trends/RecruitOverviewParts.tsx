@@ -416,6 +416,8 @@ const DELAY_TONE: Record<DelayRow['key'], ToneKey> = {
   d3: 'warn',
   d4_7: 'orange',
   over7: 'danger',
+  // รอโทร = ฟ้าทุกหน้า (QA 10 ต.ค. 2569)
+  queued: 'info',
   none: 'neutral',
 };
 
@@ -625,7 +627,7 @@ export function ReasonColumns({ groups }: { groups: readonly ReasonGroup[] }) {
 const STAFF_COLS: { key: StaffSortKey; label: string }[] = [
   { key: 'claimed', label: 'เก็บไปโทร' },
   { key: 'called', label: 'โทรแล้ว' },
-  { key: 'reached', label: 'ติดต่อสำเร็จ' },
+  { key: 'reached', label: 'ติดต่อได้' },
   { key: 'appointed', label: 'นัดได้' },
   { key: 'showed', label: 'มา' },
 ];

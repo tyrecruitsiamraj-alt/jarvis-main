@@ -168,7 +168,8 @@ describe('ข้อ 4 คนที่กรอกมา แยกช่องท
     expect(applicantCallBucketOf(fact({ phoneOk: false }))).toBe('badPhone');
     expect(applicantCallBucketOf(fact({ aiQueued: true }))).toBe('queued');
   });
-  it('ทุกแถว: ไม่โทร + รอโทร + รอโทรซ้ำ + โทรแล้ว = ทั้งหมด · ช่องทางหลักรวม = แถวรวม · รองรวม = หลัก', () => {
+  // 31 ต.ค. 2569 ทุกการ์ดในหน้านับชุดเดียวกัน: คนโทรเองแยกออกมา · รอโทรซ้ำอยู่ใน AI โทรแล้ว
+  it('ทุกแถว: AI ไม่โทร + รอโทร + คนโทรเอง + AI โทรแล้ว = ทั้งหมด · ช่องทางหลักรวม = แถวรวม · รองรวม = หลัก', () => {
     const apps = [
       fact({ id: 'a1', calledByAi: true, aiAnswer: 'said_yes' }),
       fact({ id: 'a2', calledByAi: true, aiAnswer: 'said_no' }),
@@ -178,12 +179,12 @@ describe('ข้อ 4 คนที่กรอกมา แยกช่องท
     ];
     const { total, groups } = buildApplicantChannelRows(apps);
     for (const r of [total, ...groups, ...groups.flatMap((g) => g.children ?? [])]) {
-      expect(r.notCalled + r.counts.queued + r.counts.retry + r.called).toBe(r.total);
+      expect(r.notCalled + r.counts.queued + r.counts.staff + r.called).toBe(r.total);
     }
     expect(groups.reduce((n, g) => n + g.total, 0)).toBe(total.total);
     for (const g of groups) expect((g.children ?? []).reduce((n, c) => n + c.total, 0)).toBe(g.total);
     expect(total.yesPct).toBe(50);
-    // TikTok มีแต่รอโทรซ้ำ (ยังไม่นับว่าโทรแล้ว) ⇒ ไม่ขึ้นอันดับ
+    // TikTok มีแต่รอโทรซ้ำ (ยังไม่มีผล ไม่เข้าตัวหาร % สนใจ) ⇒ ไม่ขึ้นอันดับ
     expect(applicantSuccessRanking(groups, 1).map((r) => [r.name, r.yesPct])).toEqual([['Facebook Group', 50]]);
   });
   it('กรองใบขอแล้ว ใบสมัครเหลือเฉพาะของใบที่เลือก · ไม่กรอง = ทุกใบสมัครของช่วง', () => {

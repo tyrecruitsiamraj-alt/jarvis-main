@@ -80,7 +80,7 @@ export function jobToDashboardDetailItem(
   return {
     id: job.id,
     title: job.request_no ? `${job.unit_name} (${job.request_no})` : job.unit_name,
-    subtitle: `${roleLabel}${actionLabel} • ต้องการ ${formatYmdTh(job.required_date)} • ${jobPositionUnits(job)} ตำแหน่ง`,
+    subtitle: `${roleLabel}${actionLabel} • ต้องการ ${formatYmdTh(job.required_date)} • ${jobPositionUnits(job)} อัตรา`,
     badge: DASHBOARD_STATUS_LABELS[status],
     badgeVariant: statusBadgeVariant(status),
     onClick: () => onOpen(job),

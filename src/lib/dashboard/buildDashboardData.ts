@@ -25,6 +25,7 @@ import { jobRequestDateYmd } from '@/components/shared/DateRangeCalendarPicker';
 import { toYmdLocal } from '@/lib/dateTh';
 import { dashboardCohortYmd } from '@/lib/jobUrgency';
 import { PREQUEST_LABEL, isPrequestJob } from '@/lib/publicJobVisibility';
+import { buildRemainingBridge } from '@/lib/dashboard/remainingBridge';
 import type {
   DashboardActivityTrendPoint,
   DashboardData,
@@ -689,7 +690,7 @@ function buildStockKpis(jobs: JobRequest[], _periodLabel?: string | null): Dashb
   }
 
   const posReq = (positions: number, requests: number) =>
-    `${positions.toLocaleString('th-TH')} ตำแหน่ง · ${requests.toLocaleString('th-TH')} ใบขอ`;
+    `${positions.toLocaleString('th-TH')} อัตรา · ${requests.toLocaleString('th-TH')} ใบขอ`;
 
   return [
     {
@@ -796,7 +797,7 @@ function buildKpis(
       value: closedTotal,
       description: throughputCur
         ? closedBacklog > 0
-          ? `รวมงานค้างเก่าที่หาได้ในงวดนี้ ${closedBacklog.toLocaleString('th-TH')} ตำแหน่ง`
+          ? `รวมงานค้างเก่าที่หาได้ในงวดนี้ ${closedBacklog.toLocaleString('th-TH')} อัตรา`
           : 'ตำแหน่งที่ปิดแล้วในช่วงที่เลือก'
         : closedFromFeed > 0
           ? 'ตำแหน่งที่ปิดแล้วจากรายการในช่วง'
@@ -1240,6 +1241,16 @@ export function buildDashboardData(
       : undefined,
   );
   const prequestKpi = buildPrequestKpi(openRemainingJobs);
+  const remainingBridge =
+    !period && cohortStock
+      ? buildRemainingBridge(
+          openRemainingJobs,
+          throughputRecords,
+          periodFrom,
+          periodTo,
+          cohortStock.requestPositions - cohortStock.filledPositions - cohortStock.cancelledPositions,
+        )
+      : undefined;
 
   const lifecycleBoard = buildLifecycleBoardFromStockSources({
     throughputRecords,
@@ -1252,6 +1263,7 @@ export function buildDashboardData(
     kpis,
     workStatusKpis,
     prequestKpi,
+    remainingBridge,
     activityTrend,
     // โหมดมีงวด: คงเหลือ = cohort ของ ERP (ไม่มีใบขอชั่วคราว) — ภาระงานตามรหัสไซต์ต้องชุดเดียวกัน (QA 30 ต.ค. 2569: 132 กับ 114)
     unitOverview: buildUnitOverview(period ? openRemainingJobs.filter((j) => !isPrequestJob(j)) : openRemainingJobs, today),

@@ -17,7 +17,7 @@ import type { RecruitAppFact } from '@/lib/recruitOverviewTypes';
 export type ContactBucket = 'waiting' | 'fail' | 'apptFailed' | 'apptNone' | 'showed' | 'noShow' | 'upcoming' | 'overdue';
 export const CONTACT_BUCKET_LABEL: Record<ContactBucket, string> = {
   waiting: 'รอโทร',
-  fail: 'ติดต่อไม่สำเร็จ',
+  fail: 'ติดต่อไม่ได้',
   apptFailed: 'นัดไม่สำเร็จ',
   apptNone: 'ยังไม่ลงนัด',
   showed: 'มา',

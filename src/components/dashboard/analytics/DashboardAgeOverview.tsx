@@ -19,11 +19,11 @@ type Props = {
  */
 const BUCKET_TONE: Record<DashboardAgeDaysBreakdown['bucket'], { urgency: string; tone: ToneKey; solid?: true }> = {
   // 🔴 "ล่วงหน้า" = เขียวทุกหน้า (เจ้าของสั่ง 19 ส.ค. 2569) — เดิมเป็นฟ้าที่นี่ที่เดียว
-  advance: { urgency: 'รอได้', tone: REQUEST_LEAD_KIND_TONE.advance },
-  '1-7': { urgency: 'ยังไม่ด่วน', tone: 'success' },
-  '8-15': { urgency: 'เริ่มด่วน', tone: 'warn' },
-  '16-30': { urgency: 'ด่วน', tone: 'orange' },
-  '30+': { urgency: 'ด่วนมาก', tone: 'danger', solid: true },
+  advance: { urgency: 'ยังไม่ถึงวันต้องการ', tone: REQUEST_LEAD_KIND_TONE.advance },
+  '1-7': { urgency: 'ค้าง 1–7 วัน', tone: 'success' },
+  '8-15': { urgency: 'ค้าง 8–15 วัน', tone: 'warn' },
+  '16-30': { urgency: 'ค้าง 16–30 วัน', tone: 'orange' },
+  '30+': { urgency: 'ค้าง 30 วันขึ้นไป', tone: 'danger', solid: true },
 };
 
 const DashboardAgeOverview: React.FC<Props> = ({ items, requestTotal, positionTotal, onBucketClick }) => {
@@ -35,11 +35,11 @@ const DashboardAgeOverview: React.FC<Props> = ({ items, requestTotal, positionTo
   return (
     <div className={cn(DASH.cardLg, 'p-5')}>
       <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
-        <h3 className={DASH.title}>งานไหนด่วนแค่ไหน · ตามวันที่ผ่านมา</h3>
+        <h3 className={DASH.title}>ค้างมานานแค่ไหน</h3>
         <p className={DASH.sub}>
-          รวม {bucketTotal.toLocaleString('th-TH')} ตำแหน่ง · {requestTotal.toLocaleString('th-TH')} ใบขอ
+          รวม {bucketTotal.toLocaleString('th-TH')} อัตรา · {requestTotal.toLocaleString('th-TH')} ใบขอ
           {positionTotal !== bucketTotal
-            ? ` · สต็อก ${positionTotal.toLocaleString('th-TH')} ตำแหน่ง`
+            ? ` · สต็อก ${positionTotal.toLocaleString('th-TH')} อัตรา`
             : ''}
         </p>
       </div>
@@ -81,7 +81,7 @@ const DashboardAgeOverview: React.FC<Props> = ({ items, requestTotal, positionTo
                 {item.count.toLocaleString('th-TH')}
               </p>
               <p className={cn('mt-1 text-[11px]', solid ? 'text-white/80' : 'text-slate-600 dark:text-slate-400')}>
-                {item.label} · ตำแหน่ง
+                อัตรา
               </p>
             </button>
           );

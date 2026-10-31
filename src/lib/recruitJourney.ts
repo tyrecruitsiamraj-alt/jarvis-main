@@ -109,8 +109,8 @@ export function buildRecruitJourney(list: readonly RecruitAppFact[]): JourneySte
       label: 'รายชื่อสนใจ · คนโทรต่อ',
       total: interested.length,
       parts: [
-        part('ok', 'ติดต่อสำเร็จ', staffOk, 'success'),
-        part('fail', 'ติดต่อไม่สำเร็จ', by(interested, staffResultOf, 'fail'), 'danger'),
+        part('ok', 'ติดต่อได้', staffOk, 'success'),
+        part('fail', 'ติดต่อไม่ได้', by(interested, staffResultOf, 'fail'), 'danger'),
         part('waiting', 'รอโทร', by(interested, staffResultOf, 'waiting'), 'neutral'),
       ],
     },

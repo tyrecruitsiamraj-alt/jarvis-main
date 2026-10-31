@@ -107,7 +107,7 @@ describe('การ์ดกดลงลึก "การติดต่อ" ใ
     expect([root.label, root.count]).toEqual(['สนใจ', top.total]);
     expect(root.children!.map((c) => [c.label, c.count])).toEqual([
       ['รอโทร', top.counts.waiting],
-      ['ติดต่อไม่สำเร็จ', top.counts.fail],
+      ['ติดต่อไม่ได้', top.counts.fail],
       ['ติดต่อได้', top.ok],
     ]);
     const ok = root.children![2];

@@ -56,7 +56,7 @@ const UnitRequestInfoFields: React.FC<{ job: JobRequest }> = ({ job: data }) => 
       label="ขอมา"
       value={
         data.request_positions != null && data.request_positions > 0
-          ? `${data.request_positions.toLocaleString('th-TH')} ตำแหน่ง`
+          ? `${data.request_positions.toLocaleString('th-TH')} อัตรา`
           : undefined
       }
     />
@@ -64,11 +64,11 @@ const UnitRequestInfoFields: React.FC<{ job: JobRequest }> = ({ job: data }) => 
       label="หาได้แล้ว"
       value={
         data.filled_positions != null
-          ? `${data.filled_positions.toLocaleString('th-TH')} ตำแหน่ง`
+          ? `${data.filled_positions.toLocaleString('th-TH')} อัตรา`
           : undefined
       }
     />
-    <Field label="เหลือหา" value={`${jobPositionUnits(data)} ตำแหน่ง`} />
+    <Field label="เหลือหา" value={`${jobPositionUnits(data)} อัตรา`} />
     <Field
       label="ทำงานวันสุดท้าย"
       value={data.lastWorkingDay ? formatYmdTh(data.lastWorkingDay) : undefined}
@@ -122,7 +122,7 @@ export const UnitRequestBriefFields: React.FC<{ job: JobRequest }> = ({ job: dat
       <Field label="วันที่ต้องการ" value={formatYmdTh(data.required_date)} />
       <Field
         label="จำนวนที่ต้องการ"
-        value={`${need.toLocaleString('th-TH')} ตำแหน่ง${asked != null && asked !== need ? ` (ขอมา ${asked.toLocaleString('th-TH')})` : ''}`}
+        value={`${need.toLocaleString('th-TH')} อัตรา${asked != null && asked !== need ? ` (ขอมา ${asked.toLocaleString('th-TH')})` : ''}`}
       />
       <Field label="สถานที่ปฏิบัติงาน" value={data.work_place || data.location_address} />
       <Field label="วันเวลาในการทำงาน" value={data.work_schedule} />

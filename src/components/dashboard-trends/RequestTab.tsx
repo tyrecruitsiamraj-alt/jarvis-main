@@ -299,10 +299,10 @@ export default function RequestTab({
       {/* ─── 1. ใบขอเข้ามา ─── */}
       <OverviewCard icon={FileText} title="ใบขอเข้ามา">
         <div className="grid grid-cols-2 gap-2 lg:grid-cols-4" data-testid="request-tab-funnel">
-          <Tile label="ใบขอเข้ามา" value={funnel.total} unit="ใบ" sub={`ขอ ${fmt(funnel.requested)} คน`} picked={pick === 'all'} onPick={() => togglePick('all')} testId="request-tab-total" />
-          <Tile label="ยกเลิก" value={funnel.cancelled.requests} unit="ใบ" sub={`ยกเลิก ${fmt(funnel.cancelled.people)} คน`} tone="danger" picked={pick === 'cancelled'} onPick={() => togglePick('cancelled')} testId="request-tab-cancelled" />
-          <Tile label="ปิดแล้ว" value={funnel.closed.requests} unit="ใบ" sub={`หาได้ ${fmt(funnel.closed.filled)} คน`} tone="success" picked={pick === 'closed'} onPick={() => togglePick('closed')} testId="request-tab-closed" />
-          <Tile label="ดำเนินการสรรหา" value={funnel.active.requests} unit="ใบ" sub={`เหลือหา ${fmt(funnel.active.remaining)} คน`} tone="primary" picked={pick === 'active'} onPick={() => togglePick('active')} testId="request-tab-active" />
+          <Tile label="ใบขอเข้ามา" value={funnel.total} unit="ใบ" sub={`ขอ ${fmt(funnel.requested)} อัตรา`} picked={pick === 'all'} onPick={() => togglePick('all')} testId="request-tab-total" />
+          <Tile label="ยกเลิก" value={funnel.cancelled.requests} unit="ใบ" sub={`ยกเลิก ${fmt(funnel.cancelled.people)} อัตรา`} tone="danger" picked={pick === 'cancelled'} onPick={() => togglePick('cancelled')} testId="request-tab-cancelled" />
+          <Tile label="ปิดแล้ว" value={funnel.closed.requests} unit="ใบ" sub={`หาได้ ${fmt(funnel.closed.filled)} อัตรา`} tone="success" picked={pick === 'closed'} onPick={() => togglePick('closed')} testId="request-tab-closed" />
+          <Tile label="ดำเนินการสรรหา" value={funnel.active.requests} unit="ใบ" sub={`เหลือหา ${fmt(funnel.active.remaining)} อัตรา`} tone="primary" picked={pick === 'active'} onPick={() => togglePick('active')} testId="request-tab-active" />
         </div>
         <div className="space-y-2 rounded-xl border border-border p-3">
           <p className="flex justify-between gap-3 text-sm">
@@ -421,9 +421,9 @@ function ProvinceCard({
               </span>
               <span className="text-right text-xs tabular-nums">
                 <span className="block text-sm text-foreground">
-                  {fmt(p.requests)} ใบ · {fmt(p.requested)} คน
+                  {fmt(p.requests)} ใบ · {fmt(p.requested)} อัตรา
                 </span>
-                <span className={TONE.warn.value}>เหลือหา {fmt(p.remaining)} คน</span>
+                <span className={TONE.warn.value}>เหลือหา {fmt(p.remaining)} อัตรา</span>
               </span>
             </Button>
             {open === p.name ? (
@@ -442,7 +442,7 @@ function ProvinceCard({
                     >
                       <span>{leadLabelOf(k)}</span>
                       <span className="tabular-nums">
-                        {fmt(p.lead[k].requests)} ใบ · {fmt(p.lead[k].requested)} คน
+                        {fmt(p.lead[k].requests)} ใบ · {fmt(p.lead[k].requested)} อัตรา
                       </span>
                     </Button>
                   ))}
@@ -460,7 +460,7 @@ function ProvinceCard({
                       >
                         <span className="min-w-0">{d.name}</span>
                         <span className="ml-auto text-right tabular-nums">
-                          {fmt(d.requests)} ใบ · {fmt(d.requested)} คน
+                          {fmt(d.requests)} ใบ · {fmt(d.requested)} อัตรา
                           <span className={cn('ml-2 text-xs', TONE.warn.value)}>เหลือหา {fmt(d.remaining)}</span>
                         </span>
                       </Button>
@@ -499,8 +499,8 @@ const CALLED_COLS = [
   { key: 'yes', tone: 'success' },
   { key: 'no', tone: 'danger' },
   { key: 'unreached', tone: null },
+  { key: 'retry', tone: null },
   { key: 'unclear', tone: null },
-  { key: 'staff', tone: null },
 ] as const;
 
 function ChannelRow({
@@ -542,7 +542,7 @@ function ChannelRow({
       {num(r.total, 'font-medium')}
       {num(r.notCalled)}
       {num(r.counts.queued)}
-      {num(r.counts.retry)}
+      {num(r.counts.staff)}
       {num(r.called, 'border-l border-border font-medium')}
       {CALLED_COLS.map((c) => (
         <React.Fragment key={c.key}>{num(r.counts[c.key], c.tone ? TONE[c.tone].value : undefined)}</React.Fragment>
@@ -589,8 +589,8 @@ function ApplicantCard({
               <TableHead className="text-right text-xs">ทั้งหมด</TableHead>
               <TableHead className="text-right text-xs">AI ไม่โทร</TableHead>
               <TableHead className="text-right text-xs">{APPLICANT_BUCKET_LABEL.queued}</TableHead>
-              <TableHead className="text-right text-xs">{APPLICANT_BUCKET_LABEL.retry}</TableHead>
-              <TableHead className="border-l border-border text-right text-xs">โทรแล้ว</TableHead>
+              <TableHead className="text-right text-xs">{APPLICANT_BUCKET_LABEL.staff}</TableHead>
+              <TableHead className="border-l border-border text-right text-xs">AI โทรแล้ว</TableHead>
               {CALLED_COLS.map((c) => (
                 <TableHead key={c.key} className={cn('text-right text-xs', c.tone && TONE[c.tone].value)}>
                   {APPLICANT_BUCKET_LABEL[c.key]}
@@ -641,7 +641,7 @@ function ApplicantCard({
               <span className="truncate">{r.name}</span>
               <Bar value={r.yesPct ?? 0} max={rankMax} tone="success" />
               <span className="text-right tabular-nums">
-                {r.yesPct}% · {fmt(r.counts.yes)}/{fmt(r.called - r.counts.staff)}
+                {r.yesPct}% · {fmt(r.counts.yes)}/{fmt(r.called - r.counts.retry)}
               </span>
             </p>
           ))}

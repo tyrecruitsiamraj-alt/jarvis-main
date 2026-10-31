@@ -99,7 +99,7 @@ const DashboardFlowViewCard: React.FC<Props> = ({ flow, summary, onSegmentClick 
 
       {unexplainedGap !== 0 ? (
         <div className="mt-2.5 rounded-lg bg-amber-50 dark:bg-amber-950/40 px-3 py-2 text-[11px] leading-relaxed text-amber-900 dark:text-amber-200">
-          <span className="font-medium">กระทบยอดไม่ลงตัว {Math.abs(unexplainedGap).toLocaleString('th-TH')} ตำแหน่ง</span>
+          <span className="font-medium">กระทบยอดไม่ลงตัว {Math.abs(unexplainedGap).toLocaleString('th-TH')} อัตรา</span>
           {' — '}
           สมการให้ {derivedEnding.toLocaleString('th-TH')} แต่ยอดเหลือจริงคือ{' '}
           {flow.endingBacklogPositions.toLocaleString('th-TH')} · "หาได้แล้ว" นับเฉพาะรายการที่มีวันที่เหตุการณ์ในงวดนี้

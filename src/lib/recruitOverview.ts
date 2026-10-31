@@ -23,6 +23,7 @@ import { bangkokYmd } from '@/lib/trends/timeBuckets';
 import { DAY_MS, fullDaysBetween } from '@/lib/fullDays';
 import { ALL_MAX_DAYS } from '@/lib/recruitOverviewWindow';
 import { CONTACT_OK, contactBucketOf, isInterested } from '@/lib/recruitContactTab';
+import { applicantCallBucketOf } from '@/lib/recruitRequestTab';
 import type {
   RecruitAiRow,
   RecruitAppFact,
@@ -64,7 +65,11 @@ export const isCalled = (f: RecruitAppFact) => f.calledByAi || f.calledByStaff;
 export const isAiSaidYes = (f: RecruitAppFact) => f.aiAnswer === 'said_yes';
 /** ตอบ AI ว่าไม่สนใจ · อยู่ในคิว AI รอโทร (รวมรอโทรซ้ำ) — กล่องแนวโน้มแท็บกรอกเข้ามา (เจ้าของ 27 ต.ค. 2569) */
 export const isAiSaidNo = (f: RecruitAppFact) => f.aiAnswer === 'said_no';
-export const isAiQueued = (f: RecruitAppFact) => f.aiQueued === true;
+/** รอโทร = มีคิว AI (รอโทรครั้งแรก + รอโทรซ้ำ) — ตัวแบ่งเดียวกับตารางช่องทาง (31 ต.ค. 2569 ทุกการ์ดในหน้านับชุดเดียวกัน) */
+export const isAiQueued = (f: RecruitAppFact) => {
+  const b = applicantCallBucketOf(f);
+  return b === 'queued' || b === 'retry';
+};
 /** ตอบ AI ว่าสนใจ แล้วเจ้าหน้าที่ลงมือหลังเวลาที่ AI ได้คำตอบ */
 export const isStaffFollowed = (f: RecruitAppFact) =>
   isAiSaidYes(f) && !!f.staffLastAt && !!f.aiAnswerAt && f.staffLastAt >= f.aiAnswerAt;
@@ -73,8 +78,14 @@ export const isContactWaiting = (f: RecruitAppFact) => isInterested(f) && contac
 export const isContactOk = (f: RecruitAppFact) => isInterested(f) && CONTACT_OK.includes(contactBucketOf(f, new Date()));
 export { isInterested };
 /** AI โทรแล้วและติดต่อได้ */
-/** AI โทรแล้วคุยถึงตัว — ตอบสนใจ/ไม่สนใจ = ถึงตัวแน่นอน (QA 30 ต.ค. 2569: เดิมดูแค่ผลติดต่อล่าสุด ติดต่อได้ 317 < สนใจ + ไม่สนใจ 376) */
-export const isAiCalledReached = (f: RecruitAppFact) => isAiSaidYes(f) || isAiSaidNo(f) || (f.calledByAi && f.contact === 'success');
+/**
+ * AI โทรแล้วติดต่อได้ = สนใจ + ไม่สนใจ + สรุปไม่ได้ ของตารางช่องทาง (31 ต.ค. 2569 — เดิมนับคนที่เจ้าหน้าที่ติดต่อได้ทีหลังด้วย
+ * ⇒ การ์ด 398 · ตาราง 397) · AI โทรแล้ว − ติดต่อได้ = ติดต่อไม่ได้ + รอโทรซ้ำ
+ */
+export const isAiCalledReached = (f: RecruitAppFact) => {
+  const b = applicantCallBucketOf(f);
+  return b === 'yes' || b === 'no' || b === 'unclear';
+};
 /** คนโทรต่อแล้วและคนติดต่อได้ */
 export const isFollowedReached = (f: RecruitAppFact) => isStaffFollowed(f) && f.contact === 'success' && f.contactBy === 'staff';
 
@@ -192,9 +203,10 @@ export function funnelSteps(t: RecruitTotals, opts: { attendanceEverRecorded: bo
 
 /* ─────────── กรอกแล้วโทรวันไหน (ครบ 24 ชม. = 1 วัน) ─────────── */
 
-export type DelayKey = 'd0' | 'd1' | 'd2' | 'd3' | 'd4_7' | 'over7' | 'none';
+export type DelayKey = 'd0' | 'd1' | 'd2' | 'd3' | 'd4_7' | 'over7' | 'queued' | 'none';
 
-export const DELAY_ORDER: readonly DelayKey[] = ['d0', 'd1', 'd2', 'd3', 'd4_7', 'over7', 'none'];
+/** ยังไม่มีใครโทร แยก รอโทร (มีคิว AI) / ยังไม่โทร (ไม่มีคิว) — คำชุดเดียวกับตารางช่องทาง (31 ต.ค. 2569) */
+export const DELAY_ORDER: readonly DelayKey[] = ['d0', 'd1', 'd2', 'd3', 'd4_7', 'over7', 'queued', 'none'];
 
 export const DELAY_LABEL: Record<DelayKey, string> = {
   d0: 'ภายใน 24 ชม.',
@@ -203,6 +215,7 @@ export const DELAY_LABEL: Record<DelayKey, string> = {
   d3: '3 วัน',
   d4_7: '4–7 วัน',
   over7: 'เกิน 7 วัน',
+  queued: 'รอโทร',
   none: 'ยังไม่โทร',
 };
 
@@ -219,7 +232,8 @@ export type DelayRow = { key: DelayKey; label: string; count: number; pct: numbe
 export function delayRows(cohort: readonly RecruitAppFact[]): DelayRow[] {
   const counts = new Map<DelayKey, number>(DELAY_ORDER.map((k) => [k, 0]));
   for (const f of cohort) {
-    const k = delayOf(f);
+    const d = delayOf(f);
+    const k: DelayKey = d === 'none' && isAiQueued(f) ? 'queued' : d;
     counts.set(k, (counts.get(k) ?? 0) + 1);
   }
   return DELAY_ORDER.map((key) => {
@@ -312,8 +326,10 @@ export type ReasonGroupKey = 'contact' | 'appoint' | 'attend';
 
 /** ป้ายสามขั้นตามหน้า iRecruit ที่ทีมคุ้น */
 export const REASON_GROUP_LABEL: Record<ReasonGroupKey, string> = {
-  contact: 'ติดต่อไม่สำเร็จ',
-  appoint: 'นัดหมายไม่สำเร็จ',
+  // 31 ต.ค. 2569 คำชุดเดียวทั้งระบบ — การ์ดนี้นับจากผลล่าสุด (AI หรือคน) ⇒ คนละเลขกับ "ติดต่อไม่ได้" ของ AI ต้องใช้คนละคำ
+  contact: 'ติดต่อไม่ได้ · ผลล่าสุด',
+  // ติดต่อได้แต่ไม่ได้นัด (ตอบ AI ว่าไม่สนใจ/ขอคิด หรือเจ้าหน้าที่ติดต่อได้แต่นัดไม่ได้)
+  appoint: 'คุยแล้วไม่ได้นัด',
   attend: 'ไม่มา',
 };
 

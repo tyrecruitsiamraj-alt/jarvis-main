@@ -379,12 +379,32 @@ const DashboardShell: React.FC<Props> = ({
                         const intake = data.kpis.find((k) => k.id === 'total_requests')?.value ?? 0;
                         const closed = data.kpis.find((k) => k.id === 'closed')?.value ?? 0;
                         const cancelled = data.kpis.find((k) => k.id === 'cancelled')?.value ?? 0;
-                        const stillOpen = intake - closed - cancelled;
+                        const n = (v: number) => v.toLocaleString('th-TH');
+                        const b = data.remainingBridge;
+                        // 31 ต.ค. 2569 เจ้าของ Choice "เลขเดียว 398 + แตกให้เห็น" — สมการจบที่การ์ดเหลือหาเสมอ
+                        const parts = b
+                          ? ([
+                              ['ใบขอชั่วคราว', b.prequest],
+                              ['ต้องการคนหลังช่วงนี้', b.after],
+                              ['ต้องการคนก่อนช่วงนี้', b.before],
+                              ['ไม่มีในยอด ERP', b.noRecord],
+                              ['ยอดในกล่องงานต่างจาก ERP', b.adjust],
+                            ] as const).filter(([, v]) => v !== 0)
+                          : [];
                         return (
                           <>
-                            เข้ามา − หาได้แล้ว − ยกเลิก = <b>ยังเปิดหาอยู่ {stillOpen.toLocaleString('th-TH')} อัตรา</b>{' '}
-                            ({intake.toLocaleString('th-TH')} − {closed.toLocaleString('th-TH')} −{' '}
-                            {cancelled.toLocaleString('th-TH')})
+                            เข้ามา {n(intake)} − หาได้แล้ว {n(closed)} − ยกเลิก {n(cancelled)} = {n(intake - closed - cancelled)}
+                            {parts.map(([label, v]) => (
+                              <span key={label}>
+                                {' '}
+                                {v < 0 ? '−' : '+'} {label} {n(Math.abs(v))}
+                              </span>
+                            ))}
+                            {b ? (
+                              <>
+                                {' '}= <b>เหลือหา {n(b.total)} อัตรา</b>
+                              </>
+                            ) : null}
                           </>
                         );
                       })()

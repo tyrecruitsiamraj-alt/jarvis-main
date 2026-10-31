@@ -36,41 +36,48 @@ describe('ช่องทางของใบ', () => {
   });
 });
 
-describe('เส้นผู้สมัคร 6 ขั้น', () => {
+describe('เส้นผู้สมัคร 6 ขั้นต่อกันเป็นสายเดียว (31 ต.ค. 2569 Choice "เรียงใหม่ ทุกขั้นบวกลบลงตัว")', () => {
   const apps = [
     f({ channelLabel: 'Facebook Group', calledByAi: true, aiAnswer: 'said_yes', calledByStaff: true, logOk: true, appointmentAt: '2026-10-12T03:00:00Z', attendance: 'showed' }),
     f({ channelLabel: 'Tiktok', calledByAi: true, aiAnswer: 'said_yes', calledByStaff: true, logOk: true, appointmentAt: '2026-10-12T03:00:00Z' }),
+    f({ channelLabel: 'Tiktok', calledByAi: true, aiAnswer: 'said_yes' }),
     f({ channelLabel: 'Tiktok', calledByAi: true, aiAnswer: 'said_no' }),
-    f({ channelLabel: 'iRecruit', calledByAi: true, aiAnswer: 'no_pickup', calledByStaff: true, logOk: false, appointmentFailed: true }),
+    f({ channelLabel: 'iRecruit', calledByAi: true, aiAnswer: 'no_pickup', calledByStaff: true, logOk: false }),
     f({ channelLabel: 'iRecruit', calledByAi: true, aiAnswer: 'talked_unclear' as never }),
+    f({ aiQueued: true }),
     f({}),
     // นอกช่วง — ห้ามนับ
     f({ createdAt: '2026-09-20T03:00:00Z', calledByAi: true }),
   ];
   const inWin = appsInWindow(apps, '2026-10-01', '2026-10-28');
-  const steps = buildApplicantFunnel(inWin, 3);
+  const steps = buildApplicantFunnel(inWin);
+  const rowsOf = (key: string) => Object.fromEntries(steps.find((s) => s.key === key)!.rows.map((r) => [r.key, r.value]));
 
-  it('นับเฉพาะใบในช่วง', () => {
-    expect(inWin).toHaveLength(6);
-    expect(steps.map((s) => [s.key, s.value])).toEqual([
-      ['applied', 6], ['ai', 5], ['staff', 3], ['contact', 3], ['appointment', 3], ['showed', 2],
+  it('กรอกมา → AI โทรแล้ว → สนใจ → คนโทรต่อ → ติดต่อได้ → นัดได้', () => {
+    expect(inWin).toHaveLength(8);
+    expect(steps.map((s) => [s.key, s.label, s.value])).toEqual([
+      ['applied', 'กรอกมา', 8], ['ai', 'AI โทรแล้ว', 6], ['interested', 'สนใจ', 3],
+      ['staff', 'คนโทรต่อ', 3], ['reached', 'ติดต่อได้', 2], ['booked', 'นัดได้', 2],
     ]);
   });
 
-  it('🔴 แถบช่องทางรวม = เลขขั้นทุกขั้น · แถวย่อยรวม = เลขขั้น (ยกเว้นคนโทรต่อ)', () => {
+  it('🔴 แถบช่องทางรวม = เลขขั้น · แถวย่อยรวม = เลขขั้น ทุกขั้น · ขั้นถัดไป = แถวของขั้นก่อน', () => {
     for (const s of steps) {
       expect(Object.values(s.channels).reduce((a, b) => a + b, 0), s.key).toBe(s.value);
-      if (s.key !== 'staff') expect(s.rows.reduce((a, r) => a + r.value, 0), s.key).toBe(s.value);
+      expect(s.rows.reduce((a, r) => a + r.value, 0), s.key).toBe(s.value);
     }
-    const ai = steps.find((s) => s.key === 'ai')!;
-    expect(Object.fromEntries(ai.rows.map((r) => [r.key, r.value]))).toEqual({ yes: 2, no: 1, noPickup: 1, other: 1 });
-    const show = steps.find((s) => s.key === 'showed')!;
-    expect(Object.fromEntries(show.rows.map((r) => [r.key, r.value]))).toEqual({ showed: 1, noShow: 0, pending: 1 });
-    expect(steps.find((s) => s.key === 'staff')!.rows).toEqual([{ key: 'claimed', label: 'รับไปโทรในช่วงนี้', value: 3, tone: 'neutral' }]);
+    expect(rowsOf('applied')).toEqual({ aiCalled: 6, aiQueued: 1, notCalled: 1 });
+    expect(rowsOf('ai').yes).toBe(steps[2].value);
+    expect(rowsOf('interested')).toEqual({ staffCalled: 2, staffNotYet: 1 });
+    expect(steps[3].from).toBe('สนใจ 2 + กลุ่มอื่น 1');
+    expect(rowsOf('staff').reached).toBe(steps[4].value);
+    expect(rowsOf('reached').booked).toBe(steps[5].value);
+    expect(rowsOf('booked')).toEqual({ showed: 1, noShow: 0, pending: 1 });
+    expect(steps.flatMap((s) => s.rows.map((r) => r.label))).not.toContain('รับไปโทรในช่วงนี้');
   });
 
   it('ว่าง = ทุกขั้น 0 (ห้ามหาย)', () => {
-    const empty = buildApplicantFunnel([], null);
+    const empty = buildApplicantFunnel([]);
     expect(empty).toHaveLength(6);
     for (const s of empty) expect(s.value).toBe(0);
   });

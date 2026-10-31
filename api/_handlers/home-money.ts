@@ -25,6 +25,7 @@ import { getUnitAssignmentsMap } from '../_lib/siamrajUnitAssignments.js';
 import { getUnitNotesMap } from '../_lib/siamrajUnitNotes.js';
 import { AFTERCARE_TOPIC } from '../../src/lib/aftercareRounds.js';
 import { followBuJoin, followBuSql, inBuSet, pickDashboardBuSet, type BuSet } from '../_lib/homeBuSql.js';
+import { normalizeTrendBu } from '../../src/lib/trends/bu.js';
 
 const FOLLOW = tableInAppSchema('follow_entries');
 
@@ -121,7 +122,9 @@ async function handler(req: AuthedReq, res: ApiRes) {
     const buSet = picked.buSet;
 
     const raw = await loadPenaltyLedgerRaw(departmentScope);
-    const scoped = raw.rows.filter((r) => inBuSet(r.bu, buSet));
+    // 🔴 BU ของสมุดเป็นรหัสยาวจากไซต์ (LML · DSL · SNJ) แต่ตัวเลือกเป็นรหัสสั้น (LM · DS · SN) — แปลงก่อนเทียบ
+    //    (31 ต.ค. 2569 เดิมเทียบตรง ⇒ ใบ LM/DS/SN หลุดจากหน้าหลักทั้งหมด · ขอใหม่ 163 ไม่เท่ากล่องประกาศ 183)
+    const scoped = raw.rows.filter((r) => inBuSet(normalizeTrendBu(r.bu), buSet));
     const [replacements, owners, aftercareUpcoming, sendReplacement] = await Promise.all([
       loadReplacements([...new Set(scoped.map((r) => r.site))]),
       loadOwners([...new Set(scoped.map((r) => r.requestNo))]),
@@ -137,7 +140,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
         r.amount.need.fine + r.amount.need.deduct,
       ]),
     );
-    const fines = raw.customerFines.filter((f) => inBuSet(f.bu, buSet));
+    const fines = raw.customerFines.filter((f) => inBuSet(normalizeTrendBu(f.bu), buSet));
     const body = {
       ...buildHomeMoney(ledger, fines, {
         from,

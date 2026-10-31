@@ -86,7 +86,7 @@ describe('โครงแผงของแต่ละเรื่อง (เ�
     expect([pre.ai, pre.both, pre.staff, pre.none]).toEqual([3, 1, 1, 1]);
     const l = pre.ladder!;
     expect(ladderAddsUp(l)).toBe(true);
-    expect(l.steps.map((x) => x.title)).toEqual(['โทรไปแล้ว', 'ติดต่อสำเร็จ', 'ติดต่อไม่สำเร็จ', 'รอโทร', 'ไม่โทร']);
+    expect(l.steps.map((x) => x.title)).toEqual(['โทรไปแล้ว', 'ติดต่อได้', 'ติดต่อไม่ได้', 'รอโทร', 'ไม่โทร']);
     expect(stepOf(l, 'talked').parts.map((p) => [p.label, p.value])).toEqual([['สนใจ', 2], ['สรุปไม่ได้', 1]]);
     expect(stepOf(l, 'notTalked').parts.map((p) => [p.label, p.value])).toEqual([['ไม่รับสาย', 1], ['คนโทรเอง ติดต่อไม่ได้', 1]]);
     // โทรหลัง Prescreen: คนสนใจ 2 → ติดต่อสำเร็จ 1 · รอโทร 1
@@ -94,7 +94,7 @@ describe('โครงแผงของแต่ละเรื่อง (เ�
     expect([stepOf(after.ladder!, 'talked').value, stepOf(after.ladder!, 'waiting').value]).toEqual([1, 1]);
     // นัดได้: จากที่ติดต่อสำเร็จทั้งหมด → นัดได้ 1 (มา 1) · บรรทัดผ่าน/แจ้งเข้า
     const al = appt.ladder!;
-    expect(al.totalLabel).toBe('ติดต่อสำเร็จทั้งหมด');
+    expect(al.totalLabel).toBe('ติดต่อได้ทั้งหมด');
     expect(ladderAddsUp(al)).toBe(true);
     expect(stepOf(al, 'booked').parts.map((p) => [p.label, p.value])).toEqual([['มาตามนัด', 1]]);
     expect(al.steps[0].sub).toBe('มาแล้ว ผ่าน 1 · แจ้งเข้า ERP 1');

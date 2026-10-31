@@ -379,7 +379,7 @@ const HomeExecPage: React.FC = () => {
           loading={!kpi}
           liveKey={liveKey}
           pill={flow && prevNow ? countPill(flow.remainingRequests, prevNow.flow.remainingRequests, false) : null}
-          foot={flow ? `${NUM.format(flow.remaining)} คน · ล่วงหน้าอีก ${feedReady ? NUM.format(preCount) : '—'} ใบ` : null}
+          foot={flow ? `${NUM.format(flow.remaining)} อัตรา · ใบขอชั่วคราวอีก ${feedReady ? NUM.format(preCount) : '—'} ใบ` : null}
           onClick={flow ? () => openList('เหลือหา', flowRows((f) => f.open)) : undefined}
         />
         <KpiTile
@@ -598,14 +598,14 @@ const HomeExecPage: React.FC = () => {
           </p>
           <p data-testid="exec-flow-pos-sum">
             {flow
-              ? `ยกมา ${NUM.format(flow.carryIn)} + ขอใหม่ ${NUM.format(flow.newPositions)} − หาได้ ${NUM.format(flow.filled)} − ยกเลิก ${NUM.format(flow.cancelled)} = เหลือหา ${NUM.format(flow.remaining)} คน`
+              ? `ยกมา ${NUM.format(flow.carryIn)} + ขอใหม่ ${NUM.format(flow.newPositions)} − หาได้ ${NUM.format(flow.filled)} − ยกเลิก ${NUM.format(flow.cancelled)} = เหลือหา ${NUM.format(flow.remaining)} อัตรา`
               : '—'}
           </p>
           {/* เทียบกล่องงานได้เฉพาะช่วงที่จบวันนี้ (กล่องงานคือ ณ วันนี้) */}
           {range.to >= today ? (
             <p data-testid="exec-flow-board">
               {flow && feedReady
-                ? `เหลือหา ${NUM.format(flow.remainingRequests)} + ใบขอล่วงหน้า ${NUM.format(preCount)} = ${NUM.format(flow.remainingRequests + preCount)} ใบ (เท่ากล่องงาน)`
+                ? `เหลือหา ${NUM.format(flow.remainingRequests)} + ใบขอชั่วคราว ${NUM.format(preCount)} = ${NUM.format(flow.remainingRequests + preCount)} ใบ (เท่ากล่องงาน)`
                 : '—'}
             </p>
           ) : null}

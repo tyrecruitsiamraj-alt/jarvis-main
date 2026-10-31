@@ -251,7 +251,8 @@ export function buildProvinceAreas(rows: readonly RecruitRequestRow[]): Province
 
 export type ApplicantCallBucket = 'overAge' | 'badPhone' | 'irecruit' | 'notSent' | 'queued' | 'retry' | 'yes' | 'no' | 'unreached' | 'unclear' | 'staff';
 export const APPLICANT_NOT_CALLED: readonly ApplicantCallBucket[] = ['overAge', 'badPhone', 'irecruit', 'notSent'];
-export const APPLICANT_CALLED: readonly ApplicantCallBucket[] = ['yes', 'no', 'unreached', 'unclear', 'staff'];
+/** AI โทรแล้ว (31 ต.ค. 2569 — คนโทรเองแยกออกมา · รอโทรซ้ำอยู่ใน AI โทรแล้ว) ⇒ ทุกการ์ดในหน้านับ "AI โทรแล้ว" เลขเดียวกัน */
+export const APPLICANT_CALLED: readonly ApplicantCallBucket[] = ['yes', 'no', 'unreached', 'retry', 'unclear'];
 export const APPLICANT_BUCKET_LABEL: Record<ApplicantCallBucket, string> = {
   overAge: 'อายุเกิน',
   badPhone: 'เบอร์ผิด',
@@ -261,7 +262,7 @@ export const APPLICANT_BUCKET_LABEL: Record<ApplicantCallBucket, string> = {
   retry: 'รอโทรซ้ำ',
   yes: 'สนใจ',
   no: 'ไม่สนใจ',
-  unreached: 'ไม่รับสาย / ติดต่อไม่ได้',
+  unreached: 'ติดต่อไม่ได้',
   unclear: 'สรุปไม่ได้',
   staff: 'คนโทรเอง',
 };
@@ -297,7 +298,7 @@ export type ApplicantChannelRow = {
   notCalled: number;
   called: number;
   counts: Record<ApplicantCallBucket, number>;
-  /** สนใจ ÷ โทรแล้วที่มีคำตอบจาก AI (ไม่นับคนโทรเอง) · ไม่มี = null */
+  /** สนใจ ÷ AI โทรแล้วที่มีผล (ไม่นับรอโทรซ้ำ) · ไม่มี = null */
   yesPct: number | null;
   children?: ApplicantChannelRow[];
 };
@@ -313,7 +314,7 @@ function rowOf(key: string, name: string, list: readonly RecruitAppFact[]): Appl
   for (const f of list) counts[applicantCallBucketOf(f)] += 1;
   const notCalled = APPLICANT_NOT_CALLED.reduce((n, k) => n + counts[k], 0);
   const called = APPLICANT_CALLED.reduce((n, k) => n + counts[k], 0);
-  const answered = called - counts.staff;
+  const answered = called - counts.retry;
   return { key, name, total: list.length, notCalled, called, counts, yesPct: answered > 0 ? Math.round((counts.yes / answered) * 100) : null };
 }
 

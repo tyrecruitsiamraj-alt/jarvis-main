@@ -38,11 +38,12 @@ const HERO_BUCKET: Record<
   DashboardAgeDaysBreakdown['bucket'],
   { urgency: string; num: string; numLight: string }
 > = {
-  '30+': { urgency: 'ด่วนมาก', num: 'text-red-400', numLight: 'text-red-700' },
-  '16-30': { urgency: 'ด่วน', num: 'text-orange-300', numLight: 'text-orange-700' },
-  '8-15': { urgency: 'เริ่มด่วน', num: 'text-amber-300', numLight: 'text-amber-700' },
-  '1-7': { urgency: 'ยังไม่ด่วน', num: 'text-emerald-300', numLight: 'text-emerald-700' },
-  advance: { urgency: 'รอได้', num: 'text-sky-300', numLight: 'text-sky-700' },
+  // 31 ต.ค. 2569 เจ้าของ Choice "อายุใบใช้ ค้าง" — "ด่วน" สงวนไว้กับป้ายเตือน (ชนิดใบ ฉุกเฉิน/ล่วงหน้า เป็นอีกเรื่อง)
+  '30+': { urgency: 'ค้าง 30 วันขึ้นไป', num: 'text-red-400', numLight: 'text-red-700' },
+  '16-30': { urgency: 'ค้าง 16–30 วัน', num: 'text-orange-300', numLight: 'text-orange-700' },
+  '8-15': { urgency: 'ค้าง 8–15 วัน', num: 'text-amber-300', numLight: 'text-amber-700' },
+  '1-7': { urgency: 'ค้าง 1–7 วัน', num: 'text-emerald-300', numLight: 'text-emerald-700' },
+  advance: { urgency: 'ยังไม่ถึงวันต้องการ', num: 'text-sky-300', numLight: 'text-sky-700' },
 };
 
 /** ลำดับโชว์: ด่วนสุดซ้ายสุด (สลับจากถังข้อมูลที่เรียงเบา→หนัก) */
@@ -106,7 +107,7 @@ const DashboardHeroStrip: React.FC<Props> = ({
       <div className="flex flex-wrap items-stretch gap-x-8 gap-y-4">
         <div className="min-w-[260px] flex-[1.2]">
           <p className={S.v2 ? 'text-[12.5px] font-medium text-primary' : DASH.heroLabel}>
-            ต้องลงมือตอนนี้
+            ค้างมานานแค่ไหน
           </p>
           {/* 🔴 ผู้ทดสอบมือถือทัก "ตัวเลขชิดกัน" (5 ก.ย. 2569) — จอ 375px แถวเดิม
               (flex-wrap + gap-y-2 แค่ 8px) ดันให้แถวถัดไปมาติดป้ายแถวบนแทบไม่มีช่องหายใจ
@@ -122,7 +123,7 @@ const DashboardHeroStrip: React.FC<Props> = ({
                   type="button"
                   disabled={!clickable}
                   onClick={clickable ? () => onBucketClick(item.bucket, item.label) : undefined}
-                  title={`${item.label} · ${item.count.toLocaleString('th-TH')} ตำแหน่ง`}
+                  title={`${item.label} · ${item.count.toLocaleString('th-TH')} อัตรา`}
                   className={cn(
                     'text-left',
                     clickable ? 'cursor-pointer hover:opacity-80' : 'cursor-default',
@@ -139,7 +140,7 @@ const DashboardHeroStrip: React.FC<Props> = ({
                     {item.count.toLocaleString('th-TH')}
                   </span>
                   <span className={cn('mt-1 block text-[10px]', S.muted)}>
-                    {meta.urgency} · {item.label}
+                    {meta.urgency}
                   </span>
                 </button>
               );
@@ -158,8 +159,10 @@ const DashboardHeroStrip: React.FC<Props> = ({
               {siteCount.toLocaleString('th-TH')} ไซต์
             </span>
             <span className={cn('text-[10px]', S.muted)}>
-              รวม {bucketTotal.toLocaleString('th-TH')} ตำแหน่ง · {requestTotal.toLocaleString('th-TH')} ใบขอ
-              {positionTotal !== bucketTotal ? ` · สต็อก ${positionTotal.toLocaleString('th-TH')} ตำแหน่ง` : ''}
+              {/* 31 ต.ค. 2569 เลขอัตราซ้ำกับชิปเหลือหาข้าง ๆ — ขึ้นเฉพาะตอนไม่เท่ากัน */}
+              {bucketTotal !== remainingPositions ? `รวม ${bucketTotal.toLocaleString('th-TH')} อัตรา · ` : ''}
+              {requestTotal.toLocaleString('th-TH')} ใบขอ
+              {positionTotal !== bucketTotal ? ` · สต็อก ${positionTotal.toLocaleString('th-TH')} อัตรา` : ''}
             </span>
           </div>
         </div>

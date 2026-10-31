@@ -43,7 +43,7 @@ function jobRequestToDialogItem(j: JobRequest, onNavigate: (job: JobRequest) => 
   return {
     id: j.id,
     title: j.request_no ? `${unitOneLine(j)} (${j.request_no})` : unitOneLine(j),
-    subtitle: `${roleLabel}${actionLabel} • ต้องการ ${formatYmdDmyBe(j.required_date)} • ${jobPositionUnits(j)} ตำแหน่ง`,
+    subtitle: `${roleLabel}${actionLabel} • ต้องการ ${formatYmdDmyBe(j.required_date)} • ${jobPositionUnits(j)} อัตรา`,
     badge,
     badgeVariant,
     onClick: () => onNavigate(j),
@@ -123,9 +123,9 @@ const JobDashboard: React.FC = () => {
         title="หน่วยงาน"
         subtitle={
           filterSummary
-            ? `${totalUnits} ตำแหน่ง · ${scopedJobs.length} ใบขอ · ${filterSummary}`
+            ? `${totalUnits} อัตรา · ${scopedJobs.length} ใบขอ · ${filterSummary}`
             : siamrajPrimary
-              ? `${totalUnits} ตำแหน่ง · ${scopedJobs.length} ใบขอ · ${
+              ? `${totalUnits} อัตรา · ${scopedJobs.length} ใบขอ · ${
                   dbSource === 'sqlserver'
                     ? 'อ่านใบขอจาก Siamraj SQL Server — อัปเดตเมื่อมีการคีย์'
                     : 'อ่านใบขอจาก Siamraj (so-operation) — อัปเดตอัตโนมัติเมื่อมีการคีย์'
@@ -258,7 +258,7 @@ const JobDashboard: React.FC = () => {
                       ? ` • อายุ ${j.age_range_min ?? '—'}–${j.age_range_max ?? '—'}`
                       : ''}
                     {j.resigned_employee_name ? ` • ลาออก: ${j.resigned_employee_name}` : ''}
-                    {` • ต้องการ ${formatYmdDmyBe(j.required_date)} · ${jobPositionUnits(j)} ตำแหน่ง`}
+                    {` • ต้องการ ${formatYmdDmyBe(j.required_date)} · ${jobPositionUnits(j)} อัตรา`}
                     {j.submittedByName ? ` • ส่งโดย ${j.submittedByName}` : ''}
                   </div>
                   {j.total_penalty > 0 && (

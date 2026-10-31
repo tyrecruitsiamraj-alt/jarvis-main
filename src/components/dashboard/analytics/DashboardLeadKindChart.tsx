@@ -42,7 +42,7 @@ const DashboardLeadKindChart: React.FC<DashboardLeadKindChartProps> = ({
     <div className={cn('rounded-2xl border p-4', DASH.card)}>
       <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
         <div>
-          <p className={cn('text-sm font-medium', DASH.cellStrong)}>ใบขอเร่งด่วนแค่ไหน</p>
+          <p className={cn('text-sm font-medium', DASH.cellStrong)}>ชนิดใบขอ</p>
           <p className={cn('text-[11px]', DASH.muted)}>
             แบ่งตามระยะเวลาที่ให้หา — ตามช่วง {scopeLabel} · เปลี่ยนตามตัวกรองทุกตัว
           </p>

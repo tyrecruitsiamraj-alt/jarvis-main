@@ -454,8 +454,8 @@ export function recruitProportionRows(
     ],
     steps: [
       { key: 'called', title: 'โทรไปแล้ว', value: called, parts: [], sub: whoSub(ai, both, staff) },
-      { key: 'talked', title: 'ติดต่อสำเร็จ', value: talked.length, parts: tally(TALKED, talked), indent: true },
-      { key: 'notTalked', title: 'ติดต่อไม่สำเร็จ', value: notTalked.length, parts: tally(NOT_TALKED, notTalked), indent: true },
+      { key: 'talked', title: 'ติดต่อได้', value: talked.length, parts: tally(TALKED, talked), indent: true },
+      { key: 'notTalked', title: 'ติดต่อไม่ได้', value: notTalked.length, parts: tally(NOT_TALKED, notTalked), indent: true },
       {
         key: 'waiting',
         title: 'รอโทร',
@@ -492,8 +492,8 @@ export function recruitProportionRows(
     ],
     steps: [
       { key: 'called', title: 'โทรไปแล้ว', value: afterCalled, parts: [], sub: whoSub(0, 0, afterCalled) },
-      { key: 'talked', title: 'ติดต่อสำเร็จ', value: ok.length, parts: [], indent: true },
-      { key: 'notTalked', title: 'ติดต่อไม่สำเร็จ', value: fail.length, parts: [], indent: true },
+      { key: 'talked', title: 'ติดต่อได้', value: ok.length, parts: [], indent: true },
+      { key: 'notTalked', title: 'ติดต่อไม่ได้', value: fail.length, parts: [], indent: true },
       {
         key: 'waiting',
         title: 'รอโทร',
@@ -520,7 +520,7 @@ export function recruitProportionRows(
   const informed = showed.filter((a) => a.informed === true).length;
   const appt: Ladder = {
     unit: 'คน',
-    totalLabel: 'ติดต่อสำเร็จทั้งหมด',
+    totalLabel: 'ติดต่อได้ทั้งหมด',
     total: ok.length,
     equation: [
       { label: 'นัดได้', value: booked.length },
@@ -584,7 +584,7 @@ export function recruitProportionRows(
     {
       key: 'appointment',
       name: 'นัดได้',
-      note: `จากที่ติดต่อสำเร็จ ${n(ok.length)} คน`,
+      note: `จากที่ติดต่อได้ ${n(ok.length)} คน`,
       ai: 0,
       both: 0,
       staff: booked.length,
@@ -636,8 +636,8 @@ export function matchingProportionRow(report: TopicReport | null): ProportionRow
       ],
       steps: [
         { key: 'called', title: 'โทรไปแล้ว', value: called, parts: [], sub: whoSub(ai, both, staff) },
-        { key: 'talked', title: 'ติดต่อสำเร็จ', value: sum(talkedParts), parts: talkedParts, indent: true },
-        { key: 'notTalked', title: 'ติดต่อไม่สำเร็จ', value: sum(notTalkedParts), parts: notTalkedParts, indent: true },
+        { key: 'talked', title: 'ติดต่อได้', value: sum(talkedParts), parts: talkedParts, indent: true },
+        { key: 'notTalked', title: 'ติดต่อไม่ได้', value: sum(notTalkedParts), parts: notTalkedParts, indent: true },
         { key: 'waiting', title: 'รอโทร', value: none, parts: none ? [{ key: 'waiting', label: 'ยังไม่มีใครโทร', value: none, tone: 'info' }] : [] },
       ],
       checks: [[sum(talkedParts) + sum(notTalkedParts), called]],

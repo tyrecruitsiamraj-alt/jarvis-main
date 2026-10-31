@@ -72,10 +72,10 @@ const PAGE = {
 const STEP_PAGE: Record<FunnelStep['key'], (typeof PAGE)[keyof typeof PAGE]> = {
   applied: PAGE.applicants,
   ai: PAGE.applicants,
+  interested: PAGE.applicants,
   staff: PAGE.contact,
-  contact: PAGE.contact,
-  appointment: PAGE.appointments,
-  showed: PAGE.appointments,
+  reached: PAGE.contact,
+  booked: PAGE.appointments,
 };
 
 const toneOfRow = (t: 'success' | 'warn' | 'danger' | 'neutral') => (t === 'neutral' ? null : t);
@@ -163,8 +163,7 @@ const HomeOverviewPage: React.FC = () => {
   // ── ผู้สมัคร ──
   const roNow = ro && ro.window.from === range.from && ro.window.to === range.to && ro.bu === bu ? ro : null;
   const apps = useMemo(() => (roNow?.apps ? appsInWindow(roNow.apps, range.from, range.to) : null), [roNow, range]);
-  const claimed = roNow?.staff ? roNow.staff.reduce((n, s) => n + s.claimed, 0) : null;
-  const funnel = useMemo(() => (apps ? buildApplicantFunnel(apps, claimed) : null), [apps, claimed]);
+  const funnel = useMemo(() => (apps ? buildApplicantFunnel(apps) : null), [apps]);
   const req = roNow?.requests ?? null;
   const backlog = roNow?.backlog ?? null;
 
@@ -274,7 +273,7 @@ const HomeOverviewPage: React.FC = () => {
     for (const r of list) bus.set(r.bu ?? 'ไม่ระบุ BU', (bus.get(r.bu ?? 'ไม่ระบุ BU') ?? 0) + 1);
     setPanel({
       title: 'ขอใหม่',
-      sub: flow ? `${NUM.format(flow.newRequests)} ใบ · ${NUM.format(flow.newPositions)} คน` : undefined,
+      sub: flow ? `${NUM.format(flow.newRequests)} ใบ · ${NUM.format(flow.newPositions)} อัตรา` : undefined,
       go: PAGE.requests,
       body: (
         <div className="space-y-4">
@@ -351,10 +350,10 @@ const HomeOverviewPage: React.FC = () => {
   };
 
   const openStep = (s: FunnelStep) => {
-    const staffRows = s.key === 'staff' || s.key === 'contact' ? (roNow?.staff ?? []).filter((x) => x.claimed + x.called > 0) : [];
+    const staffRows = s.key === 'staff' || s.key === 'reached' ? (roNow?.staff ?? []).filter((x) => x.claimed + x.called > 0) : [];
     setPanel({
       title: s.label,
-      sub: `${NUM.format(s.value)} คน`,
+      sub: `${NUM.format(s.value)} คน${s.from ? ` · ${s.from}` : ''}`,
       go: STEP_PAGE[s.key],
       body: (
         <div className="space-y-4">
@@ -511,7 +510,7 @@ const HomeOverviewPage: React.FC = () => {
           unit="ใบ"
           emphasis="warn"
           tag="ต้องหา"
-          sub={flow ? `${NUM.format(flow.remaining)} คน · ใบขอชั่วคราวอีก ${NUM.format(preCount)} ใบ` : undefined}
+          sub={flow ? `${NUM.format(flow.remaining)} อัตรา · ใบขอชั่วคราวอีก ${NUM.format(preCount)} ใบ` : undefined}
           onClick={flow ? () => openList('เหลือหา', flowRows((f) => f.open).sort((a, b) => perDayOf(b) - perDayOf(a))) : undefined}
           testId="overview-kpi-remain"
         />
@@ -538,16 +537,16 @@ const HomeOverviewPage: React.FC = () => {
       {/* ── 1 ใบขอ (แบบร่าง A 30 ต.ค. 2569: หัวเรื่องนอกการ์ด แยก 3 เรื่องให้ชัด) ── */}
       <OverviewGroup no={1} title="ใบขอ" testId="overview-group-requests">
       {/* ── ใบขอ: ยกมา + ขอใหม่ − ปิดครบ − ยกเลิก = เหลือหา ── */}
-      <OverviewSection title="ใบขอจริงใน ERP" sub="ใบ (คน)" testId="overview-requests">
+      <OverviewSection title="ใบขอจริงใน ERP" sub="ใบ (อัตรา)" testId="overview-requests">
         <div className="grid grid-cols-2 items-stretch gap-2 sm:grid-cols-5">
-          <OverviewNode label="ยกมา" value={flow?.carryInRequests} unit="ใบ" sub={flow ? `${NUM.format(flow.carryIn)} คน` : undefined} onClick={flow ? () => openList('ยกมา', flowRows((f) => f.carry)) : undefined} testId="overview-req-carry" />
-          <OverviewNode label="+ ขอใหม่" value={flow?.newRequests} unit="ใบ" sub={flow ? `${NUM.format(flow.newPositions)} คน` : undefined} onClick={flow ? openNew : undefined} testId="overview-req-new" />
+          <OverviewNode label="ยกมา" value={flow?.carryInRequests} unit="ใบ" sub={flow ? `${NUM.format(flow.carryIn)} อัตรา` : undefined} onClick={flow ? () => openList('ยกมา', flowRows((f) => f.carry)) : undefined} testId="overview-req-carry" />
+          <OverviewNode label="+ ขอใหม่" value={flow?.newRequests} unit="ใบ" sub={flow ? `${NUM.format(flow.newPositions)} อัตรา` : undefined} onClick={flow ? openNew : undefined} testId="overview-req-new" />
           <OverviewNode label="− ปิดครบ" value={flow?.closedRequests} unit="ใบ" emphasis="success" onClick={flow ? () => openList('ปิดครบ', flowRows((f) => f.closed)) : undefined} testId="overview-req-closed" />
           <OverviewNode
             label="− ยกเลิก"
             value={flow?.cancelledRequests}
             unit="ใบ"
-            sub={flow ? `${NUM.format(flow.cancelled)} คน` : undefined}
+            sub={flow ? `${NUM.format(flow.cancelled)} อัตรา` : undefined}
             onClick={
               flow
                 ? () => {
@@ -559,16 +558,16 @@ const HomeOverviewPage: React.FC = () => {
             }
             testId="overview-req-cancel"
           />
-          <OverviewNode label="= เหลือหา" value={flow?.remainingRequests} unit="ใบ" emphasis="warn" sub={flow ? `${NUM.format(flow.remaining)} คน` : undefined} onClick={flow ? () => openList('เหลือหา', flowRows((f) => f.open)) : undefined} testId="overview-req-remain" />
+          <OverviewNode label="= เหลือหา" value={flow?.remainingRequests} unit="ใบ" emphasis="warn" sub={flow ? `${NUM.format(flow.remaining)} อัตรา` : undefined} onClick={flow ? () => openList('เหลือหา', flowRows((f) => f.open)) : undefined} testId="overview-req-remain" />
         </div>
         {/* หาได้แล้ว (ลงงาน) แยกกล่อง — คนที่หาได้ทุกใบ รวมใบที่ได้บางส่วน ≠ ปิดครบ (CLAUDE.md "ห้ามปน หาได้แล้ว กับ ปิดครบใบขอ") */}
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
           <OverviewNode
             label="หาได้แล้ว · ลงงาน"
             value={flow?.filled}
-            unit="คน"
+            unit="อัตรา"
             emphasis="success"
-            onClick={flow ? () => openList('หาได้แล้ว', openReqs.filter((r) => r.filledInWindow > 0), `หาได้ ${NUM.format(flow.filled)} คน`) : undefined}
+            onClick={flow ? () => openList('หาได้แล้ว', openReqs.filter((r) => r.filledInWindow > 0), `หาได้ ${NUM.format(flow.filled)} อัตรา`) : undefined}
             testId="overview-req-filled"
           />
         </div>
@@ -580,7 +579,7 @@ const HomeOverviewPage: React.FC = () => {
           </p>
           <p>
             {flow
-              ? `ยกมา ${NUM.format(flow.carryIn)} + ขอใหม่ ${NUM.format(flow.newPositions)} − หาได้ ${NUM.format(flow.filled)} − ยกเลิก ${NUM.format(flow.cancelled)} = เหลือหา ${NUM.format(flow.remaining)} คน`
+              ? `ยกมา ${NUM.format(flow.carryIn)} + ขอใหม่ ${NUM.format(flow.newPositions)} − หาได้ ${NUM.format(flow.filled)} − ยกเลิก ${NUM.format(flow.cancelled)} = เหลือหา ${NUM.format(flow.remaining)} อัตรา`
               : '—'}
           </p>
         </div>
@@ -621,9 +620,10 @@ const HomeOverviewPage: React.FC = () => {
       <OverviewGroup no={2} title="ผู้สมัคร" head={applied && funnel ? `กรอกมา ${NUM.format(applied.value)} คน` : null} testId="overview-group-funnel">
       <OverviewSection title="ไปถึงขั้นไหน" sub="กรอกในช่วงที่เลือก · คน" testId="overview-funnel">
         <div className="grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-6">
-          {(funnel ?? buildApplicantFunnel([], null)).map((s) => (
+          {(funnel ?? buildApplicantFunnel([])).map((s) => (
             <OverviewNode key={s.key} label={s.label} value={funnel ? s.value : null} onClick={funnel ? () => openStep(s) : undefined} testId={`overview-step-${s.key}`}>
               <span className="mt-1 space-y-0.5 text-xs tabular-nums">
+                {s.from && funnel ? <span className="block text-muted-foreground">{s.from}</span> : null}
                 {s.rows.map((r) => (
                   <span key={r.key} className="flex justify-between gap-2">
                     <span className={r.tone === 'neutral' ? 'text-muted-foreground' : TONE[r.tone].value}>{r.label}</span>

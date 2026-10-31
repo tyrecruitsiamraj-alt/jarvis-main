@@ -216,13 +216,13 @@ export default function RecruitControlPanel() {
     },
     {
       bucket: 'contact_success',
-      label: 'ติดต่อสำเร็จ',
+      label: 'ติดต่อได้',
       value: contact.success,
       sub: 'รวมคนที่คุยแล้วปฏิเสธ (= ติดต่อถึงตัว)',
       tone: 'success',
       group: 'contact',
     },
-    { bucket: 'contact_failed', label: 'ติดต่อไม่สำเร็จ', value: contact.failed, tone: 'danger', group: 'contact' },
+    { bucket: 'contact_failed', label: 'ติดต่อไม่ได้', value: contact.failed, tone: 'danger', group: 'contact' },
     // เส้นแบ่งสรรหา→คัดสรร (16 ส.ค.) — สนใจแล้วแต่ยังไม่มาสมัคร vs มาสมัครแล้ว (ขึ้นบอร์ด)
     {
       bucket: null,
