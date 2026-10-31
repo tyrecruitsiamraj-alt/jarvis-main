@@ -836,8 +836,9 @@ describe('คนเพิ่มแผน + เบอร์ฉุกเฉิน 
     const src = readFileSync('api/_lib/irecruitReplaceSync.ts', 'utf8');
     expect(src).toContain('FROM admins a WHERE a.staff_id = h.user_add');
     expect(src).toContain('COALESCE(ua.email, ad.email) AS adder_email');
-    expect(src).toMatch(/listed\?\.emergency \?\?\s+adderPhones\.get\(\(r\.updater_email[\s\S]{0,120}adderPhones\.get\(\(r\.adder_email/);
-    // สายเดิม: เติมเฉพาะที่ยังว่าง ไม่ทับเบอร์ที่ตั้งไว้
+    // 31 ต.ค. 2569 คนกด "ความสนใจ" มาก่อนคนแก้ใบ/คนเพิ่มแผน (เทสต์ replaceEmergencyInterest2569-10-31)
+    expect(src).toMatch(/listed\?\.emergency \?\?\s+adderPhones\.get\(\(r\.interest_email[\s\S]{0,120}adderPhones\.get\(\(r\.updater_email[\s\S]{0,120}adderPhones\.get\(\(r\.adder_email/);
+    // สายเดิม: ว่าง = เติม · ระบบตั้งไว้แล้วไม่ตรง = เปลี่ยน (31 ต.ค. 2569) · สายที่เจ้าหน้าที่แก้เองไม่แตะ
     expect(src).toContain("coalesce(btrim(f.staff_phone), '') = ''");
     const { localThaiPhoneOf } = await import('../../api/_lib/irecruitReplaceSync');
     expect(localThaiPhoneOf('+66612345678')).toBe('0612345678');

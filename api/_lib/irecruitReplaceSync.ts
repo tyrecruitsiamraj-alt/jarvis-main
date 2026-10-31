@@ -105,6 +105,11 @@ export type IrecruitReplaceRow = {
    * ⚠️ ใบที่ยังเปิดส่วนใหญ่ไม่มีคนแก้ (573/588 วัด 27 ต.ค.) ⇒ ถอยไปคนสร้างใบ
    */
   updater_email?: string | null;
+  /**
+   * คนกดขั้น "ความสนใจ" ของใบ (ir_job_request_item ระดับ 2 ที่ไม่ใช่ W) — เจ้าของ 31 ต.ค. 2569 *"เหมือนเป็นคนปิดงาน
+   * ต้องใช้คนนั้นในการโทรเบอร์ฉุกเฉิน ไม่ใช่คนเปิดงาน"* · ยังไม่กด = null (ถอยไปคนแก้ใบล่าสุด / คนเปิดใบ)
+   */
+  interest_email?: string | null;
 };
 
 /** "เพิ่มโดย" ของสายที่ดึงมา — อีเมลคนเพิ่มใบใน iRecruit · ไม่มีอีเมล = ชื่อ · ไม่รู้เลย = null (ใช้ป้ายของรอบดึง) */
@@ -228,7 +233,8 @@ export async function fetchIrecruitReplaceRows(fromYmd: string, toYmd: string): 
             CASE WHEN wl.staff_id IS NOT NULL THEN 'WL' ELSE 'EX' END AS replace_type,
             s.site_name, h.site_code, h.want_date,
             COALESCE(ua.email, ad.email) AS adder_email, COALESCE(hs.nm, ad.name) AS adder_name,
-            COALESCE(uu.email, au.email) AS updater_email
+            COALESCE(uu.email, au.email) AS updater_email,
+            COALESCE(iu.email, ia.email) AS interest_email
        FROM ir_job_header h
        -- คนแก้ใบล่าสุด (หน้า /replaces · 27 ต.ค. 2569) — เจ้าหน้าที่ของสาย · ไม่มี = คนเพิ่มใบ
        OUTER APPLY (SELECT TOP 1 u.email FROM users u WHERE h.user_update IS NOT NULL AND u.staff_id = h.user_update) uu
@@ -241,11 +247,18 @@ export async function fetchIrecruitReplaceRows(fromYmd: string, toYmd: string): 
          SELECT TOP 1 LTRIM(RTRIM(CONCAT(LTRIM(RTRIM(st.fname)), N' ', LTRIM(RTRIM(st.lname))))) AS nm FROM hr_staff st WHERE st.staff_id = h.user_add
        ) hs
        OUTER APPLY (
-         SELECT TOP 1 jr.staff_id
+         SELECT TOP 1 jr.staff_id, jr.request_id
          FROM ir_job_request jr
          WHERE jr.job_id = h.job_id
          ORDER BY jr.date_add DESC
        ) cand
+       -- คนกด "ความสนใจ" (ระดับ 2 · W = ยังไม่ลงสถานะ ช่องนี้ยังเป็นคนเปิดใบ) — เบอร์ฉุกเฉิน (31 ต.ค. 2569)
+       OUTER APPLY (
+         SELECT TOP 1 it.item_user_add FROM ir_job_request_item it
+          WHERE it.request_id = cand.request_id AND LTRIM(RTRIM(it.item_level)) = '2' AND ISNULL(it.item_status, 'W') <> 'W'
+       ) ip
+       OUTER APPLY (SELECT TOP 1 u.email FROM users u WHERE ip.item_user_add IS NOT NULL AND u.staff_id = ip.item_user_add) iu
+       OUTER APPLY (SELECT TOP 1 LTRIM(RTRIM(a.email)) AS email FROM admins a WHERE ip.item_user_add IS NOT NULL AND a.staff_id = ip.item_user_add) ia
        OUTER APPLY (
          SELECT TOP 1 zz.fname, zz.lname, zz.mobile, zz.status, zz.replace_type
          FROM z_hr_recruitment_header zz
@@ -534,7 +547,11 @@ async function runIrecruitReplaceSyncUnlocked(
     } catch (e) {
       logWarn('irecruit.replaceSync: อ่านใบไม่มีวันเข้างานไม่สำเร็จ', { error: errorSummaryText(e) });
     }
-    const adderPhones = await loadAdderPhones([...rows.map((r) => r.adder_email), ...rows.map((r) => r.updater_email)]);
+    const adderPhones = await loadAdderPhones([
+      ...rows.map((r) => r.adder_email),
+      ...rows.map((r) => r.updater_email),
+      ...rows.map((r) => r.interest_email),
+    ]);
 
     // ── สายที่ iRecruit ต้องการตอนนี้ ──
     const desired: DesiredMeta[] = [];
@@ -577,9 +594,10 @@ async function runIrecruitReplaceSyncUnlocked(
           siteCode: r.site_code?.trim() || null,
           // สายที่เลยเวลาแล้ว = คนโทร (AI ไม่โทรย้อนหลัง)
           mode: p.past ? 'manual' : typeMode,
-          // รายชื่อให้ AI โทรตั้งเบอร์ไว้ = ใช้ก่อน · ไม่มี = เบอร์คนแก้ใบล่าสุด · ไม่มี = เบอร์คนเพิ่มแผน (หน้าผู้ใช้งาน · 27 ต.ค. 2569)
+          // รายชื่อให้ AI โทรตั้งเบอร์ไว้ = ใช้ก่อน · ไม่มี = คนกด "ความสนใจ" (31 ต.ค. 2569) · ยังไม่กด = คนแก้ใบล่าสุด · ไม่มี = คนเพิ่มแผน
           emergency:
             listed?.emergency ??
+            adderPhones.get((r.interest_email ?? '').trim().toLowerCase()) ??
             adderPhones.get((r.updater_email ?? '').trim().toLowerCase()) ??
             adderPhones.get((r.adder_email ?? '').trim().toLowerCase()) ??
             null,
@@ -798,18 +816,38 @@ async function runIrecruitReplaceSyncUnlocked(
         logWarn('irecruit.replaceSync: เติมคนเพิ่มใบไม่สำเร็จ', { error: errorSummaryText(e) });
       }
     }
-    // เบอร์ฉุกเฉินของสายเดิมที่ยังว่าง (20 ต.ค. 2569) — เติมในฐานเท่านั้น ไม่แตะเบอร์ที่มีอยู่แล้ว
-    // ⚠️ แผนที่ส่ง Lumos ไปแล้วยังถือของเดิม จนกว่าจะส่งแผนใหม่
+    /**
+     * เบอร์ฉุกเฉินของสายเดิม — ว่าง = เติม (20 ต.ค. 2569) · ระบบตั้งไว้แล้วไม่ตรง (เช่นคนกด "ความสนใจ" เพิ่งกด) = เปลี่ยน
+     * (เจ้าของ 31 ต.ค. 2569 Choice "เปลี่ยนเป็นคนกด + ส่งแผนใหม่") · สายที่เจ้าหน้าที่แก้เอง (`updated_by`) ไม่แตะ
+     * สาย AI ที่ส่ง Lumos ไปแล้ว = ส่งแผนใหม่ (Lumos ถือเบอร์เดิม) · ส่งไม่ได้ตอนนี้ = ไม่เปลี่ยนสายพวกนั้น รอรอบหน้า
+     */
     const emRefs = desired.filter((d) => d.emergency).map((d) => [d.ref, d.emergency as string] as const);
     if (emRefs.length > 0) {
       try {
-        await dbQuery(
+        const canReplan = Boolean(getLumosPushConfig()) && (await isAutoDispatchEnabled('follow_entry'));
+        const { rows: changed } = await dbQuery<{ id: string; sent: boolean }>(
           `update ${followTable} f set staff_phone = v.phone
              from unnest($1::text[], $2::text[]) as v(ref, phone)
-            where f.source_ref = v.ref and coalesce(btrim(f.staff_phone), '') = ''
-              and f.completed_at is null and f.cancelled_at is null`,
-          [emRefs.map((a) => a[0]), emRefs.map((a) => a[1])],
+            where f.source_ref = v.ref
+              and f.completed_at is null and f.cancelled_at is null and f.staff_call_outcome is null
+              and (
+                coalesce(btrim(f.staff_phone), '') = ''
+                or (f.updated_by is null and f.scheduled_at > $3::timestamptz
+                    and right(regexp_replace(f.staff_phone, '\\D', '', 'g'), 9) <> right(regexp_replace(v.phone, '\\D', '', 'g'), 9))
+              )
+              and ($4::boolean or coalesce(f.call_mode, 'ai') <> 'ai'
+                   or not exists (select 1 from ${REPLACE_QUEUE_TABLE} q where q.person_ref = 'follow-' || f.id::text and q.status = 'pending'))
+          returning f.id::text as id,
+                    (coalesce(f.call_mode, 'ai') = 'ai'
+                     and exists (select 1 from ${REPLACE_QUEUE_TABLE} q where q.person_ref = 'follow-' || f.id::text and q.status = 'pending')) as sent`,
+          [emRefs.map((a) => a[0]), emRefs.map((a) => a[1]), new Date(now.getTime() + LOCK_AHEAD_MS).toISOString(), canReplan],
         );
+        const replan = changed.filter((c) => c.sent).map((c) => c.id);
+        if (replan.length > 0) {
+          const res = await replanFollowSetWithLumos({ memberIds: replan, cancelledIds: [], resolveStaffName: staffNameOfPhone });
+          if (res.plans !== res.pushedPlans) logWarn('irecruit.replaceSync: ส่งแผนเบอร์ฉุกเฉินใหม่ไม่ครบ', { reason: res.reason });
+        }
+        if (changed.length > 0) logInfo('irecruit.replaceSync.emergency', { changed: changed.length, replanned: replan.length });
       } catch (e) {
         logWarn('irecruit.replaceSync: เติมเบอร์ฉุกเฉินไม่สำเร็จ', { error: errorSummaryText(e) });
       }
