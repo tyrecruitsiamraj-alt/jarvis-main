@@ -256,7 +256,7 @@ const AftercarePage: React.FC = () => {
         /* ย้อนกลับไปหน้าติดตาม (4 ต.ค. 2569 ไล่ Journey — คนมาจากการ์ดติดตามครบ แต่ไม่มีทางกลับ) */
         backPath="/follow"
         title="ดูแลหลังเริ่มงาน"
-        subtitle="คนที่ตามครบแล้วและเริ่มงานจริง — โทรถามความเป็นอยู่ตามรอบ"
+        subtitle=""
       />
 
       <div className="mt-4 space-y-3">

@@ -1701,7 +1701,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                 onApplicants={openApplicantsOf}
                 skip={skipIdx.get(job.id) ?? null}
                 onImport={onImportJob}
-                so={soByJob?.get(job.id) ?? null}
+                so={soByJob ? soByJob.get(job.id) ?? [] : null}
                 onAutopost={setAutopostJob}
               />
             ) : (

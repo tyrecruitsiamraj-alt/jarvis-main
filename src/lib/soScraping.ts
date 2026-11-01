@@ -161,13 +161,16 @@ export function soStatusView(r: { status: string; created_at: string }, nowMs = 
 }
 
 /** ค่าของตัวกรองกล่องงาน "So Scraping" ต่อใบ */
-export type SoFacetValue = 'open' | 'done' | 'rejected';
+export type SoFacetValue = 'none' | 'open' | 'done' | 'rejected';
 export const SO_FACET_LABEL: Record<SoFacetValue, string> = {
+  // 1 พ.ย. 2569 เจ้าของ "ต้องมีสถานะบอก และต้อง Filter ดูได้" — ใบที่ยังไม่เคยสั่งกรองได้ด้วย
+  none: 'ยังไม่สั่ง',
   open: 'สั่งแล้วยังไม่เสร็จ',
   done: 'โพสต์แล้ว / เสร็จ',
   rejected: 'ไม่รับงาน',
 };
 export function soFacetValues(latest: ReadonlyArray<{ status: string }>): SoFacetValue[] {
+  if (latest.length === 0) return ['none'];
   const out = new Set<SoFacetValue>();
   for (const r of latest) {
     if (r.status === 'pending' || r.status === 'in_progress') out.add('open');

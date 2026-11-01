@@ -687,7 +687,7 @@ const JobDetailPage: React.FC = () => {
                     onChange={(e) => setEditForm({ ...editForm, urgency: e.target.value as JobUrgency })}
                     className="w-full jarvis-soft-field"
                   >
-                    <option value="urgent">ด่วน</option>
+                    <option value="urgent">ฉุกเฉิน</option>
                     <option value="advance">ล่วงหน้า</option>
                   </select>
                 </div>

@@ -125,6 +125,10 @@ describe('ตามงานได้โดยไม่ต้องเปิด�
   it('ป้ายบนการ์ด + ตัวกรอง "สั่งแล้วยังไม่เสร็จ / ไม่รับงาน"', () => {
     expect(soFacetValues([{ status: 'pending' }, { status: 'rejected' }]).sort()).toEqual(['open', 'rejected']);
     expect(soFacetValues([{ status: 'completed' }])).toEqual(['done']);
+    // 1 พ.ย. 2569 เจ้าของ "ต้องมีสถานะบอก และต้อง Filter ดูได้" — ใบที่ยังไม่เคยสั่ง = ป้ายเทา + กรองได้
+    expect(soFacetValues([])).toEqual(['none']);
+    expect(read('src/components/jobs/BoardJobCard.tsx')).toContain('data-testid="board-card-so-none"');
+    expect(read('src/components/jobs/JobBoardView.tsx')).toContain('so={soByJob ? soByJob.get(job.id) ?? [] : null}');
     expect(read('src/components/jobs/BoardJobCard.tsx')).toContain('data-testid="board-card-so"');
     expect(read('src/lib/boardFilters.ts')).toContain("key: 'so',");
   });

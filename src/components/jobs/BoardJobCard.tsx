@@ -120,6 +120,14 @@ const BoardJobCard: React.FC<BoardJobCardProps> = ({ job, readiness, applicants,
       {showReadiness && readiness ? <PublishReadinessChip readiness={readiness} /> : null}
 
       {/* ── สถานะที่ So Scraping เขียนกลับ (20 ต.ค. 2569) — เหลือง รอ/กำลังทำ · เขียว โพสต์แล้ว/เสร็จ · แดง ไม่รับงาน/รอนาน ── */}
+      {/* ยังไม่เคยสั่ง = ขึ้นป้ายเทาให้รู้ว่ายังว่าง (1 พ.ย. 2569 เจ้าของ "ต้องมีสถานะบอก" กันสั่งซ้ำ) · null = ยังโหลดไม่เสร็จ */}
+      {so && so.length === 0 ? (
+        <div className="flex flex-wrap gap-1.5" data-testid="board-card-so-none">
+          <Badge variant="outline" className={cn('font-medium', TONE.neutral.outline)}>
+            ยังไม่สั่งโพสต์
+          </Badge>
+        </div>
+      ) : null}
       {so && so.length > 0 ? (
         <div className="flex flex-wrap gap-1.5" data-testid="board-card-so">
           {(['content', 'scraping'] as const).map((type) => {

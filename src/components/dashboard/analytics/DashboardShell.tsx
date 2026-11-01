@@ -159,7 +159,7 @@ const DashboardShell: React.FC<Props> = ({
   const searchInHeader = useHeaderSearch({
     value: filters.search,
     onChange: (v) => onFiltersChange({ search: v }),
-    placeholder: 'กรองไฟล์ CSV (ตัวเลขบนหน้าไม่เปลี่ยน)',
+    placeholder: 'กรองไฟล์ CSV',
   });
   const [showControlDetail, setShowControlDetail] = useState(false);
   const [showUnitOverview, setShowUnitOverview] = useState(false);

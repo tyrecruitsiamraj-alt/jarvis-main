@@ -2271,7 +2271,8 @@ const MatchingPage: React.FC = () => {
       },
       {
         key: 'urgent',
-        label: 'งานด่วน',
+        // 1 พ.ย. 2569 คำชุดเดียวกับการ์ดโพสต์ประกาศ (`uiWords.ts` ชนิดใบ = ฉุกเฉิน/ล่วงหน้า)
+        label: 'ฉุกเฉิน',
         count: serverSummary?.urgentTotal ?? urgentSummary.total,
         tone: 'danger' as const,
         active: urgentOnly,
@@ -2474,7 +2475,7 @@ const MatchingPage: React.FC = () => {
               >
                 {(
                   [
-                    ['default', 'เลยกำหนดและงานด่วนก่อน'],
+                    ['default', 'เลยกำหนดและฉุกเฉินก่อน'],
                     ['age_desc', 'ค้างนานสุด → ใหม่สุด'],
                     ['age_asc', 'ใหม่สุด → ค้างนานสุด'],
                     ['recommend', 'มีคนแนะนำก่อน'],
@@ -2577,7 +2578,7 @@ const MatchingPage: React.FC = () => {
                   </div>
                   <div className="flex shrink-0 flex-col items-end gap-1">
                     {j.urgency === 'urgent' ? (
-                      <span className="rounded-md bg-destructive/10 px-2 py-0.5 text-sm font-medium text-destructive">ด่วน</span>
+                      <span className="rounded-md bg-destructive/10 px-2 py-0.5 text-sm font-medium text-destructive">ฉุกเฉิน</span>
                     ) : null}
                     <span className={cn('rounded-md border px-1.5 py-0.5 text-sm font-medium', JOB_AGE_CHIP_META[age.level].chipCls)} title={age.title}>
                       {age.cardText}
@@ -2737,7 +2738,7 @@ const MatchingPage: React.FC = () => {
                     variant="outline"
                     className={cn(jobDetail.urgency === 'urgent' ? cn(TONE.danger.soft, TONE.danger.value) : 'font-normal')}
                   >
-                    {jobDetail.urgency === 'urgent' ? 'ด่วน' : 'ล่วงหน้า'}
+                    {jobDetail.urgency === 'urgent' ? 'ฉุกเฉิน' : 'ล่วงหน้า'}
                   </Badge>
                 </div>
                 {/* ย้ายมาจากการ์ด (15 ต.ค. 2569 ตัดหนัก): ทำอะไรต่อ · AI แนะนำ · ผลโทรในใบนี้ · หาคนจากกองไม่สนใจ */}

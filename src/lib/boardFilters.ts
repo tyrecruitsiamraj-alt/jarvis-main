@@ -261,7 +261,7 @@ const FACETS: readonly FacetDef[] = [
     key: 'so',
     label: 'สั่งโพสต์ / Scrap',
     ui: 'check',
-    order: ['open', 'done', 'rejected'],
+    order: ['none', 'open', 'done', 'rejected'],
     labelOf: (v) => SO_FACET_LABEL[v as SoFacetValue] ?? v,
     available: (facts) => Boolean(facts.soOf),
     values: (job, facts) => soFacetValues(facts.soOf?.(job) ?? []),

@@ -457,7 +457,7 @@ const RecruitChannelsPage: React.FC = () => {
     <div className="min-h-screen">
       <PageHeader
         title="จัดช่องทางรับสมัคร"
-        subtitle="ช่องทางหลัก → ช่องทางรอง · ใช้ตอน Gen link เพื่อรู้ว่าผู้สมัครมาจากช่องไหน"
+        subtitle=""
         backPath="/jobs/board"
       />
 

@@ -726,7 +726,7 @@ const PreCheckPage: React.FC<{ embedded?: boolean }> = ({ embedded = false }) =>
   return (
     <div>
       {embedded ? null : (
-        <PageHeader title="Pre-Check" subtitle="พิมพ์ที่อยู่ผู้สมัครแล้วขึ้นงานใกล้สุดก่อน" backPath="/matching" />
+        <PageHeader title="Pre-Check" subtitle="" backPath="/matching" />
       )}
       <div className={cn('space-y-4', !embedded && 'px-4 md:px-6')}>
         <div className="grid grid-cols-1 xl:grid-cols-[1.3fr,1fr] gap-4">

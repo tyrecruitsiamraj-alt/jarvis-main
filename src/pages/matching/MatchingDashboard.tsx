@@ -42,7 +42,7 @@ const MatchingDashboard: React.FC = () => {
 
   return (
     <div className="relative">
-      <PageHeader title="Matching Module" subtitle="จับคู่กับงาน" />
+      <PageHeader title="จับคู่งาน" />
       <div className="px-4 md:px-6 space-y-6">
         {/* Matching + Pre-Check */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">

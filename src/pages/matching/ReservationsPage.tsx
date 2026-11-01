@@ -101,7 +101,7 @@ const ReservationsPage: React.FC = () => {
     <div>
       <PageHeader
         title="รายชื่อคนจอง"
-        subtitle="ผู้สมัครที่กำลังจอง/ติดต่อ/ลงงานอยู่ — 1 คนจองได้ทีละใบขอเท่านั้น"
+        subtitle=""
         backPath="/matching"
       />
       <div className="px-4 md:px-6 space-y-4 pb-8">
