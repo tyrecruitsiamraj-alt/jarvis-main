@@ -4025,11 +4025,7 @@ const MatchingPage: React.FC = () => {
                           </Button>
                         ) : null}
                       </div>
-                      {/* บอกให้ชัดว่าแถวข้างบนคือ "ปุ่มกดเพื่อบันทึก" ไม่ใช่ป้ายสถานะ
-                          (เจ้าของสั่ง 21 ส.ค. 2569: *"ให้คนไม่งง"*) */}
-                      <p className="text-xs text-muted-foreground">
-                        แถวนี้คือ<b>ปุ่มกดเพื่อบันทึก</b> — ปุ่มที่ทึบคือสถานะตอนนี้ · กดปุ่มอื่นเพื่อเปลี่ยนสถานะ
-                      </p>
+                      {/* ประโยค "แถวนี้คือปุ่มกดเพื่อบันทึก…" (21 ส.ค. 2569) ถอดแล้ว — 1 พ.ย. 2569 เจ้าของ Choice "เอาออก" (ปุ่มกลางดูออกว่ากดได้) */}
                       {proposeError ? <p className="text-xs text-destructive">{proposeError}</p> : null}
                     </div>
                   );
@@ -4088,9 +4084,6 @@ const MatchingPage: React.FC = () => {
                 className="mt-1 w-full resize-none rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
               />
             </label>
-            <p className="text-xs leading-relaxed text-muted-foreground">
-              เหตุผลนี้เป็นการตัดสินใจของเจ้าหน้าที่ แยกจากเหตุผลที่ AI แนะนำด้านบน
-            </p>
           </div>
           <div className="flex justify-end gap-2">
             <Button type="button" variant="outline" size="sm" disabled={proposalFormBusy} onClick={() => setProposalActionDraft(null)}>
