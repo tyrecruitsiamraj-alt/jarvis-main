@@ -468,7 +468,7 @@ const SupervisorDashboard: React.FC = () => {
     (title: string, list: JobRequest[]) => {
       if (DEMO_MODE) return;
       const positions = sumJobPositionUnits(list);
-      setDetailDialogTitle(`${title} (${positions.toLocaleString()} คน · ${list.length.toLocaleString()} ใบขอ)`);
+      setDetailDialogTitle(`${title} (${positions.toLocaleString()} อัตรา · ${list.length.toLocaleString()} ใบขอ)`);
       setDetailDialogItems(
         list.map((j) =>
           jobToDashboardDetailItem(j, (job) => {
@@ -486,7 +486,7 @@ const SupervisorDashboard: React.FC = () => {
     (title: string, list: ReturnType<typeof jobsToRequestControlRecords>) => {
       if (DEMO_MODE) return;
       const positions = list.reduce((s, r) => s + r.requestPositions, 0);
-      setDetailDialogTitle(`${title} (${positions.toLocaleString()} คน · ${list.length.toLocaleString()} ใบขอ)`);
+      setDetailDialogTitle(`${title} (${positions.toLocaleString()} อัตรา · ${list.length.toLocaleString()} ใบขอ)`);
       setDetailDialogItems(
         list.map((r) =>
           controlRecordToDashboardDetailItem(r, (job) => {
@@ -1048,15 +1048,15 @@ const SupervisorDashboard: React.FC = () => {
   );
 
   const handleSlaCellClick = useCallback(
-    (kind: RequestLeadKind, cell: SlaCellKey, label: string) => {
+    (kind: RequestLeadKind | null, cell: SlaCellKey, label: string) => {
       openControlList(`SLA · ${label}`, filterRecordsForSlaCell(slaCohort.records, kind, cell, new Date(), slaCohort.kindOf));
     },
     [openControlList, slaCohort],
   );
 
   const handleSlaLeadKindClick = useCallback(
-    (kind: RequestLeadKind, label: string) => {
-      openControlList(`ใบขอชนิด ${label}`, filterRecordsForLeadKind(slaCohort.records, kind, new Date(), slaCohort.kindOf));
+    (kind: RequestLeadKind | null, label: string) => {
+      openControlList(kind ? `ใบขอชนิด ${label}` : `SLA · ${label}`, filterRecordsForLeadKind(slaCohort.records, kind, new Date(), slaCohort.kindOf));
     },
     [openControlList, slaCohort],
   );

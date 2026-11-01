@@ -12,7 +12,9 @@ import {
   kpiTrendWindow,
   withKpiTrend,
 } from '@/lib/dashboard/kpiTrend';
-import { SLA_CELL_TONE, jobSlaCell } from '@/lib/dashboard/slaByLeadKind';
+import { SLA_CELL_TONE, jobSlaCell, filterRecordsForSlaCell, filterRecordsForLeadKind, buildSlaByLeadKind } from '@/lib/dashboard/slaByLeadKind';
+import { jobToRequestControlRecord } from '@/lib/requestControl';
+import { controlRecordToDashboardDetailItem } from '@/lib/dashboard/dashboardDetailDialog';
 import { sortJobsByTableColumn, JOB_LIST_TABLE_COLUMNS } from '@/lib/jobListTableSort';
 import { JOB_LIST_DEFAULTS, buildJobListSearchParams, parseJobListSearchParams } from '@/lib/jobListPageState';
 import fs from 'node:fs';
@@ -168,5 +170,19 @@ describe('ช่อง SLA หน้ารายการใบขอ', () => {
     const src = fs.readFileSync(path.resolve(__dirname, '../../src/pages/jobs/JobListPage.tsx'), 'utf8');
     expect(src).toContain('id="job-list-sla"');
     expect(src).toContain('slaFilter.includes(jobSlaCell(j))');
+  });
+
+  it('ศูนย์ควบคุมใบขอ: กดเลขแถวรวมทุกชนิดได้ — รายการเท่าเลขในตาราง', () => {
+    const recs = [overdue, safe, job({ id: 'siamraj-sql:OPL6909002', request_no: 'OPL6909002', request_date: '2026-09-02', required_date: '2026-09-02' })].map((j) =>
+      jobToRequestControlRecord(j, today),
+    );
+    const table = buildSlaByLeadKind(recs, today);
+    expect(filterRecordsForSlaCell(recs, null, 'breached', today)).toHaveLength(table.totalRow.cells.breached);
+    expect(filterRecordsForLeadKind(recs, null, today)).toHaveLength(table.totalRow.total);
+  });
+
+  it('รายการที่เปิดจากตัวเลขบอกสถานะ SLA เป็นคำ', () => {
+    const item = controlRecordToDashboardDetailItem(jobToRequestControlRecord(overdue, today), () => undefined);
+    expect(item.subtitle).toContain('SLA เกินแล้ว · ครบ');
   });
 });

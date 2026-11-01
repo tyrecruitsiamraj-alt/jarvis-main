@@ -7,6 +7,7 @@ import { lifecycleKindLabel } from '@/lib/dashboard/lifecycle';
 import { JOB_TYPE_LABELS, type JobRequest } from '@/types';
 import type { CohortDrillKpi, CohortDrillRow } from '@/lib/dashboard/cohortDrillDown';
 import { REQUEST_LEAD_KIND_LABEL } from '@/lib/requestLeadKind';
+import { SLA_CELL_SHORT, slaCellOf } from '@/lib/dashboard/slaByLeadKind';
 
 export type DashboardDetailDialogItem = {
   id: string;
@@ -49,7 +50,8 @@ export function controlRecordToDashboardDetailItem(
       lifecycleKindLabel(rec.lifecycleKind, rec.requestActionName),
       rec.requestActionName,
       `ขอ ${rec.requestPositions} · ปิดได้ ${rec.filledPositions} · ยกเลิก ${rec.cancelledPositions} · เหลือ ${rec.remainingPositions}`,
-      rec.slaDueDate ? `SLA ${formatYmdTh(rec.slaDueDate)}` : null,
+      // บอกสถานะ SLA เป็นคำ (1 พ.ย. 2569) — ตัวตัดสินเดียวกับตาราง SLA / ป้ายหน้ารายการใบขอ
+      rec.slaDueDate ? `SLA ${SLA_CELL_SHORT[slaCellOf(rec)]} · ครบ ${formatYmdTh(rec.slaDueDate)}` : `SLA ${SLA_CELL_SHORT[slaCellOf(rec)]}`,
       roleLabel,
     ]
       .filter(Boolean)

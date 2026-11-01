@@ -211,24 +211,34 @@ export function buildSlaByLeadKind(
 }
 
 /** กรองรายการสำหรับ drill-down ของ 1 ช่อง (ชนิดใบขอ × ถัง SLA) */
+/** ชนิดใบขอตรงไหม — `kind` null = แถวรวมทุกชนิด (นับเฉพาะ 3 ชนิดที่ตารางมี ให้เท่าเลขแถวรวม) */
+function kindMatches(
+  r: RequestControlRecord,
+  kind: RequestLeadKind | null,
+  today: Date,
+  kindOf?: (r: RequestControlRecord) => RequestLeadKind | undefined,
+): boolean {
+  const k = kindOf?.(r) ?? computeJobUrgency(r.job, today).kind;
+  return kind === null ? (LEAD_KIND_ORDER as readonly string[]).includes(k) : k === kind;
+}
+
+/** กรองรายการสำหรับ drill-down ของ 1 ช่อง (ชนิดใบขอ × ถัง SLA) · kind null = แถวรวมทุกชนิด */
 export function filterRecordsForSlaCell(
   records: RequestControlRecord[],
-  kind: RequestLeadKind,
+  kind: RequestLeadKind | null,
   cell: SlaCellKey,
   today = new Date(),
   kindOf?: (r: RequestControlRecord) => RequestLeadKind | undefined,
 ): RequestControlRecord[] {
-  return records.filter(
-    (r) => (kindOf?.(r) ?? computeJobUrgency(r.job, today).kind) === kind && slaCellOf(r) === cell,
-  );
+  return records.filter((r) => kindMatches(r, kind, today, kindOf) && slaCellOf(r) === cell);
 }
 
-/** กรองทั้งแถว (ชนิดใบขอเดียว ทุกถัง) — ใช้เมื่อกดที่ชื่อแถว */
+/** กรองทั้งแถว (ชนิดใบขอเดียว ทุกถัง) — กดชื่อแถว/ช่องรวม · kind null = ทุกชนิด */
 export function filterRecordsForLeadKind(
   records: RequestControlRecord[],
-  kind: RequestLeadKind,
+  kind: RequestLeadKind | null,
   today = new Date(),
   kindOf?: (r: RequestControlRecord) => RequestLeadKind | undefined,
 ): RequestControlRecord[] {
-  return records.filter((r) => (kindOf?.(r) ?? computeJobUrgency(r.job, today).kind) === kind);
+  return records.filter((r) => kindMatches(r, kind, today, kindOf));
 }

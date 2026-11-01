@@ -27,9 +27,11 @@ import { cn } from '@/lib/utils';
 type Props = {
   table: SlaByLeadKind;
   /** กดช่อง (ชนิด × ถัง) */
-  onCellClick?: (kind: RequestLeadKind, cell: SlaCellKey, label: string) => void;
+  /** kind null = แถวรวมทุกชนิด */
+  onCellClick?: (kind: RequestLeadKind | null, cell: SlaCellKey, label: string) => void;
   /** กดชื่อแถว = ดูทั้งชนิดนั้น */
-  onRowClick?: (kind: RequestLeadKind, label: string) => void;
+  /** kind null = รวมทุกชนิด */
+  onRowClick?: (kind: RequestLeadKind | null, label: string) => void;
   /**
    * ชุด "ใบที่ปิดแล้ว" ถูกดึงมาแล้วหรือยัง
    *
@@ -85,7 +87,8 @@ const DashboardSlaByLeadKind: React.FC<Props> = ({
 
       {cells.map((c) => {
         const v = row.cells[c];
-        const clickable = v > 0 && !isTotal && Boolean(onCellClick);
+        // แถวรวมกดได้ด้วย (เจ้าของ 1 พ.ย. 2569 "กดตัวเลขเปิดรายการตาม SLA") — ช่องคิด SLA ไม่ได้มีใบที่หาไม่เจอปน กดไม่ได้
+        const clickable = v > 0 && Boolean(onCellClick) && !(isTotal && c === 'unknown');
         const label = `${row.label} · ${SLA_CELL_LABEL[c]}`;
         return (
           <td key={c} className="py-1.5 text-center">
@@ -95,7 +98,7 @@ const DashboardSlaByLeadKind: React.FC<Props> = ({
             ) : clickable ? (
               <button
                 type="button"
-                onClick={() => onCellClick?.(row.kind, c, label)}
+                onClick={() => onCellClick?.(isTotal ? null : row.kind, c, label)}
                 title={`ดูรายการ: ${label} (${num(v)} ใบ)`}
                 className={cn(
                   'min-w-[3rem] rounded-lg px-2 py-1 text-sm font-medium tabular-nums transition-colors',
@@ -115,7 +118,18 @@ const DashboardSlaByLeadKind: React.FC<Props> = ({
       })}
 
       <td className="py-1.5 pl-3 text-right">
-        <span className={cn('text-xs tabular-nums', DASH.cell)}>{num(row.total)}</span>
+        {onRowClick && row.total > 0 ? (
+          <button
+            type="button"
+            onClick={() => onRowClick(isTotal ? null : row.kind, row.label)}
+            title={`ดูรายการ: ${row.label} (${num(row.total)} ใบ)`}
+            className={cn('text-xs tabular-nums underline-offset-2 hover:underline', DASH.cellStrong)}
+          >
+            {num(row.total)}
+          </button>
+        ) : (
+          <span className={cn('text-xs tabular-nums', DASH.cell)}>{num(row.total)}</span>
+        )}
       </td>
       <td className="py-1.5 pl-3 text-right">
         {row.onTimeRatePercent === null ? (

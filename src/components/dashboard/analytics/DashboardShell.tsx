@@ -102,8 +102,8 @@ type Props = {
   slaClosedLoaded?: boolean;
   /** ปุ่มดึงชุดใบปิดจากในตาราง SLA — โหมด "ทั้งหมด" เท่านั้น */
   onLoadClosedForSla?: () => void;
-  onSlaCellClick?: (kind: RequestLeadKind, cell: SlaCellKey, label: string) => void;
-  onSlaRowClick?: (kind: RequestLeadKind, label: string) => void;
+  onSlaCellClick?: (kind: RequestLeadKind | null, cell: SlaCellKey, label: string) => void;
+  onSlaRowClick?: (kind: RequestLeadKind | null, label: string) => void;
   /** false = ยังไม่ได้ดึงชุดใบปิด (โหมด "ทั้งหมด") → ช่อง "ปิด" ต่อคนต้องโชว์ "—" ไม่ใช่ 0 */
   closedTotalsAvailable?: boolean;
   /** โหมด "ทั้งหมด" ใบปิดถูกดึงตอนกางแผงผู้รับผิดชอบเท่านั้น (ช่วงเต็มใช้เวลานาน) */
