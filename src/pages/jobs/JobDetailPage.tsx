@@ -681,7 +681,7 @@ const JobDetailPage: React.FC = () => {
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="text-xs font-medium text-muted-foreground mb-1 block">ความเร่งด่วน</label>
+                  <label className="text-xs font-medium text-muted-foreground mb-1 block">ชนิดใบขอ</label>
                   <select
                     value={editForm.urgency}
                     onChange={(e) => setEditForm({ ...editForm, urgency: e.target.value as JobUrgency })}

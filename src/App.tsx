@@ -33,7 +33,6 @@ const GlobalCalendar = lazyPage(() => import("@/pages/wl/GlobalCalendar"));
 const WLEmployees = lazyPage(() => import("@/pages/wl/WLEmployees"));
 const EmployeeProfile = lazyPage(() => import("@/pages/wl/EmployeeProfile"));
 const AddEmployeePage = lazyPage(() => import("@/pages/wl/AddEmployeePage"));
-const MatchingDashboard = lazyPage(() => import("@/pages/matching/MatchingDashboard"));
 const CandidateProfile = lazyPage(() => import("@/pages/matching/CandidateProfile"));
 const AddCandidatePage = lazyPage(() => import("@/pages/matching/AddCandidatePage"));
 const MatchingPage = lazyPage(() => import("@/pages/matching/MatchingPage"));
@@ -122,7 +121,8 @@ const ProtectedRoutes = () => {
             <Route path="/wl/employees" element={<WLEmployees />} />
             <Route path="/wl/employees/add" element={<AddEmployeePage />} />
             <Route path="/wl/employees/:id" element={<EmployeeProfile />} />
-            <Route path="/matching" element={<MatchingDashboard />} />
+            {/* 1 พ.ย. 2569 เจ้าของ Choice "หน้า /matching พาไปจับคู่งานเลย" — หน้าการ์ด 2 ใบเดิมถอดแล้ว */}
+            <Route path="/matching" element={<Navigate to="/matching/match" replace />} />
             {/* ผู้สมัคร = คนของเราแยกถังบนบอร์ด (หน้า CandidatesPage เดิมพักไว้ — ตาราง candidates ภายในแทบไม่ถูกใช้) */}
             <Route path="/matching/candidates" element={<OurPeoplePage />} />
             <Route path="/matching/candidates/add" element={<AddCandidatePage />} />

@@ -291,7 +291,8 @@ const FACETS: readonly FacetDef[] = [
   },
   {
     key: 'urgency',
-    label: 'ความเร่งด่วน',
+    // 1 พ.ย. 2569 เจ้าของ Choice — ชื่อเดียวกับการ์ด "ชนิดใบขอ" บน Dashboard (`uiWords.ts`)
+    label: 'ชนิดใบขอ',
     ui: 'check',
     order: ['urgent', 'advance'],
     // ชนิดใบขอ = ฉุกเฉิน/ล่วงหน้า (คำเดียวทั้งระบบ · 18 ต.ค. 2569 — "ด่วน" เป็นคำของอายุใบขอ)
