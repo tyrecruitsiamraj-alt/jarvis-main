@@ -84,6 +84,7 @@ import {
   filterJobsForThroughput,
   filterThroughputByDepartment,
   jobsToThroughputRecords,
+  monthlyIntakePoints,
   type ThroughputRecord,
 } from '@/lib/dashboard/throughput';
 import { kpiTrendPreviousRange } from '@/lib/dashboard/kpiTrend';
@@ -133,6 +134,8 @@ const SupervisorDashboard: React.FC = () => {
   const [detailDialogLoading, setDetailDialogLoading] = useState(false);
 
   const [throughputRecords, setThroughputRecords] = useState<ThroughputRecord[]>([]);
+  /** throughput ช่วงกว้าง (ช่วงเดียวกับโหมดทั้งหมด) — แท่งเข้ามารายเดือนบน hero ตอนเลือกงวด · null = ยังไม่ได้โหลด */
+  const [heroRecords, setHeroRecords] = useState<{ key: string; records: ThroughputRecord[] } | null>(null);
   /** throughput ช่วงก่อนหน้า — ลูกศรแนวโน้มบนการ์ด 4 ใบ (`kpiTrend.ts`) · null = ยังไม่มี/โหลดไม่ได้ = ไม่มีลูกศร */
   const [previousThroughput, setPreviousThroughput] = useState<{ key: string; records: ThroughputRecord[] } | null>(null);
   const [closedJobs, setClosedJobs] = useState<JobRequest[]>([]);
@@ -256,6 +259,26 @@ const SupervisorDashboard: React.FC = () => {
       cancelled = true;
     };
   }, [period, siamrajPrimary, dbSource, sideRev]);
+
+  /**
+   * 🔴 Dashboard เปิดมาที่เดือนก่อน (1 พ.ย. 2569) — งวดเดือนเดียวมีจุดเดียว แท่งบน hero จะหาย
+   * แล้วกดเลือกเดือนอื่นจากแท่งไม่ได้ ⇒ โหลดช่วงกว้างแยกไว้วาดแท่ง (ช่วงเดียวกับที่โหมดทั้งหมดใช้)
+   */
+  const heroRange = useMemo(() => resolveOpenStockTrendRange(jobs), [jobs]);
+  useEffect(() => {
+    if (DEMO_MODE || !period || !(siamrajPrimary && dbSource === 'sqlserver')) return;
+    const key = `${heroRange.from}|${heroRange.to}`;
+    if (heroRecords?.key === key) return;
+    let cancelled = false;
+    void fetchSiamrajThroughput(heroRange.from, heroRange.to)
+      .then((rows) => {
+        if (!cancelled) setHeroRecords({ key, records: rows });
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [period, heroRange, siamrajPrimary, dbSource, heroRecords?.key]);
 
   useEffect(() => {
     if (DEMO_MODE) return;
@@ -543,6 +566,27 @@ const SupervisorDashboard: React.FC = () => {
     if (needsJobLevel || !byAssignee) return null;
     return scopeThroughputByRequestKeys(byDept, byAssignee).records;
   }, [period, previousThroughput, unitFilters, assignees]);
+
+  /** แท่ง hero ตอนเลือกงวด — กรองแผนก/เจ้าหน้าที่แบบเดียวกับช่วงก่อน · ตัวกรองระดับใบ = ใช้แบบเดิม (null) */
+  const heroTrend = useMemo(() => {
+    if (!period) return null;
+    const src = heroRecords?.key === `${heroRange.from}|${heroRange.to}` ? heroRecords.records : null;
+    if (!src) return null;
+    const byDept = filterThroughputByDepartment(src, unitFilters.departmentFilter);
+    let scoped: ThroughputRecord[] | null = byDept;
+    if (needsRequestScopeFilter(unitFilters)) {
+      const needsJobLevel =
+        unitFilters.unitFilter !== 'all' ||
+        unitFilters.jobSubtypeFilter !== 'all' ||
+        unitFilters.urgencyFilter !== 'all' ||
+        unitFilters.noteFilter !== 'all' ||
+        unitFilters.ageDaysFilter !== 'all' ||
+        unitFilters.statusFilter !== 'all';
+      const byAssignee = assigneeRequestKeys(assignees, unitFilters);
+      scoped = needsJobLevel || !byAssignee ? null : scopeThroughputByRequestKeys(byDept, byAssignee).records;
+    }
+    return scoped ? monthlyIntakePoints(scoped, heroRange.from, heroRange.to) : null;
+  }, [period, heroRecords, heroRange, unitFilters, assignees]);
 
 
   const data = useMemo(() => {
@@ -1062,13 +1106,14 @@ const SupervisorDashboard: React.FC = () => {
    * (เจ้าของสั่ง 10 ส.ค. 2569: "กดแล้วข้อมูลเปลี่ยนตามเหมือนเป็น calendar ตัวนึงเลย")
    *
    * ⚠️ คิดวันสิ้นเดือนด้วย `new Date(y, m, 0)` = วันที่ 0 ของเดือนถัดไป = วันสุดท้ายของเดือนนี้
-   * ครอบคลุมทั้ง 28/29/30/31 โดยไม่ต้องมีตารางวัน · กดแท่งเดิมซ้ำ = กลับไปช่วงเริ่มต้น
+   * ครอบคลุมทั้ง 28/29/30/31 โดยไม่ต้องมีตารางวัน · กดแท่งเดิมซ้ำ = กลับไปทั้งหมด
    */
   const handleMonthClick = useCallback(
     (monthStartYmd: string) => {
       const ym = monthStartYmd.slice(0, 7);
       if (dateRange && dateRange.from.slice(0, 7) === ym && dateRange.to.slice(0, 7) === ym) {
-        setDateRange(defaultDashboardDateRange());
+        // กดแท่งเดิมซ้ำ = กลับไปดูทั้งหมด (ค่าเริ่มเป็นเดือนก่อนแล้ว กลับไปค่าเริ่มจะไม่เปลี่ยนอะไร)
+        setDateRange(null);
         return;
       }
       const [y, m] = ym.split('-').map(Number);
@@ -1099,6 +1144,7 @@ const SupervisorDashboard: React.FC = () => {
       onDateRangeChange={setDateRange}
       onMonthClick={handleMonthClick}
       selectedMonth={selectedMonth}
+      heroTrend={heroTrend}
       unitFilters={unitFilters}
       onUnitFiltersChange={patchUnitFilters}
       siamrajPrimary={siamrajPrimary}

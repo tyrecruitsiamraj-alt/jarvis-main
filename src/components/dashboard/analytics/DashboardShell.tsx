@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useHeaderSearch } from '@/hooks/useHeaderSearch';
 import { DASH, TONE, type ToneKey } from '@/lib/designTokens';
-import type { DashboardData, DashboardFilters, DashboardKpi, DashboardResponsibleRole, DashboardStatusFilter } from '@/lib/dashboard/types';
+import type { DashboardActivityTrendPoint, DashboardData, DashboardFilters, DashboardKpi, DashboardResponsibleRole, DashboardStatusFilter } from '@/lib/dashboard/types';
 import type { UnitRequestFilterState } from '@/hooks/useSiamrajUnitRequestFilters';
 import type { DateRangeYmd } from '@/components/shared/DateRangeCalendarPicker';
 import DashboardFilterBar from './DashboardFilterBar';
@@ -53,6 +53,8 @@ type Props = {
   /** กดแท่ง "เข้ามารายเดือน" → กรองทั้งหน้าเป็นเดือนนั้น */
   onMonthClick?: (monthStartYmd: string, label: string) => void;
   selectedMonth?: string | null;
+  /** แท่งเข้ามารายเดือนบน hero ที่ไม่ขึ้นกับงวด (เลือกเดือนแล้วยังเห็นทุกเดือนให้กดสลับ) · ไม่ส่ง = ใช้ data.activityTrend */
+  heroTrend?: DashboardActivityTrendPoint[] | null;
   onDateRangeChange: (range: DateRangeYmd | null) => void;
   unitFilters: UnitRequestFilterState;
   onUnitFiltersChange: (patch: Partial<UnitRequestFilterState>) => void;
@@ -117,6 +119,7 @@ const DashboardShell: React.FC<Props> = ({
   dateRange,
   onMonthClick,
   selectedMonth,
+  heroTrend,
   onDateRangeChange,
   unitFilters,
   onUnitFiltersChange,
@@ -355,7 +358,7 @@ const DashboardShell: React.FC<Props> = ({
                 positionTotal={data.ageDaysPositionTotal}
                 remainingPositions={remainingKpiValue}
                 siteCount={activeSiteCount}
-                trend={data.activityTrend}
+                trend={heroTrend && heroTrend.length >= 2 ? heroTrend : data.activityTrend}
                 trendLabel={data.activityTrendLabel || data.periodLabel}
                 onBucketClick={onAgeBucketClick}
                 onMonthClick={onMonthClick}

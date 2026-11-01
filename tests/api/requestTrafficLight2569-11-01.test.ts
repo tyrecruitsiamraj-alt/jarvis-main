@@ -15,7 +15,8 @@ import {
 import { SLA_CELL_TONE, jobSlaCell } from '@/lib/dashboard/slaByLeadKind';
 import { sortJobsByTableColumn, JOB_LIST_TABLE_COLUMNS } from '@/lib/jobListTableSort';
 import type { DashboardKpi } from '@/lib/dashboard/types';
-import type { ThroughputRecord } from '@/lib/dashboard/throughput';
+import { defaultDashboardDateRange } from '@/lib/dashboard/buildDashboardData';
+import { monthlyIntakePoints, type ThroughputRecord } from '@/lib/dashboard/throughput';
 import type { JobRequest } from '@/types';
 
 const kpi = (id: string, value: number): DashboardKpi => ({ id, label: id, value, description: '', trendPercent: null });
@@ -82,6 +83,25 @@ describe('ลูกศรแนวโน้มการ์ด', () => {
     expect(by.remaining.trendPercent).toBe(0);
     expect(by.closed.trendBase).toBe('1–30 ก.ย. 2569 1');
     expect(by.work_status_total.trendPercent).toBeNull();
+  });
+
+  it('เปิด Dashboard มาที่เดือนก่อนเต็มเดือน (Choice "เดือนก่อน") ลูกศรขึ้นเลย', () => {
+    expect(defaultDashboardDateRange(new Date(2026, 10, 1, 10))).toEqual({ from: '2026-10-01', to: '2026-10-31' });
+    expect(defaultDashboardDateRange(new Date(2027, 0, 15))).toEqual({ from: '2026-12-01', to: '2026-12-31' });
+    expect(defaultDashboardDateRange(new Date(2028, 2, 3))).toEqual({ from: '2028-02-01', to: '2028-02-29' });
+  });
+
+  it('แท่งเข้ามารายเดือนบน hero ไม่ขึ้นกับงวด · เดือนที่ไม่มีใบ = 0', () => {
+    const pts = monthlyIntakePoints(
+      [rec('A', '2026-08-03', 'filled', 2), rec('B', '2026-10-09', 'open'), rec('C', '2026-10-20', 'cancelled', 3), rec('D', '2026-12-01', 'open')],
+      '2026-08-01',
+      '2026-10-31',
+    );
+    expect(pts.map((p) => [p.label, p.requestedPositions])).toEqual([
+      ['ส.ค. 2569', 2],
+      ['ก.ย. 2569', 0],
+      ['ต.ค. 2569', 4],
+    ]);
   });
 
   it('ไม่มีข้อมูลช่วงก่อน = ไม่ใส่ลูกศร', () => {

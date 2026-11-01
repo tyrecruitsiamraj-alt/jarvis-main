@@ -4,6 +4,7 @@ import { positionBreakdownFromJob } from '@/lib/requestControl';
 import type { DashboardActivityTrendPoint, DashboardKpi } from '@/lib/dashboard/types';
 import { computeJobUrgency } from '@/lib/jobUrgency';
 import type { RequestLeadKind } from '@/lib/requestLeadKind';
+import { TH_MONTH_SHORT } from '@/lib/periodPick';
 
 export type ThroughputRecord = {
   /** เลขที่ใบขอ**ดิบ** — คีย์จัดกลุ่มของ drill-down · ห้ามตัดนำหน้าทิ้ง (เลขท้ายซ้ำข้าม BU) */
@@ -513,4 +514,42 @@ export function applyOpenQueueRemainingToActivityTrend(
     ...p,
     remainingPositions: remainingMap.get(p.date.slice(0, 7)) ?? 0,
   }));
+}
+
+/**
+ * แท่ง "เข้ามารายเดือน" บน hero แบบไม่ขึ้นกับงวดที่เลือก (1 พ.ย. 2569 — Dashboard เปิดมาที่เดือนก่อน)
+ * เลขเดียวกับ `requestedPositions` ของ `enrichActivityTrendWithThroughput` (รวม positionUnits ตามเดือนของ requestDate)
+ * เดือนที่ไม่มีใบ = 0 (ห้ามหาย)
+ */
+export function monthlyIntakePoints(
+  records: ThroughputRecord[],
+  from: string,
+  to: string,
+): DashboardActivityTrendPoint[] {
+  const sums = new Map<string, number>();
+  for (const r of records) {
+    if (!r.requestDate || r.requestDate < from || r.requestDate > to) continue;
+    const m = r.requestDate.slice(0, 7);
+    sums.set(m, (sums.get(m) ?? 0) + r.positionUnits);
+  }
+  const out: DashboardActivityTrendPoint[] = [];
+  let [y, m] = from.slice(0, 7).split('-').map(Number);
+  const [ty, tm] = to.slice(0, 7).split('-').map(Number);
+  while (y < ty || (y === ty && m <= tm)) {
+    const key = `${y}-${String(m).padStart(2, '0')}`;
+    out.push({
+      date: `${key}-01`,
+      label: `${TH_MONTH_SHORT[m - 1]} ${y + 543}`,
+      resignations: 0,
+      replacements: 0,
+      newOpenings: 0,
+      requestedPositions: sums.get(key) ?? 0,
+    });
+    m += 1;
+    if (m > 12) {
+      m = 1;
+      y += 1;
+    }
+  }
+  return out;
 }

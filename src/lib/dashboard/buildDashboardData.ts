@@ -447,9 +447,17 @@ export function filterJobsByRequestDate(jobs: JobRequest[], from: string, to: st
   });
 }
 
-/** ช่วงวันที่เริ่มต้นสำหรับ Dashboard — ทั้งหมด (ไม่จำกัดเดือน) ให้เหลือหาตรงหน้ารายการหน่วยงาน */
-export function defaultDashboardDateRange(_now = new Date()): { from: string; to: string } | null {
-  return null;
+/**
+ * ช่วงวันที่เริ่มต้นสำหรับ Dashboard = **เดือนก่อนเต็มเดือน**
+ * (เจ้าของ 1 พ.ย. 2569 Choice "เดือนก่อน" — เปิดมาลูกศรแนวโน้มขึ้นเลย และไม่แกว่งช่วงต้นเดือน)
+ * เดิม = ทั้งหมด (null) · เหลือหาทั้งระบบยังดูได้ที่ปุ่ม "ทั้งหมด"
+ */
+export function defaultDashboardDateRange(now = new Date()): { from: string; to: string } | null {
+  const y = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
+  const m = now.getMonth() === 0 ? 12 : now.getMonth();
+  const last = new Date(y, m, 0).getDate();
+  const mm = String(m).padStart(2, '0');
+  return { from: `${y}-${mm}-01`, to: `${y}-${mm}-${String(last).padStart(2, '0')}` };
 }
 
 function trendPercent(current: number, previous: number): number | null {
