@@ -20,6 +20,8 @@ import { readinessActionText, type PublishReadiness } from '@/lib/publishReadine
 import { isHiddenFromPublicByWorkStatus } from '@/lib/publicJobVisibility';
 import { isUnitRequestWorkStatus, UNIT_REQUEST_WORK_STATUS_LABELS } from '@/lib/unitRequestWorkStatus';
 import { releaseSkipText, type JobReleaseSkip } from '@/lib/jobReleaseSkips';
+import type { JobRelease } from '@/lib/jobPublicReleaseApi';
+import { formatYmdTh, toYmdBangkok } from '@/lib/dateTh';
 
 /**
  * ═══ การ์ดใบขอบนกล่องงาน — ฝั่งเจ้าหน้าที่ (แบบ A · 27 ก.ย. 2569 → กระชับแบบ C · 5 ต.ค. 2569) ═══
@@ -66,10 +68,12 @@ export type BoardJobCardProps = {
   so?: readonly JobPostingRequest[] | null;
   /** ปุ่ม Autopost (เจ้าของ 20 ต.ค. 2569 Choice "บนการ์ดกล่องงาน") — เปิดป๊อปของตัวเอง · ไม่ส่ง = ไม่มีปุ่ม */
   onAutopost?: (job: JobRequest) => void;
+  /** แถวในทะเบียนประกาศ — ขึ้น "ล่าสุด วันที่ โดย ชื่อ" ข้างชิปประกาศแล้ว (เจ้าของ 1 พ.ย. 2569 "ประกาศล่าสุดไปวันไหน ใครประกาศ") */
+  release?: Pick<JobRelease, 'released_at' | 'released_by_name'> | null;
 };
 
 /** "บางพลี สมุทรปราการ" — อำเภอที่ทีม Online กรอก + จังหวัด · ไม่รู้ = บอกตรง ๆ (ไม่เดาจากจังหวัดไซต์) */
-const BoardJobCard: React.FC<BoardJobCardProps> = ({ job, readiness, applicants, ai, closed, onOpen, onApplicants, skip, onImport, so, onAutopost }) => {
+const BoardJobCard: React.FC<BoardJobCardProps> = ({ job, readiness, applicants, ai, closed, onOpen, onApplicants, skip, onImport, so, onAutopost, release }) => {
   // เบอร์เจ้าหน้าที่สรรหาบรรทัดเดียวกับหน้า /apply (เจ้าของ 20 ต.ค. 2569 "ไหนเบอร์โทรเจ้าหน้าที่สรรหา")
   const contact = useRecruiterContact(job.recruiter_contact ? null : job.recruiter_name);
   const age = getJobAgeChipInfo(job);
@@ -117,7 +121,19 @@ const BoardJobCard: React.FC<BoardJobCardProps> = ({ job, readiness, applicants,
       </div>
 
       {/* ── พร้อมประกาศไหม / ขาดอะไร (2 ต.ค. 2569 — แทน "ติดขั้น N" + จุด 4 ขั้น) ── */}
-      {showReadiness && readiness ? <PublishReadinessChip readiness={readiness} /> : null}
+      {showReadiness && readiness ? (
+        readiness.kind === 'released' && release ? (
+          <div className="flex flex-wrap items-center gap-1.5" data-testid="board-card-released-at">
+            <PublishReadinessChip readiness={readiness} />
+            <span className={cn('text-sm', DASH.muted)}>
+              ล่าสุด {formatYmdTh(toYmdBangkok(new Date(release.released_at)))}
+              {release.released_by_name ? ` โดย ${release.released_by_name}` : ''}
+            </span>
+          </div>
+        ) : (
+          <PublishReadinessChip readiness={readiness} />
+        )
+      ) : null}
 
       {/* ── สถานะที่ So Scraping เขียนกลับ (20 ต.ค. 2569) — เหลือง รอ/กำลังทำ · เขียว โพสต์แล้ว/เสร็จ · แดง ไม่รับงาน/รอนาน ── */}
       {/* ยังไม่เคยสั่ง = ขึ้นป้ายเทาให้รู้ว่ายังว่าง (1 พ.ย. 2569 เจ้าของ "ต้องมีสถานะบอก" กันสั่งซ้ำ) · null = ยังโหลดไม่เสร็จ */}

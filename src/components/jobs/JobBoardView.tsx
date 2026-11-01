@@ -356,6 +356,11 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
    */
   const [releases, setReleases] = useState<JobRelease[] | null>(null);
   const releaseIdx = useMemo(() => buildReleaseIndex(releases ?? []), [releases]);
+  /** ประกาศล่าสุดวันไหน ใครกด (เจ้าของ 1 พ.ย. 2569) — ทะเบียนเขียน released_at ใหม่ทุกครั้งที่กดประกาศซ้ำ */
+  const releaseByJob = useMemo(
+    () => buildJobKeyIndex((releases ?? []).map((r) => [r.job_id, r] as const)),
+    [releases],
+  );
 
   /**
    * 🔴 **อ่านไม่ได้ ≠ ไม่มีใบไหนปล่อย** (แก้ 31 ส.ค. 2569)
@@ -1700,6 +1705,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                 onOpen={setPostingJob}
                 onApplicants={openApplicantsOf}
                 skip={skipIdx.get(job.id) ?? null}
+                release={releaseByJob.get(job.id) ?? null}
                 onImport={onImportJob}
                 so={soByJob ? soByJob.get(job.id) ?? [] : null}
                 onAutopost={setAutopostJob}

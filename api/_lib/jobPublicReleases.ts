@@ -13,6 +13,7 @@ import { dbQuery } from './postgres.js';
 import { tableInAppSchema } from './schema.js';
 
 const TABLE = tableInAppSchema('job_public_releases');
+const USERS = tableInAppSchema('users');
 
 export type JobReleaseRow = {
   job_id: string;
@@ -101,8 +102,13 @@ export async function unreleaseJobs(jobIds: string[]): Promise<number> {
 /** รายการที่ปล่อยแล้ว (ใหม่สุดก่อน) — บอร์ดใช้โชว์ว่าใครปล่อยเมื่อไหร่ */
 export async function listReleases(limit = 500): Promise<JobReleaseRow[]> {
   const { rows } = await dbQuery<JobReleaseRow>(
-    `select job_id, released_at, released_by_name, request_no, note
-       from ${TABLE} order by released_at desc limit $1`,
+    // ชื่อคนกด = ชื่อเล่น > ชื่อจริง > ค่าที่บันทึกตอนกด (บางแถวเป็นอีเมล) — การ์ดกล่องงานโชว์ "โดย ..." (เจ้าของ 1 พ.ย. 2569)
+    `select r.job_id, r.released_at,
+            coalesce(nullif(btrim(u.nickname), ''), nullif(btrim(u.full_name), ''), r.released_by_name) as released_by_name,
+            r.request_no, r.note
+       from ${TABLE} r
+       left join ${USERS} u on u.id = r.released_by
+      order by r.released_at desc limit $1`,
     [Math.min(Math.max(limit, 1), 2000)],
   );
   return rows;
