@@ -26,6 +26,7 @@ import { toYmdLocal } from '@/lib/dateTh';
 import { dashboardCohortYmd } from '@/lib/jobUrgency';
 import { PREQUEST_LABEL, isPrequestJob } from '@/lib/publicJobVisibility';
 import { buildRemainingBridge } from '@/lib/dashboard/remainingBridge';
+import { kpiTrendWindow, withKpiTrend } from '@/lib/dashboard/kpiTrend';
 import type {
   DashboardActivityTrendPoint,
   DashboardData,
@@ -1032,6 +1033,8 @@ export type BuildDashboardTrendInput = {
   to: string;
   label: string;
   throughputRecords?: ThroughputRecord[];
+  /** throughput ช่วงก่อน (กรองชุดเดียวกัน) — ลูกศรแนวโน้มบนการ์ด · null/ไม่ส่ง = ไม่มีลูกศร */
+  previousThroughputRecords?: ThroughputRecord[] | null;
 };
 
 function buildAgeDaysBreakdown(jobs: JobRequest[], today: Date) {
@@ -1203,7 +1206,7 @@ export function buildDashboardData(
 
   activityTrend = applyOpenQueueRemainingToActivityTrend(activityTrend, openRemainingJobs);
 
-  const kpis =
+  const stockKpis =
     cohortStock != null
       ? buildStockKpisFromCohort(
           period
@@ -1230,6 +1233,15 @@ export function buildDashboardData(
               : kpi,
         )
       : buildStockKpis(stockJobs, period?.label ?? null);
+  const kpis =
+    period && cohortStock != null
+      ? withKpiTrend(
+          stockKpis,
+          throughputRecords,
+          trend?.previousThroughputRecords ?? null,
+          kpiTrendWindow(period, toYmdLocal(today)),
+        )
+      : stockKpis;
 
   /** ใบในงวดที่ไม่ใช่ใบขอชั่วคราว — ถังอายุ/ภาระงานโหมดมีงวดนับชุดเดียวกับคงเหลือ (cohort ERP) */
   const periodStockReal = stockJobs.filter((j) => !isPrequestJob(j));

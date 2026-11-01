@@ -20,11 +20,22 @@ import { extractJobSubtypeLabel } from './siamrajUnitFilters';
 import { positionBreakdownFromJob } from './requestControl';
 import { UNIT_REQUEST_WORK_STATUS_LABELS, isUnitRequestWorkStatus } from './unitRequestWorkStatus';
 import { UNIT_SECTOR_LABEL } from './unitSector';
+import { jobSlaCell, type SlaCellKey } from './dashboard/slaByLeadKind';
+
+const SLA_SORT_RANK: Partial<Record<SlaCellKey, number>> = {
+  breached: 0,
+  at_risk: 1,
+  on_track: 2,
+  closed_late: 3,
+  closed_on_time: 4,
+  cancelled: 5,
+};
 
 /** คอลัมน์ที่กดเรียงได้ — เรียงตามลำดับที่โผล่บนตารางจริง */
 export const JOB_LIST_TABLE_COLUMNS = [
   'request_no',
   'age',
+  'sla',
   'unit',
   'sector',
   'submitted',
@@ -46,6 +57,7 @@ export type JobListTableColumn = (typeof JOB_LIST_TABLE_COLUMNS)[number];
 export const JOB_LIST_TABLE_COLUMN_LABEL: Record<JobListTableColumn, string> = {
   request_no: 'เลขที่ใบขอ',
   age: 'ผ่านมา',
+  sla: 'SLA',
   unit: 'หน่วยงาน',
   sector: 'ราชการ/เอกชน',
   submitted: 'วันที่กรอก',
@@ -185,6 +197,11 @@ export function tableSortValue(
       return job.unit_sector ? { text: UNIT_SECTOR_LABEL[job.unit_sector] } : {};
     case 'note':
       return textVal(job.list_note);
+    case 'sla': {
+      // หนักก่อน: เกินแล้ว → เสี่ยง → ยังทัน → ปิดไม่ทัน → ปิดทัน → ยกเลิก · คิดไม่ได้ตกท้าย
+      const rank = SLA_SORT_RANK[jobSlaCell(job, today)];
+      return rank == null ? {} : { num: rank };
+    }
     default:
       return {};
   }

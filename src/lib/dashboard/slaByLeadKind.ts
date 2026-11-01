@@ -19,7 +19,8 @@
  */
 
 import { computeJobUrgency } from '@/lib/jobUrgency';
-import type { RequestControlRecord } from '@/lib/requestControl';
+import { jobToRequestControlRecord, type RequestControlRecord } from '@/lib/requestControl';
+import type { JobRequest } from '@/types';
 import {
   REQUEST_LEAD_KIND_LABEL,
   REQUEST_LEAD_KIND_TONE,
@@ -61,15 +62,36 @@ export const SLA_CELL_LABEL: Record<SlaCellKey, string> = {
   unknown: 'คิด SLA ไม่ได้',
 };
 
+/**
+ * สีไฟจราจร เขียว/เหลือง/แดง (เจ้าของ 1 พ.ย. 2569 *"อันไหนแนวโน้มบวกเป็นเขียว แดง เหลือง ให้ดูง่ายๆ"*)
+ * ดี = เขียว (ปิดทัน · ยังทัน) · ใกล้หลุด = เหลือง · หลุดแล้ว = แดง (ปิดไม่ทัน · เกินแล้ว)
+ * ใช้ทั้งตาราง SLA ใน Dashboard และช่อง SLA ในหน้ารายการใบขอ
+ */
 export const SLA_CELL_TONE: Record<SlaCellKey, ToneKey> = {
   closed_on_time: 'success',
-  closed_late: 'orange',
+  closed_late: 'danger',
   cancelled: 'neutral',
   breached: 'danger',
   at_risk: 'warn',
-  on_track: 'info',
+  on_track: 'success',
   unknown: 'neutral',
 };
+
+/** คำสั้นบนป้ายรายใบ (หน้ารายการใบขอ) — ความหมายเดียวกับหัวตาราง */
+export const SLA_CELL_SHORT: Record<SlaCellKey, string> = {
+  closed_on_time: 'ปิดทัน',
+  closed_late: 'ปิดไม่ทัน',
+  cancelled: 'ยกเลิก',
+  breached: 'เกินแล้ว',
+  at_risk: 'เสี่ยง',
+  on_track: 'ยังทัน',
+  unknown: 'คิด SLA ไม่ได้',
+};
+
+/** ช่อง SLA ของใบเดียว — ตัวตัดสินเดียวกับตาราง SLA (`slaCellOf`) */
+export function jobSlaCell(job: JobRequest, today = new Date()): SlaCellKey {
+  return slaCellOf(jobToRequestControlRecord(job, today));
+}
 
 export type SlaLeadKindRow = {
   kind: RequestLeadKind;

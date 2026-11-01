@@ -86,6 +86,7 @@ import {
   jobsToThroughputRecords,
   type ThroughputRecord,
 } from '@/lib/dashboard/throughput';
+import { kpiTrendPreviousRange } from '@/lib/dashboard/kpiTrend';
 import type { JobRequest } from '@/types';
 
 /** กล่องที่กดแล้วการ์ดเร่งด่วนเป็นใบจาก cohort (ชุดเดียวกับเลขบนการ์ด) */
@@ -132,6 +133,8 @@ const SupervisorDashboard: React.FC = () => {
   const [detailDialogLoading, setDetailDialogLoading] = useState(false);
 
   const [throughputRecords, setThroughputRecords] = useState<ThroughputRecord[]>([]);
+  /** throughput ช่วงก่อนหน้า — ลูกศรแนวโน้มบนการ์ด 4 ใบ (`kpiTrend.ts`) · null = ยังไม่มี/โหลดไม่ได้ = ไม่มีลูกศร */
+  const [previousThroughput, setPreviousThroughput] = useState<{ key: string; records: ThroughputRecord[] } | null>(null);
   const [closedJobs, setClosedJobs] = useState<JobRequest[]>([]);
   /**
    * โหมด "ทั้งหมด" ไม่ดึงชุดใบปิดตอนเปิดหน้า — ช่วงเต็มมี 2,700+ ใบ ใช้เวลา ~20 วิ
@@ -237,6 +240,22 @@ const SupervisorDashboard: React.FC = () => {
       cancelled = true;
     };
   }, [siamrajPrimary, dbSource, throughputFrom, throughputTo, sideRev]);
+
+  useEffect(() => {
+    if (DEMO_MODE || !period || !(siamrajPrimary && dbSource === 'sqlserver')) return;
+    const prev = kpiTrendPreviousRange(period);
+    const key = `${prev.from}|${prev.to}`;
+    let cancelled = false;
+    void fetchSiamrajThroughput(prev.from, prev.to)
+      .then((rows) => {
+        if (!cancelled) setPreviousThroughput({ key, records: rows });
+      })
+      // โหลดไม่ได้ = ไม่มีลูกศร (ห้ามเทียบกับ 0)
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [period, siamrajPrimary, dbSource, sideRev]);
 
   useEffect(() => {
     if (DEMO_MODE) return;
@@ -503,6 +522,28 @@ const SupervisorDashboard: React.FC = () => {
     return { from, to, records: scoped.records, dropNote: scopeDropNote(scoped.droppedPositions) };
   }, [period, trendMeta, throughputRecords, unitFilters, jobsWithoutAgeFilter, scopedClosedJobs, assignees]);
 
+  /**
+   * ช่วงก่อนต้องผ่านตัวกรองชุดเดียวกับ `cohortScope` — ไม่งั้นลูกศรเทียบของคนละกอง
+   * กรองระดับใบ (หน่วยงาน/สถานะ/โน้ต ฯลฯ) ทำกับช่วงก่อนไม่ได้ เพราะไม่ได้โหลดใบปิดของช่วงก่อน → ไม่มีลูกศร
+   */
+  const previousCohortRecords = useMemo((): ThroughputRecord[] | null => {
+    if (!period || !previousThroughput) return null;
+    const prev = kpiTrendPreviousRange(period);
+    if (previousThroughput.key !== `${prev.from}|${prev.to}`) return null;
+    const byDept = filterThroughputByDepartment(previousThroughput.records, unitFilters.departmentFilter);
+    if (!needsRequestScopeFilter(unitFilters)) return byDept;
+    const needsJobLevel =
+      unitFilters.unitFilter !== 'all' ||
+      unitFilters.jobSubtypeFilter !== 'all' ||
+      unitFilters.urgencyFilter !== 'all' ||
+      unitFilters.noteFilter !== 'all' ||
+      unitFilters.ageDaysFilter !== 'all' ||
+      unitFilters.statusFilter !== 'all';
+    const byAssignee = assigneeRequestKeys(assignees, unitFilters);
+    if (needsJobLevel || !byAssignee) return null;
+    return scopeThroughputByRequestKeys(byDept, byAssignee).records;
+  }, [period, previousThroughput, unitFilters, assignees]);
+
 
   const data = useMemo(() => {
     if (DEMO_MODE) return MOCK_DASHBOARD_DATA;
@@ -534,6 +575,7 @@ const SupervisorDashboard: React.FC = () => {
          * สองเลขบนจอเดียวกันขัดกันเองแบบนั้นอ่านไม่ออกว่าอันไหนจริง
          */
         throughputRecords: cohortScope.records,
+        previousThroughputRecords: previousCohortRecords,
       },
       scopedClosedJobs,
       jobsWithoutAgeFilter,
@@ -549,7 +591,7 @@ const SupervisorDashboard: React.FC = () => {
       // โหมดทั้งหมด: ทับด้วยชุดที่รวมใบปิดที่โหลด on-demand แล้ว (ถ้ายังไม่โหลดก็ใช้ของเดิม)
       recruiterOverview: recruiterOverviewAllMode ?? built.recruiterOverview,
     };
-  }, [scopedJobs, period, filters, sortKey, sortDir, jobs, siamrajPrimary, unitFilters, cohortScope, scopedClosedJobs, jobsWithoutAgeFilter, trendMeta, recruiterOverviewAllMode, dbSource, sideFailed.throughput, throughputRecords.length]);
+  }, [scopedJobs, period, filters, sortKey, sortDir, jobs, siamrajPrimary, unitFilters, cohortScope, previousCohortRecords, scopedClosedJobs, jobsWithoutAgeFilter, trendMeta, recruiterOverviewAllMode, dbSource, sideFailed.throughput, throughputRecords.length]);
 
   const handleSort = useCallback(
     (key: DashboardSortKey) => {

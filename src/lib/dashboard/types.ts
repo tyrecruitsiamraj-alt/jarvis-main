@@ -65,6 +65,8 @@ export type DashboardKpi = {
   value: number;
   description: string;
   trendPercent: number | null;
+  /** เลขที่ใช้เทียบ เช่น "1–30 ก.ย. 2569 230" — ให้คนอ่านบวกลบเองได้ (`kpiTrend.ts`) */
+  trendBase?: string;
   format?: 'number' | 'percent';
   /** จำนวนใบขอรอง — แสดงคู่กับตำแหน่งหลัก */
   secondaryCount?: number;

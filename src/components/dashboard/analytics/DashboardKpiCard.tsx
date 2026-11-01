@@ -3,6 +3,7 @@ import { cn } from '@/lib/utils';
 import { ArrowDown, ArrowUp, Minus } from 'lucide-react';
 import { TONE, type ToneKey } from '@/lib/designTokens';
 import type { DashboardKpi } from '@/lib/dashboard/types';
+import { KPI_TREND_TONE, KPI_TREND_WORD, kpiTrendVerdict } from '@/lib/dashboard/kpiTrend';
 
 type Props = {
   kpi: DashboardKpi;
@@ -50,20 +51,13 @@ const DashboardKpiCard: React.FC<Props> = ({
   const solid = KPI_SOLID_IDS.has(kpi.id);
   const toneKey = KPI_TONE[kpi.id];
   const tone = toneKey ? TONE[toneKey] : null;
-  const trendColor =
-    trend == null || trend === 0
-      ? solid
-        ? 'text-white/70'
-        : 'text-slate-400'
-      : solid
-        ? 'text-white/90'
-        : kpi.id === 'overdue'
-          ? trend > 0
-            ? 'text-red-600'
-            : 'text-emerald-600'
-          : trend > 0
-            ? 'text-emerald-600 dark:text-emerald-400'
-            : 'text-red-600 dark:text-red-400';
+  /** ดี/ทรงตัว/แย่ ตัดสินที่ `kpiTrend.ts` ที่เดียว (เจ้าของ 1 พ.ย. 2569 "แนวโน้มบวกเป็นเขียว แดง เหลือง") */
+  const verdict = kpiTrendVerdict(kpi.id, trend);
+  const trendColor = solid
+    ? 'text-white/90'
+    : verdict
+      ? TONE[KPI_TREND_TONE[verdict]].value
+      : 'text-slate-500 dark:text-slate-400';
 
   return (
     <button
@@ -111,12 +105,19 @@ const DashboardKpiCard: React.FC<Props> = ({
         </div>
       ) : null}
       {trend != null ? (
-        <div className={cn('mt-2 flex items-center gap-1 text-xs font-medium', trendColor)}>
-          <TrendIcon className="h-3.5 w-3.5" aria-hidden />
-          <span>
-            {trend > 0 ? '+' : ''}
-            {trend}% เทียบช่วงก่อน
-          </span>
+        <div className="mt-2 flex flex-col gap-0.5">
+          <div className={cn('flex items-center gap-1 text-xs font-medium', trendColor)}>
+            <TrendIcon className="h-3.5 w-3.5" aria-hidden />
+            <span className="tabular-nums">
+              {trend > 0 ? '+' : ''}
+              {trend}%{verdict ? ` · ${KPI_TREND_WORD[verdict]}` : ''}
+            </span>
+          </div>
+          {kpi.trendBase ? (
+            <span className={cn('text-xs tabular-nums', solid ? 'text-white/80' : 'text-slate-500 dark:text-slate-400')}>
+              เทียบ {kpi.trendBase}
+            </span>
+          ) : null}
         </div>
       ) : null}
     </button>
