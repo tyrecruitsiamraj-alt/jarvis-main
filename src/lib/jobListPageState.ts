@@ -6,6 +6,7 @@ import {
   serializeTableSort,
   type JobListTableSort,
 } from '@/lib/jobListTableSort';
+import { SLA_FILTER_ORDER, type SlaCellKey } from '@/lib/dashboard/slaByLeadKind';
 import {
   isUnitRequestWorkStatus,
   type UnitRequestWorkStatus,
@@ -35,6 +36,8 @@ export type JobListPageState = {
   /** ราชการ/เอกชน/ยังไม่ระบุ (เจ้าของสั่ง 26 ส.ค. 2569) — [] = ทั้งหมด */
   sectorFilter: UnitSectorFilter[];
   ageDaysFilter: JobListAgeDaysFilter;
+  /** ช่อง SLA (เจ้าของ 1 พ.ย. 2569 "ช่อง SLA ทำตัวกรองด้วย") — [] = ทั้งหมด */
+  slaFilter: SlaCellKey[];
   sort: JobListSort;
   /**
    * เรียงจาก**การกดหัวคอลัมน์** — null = ใช้ `sort` (dropdown) ตามเดิม
@@ -61,6 +64,7 @@ export const JOB_LIST_DEFAULTS: JobListPageState = {
   replacementFilter: [],
   sectorFilter: [],
   ageDaysFilter: [],
+  slaFilter: [],
   sort: 'assignee_age',
   tableSort: null,
   page: 1,
@@ -150,6 +154,7 @@ export function parseJobListSearchParams(params: URLSearchParams): JobListPageSt
       allowed: AGE_DAYS_MULTI_VALUES,
       normalize: normalizeAgeToken,
     }) as JobListAgeDaysFilter,
+    slaFilter: parseMulti(params.get('sla'), { allowed: new Set<string>(SLA_FILTER_ORDER) }) as SlaCellKey[],
     sort: SORT_VALUES.has(sortRaw) ? sortRaw : JOB_LIST_DEFAULTS.sort,
     // `tsort=<column>:<dir>` — ค่าที่ parse ไม่ผ่านคืน null (กลับไปใช้ dropdown) ไม่ throw
     tableSort: parseTableSort(params.get('tsort')),
@@ -178,6 +183,7 @@ export function buildJobListSearchParams(state: JobListPageState): URLSearchPara
   setMulti('sr', state.replacementFilter);
   setMulti('sec', state.sectorFilter);
   setMulti('ag', state.ageDaysFilter);
+  setMulti('sla', state.slaFilter);
   if (state.sort !== JOB_LIST_DEFAULTS.sort) params.set('sort', state.sort);
   const tsort = serializeTableSort(state.tableSort);
   if (tsort) params.set('tsort', tsort);
@@ -205,6 +211,7 @@ const FILTER_RESET_KEYS: (keyof JobListPageState)[] = [
   'replacementFilter',
   'sectorFilter',
   'ageDaysFilter',
+  'slaFilter',
   'pageSize',
 ];
 

@@ -14,6 +14,9 @@ import {
 } from '@/lib/dashboard/kpiTrend';
 import { SLA_CELL_TONE, jobSlaCell } from '@/lib/dashboard/slaByLeadKind';
 import { sortJobsByTableColumn, JOB_LIST_TABLE_COLUMNS } from '@/lib/jobListTableSort';
+import { JOB_LIST_DEFAULTS, buildJobListSearchParams, parseJobListSearchParams } from '@/lib/jobListPageState';
+import fs from 'node:fs';
+import path from 'node:path';
 import type { DashboardKpi } from '@/lib/dashboard/types';
 import { defaultDashboardDateRange } from '@/lib/dashboard/buildDashboardData';
 import { monthlyIntakePoints, type ThroughputRecord } from '@/lib/dashboard/throughput';
@@ -152,5 +155,18 @@ describe('ช่อง SLA หน้ารายการใบขอ', () => {
     expect(JOB_LIST_TABLE_COLUMNS).toContain('sla');
     const sorted = sortJobsByTableColumn([safe, overdue], { column: 'sla', dir: 'asc' }, today);
     expect(sorted.map((j) => j.request_no)).toEqual(['OPL6909001', 'OPL6910050']);
+  });
+
+  it('ตัวกรอง SLA เก็บใน URL (?sla=) · ค่าแปลกถูกทิ้ง · เปลี่ยนแล้วกลับหน้า 1', () => {
+    const p = buildJobListSearchParams({ ...JOB_LIST_DEFAULTS, slaFilter: ['breached', 'at_risk'] });
+    expect(p.get('sla')).toBe('breached,at_risk');
+    expect(parseJobListSearchParams(new URLSearchParams('sla=breached,xxx,on_track')).slaFilter).toEqual(['breached', 'on_track']);
+    expect(parseJobListSearchParams(new URLSearchParams('')).slaFilter).toEqual([]);
+  });
+
+  it('หน้ารายการใบขอมีตัวกรอง SLA ที่ใช้ jobSlaCell ตัวเดียวกับป้าย', () => {
+    const src = fs.readFileSync(path.resolve(__dirname, '../../src/pages/jobs/JobListPage.tsx'), 'utf8');
+    expect(src).toContain('id="job-list-sla"');
+    expect(src).toContain('slaFilter.includes(jobSlaCell(j))');
   });
 });

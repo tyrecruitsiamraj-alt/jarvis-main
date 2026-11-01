@@ -88,6 +88,17 @@ export const SLA_CELL_SHORT: Record<SlaCellKey, string> = {
   unknown: 'คิด SLA ไม่ได้',
 };
 
+/** ลำดับตัวเลือกในตัวกรอง SLA หน้ารายการใบขอ — หนักก่อน */
+export const SLA_FILTER_ORDER: readonly SlaCellKey[] = [
+  'breached',
+  'at_risk',
+  'on_track',
+  'closed_late',
+  'closed_on_time',
+  'cancelled',
+  'unknown',
+];
+
 /** ช่อง SLA ของใบเดียว — ตัวตัดสินเดียวกับตาราง SLA (`slaCellOf`) */
 export function jobSlaCell(job: JobRequest, today = new Date()): SlaCellKey {
   return slaCellOf(jobToRequestControlRecord(job, today));
