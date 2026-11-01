@@ -10,6 +10,7 @@ import {
   kpiTrendPreviousRange,
   kpiTrendVerdict,
   kpiTrendWindow,
+  kpiTrendWord,
   withKpiTrend,
 } from '@/lib/dashboard/kpiTrend';
 import { SLA_CELL_TONE, jobSlaCell, filterRecordsForSlaCell, filterRecordsForLeadKind, buildSlaByLeadKind } from '@/lib/dashboard/slaByLeadKind';
@@ -44,6 +45,18 @@ describe('ลูกศรแนวโน้มการ์ด', () => {
     expect(kpiTrendVerdict('remaining', -4)).toBe('flat');
     expect(kpiTrendVerdict('closed', 5)).toBe('better');
     expect(KPI_TREND_TONE).toEqual({ better: 'success', flat: 'warn', worse: 'danger' });
+  });
+
+  it('คำบนการ์ดบอกทิศ เพิ่มขึ้น/ลดลง/ทรงตัว (เจ้าของ 1 พ.ย.) · ดีหรือแย่บอกด้วยสี', () => {
+    expect(kpiTrendWord(15)).toBe('เพิ่มขึ้น');
+    expect(kpiTrendWord(-46)).toBe('ลดลง');
+    expect(kpiTrendWord(111)).toBe('เพิ่มขึ้น');
+    expect(kpiTrendWord(2)).toBe('ทรงตัว');
+    expect(kpiTrendWord(-4)).toBe('ทรงตัว');
+    const card = fs.readFileSync(path.resolve(__dirname, '../../src/components/dashboard/analytics/DashboardKpiCard.tsx'), 'utf8');
+    expect(card).not.toMatch(/ดีขึ้น|แย่ลง/);
+    // เจ้าของ 1 พ.ย. "เอา % ออก" — การ์ดไม่เขียน % ของแนวโน้ม
+    expect(card).not.toMatch(/\{trend\}%/);
   });
 
   it('ช่วงก่อนเป็น 0 = ไม่มี % (ไม่ใช่ 0) · การ์ดอื่นไม่มีลูกศร', () => {

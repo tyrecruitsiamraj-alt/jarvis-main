@@ -3,7 +3,7 @@ import { cn } from '@/lib/utils';
 import { ArrowDown, ArrowUp, Minus } from 'lucide-react';
 import { TONE, type ToneKey } from '@/lib/designTokens';
 import type { DashboardKpi } from '@/lib/dashboard/types';
-import { KPI_TREND_TONE, KPI_TREND_WORD, kpiTrendVerdict } from '@/lib/dashboard/kpiTrend';
+import { KPI_TREND_TONE, kpiTrendVerdict, kpiTrendWord } from '@/lib/dashboard/kpiTrend';
 
 type Props = {
   kpi: DashboardKpi;
@@ -47,7 +47,9 @@ const DashboardKpiCard: React.FC<Props> = ({
   selected = false,
 }) => {
   const trend = kpi.trendPercent;
-  const TrendIcon = trend == null || trend === 0 ? Minus : trend > 0 ? ArrowUp : ArrowDown;
+  /** เจ้าของ 1 พ.ย. 2569 "เอา % ออก" — เหลือลูกศร + คำ (เพิ่มขึ้น/ลดลง/ทรงตัว) */
+  const trendWord = trend == null ? null : kpiTrendWord(trend);
+  const TrendIcon = trendWord == null || trendWord === 'ทรงตัว' ? Minus : trend! > 0 ? ArrowUp : ArrowDown;
   const solid = KPI_SOLID_IDS.has(kpi.id);
   const toneKey = KPI_TONE[kpi.id];
   const tone = toneKey ? TONE[toneKey] : null;
@@ -108,10 +110,7 @@ const DashboardKpiCard: React.FC<Props> = ({
         <div className="mt-2 flex flex-col gap-0.5">
           <div className={cn('flex items-center gap-1 text-xs font-medium', trendColor)}>
             <TrendIcon className="h-3.5 w-3.5" aria-hidden />
-            <span className="tabular-nums">
-              {trend > 0 ? '+' : ''}
-              {trend}%{verdict ? ` · ${KPI_TREND_WORD[verdict]}` : ''}
-            </span>
+            <span>{trendWord}</span>
           </div>
           {kpi.trendBase ? (
             <span className={cn('text-xs tabular-nums', solid ? 'text-white/80' : 'text-slate-500 dark:text-slate-400')}>

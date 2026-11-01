@@ -8,7 +8,7 @@
  * - ขั้นที่เดินหน้าใน journey เพิ่ม = ดีขึ้น (เข้ามา · หาได้แล้ว)
  * - ขั้นที่หลุด/ค้างเพิ่ม = แย่ลง (ยกเลิก · เหลือหา)
  * - เปลี่ยนไม่ถึง 5% = ทรงตัว (เหลือง)
- * - บอกด้วยคำเสมอ ไม่ใช้สีอย่างเดียว
+ * - คำบอกทิศ (เพิ่มขึ้น/ลดลง/ทรงตัว) · สีบอกดีหรือแย่
  * - ช่วงที่ยังไม่จบ (เช่น เดือนนี้) เทียบเฉพาะจำนวนวันที่ผ่านมาเท่ากัน — เทียบทั้งเดือนกับ
  *   เดือนที่เพิ่งเริ่มได้แต่ "แย่ลง" ปลอม
  * - โหมด "ทั้งหมด" ไม่มีช่วงก่อนให้เทียบ = ไม่มีลูกศร
@@ -31,11 +31,14 @@ export const KPI_TREND_UP_IS_GOOD: Record<string, boolean> = {
 
 export type KpiTrendVerdict = 'better' | 'flat' | 'worse';
 
-export const KPI_TREND_WORD: Record<KpiTrendVerdict, string> = {
-  better: 'ดีขึ้น',
-  flat: 'ทรงตัว',
-  worse: 'แย่ลง',
-};
+/**
+ * คำบนการ์ดบอกทิศของตัวเลข (เจ้าของ 1 พ.ย. 2569 *"ต้องใช้คำว่าเพิ่มขึ้น"*) — ดีหรือแย่บอกด้วยสีตาม journey
+ * เปลี่ยนไม่ถึง 5% = ทรงตัว
+ */
+export function kpiTrendWord(percent: number): string {
+  if (Math.abs(percent) < KPI_TREND_FLAT_PERCENT) return 'ทรงตัว';
+  return percent > 0 ? 'เพิ่มขึ้น' : 'ลดลง';
+}
 
 export const KPI_TREND_TONE: Record<KpiTrendVerdict, ToneKey> = {
   better: 'success',
