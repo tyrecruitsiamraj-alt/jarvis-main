@@ -390,9 +390,6 @@ function proposalStatusClass(status: ProposalStatus): string {
  * Wave 2.2 (5 ก.ย. 2569): เดิม `min-h-8` = 32px — ผู้ทดสอบมือถือทักว่าปุ่มเล็กแตะยาก
  * ⇒ มือถือดันเป็น `min-h-9` (36px) · จอ sm ขึ้นไปกลับเป็น 32px ความหนาแน่นเท่าเดิม
  */
-const CANDIDATE_ACTION_BUTTON_CLASS =
-  'inline-flex min-h-9 sm:min-h-8 cursor-pointer items-center justify-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium shadow-sm transition-[transform,box-shadow,background-color,border-color] hover:-translate-y-px hover:shadow-md active:translate-y-0 active:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none disabled:transform-none';
-
 /**
  * ปุ่มเปลี่ยนสถานะผู้สมัคร — สีมาจากโทนของสถานะที่แหล่งกลาง (PROPOSAL_STATUS_TONE)
  * ไม่ประกาศสีสถานะซ้ำในหน้านี้: ติดต่อ=น้ำเงิน · จอง=ม่วง · ลงงาน=เขียว · ไม่ผ่าน=แดง
@@ -405,18 +402,12 @@ const CANDIDATE_ACTION_BUTTON_CLASS =
  * (เจ้าของทัก 21 ส.ค. 2569: *"คนนี้อยู่ใน Todo ทำ[ไม]บอกลงงานแล้ว"* — การ์ด #1808
  * ตรวจฐานแล้วไม่มี proposal สักแถว สถานะไม่ได้เพี้ยน เพี้ยนที่สีปุ่ม)
  */
+/** สีบนปุ่มกลาง (`Button` variant outline · 1 พ.ย. 2569 เลิกปั้นปุ่มเอง) */
 function proposalActionButtonClass(status: ProposalStatus, currentStatus?: ProposalStatus | null): string {
   const tone = TONE[PROPOSAL_STATUS_TONE[status]];
-  if (isSolidProposalAction(status, currentStatus)) {
-    return cn(CANDIDATE_ACTION_BUTTON_CLASS, 'border-transparent', tone.solid);
-  }
-  return cn(CANDIDATE_ACTION_BUTTON_CLASS, tone.soft, tone.softHover, tone.value);
+  if (isSolidProposalAction(status, currentStatus)) return cn('border-transparent', tone.solid);
+  return cn(tone.soft, tone.softHover, tone.value);
 }
-
-/**
- * ปุ่มกลม ๆ ของตัวกรอง/การเรียง/จำนวนต่อหน้า — ที่เลือกอยู่ = โทน primary (กำลังดำเนินการ)
- * ที่ไม่ได้เลือก = พื้นกลาง แล้ว hover เป็น primary เพื่อบอกว่ากดได้
- */
 
 function proposalRefFromItem(item: CandidateProposal): ProposedRef {
   return {
@@ -3977,54 +3968,61 @@ const MatchingPage: React.FC = () => {
                         </div>
                       ) : null}
                       <div className="flex flex-wrap gap-1.5">
-                        <button
+                        <Button
                           type="button"
+                          variant="outline"
+                          size="sm"
                           disabled={busy || !!activeElsewhere}
                           onClick={() => openBoardProposalAction(jobDetail, candDetail, 'contacted')}
                           className={proposalActionButtonClass('contacted', current?.status)}
                         >
-                          <PhoneCall className="h-3.5 w-3.5" />
+                          <PhoneCall aria-hidden />
                           {busy ? 'กำลังบันทึก…' : current?.status === 'contacted' ? 'ติดต่อแล้ว' : 'ติดต่อแล้ว'}
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                           type="button"
+                          variant="outline"
+                          size="sm"
                           disabled={busy || !!activeElsewhere}
                           onClick={() => openBoardProposalAction(jobDetail, candDetail, 'reserved')}
                           className={proposalActionButtonClass('reserved', current?.status)}
                         >
-                          <UserCheck className="h-3.5 w-3.5" />
+                          <UserCheck aria-hidden />
                           {busy ? 'กำลังบันทึก…' : current?.status === 'reserved' ? 'จองตัวแล้ว' : 'จองตัว'}
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                           type="button"
+                          variant="outline"
+                          size="sm"
                           disabled={busy || !!activeElsewhere}
                           onClick={() => openBoardProposalAction(jobDetail, candDetail, 'placed')}
                           className={proposalActionButtonClass('placed', current?.status)}
                         >
-                          <CheckCircle2 className="h-3.5 w-3.5" />
+                          <CheckCircle2 aria-hidden />
                           {busy ? 'กำลังบันทึก…' : current?.status === 'placed' ? 'ลงงานแล้ว' : 'ลงงานแล้ว'}
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                           type="button"
+                          variant="outline"
+                          size="sm"
                           disabled={busy}
                           onClick={() => openBoardProposalAction(jobDetail, candDetail, 'rejected')}
                           className={proposalActionButtonClass('rejected', current?.status)}
                         >
-                          <UserX className="h-3.5 w-3.5" />
+                          <UserX aria-hidden />
                           {current?.status === 'rejected' ? 'ไม่ผ่าน' : 'ไม่ผ่าน'}
-                        </button>
+                        </Button>
                         {current && isActiveWorkflowStatus(current.status) ? (
-                          <button
+                          <Button
                             type="button"
+                            variant="outline"
+                            size="sm"
                             disabled={busy}
                             onClick={() => openCancelProposalAction(jobDetail, key, candDetail.full_name)}
-                            className={cn(
-                              CANDIDATE_ACTION_BUTTON_CLASS,
-                              cn(TONE.danger.outline, 'focus-visible:ring-red-400'),
-                            )}
+                            className={TONE.danger.outline}
                           >
-                            <X className="h-3 w-3" /> ยกเลิกการจอง
-                          </button>
+                            <X aria-hidden /> ยกเลิกการจอง
+                          </Button>
                         ) : null}
                       </div>
                       {/* บอกให้ชัดว่าแถวข้างบนคือ "ปุ่มกดเพื่อบันทึก" ไม่ใช่ป้ายสถานะ

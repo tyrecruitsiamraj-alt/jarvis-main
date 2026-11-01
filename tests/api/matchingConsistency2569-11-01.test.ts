@@ -22,6 +22,14 @@ describe('หน้าจับคู่งาน', () => {
       expect(page.lastIndexOf('<Button', at)).toBeGreaterThan(page.lastIndexOf('<button', at));
     }
   });
+  it('ปุ่มสถานะเสนอคน (ติดต่อแล้ว · จองตัว · ลงงานแล้ว · ไม่ผ่าน · ยกเลิกการจอง) ใช้ปุ่มกลาง · ที่ยังเป็น <button> มีแค่การ์ดคนทั้งใบ', () => {
+    for (const st of ['contacted', 'reserved', 'placed', 'rejected']) {
+      const at = page.indexOf(`openBoardProposalAction(jobDetail, candDetail, '${st}')`);
+      expect(page.lastIndexOf('<Button', at)).toBeGreaterThan(page.lastIndexOf('<button', at));
+    }
+    expect(page).not.toContain('CANDIDATE_ACTION_BUTTON_CLASS');
+    expect(page.match(/<button\b/g) ?? []).toHaveLength(1);
+  });
   it('/matching พาไปหน้าจับคู่งาน · หน้าการ์ด 2 ใบถอดแล้ว', () => {
     const app = readFileSync('src/App.tsx', 'utf8');
     expect(app).toContain('<Route path="/matching" element={<Navigate to="/matching/match" replace />} />');
