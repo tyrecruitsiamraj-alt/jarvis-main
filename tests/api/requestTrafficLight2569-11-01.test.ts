@@ -199,3 +199,10 @@ describe('ช่อง SLA หน้ารายการใบขอ', () => {
     expect(item.subtitle).toContain('SLA เกินแล้ว · ครบ');
   });
 });
+
+describe('การ์ดสมการงานค้างเอาออกจากศูนย์ควบคุมใบขอ (เจ้าของ 1 พ.ย. 2569)', () => {
+  it('DashboardShell ไม่แสดง DashboardFlowViewCard', () => {
+    const shell = fs.readFileSync(path.resolve(__dirname, '../../src/components/dashboard/analytics/DashboardShell.tsx'), 'utf8');
+    expect(shell).not.toMatch(/<DashboardFlowViewCard/);
+  });
+});

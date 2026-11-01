@@ -23,7 +23,6 @@ import DashboardUnitOverviewChart from './DashboardUnitOverviewChart';
 import DashboardDriverOverview from './DashboardDriverOverview';
 import DashboardExpandablePanel from './DashboardExpandablePanel';
 import DashboardExecutiveInsightsCard from './DashboardExecutiveInsights';
-import DashboardFlowViewCard from './DashboardFlowView';
 import DashboardCohortSummaryCard from './DashboardCohortSummary';
 import DashboardClosedBreakdownCard from './DashboardClosedBreakdown';
 import type { DashboardWorkItem } from '@/lib/dashboard/types';
@@ -530,12 +529,9 @@ const DashboardShell: React.FC<Props> = ({
 
               {/* ⚠️ การ์ด "ต้องแก้วันนี้" (DashboardPriorityQueue) ถูกเอาออก 10 ส.ค. 2569 ตามที่เจ้าของสั่ง
                   — ตัวคำนวณ `priorityWorkQueue` ยังอยู่ใน buildDashboardData และยังมีเทสต์คุม
-                  เผื่อเอากลับมา · เหลือ "สมการงานค้าง" เต็มความกว้าง */}
-              {data.flowView ? (
-                <div className="grid gap-3">
-                  <DashboardFlowViewCard flow={data.flowView} summary={data.requestControlSummary} />
-                </div>
-              ) : null}
+                  เผื่อเอากลับมา
+                  ⚠️ การ์ด "สมการงานค้าง" (DashboardFlowView) ถูกเอาออก 1 พ.ย. 2569 ตามที่เจ้าของสั่ง
+                  ("ถ้าใช่เอาออก" — โผล่มาเองหลังหน้าเปิดที่เดือนก่อน) · `data.flowView` ยังคำนวณอยู่ เผื่อเอากลับมา */}
 
               {/* แผงรองทั้งหมดยุบเป็นแถวกดขยาย — ข้อมูลครบทุกแผง ไม่มีตัวไหนหาย (กติกา mockup ข้อ 02) */}
               {data.executiveInsights && data.executiveInsights.sentences.length > 0 ? (
