@@ -1,8 +1,9 @@
 import React from 'react';
-import { Link2, LoaderCircle, Send } from 'lucide-react';
+import { ChevronDown, Link2, LoaderCircle, Send } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -30,7 +31,6 @@ import {
   SO_POST_MODES,
   SO_POST_MODE_LABEL,
   SO_POST_REASON,
-  jobProvinceOf,
   soAccountOnWorker,
   soGroupStatsText,
   soPostConfirmWarnings,
@@ -38,6 +38,11 @@ import {
   soAccountSelectable,
   soGroupLabel,
   soGroupsOfAccount,
+  soGroupSections,
+  defaultSoGroupPick,
+  jobBuOf,
+  soBuEmptyText,
+  type SoGroupSection,
   soPostSnapshot,
   soStatusView,
   soWarningText,
@@ -103,7 +108,8 @@ export function AutopostBody({
 }) {
   const looked = useRecruiterContact(job.recruiter_contact ? null : job.recruiter_name);
   const contact = job.recruiter_contact ?? looked;
-  const province = jobProvinceOf(job);
+  /** ธุรกิจของใบขอ — หมวดกลุ่มที่ติ๊กไว้ให้ (เจ้าของ 2 พ.ย. 2569) */
+  const jobBu = jobBuOf(job);
 
   const [postings, setPostings] = React.useState<RecruitPosting[] | null>(null);
   const [opts, setOpts] = React.useState<SoOptions | null>(null);
@@ -165,14 +171,14 @@ export function AutopostBody({
           setAccountId(acc.id);
           setWorkerName(acc.worker ?? '');
           if (acc.status === 'worker_offline') setWarn(offlineWarn(acc));
-          setPicked(defaultGroups(o, acc, province, s.recentGroups));
+          setPicked(defaultSoGroupPick(soGroupsOfAccount(o, acc), jobBu));
         }
       })
       .catch((e) => alive && setLoadError(e instanceof Error ? e.message : 'โหลดข้อมูลไม่ได้'));
     return () => {
       alive = false;
     };
-  }, [job.id, province]);
+  }, [job.id, jobBu]);
 
   const openPosting = postings?.find((p) => p.status === 'open') ?? null;
   const links = openPosting?.links ?? [];
@@ -188,6 +194,7 @@ export function AutopostBody({
         : [],
     [opts, account],
   );
+  const sections = React.useMemo(() => soGroupSections(accountGroups, jobBu), [accountGroups, jobBu]);
   const postWorkers = opts ? soWorkersFor(opts, 'autopost') : [];
   const worker = postWorkers.find((w) => w.name === workerName) ?? null;
   const recent = new Set(state?.recentGroups ?? []);
@@ -244,7 +251,7 @@ export function AutopostBody({
     setWarn(a.status === 'worker_offline' ? offlineWarn(a) : null);
     setAccountId(id);
     setWorkerName(a.worker ?? '');
-    setPicked(defaultGroups(opts, a, province, state?.recentGroups ?? []));
+    setPicked(defaultSoGroupPick(soGroupsOfAccount(opts, a), jobBu));
   };
 
   const send = async (confirmed = false) => {
@@ -445,32 +452,25 @@ export function AutopostBody({
             {!account ? null : accountGroups.length === 0 ? (
               <p className={cn('text-sm', TONE.warn.value)}>บัญชีนี้ยังไม่มีกลุ่ม ให้เพิ่มที่ระบบ So Scraping</p>
             ) : (
-              <ul className="space-y-2" data-testid="autopost-groups">
-                {accountGroups.map((g) => (
-                  <li key={g.id} className="flex items-start gap-2">
-                    <Checkbox
-                      id={`autopost-group-${job.id}-${g.id}`}
-                      checked={picked.includes(g.id)}
-                      onCheckedChange={(v) =>
-                        setPicked((prev) => (v === true ? [...new Set([...prev, g.id])] : prev.filter((x) => x !== g.id)))
-                      }
-                      className="mt-0.5"
-                    />
-                    <Label htmlFor={`autopost-group-${job.id}-${g.id}`} className="space-y-0.5 font-normal">
-                      <span className="block text-sm text-foreground">{soGroupLabel(g)}</span>
-                      <span className={cn('block text-xs', DASH.muted)}>
-                        {[
-                          soGroupStatsText(g.stats30d),
-                          g.lastPostedAt ? `โพสต์ล่าสุด ${WHEN.format(new Date(g.lastPostedAt))}` : null,
-                          recent.has(g.id) ? 'ใบนี้เพิ่งสั่งโพสต์กลุ่มนี้ใน 3 วัน' : null,
-                        ]
-                          .filter(Boolean)
-                          .join(' · ')}
-                      </span>
-                    </Label>
-                  </li>
+              <div className="space-y-2" data-testid="autopost-groups">
+                {/* หมวดตามธุรกิจ (เจ้าของ 2 พ.ย. 2569): ธุรกิจของใบขอกางและติ๊กให้ครบ · ที่เหลือพับ ไม่ติ๊ก */}
+                {jobBu && !sections.some((x) => x.forJob) ? (
+                  <p className={cn('text-sm', TONE.warn.value)} data-testid="autopost-bu-empty">
+                    {soBuEmptyText(jobBu)}
+                  </p>
+                ) : null}
+                {!jobBu ? <p className={cn('text-sm', TONE.warn.value)}>ใบขอนี้ไม่ระบุธุรกิจ — เลือกกลุ่มเอง</p> : null}
+                {sections.map((sec) => (
+                  <GroupSection
+                    key={sec.bu ?? '__none__'}
+                    jobId={job.id}
+                    section={sec}
+                    picked={picked}
+                    recent={recent}
+                    onToggle={(ids, on) => setPicked((prev) => (on ? [...new Set([...prev, ...ids])] : prev.filter((x) => !ids.includes(x))))}
+                  />
                 ))}
-              </ul>
+              </div>
             )}
           </section>
 
@@ -588,11 +588,72 @@ export function firstAccount(list: readonly SoOptAccount[]): SoOptAccount | null
   return null;
 }
 
-/** ติ๊กไว้ให้ก่อน = กลุ่มของบัญชีที่ชื่อมีจังหวัดของใบขอ และยังไม่ได้สั่งโพสต์ใน 3 วัน */
-function defaultGroups(o: SoOptions, acc: SoOptAccount, province: string | null, recent: readonly string[]): string[] {
-  const p = (province ?? '').replace(/^จังหวัด/, '').trim();
-  if (!p) return [];
-  return soGroupsOfAccount(o, acc)
-    .filter((g: SoOptGroup) => (g.name ?? '').includes(p) && !recent.includes(g.id))
-    .map((g) => g.id);
+/** หมวดกลุ่มตามธุรกิจ — ช่องติ๊กที่หัวเลือก/เอาออกทั้งหมวด · หมวดธุรกิจของใบขอเปิดอยู่ ที่เหลือพับ */
+function GroupSection({
+  jobId,
+  section,
+  picked,
+  recent,
+  onToggle,
+}: {
+  jobId: string;
+  section: SoGroupSection;
+  picked: readonly string[];
+  recent: ReadonlySet<string>;
+  onToggle: (ids: string[], on: boolean) => void;
+}) {
+  const [open, setOpen] = React.useState(section.forJob);
+  const ids = section.groups.map((g) => g.id);
+  const n = ids.filter((id) => picked.includes(id)).length;
+  const headId = `autopost-bu-${jobId}-${section.bu ?? 'none'}`;
+  return (
+    <Collapsible open={open} onOpenChange={setOpen} className="rounded-xl border border-border/70" data-testid={`autopost-bu-${section.bu ?? 'none'}`}>
+      <div className="flex items-center gap-2 px-3 py-2">
+        <Checkbox
+          id={headId}
+          checked={n === 0 ? false : n === ids.length ? true : 'indeterminate'}
+          onCheckedChange={(v) => onToggle(ids, v === true)}
+          aria-label={`เลือกทุกกลุ่มของ ${section.label}`}
+        />
+        <Label htmlFor={headId} className="flex-1 text-sm font-medium text-foreground">
+          {section.label}
+          <span className={cn('ml-2 text-xs font-normal tabular-nums', DASH.muted)}>
+            ติ๊ก {NUM.format(n)} / {NUM.format(ids.length)} กลุ่ม
+          </span>
+        </Label>
+        <CollapsibleTrigger asChild>
+          <Button type="button" size="xs" variant="ghost" aria-label={open ? `พับ ${section.label}` : `กาง ${section.label}`}>
+            {open ? 'พับ' : 'กาง'}
+            <ChevronDown className={cn('transition-transform', open && 'rotate-180')} aria-hidden />
+          </Button>
+        </CollapsibleTrigger>
+      </div>
+      <CollapsibleContent>
+        <ul className="space-y-2 border-t border-border/70 px-3 py-2">
+          {section.groups.map((g) => (
+            <li key={g.id} className="flex items-start gap-2">
+              <Checkbox
+                id={`autopost-group-${jobId}-${g.id}`}
+                checked={picked.includes(g.id)}
+                onCheckedChange={(v) => onToggle([g.id], v === true)}
+                className="mt-0.5"
+              />
+              <Label htmlFor={`autopost-group-${jobId}-${g.id}`} className="space-y-0.5 font-normal">
+                <span className="block text-sm text-foreground">{soGroupLabel(g)}</span>
+                <span className={cn('block text-xs', DASH.muted)}>
+                  {[
+                    soGroupStatsText(g.stats30d),
+                    g.lastPostedAt ? `โพสต์ล่าสุด ${WHEN.format(new Date(g.lastPostedAt))}` : null,
+                    recent.has(g.id) ? 'ใบนี้เพิ่งสั่งโพสต์กลุ่มนี้ใน 3 วัน' : null,
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')}
+                </span>
+              </Label>
+            </li>
+          ))}
+        </ul>
+      </CollapsibleContent>
+    </Collapsible>
+  );
 }

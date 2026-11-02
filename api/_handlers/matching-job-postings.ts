@@ -19,7 +19,7 @@ import {
   normalizeJobPostingRequestType,
 } from '../_lib/jobPostingRequests.js';
 import { isSiamrajRequestInScope, loadScopedRequestNoSet } from '../_lib/siamrajUnitRequests.js';
-import { listLinkedSoGroups } from '../_lib/soScrapingGroups.js';
+import { listSoGroups } from '../_lib/soScrapingGroups.js';
 import { fetchSoOptions, SoOptionsError, startSoRequest } from '../_lib/soScrapingOptions.js';
 import { dbQuery } from '../_lib/postgres.js';
 import { tableInAppSchema } from '../_lib/schema.js';
@@ -93,9 +93,9 @@ async function handler(req: AuthedReq, res: ApiRes) {
         const latest = await listLatestJobPostingsForJob(jobId);
         return res.status(200).json({ item: active[0] ?? null, active, latest, recent_groups: await recentGroupsOfJob(jobId) });
       }
-      // กลุ่ม Facebook ของ So Scraping ที่มีบัญชีผูก — อ่านอย่างเดียว (ป๊อปสั่งโพสต์ · 20 ต.ค. 2569)
+      // กลุ่ม Facebook ของ So Scraping ทุกกลุ่ม — อ่านอย่างเดียว (20 ต.ค. 2569 · 2 พ.ย. เลิกกรองเฉพาะที่มีบัญชีผูก)
       if (getQuery(req, 'groups') === '1') {
-        return res.status(200).json({ groups: await listLinkedSoGroups() });
+        return res.status(200).json({ groups: await listSoGroups() });
       }
       // ป๊อป Autopost / ขอ Scrap: บัญชี · กลุ่ม · เครื่อง · บัญชี JobThai/JobBKK จาก options API ของ So Scraping
       // (26 ต.ค. 2569 · ดึงใหม่ทุกครั้ง ไม่ cache · key อยู่ฝั่ง server) — ยังไม่ใส่ key = อ่านจากฐานแบบเดิม

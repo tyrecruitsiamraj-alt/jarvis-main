@@ -10,6 +10,7 @@
 import type { JobRequest } from '@/types';
 import type { ToneKey } from '@/lib/designTokens';
 import { inferProvinceFromAddress } from '@/lib/parseThaiJobAddress';
+import { normalizeTrendBu, trendBuFromSiteCode } from '@/lib/trends/bu';
 
 export type SoPostMode = 'caption_only' | 'caption_image' | 'image_only';
 export const SO_POST_MODES: readonly SoPostMode[] = ['caption_only', 'caption_image', 'image_only'];
@@ -227,6 +228,8 @@ export type SoOptGroup = {
   accountIds: string[];
   lastPostedAt: string | null;
   stats30d: SoGroupStats | null;
+  /** ธุรกิจของกลุ่ม (รหัสแผนก LBD · LBA · LM · DS · SN · ชุดเดียวกับ users.department_code) · null = ไม่ระบุธุรกิจ (So Scraping 2 พ.ย. 2569) */
+  department: string | null;
 };
 export type SoWorkerKind = 'autopost' | 'scraper';
 export type SoOptWorker = {
@@ -337,6 +340,55 @@ export function soGroupsOfAccount(o: Pick<SoOptions, 'groups'>, acc: Pick<SoOptA
   return o.groups.filter((g) => acc.groupIds.includes(g.id) || g.accountIds.includes(acc.id));
 }
 
+/* ═══ กลุ่มแยกตามธุรกิจของใบขอ (เจ้าของ 2 พ.ย. 2569 · So Scraping ติดป้ายธุรกิจให้ทุกกลุ่มแล้ว) ═══
+ * ป๊อปสั่งโพสต์: หมวดธุรกิจเดียวกับใบขอ ติ๊กไว้ให้ทั้งหมด · ธุรกิจอื่น/ไม่ระบุ พับไว้ ไม่ติ๊ก
+ * รหัสบนจอใช้ตามที่ทีมเรียก (LBD · LBA · …) ไม่ตั้งชื่อใหม่
+ */
+export const SO_BU_NONE_LABEL = 'ไม่ระบุธุรกิจ';
+
+/** ธุรกิจของใบขอ = BU จากรหัสไซต์ (ใบขอ ERP) · ไม่มีไซต์ใช้แผนก (ใบขอชั่วคราว) — ตารางจับคู่ตัวเดียวกับหน้าหลัก */
+export function jobBuOf(job: Pick<JobRequest, 'site_code' | 'department_code'>): string | null {
+  return trendBuFromSiteCode(job.site_code) ?? normalizeTrendBu(job.department_code);
+}
+
+export type SoGroupSection = {
+  /** รหัสธุรกิจ · null = ไม่ระบุ */
+  bu: string | null;
+  label: string;
+  /** หมวดธุรกิจเดียวกับใบขอ (เปิดกางและติ๊กไว้ให้) */
+  forJob: boolean;
+  groups: SoOptGroup[];
+};
+
+/** จัดหมวด: ธุรกิจของใบขอก่อน → ธุรกิจอื่นเรียงรหัส → ไม่ระบุท้ายสุด · หมวดว่างไม่ขึ้น (ใบขอที่ธุรกิจไม่มีกลุ่มเลยให้บอกด้วย `soBuEmptyText`) */
+export function soGroupSections(groups: readonly SoOptGroup[], jobBu: string | null): SoGroupSection[] {
+  const by = new Map<string | null, SoOptGroup[]>();
+  for (const g of groups) {
+    const k = g.department ?? null;
+    by.set(k, [...(by.get(k) ?? []), g]);
+  }
+  const codes = [...by.keys()].filter((k): k is string => k !== null && k !== jobBu).sort((a, b) => a.localeCompare(b));
+  const order: (string | null)[] = [...(jobBu && by.has(jobBu) ? [jobBu] : []), ...codes, ...(by.has(null) ? [null] : [])];
+  return order.map((bu) => ({ bu, label: bu ?? SO_BU_NONE_LABEL, forJob: bu !== null && bu === jobBu, groups: by.get(bu) ?? [] }));
+}
+
+/** ติ๊กไว้ให้ตั้งแต่เปิดป๊อป = ทุกกลุ่มของธุรกิจเดียวกับใบขอ · ใบขอไม่ระบุธุรกิจ = ไม่ติ๊ก */
+export function defaultSoGroupPick(groups: readonly SoOptGroup[], jobBu: string | null): string[] {
+  if (!jobBu) return [];
+  return groups.filter((g) => g.department === jobBu).map((g) => g.id);
+}
+
+/** ธุรกิจของใบขอยังไม่มีกลุ่มเลย — บอกว่าไปเพิ่มที่ไหน ไม่ปล่อยรายการว่าง */
+export function soBuEmptyText(bu: string): string {
+  return `ยังไม่มีกลุ่มของธุรกิจ ${bu} ใน So Scraping — เพิ่มที่ ตั้งค่า → กลุ่มโพสต์ หรือเลือกจากธุรกิจอื่น`;
+}
+
+/** กลุ่มจาก options API ยังไม่มีช่องธุรกิจ — เติมจากฐานของ So Scraping (อ่านอย่างเดียว) · กลุ่มที่ API มี department มาเองไม่ทับ */
+export function withSoGroupDepartments(o: SoOptions, db: ReadonlyArray<{ id: string; department: string | null }>): SoOptions {
+  const dept = new Map(db.map((g) => [g.id, normalizeTrendBu(g.department)]));
+  return { ...o, groups: o.groups.map((g) => (g.department ? g : { ...g, department: dept.get(g.id) ?? null })) };
+}
+
 const ACCOUNT_STATUSES: readonly SoAccountStatus[] = ['ready', 'busy', 'full', 'paused', 'worker_offline', 'no_worker'];
 const SCRAPE_STATUSES: readonly SoScrapeStatus[] = ['ready', 'full', 'cooldown', 'disabled'];
 const str = (v: unknown): string | null => (typeof v === 'string' && v.trim() ? v.trim() : null);
@@ -383,6 +435,7 @@ export function parseSoOptions(raw: unknown): SoOptions | null {
       url: str(g.url),
       accountIds: strs(g.account_ids),
       lastPostedAt: str(g.last_posted_at),
+      department: normalizeTrendBu(str(g.department)),
       stats30d:
         g.stats_30d && typeof g.stats_30d === 'object'
           ? (() => {

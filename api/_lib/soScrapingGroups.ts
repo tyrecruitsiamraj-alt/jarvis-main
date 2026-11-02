@@ -1,8 +1,12 @@
 /**
  * ═══ กลุ่ม Facebook ของระบบ So Scraping — อ่านอย่างเดียว (เจ้าของ 20 ต.ค. 2569) ═══
- * รายชื่อกลุ่มดูแลที่ So Scraping (เพิ่ม/ลบ/ตั้งชื่อที่นั่น) · Jarvis อ่านมาให้เลือกในป๊อปสั่งโพสต์
- * - เฉพาะกลุ่มที่มีบัญชี Facebook ผูกอยู่ (`users.group_ids` jsonb array มี id ของกลุ่ม)
- * - 🔴 ตาราง users มีรหัสผ่าน/token — อ่านแค่ `group_ids` ห้ามเลือกคอลัมน์อื่น · ห้ามเขียนตารางของ So Scraping
+ * รายชื่อกลุ่มดูแลที่ So Scraping (เพิ่ม/ลบ/ตั้งชื่อ/ติดป้ายธุรกิจที่นั่น) · Jarvis อ่านมาให้เลือกในป๊อปสั่งโพสต์
+ * - อ่าน **ทุกกลุ่ม** (2 พ.ย. 2569) — เดิมกรองเฉพาะกลุ่มที่มีบัญชีผูก (`users.group_ids`) · เลิกแล้วเพราะ
+ *   ใบสั่งส่ง account_id + group_ids ไปเอง และ So Scraping โพสต์ได้ทุกกลุ่มด้วยบัญชีที่ Jarvis เลือก
+ *   (worker กดเข้าร่วมกลุ่มให้ · `resolvePostAccount` ฝั่ง So Scraping) · options API ก็ส่งทุกกลุ่มให้ทุกบัญชีอยู่แล้ว
+ *   ตอนนั้น 33/34 บัญชียังไม่ผูกกลุ่ม ถ้ายังกรองไว้ กลุ่มจะหายทันทีที่บัญชีเดียวที่ผูกถูกแก้
+ * - `department` = ธุรกิจของกลุ่ม (LBD · LBA · LM · DS · SN) ป๊อปใช้จัดหมวด/ติ๊กให้
+ * - 🔴 ห้ามแตะตาราง users (มีรหัสผ่าน/token) ในคำสั่งนี้ · ห้ามเขียนตารางของ So Scraping
  * schema อ่านไม่ได้ / ยังไม่มี = รายการว่าง (ป๊อปบอก "ยังไม่มีกลุ่ม")
  */
 import { dbQuery } from './postgres.js';
@@ -11,21 +15,17 @@ import type { SoGroup } from '../../src/lib/soScraping.js';
 
 const SCHEMA = 'so_autopost_apiscraper';
 
-export function soLinkedGroupsSql(): string {
+export function soGroupsSql(): string {
   return `
     select g.id::text as id, g.name::text as name, g.province::text as province,
            g.department::text as department, g.job_type::text as job_type
       from ${SCHEMA}.groups g
-     where exists (
-       select 1 from ${SCHEMA}.users u
-        where jsonb_typeof(u.group_ids) = 'array' and u.group_ids ? g.id::text
-     )
      order by g.name`;
 }
 
-export async function listLinkedSoGroups(): Promise<SoGroup[]> {
+export async function listSoGroups(): Promise<SoGroup[]> {
   try {
-    const { rows } = await dbQuery<SoGroup>(soLinkedGroupsSql());
+    const { rows } = await dbQuery<SoGroup>(soGroupsSql());
     return rows.map((r) => ({
       id: r.id,
       name: (r.name ?? '').trim() || r.id,
@@ -37,12 +37,6 @@ export async function listLinkedSoGroups(): Promise<SoGroup[]> {
     logWarn('soScraping.groups: อ่านกลุ่มไม่ได้', { error: errorSummaryText(e) });
     return [];
   }
-}
-
-/** id ที่เลือกมาต้องเป็นกลุ่มที่มีบัญชีผูกอยู่จริง — คืนตัวที่ไม่รู้จัก */
-export async function unknownSoGroupIds(ids: readonly string[]): Promise<string[]> {
-  const known = new Set((await listLinkedSoGroups()).map((g) => g.id));
-  return ids.filter((id) => !known.has(id));
 }
 
 /* ═══ บัญชี Facebook + worker ของ So Scraping (ป๊อป Autopost · เจ้าของ 20 ต.ค. 2569) — อ่านอย่างเดียว ═══

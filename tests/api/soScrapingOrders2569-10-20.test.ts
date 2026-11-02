@@ -63,9 +63,10 @@ describe('สั่งโพสต์: แบบโพสต์ + ข้อค�
     expect(defaultSoGroupIds(groups, 'สมุทรปราการ')).toEqual(['b']);
     expect(defaultSoGroupIds(groups, null)).toEqual([]);
   });
-  it('ข้อ 8: อ่านเฉพาะกลุ่มที่มีบัญชีผูก · ไม่แตะคอลัมน์อื่นของ users (รหัสผ่าน/token)', () => {
+  it('ข้อ 8: อ่านทุกกลุ่ม ไม่กรองตามบัญชีผูกแล้ว (2 พ.ย. 2569) · คำสั่งกลุ่มไม่แตะตาราง users · ไม่เขียนตารางของ So Scraping', () => {
     const src = read('api/_lib/soScrapingGroups.ts');
-    expect(src).toContain('u.group_ids ? g.id::text');
+    expect(src).not.toContain('u.group_ids ? g.id::text');
+    expect(src).toContain('g.department::text as department');
     expect(src).not.toMatch(/u\.(password|fb_access_token|email|\*)/);
     expect(src).not.toMatch(/\b(insert|update|delete)\b/i);
   });
