@@ -76,11 +76,23 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         /* เครือข่ายสะดุด — รอบหน้าค่อยลอง */
       }
     };
+    /**
+     * แท็บซ่อนอยู่ไม่ต้องดึง — กลับมาเห็นจอเมื่อไหร่ดึงทันที (เจ้าของ 2 พ.ย. 2569 "งั้นทำเลย" หลังมีคนทัก CPU สูง)
+     * ตอนแท็บซ่อนไม่มีเสียง/ป๊อปบนเครื่องอยู่แล้ว ⇒ ไม่มีอะไรหาย · แพตเทิร์นเดียวกับ useUnitRequestsFeed
+     */
     void pull();
-    const timer = window.setInterval(() => void pull(), POLL_MS);
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === 'hidden') return;
+      void pull();
+    }, POLL_MS);
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void pull();
+    };
+    document.addEventListener('visibilitychange', onVisible);
     return () => {
       stopped = true;
       window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', onVisible);
     };
   }, [mergeServer]);
 
