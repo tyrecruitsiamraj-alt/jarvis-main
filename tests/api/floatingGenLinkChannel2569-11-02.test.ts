@@ -23,3 +23,17 @@ describe('Gen link กล่องลอย — ช่องทาง', () => {
     expect(src.match(/<MultiChannelPicker /g)).toHaveLength(1);
   });
 });
+
+describe('การ์ดกล่องลอยบอก Gen link ล่าสุด วันไหน ใครกด (เจ้าของ 2 พ.ย. 2569 Choice "โชว์บนการ์ดกล่องลอย")', () => {
+  const view = fs.readFileSync(path.resolve(__dirname, '../../src/components/jobs/JobBoardView.tsx'), 'utf8');
+
+  it('ใช้ลิงก์ที่สร้างล่าสุดของประเภท · ชื่อจาก postingLinkOwner (ตัวเดียวกับรายการลิงก์ในป๊อปใบขอ)', () => {
+    expect(view).toMatch(/l\.createdAt > a\.lastGen\.at\) a\.lastGen = \{ at: l\.createdAt, by: postingLinkOwner\(l, p\) \}/);
+  });
+
+  it('การ์ดขึ้น "Gen link ล่าสุด วันที่ โดย ชื่อ" · ยังไม่มีลิงก์ = ไม่มีบรรทัด', () => {
+    expect(view).toContain('data-testid="standalone-last-gen"');
+    expect(view).toContain('Gen link ล่าสุด {formatYmdTh(toYmdBangkok(new Date(s.lastGen.at)))}');
+    expect(view).toContain('{s.lastGen ? (');
+  });
+});

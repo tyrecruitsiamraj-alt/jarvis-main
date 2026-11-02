@@ -95,7 +95,8 @@ import { boardPostingPath } from '@/lib/jobNavigation';
 import { useHeaderSearch } from '@/hooks/useHeaderSearch';
 import { scrollIntoViewX } from '@/lib/scrollIntoViewX';
 import { APPLICANT_FILTER_PARAM_PREFIX } from '@/lib/applicantFilters';
-import { type RecruitPosting } from '@/lib/recruitPostings';
+import { postingLinkOwner, type RecruitPosting } from '@/lib/recruitPostings';
+import { formatYmdTh, toYmdBangkok } from '@/lib/dateTh';
 import { useRecruitPostingKinds } from '@/lib/recruitPostingKindsApi';
 import {
   CLOSED_BOX_KEYS,
@@ -1131,10 +1132,18 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
   const standaloneSummary = useMemo(() => {
     const acc: Record<
       string,
-      { postings: number; applicants: number; titles: string[]; provinces: string[]; bus: string[] }
+      {
+        postings: number;
+        applicants: number;
+        titles: string[];
+        provinces: string[];
+        bus: string[];
+        /** Gen link ล่าสุดของประเภทนี้ — วันไหน ใครกด (เจ้าของ 2 พ.ย. 2569 Choice "โชว์บนการ์ดกล่องลอย") */
+        lastGen: { at: string; by: string | null } | null;
+      }
     > = {};
     for (const k of postingKinds) {
-      acc[k.code] = { postings: 0, applicants: 0, titles: [], provinces: [], bus: [] };
+      acc[k.code] = { postings: 0, applicants: 0, titles: [], provinces: [], bus: [], lastGen: null };
     }
     for (const p of postings) {
       if (!p.standaloneKind || !acc[p.standaloneKind]) continue;
@@ -1147,6 +1156,9 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
       if (province && !a.provinces.includes(province)) a.provinces.push(province);
       const bu = p.departmentCode?.trim();
       if (bu && !a.bus.includes(bu)) a.bus.push(bu);
+      for (const l of p.links) {
+        if (!a.lastGen || l.createdAt > a.lastGen.at) a.lastGen = { at: l.createdAt, by: postingLinkOwner(l, p) };
+      }
     }
     return acc;
   }, [postings, postingKinds]);
@@ -2110,7 +2122,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                 const tone = TONE[STANDALONE_KIND_TONE[k.code] ?? 'neutral'];
                 const s =
                   standaloneSummary[k.code] ??
-                  { postings: 0, applicants: 0, titles: [], provinces: [], bus: [] };
+                  { postings: 0, applicants: 0, titles: [], provinces: [], bus: [], lastGen: null };
                 const openGen = () =>
                   setGenStandalone({
                     kind: k.code,
@@ -2172,6 +2184,13 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                         <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary/70" />
                         {s.provinces.length > 0 ? s.provinces.join(' · ') : 'ไม่ได้ระบุจังหวัด'}
                       </p>
+                      {s.lastGen ? (
+                        <p className="flex items-start gap-2 text-xs text-muted-foreground" data-testid="standalone-last-gen">
+                          <Link2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary/70" />
+                          Gen link ล่าสุด {formatYmdTh(toYmdBangkok(new Date(s.lastGen.at)))}
+                          {s.lastGen.by ? ` โดย ${s.lastGen.by}` : ''}
+                        </p>
+                      ) : null}
                     </CardContent>
                     <CardFooter className="mt-auto flex-col items-stretch gap-2 border-t border-border/60 bg-muted/20 pt-3">
                       {/* แถวล่างจัดแบบเดียวกับการ์ดใบขอ: "ผู้สมัคร N คน" ซ้าย · ปุ่มขวา
