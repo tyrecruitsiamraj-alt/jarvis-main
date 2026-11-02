@@ -129,9 +129,11 @@ async function optionsFromDb(): Promise<SoOptions> {
         groupIds: a.groupIds,
         sessionWorkers: a.preferredWorker ? [a.preferredWorker] : [],
         department: accountBu.get(a.id) ?? null,
+        // ทางถอยอ่านฐานตรง ไม่คิดสถานะกลุ่ม = ทุกกลุ่ม "ยังไม่เคยลอง"
+        groupStatus: [],
       };
     }),
-    groups: groups.map((g) => ({ id: g.id, fbGroupId: null, name: g.name, url: null, accountIds: [], lastPostedAt: null, stats30d: null, department: g.department })),
+    groups: groups.map((g) => ({ id: g.id, fbGroupId: null, name: g.name, url: null, accountIds: [], lastPostedAt: null, stats30d: null, department: g.department, blocked: null })),
     // ฐานเดิมอ่านแค่เครื่องโพสต์ (kind autopost)
     workers: workers.map((w) => ({
       name: w.name,

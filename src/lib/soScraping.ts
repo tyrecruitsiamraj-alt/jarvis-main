@@ -220,7 +220,23 @@ export type SoOptAccount = {
   sessionWorkers: string[];
   /** ธุรกิจของบัญชี (LBD · LBA · LM …) · null = ไม่ระบุธุรกิจ (So Scraping 2 พ.ย. 2569 · users.department) */
   department: string | null;
+  /** สถานะกลุ่มของบัญชีนี้ — เฉพาะกลุ่มที่เคยลองโพสต์ใน 30 วัน (So Scraping acc6821) · ไม่อยู่ในรายการ = ยังไม่เคยลอง */
+  groupStatus: SoGroupState[];
 };
+/** สถานะของกลุ่มสำหรับบัญชีหนึ่ง — `label` เป็นคำไทยจาก So Scraping ใช้ตามนั้น ห้ามแปลงเอง */
+export type SoGroupState = {
+  groupId: string;
+  state: string;
+  label: string;
+  /** false = ไม่ควรติ๊กให้ตั้งแต่แรก (คนติ๊กเองได้) */
+  recommended: boolean;
+  detail: string | null;
+  /** ลิงก์ให้คนกดไปแก้เอง (หน้ากลุ่ม หรือโพสต์ที่รออนุมัติ) */
+  url: string | null;
+  seenAt: string | null;
+};
+/** ติดที่ตัวกลุ่ม — ทุกบัญชีโพสต์ไม่ได้ (ตอนนี้มีแค่ admin_paused) */
+export type SoGroupBlock = { state: string; label: string; detail: string | null; seenAt: string | null };
 export type SoGroupStats = { attempts: number; posted: number; comments: number; phoneLeads: number };
 export type SoOptGroup = {
   id: string;
@@ -232,6 +248,8 @@ export type SoOptGroup = {
   stats30d: SoGroupStats | null;
   /** ธุรกิจของกลุ่ม (รหัสแผนก LBD · LBA · LM · DS · SN · ชุดเดียวกับ users.department_code) · null = ไม่ระบุธุรกิจ (So Scraping 2 พ.ย. 2569) */
   department: string | null;
+  /** กลุ่มโดนพัก ทุกบัญชีโพสต์ไม่ได้ · null = ไม่ติด */
+  blocked: SoGroupBlock | null;
 };
 export type SoWorkerKind = 'autopost' | 'scraper';
 export type SoOptWorker = {
@@ -372,15 +390,38 @@ export function soGroupSections(groups: readonly SoOptGroup[], jobBu: string | n
   return buOrder(by.keys(), jobBu).map((bu) => ({ bu, label: bu ?? SO_BU_NONE_LABEL, forJob: bu !== null && bu === jobBu, groups: by.get(bu) ?? [] }));
 }
 
-/** ติ๊กไว้ให้ตั้งแต่เปิดป๊อป = ทุกกลุ่มของธุรกิจเดียวกับใบขอ · ใบขอไม่ระบุธุรกิจ = ไม่ติ๊ก */
-export function defaultSoGroupPick(groups: readonly SoOptGroup[], jobBu: string | null): string[] {
+/** กลุ่มที่บัญชีนี้ยังไม่เคยลองโพสต์ใน 30 วัน และกลุ่มไม่ติด — ติ๊กได้ (คำนี้ So Scraping ให้ Jarvis ใช้) */
+export const SO_GROUP_UNTRIED = 'ยังไม่เคยลอง';
+
+export type SoGroupView = { label: string; recommended: boolean; detail: string | null; url: string | null };
+
+/**
+ * สถานะของกลุ่มเมื่อโพสต์ด้วยบัญชีนี้ (เจ้าของ 2 พ.ย. 2569 "เลือกมาก็เหมือนไม่มีไร" — ติ๊กกลุ่มที่โพสต์ไม่ติดทุกรอบ)
+ * กลุ่มติดที่ตัวกลุ่ม (แอดมินพัก) ก่อน → สถานะของบัญชีนี้ → ยังไม่เคยลอง · ลิงก์เอาของบัญชีนี้ (ไปเข้าร่วม/ตอบคำถามเอง)
+ */
+export function soGroupView(g: Pick<SoOptGroup, 'id' | 'blocked'>, acc: Pick<SoOptAccount, 'groupStatus'> | null): SoGroupView {
+  const st = acc?.groupStatus.find((x) => x.groupId === g.id) ?? null;
+  if (g.blocked) return { label: g.blocked.label, recommended: false, detail: g.blocked.detail, url: st?.url ?? null };
+  if (st) return { label: st.label, recommended: st.recommended, detail: st.detail, url: st.url };
+  return { label: SO_GROUP_UNTRIED, recommended: true, detail: null, url: null };
+}
+
+/** ติ๊กไว้ให้ตั้งแต่เปิดป๊อป = กลุ่มธุรกิจเดียวกับใบขอ ที่ไม่ติด (ไม่โดนพัก · สถานะของบัญชีไม่บอกว่าไม่ควร) · ใบขอไม่ระบุธุรกิจ = ไม่ติ๊ก */
+export function defaultSoGroupPick(groups: readonly SoOptGroup[], jobBu: string | null, acc: Pick<SoOptAccount, 'groupStatus'> | null = null): string[] {
   if (!jobBu) return [];
-  return groups.filter((g) => g.department === jobBu).map((g) => g.id);
+  return groups.filter((g) => g.department === jobBu && soGroupView(g, acc).recommended).map((g) => g.id);
+}
+
+/** หัวหมวด "LBD · ติ๊กไว้ 29 จาก 37 · ติด 8" — ติด = กลุ่มที่ไม่ควรติ๊กสำหรับบัญชีนี้ */
+export function soSectionHeadText(sec: Pick<SoGroupSection, 'label' | 'groups'>, picked: readonly string[], acc: Pick<SoOptAccount, 'groupStatus'> | null): string {
+  const n = sec.groups.filter((g) => picked.includes(g.id)).length;
+  const stuck = sec.groups.filter((g) => !soGroupView(g, acc).recommended).length;
+  return [sec.label, `ติ๊กไว้ ${n} จาก ${sec.groups.length}`, ...(stuck ? [`ติด ${stuck}`] : [])].join(' · ');
 }
 
 /** ธุรกิจของใบขอยังไม่มีกลุ่มเลย — บอกว่าไปเพิ่มที่ไหน ไม่ปล่อยรายการว่าง */
 export function soBuEmptyText(bu: string): string {
-  return `ยังไม่มีกลุ่มของธุรกิจ ${bu} ใน So Scraping — เพิ่มที่ ตั้งค่า → กลุ่มโพสต์ หรือเลือกจากธุรกิจอื่น`;
+  return `ยังไม่มีกลุ่มของ ${bu} ใน So Scraping — เพิ่มที่ ตั้งค่า → กลุ่มโพสต์ หรือเลือกจากธุรกิจอื่น`;
 }
 
 /** ธุรกิจของใบขอยังไม่มีบัญชี Facebook เลย — บอกว่าไปเพิ่มที่ไหน */
@@ -429,6 +470,16 @@ const ACCOUNT_STATUSES: readonly SoAccountStatus[] = ['ready', 'busy', 'full', '
 const SCRAPE_STATUSES: readonly SoScrapeStatus[] = ['ready', 'full', 'cooldown', 'disabled'];
 const str = (v: unknown): string | null => (typeof v === 'string' && v.trim() ? v.trim() : null);
 const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+/** ลิงก์ที่เปิดให้คนกดได้ — https เท่านั้น (กันลิงก์แปลกจากข้อมูลภายนอก) */
+const httpsUrl = (v: unknown): string | null => {
+  const t = str(v);
+  if (!t) return null;
+  try {
+    return new URL(t).protocol === 'https:' ? t : null;
+  } catch {
+    return null;
+  }
+};
 const strs = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string' && x.trim() !== '') : []);
 const queueOf = (v: unknown): SoQueue => {
   const q = (v && typeof v === 'object' ? v : {}) as Record<string, unknown>;
@@ -462,6 +513,17 @@ export function parseSoOptions(raw: unknown): SoOptions | null {
       groupIds: strs(a.group_ids),
       sessionWorkers: strs(a.session_workers),
       department: normalizeTrendBu(str(a.department)),
+      groupStatus: rows(Array.isArray(a.group_status) ? a.group_status : [])
+        .filter((x) => str(x.group_id) && str(x.label))
+        .map((x): SoGroupState => ({
+          groupId: str(x.group_id)!,
+          state: str(x.state) ?? 'unknown',
+          label: str(x.label)!,
+          recommended: x.recommended !== false,
+          detail: str(x.detail),
+          url: httpsUrl(x.url),
+          seenAt: str(x.seen_at),
+        })),
     }));
   const groups = rows(r.groups)
     .filter((g) => str(g.id))
@@ -473,6 +535,13 @@ export function parseSoOptions(raw: unknown): SoOptions | null {
       accountIds: strs(g.account_ids),
       lastPostedAt: str(g.last_posted_at),
       department: normalizeTrendBu(str(g.department)),
+      blocked:
+        g.blocked && typeof g.blocked === 'object' && str((g.blocked as Record<string, unknown>).label)
+          ? (() => {
+              const b = g.blocked as Record<string, unknown>;
+              return { state: str(b.state) ?? 'blocked', label: str(b.label)!, detail: str(b.detail), seenAt: str(b.seen_at) };
+            })()
+          : null,
       stats30d:
         g.stats_30d && typeof g.stats_30d === 'object'
           ? (() => {

@@ -14,6 +14,8 @@ import {
   soAccountsForJob,
   soBuEmptyText,
   soBuNoAccountText,
+  soGroupView,
+  soSectionHeadText,
   soGroupSections,
   withSoDepartments,
   type SoOptGroup,
@@ -29,6 +31,7 @@ const group = (id: string, name: string, department: string | null): SoOptGroup 
   lastPostedAt: null,
   stats30d: null,
   department,
+  blocked: null,
 });
 /** หน้าตาเหมือนของจริงใน so_autopost_apiscraper.groups (2 พ.ย. 2569) */
 const GROUPS = [
@@ -62,7 +65,7 @@ describe('กลุ่ม Facebook ตามธุรกิจของใบข
     expect(sections.some((s) => s.forJob)).toBe(false);
     expect(sections.map((s) => s.label)).toEqual(['LBD', 'LM', 'ไม่ระบุธุรกิจ']);
     expect(defaultSoGroupPick(GROUPS, 'LBA')).toEqual([]);
-    expect(soBuEmptyText('LBA')).toBe('ยังไม่มีกลุ่มของธุรกิจ LBA ใน So Scraping — เพิ่มที่ ตั้งค่า → กลุ่มโพสต์ หรือเลือกจากธุรกิจอื่น');
+    expect(soBuEmptyText('LBA')).toBe('ยังไม่มีกลุ่มของ LBA ใน So Scraping — เพิ่มที่ ตั้งค่า → กลุ่มโพสต์ หรือเลือกจากธุรกิจอื่น');
   });
 
   it('ใบขอไม่ระบุธุรกิจ: ไม่ติ๊ก · หมวดเรียงรหัส ไม่ระบุท้ายสุด', () => {
@@ -102,7 +105,7 @@ describe('กลุ่ม Facebook ตามธุรกิจของใบข
 
   it('ป๊อปใช้หมวดตามธุรกิจ · server เติมธุรกิจตอนเรียก API · อ่านทุกกลุ่มไม่กรองตามบัญชีผูก', () => {
     const dialog = readFileSync('src/components/jobs/AutopostDialog.tsx', 'utf8');
-    expect(dialog).toContain('defaultSoGroupPick(soGroupsOfAccount(o, acc), jobBu)');
+    expect(dialog).toContain('defaultSoGroupPick(soGroupsOfAccount(o, acc), jobBu, acc)');
     expect(dialog).toContain('data-testid="autopost-bu-empty"');
     expect(dialog).toContain("checked={n === 0 ? false : n === ids.length ? true : 'indeterminate'}");
     expect(dialog).not.toContain('jobProvinceOf');
@@ -135,5 +138,95 @@ describe('กลุ่ม Facebook ตามธุรกิจของใบข
     expect(soAccountsForJob(accounts, 'LBA')).toEqual([]);
     expect(soAccountsForJob(accounts, null)).toHaveLength(4);
     expect(soBuNoAccountText('LBA')).toBe('ยังไม่มีบัญชี Facebook ของธุรกิจ LBA ใน So Scraping — เพิ่มที่ ตั้งค่า → บัญชีที่ใช้งาน หรือเลือกจากธุรกิจอื่น');
+  });
+
+  /* ── สถานะกลุ่มของบัญชีที่เลือก (So Scraping acc6821 · เจ้าของ 2 พ.ย. 2569 "เลือกมาก็เหมือนไม่มีไร") ── */
+  /** หน้าตาเดียวกับ options API จริง 2 พ.ย. 2569 (ย่อ) */
+  const RAW = {
+    accounts: [
+      {
+        id: 'fb_2fa5a90951e240568b685097',
+        name: 'Deanna Telcocci',
+        status: 'ready',
+        department: 'LBD',
+        group_ids: ['mvhmlotjormpp7jfim', 'mvhmlov27vqejwuh96m', 'mvhmlox9aax3n5phpqj', 'mvhmloxpay78rydknrl', 'mvhmloovlppmpi5o6fg'],
+        group_status: [
+          { group_id: 'mvhmlov27vqejwuh96m', state: 'questions', label: 'ต้องเข้ากลุ่มเอง (มีคำถาม)', recommended: false, detail: null, url: 'https://www.facebook.com/groups/792186948245459', seen_at: '2026-11-02T03:38:42.081Z' },
+          { group_id: 'mvhmlox9aax3n5phpqj', state: 'ok', label: 'โพสต์ได้', recommended: true, detail: null, url: 'https://www.facebook.com/groups/1671676653270065/posts/2604302640007457/', seen_at: '2026-11-02T03:34:49.776Z' },
+          { group_id: 'mvhmlotjormpp7jfim', state: 'admin_paused', label: 'แอดมินพักกลุ่ม', recommended: false, detail: 'ผู้ดูแลพักกลุ่มนี้ชั่วคราวเมื่อ 17 สิงหาคม 2026', url: 'https://www.facebook.com/groups/299450851856799', seen_at: '2026-11-02T03:33:13.016Z' },
+          { group_id: 'mvhmloxxbad', state: 'ok', label: 'โพสต์ได้', recommended: true, url: 'javascript:alert(1)' },
+        ],
+      },
+      { id: 'fb_drost_mose', name: 'Drost Mose', status: 'ready', department: 'LBD', group_ids: [] },
+    ],
+    groups: [
+      { id: 'mvhmlotjormpp7jfim', fb_group_id: '299450851856799', name: 'ขับรถผู้บริหาร\u200b และส่วนกลาง', department: 'LBD', blocked: { state: 'admin_paused', label: 'แอดมินพักกลุ่ม', detail: 'ผู้ดูแลพักกลุ่มนี้ชั่วคราวเมื่อ 17 สิงหาคม 2026', seen_at: '2026-11-02T03:33:13.016Z' } },
+      { id: 'mvhmloxpay78rydknrl', fb_group_id: '1', name: 'กลุ่มคนขับรถผู้บริหารและคนขับรถให้นาย', department: 'LBD', blocked: { state: 'admin_paused', label: 'แอดมินพักกลุ่ม', detail: null, seen_at: null } },
+      { id: 'mvhmlov27vqejwuh96m', fb_group_id: '792186948245459', name: 'หางานขับรถและรับสมัครงานขับรถ', department: 'LBD', blocked: null },
+      { id: 'mvhmlox9aax3n5phpqj', fb_group_id: '1671676653270065', name: 'หางานขับรถ หาคนขับรถ กทม Bangkok', department: 'LBD', blocked: null },
+      { id: 'mvhmloovlppmpi5o6fg', fb_group_id: '2', name: 'กลุ่มคนขับรถผู้บริหาร', department: 'LBD' },
+    ],
+    workers: [],
+    scrape_accounts: [],
+  };
+
+  it('parseSoOptions อ่านสถานะกลุ่มของบัญชี + กลุ่มที่ติด · ไม่มีฟิลด์ = [] / null · ลิงก์ที่ไม่ใช่ https ทิ้ง', () => {
+    const o = parseSoOptions(RAW) as SoOptions;
+    const deanna = o.accounts[0];
+    expect(deanna.department).toBe('LBD');
+    expect(deanna.groupStatus).toHaveLength(4);
+    expect(deanna.groupStatus[0]).toEqual({
+      groupId: 'mvhmlov27vqejwuh96m',
+      state: 'questions',
+      label: 'ต้องเข้ากลุ่มเอง (มีคำถาม)',
+      recommended: false,
+      detail: null,
+      url: 'https://www.facebook.com/groups/792186948245459',
+      seenAt: '2026-11-02T03:38:42.081Z',
+    });
+    expect(deanna.groupStatus[3].url).toBeNull();
+    expect(o.accounts[1].groupStatus).toEqual([]);
+    expect(o.groups[0].blocked).toEqual({ state: 'admin_paused', label: 'แอดมินพักกลุ่ม', detail: 'ผู้ดูแลพักกลุ่มนี้ชั่วคราวเมื่อ 17 สิงหาคม 2026', seenAt: '2026-11-02T03:33:13.016Z' });
+    expect(o.groups[4].blocked).toBeNull();
+  });
+
+  it('Deanna Telcocci: แอดมินพัก + ต้องเข้ากลุ่มเอง ไม่ติ๊ก มีลิงก์เปิดกลุ่ม · ที่เหลือติ๊ก · หัวหมวดบอกจำนวนติด', () => {
+    const o = parseSoOptions(RAW) as SoOptions;
+    const deanna = o.accounts[0];
+    const g = (id: string) => o.groups.find((x) => x.id === id)!;
+    expect(soGroupView(g('mvhmlotjormpp7jfim'), deanna)).toEqual({
+      label: 'แอดมินพักกลุ่ม',
+      recommended: false,
+      detail: 'ผู้ดูแลพักกลุ่มนี้ชั่วคราวเมื่อ 17 สิงหาคม 2026',
+      url: 'https://www.facebook.com/groups/299450851856799',
+    });
+    expect(soGroupView(g('mvhmlov27vqejwuh96m'), deanna)).toMatchObject({ label: 'ต้องเข้ากลุ่มเอง (มีคำถาม)', recommended: false, url: 'https://www.facebook.com/groups/792186948245459' });
+    expect(soGroupView(g('mvhmlox9aax3n5phpqj'), deanna)).toMatchObject({ label: 'โพสต์ได้', recommended: true });
+    expect(soGroupView(g('mvhmloovlppmpi5o6fg'), deanna)).toEqual({ label: 'ยังไม่เคยลอง', recommended: true, detail: null, url: null });
+    const pick = defaultSoGroupPick(o.groups, 'LBD', deanna);
+    expect(pick.sort()).toEqual(['mvhmlox9aax3n5phpqj', 'mvhmloovlppmpi5o6fg'].sort());
+    const [sec] = soGroupSections(o.groups, 'LBD');
+    expect(soSectionHeadText(sec, pick, deanna)).toBe('LBD · ติ๊กไว้ 2 จาก 5 · ติด 3');
+  });
+
+  it('สลับไปบัญชีที่ไม่เคยโพสต์: ทุกกลุ่ม "ยังไม่เคยลอง" ยกเว้น 2 กลุ่มที่แอดมินพัก · ค่าติ๊กคิดใหม่', () => {
+    const o = parseSoOptions(RAW) as SoOptions;
+    const drost = o.accounts[1];
+    expect(o.groups.map((x) => soGroupView(x, drost).label)).toEqual(['แอดมินพักกลุ่ม', 'แอดมินพักกลุ่ม', 'ยังไม่เคยลอง', 'ยังไม่เคยลอง', 'ยังไม่เคยลอง']);
+    expect(defaultSoGroupPick(o.groups, 'LBD', drost).sort()).toEqual(['mvhmlov27vqejwuh96m', 'mvhmlox9aax3n5phpqj', 'mvhmloovlppmpi5o6fg'].sort());
+    // ไม่ส่งบัญชี (ทางถอยอ่านฐาน · ยังไม่เลือกบัญชี) = ติ๊กทุกกลุ่มธุรกิจเดียวกันที่ไม่โดนพัก
+    expect(defaultSoGroupPick(o.groups, 'LBD').length).toBe(3);
+    const [sec] = soGroupSections(o.groups, 'LBD');
+    expect(soSectionHeadText(sec, [], drost)).toBe('LBD · ติ๊กไว้ 0 จาก 5 · ติด 2');
+  });
+
+  it('ป๊อป: สถานะเป็นคำ · ลิงก์เปิดกลุ่มเปิดแท็บใหม่ · ค่าติ๊กคิดใหม่ตอนสลับบัญชี · ทางถอยอ่านฐานไม่มีสถานะ', () => {
+    const dialog = readFileSync('src/components/jobs/AutopostDialog.tsx', 'utf8');
+    expect(dialog).toContain('defaultSoGroupPick(soGroupsOfAccount(opts, a), jobBu, a)');
+    expect(dialog).toContain('const view = soGroupView(g, account);');
+    expect(dialog).toContain('target="_blank" rel="noopener noreferrer" data-testid="autopost-group-open"');
+    const opts = readFileSync('api/_lib/soScrapingOptions.ts', 'utf8');
+    expect(opts).toContain('groupStatus: [],');
+    expect(opts).toContain('blocked: null })),');
   });
 });

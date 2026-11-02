@@ -42,6 +42,8 @@ import {
   defaultSoGroupPick,
   jobBuOf,
   soBuEmptyText,
+  soGroupView,
+  soSectionHeadText,
   soBuNoAccountText,
   soAccountsByBu,
   soAccountsForJob,
@@ -175,7 +177,7 @@ export function AutopostBody({
           setAccountId(acc.id);
           setWorkerName(acc.worker ?? '');
           if (acc.status === 'worker_offline') setWarn(offlineWarn(acc));
-          setPicked(defaultSoGroupPick(soGroupsOfAccount(o, acc), jobBu));
+          setPicked(defaultSoGroupPick(soGroupsOfAccount(o, acc), jobBu, acc));
         }
       })
       .catch((e) => alive && setLoadError(e instanceof Error ? e.message : 'โหลดข้อมูลไม่ได้'));
@@ -255,7 +257,7 @@ export function AutopostBody({
     setWarn(a.status === 'worker_offline' ? offlineWarn(a) : null);
     setAccountId(id);
     setWorkerName(a.worker ?? '');
-    setPicked(defaultSoGroupPick(soGroupsOfAccount(opts, a), jobBu));
+    setPicked(defaultSoGroupPick(soGroupsOfAccount(opts, a), jobBu, a));
   };
 
   const send = async (confirmed = false) => {
@@ -475,6 +477,7 @@ export function AutopostBody({
                     key={sec.bu ?? '__none__'}
                     jobId={job.id}
                     section={sec}
+                    account={account}
                     picked={picked}
                     recent={recent}
                     onToggle={(ids, on) => setPicked((prev) => (on ? [...new Set([...prev, ...ids])] : prev.filter((x) => !ids.includes(x))))}
@@ -602,12 +605,15 @@ export function firstAccount(list: readonly SoOptAccount[]): SoOptAccount | null
 function GroupSection({
   jobId,
   section,
+  account,
   picked,
   recent,
   onToggle,
 }: {
   jobId: string;
   section: SoGroupSection;
+  /** บัญชีที่เลือก — สถานะกลุ่มคิดจากบัญชีนี้ (สลับบัญชี = สถานะเปลี่ยน) */
+  account: SoOptAccount | null;
   picked: readonly string[];
   recent: ReadonlySet<string>;
   onToggle: (ids: string[], on: boolean) => void;
@@ -625,11 +631,8 @@ function GroupSection({
           onCheckedChange={(v) => onToggle(ids, v === true)}
           aria-label={`เลือกทุกกลุ่มของ ${section.label}`}
         />
-        <Label htmlFor={headId} className="flex-1 text-sm font-medium text-foreground">
-          {section.label}
-          <span className={cn('ml-2 text-xs font-normal tabular-nums', DASH.muted)}>
-            ติ๊ก {NUM.format(n)} / {NUM.format(ids.length)} กลุ่ม
-          </span>
+        <Label htmlFor={headId} className="flex-1 text-sm font-medium tabular-nums text-foreground" data-testid="autopost-bu-head">
+          {soSectionHeadText(section, picked, account)}
         </Label>
         <CollapsibleTrigger asChild>
           <Button type="button" size="xs" variant="ghost" aria-label={open ? `พับ ${section.label}` : `กาง ${section.label}`}>
@@ -640,28 +643,50 @@ function GroupSection({
       </div>
       <CollapsibleContent>
         <ul className="space-y-2 border-t border-border/70 px-3 py-2">
-          {section.groups.map((g) => (
-            <li key={g.id} className="flex items-start gap-2">
-              <Checkbox
-                id={`autopost-group-${jobId}-${g.id}`}
-                checked={picked.includes(g.id)}
-                onCheckedChange={(v) => onToggle([g.id], v === true)}
-                className="mt-0.5"
-              />
-              <Label htmlFor={`autopost-group-${jobId}-${g.id}`} className="space-y-0.5 font-normal">
-                <span className="block text-sm text-foreground">{soGroupLabel(g)}</span>
-                <span className={cn('block text-xs', DASH.muted)}>
-                  {[
-                    soGroupStatsText(g.stats30d),
-                    g.lastPostedAt ? `โพสต์ล่าสุด ${WHEN.format(new Date(g.lastPostedAt))}` : null,
-                    recent.has(g.id) ? 'ใบนี้เพิ่งสั่งโพสต์กลุ่มนี้ใน 3 วัน' : null,
-                  ]
-                    .filter(Boolean)
-                    .join(' · ')}
-                </span>
-              </Label>
-            </li>
-          ))}
+          {section.groups.map((g) => {
+            // สถานะเป็นคำจาก So Scraping เสมอ (ไม่บอกด้วยสีอย่างเดียว) · ไม่ควรติ๊ก = ไม่ติ๊กให้ แต่ไม่ล็อก
+            const view = soGroupView(g, account);
+            return (
+              <li key={g.id} className="flex items-start gap-2" data-testid="autopost-group-row">
+                <Checkbox
+                  id={`autopost-group-${jobId}-${g.id}`}
+                  checked={picked.includes(g.id)}
+                  onCheckedChange={(v) => onToggle([g.id], v === true)}
+                  className="mt-0.5"
+                />
+                <div className="min-w-0 space-y-0.5">
+                  <Label htmlFor={`autopost-group-${jobId}-${g.id}`} className="block text-sm font-normal text-foreground">
+                    {soGroupLabel(g)}
+                    <span className={cn('font-medium', view.recommended ? DASH.muted : TONE.warn.value)} data-testid="autopost-group-state">
+                      {' — '}
+                      {view.label}
+                    </span>
+                  </Label>
+                  {view.detail || view.url ? (
+                    <p className="flex flex-wrap items-center gap-x-2 text-xs">
+                      {view.detail ? <span className={DASH.muted}>{view.detail}</span> : null}
+                      {view.url ? (
+                        <Button asChild type="button" size="xs" variant="link" className="h-auto p-0">
+                          <a href={view.url} target="_blank" rel="noopener noreferrer" data-testid="autopost-group-open">
+                            เปิดกลุ่ม
+                          </a>
+                        </Button>
+                      ) : null}
+                    </p>
+                  ) : null}
+                  <p className={cn('text-xs', DASH.muted)}>
+                    {[
+                      soGroupStatsText(g.stats30d),
+                      g.lastPostedAt ? `โพสต์ล่าสุด ${WHEN.format(new Date(g.lastPostedAt))}` : null,
+                      recent.has(g.id) ? 'ใบนี้เพิ่งสั่งโพสต์กลุ่มนี้ใน 3 วัน' : null,
+                    ]
+                      .filter(Boolean)
+                      .join(' · ')}
+                  </p>
+                </div>
+              </li>
+            );
+          })}
         </ul>
       </CollapsibleContent>
     </Collapsible>
