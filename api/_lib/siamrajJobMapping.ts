@@ -9,10 +9,14 @@ export function parseAgeRange(age: string | null | undefined): { min?: number; m
     const max = Number(range[2]);
     if (Number.isFinite(min) && Number.isFinite(max)) return { min, max };
   }
+  // เลขเดียวในใบขอคือขอบล่าง ("20", "20 ขึ้นไป") — เดิมตีเป็น 20–20 ทำให้ So Scraping คัดคนตกเกือบหมด (LAM6909001, 2 พ.ย. 2569)
+  // เว้นแต่ใบขอบอกชัดว่าเป็นเพดาน ("ไม่เกิน 45", "ต่ำกว่า 45", "สูงสุด 45")
   const single = s.match(/(\d+)/);
   if (single) {
     const n = Number(single[1]);
-    if (Number.isFinite(n)) return { min: n, max: n };
+    if (!Number.isFinite(n)) return {};
+    if (/ไม่เกิน|ต่ำกว่า|สูงสุด|ไม่ถึง/.test(s)) return { max: n };
+    return { min: n };
   }
   return {};
 }
