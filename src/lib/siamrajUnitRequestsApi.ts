@@ -371,11 +371,9 @@ export async function fetchAllUnitAssignees(): Promise<
  */
 export async function fetchUnitEditLog(
   requestNo: string,
-  /** ชนิดเดียว = ทุกครั้งของชนิดนั้น (เช่น 'siamraj_unit_work_status') · ไม่ส่ง = รวมทุกชนิด 50 ล่าสุด */
-  entityType?: string,
 ): Promise<import('@/lib/unitEditLog').UnitEditLogItem[]> {
   const r = await apiFetch(
-    `/api/siamraj/unit-history?request_no=${encodeURIComponent(requestNo)}${entityType ? `&type=${encodeURIComponent(entityType)}` : ''}`,
+    `/api/siamraj/unit-history?request_no=${encodeURIComponent(requestNo)}`,
     { cache: 'no-store' },
   );
   if (!r.ok) throw new Error(`โหลดประวัติไม่สำเร็จ (HTTP ${r.status})`);

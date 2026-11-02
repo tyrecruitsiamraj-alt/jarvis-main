@@ -34,7 +34,8 @@ import {
 import type { JobRequest } from '@/types';
 import { cn } from '@/lib/utils';
 import { TONE } from '@/lib/designTokens';
-import { ChevronDown, Database, ExternalLink, Landmark, Users, StickyNote, UserCheck, ClipboardList } from 'lucide-react';
+import { ChevronDown, Database, ExternalLink, History, Landmark, Users, StickyNote, UserCheck, ClipboardList } from 'lucide-react';
+import UnitEditLogSection from '@/components/jobs/UnitEditLogSection';
 import { RequestRateLinesBlock, ResignedEmployeeBlock } from '@/components/jobs/UnitRequestPayBlocks';
 
 import { resolveUnitDetailBackPath } from '@/lib/jobUnitSessionState';
@@ -492,10 +493,15 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
 
 
 
-            {/* ⚠️ ส่วน "ประวัติการแก้ไข" ถูกย้ายไปป๊อปอัปการ์ดในกล่องงานแล้ว
-                (เจ้าของ clarify 21 ส.ค. 2569: *"ฉันหมายถึงหน้ากล่องงาน — ของหน้าใบงาน
-                ทำแบบเดิม เคยไม่มีก็ไม่ต้องมี"*) — ดูที่ JobBoardView แท็บรายละเอียดงาน */}
-
+            {/* ประวัติการแก้ไขใบนี้ใต้หมายเหตุ ทุกครั้ง แบ่งหน้า (เจ้าของ 2 พ.ย. 2569 "log แก้ไขขอเอามาไว้ใต้ตรงนี้เลย … ไม่ต้องกดตรงนั้นแล้วเด้งมา")
+                แทนป๊อปตอนกดป้ายสถานะหน้ารายการใบขอ (ถอดแล้ว) · ผู้รับผิดชอบ · สถานะทำงาน · หมายเหตุ */}
+            <section className="glass-card rounded-3xl p-4 border border-white/70 space-y-3" data-testid="unit-edit-log">
+              <h3 className="text-sm font-medium flex items-center gap-1.5">
+                <History className={cn("w-4 h-4", TONE.primary.value)} />
+                ประวัติการแก้ไข
+              </h3>
+              <UnitEditLogSection job={data} />
+            </section>
 
             <p className="text-xs text-muted-foreground">ข้อมูลใบขอมาจาก ERP — แก้ที่ ERP</p>
 

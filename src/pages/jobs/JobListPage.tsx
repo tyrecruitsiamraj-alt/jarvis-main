@@ -77,9 +77,6 @@ import {
 import { cleanedAddressSummary } from '@/lib/districtMatch';
 import ListPaginationBar from '@/components/shared/ListPaginationBar';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import UnitEditLogSection from '@/components/jobs/UnitEditLogSection';
 import { fetchSiamrajClosedRequests, fetchSiamrajUnitRequest } from '@/lib/siamrajUnitRequestsApi';
 import { friendlyErrorText } from '@/lib/friendlyError';
 import LoadErrorNotice from '@/components/shared/LoadErrorNotice';
@@ -249,8 +246,6 @@ const JobListPage: React.FC = () => {
 
   /** กางเองเมื่อมีตัวกรองติดอยู่ — ไม่งั้นเลขน้อยลงโดยไม่มีอะไรบอกว่าเพราะอะไร */
   const [filtersOpen, setFiltersOpen] = useState(false);
-  /** ป๊อป "ใครแก้สถานะทำงาน" — กดป้ายสถานะ (เจ้าของ 2 พ.ย. 2569 "กดก็เด้ง Popup ขึ้นมา โชว์ไว้มันเกะกะ" · ทุกครั้ง แบ่งหน้า) */
-  const [statusLogJob, setStatusLogJob] = useState<JobRequest | null>(null);
   useEffect(() => {
     if (activeFilterCount > 0) setFiltersOpen(true);
   }, [activeFilterCount]);
@@ -964,36 +959,13 @@ const JobListPage: React.FC = () => {
                     <div className="flex items-center gap-1.5 shrink-0">
                       <PrequestBadge job={j} compact />
                       <UnitRequestReplacementBadge value={j.send_replacement} spare={j.replacement_spare} compact />
-                      <Button
-                        asChild
-                        variant="ghost"
-                        className="h-auto rounded-full p-0 hover:bg-transparent"
-                      >
-                        <span
-                          role="button"
-                          tabIndex={0}
-                          title="ดูว่าใครแก้สถานะ"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setStatusLogJob(j);
-                          }}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' || e.key === ' ') {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              setStatusLogJob(j);
-                            }
-                          }}
-                        >
-                          <UnitRequestWorkStatusBadge
-                            status={j.work_status}
-                            firstName={j.work_person_first_name}
-                            lastName={j.work_person_last_name}
-                            persons={j.work_persons}
-                            compact
-                          />
-                        </span>
-                      </Button>
+                      <UnitRequestWorkStatusBadge
+                        status={j.work_status}
+                        firstName={j.work_person_first_name}
+                        lastName={j.work_person_last_name}
+                        persons={j.work_persons}
+                        compact
+                      />
                       <JobUrgencyBadge job={j} />
                     </div>
                   </div>
@@ -1161,36 +1133,13 @@ const JobListPage: React.FC = () => {
                     </td>
                     <td className="px-1.5 py-3 text-center">
                       <div className="inline-flex flex-col items-center gap-1">
-                        <Button
-                          asChild
-                          variant="ghost"
-                          className="h-auto rounded-full p-0 hover:bg-transparent"
-                        >
-                          <span
-                            role="button"
-                            tabIndex={0}
-                            title="ดูว่าใครแก้สถานะ"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setStatusLogJob(j);
-                            }}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter' || e.key === ' ') {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                setStatusLogJob(j);
-                              }
-                            }}
-                          >
-                            <UnitRequestWorkStatusBadge
-                              status={j.work_status}
-                              firstName={j.work_person_first_name}
-                              lastName={j.work_person_last_name}
-                              persons={j.work_persons}
-                              compact
-                            />
-                          </span>
-                        </Button>
+                        <UnitRequestWorkStatusBadge
+                          status={j.work_status}
+                          firstName={j.work_person_first_name}
+                          lastName={j.work_person_last_name}
+                          persons={j.work_persons}
+                          compact
+                        />
                         <JobUrgencyBadge job={j} compact />
                       </div>
                     </td>
@@ -1217,15 +1166,6 @@ const JobListPage: React.FC = () => {
           />
         ) : null}
       </div>
-
-      <Dialog open={statusLogJob != null} onOpenChange={(o) => !o && setStatusLogJob(null)}>
-        <DialogContent aria-describedby={undefined} className="max-h-[85dvh] w-[calc(100%-1.5rem)] max-w-lg overflow-y-auto rounded-2xl">
-          <DialogHeader>
-            <DialogTitle className="text-base">ใครแก้สถานะ · {statusLogJob?.request_no ?? ''}</DialogTitle>
-          </DialogHeader>
-          <UnitEditLogSection job={statusLogJob} entityType="siamraj_unit_work_status" emptyText="ยังไม่มีใครแก้สถานะใบนี้" />
-        </DialogContent>
-      </Dialog>
     </div>
   );
 };

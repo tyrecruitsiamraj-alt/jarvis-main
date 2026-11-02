@@ -108,7 +108,7 @@ export function OverviewNode({
   big?: boolean;
   /**
    * แบบร่าง B (2 พ.ย. 2569): fill = พื้นเทาเดิม · outline = กล่องขาวมีเส้นขอบ ·
-   * kpi = การ์ดขาวขีดสีบน (สีตาม emphasis · ไม่มี = กรมท่า) · solid = พื้นกรมท่า ใช้กับผลลัพธ์ของสมการ
+   * kpi = การ์ดขาวแถบสีตรงด้านบน (สีตาม emphasis · ไม่มี = กรมท่า) · solid = พื้นกรมท่า ใช้กับผลลัพธ์ของสมการ
    */
   variant?: 'fill' | 'outline' | 'kpi' | 'solid';
   onClick?: () => void;
@@ -128,12 +128,14 @@ export function OverviewNode({
         'h-auto min-w-0 flex-col items-stretch justify-start gap-1 whitespace-normal rounded-xl p-3 text-left font-normal transition-all duration-200 hover:-translate-y-0.5 disabled:opacity-100 motion-reduce:transition-none motion-reduce:hover:translate-y-0',
         variant === 'fill' && (emphasis ? TONE[emphasis].wash : 'bg-muted/50 hover:bg-muted'),
         variant === 'outline' && 'border border-border bg-card hover:bg-muted/50',
-        variant === 'kpi' && cn('rounded-2xl border-t-4 bg-card p-5 shadow-sm hover:bg-card', emphasis ? TONE[emphasis].bar : 'border-t-foreground'),
+        variant === 'kpi' && 'relative overflow-hidden rounded-2xl bg-card p-5 pt-6 shadow-sm hover:bg-card',
         variant === 'solid' && 'bg-foreground text-background hover:bg-foreground/90 hover:text-background',
         big && variant !== 'kpi' && 'p-4',
         className,
       )}
     >
+      {/* แถบสีตรงบนการ์ด kpi — เดิมใช้ขอบบนหนา มุมโค้งทำให้เป็นรูปเสี้ยว (เจ้าของ 2 พ.ย. 2569 "ตรงนี้ไม่สวย") */}
+      {variant === 'kpi' ? <span aria-hidden className={cn('absolute inset-x-0 top-0 h-1', emphasis ? TONE[emphasis].dot : 'bg-foreground')} /> : null}
       <span className="flex items-center justify-between gap-2">
         <span className={cn('text-xs', variant === 'solid' ? 'text-background/70' : 'text-muted-foreground')}>{label}</span>
         {tag && emphasis ? (

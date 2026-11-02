@@ -70,13 +70,9 @@ async function handler(req: AuthedReq, res: ApiRes) {
       );
     }
 
-    /**
-     * `type=` เลือกชนิดเดียว = เอาทุกครั้ง (เจ้าของ 2 พ.ย. 2569 "กดป้ายสถานะแล้วเห็นว่าใครแก้ล่าสุด · เอาทุกครั้งเลยแต่ทำเป็น pagination")
-     * ไม่ส่ง = รวมทุกชนิด 50 รายการล่าสุดเหมือนเดิม
-     */
-    const type = getString(req.query?.type);
-    const types = type && (BOARD_EDIT_ENTITY_TYPES as readonly string[]).includes(type) ? [type] : [...BOARD_EDIT_ENTITY_TYPES];
-    const limit = type ? 2000 : 50;
+    // ทุกครั้งทุกชนิด (เจ้าของ 2 พ.ย. 2569 "log แก้ไขขอเอามาไว้ใต้ [หมายเหตุ] ว่าใบนี้มีการแก้ไขอะไรไปบ้าง ทำเป็น pagination") — แบ่งหน้าที่หน้าจอ
+    const types = [...BOARD_EDIT_ENTITY_TYPES];
+    const limit = 2000;
     // ชื่อคนแก้ = ชื่อเล่น > ชื่อจริง > อีเมลตัดโดเมน (audit เก็บอีเมล)
     const { rows } = await dbQuery<AuditRow>(
       `select a.id, coalesce(nullif(btrim(u.nickname), ''), nullif(btrim(u.full_name), ''), split_part(a.user_name, '@', 1)) as user_name,
