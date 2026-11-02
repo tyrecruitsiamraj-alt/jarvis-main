@@ -194,7 +194,8 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
     setShortLinks({});
     setPicked([]);
     // เหลือแค่ช่องทาง = กางรายการช่องทางให้เลย (ไม่มีอะไรอื่นให้ทำในฟอร์มนี้)
-    setChannelsOpen(channelOnly);
+    // กล่องลอย = กางและอยู่บนสุดด้วย (เจ้าของ 2 พ.ย. 2569 "ทำให้เลือกช่องทางตอน Genlink ได้ด้วยสิ่" — เดิมหุบอยู่ท้ายฟอร์มยาว หาไม่เจอ)
+    setChannelsOpen(channelOnly || Boolean(standalone));
     /**
      * ผู้รับผิดชอบ = **ทีม Online** ที่เพิ่มไว้ในหน้าตั้งค่า (เจ้าของสั่ง 19 ส.ค. 2569)
      * เดิมดึงผู้ใช้ทั้งระบบมาให้เลือก ซึ่งได้ชื่อคนที่ไม่เกี่ยวกับงานประกาศเลย
@@ -267,6 +268,47 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
 
   const heading = job ? jobBoardCardTitle(job) : standalone?.kindLabel ?? 'ประกาศรับสมัคร';
 
+  const channelSection = (
+    <>
+              {/* ── ช่องทางที่จะส่ง — 🔴 **หุบไว้เป็นค่าตั้งต้น** (แก้ 27 ส.ค. 2569) ──
+                  ของเดิมกางลิสต์ช่องทางทั้งหมด (30+ ช่อง) ⇒ กินครึ่งหน้าจอ
+                  โมเดลที่สวมบทพนักงานใหม่มาลองทำภารกิจนี้บอกว่า
+                  *"ช่องทางที่จะส่งเต็มครึ่งหน้า ยากต่อการมองหาช่องที่ต้องการ"*
+                  ⚠️ ไม่เลือกช่องทางก็สร้างได้ (ได้ลิงก์กลาง 1 อัน) ⇒ หุบได้โดยไม่ขัดขวางใคร */}
+              <div className="space-y-1.5 rounded-xl border border-border/60 px-3 py-2.5">
+                <button
+                  type="button"
+                  onClick={() => setChannelsOpen((v) => !v)}
+                  aria-expanded={channelsOpen}
+                  className="flex w-full items-center justify-between gap-2 text-left"
+                >
+                  <span className="text-xs font-medium text-muted-foreground">
+                    ช่องทางที่จะส่ง{' '}
+                    {picked.length > 0 ? (
+                      <span className="font-medium text-foreground">
+                        — {picked.length === 1 ? recruitChannelLabel(picked[0]) : `${picked.length} ช่องทาง`}
+                      </span>
+                    ) : (
+                      <span className="font-normal opacity-70">(ไม่เลือกก็ได้ — จะได้ลิงก์กลาง 1 อัน)</span>
+                    )}
+                  </span>
+                  <ChevronDown
+                    className={cn(
+                      'h-4 w-4 shrink-0 text-muted-foreground transition-transform',
+                      channelsOpen && 'rotate-180',
+                    )}
+                    aria-hidden
+                  />
+                </button>
+                {channelsOpen ? (
+                  <>
+                    <MultiChannelPicker value={picked} onChange={setPicked} reloadKey={open} />
+                  </>
+                ) : null}
+              </div>
+    </>
+  );
+
   const body = (
         // ฝังในการ์ดของป๊อปไล่งาน (ขั้น 4) = การ์ดให้ขอบ/ระยะแล้ว ไม่ต้องเว้นซ้ำ
         <div className={embedded ? 'space-y-3.5' : 'min-h-0 flex-1 space-y-3.5 overflow-y-auto px-5 py-4'}>
@@ -298,6 +340,7 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
             </div>
           ) : (
             <>
+              {standalone ? channelSection : null}
               {/* เหลือแค่เลือกช่องทาง (เจ้าของ Choice 7 ต.ค. 2569) — ลิงก์ผูกใบขอ = หน้าลิงก์ใช้การ์ดเดียวกับ /apply
                   ช่องหัวข้อ/รายละเอียด/สถานที่/ค่าตอบแทน/ผู้ติดต่อ ไม่ขึ้นให้ผู้สมัครเห็นแล้ว · ค่าตั้งต้นจากใบขอยังบันทึกตามเดิม */}
               {channelOnly ? null : (
@@ -424,42 +467,7 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
 
               </>
               )}
-              {/* ── ช่องทางที่จะส่ง — 🔴 **หุบไว้เป็นค่าตั้งต้น** (แก้ 27 ส.ค. 2569) ──
-                  ของเดิมกางลิสต์ช่องทางทั้งหมด (30+ ช่อง) ⇒ กินครึ่งหน้าจอ
-                  โมเดลที่สวมบทพนักงานใหม่มาลองทำภารกิจนี้บอกว่า
-                  *"ช่องทางที่จะส่งเต็มครึ่งหน้า ยากต่อการมองหาช่องที่ต้องการ"*
-                  ⚠️ ไม่เลือกช่องทางก็สร้างได้ (ได้ลิงก์กลาง 1 อัน) ⇒ หุบได้โดยไม่ขัดขวางใคร */}
-              <div className="space-y-1.5 rounded-xl border border-border/60 px-3 py-2.5">
-                <button
-                  type="button"
-                  onClick={() => setChannelsOpen((v) => !v)}
-                  aria-expanded={channelsOpen}
-                  className="flex w-full items-center justify-between gap-2 text-left"
-                >
-                  <span className="text-xs font-medium text-muted-foreground">
-                    ช่องทางที่จะส่ง{' '}
-                    {picked.length > 0 ? (
-                      <span className="font-medium text-foreground">
-                        — {picked.length === 1 ? recruitChannelLabel(picked[0]) : `${picked.length} ช่องทาง`}
-                      </span>
-                    ) : (
-                      <span className="font-normal opacity-70">(ไม่เลือกก็ได้ — จะได้ลิงก์กลาง 1 อัน)</span>
-                    )}
-                  </span>
-                  <ChevronDown
-                    className={cn(
-                      'h-4 w-4 shrink-0 text-muted-foreground transition-transform',
-                      channelsOpen && 'rotate-180',
-                    )}
-                    aria-hidden
-                  />
-                </button>
-                {channelsOpen ? (
-                  <>
-                    <MultiChannelPicker value={picked} onChange={setPicked} reloadKey={open} />
-                  </>
-                ) : null}
-              </div>
+              {standalone ? null : channelSection}
 
               {error ? <p className="text-xs text-red-600">{error}</p> : null}
 
@@ -528,7 +536,7 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
                 Gen link รับสมัคร
               </DialogTitle>
               <DialogDescription className="mt-0.5 line-clamp-2 text-xs leading-snug">
-                {heading} — กรอกรายละเอียดที่ผู้สมัครจะเห็น แล้วเลือกช่องทางที่จะส่ง
+                {standalone ? heading : `${heading} — กรอกรายละเอียดที่ผู้สมัครจะเห็น แล้วเลือกช่องทางที่จะส่ง`}
               </DialogDescription>
             </div>
           </div>
