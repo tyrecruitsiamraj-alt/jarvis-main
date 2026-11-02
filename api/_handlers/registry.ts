@@ -104,6 +104,7 @@ import matchingIrecruitCandidatesHandler from './matching-irecruit-candidates.js
 import matchingRecruitLaneHandler from './matching-recruit-lane.js';
 import matchingSelectionRecallHandler from './matching-selection-recall.js';
 import matchingBoardCandidatesHandler from './matching-board-candidates.js';
+import matchingBoardHandler from './matching-board.js';
 import matchingProposalsHandler from './matching-proposals.js';
 import matchingCandidateScreeningHandler from './matching-candidate-screening.js';
 import lumosDispatchModeHandler from './lumos-dispatch-mode.js';
@@ -191,6 +192,7 @@ export const apiRoutes: Record<string, ApiHandler> = {
   // เลนคัดสรร — ชวนคนที่เคยปฏิเสธงานอื่นกลับมา แล้วส่ง AI โทรทันที
   '/api/matching/selection-recall': matchingSelectionRecallHandler as ApiHandler,
   '/api/matching/board-candidates': matchingBoardCandidatesHandler as ApiHandler,
+  '/api/matching/board': matchingBoardHandler as ApiHandler,
   '/api/matching/proposals': matchingProposalsHandler as ApiHandler,
   '/api/matching/candidate-screening': matchingCandidateScreeningHandler as ApiHandler,
   '/api/lumos/dispatch-mode': lumosDispatchModeHandler as ApiHandler,

@@ -69,6 +69,7 @@ export type ApiResource =
   | 'matching-recruit-lane'
   | 'matching-selection-recall'
   | 'matching-board-candidates'
+  | 'matching-board'
   | 'matching-proposals'
   | 'matching-job-postings'
   | 'matching-flow-summary'
@@ -228,6 +229,7 @@ export function minimumRoleFor(
     case 'matching-recruit-lane':
     case 'matching-selection-recall':
     case 'matching-board-candidates':
+    case 'matching-board':
     case 'matching-proposals':
     case 'matching-job-postings':
     case 'matching-flow-summary':

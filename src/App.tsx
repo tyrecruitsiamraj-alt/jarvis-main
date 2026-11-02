@@ -41,7 +41,7 @@ const PreCheckPage = lazyPage(() => import("@/pages/matching/PreCheckPage"));
 const RecruitRmPage = lazyPage(() => import("@/pages/recruit/RecruitRmPage"));
 const RecruitChannelsPage = lazyPage(() => import("@/pages/recruit/RecruitChannelsPage"));
 const ReservationsPage = lazyPage(() => import("@/pages/matching/ReservationsPage"));
-const OurPeoplePage = lazyPage(() => import("@/pages/matching/OurPeoplePage"));
+const OurPeoplePage = lazyPage(() => import("@/pages/matching/CandidatesBoardRoute"));
 const JobDashboard = lazyPage(() => import("@/pages/jobs/JobDashboard"));
 const JobListPage = lazyPage(() => import("@/pages/jobs/JobListPage"));
 const StaffJobBoardPage = lazyPage(() => import("@/pages/jobs/StaffJobBoardPage"));
