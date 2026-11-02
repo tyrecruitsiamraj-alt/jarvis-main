@@ -218,6 +218,8 @@ export type SoOptAccount = {
   groupIds: string[];
   /** เครื่องที่บัญชีนี้ล็อกอินค้างไว้ */
   sessionWorkers: string[];
+  /** ธุรกิจของบัญชี (LBD · LBA · LM …) · null = ไม่ระบุธุรกิจ (So Scraping 2 พ.ย. 2569 · users.department) */
+  department: string | null;
 };
 export type SoGroupStats = { attempts: number; posted: number; comments: number; phoneLeads: number };
 export type SoOptGroup = {
@@ -367,9 +369,7 @@ export function soGroupSections(groups: readonly SoOptGroup[], jobBu: string | n
     const k = g.department ?? null;
     by.set(k, [...(by.get(k) ?? []), g]);
   }
-  const codes = [...by.keys()].filter((k): k is string => k !== null && k !== jobBu).sort((a, b) => a.localeCompare(b));
-  const order: (string | null)[] = [...(jobBu && by.has(jobBu) ? [jobBu] : []), ...codes, ...(by.has(null) ? [null] : [])];
-  return order.map((bu) => ({ bu, label: bu ?? SO_BU_NONE_LABEL, forJob: bu !== null && bu === jobBu, groups: by.get(bu) ?? [] }));
+  return buOrder(by.keys(), jobBu).map((bu) => ({ bu, label: bu ?? SO_BU_NONE_LABEL, forJob: bu !== null && bu === jobBu, groups: by.get(bu) ?? [] }));
 }
 
 /** ติ๊กไว้ให้ตั้งแต่เปิดป๊อป = ทุกกลุ่มของธุรกิจเดียวกับใบขอ · ใบขอไม่ระบุธุรกิจ = ไม่ติ๊ก */
@@ -383,10 +383,46 @@ export function soBuEmptyText(bu: string): string {
   return `ยังไม่มีกลุ่มของธุรกิจ ${bu} ใน So Scraping — เพิ่มที่ ตั้งค่า → กลุ่มโพสต์ หรือเลือกจากธุรกิจอื่น`;
 }
 
-/** กลุ่มจาก options API ยังไม่มีช่องธุรกิจ — เติมจากฐานของ So Scraping (อ่านอย่างเดียว) · กลุ่มที่ API มี department มาเองไม่ทับ */
-export function withSoGroupDepartments(o: SoOptions, db: ReadonlyArray<{ id: string; department: string | null }>): SoOptions {
-  const dept = new Map(db.map((g) => [g.id, normalizeTrendBu(g.department)]));
-  return { ...o, groups: o.groups.map((g) => (g.department ? g : { ...g, department: dept.get(g.id) ?? null })) };
+/** ธุรกิจของใบขอยังไม่มีบัญชี Facebook เลย — บอกว่าไปเพิ่มที่ไหน */
+export function soBuNoAccountText(bu: string): string {
+  return `ยังไม่มีบัญชี Facebook ของธุรกิจ ${bu} ใน So Scraping — เพิ่มที่ ตั้งค่า → บัญชีที่ใช้งาน หรือเลือกจากธุรกิจอื่น`;
+}
+
+/** ลำดับหัวธุรกิจ: ของใบขอก่อน → ธุรกิจอื่นเรียงรหัส → ไม่ระบุท้ายสุด (ใช้ทั้งบัญชีและกลุ่ม) */
+function buOrder(keys: Iterable<string | null>, jobBu: string | null): (string | null)[] {
+  const set = new Set(keys);
+  const codes = [...set].filter((k): k is string => k !== null && k !== jobBu).sort((a, b) => a.localeCompare(b));
+  return [...(jobBu && set.has(jobBu) ? [jobBu] : []), ...codes, ...(set.has(null) ? [null] : [])];
+}
+
+/** บัญชี Facebook เรียงเป็นก้อนตามธุรกิจ (ธุรกิจของใบขอก่อน) · `group` = หัวในช่องเลือก */
+export function soAccountsByBu<A extends Pick<SoOptAccount, 'department'>>(accounts: readonly A[], jobBu: string | null): Array<{ account: A; group: string }> {
+  return buOrder(
+    accounts.map((a) => a.department ?? null),
+    jobBu,
+  ).flatMap((bu) => accounts.filter((a) => (a.department ?? null) === bu).map((account) => ({ account, group: bu ?? SO_BU_NONE_LABEL })));
+}
+
+/** บัญชีที่ให้ช่องเลือกตั้งต้น = บัญชีธุรกิจเดียวกับใบขอ · ใบขอไม่ระบุธุรกิจ = ทุกบัญชี · ธุรกิจของใบไม่มีบัญชี = ว่าง (ไม่เลือกให้ข้ามธุรกิจ) */
+export function soAccountsForJob<A extends Pick<SoOptAccount, 'department'>>(accounts: readonly A[], jobBu: string | null): A[] {
+  return jobBu ? accounts.filter((a) => a.department === jobBu) : [...accounts];
+}
+
+/**
+ * options API ยังไม่ส่งธุรกิจของกลุ่ม/บัญชี — เติมจากฐานของ So Scraping (อ่านอย่างเดียว)
+ * ตัวที่ API ส่ง department มาเองไม่ทับ
+ */
+export function withSoDepartments(
+  o: SoOptions,
+  db: { groups: ReadonlyArray<{ id: string; department: string | null }>; accounts: ReadonlyArray<{ id: string; department: string | null }> },
+): SoOptions {
+  const g = new Map(db.groups.map((x) => [x.id, normalizeTrendBu(x.department)]));
+  const a = new Map(db.accounts.map((x) => [x.id, normalizeTrendBu(x.department)]));
+  return {
+    ...o,
+    groups: o.groups.map((x) => (x.department ? x : { ...x, department: g.get(x.id) ?? null })),
+    accounts: o.accounts.map((x) => (x.department ? x : { ...x, department: a.get(x.id) ?? null })),
+  };
 }
 
 const ACCOUNT_STATUSES: readonly SoAccountStatus[] = ['ready', 'busy', 'full', 'paused', 'worker_offline', 'no_worker'];
@@ -425,6 +461,7 @@ export function parseSoOptions(raw: unknown): SoOptions | null {
       warning: str(a.warning),
       groupIds: strs(a.group_ids),
       sessionWorkers: strs(a.session_workers),
+      department: normalizeTrendBu(str(a.department)),
     }));
   const groups = rows(r.groups)
     .filter((g) => str(g.id))

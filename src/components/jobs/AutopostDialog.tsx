@@ -42,6 +42,9 @@ import {
   defaultSoGroupPick,
   jobBuOf,
   soBuEmptyText,
+  soBuNoAccountText,
+  soAccountsByBu,
+  soAccountsForJob,
   type SoGroupSection,
   soPostSnapshot,
   soStatusView,
@@ -166,7 +169,8 @@ export function AutopostBody({
         const open = p.find((x) => x.status === 'open');
         const fb = open?.links.find((l) => /facebook/i.test(l.channelLabel ?? '')) ?? open?.links[0];
         if (fb) setLinkCode(fb.code);
-        const acc = firstAccount(o.accounts);
+        // บัญชีตั้งต้น = บัญชีธุรกิจเดียวกับใบขอ (เจ้าของ 2 พ.ย. 2569 "ตรงนี้ก็ต้องแยก Bu ด้วย") · ธุรกิจนี้ไม่มีบัญชี = ไม่เลือกให้
+        const acc = firstAccount(soAccountsForJob(o.accounts, jobBu));
         if (acc) {
           setAccountId(acc.id);
           setWorkerName(acc.worker ?? '');
@@ -415,16 +419,22 @@ export function AutopostBody({
               <p className={cn('text-sm', TONE.warn.value)}>ยังไม่มีบัญชี ให้เพิ่มที่ระบบ So Scraping</p>
             ) : (
               <>
+                {jobBu && soAccountsForJob(opts.accounts, jobBu).length === 0 ? (
+                  <p className={cn('text-sm', TONE.warn.value)} data-testid="autopost-bu-no-account">
+                    {soBuNoAccountText(jobBu)}
+                  </p>
+                ) : null}
                 <FieldSelect
                   value={accountId}
                   onChange={pickAccount}
                   placeholder="เลือกบัญชี"
                   ariaLabel="บัญชี Facebook"
                   testId="autopost-account"
-                  options={opts.accounts.map((a) => ({
+                  options={soAccountsByBu(opts.accounts, jobBu).map(({ account: a, group }) => ({
                     value: a.id,
                     label: `${a.name} · ${SO_ACCOUNT_STATUS_LABEL[a.status]} · โพสต์ ${NUM.format(a.postedToday)}${a.dailyCap !== null ? `/${NUM.format(a.dailyCap)}` : ''}`,
                     disabled: a.status === 'no_worker',
+                    group,
                   }))}
                 />
                 {account ? (

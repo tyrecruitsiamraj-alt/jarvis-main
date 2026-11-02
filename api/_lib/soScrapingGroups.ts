@@ -54,6 +54,17 @@ export type SoAccount = {
 };
 export type SoWorker = { name: string; lastSeen: string | null; online: boolean };
 
+/** ธุรกิจของบัญชี Facebook — อ่านแค่ id + department (🔴 ห้ามเลือกคอลัมน์อื่นของ users) · ยังไม่มีคอลัมน์/อ่านไม่ได้ = รายการว่าง */
+export async function listSoAccountDepartments(): Promise<Array<{ id: string; department: string | null }>> {
+  try {
+    const { rows } = await dbQuery<{ id: string; department: string | null }>(`select u.id::text as id, u.department::text as department from ${SCHEMA}.users u`);
+    return rows.map((r) => ({ id: r.id, department: (r.department ?? '').trim() || null }));
+  } catch (e) {
+    logWarn('soScraping.accountDepartments: อ่านธุรกิจของบัญชีไม่ได้', { error: errorSummaryText(e) });
+    return [];
+  }
+}
+
 /** worker ที่เห็นภายในเท่านี้ = ออนไลน์ */
 export const SO_WORKER_ONLINE_MS = 15 * 60_000;
 

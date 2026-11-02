@@ -9,8 +9,8 @@
 import { dbQuery, isPgUndefinedTable } from './postgres.js';
 import { tableInAppSchema } from './schema.js';
 import { decryptApiKey, encryptApiKey } from './aiSettingsStore.js';
-import { listSoGroups, listSoAccounts, listSoWorkers } from './soScrapingGroups.js';
-import { parseSoOptions, withSoGroupDepartments, type SoOptions } from '../../src/lib/soScraping.js';
+import { listSoAccountDepartments, listSoGroups, listSoAccounts, listSoWorkers } from './soScrapingGroups.js';
+import { parseSoOptions, withSoDepartments, type SoOptions } from '../../src/lib/soScraping.js';
 
 const KEYS = tableInAppSchema('app_outbound_api_keys');
 export const SO_OPTIONS_KEY_NAME = 'so-scraping';
@@ -105,7 +105,8 @@ export async function callSoOptions(baseUrl: string, key: string, fetchImpl: typ
 
 /** ฐานของ So Scraping แบบเดิม (ยังไม่ได้ใส่ key) — สถานะคิดแค่ พัก / ครบโควต้า / พร้อม · ไม่มีบัญชี Scrap */
 async function optionsFromDb(): Promise<SoOptions> {
-  const [accounts, groups, workers] = await Promise.all([listSoAccounts(), listSoGroups(), listSoWorkers()]);
+  const [accounts, groups, workers, accountBus] = await Promise.all([listSoAccounts(), listSoGroups(), listSoWorkers(), listSoAccountDepartments()]);
+  const accountBu = new Map(accountBus.map((a) => [a.id, a.department]));
   const online = new Map(workers.map((w) => [w.name, w.online]));
   return {
     source: 'db',
@@ -127,6 +128,7 @@ async function optionsFromDb(): Promise<SoOptions> {
         warning: null,
         groupIds: a.groupIds,
         sessionWorkers: a.preferredWorker ? [a.preferredWorker] : [],
+        department: accountBu.get(a.id) ?? null,
       };
     }),
     groups: groups.map((g) => ({ id: g.id, fbGroupId: null, name: g.name, url: null, accountIds: [], lastPostedAt: null, stats30d: null, department: g.department })),
@@ -155,9 +157,9 @@ export async function loadSoKey(): Promise<{ baseUrl: string; key: string } | nu
 export async function fetchSoOptions(): Promise<SoOptions> {
   const k = await loadSoKey();
   if (!k) return optionsFromDb();
-  // options API ยังไม่ส่งธุรกิจของกลุ่ม — เติมจากฐานของ So Scraping (อ่านอย่างเดียว · อ่านไม่ได้ = ไม่ระบุธุรกิจ) · 2 พ.ย. 2569
-  const [o, dbGroups] = await Promise.all([callSoOptions(k.baseUrl, k.key), listSoGroups()]);
-  return withSoGroupDepartments(o, dbGroups);
+  // options API ยังไม่ส่งธุรกิจของกลุ่ม/บัญชี — เติมจากฐานของ So Scraping (อ่านอย่างเดียว · อ่านไม่ได้ = ไม่ระบุธุรกิจ) · 2 พ.ย. 2569
+  const [o, groups, accounts] = await Promise.all([callSoOptions(k.baseUrl, k.key), listSoGroups(), listSoAccountDepartments()]);
+  return withSoDepartments(o, { groups, accounts });
 }
 
 /**

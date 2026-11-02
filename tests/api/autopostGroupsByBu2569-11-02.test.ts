@@ -6,7 +6,19 @@
  */
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { defaultSoGroupPick, jobBuOf, parseSoOptions, soBuEmptyText, soGroupSections, withSoGroupDepartments, type SoOptGroup, type SoOptions } from '@/lib/soScraping';
+import {
+  defaultSoGroupPick,
+  jobBuOf,
+  parseSoOptions,
+  soAccountsByBu,
+  soAccountsForJob,
+  soBuEmptyText,
+  soBuNoAccountText,
+  soGroupSections,
+  withSoDepartments,
+  type SoOptGroup,
+  type SoOptions,
+} from '@/lib/soScraping';
 
 const group = (id: string, name: string, department: string | null): SoOptGroup => ({
   id,
@@ -60,7 +72,10 @@ describe('กลุ่ม Facebook ตามธุรกิจของใบข
 
   it('options API ยังไม่ส่ง department — เติมจากฐานของ So Scraping · ถ้า API ส่งมาเองไม่ทับ · รหัส LML แปลงเป็น LM', () => {
     const raw = {
-      accounts: [],
+      accounts: [
+        { id: 'fb_01990af955014ec19e94965b', name: 'Rudge Marita', status: 'ready', group_ids: [] },
+        { id: 'fb_api_dept', name: 'บัญชีบอกธุรกิจเอง', status: 'ready', group_ids: [], department: 'LBA' },
+      ],
       workers: [],
       scrape_accounts: [],
       groups: [
@@ -70,11 +85,19 @@ describe('กลุ่ม Facebook ตามธุรกิจของใบข
     };
     const o = parseSoOptions(raw) as SoOptions;
     expect(o.groups.map((g) => g.department)).toEqual([null, 'LM']);
-    const merged = withSoGroupDepartments(o, [
-      { id: 'mvhmloovlppmpi5o6fg', department: 'LBD' },
-      { id: 'grp_api_dept', department: 'SN' },
-    ]);
+    expect(o.accounts.map((a) => a.department)).toEqual([null, 'LBA']);
+    const merged = withSoDepartments(o, {
+      groups: [
+        { id: 'mvhmloovlppmpi5o6fg', department: 'LBD' },
+        { id: 'grp_api_dept', department: 'SN' },
+      ],
+      accounts: [
+        { id: 'fb_01990af955014ec19e94965b', department: 'LBD' },
+        { id: 'fb_api_dept', department: 'LBD' },
+      ],
+    });
     expect(merged.groups.map((g) => g.department)).toEqual(['LBD', 'LM']);
+    expect(merged.accounts.map((a) => a.department)).toEqual(['LBD', 'LBA']);
   });
 
   it('ป๊อปใช้หมวดตามธุรกิจ · server เติมธุรกิจตอนเรียก API · อ่านทุกกลุ่มไม่กรองตามบัญชีผูก', () => {
@@ -84,9 +107,33 @@ describe('กลุ่ม Facebook ตามธุรกิจของใบข
     expect(dialog).toContain("checked={n === 0 ? false : n === ids.length ? true : 'indeterminate'}");
     expect(dialog).not.toContain('jobProvinceOf');
     const opts = readFileSync('api/_lib/soScrapingOptions.ts', 'utf8');
-    expect(opts).toContain('withSoGroupDepartments(o, dbGroups)');
+    expect(opts).toContain('withSoDepartments(o, { groups, accounts })');
+    // ธุรกิจของบัญชี: อ่านแค่ id + department จากตาราง users (มีรหัสผ่าน/token)
+    const grp = readFileSync('api/_lib/soScrapingGroups.ts', 'utf8');
+    expect(grp).toContain('select u.id::text as id, u.department::text as department from ${SCHEMA}.users u`');
+    expect(dialog).toContain('firstAccount(soAccountsForJob(o.accounts, jobBu))');
+    expect(dialog).toContain('data-testid="autopost-bu-no-account"');
     const groups = readFileSync('api/_lib/soScrapingGroups.ts', 'utf8');
     expect(groups).not.toContain('unknownSoGroupIds');
     expect(groups).not.toMatch(/from \$\{SCHEMA\}\.groups g\s+where exists/);
+  });
+
+  it('บัญชี Facebook แยกตามธุรกิจ: ธุรกิจของใบขอขึ้นก่อนเป็นหัวแรก · ตั้งต้นเลือกเฉพาะบัญชีธุรกิจเดียวกัน · ธุรกิจไม่มีบัญชี = ไม่เลือกให้ + ข้อความ', () => {
+    const accounts = [
+      { id: 'fb_lm_01', name: 'บัญชีสวน', department: 'LM' },
+      { id: 'fb_none_01', name: 'บัญชีเก่า', department: null },
+      { id: 'fb_01990af955014ec19e94965b', name: 'Rudge Marita', department: 'LBD' },
+      { id: 'fb_898d82093abe46eeab1980d8', name: 'Tyni Aiit', department: 'LBD' },
+    ];
+    expect(soAccountsByBu(accounts, 'LBD').map((x) => [x.group, x.account.name])).toEqual([
+      ['LBD', 'Rudge Marita'],
+      ['LBD', 'Tyni Aiit'],
+      ['LM', 'บัญชีสวน'],
+      ['ไม่ระบุธุรกิจ', 'บัญชีเก่า'],
+    ]);
+    expect(soAccountsForJob(accounts, 'LBD').map((a) => a.name)).toEqual(['Rudge Marita', 'Tyni Aiit']);
+    expect(soAccountsForJob(accounts, 'LBA')).toEqual([]);
+    expect(soAccountsForJob(accounts, null)).toHaveLength(4);
+    expect(soBuNoAccountText('LBA')).toBe('ยังไม่มีบัญชี Facebook ของธุรกิจ LBA ใน So Scraping — เพิ่มที่ ตั้งค่า → บัญชีที่ใช้งาน หรือเลือกจากธุรกิจอื่น');
   });
 });
