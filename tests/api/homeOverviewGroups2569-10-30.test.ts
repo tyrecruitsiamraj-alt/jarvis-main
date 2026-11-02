@@ -11,7 +11,9 @@ describe('หน้าหลัก แบบ A', () => {
     expect(order.every((i) => i > 0)).toBe(true);
     expect([...order].sort((a, b) => a - b)).toEqual(order);
     const parts = readFileSync('src/components/home-overview/OverviewParts.tsx', 'utf8');
-    expect(parts).toContain('border-b-2 border-foreground');
+    // แบบร่าง B (เจ้าของเลือก 2 พ.ย. 2569): หัวเรื่องคอลัมน์ซ้าย เนื้อหา 4 ส่วน
+    expect(parts).toContain('lg:grid-cols-5');
+    expect(parts).toContain('lg:col-span-4');
   });
   it('สมการใต้การ์ดยังอยู่ครบ (เจ้าของ "เอาสมการไว้")', () => {
     for (const id of ['overview-req-sum', 'overview-follow-people-sum', 'overview-follow-calls-sum']) expect(page).toContain(`data-testid="${id}"`);

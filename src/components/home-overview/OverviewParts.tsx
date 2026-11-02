@@ -22,8 +22,9 @@ export const NUM = new Intl.NumberFormat('th-TH');
 export type Emphasis = 'danger' | 'warn' | 'success' | null;
 
 /**
- * กลุ่มเรื่องของหน้าหลัก (เจ้าของ 30 ต.ค. 2569 "มันดูกลมกลืน … แยกให้ชัดเจนหน่อย" → แบบร่าง A)
- * หัวเรื่องอยู่นอกการ์ด: เลขลำดับในวงกลม · ชื่อเรื่องตัวใหญ่ · ยอดหลักชิดขวา · เส้นกรมท่าคั่น
+ * กลุ่มเรื่องของหน้าหลัก (เจ้าของ 30 ต.ค. 2569 "มันดูกลมกลืน … แยกให้ชัดเจนหน่อย")
+ * แบบร่าง B (เจ้าของเลือก 2 พ.ย. 2569 หลัง "หน้าหลัก ไม่สวย"): หัวเรื่องอยู่คอลัมน์ซ้าย · เลขลำดับสีเบอร์กันดี · ยอดหลักใต้ชื่อ
+ * จอแคบหัวเรื่องขึ้นบน
  */
 export function OverviewGroup({
   no,
@@ -34,21 +35,21 @@ export function OverviewGroup({
 }: {
   no: number;
   title: string;
-  /** ยอดหลักของเรื่อง (ขวามือ) · ไม่ส่ง = ไม่โชว์ */
+  /** ยอดหลักของเรื่อง (ใต้ชื่อ) · ไม่ส่ง = ไม่โชว์ */
   head?: string | null;
   children: React.ReactNode;
   testId?: string;
 }) {
   return (
-    <section className="space-y-4 pt-4" data-testid={testId}>
-      <div className="flex items-center gap-3 border-b-2 border-foreground pb-3">
-        <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-foreground text-base font-medium text-background" aria-hidden>
-          {no}
+    <section className="grid gap-4 pt-2 lg:grid-cols-5" data-testid={testId}>
+      <div className="min-w-0 lg:pt-1">
+        <span className="text-xs font-medium tabular-nums text-primary" aria-hidden>
+          {String(no).padStart(2, '0')}
         </span>
-        <h2 className="min-w-0 flex-1 text-2xl font-medium text-foreground">{title}</h2>
-        {head ? <span className="shrink-0 text-sm tabular-nums text-muted-foreground">{head}</span> : null}
+        <h2 className="text-2xl font-medium text-foreground">{title}</h2>
+        {head ? <p className="text-sm tabular-nums text-muted-foreground">{head}</p> : null}
       </div>
-      {children}
+      <div className="min-w-0 space-y-4 lg:col-span-4">{children}</div>
     </section>
   );
 }
@@ -92,6 +93,7 @@ export function OverviewNode({
   emphasis = null,
   tag,
   big = false,
+  variant = 'fill',
   onClick,
   testId,
   className,
@@ -104,6 +106,11 @@ export function OverviewNode({
   emphasis?: Emphasis;
   tag?: string;
   big?: boolean;
+  /**
+   * แบบร่าง B (2 พ.ย. 2569): fill = พื้นเทาเดิม · outline = กล่องขาวมีเส้นขอบ ·
+   * kpi = การ์ดขาวขีดสีบน (สีตาม emphasis · ไม่มี = กรมท่า) · solid = พื้นกรมท่า ใช้กับผลลัพธ์ของสมการ
+   */
+  variant?: 'fill' | 'outline' | 'kpi' | 'solid';
   onClick?: () => void;
   testId?: string;
   className?: string;
@@ -119,23 +126,90 @@ export function OverviewNode({
       data-testid={testId}
       className={cn(
         'h-auto min-w-0 flex-col items-stretch justify-start gap-1 whitespace-normal rounded-xl p-3 text-left font-normal transition-all duration-200 hover:-translate-y-0.5 disabled:opacity-100 motion-reduce:transition-none motion-reduce:hover:translate-y-0',
-        emphasis ? TONE[emphasis].wash : 'bg-muted/50 hover:bg-muted',
-        big && 'p-4',
+        variant === 'fill' && (emphasis ? TONE[emphasis].wash : 'bg-muted/50 hover:bg-muted'),
+        variant === 'outline' && 'border border-border bg-card hover:bg-muted/50',
+        variant === 'kpi' && cn('rounded-2xl border-t-4 bg-card p-5 shadow-sm hover:bg-card', emphasis ? TONE[emphasis].bar : 'border-t-foreground'),
+        variant === 'solid' && 'bg-foreground text-background hover:bg-foreground/90 hover:text-background',
+        big && variant !== 'kpi' && 'p-4',
         className,
       )}
     >
       <span className="flex items-center justify-between gap-2">
-        <span className="text-xs text-muted-foreground">{label}</span>
+        <span className={cn('text-xs', variant === 'solid' ? 'text-background/70' : 'text-muted-foreground')}>{label}</span>
         {tag && emphasis ? (
           <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium', TONE[emphasis].soft, TONE[emphasis].value)}>{tag}</span>
         ) : null}
       </span>
-      <span className={cn('font-medium tabular-nums', big ? 'text-3xl' : 'text-2xl', emphasis ? TONE[emphasis].num : 'text-foreground')}>
+      <span
+        className={cn(
+          'font-medium tabular-nums',
+          variant === 'kpi' ? 'text-4xl' : big ? 'text-3xl' : 'text-2xl',
+          variant === 'solid' ? 'text-background' : variant === 'kpi' || !emphasis ? 'text-foreground' : TONE[emphasis].num,
+        )}
+      >
         <Num value={value} />
-        {unit ? <span className="ml-1 text-sm font-normal text-muted-foreground">{unit}</span> : null}
+        {unit ? <span className={cn('ml-1 text-sm font-normal', variant === 'solid' ? 'text-background/70' : 'text-muted-foreground')}>{unit}</span> : null}
       </span>
-      {sub ? <span className="text-xs tabular-nums text-muted-foreground">{sub}</span> : null}
+      {sub ? <span className={cn('text-xs tabular-nums', variant === 'solid' ? 'text-background/70' : 'text-muted-foreground')}>{sub}</span> : null}
       {children}
+    </Button>
+  );
+}
+
+/**
+ * แถวของเส้นผู้สมัคร แบบร่าง B (2 พ.ย. 2569): ชื่อขั้น · แท่งยาวตามจำนวน (เลขในแท่ง) + แถบช่องทางใต้แท่ง · ตัวเลขย่อยขวามือ
+ * ทั้งแถวกดได้ (ปุ่ม shadcn)
+ */
+export function OverviewBarRow({
+  label,
+  value,
+  max,
+  onClick,
+  testId,
+  strip,
+  children,
+}: {
+  label: string;
+  value: number | null;
+  max: number;
+  onClick?: () => void;
+  testId?: string;
+  strip?: React.ReactNode;
+  children?: React.ReactNode;
+}) {
+  const [shown, setShown] = useState(false);
+  useEffect(() => {
+    const t = window.setTimeout(() => setShown(true), 60);
+    return () => window.clearTimeout(t);
+  }, []);
+  const pct = value && max > 0 ? Math.max(4, (value / max) * 100) : 4;
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      onClick={onClick}
+      disabled={!onClick}
+      data-testid={testId}
+      aria-label={`${label} ${value === null ? '' : NUM.format(value)}`}
+      className="grid h-auto w-full grid-cols-1 items-center gap-2 whitespace-normal rounded-xl px-3 py-2 text-left font-normal disabled:opacity-100 sm:grid-cols-5 sm:gap-4"
+    >
+      <span className="text-sm text-foreground">{label}</span>
+      <span className="min-w-0 space-y-1 sm:col-span-2">
+        <span className="block h-8 overflow-hidden rounded-lg bg-muted" aria-hidden>
+          <span
+            className="flex h-full min-w-10 items-center rounded-lg bg-foreground px-3 text-sm font-medium tabular-nums text-background transition-all duration-700 motion-reduce:transition-none"
+            style={{ width: shown ? `${pct}%` : '0%' }}
+          >
+            {value === null ? '—' : NUM.format(value)}
+          </span>
+        </span>
+        {strip ? (
+          <span className="block transition-all duration-700 motion-reduce:transition-none" style={{ width: shown ? `${pct}%` : '0%' }}>
+            {strip}
+          </span>
+        ) : null}
+      </span>
+      <span className="min-w-0 text-xs tabular-nums sm:col-span-2">{children}</span>
     </Button>
   );
 }

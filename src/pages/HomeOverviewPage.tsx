@@ -23,6 +23,7 @@ import {
   ChannelStrip,
   ChannelTable,
   NUM,
+  OverviewBarRow,
   OverviewGroup,
   OverviewNode,
   OverviewSection,
@@ -79,6 +80,8 @@ const STEP_PAGE: Record<FunnelStep['key'], (typeof PAGE)[keyof typeof PAGE]> = {
 };
 
 const toneOfRow = (t: 'success' | 'warn' | 'danger' | 'neutral') => (t === 'neutral' ? null : t);
+/** สีของผลติดตาม — ไป เขียว · ไม่ไป แดง · โทรไม่ติด/ขอเลื่อน เหลือง · ที่เหลือเทา */
+const followTone = (key: string) => (key === 'went' ? 'success' : key === 'notWent' ? 'danger' : key === 'failed' || key === 'reschedule' ? 'warn' : 'neutral');
 
 const HomeOverviewPage: React.FC = () => {
   usePageTitle('หน้าหลัก');
@@ -491,9 +494,10 @@ const HomeOverviewPage: React.FC = () => {
       {moneyError || roError ? <p className={cn('text-sm', TONE.danger.value)}>{moneyError ?? roError}</p> : null}
 
       {/* ── ตอนนี้ ── */}
-      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4" data-testid="overview-kpis">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4" data-testid="overview-kpis">
         <OverviewNode
           big
+          variant="kpi"
           label="เสียเงิน (ตามสัญญา)"
           value={contract}
           unit="บาท"
@@ -505,6 +509,7 @@ const HomeOverviewPage: React.FC = () => {
         />
         <OverviewNode
           big
+          variant="kpi"
           label="เหลือหา"
           value={flow?.remainingRequests}
           unit="ใบ"
@@ -516,6 +521,7 @@ const HomeOverviewPage: React.FC = () => {
         />
         <OverviewNode
           big
+          variant="kpi"
           label="ผู้สมัคร"
           value={applied?.value}
           unit="คน"
@@ -525,6 +531,7 @@ const HomeOverviewPage: React.FC = () => {
         />
         <OverviewNode
           big
+          variant="kpi"
           label="ติดตาม"
           value={people ? peopleTotal : null}
           unit="คน"
@@ -538,6 +545,7 @@ const HomeOverviewPage: React.FC = () => {
       <OverviewGroup no={1} title="ใบขอ" testId="overview-group-requests">
       {/* ── ใบขอ: ยกมา + ขอใหม่ − ปิดครบ − ยกเลิก = เหลือหา ── */}
       <OverviewSection title="ใบขอจริงใน ERP" sub="ใบ (อัตรา)" testId="overview-requests">
+        {/* แบบร่าง B (2 พ.ย. 2569): ลูกโซ่ซ้ายไปขวา ผลลัพธ์พื้นกรมท่า */}
         <div className="grid grid-cols-2 items-stretch gap-2 sm:grid-cols-5">
           <OverviewNode label="ยกมา" value={flow?.carryInRequests} unit="ใบ" sub={flow ? `${NUM.format(flow.carryIn)} อัตรา` : undefined} onClick={flow ? () => openList('ยกมา', flowRows((f) => f.carry)) : undefined} testId="overview-req-carry" />
           <OverviewNode label="+ ขอใหม่" value={flow?.newRequests} unit="ใบ" sub={flow ? `${NUM.format(flow.newPositions)} อัตรา` : undefined} onClick={flow ? openNew : undefined} testId="overview-req-new" />
@@ -558,54 +566,53 @@ const HomeOverviewPage: React.FC = () => {
             }
             testId="overview-req-cancel"
           />
-          <OverviewNode label="= เหลือหา" value={flow?.remainingRequests} unit="ใบ" emphasis="warn" sub={flow ? `${NUM.format(flow.remaining)} อัตรา` : undefined} onClick={flow ? () => openList('เหลือหา', flowRows((f) => f.open)) : undefined} testId="overview-req-remain" />
+          <OverviewNode label="= เหลือหา" value={flow?.remainingRequests} unit="ใบ" variant="solid" sub={flow ? `${NUM.format(flow.remaining)} อัตรา` : undefined} onClick={flow ? () => openList('เหลือหา', flowRows((f) => f.open)) : undefined} testId="overview-req-remain" />
         </div>
         {/* หาได้แล้ว (ลงงาน) แยกกล่อง — คนที่หาได้ทุกใบ รวมใบที่ได้บางส่วน ≠ ปิดครบ (CLAUDE.md "ห้ามปน หาได้แล้ว กับ ปิดครบใบขอ") */}
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0 space-y-1 text-xs tabular-nums text-muted-foreground">
+            <p data-testid="overview-req-sum">
+              {flow
+                ? `ยกมา ${NUM.format(flow.carryInRequests)} + ขอใหม่ ${NUM.format(flow.newRequests)} − ปิดครบ ${NUM.format(flow.closedRequests)} − ยกเลิก ${NUM.format(flow.cancelledRequests)} = เหลือหา ${NUM.format(flow.remainingRequests)} ใบ`
+                : '—'}
+            </p>
+            <p>
+              {flow
+                ? `ยกมา ${NUM.format(flow.carryIn)} + ขอใหม่ ${NUM.format(flow.newPositions)} − หาได้ ${NUM.format(flow.filled)} − ยกเลิก ${NUM.format(flow.cancelled)} = เหลือหา ${NUM.format(flow.remaining)} อัตรา`
+                : '—'}
+            </p>
+          </div>
           <OverviewNode
             label="หาได้แล้ว · ลงงาน"
             value={flow?.filled}
             unit="อัตรา"
             emphasis="success"
+            variant="outline"
+            className="shrink-0 sm:w-48"
             onClick={flow ? () => openList('หาได้แล้ว', openReqs.filter((r) => r.filledInWindow > 0), `หาได้ ${NUM.format(flow.filled)} อัตรา`) : undefined}
             testId="overview-req-filled"
           />
-        </div>
-        <div className="space-y-1 text-xs tabular-nums text-muted-foreground">
-          <p data-testid="overview-req-sum">
-            {flow
-              ? `ยกมา ${NUM.format(flow.carryInRequests)} + ขอใหม่ ${NUM.format(flow.newRequests)} − ปิดครบ ${NUM.format(flow.closedRequests)} − ยกเลิก ${NUM.format(flow.cancelledRequests)} = เหลือหา ${NUM.format(flow.remainingRequests)} ใบ`
-              : '—'}
-          </p>
-          <p>
-            {flow
-              ? `ยกมา ${NUM.format(flow.carryIn)} + ขอใหม่ ${NUM.format(flow.newPositions)} − หาได้ ${NUM.format(flow.filled)} − ยกเลิก ${NUM.format(flow.cancelled)} = เหลือหา ${NUM.format(flow.remaining)} อัตรา`
-              : '—'}
-          </p>
         </div>
       </OverviewSection>
 
       {/* ── ใบขอใหม่ประกาศแค่ไหน ── */}
       <OverviewSection title="ใบขอใหม่ ประกาศไปแค่ไหน" sub={req ? `${NUM.format(req.total)} ใบ` : undefined} testId="overview-release">
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-          <OverviewNode label="ขอใหม่" value={req?.total} unit="ใบ" onClick={req ? () => openRequestList('ขอใหม่', () => true) : undefined} testId="overview-rel-total" />
-          <div className="grid gap-2">
-            <OverviewNode label="ประกาศแล้ว" value={req?.released} unit="ใบ" onClick={req ? () => openRequestList('ประกาศแล้ว', (r) => r.released) : undefined} testId="overview-rel-released" />
-            <OverviewNode label="ยังไม่ประกาศ · ยังเปิด" value={req?.notReleasedOpen} unit="ใบ" emphasis={req && req.notReleasedOpen > 0 ? 'warn' : null} tag="ต้องประกาศ" onClick={req ? () => openRequestList('ยังไม่ประกาศ · ยังเปิด', (r) => !r.released && r.open) : undefined} testId="overview-rel-open" />
-            <OverviewNode label="ไม่ได้ประกาศ · ปิดไปแล้ว" value={req?.notReleasedClosed} unit="ใบ" onClick={req ? () => openRequestList('ไม่ได้ประกาศ · ปิดไปแล้ว', (r) => !r.released && !r.open) : undefined} testId="overview-rel-closed" />
-          </div>
-          <div className="grid gap-2">
-            <OverviewNode
-              label="มีคนกรอก"
-              value={req?.releasedWithApps}
-              unit="ใบ"
-              emphasis="success"
-              sub={req ? `${NUM.format(req.appsOnReleased)} คน${req.releasedWithApps ? ` · ใบละ ~${NUM.format(Math.round(req.appsOnReleased / req.releasedWithApps))} คน` : ''}` : undefined}
-              onClick={req ? () => openRequestList('มีคนกรอก', (r) => r.released && r.applications > 0) : undefined}
-              testId="overview-rel-apps"
-            />
-            <OverviewNode label="ไม่มีคนกรอก" value={req?.releasedNoApps} unit="ใบ" emphasis={req && req.releasedNoApps > 0 ? 'warn' : null} tag="ต้องดู" onClick={req ? () => openRequestList('ประกาศแล้ว ไม่มีคนกรอก', (r) => r.released && r.applications === 0) : undefined} testId="overview-rel-noapps" />
-          </div>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+          <OverviewNode variant="outline" label="ขอใหม่" value={req?.total} unit="ใบ" onClick={req ? () => openRequestList('ขอใหม่', () => true) : undefined} testId="overview-rel-total" />
+          <OverviewNode variant="outline" label="ประกาศแล้ว" value={req?.released} unit="ใบ" onClick={req ? () => openRequestList('ประกาศแล้ว', (r) => r.released) : undefined} testId="overview-rel-released" />
+          <OverviewNode variant="outline" label="ยังไม่ประกาศ · ยังเปิด" value={req?.notReleasedOpen} unit="ใบ" emphasis={req && req.notReleasedOpen > 0 ? 'warn' : null} tag="ต้องประกาศ" onClick={req ? () => openRequestList('ยังไม่ประกาศ · ยังเปิด', (r) => !r.released && r.open) : undefined} testId="overview-rel-open" />
+          <OverviewNode variant="outline" label="ไม่ได้ประกาศ · ปิดไปแล้ว" value={req?.notReleasedClosed} unit="ใบ" onClick={req ? () => openRequestList('ไม่ได้ประกาศ · ปิดไปแล้ว', (r) => !r.released && !r.open) : undefined} testId="overview-rel-closed" />
+          <OverviewNode
+            variant="outline"
+            label="มีคนกรอก"
+            value={req?.releasedWithApps}
+            unit="ใบ"
+            emphasis="success"
+            sub={req ? `${NUM.format(req.appsOnReleased)} คน${req.releasedWithApps ? ` · ใบละ ~${NUM.format(Math.round(req.appsOnReleased / req.releasedWithApps))} คน` : ''}` : undefined}
+            onClick={req ? () => openRequestList('มีคนกรอก', (r) => r.released && r.applications > 0) : undefined}
+            testId="overview-rel-apps"
+          />
+          <OverviewNode variant="outline" label="ไม่มีคนกรอก" value={req?.releasedNoApps} unit="ใบ" emphasis={req && req.releasedNoApps > 0 ? 'warn' : null} tag="ต้องดู" onClick={req ? () => openRequestList('ประกาศแล้ว ไม่มีคนกรอก', (r) => r.released && r.applications === 0) : undefined} testId="overview-rel-noapps" />
         </div>
         <p className="text-xs tabular-nums text-muted-foreground">
           {req
@@ -619,22 +626,28 @@ const HomeOverviewPage: React.FC = () => {
       {/* ── 2 ผู้สมัคร 6 ขั้น + แถบช่องทาง ── */}
       <OverviewGroup no={2} title="ผู้สมัคร" head={applied && funnel ? `กรอกมา ${NUM.format(applied.value)} คน` : null} testId="overview-group-funnel">
       <OverviewSection title="ไปถึงขั้นไหน" sub="กรอกในช่วงที่เลือก · คน" testId="overview-funnel">
-        <div className="grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-6">
+        {/* แบบร่าง B (2 พ.ย. 2569): แท่งยาวตามจำนวนไล่ลงทีละขั้น · ตัวเลขย่อยขวามือ */}
+        <div className="space-y-1">
           {(funnel ?? buildApplicantFunnel([])).map((s) => (
-            <OverviewNode key={s.key} label={s.label} value={funnel ? s.value : null} onClick={funnel ? () => openStep(s) : undefined} testId={`overview-step-${s.key}`}>
-              <span className="mt-1 space-y-0.5 text-xs tabular-nums">
-                {s.from && funnel ? <span className="block text-muted-foreground">{s.from}</span> : null}
+            <OverviewBarRow
+              key={s.key}
+              label={s.label}
+              value={funnel ? s.value : null}
+              max={funnel?.[0]?.value ?? 0}
+              onClick={funnel ? () => openStep(s) : undefined}
+              testId={`overview-step-${s.key}`}
+              strip={<ChannelStrip channels={s.channels} total={s.value} />}
+            >
+              <span className="flex flex-wrap gap-x-3 gap-y-0.5">
+                {s.from && funnel ? <span className="w-full text-muted-foreground">{s.from}</span> : null}
                 {s.rows.map((r) => (
-                  <span key={r.key} className="flex justify-between gap-2">
-                    <span className={r.tone === 'neutral' ? 'text-muted-foreground' : TONE[r.tone].value}>{r.label}</span>
-                    <span className={r.tone === 'neutral' ? 'text-foreground' : TONE[r.tone].value}>{funnel ? NUM.format(r.value) : '—'}</span>
+                  <span key={r.key} className="whitespace-nowrap">
+                    <span className="text-muted-foreground">{r.label}</span>{' '}
+                    <span className={cn('font-medium', r.tone === 'neutral' ? 'text-foreground' : TONE[r.tone].value)}>{funnel ? NUM.format(r.value) : '—'}</span>
                   </span>
                 ))}
               </span>
-              <span className="mt-2 block">
-                <ChannelStrip channels={s.channels} total={s.value} />
-              </span>
-            </OverviewNode>
+            </OverviewBarRow>
           ))}
         </div>
         <ChannelLegend channels={funnel?.[0]?.channels} />
@@ -643,12 +656,11 @@ const HomeOverviewPage: React.FC = () => {
 
       {/* ── 3 หลังได้คน: ติดตาม · ดูแลหลังเริ่มงาน ── */}
       <OverviewGroup no={3} title="หลังได้คน" head={people ? `ติดตาม ${NUM.format(peopleTotal)} คน · ${NUM.format(followLive)} สาย` : null} testId="overview-group-after">
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4">
         <OverviewSection
           title="ติดตามคนเริ่มงาน / ติดตามส่งคนแทน"
           sub={cells ? `ยกเลิก ${NUM.format(followCancelled)} สาย ไม่นับ` : undefined}
           testId="overview-follow"
-          className="lg:col-span-2"
           right={
             <Button type="button" variant="link" size="sm" className="h-auto p-0" onClick={openFollow} disabled={!cells}>
               ดูทั้งหมด
@@ -657,6 +669,7 @@ const HomeOverviewPage: React.FC = () => {
         >
           <div className="grid grid-cols-3 gap-2">
             <OverviewNode
+              variant="outline"
               label="ทั้งหมด"
               value={people ? peopleTotal : null}
               unit="คน"
@@ -664,28 +677,36 @@ const HomeOverviewPage: React.FC = () => {
               onClick={cells ? openFollow : undefined}
               testId="overview-follow-total"
             />
-            <OverviewNode label="AI โทรแล้ว" value={calls?.aiDone} unit="สาย" sub={calls ? `รอ AI โทร ${NUM.format(calls.aiWaiting)} สาย` : undefined} onClick={cells ? openFollow : undefined} testId="overview-follow-ai" />
-            <OverviewNode label="คนโทรแล้ว" value={calls?.staffDone} unit="สาย" sub={calls ? `รอคนโทร ${NUM.format(calls.staffWaiting)} สาย` : undefined} onClick={cells ? openFollow : undefined} testId="overview-follow-staff" />
+            <OverviewNode variant="outline" label="AI โทรแล้ว" value={calls?.aiDone} unit="สาย" sub={calls ? `รอ AI โทร ${NUM.format(calls.aiWaiting)} สาย` : undefined} onClick={cells ? openFollow : undefined} testId="overview-follow-ai" />
+            <OverviewNode variant="outline" label="คนโทรแล้ว" value={calls?.staffDone} unit="สาย" sub={calls ? `รอคนโทร ${NUM.format(calls.staffWaiting)} สาย` : undefined} onClick={cells ? openFollow : undefined} testId="overview-follow-staff" />
           </div>
-          <ul className="space-y-1.5" data-testid="overview-follow-results">
-            {personRows.map((r) => {
-              const max = Math.max(1, ...personRows.map((x) => x.people));
-              const tone = r.key === 'went' ? 'success' : r.key === 'notWent' ? 'danger' : r.key === 'failed' || r.key === 'reschedule' ? 'warn' : 'neutral';
-              return (
-                <li key={r.key} className="flex items-center gap-3 text-sm">
-                  <span className="w-24 shrink-0 truncate">{r.label}</span>
-                  <span className="block h-2.5 flex-1 overflow-hidden rounded-full bg-muted" aria-hidden>
-                    <span className={cn('block h-full rounded-full transition-all duration-700 motion-reduce:transition-none', TONE[tone].dot)} style={{ width: `${(r.people / max) * 100}%` }} />
+          {/* แบบร่าง B (2 พ.ย. 2569): แถบเดียวแบ่งตามผล · ป้ายคำทุกสีใต้แถบ */}
+          <div className="space-y-3" data-testid="overview-follow-results">
+            <span className="flex h-8 w-full overflow-hidden rounded-lg bg-muted" aria-hidden>
+              {personRows.map((r) => (
+                <span
+                  key={r.key}
+                  className={cn('block h-full border-r-2 border-card transition-all duration-700 last:border-r-0 motion-reduce:transition-none', TONE[followTone(r.key)].dot)}
+                  style={{ width: peopleTotal ? `${(r.people / peopleTotal) * 100}%` : '0%' }}
+                  title={`${r.label} ${NUM.format(r.people)} คน`}
+                />
+              ))}
+            </span>
+            <ul className="grid grid-cols-1 gap-x-6 sm:grid-cols-2 xl:grid-cols-4">
+              {personRows.map((r) => (
+                <li key={r.key} className="flex items-center justify-between gap-2 border-b border-border py-1.5 text-sm">
+                  <span className="flex min-w-0 items-center gap-2">
+                    <span className={cn('size-2 shrink-0 rounded-full', TONE[followTone(r.key)].dot)} aria-hidden />
+                    <span className="truncate">{r.label}</span>
                   </span>
-                  <span className="w-16 shrink-0 text-right tabular-nums">
+                  <span className="shrink-0 tabular-nums">
                     {NUM.format(r.people)}
-                    <span className="ml-1 text-xs text-muted-foreground">คน</span>
+                    <span className="ml-1 text-xs text-muted-foreground">คน · {NUM.format(r.calls)} สาย</span>
                   </span>
-                  <span className="w-16 shrink-0 text-right text-xs tabular-nums text-muted-foreground">{NUM.format(r.calls)} สาย</span>
                 </li>
-              );
-            })}
-          </ul>
+              ))}
+            </ul>
+          </div>
           <p className="text-xs tabular-nums text-muted-foreground" data-testid="overview-follow-people-sum">
             {personRows.length ? `${personRows.map((r) => `${r.label} ${NUM.format(r.people)}`).join(' + ')} = ${NUM.format(peopleTotal)} คน` : '—'}
           </p>
@@ -707,9 +728,9 @@ const HomeOverviewPage: React.FC = () => {
             </Button>
           }
         >
-          <div className="grid grid-cols-2 gap-2">
-            <OverviewNode label="โทรในช่วงนี้" value={aftercare?.total ?? (ai ? 0 : null)} unit="สาย" onClick={openAftercare} testId="overview-aftercare-total" />
-            <OverviewNode label="ยังไม่โทร" value={aftercare?.notCalled ?? (ai ? 0 : null)} emphasis={(aftercare?.notCalled ?? 0) > 0 ? 'warn' : null} onClick={openAftercare} />
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <OverviewNode variant="outline" label="โทรในช่วงนี้" value={aftercare?.total ?? (ai ? 0 : null)} unit="สาย" onClick={openAftercare} testId="overview-aftercare-total" />
+            <OverviewNode variant="outline" label="ยังไม่โทร" value={aftercare?.notCalled ?? (ai ? 0 : null)} emphasis={(aftercare?.notCalled ?? 0) > 0 ? 'warn' : null} onClick={openAftercare} />
           </div>
           <p className="text-xs tabular-nums text-muted-foreground">
             {upcoming && upcoming.calls > 0
