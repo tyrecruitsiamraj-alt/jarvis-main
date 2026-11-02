@@ -563,11 +563,14 @@ function resolveOpenJobsForStockKpi(
  *  totalOverride: โหมดมีงวดส่งยอด cohort มาให้ "ทั้งหมด" เท่าการ์ดคงเหลือ (ใบนอก feed ไม่มี work_status ให้แจก leaf)
  *  🔴 29 ต.ค. 2569 (เจ้าของ "การนับคงเดิมไว้ก่อน" · ร่าง 2): ใบขอชั่วคราว (`siamraj-pre:`) ไม่อยู่ในกล่องสถานะ —
  *  แยกกล่องของมันเอง (`buildPrequestKpi`) · เดิม "ทั้งหมด" 326 แต่กล่องย่อยรวมใบชั่วคราวเป็น 370 → กดแล้วเลขไม่ตรงกล่อง
- *  ยอด cohort ที่เกินผลรวมสถานะ (ใบ ERP ที่ไม่อยู่ใน feed) ขึ้นเป็นกล่อง "ไม่มีสถานะ" ให้บวกกันลงตัว */
+ *  ยอด cohort ที่เกินผลรวมสถานะ (ใบ ERP ที่ไม่อยู่ใน feed) ขึ้นเป็นกล่อง "ไม่มีสถานะ" ให้บวกกันลงตัว
+ *  🔴 2 พ.ย. 2569 (เจ้าของ "เอา ใบขอชั่วคราวด้วย" หลังถามว่าทำไม เหลือหา 410 ≠ ทั้งหมด 374): โหมดทั้งหมด "ทั้งหมด" = ผลรวมสถานะ + ใบขอชั่วคราว
+ *  = เท่าการ์ดเหลือหา · กล่องย่อยยังเป็นใบจริง บวกกล่องใบขอชั่วคราวข้างล่างแล้วลงตัว · โหมดมีงวดคงเดิม (เหลือหาเป็น cohort ERP ไม่มีใบชั่วคราวอยู่แล้ว) */
 function buildWorkStatusKpis(
   jobs: JobRequest[],
   periodLabel?: string | null,
   totalOverride?: { positions: number; requests: number },
+  withPrequest = false,
 ): DashboardKpi[] {
   const counts: Record<UnitRequestWorkStatus, number> = {
     in_progress: 0,
@@ -601,10 +604,13 @@ function buildWorkStatusKpis(
   }
   const leafTotal = Object.values(counts).reduce((s, n) => s + n, 0);
   const leafRequests = Object.values(requestCounts).reduce((s, n) => s + n, 0);
-  const total = totalOverride?.positions ?? leafTotal;
-  const totalRequests = totalOverride?.requests ?? leafRequests;
-  const nonePositions = Math.max(total - leafTotal, 0);
-  const noneRequests = Math.max(totalRequests - leafRequests, 0);
+  const pre = withPrequest && !totalOverride ? buildPrequestKpi(jobs) : null;
+  const preTotal = pre && pre.value > 0 ? pre.value : 0;
+  const total = totalOverride?.positions ?? leafTotal + preTotal;
+  const totalRequests = totalOverride?.requests ?? leafRequests + (preTotal ? (pre?.secondaryCount ?? 0) : 0);
+  // ส่วนที่เป็นใบขอชั่วคราวมีกล่องของมันเอง ไม่ใช่ "ไม่มีสถานะ"
+  const nonePositions = Math.max(total - leafTotal - preTotal, 0);
+  const noneRequests = Math.max(totalRequests - leafRequests - (preTotal ? (pre?.secondaryCount ?? 0) : 0), 0);
   const scopeHint = periodLabel
     ? `ใบเปิดในช่วงที่เลือก`
     : `ใบเปิดทั้งหมด`;
@@ -625,7 +631,9 @@ function buildWorkStatusKpis(
       value: total,
       secondaryCount: totalRequests,
       secondaryLabel: 'ใบขอ',
-      description: `${scopeHint} · ผลรวมสถานะ = ${total.toLocaleString('th-TH')} อัตรา · ${totalRequests.toLocaleString('th-TH')} ใบ`,
+      description: preTotal
+        ? `${scopeHint} · สถานะ ${leafTotal.toLocaleString('th-TH')} + ${PREQUEST_LABEL} ${preTotal.toLocaleString('th-TH')} = ${total.toLocaleString('th-TH')} อัตรา · ${totalRequests.toLocaleString('th-TH')} ใบ`
+        : `${scopeHint} · ผลรวมสถานะ = ${total.toLocaleString('th-TH')} อัตรา · ${totalRequests.toLocaleString('th-TH')} ใบ`,
       trendPercent: null,
     },
     leaf('work_status_in_progress', 'กำลังดำเนินการสรรหา', 'in_progress'),
@@ -1259,6 +1267,7 @@ export function buildDashboardData(
     period && cohortStock
       ? { positions: cohortStock.remainingPositions, requests: cohortStock.remainingRequestCount }
       : undefined,
+    !period,
   );
   const prequestKpi = buildPrequestKpi(openRemainingJobs);
   const remainingBridge =
@@ -1319,5 +1328,8 @@ export function buildDashboardData(
  * 🔴 QA 17 ต.ค. 2569: การ์ด "ทั้งหมด" (`work_status_total`) อยู่ในลิสต์เดียวกัน เดิมถูกบวกรวม ⇒ ทุก % เหลือครึ่ง
  */
 export function workStatusPercentBase(list: ReadonlyArray<{ id: string; value: number }>): number {
+  // 2 พ.ย. 2569: "ทั้งหมด" โหมดทั้งหมดรวมใบขอชั่วคราว (ไม่อยู่ในกล่องย่อย) ⇒ ตัวหาร = เลขการ์ด "ทั้งหมด" · ไม่มีการ์ดนี้ = ผลรวมกล่องย่อย
+  const total = list.find((k) => k.id === 'work_status_total')?.value ?? 0;
+  if (total > 0) return total;
   return list.filter((k) => k.id !== 'work_status_total').reduce((sum, k) => sum + (k.value || 0), 0);
 }

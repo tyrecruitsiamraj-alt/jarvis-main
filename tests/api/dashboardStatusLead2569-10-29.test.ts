@@ -145,8 +145,8 @@ describe('กล่อง เข้ามา/หาได้แล้ว/ยก�
   });
 });
 
-describe('ใบขอชั่วคราวแยกกล่อง · "ทั้งหมด" = ผลรวมสถานะ', () => {
-  it('กล่องสถานะไม่นับใบชั่วคราว · กล่องใบขอชั่วคราวนับส่วนที่แยกออก', () => {
+describe('ใบขอชั่วคราวแยกกล่อง · "ทั้งหมด" = ผลรวมสถานะ + ใบขอชั่วคราว (2 พ.ย. 2569)', () => {
+  it('กล่องย่อยไม่นับใบชั่วคราว · "ทั้งหมด" โหมดทั้งหมดรวมใบชั่วคราว = เท่าเหลือหา · กล่องย่อย + กล่องใบขอชั่วคราว = ทั้งหมด', () => {
     const open = [
       job({ id: 'siamraj-sql:OPL6910101', work_status: 'in_progress', request_positions: 2 }),
       job({ id: 'siamraj-pre:OPL6910101', request_no: 'OPL6910101', work_status: 'in_progress', request_positions: 3, is_prequest: true }),
@@ -154,8 +154,15 @@ describe('ใบขอชั่วคราวแยกกล่อง · "ท�
     const data = buildDashboardData(open, [], null, DEFAULT_DASHBOARD_FILTERS, new Date('2026-10-29T03:00:00Z'));
     const total = data.workStatusKpis.find((k) => k.id === 'work_status_total');
     const leaves = data.workStatusKpis.filter((k) => k.id !== 'work_status_total').reduce((n, k) => n + k.value, 0);
-    expect([total?.value, total?.secondaryCount, leaves]).toEqual([2, 1, 2]);
+    // เจ้าของ "เอา ใบขอชั่วคราวด้วย" (เดิม 2 · 1 ใบ ไม่เท่าเหลือหา 5 · 2 ใบ)
+    expect([total?.value, total?.secondaryCount, leaves]).toEqual([5, 2, 2]);
     expect(data.prequestKpi).toMatchObject({ id: 'work_status_prequest', label: 'ใบขอชั่วคราว', value: 3, secondaryCount: 1 });
+    expect(leaves + (data.prequestKpi?.value ?? 0)).toBe(total?.value);
+    const remaining = data.kpis.find((k) => k.id === 'remaining');
+    expect([remaining?.value, remaining?.secondaryCount]).toEqual([total?.value, total?.secondaryCount]);
+    expect(total?.description).toBe('ใบเปิดทั้งหมด · สถานะ 2 + ใบขอชั่วคราว 3 = 5 อัตรา · 2 ใบ');
+    // กดกล่อง "ทั้งหมด" โหมดทั้งหมด = รายการรวมใบชั่วคราว
+    expect(readFileSync('src/pages/dashboard/SupervisorDashboard.tsx', 'utf8')).toContain("if (kpiId === 'work_status_total' && !period) return stock;");
   });
 });
 

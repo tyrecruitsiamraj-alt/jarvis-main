@@ -895,6 +895,8 @@ const SupervisorDashboard: React.FC = () => {
           ? stock.filter(isPrequestJob)
           : (() => {
               const target = WORK_STATUS_OF_KPI[kpiId];
+              // "ทั้งหมด" โหมดทั้งหมดรวมใบขอชั่วคราว (2 พ.ย. 2569) — รายการต้องชุดเดียวกับเลขบนการ์ด
+              if (kpiId === 'work_status_total' && !period) return stock;
               const real = stock.filter((j) => !isPrequestJob(j));
               return target == null ? real : real.filter((j) => resolveUnitRequestWorkStatus(j.work_status) === target);
             })();
