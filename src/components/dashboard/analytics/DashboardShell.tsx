@@ -22,9 +22,6 @@ import DashboardSlaByLeadKind from './DashboardSlaByLeadKind';
 import DashboardUnitOverviewChart from './DashboardUnitOverviewChart';
 import DashboardDriverOverview from './DashboardDriverOverview';
 import DashboardExpandablePanel from './DashboardExpandablePanel';
-import DashboardExecutiveInsightsCard from './DashboardExecutiveInsights';
-import DashboardCohortSummaryCard from './DashboardCohortSummary';
-import DashboardClosedBreakdownCard from './DashboardClosedBreakdown';
 import type { DashboardWorkItem } from '@/lib/dashboard/types';
 import type { LeadKindBreakdown } from '@/lib/dashboard/leadKindBreakdown';
 import type { StatusLeadPanel } from '@/lib/dashboard/statusLeadPanel';
@@ -87,9 +84,6 @@ type Props = {
   leadKindBreakdown?: LeadKindBreakdown | null;
   leadKindMismatch?: string | null;
   onLeadKindClick?: (kind: RequestLeadKind, label: string) => void;
-  onCohortClick?: (rowId: string, label: string) => void;
-  onFilledBreakdownClick?: (segment: 'same' | 'backlog', label: string) => void;
-  onFullyClosedBreakdownClick?: (segment: 'same' | 'backlog', label: string) => void;
   onAgeBucketClick?: (bucket: DashboardData['ageDaysBreakdown'][number]['bucket'], label: string) => void;
   onSiteClick?: (siteCode: string | undefined, label: string) => void;
   /**
@@ -139,9 +133,6 @@ const DashboardShell: React.FC<Props> = ({
   leadKindBreakdown,
   leadKindMismatch,
   onLeadKindClick,
-  onCohortClick,
-  onFilledBreakdownClick,
-  onFullyClosedBreakdownClick,
   onAgeBucketClick,
   onSiteClick,
   slaByLeadKind,
@@ -163,10 +154,8 @@ const DashboardShell: React.FC<Props> = ({
     onChange: (v) => onFiltersChange({ search: v }),
     placeholder: 'กรองไฟล์ CSV',
   });
-  const [showControlDetail, setShowControlDetail] = useState(false);
   const [showUnitOverview, setShowUnitOverview] = useState(false);
   const [showRecruiterOverview, setShowRecruiterOverview] = useState(false);
-  const [showExecInsights, setShowExecInsights] = useState(false);
   const [showLifecycle, setShowLifecycle] = useState(false);
   /**
    * Wave 2.3 (5 ก.ย. 2569): บนมือถือแผงตัวกรองกินจอแรกทั้งจอ — คนใหม่เปิดหน้ามา
@@ -533,49 +522,9 @@ const DashboardShell: React.FC<Props> = ({
                   ⚠️ การ์ด "สมการงานค้าง" (DashboardFlowView) ถูกเอาออก 1 พ.ย. 2569 ตามที่เจ้าของสั่ง
                   ("ถ้าใช่เอาออก" — โผล่มาเองหลังหน้าเปิดที่เดือนก่อน) · `data.flowView` ยังคำนวณอยู่ เผื่อเอากลับมา */}
 
-              {/* แผงรองทั้งหมดยุบเป็นแถวกดขยาย — ข้อมูลครบทุกแผง ไม่มีตัวไหนหาย (กติกา mockup ข้อ 02) */}
-              {data.executiveInsights && data.executiveInsights.sentences.length > 0 ? (
-                <DashboardExpandablePanel
-                  title="สรุปผู้บริหาร"
-                  subtitle={`${data.executiveInsights.sentences.length.toLocaleString('th-TH')} ข้อสรุปอัตโนมัติ — กดเพื่อดู`}
-                  open={showExecInsights}
-                  onOpenChange={setShowExecInsights}
-                >
-                  <DashboardExecutiveInsightsCard insights={data.executiveInsights} />
-                </DashboardExpandablePanel>
-              ) : null}
-              {data.requestCohortSummary || data.fulfillmentBreakdown ? (
-                <DashboardExpandablePanel
-                  title="รายละเอียด Control Tower"
-                  subtitle="ยอดค้างจากงวดก่อน vs ขอใหม่ · แยกที่มาของยอดหาได้/ปิดครบ — กดเพื่อดู"
-                  open={showControlDetail}
-                  onOpenChange={setShowControlDetail}
-                >
-                  <div className="space-y-3">
-                    {data.requestCohortSummary ? (
-                      <DashboardCohortSummaryCard
-                        summary={data.requestCohortSummary}
-                        onRowClick={onCohortClick}
-                      />
-                    ) : null}
-                    {data.fulfillmentBreakdown ? (
-                      <DashboardClosedBreakdownCard
-                        breakdown={data.fulfillmentBreakdown}
-                        filledTotal={
-                          data.fulfillmentBreakdown.filledSamePeriod + data.fulfillmentBreakdown.filledBacklog
-                        }
-                        fullyClosedTotal={
-                          data.fulfillmentBreakdown.fullyClosedSamePeriod +
-                          data.fulfillmentBreakdown.fullyClosedBacklog
-                        }
-                        onFilledClick={onFilledBreakdownClick}
-                        onFullyClosedClick={onFullyClosedBreakdownClick}
-                      />
-                    ) : null}
-                  </div>
-                </DashboardExpandablePanel>
-              ) : null}
-
+              {/* แผงรองยุบเป็นแถวกดขยาย (กติกา mockup ข้อ 02)
+                  ⚠️ "สรุปผู้บริหาร" + "รายละเอียด Control Tower" ถอดออก 2 พ.ย. 2569 ตามที่เจ้าของสั่ง ("เอาออก")
+                  — ตัวคำนวณ executiveInsights / requestCohortSummary / fulfillmentBreakdown ยังอยู่ใน buildDashboardData */}
               <DashboardExpandablePanel
                 title="ภาระงานตามรหัสไซต์"
                 subtitle={

@@ -221,3 +221,14 @@ describe('การ์ดสมการงานค้างเอาออก�
     expect(shell).not.toMatch(/<DashboardFlowViewCard/);
   });
 });
+
+describe('ถอดแผงรองในศูนย์ควบคุมใบขอ (เจ้าของ 2 พ.ย. 2569 "เอาออก")', () => {
+  it('ไม่มี "สรุปผู้บริหาร" และ "รายละเอียด Control Tower" · ลบ component แล้ว', () => {
+    const shell = fs.readFileSync(path.resolve(__dirname, '../../src/components/dashboard/analytics/DashboardShell.tsx'), 'utf8');
+    expect(shell).not.toContain('title="สรุปผู้บริหาร"');
+    expect(shell).not.toContain('title="รายละเอียด Control Tower"');
+    for (const f of ['DashboardExecutiveInsights', 'DashboardCohortSummary', 'DashboardClosedBreakdown']) {
+      expect(fs.existsSync(path.resolve(__dirname, `../../src/components/dashboard/analytics/${f}.tsx`))).toBe(false);
+    }
+  });
+});

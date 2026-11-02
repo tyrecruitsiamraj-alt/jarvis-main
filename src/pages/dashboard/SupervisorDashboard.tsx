@@ -49,10 +49,7 @@ import {
   filterJobsForRemainingKpi,
   filterJobsForRecruiter,
   filterJobsForSiteCode,
-  filterRecordsForCohort,
   filterRecordsForControlKpi,
-  filterRecordsForFilledBreakdown,
-  filterRecordsForFullyClosedBreakdown,
   filterRecordsForSlaBucket,
 } from '@/lib/dashboard/drillDownFilters';
 import {
@@ -982,14 +979,6 @@ const SupervisorDashboard: React.FC = () => {
     [pickId, setStatusPick, openJobList, openClosedJobList, openControlList, throughputRecords, controlRecords, scopedJobs, scopedClosedJobs, jobsWithoutAgeFilter, siamrajPrimary, dbSource, period, dateRange],
   );
 
-  const handleCohortClick = useCallback(
-    (rowId: string, label: string) => {
-      if (!period) return;
-      openControlList(label, filterRecordsForCohort(controlRecords, rowId, period));
-    },
-    [openControlList, controlRecords, period],
-  );
-
   const handleSlaClick = useCallback(
     (bucket: string, label: string) => {
       openControlList(`SLA: ${label}`, filterRecordsForSlaBucket(controlRecords, bucket));
@@ -1059,22 +1048,6 @@ const SupervisorDashboard: React.FC = () => {
       openControlList(kind ? `ใบขอชนิด ${label}` : `SLA · ${label}`, filterRecordsForLeadKind(slaCohort.records, kind, new Date(), slaCohort.kindOf));
     },
     [openControlList, slaCohort],
-  );
-
-  const handleFilledBreakdownClick = useCallback(
-    (segment: 'same' | 'backlog', label: string) => {
-      if (!period) return;
-      openControlList(label, filterRecordsForFilledBreakdown(controlRecords, segment, period));
-    },
-    [openControlList, controlRecords, period],
-  );
-
-  const handleFullyClosedBreakdownClick = useCallback(
-    (segment: 'same' | 'backlog', label: string) => {
-      if (!period) return;
-      openControlList(label, filterRecordsForFullyClosedBreakdown(controlRecords, segment, period));
-    },
-    [openControlList, controlRecords, period],
   );
 
   const handleAgeBucketClick = useCallback(
@@ -1182,9 +1155,6 @@ const SupervisorDashboard: React.FC = () => {
       leadKindBreakdown={leadKindBreakdown}
       leadKindMismatch={leadKindMismatch}
       onLeadKindClick={DEMO_MODE ? undefined : handleLeadKindClick}
-      onCohortClick={DEMO_MODE ? undefined : handleCohortClick}
-      onFilledBreakdownClick={DEMO_MODE ? undefined : handleFilledBreakdownClick}
-      onFullyClosedBreakdownClick={DEMO_MODE ? undefined : handleFullyClosedBreakdownClick}
       onAgeBucketClick={DEMO_MODE ? undefined : handleAgeBucketClick}
       onSiteClick={DEMO_MODE ? undefined : handleSiteClick}
       slaByLeadKind={slaByLeadKind}
