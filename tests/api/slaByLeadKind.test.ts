@@ -126,15 +126,15 @@ describe('slaByLeadKind — ปิดทัน / ไม่ทัน (คำถ�
     expect(t.totalRow.cells.closed_late).toBe(3);
   });
 
-  it('% ปิดทัน หารด้วยใบที่ปิดแล้วเท่านั้น — ยังไม่มีใบปิด = null ไม่ใช่ 0', () => {
+  it('% ปิดทัน หารด้วยใบที่ถึงกำหนดแล้ว (ปิดทัน + ปิดไม่ทัน + ยังไม่ปิด·เกินแล้ว) — 2 พ.ย. 2569 · ยังไม่มีใบถึงกำหนด = null ไม่ใช่ 0', () => {
     const closedMix = buildSlaByLeadKind(
-      [retro('R1', 'closed_on_time'), retro('R2', 'closed_late'), retro('R3', 'breached')],
+      [retro('R1', 'closed_on_time'), retro('R2', 'closed_late'), retro('R3', 'breached'), retro('R4', 'at_risk')],
       TODAY,
     );
     const row = closedMix.rows.find((r) => r.kind === 'retroactive')!;
-    // ปิดแล้ว 2 ใบ (ทัน 1 ไม่ทัน 1) → 50% · ใบ breached ไม่เข้าตัวหาร
+    // ทัน 1 จาก ถึงกำหนด 3 (ทัน 1 ไม่ทัน 1 เกินแล้ว 1) → 33.3% · ใบเสี่ยงยังไม่ถึงกำหนด ไม่เข้าตัวหาร
     expect(row.closed).toBe(2);
-    expect(row.onTimeRatePercent).toBe(50);
+    expect(row.onTimeRatePercent).toBe(33.3);
 
     const openOnly = buildSlaByLeadKind([urgent('U1', 'at_risk')], TODAY);
     expect(openOnly.rows.find((r) => r.kind === 'urgent')!.onTimeRatePercent).toBeNull();

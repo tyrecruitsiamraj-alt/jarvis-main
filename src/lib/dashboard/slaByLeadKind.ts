@@ -154,6 +154,11 @@ const emptyCells = (): Record<SlaCellKey, number> => ({
 function makeRow(kind: RequestLeadKind, cells: Record<SlaCellKey, number>): SlaLeadKindRow {
   const total = SLA_CELL_ORDER.reduce((sum, k) => sum + cells[k], 0);
   const closed = cells.closed_on_time + cells.closed_late;
+  /**
+   * ตัวหาร = ใบที่ถึงกำหนดแล้ว: ปิดทัน + ปิดไม่ทัน + ยังไม่ปิดแต่เกินแล้ว
+   * (เจ้าของ 2 พ.ย. 2569 Choice "นับใบที่เกินแล้วเป็นไม่ทันด้วย" — เดิมหารเฉพาะใบที่ปิด ต.ค. ขึ้น 98% เพราะใบที่ช้ายังไม่ปิด)
+   */
+  const due = closed + cells.breached;
   return {
     kind,
     label: REQUEST_LEAD_KIND_LABEL[kind],
@@ -161,7 +166,7 @@ function makeRow(kind: RequestLeadKind, cells: Record<SlaCellKey, number>): SlaL
     cells,
     total,
     closed,
-    onTimeRatePercent: closed > 0 ? Math.round((cells.closed_on_time / closed) * 1000) / 10 : null,
+    onTimeRatePercent: due > 0 ? Math.round((cells.closed_on_time / due) * 1000) / 10 : null,
   };
 }
 
