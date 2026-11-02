@@ -16,7 +16,7 @@ import {
 import { SLA_CELL_TONE, jobSlaCell, filterRecordsForSlaCell, filterRecordsForLeadKind, buildSlaByLeadKind } from '@/lib/dashboard/slaByLeadKind';
 import { jobToRequestControlRecord } from '@/lib/requestControl';
 import { controlRecordToDashboardDetailItem } from '@/lib/dashboard/dashboardDetailDialog';
-import { sortJobsByTableColumn, JOB_LIST_TABLE_COLUMNS } from '@/lib/jobListTableSort';
+import { parseTableSort, JOB_LIST_TABLE_COLUMNS } from '@/lib/jobListTableSort';
 import { JOB_LIST_DEFAULTS, buildJobListSearchParams, parseJobListSearchParams } from '@/lib/jobListPageState';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -178,10 +178,13 @@ describe('ช่อง SLA หน้ารายการใบขอ', () => {
     expect(jobSlaCell(safe, today)).toBe('on_track');
   });
 
-  it('กดหัวช่อง SLA เรียงเกินแล้วขึ้นก่อน', () => {
-    expect(JOB_LIST_TABLE_COLUMNS).toContain('sla');
-    const sorted = sortJobsByTableColumn([safe, overdue], { column: 'sla', dir: 'asc' }, today);
-    expect(sorted.map((j) => j.request_no)).toEqual(['OPL6909001', 'OPL6910050']);
+  it('คอลัมน์ SLA ถอดออกจากตารางแล้ว (เจ้าของ 2 พ.ย. 2569 "เอาออก") · ลิงก์เก่า ?tsort=sla ถอยเป็นไม่เรียง · ตัวกรองยังอยู่', () => {
+    expect(JOB_LIST_TABLE_COLUMNS).not.toContain('sla');
+    expect(parseTableSort('sla:asc')).toBeNull();
+    const src = fs.readFileSync(path.resolve(__dirname, '../../src/pages/jobs/JobListPage.tsx'), 'utf8');
+    expect(src).not.toContain('JobSlaBadge');
+    expect(src).not.toMatch(/\['sla', 'left'\]/);
+    expect(fs.existsSync(path.resolve(__dirname, '../../src/components/jobs/JobSlaBadge.tsx'))).toBe(false);
   });
 
   it('ตัวกรอง SLA เก็บใน URL (?sla=) · ค่าแปลกถูกทิ้ง · เปลี่ยนแล้วกลับหน้า 1', () => {

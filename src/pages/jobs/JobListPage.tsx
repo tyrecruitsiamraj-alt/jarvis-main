@@ -26,7 +26,6 @@ import { navigateToUnitRequest, shouldOpenInNewTabFromEvent } from '@/lib/jobNav
 import { ChevronRight, RefreshCw, SlidersHorizontal } from 'lucide-react';
 import Term from '@/components/shared/Term';
 import JobUrgencyBadge from '@/components/jobs/JobUrgencyBadge';
-import JobSlaBadge from '@/components/jobs/JobSlaBadge';
 import { jobSlaCell, SLA_CELL_SHORT, SLA_FILTER_ORDER } from '@/lib/dashboard/slaByLeadKind';
 import UnitRequestReplacementBadge from '@/components/jobs/UnitRequestReplacementBadge';
 import PrequestBadge from '@/components/jobs/PrequestBadge';
@@ -825,7 +824,6 @@ const JobListPage: React.FC = () => {
                   <tr className={cn('border-b', DASH.divider, DASH.tableHead)}>
                     <th className="px-1.5 py-3 text-left font-medium whitespace-nowrap"><Term k="request_no">เลขที่ใบขอ</Term></th>
                     <th className="px-1.5 py-3 text-left font-medium whitespace-nowrap"><Term k="days_elapsed">ผ่านมา</Term></th>
-                    <th className="px-1.5 py-3 text-left font-medium whitespace-nowrap">SLA</th>
                     <th className="px-1.5 py-3 text-left font-medium whitespace-nowrap">หน่วยงาน</th>
                     <th className="px-1.5 py-3 text-left font-medium whitespace-nowrap">ราชการ/เอกชน</th>
                     <th className="px-1.5 py-3 text-left font-medium whitespace-nowrap">วันที่กรอก</th>
@@ -969,7 +967,6 @@ const JobListPage: React.FC = () => {
                         compact
                       />
                       <JobUrgencyBadge job={j} />
-                      <JobSlaBadge job={j} />
                     </div>
                   </div>
                 </button>
@@ -994,7 +991,6 @@ const JobListPage: React.FC = () => {
                     [
                       ['request_no', 'left'],
                       ['age', 'left'],
-                      ['sla', 'left'],
                       ['unit', 'left'],
                       ['sector', 'left'],
                       ['submitted', 'left'],
@@ -1088,9 +1084,6 @@ const JobListPage: React.FC = () => {
                         เกณฑ์ถังไม่เปลี่ยน · ดู JobAgeChip ข้างบน */}
                     <td className="px-1.5 py-3 text-xs whitespace-nowrap">
                       <JobAgeChip job={j} />
-                    </td>
-                    <td className="px-1.5 py-3 whitespace-nowrap">
-                      <JobSlaBadge job={j} />
                     </td>
                     {/* ตัวหนังสือในตารางใช้ DASH.cell* (slate + คู่ dark ชัดเจน) เพื่อคุมคอนทราสต์
                         ของตารางเองให้แน่นอน — บั๊กเดิมที่ branding เขียน --foreground ทับ inline
