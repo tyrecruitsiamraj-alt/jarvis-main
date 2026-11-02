@@ -25,7 +25,12 @@ import ListPaginationBar from '@/components/shared/ListPaginationBar';
 import { getTotalPages, type PageSizeOption } from '@/lib/pagination';
 import type { JobRequest } from '@/types';
 
-const UnitEditLogSection: React.FC<{ job: JobRequest | null }> = ({ job }) => {
+const UnitEditLogSection: React.FC<{
+  job: JobRequest | null;
+  /** ชนิดเดียว = ทุกครั้งของชนิดนั้น (ป๊อปป้ายสถานะหน้ารายการใบขอ · 2 พ.ย. 2569) */
+  entityType?: string;
+  emptyText?: string;
+}> = ({ job, entityType, emptyText = 'ยังไม่มีการแก้ไขใบนี้ในระบบ Jarvis' }) => {
   const [items, setItems] = React.useState<UnitEditLogItem[] | null>(null);
   const [failed, setFailed] = React.useState(false);
   const [page, setPage] = React.useState(1);
@@ -40,7 +45,7 @@ const UnitEditLogSection: React.FC<{ job: JobRequest | null }> = ({ job }) => {
     setItems(null);
     setFailed(false);
     setPage(1);
-    fetchUnitEditLog(unitRequestNoteKey(job))
+    fetchUnitEditLog(unitRequestNoteKey(job), entityType)
       .then((rows) => {
         if (!cancelled) setItems(rows);
       })
@@ -50,7 +55,7 @@ const UnitEditLogSection: React.FC<{ job: JobRequest | null }> = ({ job }) => {
     return () => {
       cancelled = true;
     };
-  }, [job]);
+  }, [job, entityType]);
 
   /** แบ่งหน้า — คำนวณหลังรู้จำนวนจริง (กันหน้าค้างเกินจำนวนที่มี) */
   const total = items?.length ?? 0;
@@ -68,7 +73,7 @@ const UnitEditLogSection: React.FC<{ job: JobRequest | null }> = ({ job }) => {
       ) : items == null ? (
         <p className="text-xs text-muted-foreground">กำลังโหลดประวัติ…</p>
       ) : items.length === 0 ? (
-        <p className="text-xs text-muted-foreground">ยังไม่มีการแก้ไขใบนี้ในระบบ Jarvis</p>
+        <p className="text-xs text-muted-foreground">{emptyText}</p>
       ) : (
         <>
         <ul className="space-y-1.5">
