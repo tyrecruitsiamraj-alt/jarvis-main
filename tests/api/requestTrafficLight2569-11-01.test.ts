@@ -68,7 +68,7 @@ describe('ลูกศรแนวโน้มการ์ด', () => {
 
   it('เลือกเดือน = เทียบเดือนก่อนเต็มเดือน (ต.ค. เทียบ ก.ย.)', () => {
     const w = kpiTrendWindow({ from: '2026-10-01', to: '2026-10-31', previousFrom: '2026-08-31', previousTo: '2026-09-30' }, '2026-11-01');
-    expect(w).toEqual({ from: '2026-10-01', to: '2026-10-31', previousFrom: '2026-09-01', previousTo: '2026-09-30', partial: false });
+    expect(w).toEqual({ from: '2026-10-01', to: '2026-10-31', previousFrom: '2026-09-01', previousTo: '2026-09-30', partial: false, periodTo: '2026-10-31' });
     expect(kpiTrendPreviousRange({ from: '2026-03-01', to: '2026-03-31', previousFrom: '2026-01-29', previousTo: '2026-02-28' })).toEqual({ from: '2026-02-01', to: '2026-02-28' });
     expect(kpiTrendPreviousRange({ from: '2026-01-01', to: '2026-01-31', previousFrom: '', previousTo: '' })).toEqual({ from: '2025-12-01', to: '2025-12-31' });
   });
@@ -80,7 +80,7 @@ describe('ลูกศรแนวโน้มการ์ด', () => {
 
   it('ช่วงที่ยังไม่จบ เทียบเฉพาะวันที่ผ่านมาเท่ากัน', () => {
     const w = kpiTrendWindow({ from: '2026-11-01', to: '2026-11-30', previousFrom: '2026-10-02', previousTo: '2026-10-31' }, '2026-11-03');
-    expect(w).toEqual({ from: '2026-11-01', to: '2026-11-03', previousFrom: '2026-10-01', previousTo: '2026-10-03', partial: true });
+    expect(w).toEqual({ from: '2026-11-01', to: '2026-11-03', previousFrom: '2026-10-01', previousTo: '2026-10-03', partial: true, periodTo: '2026-11-30' });
     expect(kpiTrendWindow({ from: '2026-12-01', to: '2026-12-31', previousFrom: '2026-10-31', previousTo: '2026-11-30' }, '2026-11-03')).toBeNull();
   });
 
@@ -120,6 +120,18 @@ describe('ลูกศรแนวโน้มการ์ด', () => {
       ['ก.ย. 2569', 0],
       ['ต.ค. 2569', 4],
     ]);
+  });
+
+  it('เดือนที่ยังไม่จบ: บรรทัดเทียบแตกเลขให้บวกได้เท่าการ์ด (QA 2 พ.ย. 2569 การ์ด 66 แต่เทียบ 50)', () => {
+    const cur = [rec('N1', '2026-11-01', 'open', 2), rec('N2', '2026-11-02', 'open'), rec('N3', '2026-11-20', 'open', 4)];
+    const prev = [rec('O1', '2026-10-01', 'open'), rec('O2', '2026-10-02', 'open'), rec('O3', '2026-10-25', 'open')];
+    const w = kpiTrendWindow({ from: '2026-11-01', to: '2026-11-30', previousFrom: '2026-10-02', previousTo: '2026-10-31' }, '2026-11-02');
+    const [k] = withKpiTrend([kpi('total_requests', 7)], cur, prev, w);
+    // การ์ด 7 = ถึงวันนี้ 3 + ต้องการคนหลังวันนี้ 4 · เทียบ 1–2 ต.ค. 2
+    expect(k.trendBase).toBe('1–2 ต.ค. 2569 2 · ถึงวันนี้ 3 + ต้องการคนหลังวันนี้ 4');
+    expect(k.trendPercent).toBe(50);
+    const [k2] = withKpiTrend([kpi('total_requests', 3)], cur.slice(0, 2), prev, w);
+    expect(k2.trendBase).toBe('1–2 ต.ค. 2569 2 · ถึงวันนี้ 3');
   });
 
   it('ไม่มีข้อมูลช่วงก่อน = ไม่ใส่ลูกศร', () => {

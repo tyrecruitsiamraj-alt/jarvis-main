@@ -29,3 +29,11 @@ describe('ประกาศล่าสุดบนการ์ดกล่อ�
     expect(formatYmdTh(toYmdBangkok(new Date('2026-10-28T17:30:00Z')))).toBe('29 ต.ค. 2569');
   });
 });
+
+describe('ชื่อคนประกาศไม่ขึ้นอีเมล (QA 2 พ.ย. 2569)', () => {
+  it('listReleases ถอยไปค่าที่บันทึกตอนกดแบบตัดโดเมนอีเมล', () => {
+    const sql = read('api/_lib/jobPublicReleases.ts');
+    expect(sql).toContain("nullif(split_part(btrim(r.released_by_name), '@', 1), '')) as released_by_name");
+    expect(sql).not.toMatch(/nullif\(btrim\(u\.full_name\), ''\), r\.released_by_name\)/);
+  });
+});

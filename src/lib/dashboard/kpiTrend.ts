@@ -83,6 +83,8 @@ export type KpiTrendWindow = {
   previousTo: string;
   /** ช่วงยังไม่จบ = เทียบแค่วันที่ผ่านมา */
   partial: boolean;
+  /** วันสุดท้ายของช่วงที่เลือก (ตัวเลขบนการ์ดนับถึงวันนี้) — ใช้แตกเลขให้บวกกันได้เท่าการ์ด */
+  periodTo: string;
 };
 
 function lastDayOfMonth(y: number, m: number): string {
@@ -127,6 +129,7 @@ export function kpiTrendWindow(period: PeriodLike, todayYmd: string): KpiTrendWi
     previousFrom: prev.from,
     previousTo: cut < prev.to ? cut : prev.to,
     partial,
+    periodTo: period.to,
   };
 }
 
@@ -150,19 +153,25 @@ export function withKpiTrend(
   if (!previousRecords || !window) return kpis;
   const cur = sumCohortStockByRequestDate(currentRecords, window.from, window.to);
   const prev = sumCohortStockByRequestDate(previousRecords, window.previousFrom, window.previousTo);
+  /**
+   * ช่วงยังไม่จบ: การ์ดนับใบที่ "ต้องการคน" ทั้งช่วง (รวมวันที่ต้องการหลังวันนี้) แต่เทียบได้แค่ถึงวันนี้
+   * ⇒ แตกเลขให้บวกกันได้เท่าการ์ด (QA 2 พ.ย. 2569: การ์ด 66 แต่บรรทัดเทียบ 50 — เจ้าของเลือก "แก้ให้บอกเลขเดียวกัน")
+   */
+  const whole = window.partial ? sumCohortStockByRequestDate(currentRecords, window.from, window.periodTo) : null;
   const prevLabel = rangeText(window.previousFrom, window.previousTo);
-  const curLabel = rangeText(window.from, window.to);
+  const n = (v: number) => v.toLocaleString('th-TH');
   return kpis.map((kpi) => {
     const pick = PICK[kpi.id];
     if (!pick) return kpi;
     const c = pick(cur);
     const p = pick(prev);
+    const later = whole ? pick(whole) - c : 0;
     return {
       ...kpi,
       trendPercent: kpiTrendPercent(c, p),
       trendBase: window.partial
-        ? `${curLabel} ${c.toLocaleString('th-TH')} · ${prevLabel} ${p.toLocaleString('th-TH')}`
-        : `${prevLabel} ${p.toLocaleString('th-TH')}`,
+        ? `${prevLabel} ${n(p)} · ถึงวันนี้ ${n(c)}${later > 0 ? ` + ต้องการคนหลังวันนี้ ${n(later)}` : ''}`
+        : `${prevLabel} ${n(p)}`,
     };
   });
 }

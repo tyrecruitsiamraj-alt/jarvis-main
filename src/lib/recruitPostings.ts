@@ -148,6 +148,26 @@ export function validatePostingInput(input: {
  * ผู้รับผิดชอบของลิงก์ (เจ้าของ 28 ต.ค. 2569 "บอกเพิ่มหน่อยว่าลิงก์นี้ใครรับผิดชอบ · มันจะมีคนอื่นสร้างด้วย")
  * = คนที่กดสร้างลิงก์ (ระบบรู้จากบัญชีที่ล็อกอิน) → ลิงก์เก่า: ผู้รับผิดชอบของประกาศ → คนสร้างประกาศ (ตัดโดเมนอีเมล)
  */
+/**
+ * คนที่กด Gen link นี้จริง (เจ้าของ 2 พ.ย. 2569 การ์ดกล่องลอย "Gen link ล่าสุด … โดย …" — QA: ห้ามขึ้นผู้รับผิดชอบแทนคนกด)
+ * ลิงก์ใหม่รู้จากบัญชีที่ล็อกอิน · ลิงก์เก่า (ก่อน 28 ต.ค. 2569) ใช้คนสร้างประกาศได้เฉพาะลิงก์ที่สร้างพร้อมประกาศ (ห่างไม่เกิน 5 นาที)
+ * ไม่รู้ = null (ไม่เดาชื่อ)
+ */
+export function postingLinkCreator(
+  link: Pick<RecruitPostingLink, 'createdByName' | 'createdAt'>,
+  posting: Pick<RecruitPosting, 'createdByName' | 'createdAt'> | null | undefined,
+): string | null {
+  const strip = (v: string | null | undefined) => {
+    const t = v?.trim();
+    return t ? (t.includes('@') ? t.split('@')[0] : t) : null;
+  };
+  const byLink = strip(link.createdByName);
+  if (byLink) return byLink;
+  if (!posting) return null;
+  const gap = Math.abs(new Date(link.createdAt).getTime() - new Date(posting.createdAt).getTime());
+  return Number.isFinite(gap) && gap <= 5 * 60_000 ? strip(posting.createdByName) : null;
+}
+
 export function postingLinkOwner(
   link: Pick<RecruitPostingLink, 'createdByName'>,
   posting: Pick<RecruitPosting, 'responsibleName' | 'createdByName'> | null | undefined,

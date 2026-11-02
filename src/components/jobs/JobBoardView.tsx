@@ -95,7 +95,7 @@ import { boardPostingPath } from '@/lib/jobNavigation';
 import { useHeaderSearch } from '@/hooks/useHeaderSearch';
 import { scrollIntoViewX } from '@/lib/scrollIntoViewX';
 import { APPLICANT_FILTER_PARAM_PREFIX } from '@/lib/applicantFilters';
-import { postingLinkOwner, type RecruitPosting } from '@/lib/recruitPostings';
+import { postingLinkCreator, type RecruitPosting } from '@/lib/recruitPostings';
 import { formatYmdTh, toYmdBangkok } from '@/lib/dateTh';
 import { useRecruitPostingKinds } from '@/lib/recruitPostingKindsApi';
 import {
@@ -1157,7 +1157,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
       const bu = p.departmentCode?.trim();
       if (bu && !a.bus.includes(bu)) a.bus.push(bu);
       for (const l of p.links) {
-        if (!a.lastGen || l.createdAt > a.lastGen.at) a.lastGen = { at: l.createdAt, by: postingLinkOwner(l, p) };
+        if (!a.lastGen || l.createdAt > a.lastGen.at) a.lastGen = { at: l.createdAt, by: postingLinkCreator(l, p) };
       }
     }
     return acc;

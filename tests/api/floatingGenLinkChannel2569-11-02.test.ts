@@ -27,8 +27,18 @@ describe('Gen link กล่องลอย — ช่องทาง', () => {
 describe('การ์ดกล่องลอยบอก Gen link ล่าสุด วันไหน ใครกด (เจ้าของ 2 พ.ย. 2569 Choice "โชว์บนการ์ดกล่องลอย")', () => {
   const view = fs.readFileSync(path.resolve(__dirname, '../../src/components/jobs/JobBoardView.tsx'), 'utf8');
 
-  it('ใช้ลิงก์ที่สร้างล่าสุดของประเภท · ชื่อจาก postingLinkOwner (ตัวเดียวกับรายการลิงก์ในป๊อปใบขอ)', () => {
-    expect(view).toMatch(/l\.createdAt > a\.lastGen\.at\) a\.lastGen = \{ at: l\.createdAt, by: postingLinkOwner\(l, p\) \}/);
+  it('ใช้ลิงก์ที่สร้างล่าสุดของประเภท · ชื่อ = คนกด Gen จริง (postingLinkCreator) ไม่ใช่ผู้รับผิดชอบ (QA 2 พ.ย.)', () => {
+    expect(view).toMatch(/l\.createdAt > a\.lastGen\.at\) a\.lastGen = \{ at: l\.createdAt, by: postingLinkCreator\(l, p\) \}/);
+  });
+
+  it('postingLinkCreator: ชื่อคนกด > คนสร้างประกาศเฉพาะลิงก์ที่สร้างพร้อมประกาศ > ไม่รู้ = null', async () => {
+    const { postingLinkCreator } = await import('@/lib/recruitPostings');
+    const posting = { createdByName: 'james.p@siamraj.com', createdAt: '2026-10-14T03:00:00Z' };
+    expect(postingLinkCreator({ createdByName: 'ว่าน', createdAt: '2026-10-29T03:00:00Z' }, posting)).toBe('ว่าน');
+    expect(postingLinkCreator({ createdByName: 'wan.k@siamraj.com', createdAt: '2026-10-29T03:00:00Z' }, posting)).toBe('wan.k');
+    expect(postingLinkCreator({ createdByName: null, createdAt: '2026-10-14T03:02:00Z' }, posting)).toBe('james.p');
+    expect(postingLinkCreator({ createdByName: null, createdAt: '2026-10-20T03:00:00Z' }, posting)).toBeNull();
+    expect(postingLinkCreator({ createdByName: null, createdAt: '2026-10-20T03:00:00Z' }, null)).toBeNull();
   });
 
   it('การ์ดขึ้น "Gen link ล่าสุด วันที่ โดย ชื่อ" · ยังไม่มีลิงก์ = ไม่มีบรรทัด', () => {

@@ -102,9 +102,9 @@ export async function unreleaseJobs(jobIds: string[]): Promise<number> {
 /** รายการที่ปล่อยแล้ว (ใหม่สุดก่อน) — บอร์ดใช้โชว์ว่าใครปล่อยเมื่อไหร่ */
 export async function listReleases(limit = 500): Promise<JobReleaseRow[]> {
   const { rows } = await dbQuery<JobReleaseRow>(
-    // ชื่อคนกด = ชื่อเล่น > ชื่อจริง > ค่าที่บันทึกตอนกด (บางแถวเป็นอีเมล) — การ์ดกล่องงานโชว์ "โดย ..." (เจ้าของ 1 พ.ย. 2569)
+    // ชื่อคนกด = ชื่อเล่น > ชื่อจริง > ค่าที่บันทึกตอนกดตัดโดเมนอีเมล (บัญชีถูกลบ/ไม่มีชื่อ · QA 2 พ.ย. ห้ามขึ้นอีเมลเต็ม) — การ์ดกล่องงานโชว์ "โดย ..." (เจ้าของ 1 พ.ย. 2569)
     `select r.job_id, r.released_at,
-            coalesce(nullif(btrim(u.nickname), ''), nullif(btrim(u.full_name), ''), r.released_by_name) as released_by_name,
+            coalesce(nullif(btrim(u.nickname), ''), nullif(btrim(u.full_name), ''), nullif(split_part(btrim(r.released_by_name), '@', 1), '')) as released_by_name,
             r.request_no, r.note
        from ${TABLE} r
        left join ${USERS} u on u.id = r.released_by
