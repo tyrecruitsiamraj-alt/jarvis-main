@@ -36,6 +36,7 @@ import { cn } from '@/lib/utils';
 import { TONE } from '@/lib/designTokens';
 import { ChevronDown, Database, ExternalLink, History, Landmark, Users, StickyNote, UserCheck, ClipboardList } from 'lucide-react';
 import UnitEditLogSection from '@/components/jobs/UnitEditLogSection';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { RequestRateLinesBlock, ResignedEmployeeBlock } from '@/components/jobs/UnitRequestPayBlocks';
 
 import { resolveUnitDetailBackPath } from '@/lib/jobUnitSessionState';
@@ -70,6 +71,8 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
    * เปิดใบขอมาจะเห็นหัวข้อ + ส่วนอื่น (ผู้รับผิดชอบ/หมายเหตุ/ผู้สมัคร) ก่อน
    */
   const [infoOpen, setInfoOpen] = React.useState(false);
+  /** ประวัติการแก้ไขพับไว้ กดค่อยกาง — โหลดตอนกางครั้งแรก (เจ้าของ 2 พ.ย. 2569 "ย่อไว้ถ้ากดค่อยขยาย ไม่งั้นเกะกะ") */
+  const [historyOpen, setHistoryOpen] = useState(false);
   const backPath = resolveUnitDetailBackPath({
     stateReturnTo: (location.state as { returnTo?: string } | null)?.returnTo,
     search: location.search,
@@ -495,13 +498,27 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
 
             {/* ประวัติการแก้ไขใบนี้ใต้หมายเหตุ ทุกครั้ง แบ่งหน้า (เจ้าของ 2 พ.ย. 2569 "log แก้ไขขอเอามาไว้ใต้ตรงนี้เลย … ไม่ต้องกดตรงนั้นแล้วเด้งมา")
                 แทนป๊อปตอนกดป้ายสถานะหน้ารายการใบขอ (ถอดแล้ว) · ผู้รับผิดชอบ · สถานะทำงาน · หมายเหตุ */}
-            <section className="glass-card rounded-3xl p-4 border border-white/70 space-y-3" data-testid="unit-edit-log">
-              <h3 className="text-sm font-medium flex items-center gap-1.5">
-                <History className={cn("w-4 h-4", TONE.primary.value)} />
-                ประวัติการแก้ไข
-              </h3>
-              <UnitEditLogSection job={data} />
-            </section>
+            <Collapsible
+              open={historyOpen}
+              onOpenChange={setHistoryOpen}
+              className="glass-card rounded-3xl p-4 border border-white/70 space-y-3"
+              data-testid="unit-edit-log"
+            >
+              {/* ทั้งแถวกดได้ (แบบเดียวกับ "ข้อมูลใบขอ") · พับอยู่ = ยังไม่โหลดประวัติ */}
+              <CollapsibleTrigger asChild>
+                <Button type="button" variant="ghost" className="h-auto min-h-9 w-full justify-start gap-1.5 p-0 text-sm font-medium hover:bg-transparent">
+                  <History className={cn("w-4 h-4", TONE.primary.value)} />
+                  ประวัติการแก้ไข
+                  <ChevronDown
+                    className={cn('ml-auto h-4 w-4 shrink-0 text-muted-foreground transition-transform', historyOpen && 'rotate-180')}
+                    aria-hidden
+                  />
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <UnitEditLogSection job={data} />
+              </CollapsibleContent>
+            </Collapsible>
 
             <p className="text-xs text-muted-foreground">ข้อมูลใบขอมาจาก ERP — แก้ที่ ERP</p>
 

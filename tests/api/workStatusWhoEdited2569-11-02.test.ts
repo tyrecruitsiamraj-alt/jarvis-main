@@ -21,6 +21,9 @@ describe('ประวัติการแก้ไขใบขอ', () => {
     const log = detail.indexOf('<UnitEditLogSection job={data} />');
     expect(note).toBeGreaterThan(0);
     expect(log).toBeGreaterThan(note);
+    // พับไว้ กดค่อยกาง (เจ้าของ 2 พ.ย. 2569 "ย่อไว้ถ้ากดค่อยขยาย ไม่งั้นเกะกะ") — ค่าเริ่มพับ · ประวัติอยู่ใน CollapsibleContent (ไม่กาง = ไม่โหลด)
+    expect(detail).toContain('const [historyOpen, setHistoryOpen] = useState(false);');
+    expect(detail).toMatch(/<CollapsibleContent>\s*<UnitEditLogSection job=\{data\} \/>\s*<\/CollapsibleContent>/);
     expect(read('src/components/jobs/UnitEditLogSection.tsx')).toContain('<ListPaginationBar');
     const list = read('src/pages/jobs/JobListPage.tsx');
     expect(list).not.toContain('ดูว่าใครแก้สถานะ');
