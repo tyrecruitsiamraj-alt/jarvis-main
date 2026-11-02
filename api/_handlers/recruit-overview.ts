@@ -455,6 +455,7 @@ export async function toRequestRows(rows: readonly OnlineRequestRow[]): Promise<
       district,
       subdistrict: bareSubdistrict(fo?.subdistrict) || (district ? bareSubdistrict(parts.subdistrict) : null),
       leadKind: r.leadKind ?? null,
+      subtype: r.subtype ?? null,
       requested: r.requested,
       filled: r.filled,
       cancelled: r.cancelled,

@@ -33,6 +33,10 @@ import { inferProvinceFromAddress } from '@/lib/parseThaiJobAddress';
 import { scrubPublicLocation } from '@/lib/publicLocationText';
 import { RM_FORM_TYPES, RM_SPECIFIC_TYPES } from '@/lib/recruitRmMasters';
 import { createShortLink } from '@/lib/shortLinksApi';
+import SoGroupPicker from '@/components/jobs/SoGroupPicker';
+import { fetchSoGroups } from '@/lib/jobPostingRequestsApi';
+import { isFacebookGroupChannel, jobBuOf, soGroupLinkLabel, type SoGroup } from '@/lib/soScraping';
+import { normalizeTrendBu } from '@/lib/trends/bu';
 
 export type GenApplyLinkDialogProps = {
   /**
@@ -110,6 +114,13 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
   /** ช่องทางของลิงก์นี้ — **1:1** (เจ้าของเคาะ 2 ก.ย. 2569: เลิกติ๊กหลายช่อง) */
   /** ช่องทางที่จะสร้างลิงก์ — หลายช่องได้ ได้ลิงก์ช่องละ 1 อัน (เจ้าของ 4 ต.ค. 2569) */
   const [picked, setPicked] = useState<RecruitChannelMatch[]>([]);
+  /**
+   * ช่องทาง Facebook Group = ต้องเลือกกลุ่มจากรายชื่อ So Scraping · 1 ลิงก์ = 1 กลุ่ม
+   * (เจ้าของ 2 พ.ย. 2569 "อยากรู้ว่ากลุ่มไหนได้คนมาเยอะ กลุ่มไหนเหมาะนายไทย นายต่างชาติ")
+   */
+  const [soGroups, setSoGroups] = useState<SoGroup[] | null>(null);
+  const [groupPick, setGroupPick] = useState<string[]>([]);
+  const fbGroupChannels = picked.filter((c) => isFacebookGroupChannel(c.name));
   /** ลิสต์ช่องทางหุบไว้ก่อน — กางเมื่อจะเลือกจริง (เหตุผลอยู่ที่จุดเรียกใช้) */
   const [channelsOpen, setChannelsOpen] = useState(false);
   const [title, setTitle] = useState('');
@@ -193,6 +204,7 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
     setFormType('rm');
     setShortLinks({});
     setPicked([]);
+    setGroupPick([]);
     // เหลือแค่ช่องทาง = กางรายการช่องทางให้เลย (ไม่มีอะไรอื่นให้ทำในฟอร์มนี้)
     // กล่องลอย = กางและอยู่บนสุดด้วย (เจ้าของ 2 พ.ย. 2569 "ทำให้เลือกช่องทางตอน Genlink ได้ด้วยสิ่" — เดิมหุบอยู่ท้ายฟอร์มยาว หาไม่เจอ)
     setChannelsOpen(channelOnly || Boolean(standalone));
@@ -206,6 +218,34 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
       .then(() => setOnlineNames(buildOnlineNameOptions()))
       .catch(() => setOnlineNames(buildOnlineNameOptions()));
   }, [open, job, standalone, channelOnly]);
+
+  // รายชื่อกลุ่มโหลดเมื่อเลือกช่องทาง Facebook Group ครั้งแรก (ดึงใหม่ทุกครั้งที่เปิดป๊อป)
+  const needGroups = open && fbGroupChannels.length > 0 && soGroups === null;
+  useEffect(() => {
+    if (!needGroups) return;
+    let alive = true;
+    fetchSoGroups()
+      .then((g) => alive && setSoGroups(g))
+      .catch((e: unknown) => {
+        if (!alive) return;
+        setSoGroups([]);
+        setError(e instanceof Error ? e.message : 'โหลดกลุ่ม Facebook ไม่ได้');
+      });
+    return () => {
+      alive = false;
+    };
+  }, [needGroups]);
+  useEffect(() => {
+    if (!open) setSoGroups(null);
+  }, [open]);
+
+  /** ช่องทาง → ลิงก์ที่จะสร้าง · Facebook Group แตกเป็นกลุ่มละลิงก์ ชื่อกลุ่มตามรายชื่อ So Scraping */
+  const linkChannels = picked.flatMap((c) =>
+    isFacebookGroupChannel(c.name)
+      ? (soGroups ?? []).filter((g) => groupPick.includes(g.id)).map((g) => ({ channelId: c.id, label: soGroupLinkLabel(recruitChannelLabel(c), g.name) }))
+      : [{ channelId: c.id, label: recruitChannelLabel(c) }],
+  );
+  const missingGroup = fbGroupChannels.length > 0 && groupPick.length === 0;
 
   /**
    * ⚠️ ล้มแล้วต้องคืนเป็นลิงก์ยาว ไม่ใช่ปล่อยติ๊กค้างทั้งที่ยังเป็นลิงก์เดิม
@@ -231,7 +271,7 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
   };
 
   const submit = async () => {
-    if (saving) return;
+    if (saving || missingGroup) return;
     setSaving(true);
     setError(null);
     try {
@@ -245,7 +285,7 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
         salaryText: salaryText || null,
         contactName: contactName || null,
         contactPhone: contactPhone || null,
-        channels: picked.map((c) => ({ channelId: c.id, label: recruitChannelLabel(c) })),
+        channels: linkChannels,
         positionName: positionName.trim() || null,
         province: province || null,
         responsibleName: responsible || null,
@@ -303,6 +343,17 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
                 {channelsOpen ? (
                   <>
                     <MultiChannelPicker value={picked} onChange={setPicked} reloadKey={open} />
+                    {fbGroupChannels.length > 0 ? (
+                      <div className="space-y-1.5 pt-1">
+                        <p className="text-xs font-medium text-foreground">กลุ่ม Facebook · กลุ่มละ 1 ลิงก์</p>
+                        <SoGroupPicker
+                          groups={soGroups}
+                          jobBu={job ? jobBuOf(job) : normalizeTrendBu(standalone?.departmentCode)}
+                          value={groupPick}
+                          onChange={setGroupPick}
+                        />
+                      </div>
+                    ) : null}
                   </>
                 ) : null}
               </div>
@@ -470,6 +521,11 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
               {standalone ? null : channelSection}
 
               {error ? <p className="text-xs text-red-600">{error}</p> : null}
+              {missingGroup ? (
+                <p className={cn('text-xs', TONE.warn.value)} data-testid="genlink-need-group">
+                  เลือกกลุ่ม Facebook อย่างน้อย 1 กลุ่ม
+                </p>
+              ) : null}
 
               {/**
                * 🔴 ดูตัวอย่างหน้าสมัครก่อน gen link (เจ้าของเคาะ 22 ก.ย. 2569 นิยามข้อ 4)
@@ -508,12 +564,12 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
               <button
                 type="button"
                 onClick={() => void submit()}
-                disabled={saving || !title.trim()}
+                disabled={saving || !title.trim() || missingGroup}
                 className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-2.5 text-sm font-medium text-primary-foreground disabled:opacity-60"
               >
                 {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Link2 className="h-4 w-4" />}
                 {/* คำว่า Gen link (เจ้าของสั่ง 5 ต.ค. 2569) */}
-                {saving ? 'กำลัง Gen link…' : picked.length > 1 ? `Gen ${picked.length} ลิงก์` : 'Gen link'}
+                {saving ? 'กำลัง Gen link…' : linkChannels.length > 1 ? `Gen ${linkChannels.length} ลิงก์` : 'Gen link'}
               </button>
             </>
           )}

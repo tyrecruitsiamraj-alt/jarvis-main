@@ -13,6 +13,9 @@ import { siamrajSqlQuery } from './siamrajSqlServer.js';
 import { listSiamrajThroughput } from './siamrajUnitRequests.js';
 import { getUnitSectorMap } from './unitSectorStore.js';
 import { primaryJobRoleLabel } from './siamrajJobMapping.js';
+import { drivingSubtypeOf } from '../../src/lib/boardFilters.js';
+import { isDrivingPositionLabel } from '../../src/lib/jobBoardPositionPreset.js';
+import type { JobRequest } from '../../src/types/index.js';
 import type { DepartmentScope } from './departmentScope.js';
 import { trendBuFromSiteCode } from '../../src/lib/trends/bu.js';
 import { groupThroughputByRequest, onlineRequestStateOf, type OnlineApplicantRow, type OnlineRequestRow } from '../../src/lib/homeOnline.js';
@@ -35,6 +38,10 @@ type ErpExtra = {
   job_name1: string | null;
   staff_title_name: string | null;
   job_description_code_1: string | null;
+  /** ลักษณะงานย่อย (ส่วนกลาง · รถผู้บริหาร …) + สัญชาตินาย — แยกนายไทย/นายต่างชาติ (2 พ.ย. 2569) */
+  job_name2: string | null;
+  job_description_code_2: string | null;
+  boss_nationality: string | null;
   site_name: string | null;
   province_name: string | null;
   work_addr: string | null;
@@ -53,6 +60,9 @@ async function loadErpExtras(requestNos: readonly string[]): Promise<Map<string,
               (SELECT TOP 1 z.job_description_name FROM hr_ms_job_description_1 z WHERE z.job_description_code_1 = A.job_description_code_1) AS job_name1,
               (SELECT TOP 1 z.staff_title_name FROM hr_ms_staff_title z WHERE z.staff_title_code = A.staff_title_code) AS staff_title_name,
               A.job_description_code_1,
+              (SELECT TOP 1 z.job_description_name FROM hr_ms_job_description_2 z WHERE z.job_description_code_2 = A.job_description_code_2) AS job_name2,
+              A.job_description_code_2,
+              (SELECT TOP 1 LTRIM(RTRIM(b.boss_nationality)) FROM st_request_p2 b WHERE b.request_no = A.request_no) AS boss_nationality,
               RTRIM(SS.site_name) AS site_name,
               (SELECT TOP 1 RTRIM(p.province_name) FROM ms_province p WHERE p.province_code = SS.province_code) AS province_name,
               (SELECT TOP 1 LTRIM(RTRIM(ISNULL(b.work_place1, N'') + N' ' + ISNULL(b.work_place2, N'') + N' ' + ISNULL(b.work_place3, N'')))
@@ -168,6 +178,11 @@ export async function loadOnlineRequestRows(opts: OnlineRequestOpts): Promise<On
       industry: x?.industry?.trim() || null,
       sector: (g.siteCode && sectors[g.siteCode]) || null,
       position: position?.trim() || null,
+      // งานย่อยของงานขับรถ (นายไทย · นายต่างชาติ …) ตัวตัดสินเดียวกับตัวกรองกล่องงาน · งานอื่น = null
+      subtype:
+        x && isDrivingPositionLabel(position)
+          ? drivingSubtypeOf({ job_description_code_2: x.job_name2 || x.job_description_code_2 || undefined, boss_nationality: x.boss_nationality || undefined } as JobRequest)
+          : null,
       releasedAt: releasedAt.get(jobId) ?? null,
       applications: appCount.get(jobId) ?? 0,
       siteCode: g.siteCode,

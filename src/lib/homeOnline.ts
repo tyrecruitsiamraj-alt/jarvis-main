@@ -45,6 +45,8 @@ export type OnlineRequestRow = {
   applications: number;
   /** รหัสไซต์ (29 ต.ค. 2569 แท็บใบขอ ตัวกรอง Code Site) */
   siteCode?: string | null;
+  /** งานย่อยของงานขับรถ (`DRIVING_SUBTYPES` · นายไทย/นายต่างชาติ) · null = ไม่ใช่งานขับรถ (2 พ.ย. 2569) */
+  subtype?: string | null;
   /** ของ ERP สำหรับแท็บใบขอ (29 ต.ค. 2569) — จังหวัดของไซต์ · ที่อยู่หน้างาน · กลุ่มลูกค้า · วันกรอก/วันต้องการ */
   erp?: {
     siteName: string | null;

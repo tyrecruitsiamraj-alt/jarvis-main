@@ -43,7 +43,9 @@ describe('สร้างลิงก์ได้หลายช่องทา�
   it('ฟอร์มสร้างลิงก์ส่งทุกช่องที่เลือก (ช่องละ 1 ลิงก์)', () => {
     const src = readFileSync('src/components/jobs/GenApplyLinkDialog.tsx', 'utf8');
     expect(src).toContain('<MultiChannelPicker');
-    expect(src).toContain('channels: picked.map((c) => ({ channelId: c.id, label: recruitChannelLabel(c) }))');
+    // ช่องทางอื่นช่องละ 1 ลิงก์ · Facebook Group แตกเป็นกลุ่มละลิงก์ (2 พ.ย. 2569)
+    expect(src).toContain(': [{ channelId: c.id, label: recruitChannelLabel(c) }],');
+    expect(src).toContain('channels: linkChannels,');
   });
 });
 

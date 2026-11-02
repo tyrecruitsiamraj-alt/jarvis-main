@@ -16,9 +16,9 @@ import type { JobRequest } from '@/types';
 import { useRecruiterContact } from '@/hooks/useRecruiterContact';
 import { jobBoardCardTitle } from '@/lib/unitRequestDisplay';
 import { publicJobTitle } from '@/lib/publicJobTitle';
-import { addPostingLink, fetchRecruitPostings } from '@/lib/recruitPostingsApi';
+import { addPostingLink, fetchRecruitPostings, searchRecruitChannels } from '@/lib/recruitPostingsApi';
 import { saveUnitFieldOverridesPatch } from '@/lib/siamrajUnitRequestsApi';
-import { applyLinkPath, postingLinkOwner, type RecruitPosting } from '@/lib/recruitPostings';
+import { applyLinkPath, postingLinkOwner, recruitChannelLabel, type RecruitPosting, type RecruitPostingLink } from '@/lib/recruitPostings';
 import {
   composeJobSnapshot,
   createJobPostingRequest,
@@ -42,6 +42,9 @@ import {
   defaultSoGroupPick,
   jobBuOf,
   soBuEmptyText,
+  isFacebookGroupChannel,
+  soGroupLinkLabel,
+  type SoGroupLink,
   soGroupView,
   soSectionHeadText,
   soBuNoAccountText,
@@ -245,6 +248,32 @@ export function AutopostBody({
     }
   };
 
+  /**
+   * ลิงก์ของแต่ละกลุ่มที่ติ๊ก (เจ้าของ 2 พ.ย. 2569 "อยากรู้ว่ากลุ่มไหนได้คนมาเยอะ" · Choice 1 ลิงก์ = 1 กลุ่ม)
+   * ชื่อลิงก์ชุดเดียวกับ Gen link ("Facebook · Facebook Group · <ชื่อกลุ่ม>") — มีแล้วใช้ตัวเดิม ไม่มีค่อยสร้าง (สั่งซ้ำไม่งอกลิงก์)
+   */
+  const ensureGroupLinks = async (): Promise<SoGroupLink[]> => {
+    if (!openPosting || !opts) throw new Error('ใบนี้ยังไม่ได้ประกาศ');
+    const matches = await searchRecruitChannels('Facebook Group', { limit: 20 });
+    const fbGroup = matches.find((c) => isFacebookGroupChannel(c.name) && /^facebook$/i.test((c.parentName ?? '').trim())) ?? null;
+    const channelLabel = fbGroup ? recruitChannelLabel(fbGroup) : 'Facebook · Facebook Group';
+    const have = new Map(openPosting.links.map((l) => [l.channelLabel ?? '', l]));
+    const made: RecruitPostingLink[] = [];
+    const out: SoGroupLink[] = [];
+    for (const g of opts.groups.filter((x) => picked.includes(x.id))) {
+      const label = soGroupLinkLabel(channelLabel, soGroupLabel(g));
+      let l = have.get(label) ?? null;
+      if (!l) {
+        l = await addPostingLink(openPosting.id, { channelId: fbGroup?.id ?? null, channelLabel: label });
+        made.push(l);
+        have.set(label, l);
+      }
+      out.push({ group_id: g.id, link_code: l.code, apply_link: `${window.location.origin}${applyLinkPath(l.code)}` });
+    }
+    if (made.length) setPostings((prev) => (prev ?? []).map((p) => (p.id === openPosting.id ? { ...p, links: [...p.links, ...made] } : p)));
+    return out;
+  };
+
   const pickAccount = (id: string) => {
     const a = opts?.accounts.find((x) => x.id === id);
     if (!opts || !a) return;
@@ -271,6 +300,7 @@ export function AutopostBody({
     setBusy('send');
     setError(null);
     try {
+      const groupLinks = await ensureGroupLinks();
       const link = links.find((l) => l.code === linkCode);
       const item = await createJobPostingRequest({
         jobId: job.id,
@@ -286,6 +316,8 @@ export function AutopostBody({
           apply_link: linkUrl,
           link_code: linkCode,
           channel_label: link?.channelLabel ?? null,
+          // ลิงก์กลุ่มละอัน — So Scraping แทน apply_link ใน caption ด้วยลิงก์ของกลุ่มตอนโพสต์ (เจ้าของ 2 พ.ย. 2569 "รอทำพร้อมกันทีเดียว")
+          group_links: groupLinks,
         },
       });
       setSent(item);

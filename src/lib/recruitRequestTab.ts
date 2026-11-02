@@ -17,6 +17,7 @@ import { aiStage } from '@/lib/recruitJourney';
 import { FUNNEL_GROUP_LABEL, NO_SUB, funnelPlaceOf, funnelSubOf, type FunnelGroupKey } from '@/lib/channelFunnel';
 import type { RequestLeadKind } from '@/lib/requestLeadKind';
 import type { RecruitAppFact } from '@/lib/recruitOverviewTypes';
+import { DRIVING_SUBTYPES } from '@/lib/boardFilters';
 
 export type RequestSector = 'bank' | 'government' | 'private';
 export const REQUEST_SECTOR_LABEL: Record<RequestSector, string> = { private: 'เอกชน', government: 'ราชการ', bank: 'ธนาคาร' };
@@ -41,6 +42,8 @@ export type RecruitRequestRow = {
   district: string | null;
   subdistrict: string | null;
   leadKind: RequestLeadKind | null;
+  /** งานย่อยของงานขับรถ (นายไทย · นายต่างชาติ …) · null = ไม่ใช่งานขับรถ — ตัวกรอง "งานย่อย" (2 พ.ย. 2569) */
+  subtype?: string | null;
   requested: number;
   filled: number;
   cancelled: number;
@@ -68,15 +71,20 @@ export function requestSectorOf(
  */
 export type RequestTabFilter = {
   sector: RequestSector | 'unset' | null;
+  /**
+   * งานย่อยของงานขับรถ (`DRIVING_SUBTYPES` id) — เจ้าของ 2 พ.ย. 2569 "กลุ่มไหนเหมาะงานนายไทย กลุ่มไหนนายต่างชาติ"
+   * เลือกแล้วตารางช่องทาง (ลงถึงชื่อกลุ่ม Facebook) นับเฉพาะคนที่กรอกใบของงานย่อยนั้น
+   */
+  subtype?: string | null;
   siteCode: string | null;
   province: string | null;
   district: string | null;
   subdistrict: string | null;
 };
-export const EMPTY_REQUEST_FILTER: RequestTabFilter = { sector: null, siteCode: null, province: null, district: null, subdistrict: null };
+export const EMPTY_REQUEST_FILTER: RequestTabFilter = { sector: null, subtype: null, siteCode: null, province: null, district: null, subdistrict: null };
 
 export const isRequestFilterActive = (f: RequestTabFilter) =>
-  Boolean(f.sector || f.siteCode || f.province || f.district || f.subdistrict);
+  Boolean(f.sector || f.subtype || f.siteCode || f.province || f.district || f.subdistrict);
 
 export const provinceOf = (r: RecruitRequestRow) => r.province || NO_PROVINCE;
 export const districtOf = (r: RecruitRequestRow) => r.district || NO_DISTRICT;
@@ -86,11 +94,19 @@ export function filterRequestRows(rows: readonly RecruitRequestRow[], f: Request
   return rows.filter(
     (r) =>
       (!f.sector || (f.sector === 'unset' ? r.sector === null : r.sector === f.sector)) &&
+      (!f.subtype || r.subtype === f.subtype) &&
       (!f.siteCode || r.siteCode === f.siteCode) &&
       (!f.province || provinceOf(r) === f.province) &&
       (!f.district || districtOf(r) === f.district) &&
       (!f.subdistrict || subdistrictOf(r) === f.subdistrict),
   );
+}
+
+/** ตัวเลือกงานย่อย — เฉพาะที่มีใบในช่วง (ใบมากสุดก่อน) · ลำดับ/ชื่อตาม `DRIVING_SUBTYPES` ของกล่องงาน */
+export function requestSubtypeOptions(rows: readonly RecruitRequestRow[]): Array<{ value: string; label: string; n: number }> {
+  const m = new Map<string, number>();
+  for (const r of rows) if (r.subtype) m.set(r.subtype, (m.get(r.subtype) ?? 0) + 1);
+  return DRIVING_SUBTYPES.filter((t) => m.has(t.id)).map((t) => ({ value: t.id, label: t.label, n: m.get(t.id) ?? 0 }));
 }
 
 /** ไซต์ที่มีใบขอในช่วง (ERP) — ตัวเลือก Code Site · ใบมากสุดขึ้นก่อน · ค้นด้วยชื่อไซต์/หน่วยงานได้ */

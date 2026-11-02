@@ -52,7 +52,7 @@ async function recentGroupsOfJob(jobId: string): Promise<string[]> {
     return [];
   }
 }
-import { soPickError, soSnapshotError } from '../../src/lib/soScraping.js';
+import { soGroupLinksError, soPickError, soSnapshotError } from '../../src/lib/soScraping.js';
 
 const OUT_OF_SCOPE = 'ไม่มีสิทธิ์เข้าถึงใบขอของแผนกอื่น';
 
@@ -186,6 +186,16 @@ async function handler(req: AuthedReq, res: ApiRes) {
           const code = typeof jobSnapshot.link_code === 'string' ? jobSnapshot.link_code : '';
           if (!code || !(await linkCodeBelongsToJob(code, jobId))) {
             return sendError(res, 400, 'Bad request', 'ลิงก์สมัครไม่ใช่ของใบนี้หรือประกาศปิดไปแล้ว — เลือกลิงก์ใหม่');
+          }
+          // ลิงก์กลุ่มละอัน (2 พ.ย. 2569) — ครบทุกกลุ่ม และเป็นของประกาศที่เปิดอยู่ของใบนี้ทุกตัว
+          const glError = soGroupLinksError(jobSnapshot);
+          if (glError) return sendError(res, 400, 'Bad request', glError);
+          if (Array.isArray(jobSnapshot.group_links)) {
+            for (const gl of jobSnapshot.group_links as Array<{ link_code: string }>) {
+              if (!(await linkCodeBelongsToJob(gl.link_code, jobId))) {
+                return sendError(res, 400, 'Bad request', 'ลิงก์ของกลุ่มไม่ใช่ของใบนี้หรือประกาศปิดไปแล้ว — ปิดแล้วสั่งใหม่');
+              }
+            }
           }
         }
       }

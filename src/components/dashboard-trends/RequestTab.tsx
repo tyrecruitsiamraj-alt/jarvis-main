@@ -33,6 +33,7 @@ import {
   isRequestFilterActive,
   requestAreaOptions,
   requestSiteOptions,
+  requestSubtypeOptions,
   type ApplicantChannelRow,
   type RecruitRequestRow,
   type RequestSector,
@@ -224,6 +225,7 @@ export default function RequestTab({
   const picked = useMemo(() => (rows ? filterRequestRows(rows, f) : []), [rows, f]);
   const options = useMemo(() => requestAreaOptions(rows ?? [], f), [rows, f]);
   const sites = useMemo(() => requestSiteOptions(rows ?? []), [rows]);
+  const subtypes = useMemo(() => requestSubtypeOptions(rows ?? []), [rows]);
   const funnel = useMemo(() => buildRequestFunnel(picked), [picked]);
   const areas = useMemo(() => buildProvinceAreas(picked), [picked]);
   const pickedPrev = useMemo(() => (prevRows ? filterRequestRows(prevRows, f) : null), [prevRows, f]);
@@ -250,7 +252,7 @@ export default function RequestTab({
 
   return (
     <div className="space-y-3">
-      {/* ─── ตัวกรอง (เจ้าของ 29 ต.ค. 2569): ประเภทงาน · Code Site จากไซต์ที่มีใบขอ · จังหวัด อำเภอ ตำบล ─── */}
+      {/* ─── ตัวกรอง (เจ้าของ 29 ต.ค. 2569): ประเภทงาน · งานย่อย (2 พ.ย.) · Code Site จากไซต์ที่มีใบขอ · จังหวัด อำเภอ ตำบล ─── */}
       <div className="flex flex-wrap items-end gap-2 rounded-2xl border border-border bg-card p-3" data-testid="request-tab-filters">
         <div className="flex min-w-32 flex-1 flex-col gap-1">
           <Label className={cn('text-xs font-normal', DASH.sub)}>ประเภทงาน</Label>
@@ -266,6 +268,23 @@ export default function RequestTab({
                 </SelectItem>
               ))}
               <SelectItem value="unset">{REQUEST_SECTOR_UNSET}</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        {/* งานย่อย (เจ้าของ 2 พ.ย. 2569 "กลุ่มไหนเหมาะงานนายไทย กลุ่มไหนนายต่างชาติ") — ตารางช่องทางนับเฉพาะคนที่กรอกใบงานย่อยนี้ */}
+        <div className="flex min-w-32 flex-1 flex-col gap-1">
+          <Label className={cn('text-xs font-normal', DASH.sub)}>งานย่อย</Label>
+          <Select value={f.subtype ?? ALL} onValueChange={(v) => set({ subtype: v === ALL ? null : v })} disabled={subtypes.length === 0 && !f.subtype}>
+            <SelectTrigger className="h-9 text-sm" aria-label="งานย่อย" data-testid="request-tab-subtype">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL}>ทั้งหมด</SelectItem>
+              {subtypes.map((o) => (
+                <SelectItem key={o.value} value={o.value}>
+                  {o.label} · {fmt(o.n)} ใบ
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>

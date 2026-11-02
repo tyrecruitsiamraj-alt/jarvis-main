@@ -371,23 +371,54 @@ export function jobBuOf(job: Pick<JobRequest, 'site_code' | 'department_code'>):
   return trendBuFromSiteCode(job.site_code) ?? normalizeTrendBu(job.department_code);
 }
 
-export type SoGroupSection = {
+export type SoGroupSection<G extends { department: string | null } = SoOptGroup> = {
   /** รหัสธุรกิจ · null = ไม่ระบุ */
   bu: string | null;
   label: string;
   /** หมวดธุรกิจเดียวกับใบขอ (เปิดกางและติ๊กไว้ให้) */
   forJob: boolean;
-  groups: SoOptGroup[];
+  groups: G[];
 };
 
 /** จัดหมวด: ธุรกิจของใบขอก่อน → ธุรกิจอื่นเรียงรหัส → ไม่ระบุท้ายสุด · หมวดว่างไม่ขึ้น (ใบขอที่ธุรกิจไม่มีกลุ่มเลยให้บอกด้วย `soBuEmptyText`) */
-export function soGroupSections(groups: readonly SoOptGroup[], jobBu: string | null): SoGroupSection[] {
-  const by = new Map<string | null, SoOptGroup[]>();
+export function soGroupSections<G extends { department: string | null }>(groups: readonly G[], jobBu: string | null): SoGroupSection<G>[] {
+  const by = new Map<string | null, G[]>();
   for (const g of groups) {
     const k = g.department ?? null;
     by.set(k, [...(by.get(k) ?? []), g]);
   }
   return buOrder(by.keys(), jobBu).map((bu) => ({ bu, label: bu ?? SO_BU_NONE_LABEL, forJob: bu !== null && bu === jobBu, groups: by.get(bu) ?? [] }));
+}
+
+/* ═══ Gen link ช่องทาง Facebook Group = เลือกกลุ่มจาก So Scraping (เจ้าของ 2 พ.ย. 2569) ═══
+ * "อยากรู้ว่ากลุ่มไหนได้คนมาเยอะ · กลุ่มไหนเหมาะนายไทย นายต่างชาติ" → Choice: เลือกจากรายชื่อ So Scraping · 1 ลิงก์ = 1 กลุ่ม
+ * ชื่อลิงก์ = "Facebook · Facebook Group · <ชื่อกลุ่ม>" — ตารางช่องทางในภาพรวมงานสรรหาอ่านชื่อกลุ่มจากส่วนท้าย (`funnelSubOf`)
+ */
+/** ช่องทางรอง Facebook Group (ตั้งค่าช่องทาง) — ตัวที่ต้องเลือกกลุ่มต่อ */
+export const isFacebookGroupChannel = (name: string | null | undefined) => /^facebook\s*group$/i.test((name ?? '').trim());
+
+/** ชื่อลิงก์ของกลุ่ม — ชื่อช่องทาง + ชื่อกลุ่มตามรายชื่อ So Scraping (ตัด "·" ในชื่อกลุ่ม กันชื่อแตกเป็นหลายชั้น) */
+export function soGroupLinkLabel(channelLabel: string, groupName: string): string {
+  return `${channelLabel} · ${groupName.replace(/\s*·\s*/g, ' ').trim()}`;
+}
+
+/** ลิงก์ของแต่ละกลุ่มที่ส่งไปกับใบสั่ง Autopost — So Scraping แทน apply_link ใน caption ด้วยลิงก์ของกลุ่มตอนโพสต์ (สเปก 2 พ.ย. 2569) */
+export type SoGroupLink = { group_id: string; apply_link: string; link_code: string };
+
+/** group_links ต้องครบทุกกลุ่มที่เลือก · ลิงก์รูปเดียวกับ apply_link · ไม่มีช่องนี้ = ใบสั่งแบบเดิม (ลิงก์เดียวทุกกลุ่ม) */
+export function soGroupLinksError(snap: Record<string, unknown> | null | undefined): string | null {
+  if (!snap || snap.group_links === undefined) return null;
+  const list = Array.isArray(snap.group_links) ? (snap.group_links as unknown[]) : null;
+  const groups = Array.isArray(snap.group_ids) ? snap.group_ids.filter((x): x is string => typeof x === 'string') : [];
+  if (!list) return 'ลิงก์ของกลุ่มผิดรูป — ปิดแล้วสั่งใหม่';
+  const ok = list.every((x) => {
+    const r = (x ?? {}) as Record<string, unknown>;
+    return typeof r.group_id === 'string' && typeof r.link_code === 'string' && typeof r.apply_link === 'string' && r.apply_link.endsWith(`/apply/p/${r.link_code}`);
+  });
+  if (!ok) return 'ลิงก์ของกลุ่มผิดรูป — ปิดแล้วสั่งใหม่';
+  const covered = new Set(list.map((x) => (x as SoGroupLink).group_id));
+  if (groups.some((g) => !covered.has(g))) return 'ยังไม่มีลิงก์ของบางกลุ่ม — ปิดแล้วสั่งใหม่';
+  return null;
 }
 
 /** กลุ่มที่บัญชีนี้ยังไม่เคยลองโพสต์ใน 30 วัน และกลุ่มไม่ติด — ติ๊กได้ (คำนี้ So Scraping ให้ Jarvis ใช้) */
