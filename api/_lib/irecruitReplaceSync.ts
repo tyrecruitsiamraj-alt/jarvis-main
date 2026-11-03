@@ -106,8 +106,9 @@ export type IrecruitReplaceRow = {
    */
   updater_email?: string | null;
   /**
-   * คนกดขั้น "ความสนใจ" ของใบ (ir_job_request_item ระดับ 2 ที่ไม่ใช่ W) — เจ้าของ 31 ต.ค. 2569 *"เหมือนเป็นคนปิดงาน
-   * ต้องใช้คนนั้นในการโทรเบอร์ฉุกเฉิน ไม่ใช่คนเปิดงาน"* · ยังไม่กด = null (ถอยไปคนแก้ใบล่าสุด / คนเปิดใบ)
+   * ผู้รับผิดชอบล่าสุดของใบ (ir_job_request_item แถวล่าสุด ทุกระดับ ไม่สนสถานะ) — เจ้าของ 31 ต.ค. 2569 *"ต้องใช้คนนั้นในการโทรเบอร์ฉุกเฉิน
+   * ไม่ใช่คนเปิดงาน"* · 3 พ.ย. 2569 *"เอาชื่อผู้รับผิดชอบล่าสุดเนี่ยมาเป็นเบอร์โทรฉุกเฉิน"* (เดิมข้ามความสนใจที่ยังไม่ลงสถานะ)
+   * ไม่มี = null (ถอยไปคนแก้ใบล่าสุด / คนเปิดใบ)
    */
   interest_email?: string | null;
 };
@@ -252,10 +253,13 @@ export async function fetchIrecruitReplaceRows(fromYmd: string, toYmd: string): 
          WHERE jr.job_id = h.job_id
          ORDER BY jr.date_add DESC
        ) cand
-       -- คนกด "ความสนใจ" (ระดับ 2 · W = ยังไม่ลงสถานะ ช่องนี้ยังเป็นคนเปิดใบ) — เบอร์ฉุกเฉิน (31 ต.ค. 2569)
+       -- ผู้รับผิดชอบล่าสุดของใบ (แถวล่าสุดในตาราง ขั้นตอน/สถานะ/ผู้รับผิดชอบ ของ iRecruit) — เบอร์ฉุกเฉิน
+       -- 31 ต.ค. 2569 เดิมเอาเฉพาะ "ความสนใจ" ที่ลงสถานะแล้ว (ไม่ใช่ W) ⇒ ใบสถานะสนใจที่ขั้นความสนใจยังไม่ลงข้อมูล ถอยไปคนเปิดงาน
+       -- 3 พ.ย. 2569 เจ้าของ "เอาชื่อผู้รับผิดชอบล่าสุดเนี่ยมาเป็นเบอร์โทรฉุกเฉิน" ⇒ แถวล่าสุดทุกระดับ ไม่สนสถานะ
        OUTER APPLY (
          SELECT TOP 1 it.item_user_add FROM ir_job_request_item it
-          WHERE it.request_id = cand.request_id AND LTRIM(RTRIM(it.item_level)) = '2' AND ISNULL(it.item_status, 'W') <> 'W'
+          WHERE it.request_id = cand.request_id AND it.item_user_add IS NOT NULL
+          ORDER BY it.item_date_add DESC, TRY_CAST(LTRIM(RTRIM(it.item_level)) AS int) DESC
        ) ip
        OUTER APPLY (SELECT TOP 1 u.email FROM users u WHERE ip.item_user_add IS NOT NULL AND u.staff_id = ip.item_user_add) iu
        OUTER APPLY (SELECT TOP 1 LTRIM(RTRIM(a.email)) AS email FROM admins a WHERE ip.item_user_add IS NOT NULL AND a.staff_id = ip.item_user_add) ia
@@ -594,7 +598,7 @@ async function runIrecruitReplaceSyncUnlocked(
           siteCode: r.site_code?.trim() || null,
           // สายที่เลยเวลาแล้ว = คนโทร (AI ไม่โทรย้อนหลัง)
           mode: p.past ? 'manual' : typeMode,
-          // รายชื่อให้ AI โทรตั้งเบอร์ไว้ = ใช้ก่อน · ไม่มี = คนกด "ความสนใจ" (31 ต.ค. 2569) · ยังไม่กด = คนแก้ใบล่าสุด · ไม่มี = คนเพิ่มแผน
+          // รายชื่อให้ AI โทรตั้งเบอร์ไว้ = ใช้ก่อน · ไม่มี = ผู้รับผิดชอบล่าสุดของใบ (3 พ.ย. 2569) · ไม่มี = คนแก้ใบล่าสุด · ไม่มี = คนเพิ่มแผน
           emergency:
             listed?.emergency ??
             adderPhones.get((r.interest_email ?? '').trim().toLowerCase()) ??

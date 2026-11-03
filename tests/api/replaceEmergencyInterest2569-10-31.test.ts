@@ -2,6 +2,8 @@
  * เบอร์ฉุกเฉินงานส่งคนแทน = คนกด "ความสนใจ" ใน iRecruit (เจ้าของ 31 ต.ค. 2569)
  * *"ดูว่าใครเป็นคนกด มันเหมือนเป็นคนปิดงาน ต้องใช้คนนั้นในการโทรเบอร์ฉุกเฉิน ไม่ใช่คนเปิดงานแล้ว"*
  * Choice: ยังไม่กด = คนเปิดใบไปก่อน · รายชื่อให้ AI โทรมาก่อน · สายเดิมเปลี่ยนเป็นคนกด + ส่งแผนใหม่
+ * 3 พ.ย. 2569 เจ้าของ (ใบสถานะสนใจ ขั้นความสนใจยังไม่ลงข้อมูล) *"เอาชื่อผู้รับผิดชอบล่าสุดเนี่ยมาเป็นเบอร์โทรฉุกเฉิน"*
+ *   ⇒ แถวล่าสุดของตารางขั้นตอนทุกระดับ ไม่สนสถานะ (เดิมข้ามความสนใจที่เป็น W แล้วถอยไปคนเปิดงาน)
  */
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
@@ -9,8 +11,9 @@ import { describe, expect, it } from 'vitest';
 const src = readFileSync('api/_lib/irecruitReplaceSync.ts', 'utf8');
 
 describe('คนกดความสนใจ', () => {
-  it('อ่านขั้นที่ 2 ของใบที่ลงสถานะแล้ว (W = ยังไม่กด ช่องคนยังเป็นคนเปิดใบ)', () => {
-    expect(src).toContain("LTRIM(RTRIM(it.item_level)) = '2' AND ISNULL(it.item_status, 'W') <> 'W'");
+  it('อ่านผู้รับผิดชอบแถวล่าสุดของใบ ทุกระดับ ไม่สนสถานะ (3 พ.ย. 2569)', () => {
+    expect(src).not.toContain("ISNULL(it.item_status, 'W') <> 'W'");
+    expect(src).toContain('ORDER BY it.item_date_add DESC, TRY_CAST(LTRIM(RTRIM(it.item_level)) AS int) DESC');
     expect(src).toContain('COALESCE(iu.email, ia.email) AS interest_email');
   });
 
