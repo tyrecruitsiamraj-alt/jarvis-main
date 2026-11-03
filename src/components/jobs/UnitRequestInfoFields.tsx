@@ -43,6 +43,17 @@ export function Field({
   );
 }
 
+/**
+ * รายละเอียดงาน / คุณสมบัติ **ตามใบขอ ERP** (เจ้าของ 3 พ.ย. 2569 ถามว่าหน้าใบขอ "มียัง") — กล่องนี้คือ "ข้อมูลใบขอมาจาก ERP"
+ * ⇒ ทีมแก้ทับในป๊อปประกาศแล้วก็ยังโชว์ของ ERP (`erp_*`) · ไม่ได้แก้ = ค่าปัจจุบันซึ่งคือของ ERP อยู่แล้ว (erpJobText.ts)
+ */
+function erpLinesText(job: JobRequest, key: 'job_details' | 'requirements'): string | null {
+  const erpKey = key === 'job_details' ? 'erp_job_details' : 'erp_requirements';
+  const lines = (erpKey in job ? job[erpKey] : job[key]) ?? [];
+  const text = lines.map((l) => l.trim()).filter(Boolean).join('\n');
+  return text || null;
+}
+
 const UnitRequestInfoFields: React.FC<{ job: JobRequest }> = ({ job: data }) => (
   <div className="grid gap-2 sm:grid-cols-2">
     <Field label="เลขที่ใบขอ" value={data.request_no} />
@@ -101,6 +112,12 @@ const UnitRequestInfoFields: React.FC<{ job: JobRequest }> = ({ job: data }) => 
       value={data.total_income ? `฿${data.total_income.toLocaleString()}` : undefined}
     />
     <Field label="วันเวลาเข้างาน" value={data.work_schedule} />
+    <div className="sm:col-span-2">
+      <Field label="รายละเอียดงาน" value={erpLinesText(data, 'job_details')} />
+    </div>
+    <div className="sm:col-span-2">
+      <Field label="คุณสมบัติ" value={erpLinesText(data, 'requirements')} />
+    </div>
     <Field label="ชื่อผู้ติดต่อหน่วยงาน" value={data.contact_name} />
     <Field label="เบอร์ติดต่อ" value={data.contact_phone} />
     <Field label="ค่าปรับต่อวันถ้าไม่มีคน" value={moneyFieldText(data.penalty_per_day)} />

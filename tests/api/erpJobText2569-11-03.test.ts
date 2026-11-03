@@ -59,3 +59,12 @@ describe('ต่อสายครบทั้งใบขอจริงแล�
     expect(s).toContain('it.erp_job_details = it.job_details ?? null;');
   });
 });
+
+describe('หน้ารายละเอียดใบขอโชว์รายละเอียดงาน/คุณสมบัติตาม ERP (เจ้าของ 3 พ.ย. 2569 "หน้าใบขอ มียัง")', () => {
+  it('กล่องข้อมูลใบขอมีสองช่อง · ทีมแก้ทับแล้วยังโชว์ของ ERP', () => {
+    const s = readFileSync('src/components/jobs/UnitRequestInfoFields.tsx', 'utf8');
+    expect(s).toContain(`<Field label="รายละเอียดงาน" value={erpLinesText(data, 'job_details')} />`);
+    expect(s).toContain(`<Field label="คุณสมบัติ" value={erpLinesText(data, 'requirements')} />`);
+    expect(s).toContain("const erpKey = key === 'job_details' ? 'erp_job_details' : 'erp_requirements';");
+  });
+});
