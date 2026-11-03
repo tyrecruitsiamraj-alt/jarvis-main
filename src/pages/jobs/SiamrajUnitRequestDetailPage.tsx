@@ -25,7 +25,6 @@ import { JOB_STAFF_ROSTER_CHANGED_EVENT } from '@/lib/jobStaffRemote';
 import { UnitRequestNoteDetail } from '@/components/jobs/UnitRequestNoteField';
 import UnitRequestInfoFields from '@/components/jobs/UnitRequestInfoFields';
 import UnitRequestTabs from '@/components/jobs/UnitRequestTabs';
-import RequestLeadRulesCard from '@/components/jobs/RequestLeadRulesCard';
 import { UnitRequestReplacementSelect } from '@/components/jobs/UnitRequestReplacementToggle';
 import {
   UnitRequestWorkStatusBadge,
@@ -285,14 +284,7 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
               ) : null}
             </div>
 
-            {/* เกณฑ์ความเร่งเฉพาะใบ (เจ้าของสั่ง 10 ก.ย. 2569) — วางไว้ใต้ป้ายสถานะ
-                เพราะป้าย "ฉุกเฉิน/ล่วงหน้า" ด้านบนมาจากเกณฑ์ชุดนี้ตรง ๆ */}
-            <RequestLeadRulesCard
-              job={data}
-              onSaved={() => {
-                void queryClient.invalidateQueries({ queryKey: ['siamraj', 'unit-request', id] });
-              }}
-            />
+            {/* เกณฑ์ความเร่งเฉพาะใบ ย้ายไป ตั้งค่า › เกณฑ์ความเร่งใบขอ แล้ว (เจ้าของ 3 พ.ย. 2569) */}
 
             <section className="glass-card rounded-3xl p-4 border border-white/70 space-y-2">
               {/* หัวข้อเป็นปุ่มกาง/หุบ (เจ้าของสั่ง 25 ส.ค. 2569) — ลูกศรหมุนตามสถานะ

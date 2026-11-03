@@ -12,12 +12,14 @@ import { Users, Shield, Link2, Database, FileText, Palette, ListChecks, ListOrde
   Plug,
   ShieldCheck,
   Trash2,
+  Gauge,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import BrandingAppearanceTab from '@/pages/settings/BrandingAppearanceTab';
 import RolePermissionsTab from '@/pages/settings/RolePermissionsTab';
 import WorkStatusMasterTab from '@/pages/settings/WorkStatusMasterTab';
 import MatchPriorityWeightsTab from '@/pages/settings/MatchPriorityWeightsTab';
+import RequestLeadRulesTab from '@/pages/settings/RequestLeadRulesTab';
 import LumosDispatchModeTab from '@/pages/settings/LumosDispatchModeTab';
 import CallScriptsTab from '@/pages/settings/CallScriptsTab';
 import AiSettingsTab from '@/pages/settings/AiSettingsTab';
@@ -105,6 +107,7 @@ const TAB_ICON: Record<SettingsTab, React.ElementType> = {
   users: Users,
   roles: Shield,
   workStatus: ListChecks,
+  leadRules: Gauge,
   matchWeights: SlidersHorizontal,
   lumosMode: PhoneForwarded,
   callRetry: Repeat,
@@ -825,6 +828,7 @@ const AdminSettings: React.FC = () => {
         {activeTab === 'roles' && <RolePermissionsTab />}
 
         {activeTab === 'workStatus' && <WorkStatusMasterTab />}
+        {activeTab === 'leadRules' && <RequestLeadRulesTab />}
         {activeTab === 'matchWeights' && <MatchPriorityWeightsTab />}
         {activeTab === 'lumosMode' && <LumosDispatchModeTab />}
         {activeTab === 'callRetry' && <CallRetryTab />}

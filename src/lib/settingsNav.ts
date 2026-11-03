@@ -19,6 +19,7 @@ export const SETTINGS_TAB_IDS = [
   'users',
   'roles',
   'workStatus',
+  'leadRules',
   'matchWeights',
   'lumosMode',
   'callRetry',
@@ -46,6 +47,7 @@ export const SETTINGS_TAB_LABEL: Record<SettingsTabId, string> = {
   users: 'ผู้ใช้งาน',
   roles: 'บทบาทและสิทธิ์',
   workStatus: 'สถานะทำงาน',
+  leadRules: 'เกณฑ์ความเร่งใบขอ',
   matchWeights: 'น้ำหนักเรียงผู้สมัคร',
   lumosMode: 'โหมดส่งงานให้ Lumos',
   callRetry: 'โทรซ้ำคนไม่รับสาย',
@@ -68,6 +70,7 @@ export const SETTINGS_TAB_HINT: Record<SettingsTabId, string> = {
   users: 'เพิ่ม/แก้ผู้ใช้ · บทบาท · แผนก',
   roles: 'สิทธิ์เข้าถึงของแต่ละบทบาท',
   workStatus: 'สถานะของใบขอที่ใช้ทั้งระบบ',
+  leadRules: 'ฉุกเฉิน / ล่วงหน้า · วันให้หาคน รายใบขอ',
   matchWeights: 'เกณฑ์เรียงลำดับผู้สมัครที่ AI แนะนำ',
   lumosMode: 'ให้ AI โทรเอง / ช่วยโทร / โทรมือ',
   callRetry: 'เวลาโทรซ้ำ · โทรได้กี่ครั้ง',
@@ -103,7 +106,7 @@ export const SETTINGS_GROUP_TABS: Record<SettingsGroupId, readonly SettingsTabId
   people: ['users', 'roles'],
   look: ['appearance', 'navMenu'],
   automation: ['lumosMode', 'callRetry', 'callScripts', 'aiSettings', 'callSuppression', 'autoMove', 'matchWeights', 'integrations'],
-  data: ['workStatus', 'reference', 'applyLinks', 'pdpaRequests'],
+  data: ['workStatus', 'leadRules', 'reference', 'applyLinks', 'pdpaRequests'],
   monitor: ['health', 'audit'],
 };
 
