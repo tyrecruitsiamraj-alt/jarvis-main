@@ -220,13 +220,13 @@ export function AutopostBody({
   const recent = new Set(state?.recentGroups ?? []);
   const openOrder = state?.latest.find((r) => r.request_type === 'content' && soStatusView(r).open) ?? null;
 
-  // แคปชั่นร่างใหม่ตามลิงก์ที่เลือก จนกว่าคนจะแก้เอง · แก้แล้วเปลี่ยนลิงก์ = แทนเฉพาะ URL เดิม
+  // แคปชั่นร่างใหม่ตามลิงก์ที่เลือก จนกว่าคนจะแก้เอง · แก้แล้ว = แทนเฉพาะลิงก์สมัครในข้อความ (syncCaptionLink)
   const draft = React.useMemo(() => buildAutopostCaption(job, { contact, link: captionLink }), [job, contact, captionLink]);
-  const prevLink = React.useRef<string | null>(null);
   React.useEffect(() => {
     if (!captionEdited) setCaption(draft);
-    else if (prevLink.current && prevLink.current !== captionLink) setCaption((c) => c.split(prevLink.current as string).join(captionLink));
-    prevLink.current = captionLink;
+    // ข้อความที่เคยแก้แล้วบันทึกไว้มีลิงก์ของรอบก่อน (3 พ.ย. 2569 รูปจากหน้างาน: ขึ้น "ข้อความต้องมีลิงก์สมัครที่เลือก" กดส่งไม่ได้)
+    // ⇒ ลิงก์สมัครทุกอันในข้อความ = ลิงก์ที่เลือกอยู่เสมอ (รวมตัวแทนลิงก์)
+    else setCaption((c) => syncCaptionLink(c, captionLink));
   }, [draft, captionLink, captionEdited]);
 
   // ลิงก์ไม่ต้องมีก่อนแล้ว — กดส่งสร้างให้ (ใบที่ข้อมูลขาดยังกดส่งไม่ได้ · เจ้าของ 3 พ.ย. 2569 Choice)
@@ -654,6 +654,14 @@ export function AutopostBody({
 /** เครื่องหลักออฟไลน์ — เลือกบัญชีได้ แต่บอกให้เปลี่ยนเครื่อง */
 function offlineWarn(a: SoOptAccount): { kind: 'info'; lines: string[] } {
   return { kind: 'info', lines: [soWarningText(a.name, a.status, a.warning), 'เลือกเครื่องอื่นที่ออนไลน์ในช่องเครื่อง'] };
+}
+
+/** แทนลิงก์สมัคร (…/apply/p/<รหัส>) และตัวแทนลิงก์ทุกอันในข้อความด้วยลิงก์ที่เลือก */
+export function syncCaptionLink(caption: string, link: string): string {
+  return caption
+    .replace(/https?:\/\/[^\s]*\/apply\/p\/[A-Za-z0-9]+/g, link)
+    .split(AUTOPOST_LINK_PLACEHOLDER)
+    .join(link);
 }
 
 export function firstAccount(list: readonly SoOptAccount[]): SoOptAccount | null {

@@ -44,3 +44,13 @@ describe('ตัวแทนลิงก์', () => {
     expect(src).toContain('autopostMissing(job, { hasLink: true })');
   });
 });
+
+describe('ข้อความที่เคยแก้ไว้ ลิงก์ตามที่เลือกเสมอ (รูปหน้างาน 3 พ.ย. 2569 "ข้อความต้องมีลิงก์สมัครที่เลือก")', () => {
+  it('แทนลิงก์สมัครเก่าและตัวแทนลิงก์ด้วยลิงก์ที่เลือก · ข้อความอื่นไม่แตะ', async () => {
+    const { syncCaptionLink } = await import('@/components/jobs/AutopostDialog');
+    const now = 'https://jarvis.siamrajathanee.dev/apply/p/eymkhef';
+    expect(syncCaptionLink('รับสมัครคนขับรถ\nหรือสมัครงานได้ที่ : https://jarvis.siamrajathanee.dev/apply/p/64hfy6f', now)).toBe(`รับสมัครคนขับรถ\nหรือสมัครงานได้ที่ : ${now}`);
+    expect(syncCaptionLink(`สมัครงานได้ที่ : ${AUTOPOST_LINK_PLACEHOLDER}`, now)).toBe(`สมัครงานได้ที่ : ${now}`);
+    expect(syncCaptionLink('ดูรายละเอียด https://www.facebook.com/groups/123', now)).toBe('ดูรายละเอียด https://www.facebook.com/groups/123');
+  });
+});
