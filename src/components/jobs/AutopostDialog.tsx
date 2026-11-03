@@ -16,7 +16,10 @@ import type { JobRequest } from '@/types';
 import { useRecruiterContact } from '@/hooks/useRecruiterContact';
 import { jobBoardCardTitle } from '@/lib/unitRequestDisplay';
 import { publicJobTitle } from '@/lib/publicJobTitle';
-import { addPostingLink, fetchRecruitPostings, searchRecruitChannels } from '@/lib/recruitPostingsApi';
+import { addPostingLink, createRecruitPosting, fetchRecruitPostings, searchRecruitChannels } from '@/lib/recruitPostingsApi';
+import { jobPostingBody } from '@/lib/recruitPostingDraft';
+import { releaseJobsToPublic } from '@/lib/jobPublicReleaseApi';
+import { AUTOPOST_LINK_PLACEHOLDER } from '@/lib/postText';
 import { saveUnitFieldOverridesPatch } from '@/lib/siamrajUnitRequestsApi';
 import { applyLinkPath, postingLinkOwner, recruitChannelLabel, type RecruitPosting, type RecruitPostingLink } from '@/lib/recruitPostings';
 import {
@@ -195,6 +198,11 @@ export function AutopostBody({
   const openPosting = postings?.find((p) => p.status === 'open') ?? null;
   const links = openPosting?.links ?? [];
   const linkUrl = linkCode ? `${window.location.origin}${applyLinkPath(linkCode)}` : null;
+  /**
+   * ใบที่ยังไม่ประกาศ (เจ้าของ 3 พ.ย. 2569 Choice "ใช่ กด Autopost ทีเดียวจบ") — ข้อความใช้ตัวแทนลิงก์ไปก่อน
+   * กดส่ง = ประกาศ + สร้างประกาศ/ลิงก์ให้ แล้วแทนตัวแทนด้วยลิงก์จริง (เปิดป๊อปดูเฉย ๆ ไม่เขียนฐาน)
+   */
+  const captionLink = linkUrl ?? AUTOPOST_LINK_PLACEHOLDER;
   const account = opts?.accounts.find((a) => a.id === accountId) ?? null;
   const accountGroups = React.useMemo(
     // กลุ่มที่โพสต์ได้บ่อยใน 30 วันขึ้นก่อน (เอกสาร: ใช้ posted เป็นหลัก)
@@ -213,15 +221,16 @@ export function AutopostBody({
   const openOrder = state?.latest.find((r) => r.request_type === 'content' && soStatusView(r).open) ?? null;
 
   // แคปชั่นร่างใหม่ตามลิงก์ที่เลือก จนกว่าคนจะแก้เอง · แก้แล้วเปลี่ยนลิงก์ = แทนเฉพาะ URL เดิม
-  const draft = React.useMemo(() => buildAutopostCaption(job, { contact, link: linkUrl }), [job, contact, linkUrl]);
+  const draft = React.useMemo(() => buildAutopostCaption(job, { contact, link: captionLink }), [job, contact, captionLink]);
   const prevLink = React.useRef<string | null>(null);
   React.useEffect(() => {
     if (!captionEdited) setCaption(draft);
-    else if (prevLink.current && linkUrl && prevLink.current !== linkUrl) setCaption((c) => c.split(prevLink.current as string).join(linkUrl));
-    prevLink.current = linkUrl;
-  }, [draft, linkUrl, captionEdited]);
+    else if (prevLink.current && prevLink.current !== captionLink) setCaption((c) => c.split(prevLink.current as string).join(captionLink));
+    prevLink.current = captionLink;
+  }, [draft, captionLink, captionEdited]);
 
-  const missing = autopostMissing(job, { hasLink: Boolean(linkUrl) });
+  // ลิงก์ไม่ต้องมีก่อนแล้ว — กดส่งสร้างให้ (ใบที่ข้อมูลขาดยังกดส่งไม่ได้ · เจ้าของ 3 พ.ย. 2569 Choice)
+  const missing = autopostMissing(job, { hasLink: true });
   const leaks = captionLeaks(caption);
   const problems = [
     ...missing.map((m) => `ขาด${m}`),
@@ -229,7 +238,7 @@ export function AutopostBody({
     ...(account && !soAccountSelectable(account.status) ? [soWarningText(account.name, account.status, account.warning)] : []),
     ...(picked.length === 0 ? ['เลือกกลุ่มอย่างน้อย 1 กลุ่ม'] : []),
     ...(mode !== 'image_only' && !caption.trim() ? ['ใส่ข้อความประกาศ'] : []),
-    ...(mode !== 'image_only' && linkUrl && !caption.includes(linkUrl) ? ['ข้อความต้องมีลิงก์สมัครที่เลือก'] : []),
+    ...(mode !== 'image_only' && !caption.includes(captionLink) ? ['ข้อความต้องมีลิงก์สมัครที่เลือก'] : []),
     ...leaks.map((l) => `ข้อความมี${l} — ลบออกก่อน`),
     ...(caption.length > AUTOPOST_CAPTION_MAX ? [`ข้อความยาวเกิน ${NUM.format(AUTOPOST_CAPTION_MAX)} ตัวอักษร`] : []),
   ];
@@ -255,8 +264,8 @@ export function AutopostBody({
    * ลิงก์ของแต่ละกลุ่มที่ติ๊ก (เจ้าของ 2 พ.ย. 2569 "อยากรู้ว่ากลุ่มไหนได้คนมาเยอะ" · Choice 1 ลิงก์ = 1 กลุ่ม)
    * ชื่อลิงก์ชุดเดียวกับ Gen link ("Facebook · Facebook Group · <ชื่อกลุ่ม>") — มีแล้วใช้ตัวเดิม ไม่มีค่อยสร้าง (สั่งซ้ำไม่งอกลิงก์)
    */
-  const ensureGroupLinks = async (): Promise<SoGroupLink[]> => {
-    if (!openPosting || !opts) throw new Error('ใบนี้ยังไม่ได้ประกาศ');
+  const ensureGroupLinks = async (openPosting: RecruitPosting): Promise<SoGroupLink[]> => {
+    if (!opts) throw new Error('โหลดข้อมูล So Scraping ไม่ได้');
     const matches = await searchRecruitChannels('Facebook Group', { limit: 20 });
     const fbGroup = matches.find((c) => isFacebookGroupChannel(c.name) && /^facebook$/i.test((c.parentName ?? '').trim())) ?? null;
     const channelLabel = fbGroup ? recruitChannelLabel(fbGroup) : 'Facebook · Facebook Group';
@@ -297,7 +306,7 @@ export function AutopostBody({
   };
 
   const send = async (confirmed = false) => {
-    if (busy || problems.length > 0 || !account || !linkUrl) return;
+    if (busy || problems.length > 0 || !account) return;
     const confirmLines = soPostConfirmWarnings(account, worker);
     if (!confirmed && confirmLines.length > 0) {
       setWarn({ kind: 'confirm', lines: confirmLines });
@@ -307,21 +316,35 @@ export function AutopostBody({
     setBusy('send');
     setError(null);
     try {
-      const groupLinks = await ensureGroupLinks();
-      const link = links.find((l) => l.code === linkCode);
+      // ใบที่ยังไม่ประกาศ = ประกาศ (ขึ้นหน้าสมัคร) + สร้างประกาศลิงก์กลาง ด้วยค่าตั้งต้นชุดเดียวกับป๊อป Gen link
+      let posting = openPosting;
+      let code = linkCode;
+      if (!posting) {
+        posting = await createRecruitPosting(jobPostingBody(job));
+        await releaseJobsToPublic([job.id]);
+        const created = posting;
+        setPostings((prev) => [...(prev ?? []), created]);
+        code = posting.links.find((l) => l.code)?.code ?? '';
+        if (!code) throw new Error('สร้างลิงก์สมัครไม่สำเร็จ');
+        setLinkCode(code);
+      }
+      const applyLink = `${window.location.origin}${applyLinkPath(code)}`;
+      const finalCaption = caption.split(AUTOPOST_LINK_PLACEHOLDER).join(applyLink);
+      const groupLinks = await ensureGroupLinks(posting);
+      const link = posting.links.find((l) => l.code === code);
       const item = await createJobPostingRequest({
         jobId: job.id,
         requestNo: job.request_no,
         reason: SO_POST_REASON,
         requestType: 'content',
         jobSnapshot: {
-          ...soPostSnapshot({ ...composeJobSnapshot(job), position: publicJobTitle(job) }, { mode, caption, groupIds: picked }),
+          ...soPostSnapshot({ ...composeJobSnapshot(job), position: publicJobTitle(job) }, { mode, caption: finalCaption, groupIds: picked }),
           account_id: account.id,
           account_name: account.name,
           // ไม่เปลี่ยนจากเครื่องหลัก = ไม่ส่ง ให้ So Scraping ใช้เครื่องหลักของบัญชี
           ...(workerName && workerName !== account.worker ? { worker: workerName } : {}),
-          apply_link: linkUrl,
-          link_code: linkCode,
+          apply_link: applyLink,
+          link_code: code,
           channel_label: link?.channelLabel ?? null,
           // ลิงก์กลุ่มละอัน — So Scraping แทน apply_link ใน caption ด้วยลิงก์ของกลุ่มตอนโพสต์ (เจ้าของ 2 พ.ย. 2569 "รอทำพร้อมกันทีเดียว")
           group_links: groupLinks,
@@ -450,7 +473,9 @@ export function AutopostBody({
                 </Button>
               </div>
             ) : (
-              <p className={cn('text-sm', TONE.warn.value)}>ใบนี้ยังไม่ได้ประกาศ — ประกาศก่อนถึงมีลิงก์สมัคร</p>
+              <p className={cn('text-sm', TONE.warn.value)} data-testid="autopost-auto-release">
+                ใบนี้ยังไม่ได้ประกาศ — กดส่งแล้วระบบประกาศและสร้างลิงก์ให้
+              </p>
             )}
           </section>
 

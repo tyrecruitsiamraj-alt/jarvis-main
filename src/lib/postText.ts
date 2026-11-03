@@ -342,12 +342,18 @@ export const PUBLIC_POST_TEXT_MAX = 2000;
  * ข้อความประกาศที่แก้ใน Autopost → โชว์บนหน้าสมัคร (เจ้าของ 28 ต.ค. 2569 Choice "ข้อความที่แก้ไปโชว์บนหน้าสมัครด้วย")
  * ตัดบรรทัดที่มีลิงก์ออก (แคปชั่นต้องมีลิงก์สมัคร แต่หน้าสมัครไม่ต้องลิงก์หาตัวเอง) · ว่าง = null
  */
+/**
+ * ตัวแทนลิงก์ในข้อความ Autopost ของใบที่ยังไม่ประกาศ (3 พ.ย. 2569 "กด Autopost ทีเดียวจบ") — ตอนกดส่งระบบสร้างประกาศ
+ * แล้วแทนด้วยลิงก์จริง · บรรทัดที่มีตัวแทนนี้ไม่ขึ้นหน้าสมัคร (แบบเดียวกับบรรทัดลิงก์)
+ */
+export const AUTOPOST_LINK_PLACEHOLDER = '(ลิงก์สมัคร ระบบใส่ให้ตอนส่ง)';
+
 export function publicPostText(raw: unknown): string | null {
   if (typeof raw !== 'string') return null;
   const lines = raw
     .replace(/\r\n?/g, '\n')
     .split('\n')
-    .filter((l) => !/https?:\/\//i.test(l))
+    .filter((l) => !/https?:\/\//i.test(l) && !l.includes(AUTOPOST_LINK_PLACEHOLDER))
     .map((l) => l.replace(/\s+$/u, ''));
   const text = lines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
   return text ? text.slice(0, PUBLIC_POST_TEXT_MAX) : null;

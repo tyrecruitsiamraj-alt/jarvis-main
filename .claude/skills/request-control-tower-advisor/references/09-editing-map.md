@@ -14189,3 +14189,8 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 - **3 พ.ย. 2569 ป๊อป Autopost บอกบัญชีถูกพัก/ยังไม่ได้ล็อกอินก่อนสั่ง** — So Scraping แจ้ง 11:00 (10 ใช้ได้ · 3 ถูกพัก · 21 ไม่มี session บน RM009)
   · `soAccountChoice` / `soAccountHasSession` ใน `src/lib/soScraping.ts`: ถูกพัก = "ถูกพัก ใช้ได้ 4 พ.ย. 10:26" (`paused_until` เวลาไทย) · ไม่มี session บนเครื่องไหน (`session_workers` ว่าง + ไม่อยู่ใน `fb_account_ids` ของเครื่องใด) = "ยังไม่ได้ล็อกอิน Facebook" · ทั้งสองแบบเลือกไม่ได้ · บัญชีตั้งต้นข้ามบัญชีไม่มี session
   · เทสต์ `tests/api/spareFilterSoAccounts2569-11-03.test.ts`
+- **3 พ.ย. 2569 Autopost กดทีเดียวจบ (ใบที่ยังไม่ประกาศ)** — เจ้าของ *"ถ้ากด Auto post … เลือกบัญชี เลือกกลุ่ม เลือก worker แล้วก็ไปโพสต์เลย"* → Choice "ใช่ กด Autopost ทีเดียวจบ" · ข้อมูลขาด = ยังกดส่งไม่ได้ (Choice)
+  · `AutopostDialog.tsx`: ไม่มีประกาศ = ข้อความใช้ตัวแทน `AUTOPOST_LINK_PLACEHOLDER` (postText.ts) · กดส่ง → `createRecruitPosting(jobPostingBody(job))` + `releaseJobsToPublic` → แทนตัวแทนด้วยลิงก์จริง → ลิงก์กลุ่มละอัน → ใบสั่ง So Scraping
+  · ค่าตั้งต้นประกาศอยู่ `src/lib/recruitPostingDraft.ts` ที่เดียว (ป๊อป Gen link ใช้ด้วย) · เปิดป๊อปดูเฉย ๆ ไม่เขียนฐาน
+  · บรรทัดที่มีตัวแทนลิงก์ไม่ขึ้นหน้าสมัคร (`publicPostText`) · ผู้รับผิดชอบลิงก์ = คนกด (created_by_name เดิม)
+  · เทสต์ `tests/api/autopostOneClick2569-11-03.test.ts`

@@ -5,7 +5,7 @@ import SearchableSelect from '@/components/shared/SearchableSelect';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import type { JobRequest } from '@/types';
-import { jobBoardCardTitle, publicJobPositionLabel } from '@/lib/unitRequestDisplay';
+import { jobBoardCardTitle } from '@/lib/unitRequestDisplay';
 import { buildOnlineNameOptions } from '@/lib/jobStaffNames';
 import { refreshJobStaffFromApi } from '@/lib/jobStaffRemote';
 import {
@@ -29,8 +29,8 @@ import { cn } from '@/lib/utils';
 import { TONE } from '@/lib/designTokens';
 import PublicPostingPreview from '@/components/jobs/PublicPostingPreview';
 import { THAI_PROVINCE_NAMES_SORTED } from '@/lib/thaiProvinces';
-import { inferProvinceFromAddress } from '@/lib/parseThaiJobAddress';
 import { scrubPublicLocation } from '@/lib/publicLocationText';
+import { jobPostingDraft } from '@/lib/recruitPostingDraft';
 import { RM_FORM_TYPES, RM_SPECIFIC_TYPES } from '@/lib/recruitRmMasters';
 import { createShortLink } from '@/lib/shortLinksApi';
 import SoGroupPicker from '@/components/jobs/SoGroupPicker';
@@ -172,13 +172,9 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
      *
      * ⚠️ เปลี่ยนแค่**ค่าตั้งต้นของประกาศใหม่** · ประกาศเก่าที่สร้างไปแล้วไม่ถูกแตะ
      */
-    setTitle(
-      job
-        ? [publicJobPositionLabel(job), jobBoardCardTitle(job)].filter(Boolean).join(' · ')
-        : standalone
-          ? standalone.kindLabel
-          : '',
-    );
+    // ค่าตั้งต้นจากใบขออยู่ `jobPostingDraft` ที่เดียว (Autopost กดทีเดียวจบใช้ชุดเดียวกัน · 3 พ.ย. 2569)
+    const draft = job ? jobPostingDraft(job) : null;
+    setTitle(draft ? draft.title : standalone ? standalone.kindLabel : '');
     setDetail('');
     /**
      * 🔴 **ตัดชื่อ/เบอร์คนออกก่อนเติม** (เจ้าของสั่ง 22 ก.ย. 2569)
@@ -191,15 +187,15 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
      * ตัดแค่ตอน**เติมค่าตั้งต้น** — คนกรอกพิมพ์กลับเข้าไปเองได้ถ้าตั้งใจจริง
      * ⚠️ ตัดแล้วไม่เหลืออะไร = ปล่อยว่าง ให้คนกรอกเอง ดีกว่าโยนเบอร์ขึ้นหน้าสาธารณะ
      */
-    setLocationText(scrubPublicLocation(job?.location_address));
+    setLocationText(draft ? draft.locationText : scrubPublicLocation(undefined));
     setSalaryText('');
-    setContactName(job?.contact_name ?? '');
-    setContactPhone(job?.contact_phone ?? '');
+    setContactName(draft?.contactName ?? '');
+    setContactPhone(draft?.contactPhone ?? '');
     // ตำแหน่ง/จังหวัด: ใบขอมีอยู่แล้ว ไม่ต้องให้พิมพ์ซ้ำ (staff_title_name = ตำแหน่งที่ขอ)
     // ประกาศลอยไม่มีใบขอ ใช้ชื่อกล่องเป็นตำแหน่งตั้งต้นแล้วแก้ได้
-    setPositionName(job?.staff_title_name ?? standalone?.kindLabel ?? '');
+    setPositionName(draft ? draft.positionName : (standalone?.kindLabel ?? ''));
     // จังหวัดไม่มีเป็นฟิลด์เดี่ยวในใบขอ — ถอดจากที่อยู่ด้วยตัวถอดเดิมที่ตัวกรองบอร์ดใช้
-    setProvince(job ? (inferProvinceFromAddress(job.location_address || '') ?? '') : '');
+    setProvince(draft?.province ?? '');
     setResponsible('');
     setFormType('rm');
     setShortLinks({});

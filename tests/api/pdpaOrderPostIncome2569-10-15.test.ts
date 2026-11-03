@@ -56,7 +56,7 @@ describe('สั่งโพสต์ — ผ่านศูนย์งาน a
   it('🔴 คำขอโพสต์มีข้อความ/แบบโพสต์/กลุ่ม · ยังรอ/กำลังทำ = กดซ้ำไม่ได้ · ขอ Scrap อยู่ที่นี่ที่เดียว', () => {
     // 20 ต.ค. 2569 (Choice "บนการ์ดกล่องงาน"): สั่งโพสต์ย้ายไปป๊อป Autopost · ป๊อปประกาศเหลือสถานะ + ขอ Scrap
     const dlg = read('src/components/jobs/AutopostDialog.tsx');
-    expect(dlg).toContain("soPostSnapshot({ ...composeJobSnapshot(job), position: publicJobTitle(job) }, { mode, caption, groupIds: picked })");
+    expect(dlg).toContain("soPostSnapshot({ ...composeJobSnapshot(job), position: publicJobTitle(job) }, { mode, caption: finalCaption, groupIds: picked })");
     const btn = read('src/components/jobs/OrderPostButton.tsx');
     expect(btn).not.toContain('soPostSnapshot(');
     expect(btn).toContain('...soScrapSnapshot(job, title),');
