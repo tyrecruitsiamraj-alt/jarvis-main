@@ -53,4 +53,13 @@ describe('ข้อความที่เคยแก้ไว้ ลิงก
     expect(syncCaptionLink(`สมัครงานได้ที่ : ${AUTOPOST_LINK_PLACEHOLDER}`, now)).toBe(`สมัครงานได้ที่ : ${now}`);
     expect(syncCaptionLink('ดูรายละเอียด https://www.facebook.com/groups/123', now)).toBe('ดูรายละเอียด https://www.facebook.com/groups/123');
   });
+
+  it('ไม่มีช่องเลือกลิงก์ (เจ้าของ 3 พ.ย. 2569 "ฉันก็เลือกกลุ่มแล้วหนิ") · ลิงก์กลางของใบสั่ง = ลิงก์ของกลุ่มแรก', () => {
+    const src = readFileSync('src/components/jobs/AutopostDialog.tsx', 'utf8');
+    expect(src).not.toContain('testId="autopost-link"');
+    expect(src).not.toContain('สร้างลิงก์ใหม่ Facebook');
+    expect(src).toContain('const captionLink = AUTOPOST_LINK_PLACEHOLDER;');
+    expect(src).toContain('const first = groupLinks[0];');
+    expect(src).toContain('const applyLink = first.apply_link;');
+  });
 });

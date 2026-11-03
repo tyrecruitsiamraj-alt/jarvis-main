@@ -1,5 +1,5 @@
 import React from 'react';
-import { ChevronDown, Link2, LoaderCircle, Send } from 'lucide-react';
+import { ChevronDown, LoaderCircle, Send } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -21,7 +21,7 @@ import { jobPostingBody } from '@/lib/recruitPostingDraft';
 import { releaseJobsToPublic } from '@/lib/jobPublicReleaseApi';
 import { AUTOPOST_LINK_PLACEHOLDER } from '@/lib/postText';
 import { saveUnitFieldOverridesPatch } from '@/lib/siamrajUnitRequestsApi';
-import { applyLinkPath, postingLinkOwner, recruitChannelLabel, type RecruitPosting, type RecruitPostingLink } from '@/lib/recruitPostings';
+import { applyLinkPath, recruitChannelLabel, type RecruitPosting, type RecruitPostingLink } from '@/lib/recruitPostings';
 import {
   composeJobSnapshot,
   createJobPostingRequest,
@@ -81,7 +81,6 @@ import { AUTOPOST_CAPTION_MAX, autopostMissing, buildAutopostCaption, captionLea
  */
 const NUM = new Intl.NumberFormat('th-TH');
 const WHEN = new Intl.DateTimeFormat('th-TH', { timeZone: 'Asia/Bangkok', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
-const NEW_LINK_LABEL = 'Facebook Group';
 
 export default function AutopostDialog({
   job,
@@ -130,7 +129,6 @@ export function AutopostBody({
   const [loadError, setLoadError] = React.useState<string | null>(null);
 
   const [mode, setMode] = React.useState<SoPostMode>('caption_only');
-  const [linkCode, setLinkCode] = React.useState('');
   const [accountId, setAccountId] = React.useState('');
   const [picked, setPicked] = React.useState<string[]>([]);
   /** กล่องเตือนในป๊อป — block = บัญชีที่เลือกไม่ได้ · info = เครื่องหลักออฟไลน์ · confirm = ถามก่อนส่ง */
@@ -164,7 +162,7 @@ export function AutopostBody({
     }, 900);
     return () => window.clearTimeout(t);
   }, [captionDirty, job.request_no]);
-  const [busy, setBusy] = React.useState<'send' | 'link' | null>(null);
+  const [busy, setBusy] = React.useState<'send' | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [sent, setSent] = React.useState<JobPostingRequest | null>(null);
 
@@ -177,8 +175,6 @@ export function AutopostBody({
         setOpts(o);
         setState(s);
         const open = p.find((x) => x.status === 'open');
-        const fb = open?.links.find((l) => /facebook/i.test(l.channelLabel ?? '')) ?? open?.links[0];
-        if (fb) setLinkCode(fb.code);
         // บัญชีตั้งต้น = บัญชีธุรกิจเดียวกับใบขอ (เจ้าของ 2 พ.ย. 2569 "ตรงนี้ก็ต้องแยก Bu ด้วย") · ธุรกิจนี้ไม่มีบัญชี = ไม่เลือกให้
         const acc = firstAccount(soAccountsForJob(o.accounts, jobBu).filter((a) => soAccountHasSession(a, o.workers)));
         if (acc) {
@@ -195,13 +191,15 @@ export function AutopostBody({
   }, [job.id, jobBu]);
 
   const openPosting = postings?.find((p) => p.status === 'open') ?? null;
-  const links = openPosting?.links ?? [];
-  const linkUrl = linkCode ? `${window.location.origin}${applyLinkPath(linkCode)}` : null;
   /**
    * ใบที่ยังไม่ประกาศ (เจ้าของ 3 พ.ย. 2569 Choice "ใช่ กด Autopost ทีเดียวจบ") — ข้อความใช้ตัวแทนลิงก์ไปก่อน
    * กดส่ง = ประกาศ + สร้างประกาศ/ลิงก์ให้ แล้วแทนตัวแทนด้วยลิงก์จริง (เปิดป๊อปดูเฉย ๆ ไม่เขียนฐาน)
    */
-  const captionLink = linkUrl ?? AUTOPOST_LINK_PLACEHOLDER;
+  /**
+   * ไม่มีช่องเลือกลิงก์แล้ว (เจ้าของ 3 พ.ย. 2569 "ทำไมยังต้องเลือก … ฉันก็เลือกกลุ่มแล้วหนิ") — ข้อความใช้ตัวแทนลิงก์เสมอ
+   * กดส่ง = แต่ละกลุ่มได้ลิงก์ของกลุ่ม (`ensureGroupLinks`) · apply_link กลางของใบสั่ง = ลิงก์ของกลุ่มแรก
+   */
+  const captionLink = AUTOPOST_LINK_PLACEHOLDER;
   const account = opts?.accounts.find((a) => a.id === accountId) ?? null;
   const accountGroups = React.useMemo(
     // กลุ่มที่โพสต์ได้บ่อยใน 30 วันขึ้นก่อน (เอกสาร: ใช้ posted เป็นหลัก)
@@ -237,27 +235,10 @@ export function AutopostBody({
     ...(account && !soAccountSelectable(account.status) ? [soWarningText(account.name, account.status, account.warning)] : []),
     ...(picked.length === 0 ? ['เลือกกลุ่มอย่างน้อย 1 กลุ่ม'] : []),
     ...(mode !== 'image_only' && !caption.trim() ? ['ใส่ข้อความประกาศ'] : []),
-    ...(mode !== 'image_only' && !caption.includes(captionLink) ? ['ข้อความต้องมีลิงก์สมัครที่เลือก'] : []),
+    ...(mode !== 'image_only' && !caption.includes(captionLink) ? [`ข้อความต้องมี ${AUTOPOST_LINK_PLACEHOLDER}`] : []),
     ...leaks.map((l) => `ข้อความมี${l} — ลบออกก่อน`),
     ...(caption.length > AUTOPOST_CAPTION_MAX ? [`ข้อความยาวเกิน ${NUM.format(AUTOPOST_CAPTION_MAX)} ตัวอักษร`] : []),
   ];
-
-  const createLink = async () => {
-    if (!openPosting || busy) return;
-    setBusy('link');
-    setError(null);
-    try {
-      const names = accountGroups.filter((g) => picked.includes(g.id)).map((g) => g.name);
-      const label = names.length > 0 ? `${NEW_LINK_LABEL} · ${names.join(', ')}`.slice(0, 120) : NEW_LINK_LABEL;
-      const link = await addPostingLink(openPosting.id, { channelLabel: label });
-      setPostings((prev) => (prev ?? []).map((p) => (p.id === openPosting.id ? { ...p, links: [...p.links, link] } : p)));
-      setLinkCode(link.code);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'สร้างลิงก์ไม่สำเร็จ');
-    } finally {
-      setBusy(null);
-    }
-  };
 
   /**
    * ลิงก์ของแต่ละกลุ่มที่ติ๊ก (เจ้าของ 2 พ.ย. 2569 "อยากรู้ว่ากลุ่มไหนได้คนมาเยอะ" · Choice 1 ลิงก์ = 1 กลุ่ม)
@@ -313,19 +294,18 @@ export function AutopostBody({
     try {
       // ใบที่ยังไม่ประกาศ = ประกาศ (ขึ้นหน้าสมัคร) + สร้างประกาศลิงก์กลาง ด้วยค่าตั้งต้นชุดเดียวกับป๊อป Gen link
       let posting = openPosting;
-      let code = linkCode;
       if (!posting) {
         posting = await createRecruitPosting(jobPostingBody(job));
         await releaseJobsToPublic([job.id]);
         const created = posting;
         setPostings((prev) => [...(prev ?? []), created]);
-        code = posting.links.find((l) => l.code)?.code ?? '';
-        if (!code) throw new Error('สร้างลิงก์สมัครไม่สำเร็จ');
-        setLinkCode(code);
       }
-      const applyLink = `${window.location.origin}${applyLinkPath(code)}`;
-      const finalCaption = caption.split(AUTOPOST_LINK_PLACEHOLDER).join(applyLink);
       const groupLinks = await ensureGroupLinks(posting);
+      const first = groupLinks[0];
+      if (!first) throw new Error('สร้างลิงก์สมัครไม่สำเร็จ');
+      const applyLink = first.apply_link;
+      const code = first.link_code;
+      const finalCaption = caption.split(AUTOPOST_LINK_PLACEHOLDER).join(applyLink);
       const link = posting.links.find((l) => l.code === code);
       const item = await createJobPostingRequest({
         jobId: job.id,
@@ -442,37 +422,11 @@ export function AutopostBody({
             </RadioGroup>
           </section>
 
-          <section className="space-y-2">
-            <p className="text-sm font-medium text-foreground">ลิงก์สมัคร</p>
-            {openPosting ? (
-              <div className="flex flex-wrap items-center gap-2">
-                <FieldSelect
-                  value={linkCode}
-                  onChange={setLinkCode}
-                  placeholder="เลือกลิงก์"
-                  ariaLabel="ลิงก์สมัคร"
-                  className="min-w-0 flex-1"
-                  testId="autopost-link"
-                  options={links.map((l) => {
-                    // ผู้รับผิดชอบของลิงก์ = คนกดสร้าง (เจ้าของ 28 ต.ค. 2569 "บอกเพิ่มหน่อยว่าลิงก์นี้ใครรับผิดชอบ")
-                    const owner = postingLinkOwner(l, openPosting);
-                    return {
-                      value: l.code,
-                      label: `${l.channelLabel || 'ลิงก์ประกาศ'} · ${l.code}${owner ? ` · ${owner}` : ''}${l.applicationCount ? ` · สมัคร ${NUM.format(l.applicationCount)}` : ''}`,
-                    };
-                  })}
-                />
-                <Button type="button" size="sm" variant="outline" onClick={() => void createLink()} disabled={busy !== null}>
-                  {busy === 'link' ? <LoaderCircle className="animate-spin" aria-hidden /> : <Link2 aria-hidden />}
-                  สร้างลิงก์ใหม่ Facebook
-                </Button>
-              </div>
-            ) : (
-              <p className={cn('text-sm', TONE.warn.value)} data-testid="autopost-auto-release">
-                ใบนี้ยังไม่ได้ประกาศ — กดส่งแล้วระบบประกาศและสร้างลิงก์ให้
-              </p>
-            )}
-          </section>
+          {openPosting ? null : (
+            <p className={cn('text-sm', TONE.warn.value)} data-testid="autopost-auto-release">
+              ใบนี้ยังไม่ได้ประกาศ — กดส่งแล้วระบบประกาศและสร้างลิงก์ให้
+            </p>
+          )}
 
           <section className="space-y-2">
             <p className="text-sm font-medium text-foreground">บัญชี Facebook</p>
