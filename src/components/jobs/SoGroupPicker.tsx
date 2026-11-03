@@ -6,7 +6,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { TONE } from '@/lib/designTokens';
-import { soBuEmptyText, soGroupSections, type SoGroup, type SoGroupSection } from '@/lib/soScraping';
+import { soGroupSections, type SoGroup, type SoGroupSection } from '@/lib/soScraping';
 
 /**
  * ═══ เลือกกลุ่ม Facebook ตอน Gen link (เจ้าของ 2 พ.ย. 2569) ═══
@@ -32,7 +32,6 @@ export default function SoGroupPicker({
   const toggle = (ids: string[], on: boolean) => onChange((prev) => (on ? [...new Set([...prev, ...ids])] : prev.filter((x) => !ids.includes(x))));
   return (
     <div className="space-y-2" data-testid="genlink-so-groups">
-      {jobBu && !sections.some((x) => x.forJob) ? <p className={cn('text-xs', TONE.warn.value)}>{soBuEmptyText(jobBu)}</p> : null}
       {sections.map((sec) => (
         <Section key={sec.bu ?? '__none__'} section={sec} value={value} onToggle={toggle} />
       ))}

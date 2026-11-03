@@ -131,7 +131,6 @@ const AddChannelLinks: React.FC<{
       <MultiChannelPicker value={picked} onChange={setPicked} reloadKey={posting.id} />
       {fbGroupChannels.length > 0 ? (
         <div className="space-y-1.5" data-testid="add-links-groups">
-          <p className="text-xs font-medium text-foreground">กลุ่ม Facebook · กลุ่มละ 1 ลิงก์ · ไม่เลือกก็ได้</p>
           <SoGroupPicker groups={soGroups} jobBu={jobBu} value={groupPick} onChange={setGroupPick} />
         </div>
       ) : null}

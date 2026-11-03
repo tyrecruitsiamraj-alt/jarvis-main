@@ -344,7 +344,6 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
                     <MultiChannelPicker value={picked} onChange={setPicked} reloadKey={open} />
                     {fbGroupChannels.length > 0 ? (
                       <div className="space-y-1.5 pt-1">
-                        <p className="text-xs font-medium text-foreground">กลุ่ม Facebook · กลุ่มละ 1 ลิงก์ · ไม่เลือกก็ได้</p>
                         <SoGroupPicker
                           groups={soGroups}
                           jobBu={job ? jobBuOf(job) : normalizeTrendBu(standalone?.departmentCode)}
