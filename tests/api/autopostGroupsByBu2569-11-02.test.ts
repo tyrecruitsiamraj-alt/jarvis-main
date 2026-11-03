@@ -114,8 +114,8 @@ describe('กลุ่ม Facebook ตามธุรกิจของใบข
     // ธุรกิจของบัญชี: อ่านแค่ id + department จากตาราง users (มีรหัสผ่าน/token)
     const grp = readFileSync('api/_lib/soScrapingGroups.ts', 'utf8');
     expect(grp).toContain('select u.id::text as id, u.department::text as department from ${SCHEMA}.users u`');
-    // 3 พ.ย. 2569: ข้ามบัญชีที่ยังไม่ได้ล็อกอิน Facebook บนเครื่องไหน (So Scraping แจ้ง)
-    expect(dialog).toContain('firstAccount(soAccountsForJob(o.accounts, jobBu).filter((a) => soAccountHasSession(a, o.workers)))');
+    // 3 พ.ย. 2569 สเปค So Scraping 6.1: บัญชีตั้งต้น = บัญชีแรกที่ So Scraping แนะนำ (ธุรกิจของใบขอก่อน)
+    expect(dialog).toContain('const acc = soDefaultAccount(o.accounts, jobBu);');
     expect(dialog).toContain('data-testid="autopost-bu-no-account"');
     const groups = readFileSync('api/_lib/soScrapingGroups.ts', 'utf8');
     expect(groups).not.toContain('unknownSoGroupIds');
@@ -228,6 +228,6 @@ describe('กลุ่ม Facebook ตามธุรกิจของใบข
     expect(dialog).toContain('target="_blank" rel="noopener noreferrer" data-testid="autopost-group-open"');
     const opts = readFileSync('api/_lib/soScrapingOptions.ts', 'utf8');
     expect(opts).toContain('groupStatus: [],');
-    expect(opts).toContain('blocked: null })),');
+    expect(opts).toContain('blocked: null, repostWait: null })),');
   });
 });

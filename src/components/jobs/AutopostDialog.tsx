@@ -54,7 +54,14 @@ import {
   soAccountsByBu,
   soAccountsForJob,
   soAccountChoice,
-  soAccountHasSession,
+  soAccountStatusText,
+  soAddWithinCap,
+  soDefaultAccount,
+  soDefaultWorker,
+  soGroupCap,
+  soNoAccountReadyText,
+  soRepostWaitText,
+  soWorkerOfflineText,
   type SoGroupSection,
   soPostSnapshot,
   soStatusView,
@@ -168,19 +175,19 @@ export function AutopostBody({
 
   React.useEffect(() => {
     let alive = true;
-    Promise.all([fetchRecruitPostings({ jobId: job.id }), fetchSoOptions(), fetchJobPostingState(job.id)])
+    Promise.all([fetchRecruitPostings({ jobId: job.id }), fetchSoOptions(job.request_no), fetchJobPostingState(job.id)])
       .then(([p, o, s]) => {
         if (!alive) return;
         setPostings(p);
         setOpts(o);
         setState(s);
         const open = p.find((x) => x.status === 'open');
-        // บัญชีตั้งต้น = บัญชีธุรกิจเดียวกับใบขอ (เจ้าของ 2 พ.ย. 2569 "ตรงนี้ก็ต้องแยก Bu ด้วย") · ธุรกิจนี้ไม่มีบัญชี = ไม่เลือกให้
-        const acc = firstAccount(soAccountsForJob(o.accounts, jobBu).filter((a) => soAccountHasSession(a, o.workers)));
+        // บัญชีตั้งต้น = บัญชีแรกที่ So Scraping แนะนำ (สเปค 6.1 · 3 พ.ย. 2569) ธุรกิจของใบขอก่อน · ไม่มี = ช่องว่าง + บอกเวลาที่ใช้ได้
+        const acc = soDefaultAccount(o.accounts, jobBu);
         if (acc) {
           setAccountId(acc.id);
-          setWorkerName(acc.worker ?? '');
-          if (acc.status === 'worker_offline') setWarn(offlineWarn(acc));
+          // เครื่องตั้งต้น = เครื่องที่ So Scraping แนะนำ (ออนไลน์ คิวเบาสุด · สเปค 6.3) · ไม่มี = เครื่องหลักของบัญชี
+          setWorkerName(soDefaultWorker(soWorkersFor(o, 'autopost'), 'post')?.name ?? acc.worker ?? '');
           setPicked(defaultSoGroupPick(soGroupsOfAccount(o, acc), jobBu, acc));
         }
       })
@@ -188,7 +195,7 @@ export function AutopostBody({
     return () => {
       alive = false;
     };
-  }, [job.id, jobBu]);
+  }, [job.id, job.request_no, jobBu]);
 
   const openPosting = postings?.find((p) => p.status === 'open') ?? null;
   /**
@@ -215,6 +222,8 @@ export function AutopostBody({
   const postWorkers = opts ? soWorkersFor(opts, 'autopost') : [];
   const worker = postWorkers.find((w) => w.name === workerName) ?? null;
   const recent = new Set(state?.recentGroups ?? []);
+  /** ติ๊กกลุ่มได้ไม่เกินโพสต์ที่บัญชีเหลือวันนี้ (สเปค 6.2) — เกินแล้ว worker หยุดเองที่เพดาน กลุ่มที่เหลือไม่ได้โพสต์ */
+  const cap = soGroupCap(account);
   const openOrder = state?.latest.find((r) => r.request_type === 'content' && soStatusView(r).open) ?? null;
 
   // แคปชั่นร่างใหม่ตามลิงก์ที่เลือก จนกว่าคนจะแก้เอง · แก้แล้ว = แทนเฉพาะลิงก์สมัครในข้อความ (syncCaptionLink)
@@ -234,6 +243,7 @@ export function AutopostBody({
     ...(account ? [] : ['เลือกบัญชี Facebook']),
     ...(account && !soAccountSelectable(account.status) ? [soWarningText(account.name, account.status, account.warning)] : []),
     ...(picked.length === 0 ? ['เลือกกลุ่มอย่างน้อย 1 กลุ่ม'] : []),
+    ...(cap !== null && picked.length > cap ? [`เลือกกลุ่มได้ไม่เกิน ${NUM.format(cap)} กลุ่ม (โพสต์ที่บัญชีนี้เหลือวันนี้)`] : []),
     ...(mode !== 'image_only' && !caption.trim() ? ['ใส่ข้อความประกาศ'] : []),
     ...(mode !== 'image_only' && !caption.includes(captionLink) ? [`ข้อความต้องมี ${AUTOPOST_LINK_PLACEHOLDER}`] : []),
     ...leaks.map((l) => `ข้อความมี${l} — ลบออกก่อน`),
@@ -277,7 +287,7 @@ export function AutopostBody({
     // เครื่องหลักออฟไลน์ = เลือกบัญชีได้ แต่ให้เลือกเครื่องอื่นที่ออนไลน์
     setWarn(a.status === 'worker_offline' ? offlineWarn(a) : null);
     setAccountId(id);
-    setWorkerName(a.worker ?? '');
+    setWorkerName(soDefaultWorker(soWorkersFor(opts, 'autopost'), 'post')?.name ?? a.worker ?? '');
     setPicked(defaultSoGroupPick(soGroupsOfAccount(opts, a), jobBu, a));
   };
 
@@ -439,20 +449,26 @@ export function AutopostBody({
                     {soBuNoAccountText(jobBu)}
                   </p>
                 ) : null}
+                {!opts.accounts.some((a) => a.recommended) ? (
+                  <p className={cn('text-sm', TONE.danger.value)} data-testid="autopost-no-ready-account">
+                    {soNoAccountReadyText(opts.accounts)}
+                  </p>
+                ) : null}
                 <FieldSelect
                   value={accountId}
                   onChange={pickAccount}
                   placeholder="เลือกบัญชี"
                   ariaLabel="บัญชี Facebook"
                   testId="autopost-account"
-                  options={soAccountsByBu(opts.accounts, jobBu).map(({ account: a, group }) => ({
-                    value: a.id,
-                    ...soAccountChoice(a, opts.workers),
-                    group,
-                  }))}
+                  options={soAccountsByBu(opts.accounts, jobBu).map(({ account: a, group }) => {
+                    // คำสถานะ + สี (สเปค 6.1 · ห้ามใช้สีอย่างเดียว)
+                    const c = soAccountChoice(a, opts.workers);
+                    return { value: a.id, label: c.label, disabled: c.disabled, className: TONE[c.tone].value, group };
+                  })}
                 />
                 {account ? (
                   <div className="space-y-0.5 text-xs" data-testid="autopost-account-status">
+                    <p className={cn('font-medium', TONE[soAccountStatusText(account).tone].value)}>{soAccountStatusText(account).text}</p>
                     <p className="tabular-nums text-muted-foreground">
                       {[
                         `วันนี้โพสต์ ${NUM.format(account.postedToday)}${account.dailyCap !== null ? `/${NUM.format(account.dailyCap)}` : ''}`,
@@ -472,7 +488,19 @@ export function AutopostBody({
           </section>
 
           <section className="space-y-2">
-            <p className="text-sm font-medium text-foreground">กลุ่ม Facebook</p>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-sm font-medium text-foreground">กลุ่ม Facebook</p>
+              {account && cap !== null ? (
+                <span className={cn('text-xs tabular-nums', picked.length > cap ? TONE.danger.value : DASH.muted)} data-testid="autopost-group-count">
+                  เลือกแล้ว {NUM.format(picked.length)}/{NUM.format(cap)}
+                </span>
+              ) : null}
+            </div>
+            {account && cap === 0 ? (
+              <p className={cn('text-sm', TONE.warn.value)} data-testid="autopost-cap-zero">
+                บัญชีนี้ไม่เหลือโพสต์วันนี้ ติ๊กกลุ่มไม่ได้ — เลือกบัญชีอื่น
+              </p>
+            ) : null}
             {!account ? null : accountGroups.length === 0 ? (
               <p className={cn('text-sm', TONE.warn.value)}>บัญชีนี้ยังไม่มีกลุ่ม ให้เพิ่มที่ระบบ So Scraping</p>
             ) : (
@@ -492,7 +520,8 @@ export function AutopostBody({
                     account={account}
                     picked={picked}
                     recent={recent}
-                    onToggle={(ids, on) => setPicked((prev) => (on ? [...new Set([...prev, ...ids])] : prev.filter((x) => !ids.includes(x))))}
+                    cap={cap}
+                    onToggle={(ids, on) => setPicked((prev) => (on ? soAddWithinCap(prev, ids, cap) : prev.filter((x) => !ids.includes(x))))}
                   />
                 ))}
               </div>
@@ -530,7 +559,7 @@ export function AutopostBody({
                         <span className="flex items-center gap-2">
                           <span className={cn('h-2 w-2 shrink-0 rounded-full', tone.dot)} aria-hidden />
                           <span className="text-foreground">{w.name}</span>
-                          <span className={cn('text-xs font-medium', tone.value)}>{w.online ? 'ออนไลน์' : 'ออฟไลน์'}</span>
+                          <span className={cn('text-xs font-medium', tone.value)}>{w.online ? 'ออนไลน์' : soWorkerOfflineText(w)}</span>
                           <span className="text-xs text-muted-foreground">{extra}</span>
                         </span>
                       </SelectItem>
@@ -628,10 +657,13 @@ function GroupSection({
   account,
   picked,
   recent,
+  cap,
   onToggle,
 }: {
   jobId: string;
   section: SoGroupSection;
+  /** ติ๊กได้สูงสุด (โพสต์ที่บัญชีเหลือวันนี้) · null = ไม่จำกัด */
+  cap: number | null;
   /** บัญชีที่เลือก — สถานะกลุ่มคิดจากบัญชีนี้ (สลับบัญชี = สถานะเปลี่ยน) */
   account: SoOptAccount | null;
   picked: readonly string[];
@@ -642,6 +674,8 @@ function GroupSection({
   const ids = section.groups.map((g) => g.id);
   const n = ids.filter((id) => picked.includes(id)).length;
   const headId = `autopost-bu-${jobId}-${section.bu ?? 'none'}`;
+  /** ติ๊กครบเพดานแล้ว — ช่องที่ยังไม่ติ๊กเป็นสีเทา กดไม่ได้ (เอาออกได้เสมอ) */
+  const full = cap !== null && picked.length >= cap;
   return (
     <Collapsible open={open} onOpenChange={setOpen} className="rounded-xl border border-border/70" data-testid={`autopost-bu-${section.bu ?? 'none'}`}>
       <div className="flex items-center gap-2 px-3 py-2">
@@ -667,10 +701,16 @@ function GroupSection({
             // สถานะเป็นคำจาก So Scraping เสมอ (ไม่บอกด้วยสีอย่างเดียว) · ไม่ควรติ๊ก = ไม่ติ๊กให้ แต่ไม่ล็อก
             const view = soGroupView(g, account);
             return (
-              <li key={g.id} className="flex items-start gap-2" data-testid="autopost-group-row">
+              // ติ๊กครบเพดานแล้ว = แถวที่ยังไม่ติ๊กเป็นสีเทา (สเปค 6.2)
+              <li
+                key={g.id}
+                className={cn('flex items-start gap-2', full && !picked.includes(g.id) && 'opacity-50')}
+                data-testid="autopost-group-row"
+              >
                 <Checkbox
                   id={`autopost-group-${jobId}-${g.id}`}
                   checked={picked.includes(g.id)}
+                  disabled={full && !picked.includes(g.id)}
                   onCheckedChange={(v) => onToggle([g.id], v === true)}
                   className="mt-0.5"
                 />
@@ -682,6 +722,12 @@ function GroupSection({
                       {view.label}
                     </span>
                   </Label>
+                  {g.repostWait ? (
+                    // ใบนี้เพิ่งลงกลุ่มนี้ไม่ถึง 2 วัน (สเปค 6.2) — ไม่ติ๊กให้ · ติ๊กเองได้แต่รอบนี้ So Scraping จะข้าม
+                    <p className={cn('text-xs', DASH.muted)} data-testid="autopost-group-repost-wait">
+                      {soRepostWaitText(g.repostWait)}
+                    </p>
+                  ) : null}
                   {view.detail || view.url ? (
                     <p className="flex flex-wrap items-center gap-x-2 text-xs">
                       {view.detail ? <span className={DASH.muted}>{view.detail}</span> : null}
@@ -698,7 +744,7 @@ function GroupSection({
                     {[
                       soGroupStatsText(g.stats30d),
                       g.lastPostedAt ? `โพสต์ล่าสุด ${WHEN.format(new Date(g.lastPostedAt))}` : null,
-                      recent.has(g.id) ? 'ใบนี้เพิ่งสั่งโพสต์กลุ่มนี้ใน 3 วัน' : null,
+                      !g.repostWait && recent.has(g.id) ? 'ใบนี้เพิ่งสั่งโพสต์กลุ่มนี้ใน 3 วัน' : null,
                     ]
                       .filter(Boolean)
                       .join(' · ')}

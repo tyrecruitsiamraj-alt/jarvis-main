@@ -30,15 +30,15 @@ describe('ตัวกรองส่งคนแทน', () => {
 
 describe('บัญชี Facebook ในป๊อปสั่งโพสต์', () => {
   const acc = (p: Partial<SoOptAccount>) =>
-    ({ id: 'a1', name: 'Donnomeachi Chardonnay', status: 'ready', pausedUntil: null, sessionWorkers: ['SONB-RM009'], postedToday: 2, dailyCap: 10, ...p }) as SoOptAccount;
+    ({ id: 'a1', name: 'Donnomeachi Chardonnay', status: 'ready', pausedUntil: null, sessionWorkers: ['SONB-RM009'], postedToday: 2, dailyCap: 10, remainingToday: 8, worker: 'SONB-RM009', needsVerificationSince: null, warning: null, ...p }) as SoOptAccount;
   const workers = [{ fbAccountIds: ['a9'] }];
   it('ถูกพัก = บอกเวลาที่ใช้ได้ (เวลาไทย) · เลือกไม่ได้', () => {
-    expect(soAccountChoice(acc({ status: 'paused', pausedUntil: '2026-11-04T03:26:00Z' }), workers)).toEqual({ label: 'Donnomeachi Chardonnay · ถูกพัก ใช้ได้ 4 พ.ย. 10:26', disabled: true });
+    expect(soAccountChoice(acc({ status: 'paused', pausedUntil: '2026-11-04T03:26:00Z' }), workers)).toEqual({ label: 'Donnomeachi Chardonnay · ถูกพัก ใช้ได้ 4 พ.ย. 10:26', disabled: true, tone: 'danger' });
   });
   it('ไม่มี session บนเครื่องไหน = ยังไม่ได้ล็อกอิน · เลือกได้ (เจ้าของ Choice "เลือกได้ แต่เตือนก่อนส่ง") · มีบนเครื่อง (fb_account_ids) = ป้ายปกติ', () => {
-    expect(soAccountChoice(acc({ name: 'Bennie Bobbe', sessionWorkers: [] }), workers)).toEqual({ label: 'Bennie Bobbe · ยังไม่ได้ล็อกอิน Facebook', disabled: false });
+    expect(soAccountChoice(acc({ name: 'Bennie Bobbe', sessionWorkers: [] }), workers)).toEqual({ label: 'Bennie Bobbe · พร้อมโพสต์ · เหลือ 8 โพสต์วันนี้ · ยังไม่ได้ล็อกอิน Facebook', disabled: false, tone: 'success' });
     expect(soAccountHasSession(acc({ id: 'a9', sessionWorkers: [] }), workers)).toBe(true);
-    expect(soAccountChoice(acc({}), workers)).toEqual({ label: 'Donnomeachi Chardonnay · พร้อมโพสต์ · โพสต์ 2/10', disabled: false });
+    expect(soAccountChoice(acc({}), workers)).toEqual({ label: 'Donnomeachi Chardonnay · พร้อมโพสต์ · เหลือ 8 โพสต์วันนี้', disabled: false, tone: 'success' });
   });
   it('ยังไม่ได้ล็อกอิน = เตือนก่อนส่ง ทั้งเลือกเครื่องและไม่เลือกเครื่อง', () => {
     const none = acc({ id: 'a2', sessionWorkers: [] }) as SoOptAccount;
@@ -48,9 +48,10 @@ describe('บัญชี Facebook ในป๊อปสั่งโพสต์
     expect(src).toContain('soPostConfirmWarnings(account, worker, opts?.workers ?? [])');
     expect(src).not.toContain('SO_NO_LOGIN_TEXT');
   });
-  it('ป๊อปใช้ตัวนี้ · บัญชีตั้งต้นข้ามบัญชีที่ไม่มี session', () => {
+  it('ป๊อปใช้ตัวนี้ (คำ + สี) · บัญชีตั้งต้น = บัญชีที่ So Scraping แนะนำ', () => {
     const src = readFileSync('src/components/jobs/AutopostDialog.tsx', 'utf8');
-    expect(src).toContain('...soAccountChoice(a, opts.workers)');
-    expect(src).toContain('.filter((a) => soAccountHasSession(a, o.workers))');
+    expect(src).toContain('const c = soAccountChoice(a, opts.workers);');
+    expect(src).toContain('className: TONE[c.tone].value');
+    expect(src).toContain('const acc = soDefaultAccount(o.accounts, jobBu);');
   });
 });

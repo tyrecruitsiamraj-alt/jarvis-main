@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils';
 import { DASH, TONE } from '@/lib/designTokens';
 import type { JobRequest } from '@/types';
 import { publicJobTitle } from '@/lib/publicJobTitle';
-import { createJobPostingRequest, fetchSoOptions, listLatestJobPostingsForJob, type JobPostingRequest } from '@/lib/jobPostingRequestsApi';
+import { createJobPostingRequest, fetchSoOptions, fetchSoRunMessage, listLatestJobPostingsForJob, type JobPostingRequest } from '@/lib/jobPostingRequestsApi';
 import {
   SO_SCRAPE_STATUS_LABEL,
   SO_SCRAP_REASON,
@@ -20,6 +20,8 @@ import {
   soScrapSnapshot,
   soScrapeSelectable,
   soStatusView,
+  soDefaultWorker,
+  soWorkerOfflineText,
   soWorkersFor,
   type SoOptWorker,
   type SoScrapeAccount,
@@ -63,6 +65,17 @@ export default function OrderPostButton({
   const [scrapeWorker, setScrapeWorker] = React.useState(AUTO_WORKER);
   /** คำขอ Scrap ที่เพิ่งส่งในรอบนี้ — โชว์ผลเริ่มงานของ So Scraping */
   const [lastScrap, setLastScrap] = React.useState<JobPostingRequest | null>(null);
+  /** ข้อความรอบล่าสุดของงานโพสต์จาก So Scraping เช่น "ข้าม 3 กลุ่มที่เพิ่งลง" (สเปค 6.4 "หน้าใบงานก็เห็น") */
+  const [runMessage, setRunMessage] = React.useState<string | null>(null);
+  React.useEffect(() => {
+    let alive = true;
+    setRunMessage(null);
+    const requestNo = (job.request_no ?? '').trim();
+    if (requestNo) void fetchSoRunMessage(requestNo).then((m) => alive && setRunMessage(m));
+    return () => {
+      alive = false;
+    };
+  }, [job.request_no]);
 
   React.useEffect(() => {
     let alive = true;
@@ -73,7 +86,10 @@ export default function OrderPostButton({
         if (!alive) return;
         setScrapeAccounts(o.scrapeAccounts);
         setScrapeIds(defaultScrapeIds(o.scrapeAccounts));
-        setScrapeWorkers(soWorkersFor(o, 'scraper'));
+        const ws = soWorkersFor(o, 'scraper');
+        setScrapeWorkers(ws);
+        // เครื่องตั้งต้น = เครื่องที่ So Scraping แนะนำ (ออนไลน์ คิวเบาสุด · สเปค 6.3) · ไม่มี = ให้ระบบเลือก
+        setScrapeWorker(soDefaultWorker(ws, 'scrape')?.name ?? AUTO_WORKER);
       })
       .catch((e) => alive && setScrapeError(e instanceof Error ? e.message : 'โหลดบัญชี JobThai/JobBKK ไม่ได้'));
     return () => {
@@ -195,6 +211,11 @@ export default function OrderPostButton({
             <Megaphone aria-hidden /> Autopost
           </Button>,
         )}
+        {runMessage ? (
+          <p className={cn('text-xs', TONE.warn.value)} data-testid="so-run-message">
+            {runMessage}
+          </p>
+        ) : null}
         {statusRow('Scrap', scraping, scrapingView, 'so-status-scraping')}
         {loadError ? <p className={cn('text-xs', TONE.danger.value)}>{loadError}</p> : null}
       </div>
@@ -243,7 +264,7 @@ export default function OrderPostButton({
             { value: AUTO_WORKER, label: 'เครื่อง: ให้ระบบเลือก' },
             ...scrapeWorkers.map((w) => ({
               value: w.name,
-              label: `เครื่อง ${w.name} · ${w.online ? 'ออนไลน์' : 'ออฟไลน์'} · งาน Scrap ค้าง ${NUM.format(w.scrapeQueue.running + w.scrapeQueue.queued)}`,
+              label: `เครื่อง ${w.name} · ${w.online ? 'ออนไลน์' : soWorkerOfflineText(w)} · งาน Scrap ค้าง ${NUM.format(w.scrapeQueue.running + w.scrapeQueue.queued)}`,
             })),
           ]}
         />

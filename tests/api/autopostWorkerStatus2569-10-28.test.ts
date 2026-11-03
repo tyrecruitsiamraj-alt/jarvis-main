@@ -10,7 +10,8 @@ describe('Autopost ช่องเครื่อง: ออนไลน์เ�
   });
   it('จุดสี + คำบอกสถานะคู่กัน', () => {
     expect(src).toContain('const tone = w.online ? TONE.success : TONE.neutral;');
-    expect(src).toContain("{w.online ? 'ออนไลน์' : 'ออฟไลน์'}");
+    // ออฟไลน์บอกตั้งแต่เมื่อไร (สเปค 6.3 · 3 พ.ย. 2569)
+    expect(src).toContain("{w.online ? 'ออนไลน์' : soWorkerOfflineText(w)}");
     expect(src).toContain("cn('h-2 w-2 shrink-0 rounded-full', tone.dot)");
   });
 });

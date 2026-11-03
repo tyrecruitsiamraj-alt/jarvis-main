@@ -143,8 +143,17 @@ export async function fetchJobPostingState(jobId: string): Promise<{ latest: Job
  * บัญชี · กลุ่ม · เครื่อง · บัญชี JobThai/JobBKK ของ So Scraping (อ่านอย่างเดียว · ดึงใหม่ทุกครั้งที่เปิดฟอร์ม)
  * ป๊อป Autopost + ขอ Scrap (26 ต.ค. 2569 ตามเอกสาร options API)
  */
-export async function fetchSoOptions(): Promise<SoOptions> {
-  const r = await apiFetch('/api/matching/job-postings?options=1');
+/** ข้อความรอบล่าสุดของงานโพสต์ (So Scraping `run_message`) — ไม่มี/อ่านไม่ได้ = null */
+export async function fetchSoRunMessage(requestNo: string): Promise<string | null> {
+  const r = await apiFetch(`/api/matching/job-postings?run_message=1&request_no=${encodeURIComponent(requestNo)}`);
+  if (!r.ok) return null;
+  const d = (await r.json().catch(() => ({}))) as { run_message?: unknown };
+  return typeof d.run_message === 'string' && d.run_message.trim() ? d.run_message.trim() : null;
+}
+
+/** `requestNo` = ส่งเลขใบขอให้ So Scraping บอกกลุ่มที่ใบนี้เพิ่งลง (`repostWait` · สเปค 6.2) */
+export async function fetchSoOptions(requestNo?: string | null): Promise<SoOptions> {
+  const r = await apiFetch(`/api/matching/job-postings?options=1${requestNo ? `&request_no=${encodeURIComponent(requestNo)}` : ''}`);
   if (!r.ok) return readError(r, 'โหลดบัญชี/กลุ่มของ So Scraping ไม่ได้');
   const d = (await r.json().catch(() => ({}))) as Partial<SoOptions>;
   return {

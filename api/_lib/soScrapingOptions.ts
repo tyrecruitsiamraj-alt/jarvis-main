@@ -85,12 +85,14 @@ export async function saveSoKey(input: { key: string | null; baseUrl: string; cl
 }
 
 /** เรียก options API ด้วย key/URL ที่ให้มา — ใช้ทั้งตอนใช้งานจริงและปุ่มทดสอบ */
-export async function callSoOptions(baseUrl: string, key: string, fetchImpl: typeof fetch = fetch): Promise<SoOptions> {
+export async function callSoOptions(baseUrl: string, key: string, fetchImpl: typeof fetch = fetch, requestNo: string | null = null): Promise<SoOptions> {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
   let res: Response;
   try {
-    res = await fetchImpl(`${baseUrl}${SO_OPTIONS_PATH}`, { headers: { 'x-api-key': key, accept: 'application/json' }, signal: ctrl.signal });
+    // ส่งเลขใบขอ = So Scraping เติม groups[].repost_wait ให้กลุ่มที่ใบนี้เพิ่งลงไม่ถึง 2 วัน (สเปค 6.2)
+    const qs = requestNo ? `?request_no=${encodeURIComponent(requestNo)}` : '';
+    res = await fetchImpl(`${baseUrl}${SO_OPTIONS_PATH}${qs}`, { headers: { 'x-api-key': key, accept: 'application/json' }, signal: ctrl.signal });
   } catch {
     throw new SoOptionsError('ติดต่อระบบ So Scraping ไม่ได้ ลองใหม่อีกครั้ง', 502);
   } finally {
@@ -126,6 +128,9 @@ async function optionsFromDb(): Promise<SoOptions> {
         queue: { running: 0, queued: 0 },
         status: paused ? 'paused' : full ? 'full' : 'ready',
         warning: null,
+        // ทางถอย: แนะนำ = พร้อม + เครื่องหลักออนไลน์ (API ตัดสินละเอียดกว่า)
+        recommended: !paused && !full && Boolean(a.preferredWorker && online.get(a.preferredWorker)),
+        needsVerificationSince: null,
         groupIds: a.groupIds,
         sessionWorkers: a.preferredWorker ? [a.preferredWorker] : [],
         department: accountBu.get(a.id) ?? null,
@@ -133,7 +138,7 @@ async function optionsFromDb(): Promise<SoOptions> {
         groupStatus: [],
       };
     }),
-    groups: groups.map((g) => ({ id: g.id, fbGroupId: null, name: g.name, url: null, accountIds: [], lastPostedAt: null, stats30d: null, department: g.department, blocked: null })),
+    groups: groups.map((g) => ({ id: g.id, fbGroupId: null, name: g.name, url: null, accountIds: [], lastPostedAt: null, stats30d: null, department: g.department, blocked: null, repostWait: null })),
     // ฐานเดิมอ่านแค่เครื่องโพสต์ (kind autopost)
     workers: workers.map((w) => ({
       name: w.name,
@@ -144,6 +149,7 @@ async function optionsFromDb(): Promise<SoOptions> {
       postQueue: { running: 0, queued: 0 },
       scrapeQueue: { running: 0, queued: 0 },
       fbAccountIds: accounts.filter((a) => a.preferredWorker === w.name).map((a) => a.id),
+      recommended: { post: w.name === workers.find((x) => x.online)?.name, scrape: false },
     })),
     scrapeAccounts: [],
   };
@@ -156,11 +162,11 @@ export async function loadSoKey(): Promise<{ baseUrl: string; key: string } | nu
   return row && key ? { baseUrl: row.base_url || SO_DEFAULT_BASE_URL, key } : null;
 }
 
-export async function fetchSoOptions(): Promise<SoOptions> {
+export async function fetchSoOptions(requestNo: string | null = null): Promise<SoOptions> {
   const k = await loadSoKey();
   if (!k) return optionsFromDb();
   // options API ยังไม่ส่งธุรกิจของกลุ่ม/บัญชี — เติมจากฐานของ So Scraping (อ่านอย่างเดียว · อ่านไม่ได้ = ไม่ระบุธุรกิจ) · 2 พ.ย. 2569
-  const [o, groups, accounts] = await Promise.all([callSoOptions(k.baseUrl, k.key), listSoGroups(), listSoAccountDepartments()]);
+  const [o, groups, accounts] = await Promise.all([callSoOptions(k.baseUrl, k.key, fetch, requestNo), listSoGroups(), listSoAccountDepartments()]);
   return withSoDepartments(o, { groups, accounts });
 }
 
@@ -169,7 +175,7 @@ export async function fetchSoOptions(): Promise<SoOptions> {
  * 200 เริ่มแล้ว · 409 เริ่มไปแล้ว (เรียกซ้ำได้) · 422 ข้อมูลไม่ครบ (คำสั่งค้าง แก้แล้วเรียกใหม่) · 404 ไม่พบเลขใบ · 401 key ผิด
  */
 export type SoStartResult =
-  | { state: 'started'; worker: string | null; preflightQueued: boolean; queued: boolean | null; message: string | null }
+  | { state: 'started'; worker: string | null; preflightQueued: boolean; queued: boolean | null; message: string | null; skippedGroups?: number }
   | { state: 'already' }
   | { state: 'error'; message: string }
   | { state: 'skipped' };
@@ -199,6 +205,8 @@ export async function callSoStart(baseUrl: string, key: string, requestNo: strin
       preflightQueued: body.preflight_queued === true,
       queued: typeof body.queued === 'boolean' ? body.queued : null,
       message: text(body.message),
+      // ข้ามกลุ่มที่ใบนี้เพิ่งลงไม่ถึง 2 วัน (สเปค 6.4) — message บอกชื่อกลุ่ม + เวลาที่โพสต์ได้อีก
+      skippedGroups: Array.isArray(body.skipped_groups) ? body.skipped_groups.length : 0,
     };
   }
   if (res.status === 409) return { state: 'already' };
@@ -206,6 +214,35 @@ export async function callSoStart(baseUrl: string, key: string, requestNo: strin
   if (res.status === 404) return { state: 'error', message: `So Scraping ไม่พบใบ ${requestNo}` };
   if (res.status === 401 || res.status === 403) return { state: 'error', message: 'key ของ So Scraping ไม่ถูกต้อง — แก้ที่ ตั้งค่า › เชื่อมระบบภายนอก' };
   return { state: 'error', message: `ระบบ So Scraping ตอบ ${res.status} กดเริ่มงานอีกครั้งได้` };
+}
+
+export const SO_STATUS_PATH = '/api/integrations/jarvis/status';
+
+/**
+ * ข้อความรอบล่าสุดของงานโพสต์ (`run_message` เช่น "ข้าม 3 กลุ่มที่เพิ่งลง โพสต์ได้อีก 4 พ.ย. 09:21") — สเปค 6.4 "หน้าใบงานก็เห็น"
+ * ยังไม่ใส่ key / เรียกไม่ได้ = null (ข้อมูลเสริม ไม่ทำให้หน้าใบขอพัง)
+ */
+export async function fetchSoRunMessage(requestNo: string, fetchImpl: typeof fetch = fetch): Promise<string | null> {
+  const k = await loadSoKey();
+  if (!k) return null;
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
+  try {
+    const res = await fetchImpl(`${k.baseUrl}${SO_STATUS_PATH}?request_no=${encodeURIComponent(requestNo)}`, {
+      headers: { 'x-api-key': k.key, accept: 'application/json' },
+      signal: ctrl.signal,
+    });
+    if (!res.ok) return null;
+    const body = ((await res.json().catch(() => null)) ?? {}) as { requests?: unknown };
+    const list = Array.isArray(body.requests) ? (body.requests as Array<Record<string, unknown>>) : [];
+    const hit = list.find((r) => r && r.type === 'content' && String(r.request_no ?? '').trim() === requestNo);
+    const msg = hit?.run_message;
+    return typeof msg === 'string' && msg.trim() ? msg.trim() : null;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 /** เรียก start ด้วย key ที่บันทึกไว้ — ยังไม่ใส่ key = ข้าม (So Scraping หยิบคำขอ pending เองแบบเดิม) */

@@ -198,7 +198,11 @@ export function soNoticeTitle(type: 'content' | 'scraping', status: string): str
  *   กลุ่มมีผล 30 วัน (`posted` เป็นหลัก — คอมเมนต์/เบอร์ยังนับไม่ครบ)
  * ยังไม่ได้ใส่ key = อ่านจากฐานของ So Scraping แบบเดิม (`source: 'db'` · ทางถอย) */
 
-export type SoAccountStatus = 'ready' | 'busy' | 'full' | 'paused' | 'worker_offline' | 'no_worker';
+/**
+ * `needs_verification` = Facebook ขอยืนยันตัวตน ต้องมีคนไปทำที่เครื่อง (So Scraping 2be6efb · 3 พ.ย. 2569) ·
+ * `unknown` = สถานะที่ Jarvis ยังไม่รู้จัก ⇒ เลือกไม่ได้ แสดง `warning` ตรง ๆ (สเปค 6.1)
+ */
+export type SoAccountStatus = 'ready' | 'busy' | 'full' | 'paused' | 'worker_offline' | 'no_worker' | 'needs_verification' | 'unknown';
 export type SoScrapeStatus = 'ready' | 'full' | 'cooldown' | 'disabled';
 export type SoQueue = { running: number; queued: number };
 
@@ -215,6 +219,10 @@ export type SoOptAccount = {
   queue: SoQueue;
   status: SoAccountStatus;
   warning: string | null;
+  /** ค่าเริ่มต้นให้คนสั่ง: พร้อมโพสต์ ไม่มีคำเตือน ล็อกอินบนเครื่องที่ออนไลน์ (So Scraping ตัดสิน · สเปค 6.1) */
+  recommended: boolean;
+  /** Facebook ขอยืนยันตัวตนตั้งแต่เมื่อไร · null = ไม่ติด */
+  needsVerificationSince: string | null;
   groupIds: string[];
   /** เครื่องที่บัญชีนี้ล็อกอินค้างไว้ */
   sessionWorkers: string[];
@@ -250,7 +258,10 @@ export type SoOptGroup = {
   department: string | null;
   /** กลุ่มโดนพัก ทุกบัญชีโพสต์ไม่ได้ · null = ไม่ติด */
   blocked: SoGroupBlock | null;
+  /** ใบขอนี้เพิ่งลงกลุ่มนี้ไม่ถึง 2 วัน (ส่ง ?request_no=) — ติ๊กได้แต่รอบนี้ So Scraping ข้าม · null = ลงได้ (สเปค 6.2) */
+  repostWait: SoRepostWait | null;
 };
+export type SoRepostWait = { requestNo: string | null; lastPostedAt: string | null; availableAt: string | null };
 export type SoWorkerKind = 'autopost' | 'scraper';
 export type SoOptWorker = {
   name: string;
@@ -261,6 +272,8 @@ export type SoOptWorker = {
   postQueue: SoQueue;
   scrapeQueue: SoQueue;
   fbAccountIds: string[];
+  /** ค่าเริ่มต้น: ออนไลน์และคิวเบาสุด แยกงานโพสต์/Scrap (สเปค 6.3) */
+  recommended: { post: boolean; scrape: boolean };
 };
 export type SoScrapeAccount = {
   id: string;
@@ -287,6 +300,8 @@ export const SO_ACCOUNT_STATUS_LABEL: Record<SoAccountStatus, string> = {
   paused: 'ถูกพัก',
   worker_offline: 'เครื่องออฟไลน์',
   no_worker: 'ยังไม่ผูกเครื่อง',
+  needs_verification: 'ต้องยืนยันตัวตน',
+  unknown: 'ใช้ไม่ได้',
 };
 export const SO_SCRAPE_STATUS_LABEL: Record<SoScrapeStatus, string> = {
   ready: 'พร้อมใช้',
@@ -295,7 +310,7 @@ export const SO_SCRAPE_STATUS_LABEL: Record<SoScrapeStatus, string> = {
   disabled: 'ปิดใช้งาน',
 };
 
-/** เลือกบัญชี Facebook นี้ได้ไหม — ตามตารางในเอกสาร (paused/no_worker = ไม่ได้ · worker_offline ได้ แต่ต้องเลือกเครื่องอื่น) */
+/** เลือกบัญชี Facebook นี้ได้ไหม — ตามตารางในเอกสาร (paused/no_worker/needs_verification/ไม่รู้จัก = ไม่ได้ · worker_offline ได้ แต่ต้องเลือกเครื่องอื่น) */
 export const soAccountSelectable = (s: SoAccountStatus): boolean => s === 'ready' || s === 'busy' || s === 'full' || s === 'worker_offline';
 /** เลือกบัญชี JobThai/JobBKK นี้ได้ไหม (cooldown/disabled = ไม่ได้) */
 export const soScrapeSelectable = (s: SoScrapeStatus): boolean => s === 'ready' || s === 'full';
@@ -323,21 +338,99 @@ export function soAccountHasSession(acc: Pick<SoOptAccount, 'id' | 'sessionWorke
 
 const BKK_TIME = new Intl.DateTimeFormat('th-TH', { timeZone: 'Asia/Bangkok', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 
+const whenBkk = (iso: string | null | undefined): string | null =>
+  iso && !Number.isNaN(Date.parse(iso)) ? BKK_TIME.format(new Date(iso)) : null;
+
 /**
- * สถานะบัญชีบนช่องเลือก — เห็นก่อนสั่ง ไม่ต้องรอ So Scraping แจ้ง (3 พ.ย. 2569)
- * ถูกพัก = บอกเวลาที่ใช้ได้ (`paused_until`) เลือกไม่ได้ · ไม่มี session = บอกว่ายังไม่ได้ล็อกอิน เลือกได้ · ที่เหลือ = ป้ายเดิม
+ * คำสถานะ + สีของบัญชี (สเปค So Scraping 6.1 · 3 พ.ย. 2569 "ห้ามใช้สีอย่างเดียว ทุกสถานะต้องมีคำ")
+ * พร้อม = เขียว · มีงานค้าง/ครบโควต้า/เครื่องออฟไลน์ = เหลือง เลือกได้ · ถูกพัก/ต้องยืนยันตัวตน/ไม่ผูกเครื่อง/ไม่รู้จัก = แดง เลือกไม่ได้
  */
-export function soAccountChoice(
-  a: Pick<SoOptAccount, 'id' | 'name' | 'status' | 'pausedUntil' | 'sessionWorkers' | 'postedToday' | 'dailyCap'>,
-  workers: readonly Pick<SoOptWorker, 'fbAccountIds'>[],
-): { label: string; disabled: boolean } {
-  const used = `โพสต์ ${a.postedToday.toLocaleString('th-TH')}${a.dailyCap !== null ? `/${a.dailyCap.toLocaleString('th-TH')}` : ''}`;
-  if (a.status === 'paused') {
-    const until = a.pausedUntil && !Number.isNaN(Date.parse(a.pausedUntil)) ? ` ใช้ได้ ${BKK_TIME.format(new Date(a.pausedUntil))}` : '';
-    return { label: `${a.name} · ถูกพัก${until}`, disabled: true };
+export function soAccountStatusText(
+  a: Pick<SoOptAccount, 'status' | 'remainingToday' | 'postedToday' | 'dailyCap' | 'worker' | 'pausedUntil' | 'needsVerificationSince' | 'warning'>,
+): { text: string; tone: 'success' | 'warn' | 'danger' } {
+  switch (a.status) {
+    case 'ready':
+      return { text: a.remainingToday !== null ? `พร้อมโพสต์ · เหลือ ${a.remainingToday.toLocaleString('th-TH')} โพสต์วันนี้` : 'พร้อมโพสต์', tone: 'success' };
+    case 'busy':
+      return { text: 'มีงานค้าง ต่อคิวได้', tone: 'warn' };
+    case 'full':
+      return { text: `ครบโควต้าวันนี้ (${a.postedToday.toLocaleString('th-TH')}/${(a.dailyCap ?? a.postedToday).toLocaleString('th-TH')})`, tone: 'warn' };
+    case 'worker_offline':
+      return { text: a.worker ? `เครื่อง ${a.worker} ออฟไลน์` : 'เครื่องออฟไลน์', tone: 'warn' };
+    case 'paused': {
+      const until = whenBkk(a.pausedUntil);
+      return { text: until ? `ถูกพัก ใช้ได้ ${until}` : 'ถูกพัก', tone: 'danger' };
+    }
+    case 'needs_verification': {
+      const since = whenBkk(a.needsVerificationSince);
+      return { text: since ? `ต้องยืนยันตัวตนที่เครื่อง ตั้งแต่ ${since}` : 'ต้องยืนยันตัวตนที่เครื่อง', tone: 'danger' };
+    }
+    case 'no_worker':
+      return { text: 'ยังไม่ผูกเครื่อง', tone: 'danger' };
+    default:
+      return { text: a.warning ?? 'ใช้ไม่ได้', tone: 'danger' };
   }
-  if (!soAccountHasSession(a, workers)) return { label: `${a.name} · ยังไม่ได้ล็อกอิน Facebook`, disabled: !soAccountSelectable(a.status) };
-  return { label: `${a.name} · ${SO_ACCOUNT_STATUS_LABEL[a.status]} · ${used}`, disabled: !soAccountSelectable(a.status) };
+}
+
+/** ตัวเลือกในช่องบัญชี — ชื่อ · คำสถานะ (+ "ยังไม่ได้ล็อกอิน Facebook" เมื่อไม่มี session · เจ้าของ 3 พ.ย. 2569 เลือกได้ เตือนตอนส่ง) */
+export function soAccountChoice(
+  a: Pick<
+    SoOptAccount,
+    'id' | 'name' | 'status' | 'pausedUntil' | 'sessionWorkers' | 'postedToday' | 'dailyCap' | 'remainingToday' | 'worker' | 'needsVerificationSince' | 'warning'
+  >,
+  workers: readonly Pick<SoOptWorker, 'fbAccountIds'>[],
+): { label: string; disabled: boolean; tone: 'success' | 'warn' | 'danger' } {
+  const st = soAccountStatusText(a);
+  const selectable = soAccountSelectable(a.status);
+  const noLogin = selectable && !soAccountHasSession(a, workers) ? ' · ยังไม่ได้ล็อกอิน Facebook' : '';
+  return { label: `${a.name} · ${st.text}${noLogin}`, disabled: !selectable, tone: st.tone };
+}
+
+/** บัญชีตั้งต้น = บัญชีแรกที่ So Scraping แนะนำ (สเปค 6.1) — ธุรกิจของใบขอก่อน แล้วธุรกิจอื่น · ไม่มี = null (ช่องว่าง) */
+export function soDefaultAccount<A extends Pick<SoOptAccount, 'recommended' | 'department'>>(accounts: readonly A[], jobBu: string | null): A | null {
+  const rec = accounts.filter((a) => a.recommended);
+  return (jobBu ? rec.find((a) => a.department === jobBu) : undefined) ?? rec[0] ?? null;
+}
+
+/** ไม่มีบัญชีพร้อมโพสต์ — บอกเวลาที่บัญชีแรกจะกลับมาใช้ได้ (`paused_until` ที่ใกล้สุด) */
+export function soNoAccountReadyText(accounts: readonly Pick<SoOptAccount, 'pausedUntil'>[], now = Date.now()): string {
+  const next = accounts
+    .map((a) => Date.parse(a.pausedUntil ?? ''))
+    .filter((t) => Number.isFinite(t) && t > now)
+    .sort((x, y) => x - y)[0];
+  return next ? `ตอนนี้ไม่มีบัญชีที่พร้อมโพสต์ · บัญชีแรกใช้ได้ ${BKK_TIME.format(new Date(next))}` : 'ตอนนี้ไม่มีบัญชีที่พร้อมโพสต์';
+}
+
+/** ติ๊กกลุ่มได้สูงสุดกี่กลุ่ม = โพสต์ที่บัญชีเหลือวันนี้ (สเปค 6.2) · ไม่รู้ = ไม่จำกัด (null) */
+export const soGroupCap = (a: Pick<SoOptAccount, 'remainingToday'> | null): number | null => (a ? a.remainingToday : null);
+
+/** ติ๊กเพิ่มแบบไม่เกินเพดาน — เกินแล้วตัดตามลำดับที่ส่งมา */
+export function soAddWithinCap(prev: readonly string[], ids: readonly string[], cap: number | null): string[] {
+  const out = [...prev];
+  for (const id of ids) {
+    if (out.includes(id)) continue;
+    if (cap !== null && out.length >= cap) break;
+    out.push(id);
+  }
+  return out;
+}
+
+/** "ใบนี้เพิ่งลง 2 พ.ย. 10:12 โพสต์ได้อีก 4 พ.ย. 10:12" (สเปค 6.2) */
+export function soRepostWaitText(w: SoRepostWait): string {
+  const last = whenBkk(w.lastPostedAt);
+  const avail = whenBkk(w.availableAt);
+  return [last ? `ใบนี้เพิ่งลง ${last}` : 'ใบนี้เพิ่งลงกลุ่มนี้', avail ? `โพสต์ได้อีก ${avail}` : null].filter(Boolean).join(' ');
+}
+
+/** เครื่องตั้งต้น = เครื่องที่ So Scraping แนะนำ (ออนไลน์ คิวเบาสุด · สเปค 6.3) */
+export function soDefaultWorker(workers: readonly SoOptWorker[], kind: 'post' | 'scrape'): SoOptWorker | null {
+  return workers.find((w) => w.recommended[kind]) ?? null;
+}
+
+/** "ออฟไลน์ ตั้งแต่ 3 พ.ย. 14:20" */
+export function soWorkerOfflineText(w: Pick<SoOptWorker, 'lastSeen'>): string {
+  const since = whenBkk(w.lastSeen);
+  return since ? `ออฟไลน์ ตั้งแต่ ${since}` : 'ออฟไลน์';
 }
 
 export const SO_NO_SESSION_WARNING = 'บัญชีนี้ยังไม่เคยล็อกอินบนเครื่องนี้ บอทจะล็อกอินใหม่ และ Facebook อาจขอยืนยันตัวตน';
@@ -464,10 +557,21 @@ export function soGroupView(g: Pick<SoOptGroup, 'id' | 'blocked'>, acc: Pick<SoO
   return { label: SO_GROUP_UNTRIED, recommended: true, detail: null, url: null };
 }
 
-/** ติ๊กไว้ให้ตั้งแต่เปิดป๊อป = กลุ่มธุรกิจเดียวกับใบขอ ที่ไม่ติด (ไม่โดนพัก · สถานะของบัญชีไม่บอกว่าไม่ควร) · ใบขอไม่ระบุธุรกิจ = ไม่ติ๊ก */
-export function defaultSoGroupPick(groups: readonly SoOptGroup[], jobBu: string | null, acc: Pick<SoOptAccount, 'groupStatus'> | null = null): string[] {
+/**
+ * ติ๊กไว้ให้ตั้งแต่เปิดป๊อป (สเปค So Scraping 6.2) = กลุ่มธุรกิจเดียวกับใบขอ ที่ไม่ติด (ไม่โดนพัก · สถานะของบัญชีไม่บอกว่าไม่ควร)
+ * และใบนี้ไม่ได้เพิ่งลง (`repostWait`) · เรียงโพสต์ได้ 30 วันมากไปน้อย · ตัดที่โพสต์ที่บัญชีเหลือวันนี้ · ใบขอไม่ระบุธุรกิจ = ไม่ติ๊ก
+ */
+export function defaultSoGroupPick(
+  groups: readonly SoOptGroup[],
+  jobBu: string | null,
+  acc: (Pick<SoOptAccount, 'groupStatus'> & Partial<Pick<SoOptAccount, 'remainingToday'>>) | null = null,
+): string[] {
   if (!jobBu) return [];
-  return groups.filter((g) => g.department === jobBu && soGroupView(g, acc).recommended).map((g) => g.id);
+  const ok = groups
+    .filter((g) => g.department === jobBu && !g.repostWait && soGroupView(g, acc).recommended)
+    .sort((a, b) => (b.stats30d?.posted ?? 0) - (a.stats30d?.posted ?? 0));
+  const cap = acc?.remainingToday ?? null;
+  return (cap === null ? ok : ok.slice(0, Math.max(0, cap))).map((g) => g.id);
 }
 
 /** หัวหมวด "LBD · ติ๊กไว้ 29 จาก 37 · ติด 8" — ติด = กลุ่มที่ไม่ควรติ๊กสำหรับบัญชีนี้ */
@@ -524,7 +628,7 @@ export function withSoDepartments(
   };
 }
 
-const ACCOUNT_STATUSES: readonly SoAccountStatus[] = ['ready', 'busy', 'full', 'paused', 'worker_offline', 'no_worker'];
+const ACCOUNT_STATUSES: readonly SoAccountStatus[] = ['ready', 'busy', 'full', 'paused', 'worker_offline', 'no_worker', 'needs_verification'];
 const SCRAPE_STATUSES: readonly SoScrapeStatus[] = ['ready', 'full', 'cooldown', 'disabled'];
 const str = (v: unknown): string | null => (typeof v === 'string' && v.trim() ? v.trim() : null);
 const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
@@ -546,7 +650,7 @@ const queueOf = (v: unknown): SoQueue => {
 
 /**
  * คำตอบดิบของ options API → รูปที่จอใช้ · ไม่มี accounts/groups/workers/scrape_accounts = ผิดรูป (null)
- * สถานะที่ไม่รู้จัก = ถือว่าเลือกไม่ได้ (บัญชี → no_worker · บัญชี Scrap → disabled) — fail-safe ไปทางไม่ส่ง
+ * สถานะที่ไม่รู้จัก = ถือว่าเลือกไม่ได้ (บัญชี → unknown แสดง warning ตรง ๆ · บัญชี Scrap → disabled) — fail-safe ไปทางไม่ส่ง
  */
 export function parseSoOptions(raw: unknown): SoOptions | null {
   if (!raw || typeof raw !== 'object') return null;
@@ -566,8 +670,10 @@ export function parseSoOptions(raw: unknown): SoOptions | null {
       pausedUntil: str(a.paused_until),
       pauseReason: str(a.pause_reason),
       queue: queueOf(a.queue),
-      status: ACCOUNT_STATUSES.includes(a.status as SoAccountStatus) ? (a.status as SoAccountStatus) : 'no_worker',
+      status: ACCOUNT_STATUSES.includes(a.status as SoAccountStatus) ? (a.status as SoAccountStatus) : 'unknown',
       warning: str(a.warning),
+      recommended: a.recommended === true,
+      needsVerificationSince: str(a.needs_verification_since),
       groupIds: strs(a.group_ids),
       sessionWorkers: strs(a.session_workers),
       department: normalizeTrendBu(str(a.department)),
@@ -600,6 +706,13 @@ export function parseSoOptions(raw: unknown): SoOptions | null {
               return { state: str(b.state) ?? 'blocked', label: str(b.label)!, detail: str(b.detail), seenAt: str(b.seen_at) };
             })()
           : null,
+      repostWait:
+        g.repost_wait && typeof g.repost_wait === 'object'
+          ? (() => {
+              const w = g.repost_wait as Record<string, unknown>;
+              return { requestNo: str(w.request_no), lastPostedAt: str(w.last_posted_at), availableAt: str(w.available_at) };
+            })()
+          : null,
       stats30d:
         g.stats_30d && typeof g.stats_30d === 'object'
           ? (() => {
@@ -619,6 +732,10 @@ export function parseSoOptions(raw: unknown): SoOptions | null {
       postQueue: queueOf(w.post_queue),
       scrapeQueue: queueOf(w.scrape_queue),
       fbAccountIds: strs(w.fb_account_ids),
+      recommended: (() => {
+        const rc = (w.recommended && typeof w.recommended === 'object' ? w.recommended : {}) as Record<string, unknown>;
+        return { post: rc.post === true, scrape: rc.scrape === true };
+      })(),
     }));
   const scrapeAccounts = rows(r.scrape_accounts)
     .filter((s) => str(s.id))
@@ -694,6 +811,10 @@ export function soPickError(
   const acc = o.accounts.find((a) => a.id === snap.account_id);
   if (!acc) return 'ไม่พบบัญชี Facebook นี้ในระบบ So Scraping แล้ว — ปิดแล้วเลือกใหม่';
   if (!soAccountSelectable(acc.status)) return soWarningText(acc.name, acc.status, acc.warning);
+  // เกินโพสต์ที่บัญชีเหลือวันนี้ = worker หยุดเองที่เพดาน กลุ่มที่เหลือไม่ได้โพสต์ (สเปค 6.2) — กันฝั่ง server ด้วย
+  if (acc.remainingToday !== null && picked.length > acc.remainingToday) {
+    return `บัญชี ${acc.name} เหลือโพสต์วันนี้ ${acc.remainingToday} กลุ่ม — ลดกลุ่ม หรือสั่งใบใหม่ด้วยบัญชีอื่น`;
+  }
   const mine = new Set(soGroupsOfAccount(o, acc).map((g) => g.id));
   if (picked.some((g) => !mine.has(g))) return `มีกลุ่มที่บัญชี ${acc.name} โพสต์ไม่ได้ — เลือกกลุ่มใหม่`;
   return null;
@@ -701,7 +822,7 @@ export function soPickError(
 
 /** ผลเรียก start ที่ server ส่งกลับมากับคำขอ (เอกสารรอบ 3) */
 export type SoStartView =
-  | { state: 'started'; worker: string | null; preflightQueued: boolean; queued: boolean | null; message: string | null }
+  | { state: 'started'; worker: string | null; preflightQueued: boolean; queued: boolean | null; message: string | null; skippedGroups?: number }
   | { state: 'already' }
   | { state: 'error'; message: string }
   | { state: 'skipped' };
@@ -714,5 +835,7 @@ export function soStartText(r: SoStartView | null | undefined): { text: string; 
   if (r.queued === false) return { text: r.message ?? 'สร้างงานแล้วแต่ยังเริ่มไม่ได้', tone: 'warn', canRetry: false };
   const parts = [`เริ่มงานแล้ว${r.worker ? ` ที่เครื่อง ${r.worker}` : ''}`];
   if (r.preflightQueued) parts.push('บัญชีต้องทดสอบก่อน งานจะเริ่มช้าขึ้นราว 1 นาที');
+  // ข้ามกลุ่มที่ใบนี้เพิ่งลง (สเปค 6.4) — ข้อความไทยจาก So Scraping ขึ้นทันทีหลังกดสั่ง
+  if ((r.skippedGroups ?? 0) > 0 && r.message) return { text: [...parts, r.message].join(' · '), tone: 'warn', canRetry: false };
   return { text: parts.join(' · '), tone: 'success', canRetry: false };
 }

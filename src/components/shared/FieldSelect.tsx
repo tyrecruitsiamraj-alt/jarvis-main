@@ -9,8 +9,8 @@ import { cn } from '@/lib/utils';
  */
 const EMPTY = '__field_select_empty__';
 
-/** `group` = หัวกลุ่ม (แทน `<optgroup>`) — ตัวเลือกที่กลุ่มเดียวกันติดกันอยู่ใต้หัวเดียว */
-export type FieldSelectOption = { value: string; label: string; disabled?: boolean; group?: string };
+/** `group` = หัวกลุ่ม (แทน `<optgroup>`) — ตัวเลือกที่กลุ่มเดียวกันติดกันอยู่ใต้หัวเดียว · `className` = สีของคำ (เช่น สถานะบัญชี) */
+export type FieldSelectOption = { value: string; label: string; disabled?: boolean; group?: string; className?: string };
 
 /** ตัวเลือกติดกันที่กลุ่มเดียวกัน = ก้อนเดียว (ไม่มีกลุ่ม = ก้อนไร้หัว) */
 function chunkByGroup(options: readonly FieldSelectOption[]): Array<{ group?: string; items: FieldSelectOption[] }> {
@@ -65,7 +65,7 @@ export function FieldSelect({
         {chunkByGroup(options).map((chunk, ci) => {
           const items = chunk.items.map((o, i) => (
             <SelectItem key={`${o.value || EMPTY}-${i}`} value={o.value === '' ? EMPTY : o.value} disabled={o.disabled}>
-              {o.label}
+              {o.className ? <span className={o.className}>{o.label}</span> : o.label}
             </SelectItem>
           ));
           return chunk.group ? (

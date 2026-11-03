@@ -84,7 +84,8 @@ describe('อ่านคำตอบ options API', () => {
 
   it('ครบ 4 ส่วน · สถานะที่ไม่รู้จัก = เลือกไม่ได้', () => {
     expect(o.source).toBe('api');
-    expect(o.accounts.map((a) => a.status)).toEqual(['busy', 'paused', 'full', 'no_worker']);
+    // สถานะที่ไม่รู้จัก = unknown เลือกไม่ได้ แสดง warning ตรง ๆ (สเปค 6.1 · 3 พ.ย. 2569 · เดิมยุบเป็น no_worker)
+    expect(o.accounts.map((a) => a.status)).toEqual(['busy', 'paused', 'full', 'unknown']);
     expect(o.accounts[0]).toMatchObject({ worker: 'SONB-RM009', postedToday: 5, dailyCap: 20, queue: { running: 1, queued: 0 } });
     expect(o.workers[0]).toMatchObject({ load: 2, kinds: ['autopost', 'scraper'], scrapeQueue: { running: 1, queued: 0 } });
     expect(o.accounts[0].sessionWorkers).toEqual(['SONB-RM009']);
@@ -178,7 +179,7 @@ describe('key ไม่ออกไปหน้าจอ', () => {
     const view = readFileSync('api/_lib/soScrapingOptions.ts', 'utf8');
     expect(view).toMatch(/configured: Boolean\(r\?\.key_enc/);
     expect(view).not.toMatch(/key:\s*decryptApiKey/);
-    expect(readFileSync('src/lib/jobPostingRequestsApi.ts', 'utf8')).toContain("'/api/matching/job-postings?options=1'");
+    expect(readFileSync('src/lib/jobPostingRequestsApi.ts', 'utf8')).toContain('`/api/matching/job-postings?options=1${requestNo ?');
     expect(readFileSync('src/components/jobs/AutopostDialog.tsx', 'utf8')).not.toContain('so-scraping.vercel.app');
   });
 });
@@ -195,7 +196,7 @@ describe('เริ่มงานทันที (start · เอกสาร�
     }) as unknown as typeof fetch;
     const r = await callSoStart('https://so-scraping.vercel.app', 'k1', 'OPL6910068', spy);
     expect(seen).toEqual({ url: 'https://so-scraping.vercel.app/api/integrations/jarvis/start', method: 'POST', key: 'k1', body: '{"request_no":"OPL6910068"}' });
-    expect(r).toEqual({ state: 'started', worker: 'SONB-RM009', preflightQueued: true, queued: null, message: null });
+    expect(r).toEqual({ state: 'started', worker: 'SONB-RM009', preflightQueued: true, queued: null, message: null, skippedGroups: 0 });
     expect(soStartText(r)?.text).toBe('เริ่มงานแล้ว ที่เครื่อง SONB-RM009 · บัญชีต้องทดสอบก่อน งานจะเริ่มช้าขึ้นราว 1 นาที');
   });
 

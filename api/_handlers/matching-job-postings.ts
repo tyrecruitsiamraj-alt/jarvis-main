@@ -20,7 +20,7 @@ import {
 } from '../_lib/jobPostingRequests.js';
 import { isSiamrajRequestInScope, loadScopedRequestNoSet } from '../_lib/siamrajUnitRequests.js';
 import { listSoGroups } from '../_lib/soScrapingGroups.js';
-import { fetchSoOptions, SoOptionsError, startSoRequest } from '../_lib/soScrapingOptions.js';
+import { fetchSoOptions, fetchSoRunMessage, SoOptionsError, startSoRequest } from '../_lib/soScrapingOptions.js';
 import { dbQuery } from '../_lib/postgres.js';
 import { tableInAppSchema } from '../_lib/schema.js';
 
@@ -101,11 +101,19 @@ async function handler(req: AuthedReq, res: ApiRes) {
       // (26 ต.ค. 2569 · ดึงใหม่ทุกครั้ง ไม่ cache · key อยู่ฝั่ง server) — ยังไม่ใส่ key = อ่านจากฐานแบบเดิม
       if (getQuery(req, 'autopost') === '1' || getQuery(req, 'options') === '1') {
         try {
-          return res.status(200).json(await fetchSoOptions());
+          const requestNo = (getQuery(req, 'request_no') ?? '').trim() || null;
+          return res.status(200).json(await fetchSoOptions(requestNo));
         } catch (e) {
           if (e instanceof SoOptionsError) return sendError(res, e.status, 'So Scraping', e.message);
           throw e;
         }
+      }
+      // ข้อความรอบล่าสุดของงานโพสต์จาก So Scraping (สเปค 6.4 · 3 พ.ย. 2569) — เช่น "ข้าม 3 กลุ่มที่เพิ่งลง"
+      if (getQuery(req, 'run_message') === '1') {
+        const requestNo = (getQuery(req, 'request_no') ?? '').trim();
+        if (!requestNo) return sendError(res, 400, 'Bad request', 'request_no is required');
+        if (!(await isSiamrajRequestInScope(req.user, requestNo))) return res.status(200).json({ run_message: null });
+        return res.status(200).json({ run_message: await fetchSoRunMessage(requestNo) });
       }
       // ป้ายสถานะบนการ์ดกล่องงาน + ตัวกรอง (20 ต.ค. 2569) — ล่าสุดต่อ (ใบ, ประเภท) ของใบที่ผู้ใช้เห็นได้
       if (getQuery(req, 'board') === '1') {
