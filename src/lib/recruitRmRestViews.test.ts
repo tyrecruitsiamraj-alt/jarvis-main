@@ -105,6 +105,10 @@ describe('บรรทัดบนแถว = ชื่อชิป + ข้อ�
     expect(rmRowStatusOf(row({ last_call_status: 'failed', last_call_followup: 'needs_human', last_call_outcome: 'busy', last_call_attempts: 3, ai_answer: { micro: 'no_pickup', at: null } })).detail).toMatch(/^AI โทร 3 ครั้ง · ล่าสุด สายไม่ว่าง/);
     expect(rmRowStatusOf(row({ last_call_status: 'pending', last_call_followup: 'retry_scheduled', last_call_attempts: 2, last_call_prev_outcome: 'no_answer', last_call_next_at: FUTURE })).detail).toMatch(/^โทรแล้ว 1 ครั้ง ไม่รับสาย · โทรซ้ำ /);
     expect(rmRowStatusOf(row({ last_call_status: 'completed', ai_answer: { micro: 'picked_silent', at: null } })).detail).toBe('รับสายแต่ไม่พูด');
+    // โทรซ้ำที่ส่งถึง Lumos แล้ว = รอคิว ไม่ใช่เลยเวลา (3 พ.ย. 2569 "นัดโทรซ้ำ … ยังไม่มีผล คือไร")
+    expect(
+      rmRowStatusOf(row({ last_call_status: 'pending', last_call_attempts: 2, last_call_prev_outcome: 'unresponsive', last_call_next_at: '2026-11-03T08:11:00Z', last_call_push_state: 'pushed', last_call_sent_at: '2026-11-03T08:11:30Z', last_call_queue_ahead: 120 })).detail,
+    ).toBe('โทรแล้ว 1 ครั้ง รับแต่ไม่ตอบ · ส่งโทรซ้ำ 3 พ.ย. 15:11 · คิวก่อนหน้า 120 คน');
     expect(rmRowStatusOf(row({ job_id: undefined })).detail).toBe('AI ไม่โทร · เลือกใบขอแล้วกดส่ง AI ได้');
   });
 });

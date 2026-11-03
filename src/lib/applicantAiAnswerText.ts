@@ -86,7 +86,13 @@ export function rmRowStatusOf(r: PublicApplication, now: number = Date.now()): R
       if (q?.kind === 'retry' || q?.kind === 'retry_late') {
         const prev = OUTCOME_SHORT[(r.last_call_prev_outcome ?? '').trim()] ?? 'ไม่ได้คำตอบ';
         const at = rowWhen(r.last_call_next_at);
-        return { view, title: 'รอ AI โทรซ้ำ', detail: join(`โทรแล้ว ${Math.max(1, n - 1)} ครั้ง ${prev}`, at ? `โทรซ้ำ ${at}` : null, q.kind === 'retry_late' ? 'เลยเวลาแล้ว ยังไม่มีผล' : null), tone: q.kind === 'retry_late' ? 'danger' : 'warn' };
+        const done = `โทรแล้ว ${Math.max(1, n - 1)} ครั้ง ${prev}`;
+        // ส่งรอบโทรซ้ำถึง Lumos แล้ว = รอคิว Lumos ไม่ใช่ "เลยเวลา" (3 พ.ย. 2569 สายโทรซ้ำ 322 สายส่งตรงเวลาแต่รอคิว)
+        if (r.last_call_push_state === 'pushed' && typeof r.last_call_queue_ahead === 'number') {
+          const sent = rowWhen(r.last_call_sent_at);
+          return { view, title: 'รอ AI โทรซ้ำ', detail: join(done, sent ? `ส่งโทรซ้ำ ${sent}` : null, `คิวก่อนหน้า ${r.last_call_queue_ahead.toLocaleString('th-TH')} คน`), tone: 'warn' };
+        }
+        return { view, title: 'รอ AI โทรซ้ำ', detail: join(done, at ? `โทรซ้ำ ${at}` : null, q.kind === 'retry_late' ? 'เลยเวลาแล้ว ยังไม่ได้ส่ง' : null), tone: q.kind === 'retry_late' ? 'danger' : 'warn' };
       }
       if (q?.kind === 'silent') return { view, title: 'รอ AI โทร', detail: 'ส่งเกิน 24 ชม. Lumos ยังไม่โทร · กดส่ง AI ใหม่ได้', tone: 'danger' };
       if (q?.kind === 'first_late') return { view, title: 'รอ AI โทร', detail: join(rowWhen(r.last_call_sent_at) ? `ส่ง ${rowWhen(r.last_call_sent_at)}` : null, 'เกิน 24 ชม. ยังไม่มีผล'), tone: 'danger' };
