@@ -77,7 +77,7 @@ const ErpBoardCardDialog: React.FC<{ cardId: number | null; overview: ErpBoardOv
                 </DialogDescription>
               </DialogHeader>
 
-              <ol className="flex flex-wrap gap-1.5" data-testid="erp-board-steps">
+              <ol className="pointer-events-none flex flex-wrap gap-1.5" data-testid="erp-board-steps">
                 {steps.map((s) => {
                   const isCurrent = current?.id === s.id;
                   const isPast = current ? s.seq < current.seq : false;
@@ -86,7 +86,7 @@ const ErpBoardCardDialog: React.FC<{ cardId: number | null; overview: ErpBoardOv
                       key={s.id}
                       className={cn(
                         'flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs',
-                        isCurrent ? TONE.primary.solid : isPast ? cn(TONE.success.soft, TONE.success.value) : TONE.neutral.outline,
+                        isCurrent ? TONE.primary.solid : isPast ? cn(TONE.success.soft, TONE.success.value) : cn(TONE.neutral.soft, TONE.neutral.value),
                       )}
                     >
                       <span className="tabular-nums">{s.seq}</span>
