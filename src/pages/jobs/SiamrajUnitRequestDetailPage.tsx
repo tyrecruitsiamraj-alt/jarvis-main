@@ -24,6 +24,7 @@ import { refreshJobStaffFromApi } from '@/lib/jobStaffRemote';
 import { JOB_STAFF_ROSTER_CHANGED_EVENT } from '@/lib/jobStaffRemote';
 import { UnitRequestNoteDetail } from '@/components/jobs/UnitRequestNoteField';
 import UnitRequestInfoFields from '@/components/jobs/UnitRequestInfoFields';
+import OrderPostButton from '@/components/jobs/OrderPostButton';
 import UnitRequestTabs from '@/components/jobs/UnitRequestTabs';
 import { UnitRequestReplacementSelect } from '@/components/jobs/UnitRequestReplacementToggle';
 import {
@@ -33,7 +34,7 @@ import {
 import type { JobRequest } from '@/types';
 import { cn } from '@/lib/utils';
 import { TONE } from '@/lib/designTokens';
-import { ChevronDown, Database, ExternalLink, History, Landmark, Users, StickyNote, UserCheck, ClipboardList } from 'lucide-react';
+import { ChevronDown, Database, ExternalLink, History, Landmark, Megaphone, Users, StickyNote, UserCheck, ClipboardList } from 'lucide-react';
 import UnitEditLogSection from '@/components/jobs/UnitEditLogSection';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { RequestRateLinesBlock, ResignedEmployeeBlock } from '@/components/jobs/UnitRequestPayBlocks';
@@ -285,6 +286,16 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
             </div>
 
             {/* เกณฑ์ความเร่งเฉพาะใบ ย้ายไป ตั้งค่า › เกณฑ์ความเร่งใบขอ แล้ว (เจ้าของ 3 พ.ย. 2569) */}
+
+            {/* สั่ง Autopost / ขอ Scrap จากหน้าใบขอ (เจ้าของ 3 พ.ย. 2569 "ทำให้สั่ง autopost กับ Scrap ตรงนี้ได้ด้วยเลย")
+                ตัวเดียวกับป๊อปประกาศ (`OrderPostButton`) — สถานะล่าสุด + Autopost กดทีเดียวจบ + ขอ Scrap */}
+            <section className="glass-card rounded-3xl p-4 border border-white/70 space-y-3" data-testid="detail-order-post">
+              <h3 className="text-sm font-medium flex items-center gap-1.5">
+                <Megaphone className={cn('w-4 h-4', TONE.primary.value)} aria-hidden />
+                Autopost / Scrap
+              </h3>
+              <OrderPostButton job={data} />
+            </section>
 
             <section className="glass-card rounded-3xl p-4 border border-white/70 space-y-2">
               {/* หัวข้อเป็นปุ่มกาง/หุบ (เจ้าของสั่ง 25 ส.ค. 2569) — ลูกศรหมุนตามสถานะ
