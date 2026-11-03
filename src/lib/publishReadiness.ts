@@ -17,7 +17,7 @@
  */
 import type { JobRequest } from '@/types';
 import { genderNeedsChoice } from '@/lib/genderRequirement';
-import { publicSafeAddress } from '@/lib/publicJobPrivacy';
+import { publicSafeAddress, publicWorkSchedule } from '@/lib/publicJobPrivacy';
 import { incomeDisplay } from '@/lib/incomeLabel';
 import { INCOME_PERIOD_LABEL } from '@/lib/incomeBreakdown';
 import { JOB_BOX_LABEL, openJobBoxOf, type OpenBoxKey } from '@/lib/jobBoxGroups';
@@ -72,14 +72,46 @@ export function publicIncomeOf(
   return d ? { text: d.text, unit: d.period !== 'unknown', manual: false, hint: d.hint } : null;
 }
 
-/** ใบนี้ยังขาดอะไรก่อนขึ้นประกาศ — ว่าง = ครบ */
+/**
+ * ═══ ใบขอขาดข้อมูลอะไร — ตัวตัดสินที่เดียว (เจ้าของ 3 พ.ย. 2569 *"บอกเลยได้ไหมว่า ใบขอขาดอะไร เช่น ขาดอายุ ขาดเพศ ขาดคุณสมบัติ ขาดเงินเดือน"*) ═══
+ * ดูจากค่าที่ใช้จริงหลังรวม ERP + ที่ทีมแก้ (รายละเอียดงาน/คุณสมบัติ ค่าตั้งต้น = ERP ตั้งแต่ 3 พ.ย. 2569)
+ * 3 ช่องแรกคือชุดเดียวกับ "พร้อมประกาศ" ของกล่องงาน (`publishGapsOf`) — ห้ามเขียนเงื่อนไขซ้ำที่อื่น
+ * "เงินเดือน" ใช้คำว่า **รายได้** ให้ตรงกับชิปกล่องงาน (นิยามเดียวกัน: คนนอกเห็นเลขพร้อมหน่วย)
+ */
+export const REQUEST_GAP_KEYS = ['place', 'income', 'gender', 'age', 'schedule', 'requirements', 'details'] as const;
+export type RequestGapKey = (typeof REQUEST_GAP_KEYS)[number];
+
+export const REQUEST_GAP_LABEL: Record<RequestGapKey, string> = {
+  ...PUBLISH_GAP_LABEL,
+  age: 'อายุ',
+  schedule: 'วันเวลาทำงาน',
+  requirements: 'คุณสมบัติ',
+  details: 'รายละเอียดงาน',
+};
+
+const hasLines = (xs: readonly string[] | null | undefined) => (xs ?? []).some((x) => x.trim() !== '');
+
+const REQUEST_GAP_TEST: Record<RequestGapKey, (job: JobRequest) => boolean> = {
+  place: (job) => !publicSafeAddress(job),
+  income: (job) => {
+    const income = publicIncomeOf(job);
+    return !income || !income.unit;
+  },
+  gender: (job) => genderNeedsChoice(job),
+  age: (job) => job.age_range_min == null && job.age_range_max == null,
+  schedule: (job) => !publicWorkSchedule(job.work_schedule),
+  requirements: (job) => !hasLines(job.requirements),
+  details: (job) => !hasLines(job.job_details),
+};
+
+/** ใบขอขาดข้อมูลอะไรบ้าง (ลำดับตามบนจอ) — ว่าง = ครบ */
+export function requestGapsOf(job: JobRequest): RequestGapKey[] {
+  return REQUEST_GAP_KEYS.filter((k) => REQUEST_GAP_TEST[k](job));
+}
+
+/** ใบนี้ยังขาดอะไรก่อนขึ้นประกาศ — ว่าง = ครบ (ชุดย่อยของ `requestGapsOf`) */
 export function publishGapsOf(job: JobRequest): PublishGapKey[] {
-  const gaps: PublishGapKey[] = [];
-  if (!publicSafeAddress(job)) gaps.push('place');
-  const income = publicIncomeOf(job);
-  if (!income || !income.unit) gaps.push('income');
-  if (genderNeedsChoice(job)) gaps.push('gender');
-  return gaps;
+  return PUBLISH_GAP_KEYS.filter((k) => REQUEST_GAP_TEST[k](job));
 }
 
 export type PublishReadiness =

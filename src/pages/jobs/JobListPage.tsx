@@ -28,6 +28,7 @@ import Term from '@/components/shared/Term';
 import JobUrgencyBadge from '@/components/jobs/JobUrgencyBadge';
 import { jobSlaCell, SLA_CELL_SHORT, SLA_FILTER_ORDER } from '@/lib/dashboard/slaByLeadKind';
 import UnitRequestReplacementBadge from '@/components/jobs/UnitRequestReplacementBadge';
+import RequestGapsLine from '@/components/jobs/RequestGapsLine';
 import PrequestBadge from '@/components/jobs/PrequestBadge';
 import { UnitRequestNotePreview } from '@/components/jobs/UnitRequestNoteField';
 import { UnitRequestWorkStatusBadge } from '@/components/jobs/UnitRequestWorkStatusField';
@@ -914,6 +915,7 @@ const JobListPage: React.FC = () => {
                       {jobPositionUnits(j)}
                     </span>
                   </div>
+                  <RequestGapsLine job={j} className="mt-1" />
 
                   <div className="text-xs text-muted-foreground mt-1 space-y-0.5">
                     {(() => {
@@ -1089,7 +1091,10 @@ const JobListPage: React.FC = () => {
                         ของตารางเองให้แน่นอน — บั๊กเดิมที่ branding เขียน --foreground ทับ inline
                         บน <html> จนไม่สลับตามธีมนั้น แก้แล้วที่ brandingStorage.applyBrandSurfaceVars()
                         และมีเทสต์คุมที่ tests/api/brandingSurfaceTheme.test.ts */}
-                    <td className={cn('px-1.5 py-3 text-xs', DASH.cell)}>{unitLabel(j)}</td>
+                    <td className={cn('px-1.5 py-3 text-xs', DASH.cell)}>
+                      {unitLabel(j)}
+                      <RequestGapsLine job={j} className="mt-0.5" />
+                    </td>
                     {/* ราชการ/เอกชน — **อ่านอย่างเดียว** (เจ้าของสั่ง 25 ส.ค. 2569:
                         *"เอาไปบอกด้วยว่าเป็นอะไร แต่ถ้าจะเลือกต้องมาเลือกข้างใน"*)
                         ⚠️ ห้ามเอา dropdown กลับมาที่นี่ — เคยอยู่ตรงนี้แล้วเจ้าของสั่งย้ายออก (รอบ 39) */}
