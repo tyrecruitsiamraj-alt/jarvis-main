@@ -109,6 +109,23 @@ export function requestGapsOf(job: JobRequest): RequestGapKey[] {
   return REQUEST_GAP_KEYS.filter((k) => REQUEST_GAP_TEST[k](job));
 }
 
+/**
+ * ตัวกรอง "ข้อมูลใบขอ" หน้าใบขอ (เจ้าของ 3 พ.ย. 2569 "เพิ่ม filter ดูว่าใบขอไหนรายละเอียดไม่ครบ")
+ * missing = ขาดอะไรก็ได้ · complete = ครบ · ชื่อช่อง = ขาดช่องนั้น · เลือกหลายค่า = ตรงค่าใดค่าหนึ่ง · ตัวตัดสิน `requestGapsOf` ตัวเดียวกับบรรทัด "ขาด:"
+ */
+export const REQUEST_GAP_FILTER_VALUES = ['missing', 'complete', ...REQUEST_GAP_KEYS] as const;
+export type RequestGapFilterValue = (typeof REQUEST_GAP_FILTER_VALUES)[number];
+export const REQUEST_GAP_FILTER_OPTIONS: { value: RequestGapFilterValue; label: string }[] = [
+  { value: 'missing', label: 'ไม่ครบ' },
+  { value: 'complete', label: 'ครบ' },
+  ...REQUEST_GAP_KEYS.map((k) => ({ value: k, label: `ขาด${REQUEST_GAP_LABEL[k]}` })),
+];
+export function matchesRequestGapFilter(job: JobRequest, values: readonly RequestGapFilterValue[]): boolean {
+  if (values.length === 0) return true;
+  const gaps = requestGapsOf(job);
+  return values.some((v) => (v === 'missing' ? gaps.length > 0 : v === 'complete' ? gaps.length === 0 : gaps.includes(v)));
+}
+
 /** ใบนี้ยังขาดอะไรก่อนขึ้นประกาศ — ว่าง = ครบ (ชุดย่อยของ `requestGapsOf`) */
 export function publishGapsOf(job: JobRequest): PublishGapKey[] {
   return PUBLISH_GAP_KEYS.filter((k) => REQUEST_GAP_TEST[k](job));

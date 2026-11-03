@@ -178,7 +178,7 @@ describe('ช่อง SLA หน้ารายการใบขอ', () => {
     expect(jobSlaCell(safe, today)).toBe('on_track');
   });
 
-  it('คอลัมน์ SLA ถอดออกจากตารางแล้ว (เจ้าของ 2 พ.ย. 2569 "เอาออก") · ลิงก์เก่า ?tsort=sla ถอยเป็นไม่เรียง · ตัวกรองยังอยู่', () => {
+  it('คอลัมน์ SLA ถอดออกจากตารางแล้ว (เจ้าของ 2 พ.ย. 2569 "เอาออก") · ลิงก์เก่า ?tsort=sla ถอยเป็นไม่เรียง', () => {
     expect(JOB_LIST_TABLE_COLUMNS).not.toContain('sla');
     expect(parseTableSort('sla:asc')).toBeNull();
     const src = fs.readFileSync(path.resolve(__dirname, '../../src/pages/jobs/JobListPage.tsx'), 'utf8');
@@ -187,17 +187,12 @@ describe('ช่อง SLA หน้ารายการใบขอ', () => {
     expect(fs.existsSync(path.resolve(__dirname, '../../src/components/jobs/JobSlaBadge.tsx'))).toBe(false);
   });
 
-  it('ตัวกรอง SLA เก็บใน URL (?sla=) · ค่าแปลกถูกทิ้ง · เปลี่ยนแล้วกลับหน้า 1', () => {
-    const p = buildJobListSearchParams({ ...JOB_LIST_DEFAULTS, slaFilter: ['breached', 'at_risk'] });
-    expect(p.get('sla')).toBe('breached,at_risk');
-    expect(parseJobListSearchParams(new URLSearchParams('sla=breached,xxx,on_track')).slaFilter).toEqual(['breached', 'on_track']);
-    expect(parseJobListSearchParams(new URLSearchParams('')).slaFilter).toEqual([]);
-  });
-
-  it('หน้ารายการใบขอมีตัวกรอง SLA ที่ใช้ jobSlaCell ตัวเดียวกับป้าย', () => {
+  it('ตัวกรอง SLA หน้าใบขอถอดออกแล้ว (เจ้าของ 3 พ.ย. 2569 "Sla เอาออก") · ลิงก์เก่า ?sla= ไม่มีผล', () => {
     const src = fs.readFileSync(path.resolve(__dirname, '../../src/pages/jobs/JobListPage.tsx'), 'utf8');
-    expect(src).toContain('id="job-list-sla"');
-    expect(src).toContain('slaFilter.includes(jobSlaCell(j))');
+    expect(src).not.toContain('job-list-sla');
+    expect(src).not.toContain('slaFilter');
+    expect(parseJobListSearchParams(new URLSearchParams('sla=breached'))).toEqual(parseJobListSearchParams(new URLSearchParams('')));
+    expect(buildJobListSearchParams(JOB_LIST_DEFAULTS).has('sla')).toBe(false);
   });
 
   it('ศูนย์ควบคุมใบขอ: กดเลขแถวรวมทุกชนิดได้ — รายการเท่าเลขในตาราง', () => {

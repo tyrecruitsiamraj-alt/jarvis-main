@@ -26,9 +26,9 @@ import { navigateToUnitRequest, shouldOpenInNewTabFromEvent } from '@/lib/jobNav
 import { ChevronRight, RefreshCw, SlidersHorizontal } from 'lucide-react';
 import Term from '@/components/shared/Term';
 import JobUrgencyBadge from '@/components/jobs/JobUrgencyBadge';
-import { jobSlaCell, SLA_CELL_SHORT, SLA_FILTER_ORDER } from '@/lib/dashboard/slaByLeadKind';
 import UnitRequestReplacementBadge from '@/components/jobs/UnitRequestReplacementBadge';
 import RequestGapsLine from '@/components/jobs/RequestGapsLine';
+import { matchesRequestGapFilter, REQUEST_GAP_FILTER_OPTIONS } from '@/lib/publishReadiness';
 import PrequestBadge from '@/components/jobs/PrequestBadge';
 import { UnitRequestNotePreview } from '@/components/jobs/UnitRequestNoteField';
 import { UnitRequestWorkStatusBadge } from '@/components/jobs/UnitRequestWorkStatusField';
@@ -157,7 +157,7 @@ const JobListPage: React.FC = () => {
     replacementFilter,
     sectorFilter,
     ageDaysFilter,
-    slaFilter,
+    gapFilter,
     sort,
     tableSort,
     page,
@@ -217,7 +217,7 @@ const JobListPage: React.FC = () => {
       replacementFilter,
       sectorFilter,
       ageDaysFilter,
-      slaFilter,
+      gapFilter,
     ];
     let n = lists.reduce((acc, v) => acc + (Array.isArray(v) ? v.length : v ? 1 : 0), 0);
     /**
@@ -241,7 +241,7 @@ const JobListPage: React.FC = () => {
     replacementFilter,
     sectorFilter,
     ageDaysFilter,
-    slaFilter,
+    gapFilter,
     filter,
   ]);
 
@@ -465,7 +465,7 @@ const JobListPage: React.FC = () => {
       if (!matchesAnyReplacementFilter(j, replacementFilter)) return false;
       if (!matchesAnyUnitSectorFilter(j.unit_sector, sectorFilter)) return false;
       if (!matchesAnyAgeDaysFilter(j, ageDaysFilter)) return false;
-      if (slaFilter.length > 0 && !slaFilter.includes(jobSlaCell(j))) return false;
+      if (!matchesRequestGapFilter(j, gapFilter)) return false;
         if (filter === 'all') return true;
         if (filter === 'closed') return j.status === 'closed';
         return j.status !== 'closed';
@@ -483,7 +483,7 @@ const JobListPage: React.FC = () => {
           ? compareJobsByTableColumn(a, b, tableSort)
           : compareJobsForListSort(a, b, sort),
       );
-  }, [scopedJobs, filter, search, unitFilter, recruiterFilter, screenerFilter, oplFilter, urgencyFilter, workStatusFilter, noteFilter, replacementFilter, sectorFilter, ageDaysFilter, slaFilter, sort, tableSort, unitScopeNames, lookupJob]);
+  }, [scopedJobs, filter, search, unitFilter, recruiterFilter, screenerFilter, oplFilter, urgencyFilter, workStatusFilter, noteFilter, replacementFilter, sectorFilter, ageDaysFilter, gapFilter, sort, tableSort, unitScopeNames, lookupJob]);
 
   const totalPages = getTotalPages(filtered.length, pageSize);
 
@@ -768,12 +768,12 @@ const JobListPage: React.FC = () => {
           />
 
           <FilterMultiSelect
-            id="job-list-sla"
-            label="SLA"
+            id="job-list-gap"
+            label="ข้อมูลใบขอ"
             summaryNoun="แบบ"
-            values={slaFilter}
-            onChange={(v) => updateListState({ slaFilter: v as typeof slaFilter })}
-            options={SLA_FILTER_ORDER.map((k) => ({ value: k, label: SLA_CELL_SHORT[k] }))}
+            values={gapFilter}
+            onChange={(v) => updateListState({ gapFilter: v as typeof gapFilter })}
+            options={REQUEST_GAP_FILTER_OPTIONS}
           />
 
           {/* dropdown กับการกดหัวคอลัมน์เป็นตัวเรียง**คนละตัว** — เลือก dropdown = ล้าง
