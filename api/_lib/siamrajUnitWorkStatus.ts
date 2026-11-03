@@ -33,6 +33,11 @@ export type UnitWorkStatusRow = {
   person_last_name: string | null;
   status_date: string | null;
   persons: UnitWorkStatusPerson[];
+  /**
+   * ชื่อที่เก็บไว้ตอนสถานะ "ดำเนินการ" (เจ้าของ 3 พ.ย. 2569 Choice "เก็บชื่อไว้ เลือกสถานะเดิมแล้วขึ้นกลับมา")
+   * ดำเนินการไม่โชว์ชื่อ (`persons` ว่าง) แต่ไม่ลบ · เปลี่ยนกลับเป็นสถานะที่ต้องมีชื่อ = ช่องชื่อขึ้นชุดนี้ให้
+   */
+  held_persons: UnitWorkStatusPerson[];
   updated_at: string | null;
 };
 
@@ -188,17 +193,21 @@ function personsFromLegacy(r: Row): UnitWorkStatusPerson[] {
   ];
 }
 
-function mapRow(r: Row): UnitWorkStatusRow {
+export function mapRow(r: Row): UnitWorkStatusRow {
   const fromJson = normalizePersons(r.persons);
-  const persons = fromJson.length > 0 ? fromJson : personsFromLegacy(r);
+  const stored = fromJson.length > 0 ? fromJson : personsFromLegacy(r);
+  const status = isUnitRequestWorkStatus(r.status) ? r.status : 'in_progress';
+  // ดำเนินการ = ไม่มีชื่อบนจอ · ชื่อที่เก็บไว้อยู่ใน held_persons
+  const persons = status === 'in_progress' ? [] : stored;
   const primary = persons[0] ?? null;
   return {
     request_no: r.request_no,
-    status: isUnitRequestWorkStatus(r.status) ? r.status : 'in_progress',
+    status,
     person_first_name: primary?.first_name ?? null,
     person_last_name: primary?.last_name ?? null,
     status_date: primary?.status_date ?? null,
     persons,
+    held_persons: status === 'in_progress' ? stored : [],
     updated_at: toIso(r.updated_at),
   };
 }
@@ -435,6 +444,9 @@ export async function upsertUnitWorkStatus(input: {
   const statusDate = primary?.status_date ?? null;
   const userId = asUserId(input.userId ?? null);
   const previous = await getUnitWorkStatus(requestNo);
+  // กลับเป็นดำเนินการ = เก็บชื่อชุดล่าสุดไว้ในคอลัมน์ persons (คอลัมน์ชื่อเดี่ยวยังว่าง) · mapRow ซ่อนให้เอง
+  const storedPersons =
+    input.status === 'in_progress' ? (previous ? (previous.status === 'in_progress' ? previous.held_persons : previous.persons) : []) : persons;
 
   const runInsert = async (withPersons: boolean): Promise<Row> => {
     if (withPersons) {
@@ -451,7 +463,7 @@ export async function upsertUnitWorkStatus(input: {
            updated_by_user_id = excluded.updated_by_user_id,
            updated_at = now()
          returning ${SELECT_COLS}`,
-        [requestNo, input.status, first, last, statusDate, JSON.stringify(persons), userId],
+        [requestNo, input.status, first, last, statusDate, JSON.stringify(storedPersons), userId],
       );
       if (!rows[0]) throw new Error('upsert failed');
       return rows[0];
@@ -476,7 +488,7 @@ export async function upsertUnitWorkStatus(input: {
   };
 
   const finish = async (row: Row): Promise<UnitWorkStatusRow> => {
-    const next = mapRow({ ...row, persons: row.persons ?? persons });
+    const next = mapRow({ ...row, persons: row.persons ?? storedPersons });
     await appendWorkStatusHistory({
       requestNo,
       next,

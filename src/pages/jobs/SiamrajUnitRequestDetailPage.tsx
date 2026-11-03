@@ -463,6 +463,7 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
                       initialLastName={data.work_person_last_name}
                       initialStatusDate={data.work_status_date}
                       initialPersons={data.work_persons}
+                      initialHeldPersons={data.work_held_persons}
                       hideLabel
                       onSaved={(next) => {
                         queryClient.setQueryData<JobRequest>(['siamraj', 'unit-request', id], (old) =>

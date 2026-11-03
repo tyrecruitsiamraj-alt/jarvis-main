@@ -44,6 +44,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
           person_last_name: null,
           status_date: null,
           persons: [],
+          held_persons: [],
           updated_at: null,
         },
       );

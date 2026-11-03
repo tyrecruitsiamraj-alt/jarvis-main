@@ -386,6 +386,8 @@ export interface JobRequest {
   work_status_date?: string | null;
   /** รายชื่อคนในสถานะทำงาน (หลายคนต่อใบได้) */
   work_persons?: Array<{ first_name: string; last_name: string; status_date: string | null }> | null;
+  /** ชื่อที่เก็บไว้ตอนสถานะดำเนินการ — ไม่โชว์ แต่เปลี่ยนกลับเป็นสถานะที่ต้องมีชื่อแล้วขึ้นให้ (3 พ.ย. 2569) */
+  work_held_persons?: Array<{ first_name: string; last_name: string; status_date: string | null }> | null;
   /** สาขาที่ผู้ใช้แก้เอง (persist) — ใช้แทนผลแตกสาขาจาก ERP */
   branch_override?: Array<{
     branch_id?: string;

@@ -28,6 +28,7 @@ type SavedPayload = {
   work_person_last_name: string | null;
   work_status_date: string | null;
   work_persons: Array<{ first_name: string; last_name: string; status_date: string | null }>;
+  work_held_persons: Array<{ first_name: string; last_name: string; status_date: string | null }>;
 };
 
 type Props = {
@@ -37,6 +38,8 @@ type Props = {
   initialLastName?: string | null;
   initialStatusDate?: string | null;
   initialPersons?: Array<{ first_name?: string | null; last_name?: string | null; status_date?: string | null }> | null;
+  /** ชื่อที่เก็บไว้ตอนดำเนินการ (`work_held_persons`) — เลือกสถานะที่ต้องมีชื่อแล้วขึ้นให้ ไม่ต้องพิมพ์ใหม่ */
+  initialHeldPersons?: Props['initialPersons'];
   /** ซ่อนป้าย "สถานะทำงาน" ของตัวเอง (ผู้เรียกวางป้ายให้แล้ว) */
   hideLabel?: boolean;
   onSaved?: (next: SavedPayload) => void;
@@ -132,6 +135,7 @@ export const UnitRequestWorkStatusEditor: React.FC<Props> = ({
   initialLastName,
   initialStatusDate,
   initialPersons,
+  initialHeldPersons,
   hideLabel,
   onSaved,
 }) => {
@@ -139,8 +143,13 @@ export const UnitRequestWorkStatusEditor: React.FC<Props> = ({
   const readOnly = !isFunctionEnabled('unit_notes_edit');
 
   const [status, setStatus] = useState<UnitRequestWorkStatus>(resolveUnitRequestWorkStatus(initialStatus));
+  // ดำเนินการ = ไม่มีชื่อบนจอ แต่ช่องชื่อเตรียมชุดที่เก็บไว้ (เลือกสถานะเดิมกลับมาแล้วไม่ต้องพิมพ์ใหม่)
+  const draftSource = useMemo(
+    () => (initialPersons && initialPersons.length > 0 ? initialPersons : initialHeldPersons),
+    [initialPersons, initialHeldPersons],
+  );
   const [persons, setPersons] = useState<PersonDraft[]>(() =>
-    personsFromInitial(initialPersons, initialFirstName, initialLastName, initialStatusDate),
+    personsFromInitial(draftSource, initialFirstName, initialLastName, initialStatusDate),
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -148,10 +157,10 @@ export const UnitRequestWorkStatusEditor: React.FC<Props> = ({
 
   useEffect(() => {
     setStatus(resolveUnitRequestWorkStatus(initialStatus));
-    setPersons(personsFromInitial(initialPersons, initialFirstName, initialLastName, initialStatusDate));
+    setPersons(personsFromInitial(draftSource, initialFirstName, initialLastName, initialStatusDate));
     setError(null);
     setSavedMsg(null);
-  }, [requestKey, initialStatus, initialFirstName, initialLastName, initialStatusDate, initialPersons]);
+  }, [requestKey, initialStatus, initialFirstName, initialLastName, initialStatusDate, draftSource]);
 
   const needsPerson = status !== 'in_progress';
   // ป้ายช่องวันที่ + ตัวเลือกสถานะมาจาก master (Admin แก้ได้) — โค้ดเป็น fallback
@@ -246,6 +255,11 @@ export const UnitRequestWorkStatusEditor: React.FC<Props> = ({
         work_person_last_name: savedPersons[0]?.last_name ?? null,
         work_status_date: savedPersons[0]?.status_date ?? null,
         work_persons: savedPersons,
+        work_held_persons: (item.held_persons ?? []).map((p) => ({
+          first_name: p.first_name,
+          last_name: p.last_name,
+          status_date: p.status_date ?? null,
+        })),
       });
       setSavedMsg('บันทึกสถานะทำงานแล้ว');
     } catch (e) {

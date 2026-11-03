@@ -225,6 +225,7 @@ export async function attachWorkStatus(items: unknown[]): Promise<void> {
       it.work_person_last_name = w.person_last_name;
       it.work_status_date = w.status_date;
       it.work_persons = w.persons;
+      it.work_held_persons = w.held_persons;
     }
   } catch (e) {
     /* สถานะทำงานเป็นข้อมูลเสริม — แต่ต้อง log เหตุผลเดียวกับ attachAssignments */

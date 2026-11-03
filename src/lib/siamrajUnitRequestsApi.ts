@@ -254,6 +254,8 @@ export type UnitWorkStatusPayload = {
 export type UnitWorkStatusRecord = UnitWorkStatusPayload & {
   request_no: string;
   persons?: UnitWorkStatusPersonPayload[];
+  /** ชื่อที่เก็บไว้ตอนดำเนินการ (3 พ.ย. 2569) */
+  held_persons?: UnitWorkStatusPersonPayload[];
   updated_at: string | null;
 };
 
