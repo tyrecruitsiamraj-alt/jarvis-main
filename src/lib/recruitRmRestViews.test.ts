@@ -68,7 +68,8 @@ describe('ทำไมยังไม่ส่ง AI (27 ต.ค. 2569)', () => 
     expect(notSentReasonOf(row({ claimed_by_name: 'แป๋ม' }))).toBe('เก็บไปโทรเอง · แป๋ม');
     expect(notSentReasonOf(row({ job_id: undefined }))).toBe('ไม่ผูกใบขอ');
     expect(notSentReasonOf(row({ created_by_name: 'narissara.p@siamraj.com' }))).toBe('เพิ่มเอง/นำเข้า ยังไม่กดส่ง AI');
-    expect(notSentReasonOf(row({}))).toBe('สมัครผ่านลิงก์ ระบบไม่ได้ส่ง');
+    expect(notSentReasonOf(row({}))).toBe('ส่ง AI ไม่สำเร็จตอนกรอก · กดส่ง AI ได้');
+    expect(notSentReasonOf(row({ age: 60 }))).toBe('อายุ 58 ปีขึ้นไป AI ไม่โทร');
     expect(aiAnswerTextOf(row({ job_id: undefined }))).toMatchObject({ kind: 'not_sent', reason: 'ไม่ผูกใบขอ' });
   });
   it('ลำดับบนจอตามที่เจ้าของสั่ง', () => {
@@ -82,5 +83,28 @@ describe('โทรครบแล้ว (27 ต.ค. 2569 "บอกหน่�
     expect(aiCallsDoneText(row({ last_call_status: 'failed', last_call_followup: 'needs_human', last_call_outcome: 'busy', last_call_attempts: 3 }))).toBe('โทรครบ 3 ครั้งแล้ว');
     expect(aiCallsDoneText(row({ last_call_status: 'failed', last_call_followup: 'needs_human', last_call_outcome: 'wrong_person', last_call_attempts: 1 }))).toBeNull();
     expect(aiCallsDoneText(row({ last_call_status: 'pending', last_call_followup: 'retry_scheduled', last_call_attempts: 2 }))).toBeNull();
+  });
+});
+
+describe('บรรทัดบนแถว = ชื่อชิป + ข้อเท็จจริง (3 พ.ย. 2569 "แก้ให้ตรง Slot มัน")', () => {
+  it('ทุกเคสในตาราง: หัวข้อแถวตรงกับชิปที่อยู่', async () => {
+    const { rmRowStatusOf } = await import('@/lib/applicantAiAnswerText');
+    const TITLE: Record<string, string> = {
+      ai_waiting: 'รอ AI โทร', no_pickup: 'ไม่รับสาย', interested: 'สนใจ', declined: 'ไม่สนใจ',
+      ai_talked: 'คุยแล้วไม่ได้คำตอบ', not_sent: 'ไม่ได้ส่ง AI', irecruit_pull: 'iRecruit', no_job: 'ไม่ผูกใบขอ',
+    };
+    for (const [x, expected] of CASES) {
+      const st = rmRowStatusOf(row(x));
+      expect(st.view).toBe(expected);
+      expect(st.title.startsWith(TITLE[expected])).toBe(true);
+    }
+  });
+  it('บรรทัดล่างบอกข้อเท็จจริง', async () => {
+    const { rmRowStatusOf } = await import('@/lib/applicantAiAnswerText');
+    expect(rmRowStatusOf(row({ age: 60 })).detail).toBe('อายุ 58 ปีขึ้นไป AI ไม่โทร');
+    expect(rmRowStatusOf(row({ last_call_status: 'failed', last_call_followup: 'needs_human', last_call_outcome: 'busy', last_call_attempts: 3, ai_answer: { micro: 'no_pickup', at: null } })).detail).toMatch(/^AI โทร 3 ครั้ง · ล่าสุด สายไม่ว่าง/);
+    expect(rmRowStatusOf(row({ last_call_status: 'pending', last_call_followup: 'retry_scheduled', last_call_attempts: 2, last_call_prev_outcome: 'no_answer', last_call_next_at: FUTURE })).detail).toMatch(/^โทรแล้ว 1 ครั้ง ไม่รับสาย · โทรซ้ำ /);
+    expect(rmRowStatusOf(row({ last_call_status: 'completed', ai_answer: { micro: 'picked_silent', at: null } })).detail).toBe('รับสายแต่ไม่พูด');
+    expect(rmRowStatusOf(row({ job_id: undefined })).detail).toBe('AI ไม่โทร · เลือกใบขอแล้วกดส่ง AI ได้');
   });
 });

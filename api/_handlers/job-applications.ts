@@ -1727,6 +1727,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
             rec.last_call_push_state = hit.pushState ?? null;
             rec.last_call_import_status = hit.importStatus ?? null;
             rec.last_call_sent_at = hit.sentAt ?? null;
+            rec.last_call_queue_ahead = hit.queueAhead ?? null;
           }
         }
       }

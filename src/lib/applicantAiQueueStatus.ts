@@ -36,6 +36,8 @@ export type AiQueueInput = {
   last_call_push_state?: string | null;
   last_call_import_status?: string | null;
   last_call_sent_at?: string | null;
+  /** สายที่ส่งก่อนหน้าแล้วยังรอโทร — Lumos ไม่บอกเวลาโทร บอกแค่ที่รู้แน่ (3 พ.ย. 2569) */
+  last_call_queue_ahead?: number | null;
 };
 
 /** เลยเวลานัดโทรซ้ำกี่นาทีถึงเตือน — ตัวเดียวกับงานติดตาม (`OVERDUE_ALERT_MINUTES`) */
@@ -136,5 +138,10 @@ export function aiQueueStatusOf(r: AiQueueInput, now: number = Date.now()): AiQu
   if (Number.isFinite(sent) && sent < now - AI_FIRST_LATE_MINUTES * 60_000) {
     return { kind: 'first_late', label: 'ส่ง AI แล้ว ยังไม่มีผล', sub: `ส่ง ${whenText(r.last_call_sent_at)}`, tone: 'danger', atRisk: true };
   }
-  return { kind: 'waiting', label: 'รอ AI โทร', sub: null, tone: 'neutral', atRisk: false };
+  // ส่งแล้ว รอคิว Lumos (3 พ.ย. 2569 เจ้าของ "บอกไปเลยว่าส่งกี่โมง คิวก่อนหน้าเท่าไหร่") — ไม่เดาเวลาโทร
+  const parts = [
+    Number.isFinite(sentRaw) ? `ส่ง ${whenText(r.last_call_sent_at)}` : null,
+    typeof r.last_call_queue_ahead === 'number' ? `คิวก่อนหน้า ${r.last_call_queue_ahead.toLocaleString('th-TH')} คน` : null,
+  ].filter(Boolean);
+  return { kind: 'waiting', label: 'รอ AI โทร', sub: parts.length ? parts.join(' · ') : null, tone: 'neutral', atRisk: false };
 }

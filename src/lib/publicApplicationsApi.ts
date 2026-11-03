@@ -29,6 +29,8 @@ export type PublicApplication = {
   last_call_import_status?: string | null;
   /** เวลาที่ส่งรอบล่าสุดถึง Lumos — รอบแรกเงียบเกิน 30 นาที = ป้ายแดง */
   last_call_sent_at?: string | null;
+  /** สายที่ส่งถึง Lumos ก่อนสายนี้แล้วยังรอโทร (3 พ.ย. 2569) */
+  last_call_queue_ahead?: number | null;
   /**
    * คำตอบล่าสุดที่ผู้สมัครตอบ AI (30 ก.ย. 2569 · คอลัมน์ "คำตอบกับ AI") — ถังผลชุดเดียวกับแผงผลโทรหน้าหลัก + เวลาโทร
    * ไม่มี = AI ยังไม่ได้คุยกับใบนี้ (ดู `last_call_status` ว่ารอคิวหรือยังไม่ส่ง)

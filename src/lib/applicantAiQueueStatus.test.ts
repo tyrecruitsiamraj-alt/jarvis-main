@@ -137,3 +137,14 @@ describe('รอบแรกส่งแล้วเงียบ (เจ้า�
     expect(queued?.atRisk).toBe(false);
   });
 });
+
+describe('รอ AI โทร บอกเวลาส่ง + คิวก่อนหน้า (3 พ.ย. 2569 "บอกไปเลยว่าส่งกี่โมง คิวก่อนหน้าเท่าไหร่")', () => {
+  it('ส่งแล้วยังไม่ถึง 24 ชม. = "ส่ง <เวลา> · คิวก่อนหน้า N คน" · ไม่เดาเวลาโทร', () => {
+    const st = aiQueueStatusOf(
+      { last_call_status: 'pending', last_call_attempts: 1, last_call_sent_at: '2026-10-14T04:12:00Z', last_call_queue_ahead: 120 },
+      NOW,
+    );
+    expect(st).toMatchObject({ kind: 'waiting', label: 'รอ AI โทร', atRisk: false });
+    expect(st?.sub).toMatch(/^ส่ง 14 ต\.ค\. .*11:12 · คิวก่อนหน้า 120 คน$/);
+  });
+});

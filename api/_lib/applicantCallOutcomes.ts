@@ -96,6 +96,11 @@ export type ApplicantCallState = {
   importStatus?: string | null;
   /** เวลาที่ส่งรอบล่าสุดถึง Lumos — รอบแรกเงียบเกิน 30 นาที = ป้ายแดง (14 ต.ค. 2569) */
   sentAt?: string | null;
+  /**
+   * คิวก่อนหน้า (3 พ.ย. 2569 เจ้าของ "บอกไปเลยว่าส่งกี่โมง คิวก่อนหน้าเท่าไหร่") — สาย AI สรรหาที่ส่งถึง Lumos ก่อนสายนี้แล้วยังไม่มีผล
+   * Lumos ไม่บอกเวลาโทร ⇒ บอกแค่สิ่งที่รู้แน่ · null = ไม่ใช่สายที่รอสายแรก
+   */
+  queueAhead?: number | null;
 };
 
 export async function loadLatestCallStateByPhone(
@@ -127,8 +132,30 @@ export async function loadLatestCallStateByPhone(
         order by ${QUEUE_PHONE_EXPR}, updated_at desc`,
       [keys],
     );
+    // เวลาส่งของสายที่ยังรอสายแรกทั้งหมด (เรียงแล้ว) — นับคิวก่อนหน้าด้วย binary search ไม่ต้องคิวรีทีละคน
+    const { rows: waiting } = await dbQuery<{ sent_at: string }>(
+      `select push_started_at as sent_at from lumos_dispatch_queue
+        where channel = 'interview' and status = 'pending' and result is null
+          and push_state = 'pushed' and followup_state is null and push_started_at is not null
+          -- เกิน 24 ชม. ยังไม่มีผล = ไม่ได้รอคิวแล้ว (เกณฑ์เดียวกับ AI_FIRST_LATE_MINUTES) — ไม่นับเป็นคิวก่อนหน้า
+          and push_started_at > now() - interval '24 hours'
+        order by push_started_at`,
+    );
+    const waitTimes = waiting.map((w) => new Date(w.sent_at).getTime());
+    const countBefore = (t: number) => {
+      let lo = 0;
+      let hi = waitTimes.length;
+      while (lo < hi) {
+        const mid = (lo + hi) >> 1;
+        if (waitTimes[mid] < t) lo = mid + 1;
+        else hi = mid;
+      }
+      return lo;
+    };
     for (const r of rows) {
+      const firstWait = r.status === 'pending' && !r.followup && r.push_state === 'pushed' && r.sent_at;
       out.set(r.phone, {
+        queueAhead: firstWait ? countBefore(new Date(r.sent_at as string).getTime()) : null,
         status: r.status,
         at: r.at,
         attempts: r.attempts,

@@ -35,12 +35,10 @@ import {
 import type { CallHold } from '@/lib/callHoldsApi';
 import { choiceCountdown } from '@/lib/callChoiceGuard';
 import { greetingHeardText } from '@/lib/greetingCall';
-import { INTEREST_MICRO_TONE } from '@/lib/trends/lumosPipeline';
-import { FOLLOW_STATUS_TONE, isFollowCallStatus } from '@/lib/followApi';
-import { aiQueueStatusOf, type AiQueueStatus } from '@/lib/applicantAiQueueStatus';
-import { aiAnswerTextOf, aiCallsDoneText } from '@/lib/applicantAiAnswerText';
+import { aiQueueStatusOf } from '@/lib/applicantAiQueueStatus';
+import { rmRowStatusOf } from '@/lib/applicantAiAnswerText';
 import { PROCESS_STATE_LABEL, PROCESS_STATE_TONE, PROCESS_STEP_LABEL, applicantProcessOf } from '@/lib/applicantProcess';
-import { irecruitLateHours, irecruitPullState, lateText } from '@/lib/irecruitPullStatus';
+import { irecruitLateHours, lateText } from '@/lib/irecruitPullStatus';
 
 /** สถานะแบบ iRecruit (เจ้าของ 4 ต.ค. 2569 "เอาสถานะมาเพิ่มพอ") — ชิปสถานะ + ขั้นที่อยู่ */
 function ProcessCell({ r }: { r: PublicApplication }) {
@@ -104,94 +102,27 @@ function daysAppliedText(createdAt: string | null | undefined, now: Date): strin
  * ถังผลชุดเดียวกับแผงผลโทรหน้าหลัก (server จัดถัง · `ai_answer`) · สีจาก `INTEREST_MICRO_TONE` ชุดเดียวกับ Dashboard ·
  * ยังไม่มีผล = บอกสถานะคิวแบบเดียวกับป๊อปรายชื่อ (รอคิว/กำลังโทร) · เบอร์ใช้ไม่ได้ = บอกตรง ๆ
  */
-function AiQueueCell({ q }: { q: AiQueueStatus }) {
+/**
+ * คอลัมน์ "คำตอบกับ AI" = ชิปที่แถวนั้นอยู่ (เจ้าของ 3 พ.ย. 2569 "อ่านแล้วต้องเคลียร์ว่าโทรแล้วเป็นไง ไม่โทรเพราะไร … แก้ให้ตรง Slot มัน")
+ * บรรทัดบน = ชื่อชิปเป๊ะ · บรรทัดล่าง = ข้อเท็จจริง (โทรกี่ครั้ง ผลล่าสุด เวลา / เหตุที่ไม่ได้โทร) — ตัวตัดสินเดียว `rmRowStatusOf`
+ */
+function AiAnswerCell({ r }: { r: PublicApplication }) {
+  const st = rmRowStatusOf(r);
+  // iRecruit ค้างเกินเวลา = บอกชั่วโมงที่ค้าง (21 ต.ค. 2569)
+  const late = st.view === 'irecruit_pull' ? irecruitLateHours(r.irecruit_status, r.created_at) : null;
   return (
-    <span className="flex flex-col gap-0.5" data-testid="ai-queue-status" data-kind={q.kind}>
-      <span className={cn('whitespace-nowrap text-xs font-medium', TONE[q.tone].value)}>{q.label}</span>
-      {q.sub ? (
-        <span className={cn('whitespace-nowrap text-xs tabular-nums', q.atRisk ? TONE[q.tone].value : DASH.cellMuted)}>{q.sub}</span>
+    <span className="flex flex-col gap-0.5" data-testid="ai-row-status" data-view={st.view}>
+      <span className={cn('whitespace-nowrap text-xs font-medium', TONE[st.tone].value)}>{st.title}</span>
+      {st.detail ? (
+        <span className={cn('text-xs tabular-nums', st.tone === 'danger' ? TONE.danger.value : DASH.cellMuted)}>{st.detail}</span>
+      ) : null}
+      {late ? (
+        <span className={cn('whitespace-nowrap text-xs tabular-nums', TONE.danger.value)} data-testid="irecruit-pull-status">
+          {lateText(late)}
+        </span>
       ) : null}
     </span>
   );
-}
-
-function AiAnswerCell({ r }: { r: PublicApplication }) {
-  // คำบรรทัดบนมาจาก `aiAnswerTextOf` ตัวเดียวกับตัวกรอง "สถานะการตอบของ AI" (22 ต.ค. 2569) — ที่นี่แค่แต่งสี/บรรทัดรอง
-  const a = aiAnswerTextOf(r);
-  // ยังรอฝั่ง AI แต่มีเรื่องให้บอก (โทรแล้วกี่ครั้ง · โทรซ้ำเมื่อไร · ให้คนโทร) — มาก่อนคำตอบรอบเก่า (14 ต.ค. 2569)
-  if (a.kind === 'queue' && a.queue) return <AiQueueCell q={a.queue} />;
-  if (a.kind === 'answer' && r.ai_answer) {
-    return (
-      <span className="flex flex-col gap-0.5">
-        <span className={cn('whitespace-nowrap font-medium', TONE[INTEREST_MICRO_TONE[r.ai_answer.micro]].value)}>{a.text}</span>
-        {r.ai_answer.at ? (
-          <span className={cn('whitespace-nowrap text-xs tabular-nums', DASH.cellMuted)}>
-            {formatYmdTh(toYmdBangkok(new Date(r.ai_answer.at)))}
-          </span>
-        ) : null}
-        {aiCallsDoneText(r) ? (
-          <span className={cn('whitespace-nowrap text-xs font-medium', TONE.warn.value)} data-testid="ai-calls-done">
-            {aiCallsDoneText(r)}
-          </span>
-        ) : null}
-      </span>
-    );
-  }
-  if (a.kind === 'bad_phone') {
-    return (
-      <span
-        className={cn('whitespace-nowrap text-xs font-medium', TONE.danger.value)}
-        title="เบอร์นี้ใช้กับระบบโทรไม่ได้ (ไม่ใช่มือถือ 10 หลัก) — กดดูรายละเอียดเพื่อแก้เบอร์"
-      >
-        {a.text}
-      </span>
-    );
-  }
-  if (a.kind === 'call_status' && isFollowCallStatus(r.last_call_status)) {
-    const done = aiCallsDoneText(r);
-    return (
-      <span className="flex flex-col gap-0.5">
-        <span className={cn('whitespace-nowrap text-xs font-medium', TONE[FOLLOW_STATUS_TONE[r.last_call_status]].value)}>{a.text}</span>
-        {done ? (
-          <span className={cn('whitespace-nowrap text-xs font-medium', TONE.warn.value)} data-testid="ai-calls-done">
-            {done}
-          </span>
-        ) : null}
-      </span>
-    );
-  }
-  // ซ้ำกับ iRecruit ภายใน 14 วัน — AI ไม่โทรเอง เจ้าหน้าที่เลือกส่งเองได้ (143 · 12 ต.ค. 2569)
-  if (a.kind === 'irecruit_dup' && r.irecruit_dup_at) {
-    return (
-      <span className="flex flex-col gap-0.5" data-testid="irecruit-dup">
-        <span className={cn('whitespace-nowrap text-xs font-medium', TONE.warn.value)}>{a.text}</span>
-        <span className={cn('whitespace-nowrap text-xs tabular-nums', DASH.cellMuted)}>
-          สมัคร {formatYmdTh(toYmdBangkok(new Date(r.irecruit_dup_at)))}
-        </span>
-      </span>
-    );
-  }
-  // รายชื่อที่ดึงจาก iRecruit = ทีมโทรใน iRecruit ⇒ บอกสถานะของ iRecruit + ค้างกี่ชั่วโมง (21 ต.ค. 2569)
-  const irState = irecruitPullState(r.irecruit_status);
-  if (a.kind === 'irecruit_pull' && irState) {
-    const late = irecruitLateHours(r.irecruit_status, r.created_at);
-    const tone = irState === 'done' ? TONE.success.value : irState === 'failed' ? DASH.cellMuted : late ? TONE.danger.value : TONE.warn.value;
-    return (
-      <span className="flex flex-col gap-0.5" data-testid="irecruit-pull-status" data-state={irState}>
-        <span className={cn('whitespace-nowrap text-xs font-medium', tone)}>{a.text}</span>
-        {late ? <span className={cn('whitespace-nowrap text-xs tabular-nums', TONE.danger.value)}>{lateText(late)}</span> : null}
-      </span>
-    );
-  }
-  if (a.kind === 'not_sent' && a.reason) {
-    return (
-      <span className="flex flex-col gap-0.5" data-testid="ai-not-sent">
-        <span className={cn('whitespace-nowrap text-xs', DASH.cellMuted)}>{a.text}</span>
-        <span className={cn('whitespace-nowrap text-xs font-medium', TONE.warn.value)}>{a.reason}</span>
-      </span>
-    );
-  }
-  return <span className={cn('whitespace-nowrap text-xs', DASH.cellMuted)}>{a.text}</span>;
 }
 
 const ACTION_ICON: Record<RmRowAction, typeof Phone> = {
