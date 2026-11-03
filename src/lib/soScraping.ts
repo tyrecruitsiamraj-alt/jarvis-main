@@ -314,8 +314,8 @@ export function soAccountOnWorker(acc: Pick<SoOptAccount, 'id' | 'sessionWorkers
 }
 
 /**
- * บัญชีนี้มี session Facebook บนเครื่องไหนสักเครื่องไหม — ไม่มีเลย = "เลือกไปก็โพสต์ไม่ได้"
- * (So Scraping แจ้ง 3 พ.ย. 2569: 21 บัญชียังไม่มี session บน RM009) ⇒ ป๊อปสั่งโพสต์ห้ามเลือก
+ * บัญชีนี้มี session Facebook บนเครื่องไหนสักเครื่องไหม (So Scraping แจ้ง 3 พ.ย. 2569: 21 บัญชียังไม่มี session บน RM009)
+ * ไม่มี = เลือกได้ แต่เตือนก่อนส่ง บอทล็อกอินให้เอง (เอกสาร So Scraping · เจ้าของ Choice 3 พ.ย. 2569 "เลือกได้ แต่เตือนก่อนส่ง")
  */
 export function soAccountHasSession(acc: Pick<SoOptAccount, 'id' | 'sessionWorkers'>, workers: readonly Pick<SoOptWorker, 'fbAccountIds'>[]): boolean {
   return acc.sessionWorkers.length > 0 || workers.some((w) => w.fbAccountIds.includes(acc.id));
@@ -325,7 +325,7 @@ const BKK_TIME = new Intl.DateTimeFormat('th-TH', { timeZone: 'Asia/Bangkok', da
 
 /**
  * สถานะบัญชีบนช่องเลือก — เห็นก่อนสั่ง ไม่ต้องรอ So Scraping แจ้ง (3 พ.ย. 2569)
- * ถูกพัก = บอกเวลาที่ใช้ได้ (`paused_until`) · ไม่มี session = ใช้ไม่ได้ · ที่เหลือ = ป้ายเดิม
+ * ถูกพัก = บอกเวลาที่ใช้ได้ (`paused_until`) เลือกไม่ได้ · ไม่มี session = บอกว่ายังไม่ได้ล็อกอิน เลือกได้ · ที่เหลือ = ป้ายเดิม
  */
 export function soAccountChoice(
   a: Pick<SoOptAccount, 'id' | 'name' | 'status' | 'pausedUntil' | 'sessionWorkers' | 'postedToday' | 'dailyCap'>,
@@ -336,24 +336,22 @@ export function soAccountChoice(
     const until = a.pausedUntil && !Number.isNaN(Date.parse(a.pausedUntil)) ? ` ใช้ได้ ${BKK_TIME.format(new Date(a.pausedUntil))}` : '';
     return { label: `${a.name} · ถูกพัก${until}`, disabled: true };
   }
-  if (!soAccountHasSession(a, workers)) return { label: `${a.name} · ยังไม่ได้ล็อกอิน Facebook`, disabled: true };
+  if (!soAccountHasSession(a, workers)) return { label: `${a.name} · ยังไม่ได้ล็อกอิน Facebook`, disabled: !soAccountSelectable(a.status) };
   return { label: `${a.name} · ${SO_ACCOUNT_STATUS_LABEL[a.status]} · ${used}`, disabled: !soAccountSelectable(a.status) };
 }
-
-export const SO_NO_LOGIN_TEXT = (name: string) => `${name} ยังไม่ได้ล็อกอิน Facebook บนเครื่องไหนเลย โพสต์ไม่ได้ — เลือกบัญชีอื่น`;
 
 export const SO_NO_SESSION_WARNING = 'บัญชีนี้ยังไม่เคยล็อกอินบนเครื่องนี้ บอทจะล็อกอินใหม่ และ Facebook อาจขอยืนยันตัวตน';
 export const soWorkerOfflineWarning = (name: string) => `เครื่อง ${name} ออฟไลน์อยู่ งานจะค้างรอจนเครื่องเปิด`;
 
 /**
  * คำเตือนก่อนส่ง (ตามข้อ 4 ของเอกสาร) — ว่าง = ส่งได้เลย · มี = ต้องกดยืนยัน
- * โพสต์: บัญชีครบโควต้า · เครื่องออฟไลน์ · บัญชียังไม่ล็อกอินบนเครื่องที่เลือก · Scrap: บัญชีครบโควต้า · เครื่องออฟไลน์
+ * โพสต์: บัญชีครบโควต้า · เครื่องออฟไลน์ · บัญชียังไม่ล็อกอินบนเครื่องที่เลือก (ไม่เลือกเครื่อง = ยังไม่ล็อกอินบนเครื่องไหนเลย) · Scrap: บัญชีครบโควต้า · เครื่องออฟไลน์
  */
-export function soPostConfirmWarnings(acc: SoOptAccount, worker: SoOptWorker | null): string[] {
+export function soPostConfirmWarnings(acc: SoOptAccount, worker: SoOptWorker | null, allWorkers: readonly Pick<SoOptWorker, 'fbAccountIds'>[] = []): string[] {
   const out: string[] = [];
   if (soAccountNeedsConfirm(acc.status)) out.push(soWarningText(acc.name, acc.status, acc.warning));
   if (worker && !worker.online) out.push(soWorkerOfflineWarning(worker.name));
-  if (worker && !soAccountOnWorker(acc, worker)) out.push(SO_NO_SESSION_WARNING);
+  if (worker ? !soAccountOnWorker(acc, worker) : !soAccountHasSession(acc, allWorkers)) out.push(SO_NO_SESSION_WARNING);
   return out;
 }
 export function soScrapConfirmWarnings(picked: readonly SoScrapeAccount[], worker: SoOptWorker | null): string[] {

@@ -55,7 +55,6 @@ import {
   soAccountsForJob,
   soAccountChoice,
   soAccountHasSession,
-  SO_NO_LOGIN_TEXT,
   type SoGroupSection,
   soPostSnapshot,
   soStatusView,
@@ -289,11 +288,7 @@ export function AutopostBody({
   const pickAccount = (id: string) => {
     const a = opts?.accounts.find((x) => x.id === id);
     if (!opts || !a) return;
-    // ถูกพัก / เครื่องออฟไลน์ / ยังไม่ผูกเครื่อง = เลือกไม่ได้ (เอกสาร So Scraping) — เตือนแล้วคงบัญชีเดิม
-    if (a.status !== 'paused' && !soAccountHasSession(a, opts.workers)) {
-      setWarn({ kind: 'block', lines: [SO_NO_LOGIN_TEXT(a.name)] });
-      return;
-    }
+    // ถูกพัก / ยังไม่ผูกเครื่อง = เลือกไม่ได้ (เอกสาร So Scraping) — เตือนแล้วคงบัญชีเดิม · ยังไม่ได้ล็อกอิน = เลือกได้ เตือนตอนกดส่ง
     if (!soAccountSelectable(a.status)) {
       setWarn({ kind: 'block', lines: [soWarningText(a.name, a.status, a.warning)] });
       return;
@@ -307,7 +302,7 @@ export function AutopostBody({
 
   const send = async (confirmed = false) => {
     if (busy || problems.length > 0 || !account) return;
-    const confirmLines = soPostConfirmWarnings(account, worker);
+    const confirmLines = soPostConfirmWarnings(account, worker, opts?.workers ?? []);
     if (!confirmed && confirmLines.length > 0) {
       setWarn({ kind: 'confirm', lines: confirmLines });
       return;
