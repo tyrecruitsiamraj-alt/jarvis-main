@@ -45,12 +45,13 @@ describe('Gen link ช่องทาง Facebook Group = กลุ่มละ�
     ]);
   });
 
-  it('ป๊อป Gen link: Facebook Group ต้องเลือกกลุ่ม · แตกเป็นกลุ่มละลิงก์ · ปุ่มบอกจำนวนลิงก์', () => {
+  it('ป๊อป Gen link: Facebook Group เลือกกลุ่ม = กลุ่มละลิงก์ · ไม่เลือกกลุ่ม = 1 ลิงก์ของช่องทาง (3 พ.ย. 2569) · ปุ่มบอกจำนวนลิงก์', () => {
     const src = read('src/components/jobs/GenApplyLinkDialog.tsx');
     expect(src).toContain('channels: linkChannels,');
     expect(src).toContain('soGroupLinkLabel(recruitChannelLabel(c), g.name)');
-    expect(src).toContain('const missingGroup = fbGroupChannels.length > 0 && groupPick.length === 0;');
-    expect(src).toContain("disabled={saving || !title.trim() || missingGroup}");
+    expect(src).toContain('isFacebookGroupChannel(c.name) && pickedGroups.length > 0');
+    expect(src).not.toContain('missingGroup');
+    expect(src).toContain('disabled={saving || !title.trim()}');
   });
 });
 
@@ -115,11 +116,13 @@ describe('ภาพรวมงานสรรหา ตัวกรอง "ง�
 });
 
 describe('Gen link เพิ่ม (ใบที่มีลิงก์แล้ว) เลือกกลุ่มได้เหมือนป๊อปแรก (3 พ.ย. 2569)', () => {
-  it('AddChannelLinks แตก Facebook Group เป็นกลุ่มละลิงก์ · ไม่เลือกกลุ่มกด Gen ไม่ได้', () => {
+  it('AddChannelLinks แตก Facebook Group เป็นกลุ่มละลิงก์ · ไม่เลือกกลุ่ม = 1 ลิงก์ของช่องทาง (3 พ.ย. 2569)', () => {
     const src = read('src/components/jobs/AddChannelLinks.tsx');
     expect(src).toContain('<SoGroupPicker');
     expect(src).toContain('soGroupLinkLabel(recruitChannelLabel(c), g.name)');
-    expect(src).toContain('disabled={busy || missingGroup}');
+    expect(src).toContain('isFacebookGroupChannel(c.name) && pickedGroups.length > 0');
+    expect(src).not.toContain('missingGroup');
+    expect(src).toContain('disabled={busy}');
     expect(read('src/pages/jobs/BoardPostingPage.tsx')).toContain('jobBu={jobBuOf(job)}');
   });
 });

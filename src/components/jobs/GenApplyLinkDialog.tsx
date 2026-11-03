@@ -235,13 +235,16 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
     if (!open) setSoGroups(null);
   }, [open]);
 
-  /** ช่องทาง → ลิงก์ที่จะสร้าง · Facebook Group แตกเป็นกลุ่มละลิงก์ ชื่อกลุ่มตามรายชื่อ So Scraping */
+  /**
+   * ช่องทาง → ลิงก์ที่จะสร้าง · Facebook Group เลือกกลุ่ม = กลุ่มละลิงก์ ชื่อกลุ่มตามรายชื่อ So Scraping
+   * ไม่เลือกกลุ่ม = 1 ลิงก์ของช่องทางหลัก/รอง (เจ้าของ 3 พ.ย. 2569 "ไม่เลือกกลุ่มก็ gen ได้")
+   */
+  const pickedGroups = (soGroups ?? []).filter((g) => groupPick.includes(g.id));
   const linkChannels = picked.flatMap((c) =>
-    isFacebookGroupChannel(c.name)
-      ? (soGroups ?? []).filter((g) => groupPick.includes(g.id)).map((g) => ({ channelId: c.id, label: soGroupLinkLabel(recruitChannelLabel(c), g.name) }))
+    isFacebookGroupChannel(c.name) && pickedGroups.length > 0
+      ? pickedGroups.map((g) => ({ channelId: c.id, label: soGroupLinkLabel(recruitChannelLabel(c), g.name) }))
       : [{ channelId: c.id, label: recruitChannelLabel(c) }],
   );
-  const missingGroup = fbGroupChannels.length > 0 && groupPick.length === 0;
 
   /**
    * ⚠️ ล้มแล้วต้องคืนเป็นลิงก์ยาว ไม่ใช่ปล่อยติ๊กค้างทั้งที่ยังเป็นลิงก์เดิม
@@ -267,7 +270,7 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
   };
 
   const submit = async () => {
-    if (saving || missingGroup) return;
+    if (saving) return;
     setSaving(true);
     setError(null);
     try {
@@ -341,7 +344,7 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
                     <MultiChannelPicker value={picked} onChange={setPicked} reloadKey={open} />
                     {fbGroupChannels.length > 0 ? (
                       <div className="space-y-1.5 pt-1">
-                        <p className="text-xs font-medium text-foreground">กลุ่ม Facebook · กลุ่มละ 1 ลิงก์</p>
+                        <p className="text-xs font-medium text-foreground">กลุ่ม Facebook · กลุ่มละ 1 ลิงก์ · ไม่เลือกก็ได้</p>
                         <SoGroupPicker
                           groups={soGroups}
                           jobBu={job ? jobBuOf(job) : normalizeTrendBu(standalone?.departmentCode)}
@@ -517,11 +520,6 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
               {standalone ? null : channelSection}
 
               {error ? <p className="text-xs text-red-600">{error}</p> : null}
-              {missingGroup ? (
-                <p className={cn('text-xs', TONE.warn.value)} data-testid="genlink-need-group">
-                  เลือกกลุ่ม Facebook อย่างน้อย 1 กลุ่ม
-                </p>
-              ) : null}
 
               {/**
                * 🔴 ดูตัวอย่างหน้าสมัครก่อน gen link (เจ้าของเคาะ 22 ก.ย. 2569 นิยามข้อ 4)
@@ -560,7 +558,7 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
               <button
                 type="button"
                 onClick={() => void submit()}
-                disabled={saving || !title.trim() || missingGroup}
+                disabled={saving || !title.trim()}
                 className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-2.5 text-sm font-medium text-primary-foreground disabled:opacity-60"
               >
                 {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Link2 className="h-4 w-4" />}

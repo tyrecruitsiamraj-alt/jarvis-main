@@ -78,21 +78,21 @@ const AddChannelLinks: React.FC<{
     };
   }, [needGroups]);
 
-  /** ช่องทาง → ลิงก์ที่จะสร้าง · Facebook Group แตกเป็นกลุ่มละลิงก์ (ไม่เลือกช่องทาง = ลิงก์กลาง 1 อัน) */
+  /**
+   * ช่องทาง → ลิงก์ที่จะสร้าง · Facebook Group เลือกกลุ่ม = กลุ่มละลิงก์ · ไม่เลือกกลุ่ม = 1 ลิงก์ของช่องทาง
+   * (เจ้าของ 3 พ.ย. 2569 "ไม่เลือกกลุ่มก็ gen ได้") · ไม่เลือกช่องทาง = ลิงก์กลาง 1 อัน
+   */
+  const pickedGroups = (soGroups ?? []).filter((g) => groupPick.includes(g.id));
   const wanted: ({ channelId: string; channelLabel: string } | null)[] =
     picked.length === 0
       ? [null]
       : picked.flatMap((c) =>
-          isFacebookGroupChannel(c.name)
-            ? (soGroups ?? [])
-                .filter((g) => groupPick.includes(g.id))
-                .map((g) => ({ channelId: c.id, channelLabel: soGroupLinkLabel(recruitChannelLabel(c), g.name) }))
+          isFacebookGroupChannel(c.name) && pickedGroups.length > 0
+            ? pickedGroups.map((g) => ({ channelId: c.id, channelLabel: soGroupLinkLabel(recruitChannelLabel(c), g.name) }))
             : [{ channelId: c.id, channelLabel: recruitChannelLabel(c) }],
         );
-  const missingGroup = fbGroupChannels.length > 0 && groupPick.length === 0;
 
   const create = async () => {
-    if (missingGroup) return;
     setBusy(true);
     setError(null);
     const made: RecruitPostingLink[] = [];
@@ -131,12 +131,11 @@ const AddChannelLinks: React.FC<{
       <MultiChannelPicker value={picked} onChange={setPicked} reloadKey={posting.id} />
       {fbGroupChannels.length > 0 ? (
         <div className="space-y-1.5" data-testid="add-links-groups">
-          <p className="text-xs font-medium text-foreground">กลุ่ม Facebook · กลุ่มละ 1 ลิงก์</p>
+          <p className="text-xs font-medium text-foreground">กลุ่ม Facebook · กลุ่มละ 1 ลิงก์ · ไม่เลือกก็ได้</p>
           <SoGroupPicker groups={soGroups} jobBu={jobBu} value={groupPick} onChange={setGroupPick} />
-          {missingGroup ? <p className={cn('text-xs', TONE.warn.value)}>เลือกกลุ่ม Facebook อย่างน้อย 1 กลุ่ม</p> : null}
         </div>
       ) : null}
-      <Button type="button" className="w-full" disabled={busy || missingGroup} onClick={() => void create()}>
+      <Button type="button" className="w-full" disabled={busy} onClick={() => void create()}>
         {busy ? <Loader2 className="animate-spin" aria-hidden /> : <Link2 aria-hidden />}
         {/* คำว่า "Gen link" ทั้งก้อน (เจ้าของสั่ง 5 ต.ค. 2569 "สร้างลิงก์ เปลี่ยนเป็น Gen link") */}
         {busy
