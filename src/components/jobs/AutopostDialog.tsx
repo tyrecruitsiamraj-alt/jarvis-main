@@ -50,6 +50,9 @@ import {
   soBuNoAccountText,
   soAccountsByBu,
   soAccountsForJob,
+  soAccountChoice,
+  soAccountHasSession,
+  SO_NO_LOGIN_TEXT,
   type SoGroupSection,
   soPostSnapshot,
   soStatusView,
@@ -175,7 +178,7 @@ export function AutopostBody({
         const fb = open?.links.find((l) => /facebook/i.test(l.channelLabel ?? '')) ?? open?.links[0];
         if (fb) setLinkCode(fb.code);
         // บัญชีตั้งต้น = บัญชีธุรกิจเดียวกับใบขอ (เจ้าของ 2 พ.ย. 2569 "ตรงนี้ก็ต้องแยก Bu ด้วย") · ธุรกิจนี้ไม่มีบัญชี = ไม่เลือกให้
-        const acc = firstAccount(soAccountsForJob(o.accounts, jobBu));
+        const acc = firstAccount(soAccountsForJob(o.accounts, jobBu).filter((a) => soAccountHasSession(a, o.workers)));
         if (acc) {
           setAccountId(acc.id);
           setWorkerName(acc.worker ?? '');
@@ -278,6 +281,10 @@ export function AutopostBody({
     const a = opts?.accounts.find((x) => x.id === id);
     if (!opts || !a) return;
     // ถูกพัก / เครื่องออฟไลน์ / ยังไม่ผูกเครื่อง = เลือกไม่ได้ (เอกสาร So Scraping) — เตือนแล้วคงบัญชีเดิม
+    if (a.status !== 'paused' && !soAccountHasSession(a, opts.workers)) {
+      setWarn({ kind: 'block', lines: [SO_NO_LOGIN_TEXT(a.name)] });
+      return;
+    }
     if (!soAccountSelectable(a.status)) {
       setWarn({ kind: 'block', lines: [soWarningText(a.name, a.status, a.warning)] });
       return;
@@ -466,8 +473,7 @@ export function AutopostBody({
                   testId="autopost-account"
                   options={soAccountsByBu(opts.accounts, jobBu).map(({ account: a, group }) => ({
                     value: a.id,
-                    label: `${a.name} · ${SO_ACCOUNT_STATUS_LABEL[a.status]} · โพสต์ ${NUM.format(a.postedToday)}${a.dailyCap !== null ? `/${NUM.format(a.dailyCap)}` : ''}`,
-                    disabled: a.status === 'no_worker',
+                    ...soAccountChoice(a, opts.workers),
                     group,
                   }))}
                 />

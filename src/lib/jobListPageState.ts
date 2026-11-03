@@ -74,7 +74,7 @@ export const JOB_LIST_DEFAULTS: JobListPageState = {
 const FILTER_VALUES = new Set<JobListFilter>(['all', 'active', 'closed']);
 const URGENCY_VALUES = new Set<string>(['retroactive', 'urgent', 'advance']);
 const NOTE_VALUES = new Set<string>(['has', 'empty']);
-const REPLACEMENT_VALUES = new Set<string>(['send', 'no_send', 'unset']);
+const REPLACEMENT_VALUES = new Set<string>(['send', 'spare', 'no_send', 'unset']);
 const AGE_DAYS_MULTI_VALUES = new Set<string>(['advance', 'today', '1-7', '8-15', '16-30', '30+']);
 
 function normalizeAgeToken(raw: string): string {

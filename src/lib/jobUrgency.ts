@@ -22,12 +22,14 @@ export type RequestStatusKind = 'retroactive' | 'urgent' | 'advance';
 export type UrgencyFilter = 'all' | RequestStatusKind;
 
 export type NoteFilter = 'all' | 'has' | 'empty';
-export type ReplacementFilter = 'all' | 'send' | 'no_send' | 'unset';
+export type ReplacementFilter = 'all' | 'send' | 'spare' | 'no_send' | 'unset';
 
 export const REPLACEMENT_FILTER_OPTIONS: { value: ReplacementFilter; label: string }[] = [
   { value: 'all', label: 'ทั้งหมด' },
   // ภาษาสถานะให้ตรงกับป้ายบนการ์ด (แผนแก้จุดงงข้อ 4 · 2 ก.ย. 2569)
   { value: 'send', label: 'ต้องส่งคนแทน' },
+  // Spare (เจ้าของ 3 พ.ย. 2569 "ส่งคนแทน ไม่เห็นมีสแปร์") — ป้ายบนการ์ดแยก "Spare" กับ "ต้องส่งคนแทน" ⇒ ตัวกรองแยกตามป้าย
+  { value: 'spare', label: 'Spare' },
   { value: 'no_send', label: 'ไม่ต้องส่งคนแทน' },
   { value: 'unset', label: 'ยังไม่ระบุ' },
 ];
@@ -491,7 +493,9 @@ export function matchesNoteFilter(job: JobRequest, filter: NoteFilter): boolean 
 
 export function matchesReplacementFilter(job: JobRequest, filter: ReplacementFilter): boolean {
   if (filter === 'all') return true;
-  if (filter === 'send') return job.send_replacement === true;
+  // ตรงกับป้าย UnitRequestReplacementBadge: ต้องส่ง + Spare = "Spare" · ต้องส่งเฉย ๆ = "ต้องส่งคนแทน"
+  if (filter === 'send') return job.send_replacement === true && job.replacement_spare !== true;
+  if (filter === 'spare') return job.send_replacement === true && job.replacement_spare === true;
   if (filter === 'no_send') return job.send_replacement === false;
   return job.send_replacement == null;
 }

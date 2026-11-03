@@ -1,0 +1,48 @@
+/**
+ * 3 พ.ย. 2569
+ * 1) ตัวกรอง "ส่งคนแทน" มี Spare (เจ้าของ "จากรูปส่งคนแทน ไม่เห็นมีสแปร์") — แยกตามป้ายบนการ์ด
+ * 2) ป๊อปสั่งโพสต์บอกบัญชีถูกพัก (ใช้ได้เมื่อไหร่) / ยังไม่ได้ล็อกอิน Facebook ก่อนสั่ง (So Scraping แจ้ง 3 พ.ย. 11:00)
+ */
+import { readFileSync } from 'node:fs';
+import { describe, expect, it } from 'vitest';
+import { REPLACEMENT_FILTER_OPTIONS, matchesReplacementFilter } from '@/lib/jobUrgency';
+import { soAccountChoice, soAccountHasSession, type SoOptAccount } from '@/lib/soScraping';
+import type { JobRequest } from '@/types';
+
+const job = (send: boolean | null, spare?: boolean) => ({ id: 'siamraj-sql:LBM6903002', send_replacement: send, replacement_spare: spare }) as unknown as JobRequest;
+
+describe('ตัวกรองส่งคนแทน', () => {
+  it('มีตัวเลือก Spare ต่อจากต้องส่งคนแทน', () => {
+    expect(REPLACEMENT_FILTER_OPTIONS.map((o) => o.label)).toEqual(['ทั้งหมด', 'ต้องส่งคนแทน', 'Spare', 'ไม่ต้องส่งคนแทน', 'ยังไม่ระบุ']);
+  });
+  it('Spare = ต้องส่ง + Spare · ต้องส่งคนแทน = ไม่รวม Spare (ตรงกับป้าย)', () => {
+    expect(matchesReplacementFilter(job(true, true), 'spare')).toBe(true);
+    expect(matchesReplacementFilter(job(true, true), 'send')).toBe(false);
+    expect(matchesReplacementFilter(job(true, false), 'send')).toBe(true);
+    expect(matchesReplacementFilter(job(true), 'spare')).toBe(false);
+    expect(matchesReplacementFilter(job(false), 'no_send')).toBe(true);
+    expect(matchesReplacementFilter(job(null), 'unset')).toBe(true);
+  });
+  it('ลิงก์ ?sr=spare อ่านได้', () => {
+    expect(readFileSync('src/lib/jobListPageState.ts', 'utf8')).toContain("['send', 'spare', 'no_send', 'unset']");
+  });
+});
+
+describe('บัญชี Facebook ในป๊อปสั่งโพสต์', () => {
+  const acc = (p: Partial<SoOptAccount>) =>
+    ({ id: 'a1', name: 'Donnomeachi Chardonnay', status: 'ready', pausedUntil: null, sessionWorkers: ['SONB-RM009'], postedToday: 2, dailyCap: 10, ...p }) as SoOptAccount;
+  const workers = [{ fbAccountIds: ['a9'] }];
+  it('ถูกพัก = บอกเวลาที่ใช้ได้ (เวลาไทย) · เลือกไม่ได้', () => {
+    expect(soAccountChoice(acc({ status: 'paused', pausedUntil: '2026-11-04T03:26:00Z' }), workers)).toEqual({ label: 'Donnomeachi Chardonnay · ถูกพัก ใช้ได้ 4 พ.ย. 10:26', disabled: true });
+  });
+  it('ไม่มี session บนเครื่องไหน = ยังไม่ได้ล็อกอิน · เลือกไม่ได้ · มีบนเครื่อง (fb_account_ids) = ได้', () => {
+    expect(soAccountChoice(acc({ name: 'Bennie Bobbe', sessionWorkers: [] }), workers)).toEqual({ label: 'Bennie Bobbe · ยังไม่ได้ล็อกอิน Facebook', disabled: true });
+    expect(soAccountHasSession(acc({ id: 'a9', sessionWorkers: [] }), workers)).toBe(true);
+    expect(soAccountChoice(acc({}), workers)).toEqual({ label: 'Donnomeachi Chardonnay · พร้อมโพสต์ · โพสต์ 2/10', disabled: false });
+  });
+  it('ป๊อปใช้ตัวนี้ · บัญชีตั้งต้นข้ามบัญชีที่ไม่มี session', () => {
+    const src = readFileSync('src/components/jobs/AutopostDialog.tsx', 'utf8');
+    expect(src).toContain('...soAccountChoice(a, opts.workers)');
+    expect(src).toContain('.filter((a) => soAccountHasSession(a, o.workers))');
+  });
+});

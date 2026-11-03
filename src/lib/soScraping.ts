@@ -313,6 +313,35 @@ export function soAccountOnWorker(acc: Pick<SoOptAccount, 'id' | 'sessionWorkers
   return acc.sessionWorkers.includes(w.name) || w.fbAccountIds.includes(acc.id);
 }
 
+/**
+ * บัญชีนี้มี session Facebook บนเครื่องไหนสักเครื่องไหม — ไม่มีเลย = "เลือกไปก็โพสต์ไม่ได้"
+ * (So Scraping แจ้ง 3 พ.ย. 2569: 21 บัญชียังไม่มี session บน RM009) ⇒ ป๊อปสั่งโพสต์ห้ามเลือก
+ */
+export function soAccountHasSession(acc: Pick<SoOptAccount, 'id' | 'sessionWorkers'>, workers: readonly Pick<SoOptWorker, 'fbAccountIds'>[]): boolean {
+  return acc.sessionWorkers.length > 0 || workers.some((w) => w.fbAccountIds.includes(acc.id));
+}
+
+const BKK_TIME = new Intl.DateTimeFormat('th-TH', { timeZone: 'Asia/Bangkok', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+
+/**
+ * สถานะบัญชีบนช่องเลือก — เห็นก่อนสั่ง ไม่ต้องรอ So Scraping แจ้ง (3 พ.ย. 2569)
+ * ถูกพัก = บอกเวลาที่ใช้ได้ (`paused_until`) · ไม่มี session = ใช้ไม่ได้ · ที่เหลือ = ป้ายเดิม
+ */
+export function soAccountChoice(
+  a: Pick<SoOptAccount, 'id' | 'name' | 'status' | 'pausedUntil' | 'sessionWorkers' | 'postedToday' | 'dailyCap'>,
+  workers: readonly Pick<SoOptWorker, 'fbAccountIds'>[],
+): { label: string; disabled: boolean } {
+  const used = `โพสต์ ${a.postedToday.toLocaleString('th-TH')}${a.dailyCap !== null ? `/${a.dailyCap.toLocaleString('th-TH')}` : ''}`;
+  if (a.status === 'paused') {
+    const until = a.pausedUntil && !Number.isNaN(Date.parse(a.pausedUntil)) ? ` ใช้ได้ ${BKK_TIME.format(new Date(a.pausedUntil))}` : '';
+    return { label: `${a.name} · ถูกพัก${until}`, disabled: true };
+  }
+  if (!soAccountHasSession(a, workers)) return { label: `${a.name} · ยังไม่ได้ล็อกอิน Facebook`, disabled: true };
+  return { label: `${a.name} · ${SO_ACCOUNT_STATUS_LABEL[a.status]} · ${used}`, disabled: !soAccountSelectable(a.status) };
+}
+
+export const SO_NO_LOGIN_TEXT = (name: string) => `${name} ยังไม่ได้ล็อกอิน Facebook บนเครื่องไหนเลย โพสต์ไม่ได้ — เลือกบัญชีอื่น`;
+
 export const SO_NO_SESSION_WARNING = 'บัญชีนี้ยังไม่เคยล็อกอินบนเครื่องนี้ บอทจะล็อกอินใหม่ และ Facebook อาจขอยืนยันตัวตน';
 export const soWorkerOfflineWarning = (name: string) => `เครื่อง ${name} ออฟไลน์อยู่ งานจะค้างรอจนเครื่องเปิด`;
 

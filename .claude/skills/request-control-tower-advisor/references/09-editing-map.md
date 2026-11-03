@@ -14184,3 +14184,8 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
   · `UnitRequestInfoFields.tsx` (กล่อง "ข้อมูลใบขอ" — ตัวเดียวกับป๊อปไล่งาน) เติม 2 ช่องเต็มแถวต่อจากวันเวลาเข้างาน
   · โชว์ของ **ERP** เสมอ (`erp_job_details`/`erp_requirements` เมื่อทีมแก้ทับ) เพราะกล่องนี้คือ "ข้อมูลใบขอมาจาก ERP"
   · ⚠️ ข้อความแปลกเช่น "G.00 / T.00" (LMO6801013) = ERP กรอกมาแบบนั้นจริง แก้ที่ ERP หรือกด "แก้" ในป๊อปประกาศ
+- **3 พ.ย. 2569 ตัวกรอง "ส่งคนแทน" มี Spare** — เจ้าของ *"จากรูปส่งคนแทน ไม่เห็นมีสแปร์"*
+  · `src/lib/jobUrgency.ts` `ReplacementFilter` เพิ่ม `spare` (ส่ง + replacement_spare) · `send` = ต้องส่งแต่ไม่ใช่ Spare (ตรงกับป้าย `UnitRequestReplacementBadge`) · URL `?sr=spare`
+- **3 พ.ย. 2569 ป๊อป Autopost บอกบัญชีถูกพัก/ยังไม่ได้ล็อกอินก่อนสั่ง** — So Scraping แจ้ง 11:00 (10 ใช้ได้ · 3 ถูกพัก · 21 ไม่มี session บน RM009)
+  · `soAccountChoice` / `soAccountHasSession` ใน `src/lib/soScraping.ts`: ถูกพัก = "ถูกพัก ใช้ได้ 4 พ.ย. 10:26" (`paused_until` เวลาไทย) · ไม่มี session บนเครื่องไหน (`session_workers` ว่าง + ไม่อยู่ใน `fb_account_ids` ของเครื่องใด) = "ยังไม่ได้ล็อกอิน Facebook" · ทั้งสองแบบเลือกไม่ได้ · บัญชีตั้งต้นข้ามบัญชีไม่มี session
+  · เทสต์ `tests/api/spareFilterSoAccounts2569-11-03.test.ts`
