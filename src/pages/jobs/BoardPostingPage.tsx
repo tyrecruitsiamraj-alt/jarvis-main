@@ -843,6 +843,9 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
         ? boardCardAge({ ...src, age_range_min: erpAgeMin ?? undefined, age_range_max: erpAgeMax ?? undefined })
         : null;
     const erpSchedule = ('erp_work_schedule' in src ? src.erp_work_schedule : src.work_schedule)?.trim() || null;
+    // ค่า ERP ของกล่องรายละเอียดงาน/คุณสมบัติ (3 พ.ย. 2569) — โชว์คู่เมื่อทีมแก้ทับแล้วเท่านั้น
+    const erpDetails = 'erp_job_details' in src ? (src.erp_job_details ?? []) : [];
+    const erpRequirements = 'erp_requirements' in src ? (src.erp_requirements ?? []) : [];
     const erpGender = erpGenderLabel(src);
     const erpBenefits = src.benefits ?? [];
     const k = (name: string) => `${j.id}-${name}-${pasteRev}`;
@@ -955,7 +958,14 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
           title="รายละเอียดงาน"
           testId="box-details"
           value={j.job_details && j.job_details.length > 0 ? lines(j.job_details) : none}
-          erp={src.vehicle_required?.trim() ? <p>รถ {src.vehicle_required}</p> : null}
+          erp={
+            src.vehicle_required?.trim() || erpDetails.length > 0 ? (
+              <>
+                {src.vehicle_required?.trim() ? <p>รถ {src.vehicle_required}</p> : null}
+                {erpDetails.length > 0 ? lines(erpDetails) : null}
+              </>
+            ) : null
+          }
           editor={<ScheduleRequirementsFields key={k('details')} only="details" job={j} onSaved={onFieldsSaved} />}
           {...boxProps('details')}
         />
@@ -963,7 +973,7 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
           title="คุณสมบัติ"
           testId="box-requirements"
           value={j.requirements && j.requirements.length > 0 ? lines(j.requirements) : none}
-          erp={null}
+          erp={erpRequirements.length > 0 ? lines(erpRequirements) : null}
           editor={<ScheduleRequirementsFields key={k('requirements')} only="requirements" job={j} onSaved={onFieldsSaved} />}
           {...boxProps('requirements')}
         />

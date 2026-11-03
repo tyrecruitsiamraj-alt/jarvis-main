@@ -1,3 +1,4 @@
+import { erpJobDetailLines, erpRequirementLines } from './erpJobText.js';
 import { siamrajSqlQuery } from './siamrajSqlServer.js';
 import { workSiteNameOf } from './siamrajUnitName';
 import {
@@ -68,6 +69,17 @@ type SqlServerRequestRow = {
   work_time: string | null;
   age: string | null;
   sex: string | null;
+  /** รายละเอียดงาน + คุณสมบัติ (3 พ.ย. 2569) — ค่าตั้งต้นของกล่องในป๊อปประกาศ · erpJobText.ts */
+  work_detail1: string | null;
+  work_detail2: string | null;
+  work_detail3: string | null;
+  degree_detail: string | null;
+  major_detail: string | null;
+  experience: string | null;
+  capability1: string | null;
+  capability2: string | null;
+  capability3: string | null;
+  capability_other: string | null;
   payment_rate: number | null;
   draw_rate: number | null;
   /**
@@ -258,6 +270,16 @@ function mapSqlServerRow(r: SqlServerRequestRow) {
     contact_name: r.contact_name || undefined,
     contact_phone: r.mobile_phone?.trim() || undefined,
     work_schedule: workSchedule || undefined,
+    job_details: erpJobDetailLines(r.work_detail1, r.work_detail2, r.work_detail3),
+    requirements: erpRequirementLines({
+      degree: r.degree_detail,
+      major: r.major_detail,
+      experience: r.experience,
+      capability1: r.capability1,
+      capability2: r.capability2,
+      capability3: r.capability3,
+      capabilityOther: r.capability_other,
+    }),
     /**
      * เดิม hardcode 'open' เพราะ feed ผ่าน open WHERE เสมอ — พอหน้ารายละเอียด
      * เปิดใบปิดได้ (includeClosed) ต้องตีจากแถวจริง ไม่งั้นใบปิดโชว์เป็นใบเปิด
@@ -379,6 +401,8 @@ const BASE_SQL = `
     B.work_time,
     B.age,
     B.sex,
+    B.work_detail1, B.work_detail2, B.work_detail3,
+    B.degree_detail, B.major_detail, B.experience, B.capability1, B.capability2, B.capability3, B.capability_other,
     (SELECT z.abs_customer_fine FROM st_request_p3 z WHERE z.request_no = A.request_no) AS abs_customer_fine,
     (SELECT z.abs_customer_deduct FROM st_request_p3 z WHERE z.request_no = A.request_no) AS abs_customer_deduct,
     (SELECT z.contact_name FROM st_request_p1 z WHERE z.request_no = A.request_no) AS contact_name,
@@ -478,6 +502,7 @@ const SELECT_COLUMNS = `
   job_name1, job_name2, requester_name, request_action_name, request_action_code,
   request_qty, inform_qty, is_inform_all, effective_inform_qty,
   reason_main_name, work_addr, work_place, boss_nationality, work_date, work_time, age, sex,
+  work_detail1, work_detail2, work_detail3, degree_detail, major_detail, experience, capability1, capability2, capability3, capability_other,
   payment_rate, draw_rate, fee_name, abs_customer_fine, abs_customer_deduct, contact_name,
   resigned_wage_draw_rate, resigned_wage_fee_rate, resigned_wage_effective_date,
   resigned_income_3m

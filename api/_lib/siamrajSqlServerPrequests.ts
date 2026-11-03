@@ -22,6 +22,7 @@
  * เผื่อวันหน้ามีหลายแถว — ที่นี่เรียงด้วย `work_place1` ให้ผลคงที่ ไม่ใช่หยิบมั่ว
  */
 import { siamrajSqlQuery } from './siamrajSqlServer.js';
+import { erpJobDetailLines, erpRequirementLines } from './erpJobText.js';
 import { inferJobTypeFromDescription, primaryJobRoleLabel } from './siamrajJobMapping.js';
 import { parseAgeRange, formatGenderRequirement } from './siamrajJobMapping.js';
 import { normalizeSiamrajWorkAddress } from './siamrajSqlServerRequests.js';
@@ -59,6 +60,14 @@ type PrequestRow = {
   work_place: string | null;
   work_addr: string | null;
   work_detail: string | null;
+  work_detail2: string | null;
+  work_detail3: string | null;
+  degree_detail: string | null;
+  major_detail: string | null;
+  capability1: string | null;
+  capability2: string | null;
+  capability3: string | null;
+  capability_other: string | null;
   work_date: string | null;
   work_time: string | null;
   resign_staff_name: string | null;
@@ -119,6 +128,17 @@ function mapPrequestRow(r: PrequestRow) {
     work_place: txt(r.work_place),
     work_schedule: workSchedule || undefined,
     work_detail: txt(r.work_detail),
+    // ค่าตั้งต้นของกล่องรายละเอียดงาน/คุณสมบัติในป๊อปประกาศ (3 พ.ย. 2569 · ใบ Pre Order ก็กรอกครบ 3 บรรทัด)
+    job_details: erpJobDetailLines(r.work_detail, r.work_detail2, r.work_detail3),
+    requirements: erpRequirementLines({
+      degree: r.degree_detail,
+      major: r.major_detail,
+      experience: r.experience,
+      capability1: r.capability1,
+      capability2: r.capability2,
+      capability3: r.capability3,
+      capabilityOther: r.capability_other,
+    }),
     contact_name: txt(r.contact_name),
     contact_phone: txt(r.contact_phone),
     boss_nationality: txt(r.boss_nationality),
@@ -186,6 +206,9 @@ const PREQUEST_SELECT = `
       CASE WHEN NULLIF(LTRIM(RTRIM(p2.work_place3)), N'') IS NOT NULL THEN N' ' + LTRIM(RTRIM(p2.work_place3)) ELSE N'' END
     )) AS work_addr,
     RTRIM(p2.work_detail1) AS work_detail,
+    RTRIM(p2.work_detail2) AS work_detail2, RTRIM(p2.work_detail3) AS work_detail3,
+    RTRIM(p2.degree_detail) AS degree_detail, RTRIM(p2.major_detail) AS major_detail,
+    RTRIM(p2.capability1) AS capability1, RTRIM(p2.capability2) AS capability2, RTRIM(p2.capability3) AS capability3, RTRIM(p2.capability_other) AS capability_other,
     RTRIM(p2.work_date) AS work_date, RTRIM(p2.work_time) AS work_time,
     LTRIM(RTRIM(p2.replace_detail1)) AS resign_staff_name,
     LTRIM(RTRIM(p2.replace_detail2)) AS resign_reason,

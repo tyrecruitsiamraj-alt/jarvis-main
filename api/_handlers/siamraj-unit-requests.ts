@@ -178,8 +178,15 @@ export async function attachNotes(items: unknown[]): Promise<void> {
           it.erp_work_schedule = it.work_schedule ?? null;
           it.work_schedule = fo.work_schedule;
         }
-        if (fo.requirements && fo.requirements.length > 0) it.requirements = fo.requirements;
-        if (fo.job_details && fo.job_details.length > 0) it.job_details = fo.job_details;
+        // รายละเอียดงาน/คุณสมบัติ: ค่าตั้งต้น = ERP (3 พ.ย. 2569 erpJobText.ts) · ทีมแก้แล้วทับ · เก็บของ ERP ไว้ให้ป๊อปโชว์คู่
+        if (fo.requirements && fo.requirements.length > 0) {
+          it.erp_requirements = it.requirements ?? null;
+          it.requirements = fo.requirements;
+        }
+        if (fo.job_details && fo.job_details.length > 0) {
+          it.erp_job_details = it.job_details ?? null;
+          it.job_details = fo.job_details;
+        }
         // ข้อความประกาศที่แก้ใน Autopost (28 ต.ค. 2569) — ขึ้นหน้าสมัคร (ตัดบรรทัดลิงก์ที่ชั้นสาธารณะ)
         if (fo.post_caption) it.public_post_text = fo.post_caption;
         /**
@@ -484,7 +491,8 @@ async function handler(req: AuthedReq, res: ApiRes) {
      */
     const fresh = getQuery(req, 'fresh') === '1';
     const outcome = await readUnitRequestListThroughCache({ limit, mode, departmentScope, fresh });
-    const items = outcome.value;
+    // ใบขอจริง + ใบ Pre Order รูปไม่เท่ากัน ⇒ ประกาศเป็นอาเรย์ของ union (TS เดาไม่ได้เมื่อเป็น union ของอาเรย์)
+    const items: readonly (typeof outcome.value)[number][] = outcome.value;
     // หน้าจอเอาไปเขียนว่า "ข้อมูลเมื่อ X นาทีที่แล้ว" — ไม่แตะรูปคำตอบเดิม (ยังเป็น array)
     res.setHeader?.('x-data-age-seconds', String(ageSeconds(outcome.fetchedAt)));
     res.setHeader?.('x-data-source', outcome.source);

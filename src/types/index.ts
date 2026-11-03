@@ -246,6 +246,9 @@ export interface JobRequest {
   erp_age_range_min?: number | null;
   erp_age_range_max?: number | null;
   erp_work_schedule?: string | null;
+  /** รายละเอียดงาน/คุณสมบัติที่ใบขอ ERP เขียนไว้ก่อนทีมแก้ทับ (3 พ.ย. 2569) — ไม่มีคีย์ = ไม่ได้ทับ */
+  erp_job_details?: string[] | null;
+  erp_requirements?: string[] | null;
   request_no?: string;
   resigned_title_prefix?: string;
   resigned_first_name?: string;
