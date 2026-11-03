@@ -4,7 +4,7 @@ import type { PublicApplication } from '@/lib/publicApplicationsApi';
 
 /**
  * 14 ต.ค. 2569 เจ้าของ: "397 แบ่งเป็น สนใจ … หายไปไหน 146" → ทุกคนต้องมีชิป
- * 3 พ.ย. 2569 เจ้าของ "Status มันเยอะไป" → Choice 7 ชิป: ทั้งหมด · รอโทร · ไม่รับสาย · สนใจ · ไม่สนใจ · คุยแล้วไม่ได้คำตอบ · ไม่ได้ส่ง AI
+ * 3 พ.ย. 2569 เจ้าของ "Status มันเยอะไป" → 7 ชิป แล้ว "ไม่ได้ส่ง AI 744 แยก iRecruit ไม่ผูกใบขอ ออกมา" → 9 ชิป
  * 🔴 ทุกชิป (ยกเว้น "ทั้งหมด") ไม่ทับกัน รวมกัน = ทั้งหมด
  */
 const row = (x: Partial<PublicApplication>) => ({ id: 'a', status: 'new', job_id: 'siamraj-sql:X', ...x }) as PublicApplication;
@@ -18,11 +18,11 @@ const CASES: Array<[Partial<PublicApplication>, string]> = [
   [{ last_call_status: 'failed', last_call_followup: 'needs_human', last_call_outcome: 'no_answer', ai_answer: { micro: 'no_pickup', at: null } }, 'no_pickup'],
   [{ last_call_status: 'pending', last_call_followup: 'retry_scheduled', last_call_attempts: 2, last_call_prev_outcome: 'busy', last_call_next_at: FUTURE }, 'ai_waiting'],
   [{}, 'not_sent'],
-  [{ job_id: undefined }, 'not_sent'],
+  [{ job_id: undefined }, 'no_job'],
   [{ phone_callable: false }, 'not_sent'],
   // 20 ต.ค. 2569: ดึงจาก iRecruit ยังไม่มีใครส่ง AI = กล่อง iRecruit แยกจาก "ยังไม่ส่ง AI"
-  [{ created_by_name: 'iRecruit', job_id: undefined }, 'not_sent'],
-  [{ created_by_name: 'สมชาย', job_id: undefined }, 'not_sent'],
+  [{ created_by_name: 'iRecruit', job_id: undefined }, 'irecruit_pull'],
+  [{ created_by_name: 'สมชาย', job_id: undefined }, 'no_job'],
   // ซ้ำ iRecruit แล้วกดส่ง AI จนตอบสนใจ = อยู่ "สนใจ" กล่องเดียว (เดิมอยู่สองกล่อง)
   [{ irecruit_dup_at: '2026-10-10T00:00:00Z', last_call_outcome: 'confirmed', last_call_at: '2026-10-13T01:00:00Z' }, 'interested'],
   [{ age: 60, irecruit_dup_at: '2026-10-10T00:00:00Z' }, 'not_sent'],
@@ -53,7 +53,7 @@ describe('ชิปแท็บผู้สมัคร แบ่งครบไ
     expect(rmListViewFromParam('ai_at_risk')).toBe('ai_waiting');
     expect(rmListViewFromParam('retry_wait')).toBe('ai_waiting');
     expect(rmListViewFromParam('over_age')).toBe('not_sent');
-    expect(rmListViewFromParam('irecruit_pull')).toBe('not_sent');
+    expect(rmListViewFromParam('irecruit_pull')).toBe('irecruit_pull');
     expect(rmListViewFromParam('no_pickup')).toBe('no_pickup');
     expect(rmListViewFromParam('collect')).toBeNull();
     expect(rmListViewFromParam('xx')).toBeNull();
@@ -72,7 +72,7 @@ describe('ทำไมยังไม่ส่ง AI (27 ต.ค. 2569)', () => 
     expect(aiAnswerTextOf(row({ job_id: undefined }))).toMatchObject({ kind: 'not_sent', reason: 'ไม่ผูกใบขอ' });
   });
   it('ลำดับบนจอตามที่เจ้าของสั่ง', () => {
-    expect(RM_LIST_VIEWS_SHOWN).toEqual(['all', 'ai_waiting', 'no_pickup', 'interested', 'declined', 'ai_talked', 'not_sent']);
+    expect(RM_LIST_VIEWS_SHOWN).toEqual(['all', 'ai_waiting', 'no_pickup', 'interested', 'declined', 'ai_talked', 'not_sent', 'irecruit_pull', 'no_job']);
   });
 });
 

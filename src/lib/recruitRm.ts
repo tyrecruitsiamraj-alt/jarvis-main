@@ -160,6 +160,7 @@ export const RM_LIST_VIEWS = [
   'bad_data',
   'ai_cancelled',
   'collect',
+  'no_job',
 ] as const;
 export type RmListView = (typeof RM_LIST_VIEWS)[number];
 
@@ -188,7 +189,8 @@ export type RmListView = (typeof RM_LIST_VIEWS)[number];
  * คุยแล้วไม่ได้คำตอบ คงไว้ (ไม่ใช่ไม่รับสาย ต้องมีคนโทรต่อ) · "ปิดเครื่อง" Lumos ไม่แยก รวมในไม่รับสาย
  * ลิงก์เก่า ?list=<ชิปเดิม> ยังเปิดได้ (`rmListViewFromParam` แปลงเป็นชิปที่รวมมัน)
  */
-export const RM_LIST_VIEWS_SHOWN = ['all', 'ai_waiting', 'no_pickup', 'interested', 'declined', 'ai_talked', 'not_sent'] as const satisfies readonly RmListView[];
+// 3 พ.ย. 2569 (ต่อ) เจ้าของ "ไม่ได้ส่ง AI 744 แยก iRecruit ไม่ผูกใบขอ ออกมา" → 9 ชิป: + iRecruit (ดึงจาก iRecruit) · ไม่ผูกใบขอ
+export const RM_LIST_VIEWS_SHOWN = ['all', 'ai_waiting', 'no_pickup', 'interested', 'declined', 'ai_talked', 'not_sent', 'irecruit_pull', 'no_job'] as const satisfies readonly RmListView[];
 export type RmShownView = (typeof RM_LIST_VIEWS_SHOWN)[number];
 
 /** ชิปเดิมที่ถูกยุบ → ชิปที่รวมมัน (ลิงก์เก่า/ตัวนับเก่าไม่ตาย) */
@@ -197,7 +199,6 @@ const RM_VIEW_ALIAS: Partial<Record<RmListView, RmShownView>> = {
   retry_wait: 'ai_waiting',
   over_age: 'not_sent',
   irecruit_dup: 'not_sent',
-  irecruit_pull: 'not_sent',
   bad_data: 'not_sent',
   ai_cancelled: 'not_sent',
 };
@@ -231,6 +232,7 @@ export const RM_LIST_VIEW_LABEL: Record<RmListView, string> = {
   // 27 ต.ค. 2569 เจ้าของ "ข้อมูลผิด เปลี่ยนเป็น เบอร์โทรผิด" (ชิปนี้ = เบอร์ใช้กับระบบโทรไม่ได้)
   bad_data: 'เบอร์โทรผิด',
   ai_cancelled: 'ยกเลิก',
+  no_job: 'ไม่ผูกใบขอ',
   // คิวงานสรรหา (16 ส.ค.): สนใจจริง แต่ยังไม่ขึ้นบอร์ด (= ยังไม่ได้มาสมัคร)
   // "ขึ้นบอร์ดแล้ว" = on_board (server จับคู่เบอร์กับคนบนบอร์ด ERP) → ออกจากคิวเอง
   collect: 'รอเก็บใบสมัคร',
@@ -266,7 +268,7 @@ export const IRECRUIT_PULL_CREATED_BY = 'iRecruit';
 /**
  * ใบนี้อยู่ชิปไหน (ชิปเดียว ตัดสินตามลำดับ · 3 พ.ย. 2569):
  * สนใจ → ไม่สนใจ → ยังอยู่ในคิว AI (รอโทร · AI โทรครบแล้วรอคน = ไม่รับสาย/คุยแล้วไม่ได้คำตอบ) → คิวถูกยกเลิก = ไม่ได้ส่ง →
- * AI เคยโทรแล้ว (คุยแล้วไม่ได้คำตอบ / ไม่รับสาย) → ที่เหลือ = ไม่ได้ส่ง AI (เหตุผลบนแถว: อายุเกิน · ซ้ำ · ไม่ผูกใบ · เบอร์ผิด …)
+ * AI เคยโทรแล้ว (คุยแล้วไม่ได้คำตอบ / ไม่รับสาย) → ดึงจาก iRecruit → ไม่ผูกใบขอ → ที่เหลือ = ไม่ได้ส่ง AI (เหตุผลบนแถว: อายุเกิน · ซ้ำ · เบอร์ผิด …)
  * ⚠️ อายุเกิน/ซ้ำ iRecruit ที่ถูกส่ง AI ไปแล้ว = อยู่ตามผลโทรจริง ไม่ใช่ "ไม่ได้ส่ง" (ตรงกับความจริง)
  */
 export function rmShownViewOf(r: PublicApplication): Exclude<RmShownView, 'all'> {
@@ -282,6 +284,8 @@ export function rmShownViewOf(r: PublicApplication): Exclude<RmShownView, 'all'>
   const aiCalled =
     Boolean(r.ai_answer) || r.last_call_status === 'completed' || r.last_call_status === 'failed' || Boolean(r.last_call_prev_outcome);
   if (aiCalled) return talkedOrNot();
+  if (r.created_by_name === IRECRUIT_PULL_CREATED_BY) return 'irecruit_pull';
+  if (!r.job_id?.trim()) return 'no_job';
   return 'not_sent';
 }
 

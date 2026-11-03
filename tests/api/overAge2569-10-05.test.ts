@@ -10,7 +10,7 @@ import { RM_LIST_VIEWS_SHOWN, RM_LIST_VIEW_LABEL, isInRmListView } from '../../s
 import type { PublicApplication } from '../../src/lib/publicApplicationsApi';
 
 const code = (p: string) => readFileSync(new URL(`../../${p}`, import.meta.url), 'utf8');
-const app = (age?: number) => ({ id: 'a', full_name: 'ทดสอบ', age }) as unknown as PublicApplication;
+const app = (age?: number) => ({ id: 'a', full_name: 'ทดสอบ', age, job_id: 'siamraj-sql:OPL6910074' }) as unknown as PublicApplication;
 
 describe('ตัวตัดสินอายุเกิน', () => {
   it('58 ขึ้นไป = เกิน · 57 ไม่เกิน · ไม่รู้อายุ = ไม่เกิน (ส่ง AI ได้ตามเดิม)', () => {
@@ -28,7 +28,7 @@ describe('ตัวตัดสินอายุเกิน', () => {
 
 describe('กล่อง "อายุเกิน" บนแท็บผู้สมัคร', () => {
   it('ปุ่มอยู่คู่กับสนใจ/ไม่สนใจ · เลือกแล้วเหลือเฉพาะคน 58 ขึ้นไป · ทั้งหมดยังเห็นทุกคน', () => {
-    expect([...RM_LIST_VIEWS_SHOWN]).toEqual(['all', 'ai_waiting', 'no_pickup', 'interested', 'declined', 'ai_talked', 'not_sent'] /* 7 ชิป เจ้าของ 3 พ.ย. 2569 */);
+    expect([...RM_LIST_VIEWS_SHOWN]).toEqual(['all', 'ai_waiting', 'no_pickup', 'interested', 'declined', 'ai_talked', 'not_sent', 'irecruit_pull', 'no_job'] /* 9 ชิป เจ้าของ 3 พ.ย. 2569 */);
     // 3 พ.ย. 2569 ชิป "อายุเกิน" ยุบเข้า "ไม่ได้ส่ง AI" (เหตุผลอยู่บนแถว) — ลิงก์เก่า ?list=over_age = ชิปนั้น
     expect(RM_LIST_VIEW_LABEL.not_sent).toBe('ไม่ได้ส่ง AI');
     expect(isInRmListView(app(59), 'not_sent')).toBe(true);

@@ -41,7 +41,7 @@ describe('แจ้งเตือนเช้าละครั้งถึง�
     expect(sql).toContain("a.created_by_name = 'iRecruit'");
     expect(sql).toContain("i.irecruit_status = 'W'");
     expect(sql).toContain('application_cancellations');
-    expect(IRECRUIT_LATE_LINK).toBe('/jobs/board?view=list&list=not_sent');
+    expect(IRECRUIT_LATE_LINK).toBe('/jobs/board?view=list&list=irecruit_pull');
   });
   it('ชื่อผู้รับผิดชอบ → ผู้ใช้ด้วยชื่อเล่น/ชื่อเต็ม/อีเมล · ชื่อซ้ำหลายคนไม่เดา', () => {
     const users = [

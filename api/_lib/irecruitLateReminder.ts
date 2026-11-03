@@ -17,7 +17,7 @@ const USERS = tableInAppSchema('users');
 const CANCELLATIONS = tableInAppSchema('application_cancellations');
 const LOOKBACK_DAYS = 14;
 const CHECK_EVERY_MS = 30 * 60_000;
-export const IRECRUIT_LATE_LINK = '/jobs/board?view=list&list=not_sent';
+export const IRECRUIT_LATE_LINK = '/jobs/board?view=list&list=irecruit_pull';
 
 /** ค้างต่อผู้รับผิดชอบ · $1 = ชั่วโมงที่นับว่าค้าง · $2 = ย้อนกี่วัน */
 export function irecruitLateSql(): string {
