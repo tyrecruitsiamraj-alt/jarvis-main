@@ -27,7 +27,7 @@ import {
   filterApplications,
   isInRmTab,
   isInRmListView,
-  isShownRmListView,
+  rmListViewFromParam,
   RM_LIST_VIEWS,
   RM_LIST_VIEWS_SHOWN,
   RM_LIST_VIEW_DEFAULT,
@@ -198,7 +198,8 @@ const RmWorkspace: React.FC<{
   const listParam = searchParams.get('list');
   // ค่าเริ่ม = รายชื่อคนที่สนใจ (เจ้าของสั่ง 14 ต.ค. 2569 "Default หน้า ผู้สมัครใน menu งานสรรหา ให้เป็น รายชื่อคนที่สนใจ")
   // "รายชื่อทั้งหมด" จึงต้องมี ?list=all ชัด ๆ · ลิงก์จากตัวเลขที่ต้องการทุกคน (ยังไม่ถูกโทร ฯลฯ) ส่ง list=all มาเอง
-  const listView: RmListView = isShownRmListView(listParam) ? listParam : RM_LIST_VIEW_DEFAULT;
+  // ลิงก์เก่า ?list=<ชิปที่ถูกยุบ 3 พ.ย. 2569> แปลงเป็นชิปที่รวมมัน (rmListViewFromParam)
+  const listView: RmListView = rmListViewFromParam(listParam) ?? RM_LIST_VIEW_DEFAULT;
 
   const [rows, setRows] = useState<PublicApplication[]>([]);
   const [loading, setLoading] = useState(true);

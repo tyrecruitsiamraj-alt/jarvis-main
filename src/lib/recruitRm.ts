@@ -174,30 +174,39 @@ export type RmListView = (typeof RM_LIST_VIEWS)[number];
 /**
  * 14 ต.ค. 2569 เจ้าของ: *"397 แบ่งเป็น สนใจ … Aiไม่ได้ผล 22 หายไปไหน 146"* → *"เพิ่ม ไม่รับสาย รอติดต่อซ้ำ ยังไม่ได้ ข้อมูลผิด ยกเลิก
  * ไปกะพวก รายชื่อคนสนใจ ฯลฯ อยู่แถวเดียวกัน"* (Choice ยืนยันการนับ) ⇒ 5 ชิปท้ายแถว = คนที่ไม่อยู่ชิปก่อนหน้า
- * (`rmRestViewOf`) ทุกชิปไม่ทับกัน รวมกัน = รายชื่อทั้งหมด
+ * (`rmShownViewOf`) ทุกชิปไม่ทับกัน รวมกัน = รายชื่อทั้งหมด
  */
 /**
  * 🔴 ลำดับบนจอตามเจ้าของ 27 ต.ค. 2569: ทั้งหมด · รอโทร · สนใจ · ไม่สนใจ · อายุเกิน · ซ้ำ iRecruit · รอติดต่อซ้ำ ·
  * ไม่รับสาย (โทรครบ 3 ครั้ง) · iRecruit · ยังไม่ส่ง AI · ยกเลิก — แล้ว AI ไม่ได้ผล · ข้อมูลผิด ท้ายรายการ (Choice "คงไว้ท้ายรายการ")
- * ลำดับบนจอ ≠ ลำดับตัดสินชิป (`RM_PRIMARY_VIEWS` ก่อน แล้ว `rmRestViewOf`) — ทุกชิปไม่ทับกัน รวม = ทั้งหมด
+ * ลำดับบนจอ ≠ ลำดับตัดสินชิป (`rmShownViewOf`) — ทุกชิปไม่ทับกัน รวม = ทั้งหมด
  */
-export const RM_LIST_VIEWS_SHOWN = [
-  'all',
-  'ai_waiting',
-  'interested',
-  'declined',
-  'over_age',
-  'irecruit_dup',
-  'retry_wait',
-  'no_pickup',
-  // 27 ต.ค. 2569 เจ้าของ "คุยแล้วแต่ไม่ได้คำตอบ ทำไมอยู่ในไม่รับสาย" · Choice แยกกลุ่มต่อจากไม่รับสาย
-  'ai_talked',
-  'irecruit_pull',
-  'not_sent',
-  'ai_cancelled',
-  'ai_at_risk',
-  'bad_data',
-] as const satisfies readonly RmListView[];
+/**
+ * 🔴 3 พ.ย. 2569 เจ้าของ "Status มันเยอะไป … แยกแค่ ทั้งหมด รอโทร โทรแล้วไม่รับ สนใจ ไม่สนใจ โทรซ้ำก็ไปอยู่ที่รอโทร" → Choice 7 ชิป
+ * 14 ชิปเดิมยุบเหลือ 7: รอโทร = ยังไม่มีผล + นัดโทรซ้ำ + รอคิว/เงียบ (รอโทร · รอติดต่อซ้ำ · AI ไม่ได้ผล เดิม) ·
+ * ไม่ได้ส่ง AI = AI ไม่โทรทุกเหตุ (อายุเกิน · ซ้ำ iRecruit · iRecruit · ยกเลิก · เบอร์ผิด · ยังไม่ส่ง เดิม — เหตุผลอยู่บนแถว) ·
+ * คุยแล้วไม่ได้คำตอบ คงไว้ (ไม่ใช่ไม่รับสาย ต้องมีคนโทรต่อ) · "ปิดเครื่อง" Lumos ไม่แยก รวมในไม่รับสาย
+ * ลิงก์เก่า ?list=<ชิปเดิม> ยังเปิดได้ (`rmListViewFromParam` แปลงเป็นชิปที่รวมมัน)
+ */
+export const RM_LIST_VIEWS_SHOWN = ['all', 'ai_waiting', 'no_pickup', 'interested', 'declined', 'ai_talked', 'not_sent'] as const satisfies readonly RmListView[];
+export type RmShownView = (typeof RM_LIST_VIEWS_SHOWN)[number];
+
+/** ชิปเดิมที่ถูกยุบ → ชิปที่รวมมัน (ลิงก์เก่า/ตัวนับเก่าไม่ตาย) */
+const RM_VIEW_ALIAS: Partial<Record<RmListView, RmShownView>> = {
+  ai_at_risk: 'ai_waiting',
+  retry_wait: 'ai_waiting',
+  over_age: 'not_sent',
+  irecruit_dup: 'not_sent',
+  irecruit_pull: 'not_sent',
+  bad_data: 'not_sent',
+  ai_cancelled: 'not_sent',
+};
+
+/** ค่า ?list= → ชิปที่โชว์ (ชิปเดิมแปลงให้ · ไม่รู้จัก/collect = null ให้ผู้เรียกใช้ค่าเริ่ม) */
+export function rmListViewFromParam(v: string | null | undefined): RmShownView | null {
+  if (isShownRmListView(v)) return v;
+  return isRmListView(v) ? (RM_VIEW_ALIAS[v] ?? null) : null;
+}
 /** มุมมองตอนเปิดแท็บผู้สมัคร (ไม่มี ?list=) — เจ้าของสั่ง 14 ต.ค. 2569 */
 export const RM_LIST_VIEW_DEFAULT = 'interested' as const satisfies RmListView;
 
@@ -218,7 +227,7 @@ export const RM_LIST_VIEW_LABEL: Record<RmListView, string> = {
   retry_wait: 'รอติดต่อซ้ำ',
   // 20 ต.ค. 2569 เจ้าของ: "แก้คำ ยังไม่ได้ เป็น iRecruit" + Choice แยกกล่อง — ดึงจาก iRecruit (คนกดส่ง AI เอง) แยกจากที่ยังไม่ส่ง AI
   irecruit_pull: 'iRecruit',
-  not_sent: 'ยังไม่ส่ง AI',
+  not_sent: 'ไม่ได้ส่ง AI',
   // 27 ต.ค. 2569 เจ้าของ "ข้อมูลผิด เปลี่ยนเป็น เบอร์โทรผิด" (ชิปนี้ = เบอร์ใช้กับระบบโทรไม่ได้)
   bad_data: 'เบอร์โทรผิด',
   ai_cancelled: 'ยกเลิก',
@@ -239,62 +248,40 @@ export function isInRmListView(r: PublicApplication, view: RmListView): boolean 
    * (เดิมไฟล์นี้เทียบ `=== 'confirmed'` / `=== 'declined'` เองตรง ๆ → พอเจ้าของสั่งให้
    * ผลติดต่อ `ok=false` นับเป็นไม่สนใจด้วย (Phase 5.11) กล่องกับแท็บจะตอบไม่เหมือนกัน)
    */
-  // 🔴 ชิปแถวบนห้ามทับกัน (เจ้าของ 20 ต.ค. 2569 "แยกกล่องอย่าให้ซ้ำกัน") — คนเดียวอยู่ชิปแรกที่เข้าเกณฑ์ตามลำดับ RM_PRIMARY_VIEWS
-  if ((RM_PRIMARY_VIEWS as readonly string[]).includes(view)) return rmPrimaryViewOf(r) === view;
+  if (view === 'all') return true;
   // คิวสรรหา: ตอบสนใจตอนโทร แต่ยังไม่ขึ้นบอร์ด (ยังไม่มาสมัคร) — พอสรรหาเก็บใบสมัคร
   // (ชื่อขึ้นบอร์ด) on_board = true → หลุดจากคิวเอง
   if (view === 'collect') return isInterestedApplicant(r) && r.on_board !== true;
-  if (isRmRestView(view)) return rmRestViewOf(r) === view;
-  return true;
+  // 🔴 ทุกชิปไม่ทับกัน (เจ้าของ 20 ต.ค. 2569 "แยกกล่องอย่าให้ซ้ำกัน") — คนเดียวอยู่ชิปเดียว · ชิปเดิมที่ถูกยุบ = ชิปที่รวมมัน
+  const target = isShownRmListView(view) ? view : RM_VIEW_ALIAS[view];
+  return target !== undefined && rmShownViewOf(r) === target;
 }
 
-/** ชิปท้ายแถว (14 ต.ค. 2569) — คนที่ไม่อยู่ชิปก่อนหน้า แบ่งให้ครบทุกคน */
-const RM_REST_VIEWS = ['ai_waiting', 'no_pickup', 'ai_talked', 'retry_wait', 'irecruit_pull', 'not_sent', 'bad_data', 'ai_cancelled'] as const;
 /** รับสาย/คุยแล้วแต่ไม่ได้คำตอบที่ตัดสินได้ (ถังกลาง `classifyCallMicro`) — ไม่ใช่ "ไม่รับสาย" */
 const TALKED_NO_ANSWER = new Set(['talked_unclear', 'not_yet', 'picked_silent']);
-type RmRestView = (typeof RM_REST_VIEWS)[number];
-const RM_PRIMARY_VIEWS = ['interested', 'declined', 'over_age', 'irecruit_dup', 'ai_at_risk'] as const;
-type RmPrimaryView = (typeof RM_PRIMARY_VIEWS)[number];
 
 /** ใบที่ระบบดึงจาก iRecruit เอง (`irecruitApplicantImport.ts` · created_by_name = 'iRecruit') */
 export const IRECRUIT_PULL_CREATED_BY = 'iRecruit';
 
 /**
- * ชิปแถวบนของใบนี้ — ชิปแรกที่เข้าเกณฑ์ตามลำดับ · null = ไปชิปท้ายแถว
- * เดิมแต่ละชิปเช็กแยกกัน ⇒ คนที่ซ้ำ iRecruit แล้วกดส่ง AI จนตอบสนใจ อยู่ทั้ง "สนใจ" และ "ซ้ำ iRecruit" (20 ต.ค. 2569 เจอ 1 คน)
+ * ใบนี้อยู่ชิปไหน (ชิปเดียว ตัดสินตามลำดับ · 3 พ.ย. 2569):
+ * สนใจ → ไม่สนใจ → ยังอยู่ในคิว AI (รอโทร · AI โทรครบแล้วรอคน = ไม่รับสาย/คุยแล้วไม่ได้คำตอบ) → คิวถูกยกเลิก = ไม่ได้ส่ง →
+ * AI เคยโทรแล้ว (คุยแล้วไม่ได้คำตอบ / ไม่รับสาย) → ที่เหลือ = ไม่ได้ส่ง AI (เหตุผลบนแถว: อายุเกิน · ซ้ำ · ไม่ผูกใบ · เบอร์ผิด …)
+ * ⚠️ อายุเกิน/ซ้ำ iRecruit ที่ถูกส่ง AI ไปแล้ว = อยู่ตามผลโทรจริง ไม่ใช่ "ไม่ได้ส่ง" (ตรงกับความจริง)
  */
-export function rmPrimaryViewOf(r: PublicApplication): RmPrimaryView | null {
+export function rmShownViewOf(r: PublicApplication): Exclude<RmShownView, 'all'> {
   if (isInterestedApplicant(r)) return 'interested';
   if (isNotInterestedApplicant(r)) return 'declined';
-  if (isOverAge(r.age)) return 'over_age';
-  if (r.irecruit_dup_at) return 'irecruit_dup';
-  // เลยนัดโทรซ้ำ = ยังอยู่รอติดต่อซ้ำ (เจ้าของ 27 ต.ค. 2569 "ไม่รับสายมันควรไปอยู่รอติดต่อซ้ำ") — ป้ายแดงบนแถวยังเตือน
+  const talkedOrNot = (): 'ai_talked' | 'no_pickup' => (r.ai_answer && TALKED_NO_ANSWER.has(r.ai_answer.micro) ? 'ai_talked' : 'no_pickup');
   const q = aiQueueStatusOf(r);
-  if (q?.atRisk === true && q.kind !== 'retry_late') return 'ai_at_risk';
-  return null;
-}
-
-function isRmRestView(v: RmListView): v is RmRestView {
-  return (RM_REST_VIEWS as readonly string[]).includes(v);
-}
-
-/**
- * ใบนี้อยู่ชิปท้ายแถวอันไหน — null = อยู่ชิปก่อนหน้าแล้ว (สนใจ · ไม่สนใจ · อายุเกิน · ซ้ำ · AI ไม่ได้ผล)
- * ไม่รับสาย = AI เคยโทรแล้วไม่ได้คำตอบ คิวปิดแล้ว · รอติดต่อซ้ำ = ตั้งโทรซ้ำไว้ · ยกเลิก = คิว AI ถูกยกเลิก ·
- * ข้อมูลผิด = เบอร์ใช้โทรไม่ได้ · iRecruit = ดึงจาก iRecruit ยังไม่มีใครส่ง AI · ยังไม่ส่ง AI = ยังไม่ได้ส่งให้ AI / รอรอบแรก
- */
-export function rmRestViewOf(r: PublicApplication): RmRestView | null {
-  if (rmPrimaryViewOf(r) !== null) return null;
-  const q = aiQueueStatusOf(r);
-  if (q?.kind === 'retry' || q?.kind === 'retry_late') return 'retry_wait';
-  // ส่งให้ AI แล้ว รอสายแรก (27 ต.ค. 2569 "รอโทรเท่าไหร่") — เดิมปนอยู่ในยังไม่ส่ง AI
-  if (q?.kind === 'waiting') return 'ai_waiting';
-  if (r.last_call_status === 'cancelled') return 'ai_cancelled';
+  if (q) {
+    // AI โทรครบทุกรอบแล้วยังไม่ได้คำตอบ (needs_human) = จบฝั่ง AI แล้ว ไปตามผลที่ได้ · ที่เหลือ (รอสายแรก · นัดโทรซ้ำ · เงียบ · Lumos ไม่รับ) = รอโทร
+    return q.kind === 'needs_human' ? talkedOrNot() : 'ai_waiting';
+  }
+  if (r.last_call_status === 'cancelled') return 'not_sent';
   const aiCalled =
     Boolean(r.ai_answer) || r.last_call_status === 'completed' || r.last_call_status === 'failed' || Boolean(r.last_call_prev_outcome);
-  if (aiCalled) return r.ai_answer && TALKED_NO_ANSWER.has(r.ai_answer.micro) ? 'ai_talked' : 'no_pickup';
-  if (r.phone_callable === false) return 'bad_data';
-  if (r.created_by_name === IRECRUIT_PULL_CREATED_BY) return 'irecruit_pull';
+  if (aiCalled) return talkedOrNot();
   return 'not_sent';
 }
 

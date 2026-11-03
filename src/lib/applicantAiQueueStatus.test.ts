@@ -101,12 +101,12 @@ describe('aiQueueStatusOf', () => {
   });
 });
 
-describe('ชิป "AI ไม่ได้ผล" ของแท็บผู้สมัคร', () => {
-  it('รวมเฉพาะสายที่ AI จะไม่โทรแล้ว/เลยนัดแล้วไม่มีผล — รอโทรซ้ำตามนัดไม่นับ', async () => {
+describe('ชิป "รอโทร" ของแท็บผู้สมัคร (3 พ.ย. 2569 รวม AI ไม่ได้ผล + รอติดต่อซ้ำ)', () => {
+  it('ยังอยู่ในคิว AI = รอโทร · AI โทรครบแล้วรอคน (needs_human) = ไม่รับสาย ไม่ใช่รอโทร', async () => {
     const { isInRmListView } = await import('@/lib/recruitRm');
     const base = { id: 'a', status: 'new' } as never;
     const row = (x: object) => ({ ...(base as object), ...x }) as Parameters<typeof isInRmListView>[0];
-    expect(isInRmListView(row({ last_call_status: 'pending', last_call_followup: 'needs_human', last_call_attempts: 3 }), 'ai_at_risk')).toBe(true);
+    expect(isInRmListView(row({ last_call_status: 'pending', last_call_followup: 'needs_human', last_call_attempts: 3 }), 'no_pickup')).toBe(true);
     expect(
       isInRmListView(
         row({
@@ -116,10 +116,10 @@ describe('ชิป "AI ไม่ได้ผล" ของแท็บผู้
           last_call_prev_outcome: 'no_answer',
           last_call_next_at: new Date(Date.now() + 3600_000).toISOString(),
         }),
-        'ai_at_risk',
+        'ai_waiting',
       ),
-    ).toBe(false);
-    expect(isInRmListView(row({ last_call_status: 'pending', last_call_attempts: 1 }), 'ai_at_risk')).toBe(false);
+    ).toBe(true);
+    expect(isInRmListView(row({ last_call_status: 'pending', last_call_attempts: 1 }), 'ai_waiting')).toBe(true);
   });
 });
 

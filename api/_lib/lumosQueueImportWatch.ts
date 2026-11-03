@@ -93,7 +93,7 @@ export async function checkQueueImports(): Promise<{ checked: number; imported: 
       type: 'queue_not_imported',
       title: `AI จะไม่โทร ${r.name || 'ผู้สมัคร'} — Lumos ไม่รับสาย`,
       body: 'ให้เจ้าหน้าที่โทรแทน หรือส่ง AI ใหม่',
-      link: '/jobs/board?view=list&list=ai_at_risk',
+      link: '/jobs/board?view=list&list=ai_waiting',
       dedupeKey: `queue_not_imported:${r.qid}:${r.event_id}`,
     });
   }
