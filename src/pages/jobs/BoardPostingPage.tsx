@@ -41,6 +41,7 @@ import ScheduleRequirementsFields from '@/components/jobs/ScheduleRequirementsFi
 import { buildPostText } from '@/lib/postText';
 import { applyLinkPath } from '@/lib/recruitPostings';
 import PostingLinksList from '@/components/jobs/PostingLinksList';
+import { jobBuOf } from '@/lib/soScraping';
 import AddChannelLinks from '@/components/jobs/AddChannelLinks';
 import JobApplicantsDialog from '@/components/jobs/JobApplicantsDialog';
 import ReleaseSkipControl from '@/components/jobs/ReleaseSkipControl';
@@ -580,6 +581,7 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
                       {job && openPosting ? (
                         <AddChannelLinks
                           posting={openPosting}
+                          jobBu={jobBuOf(job)}
                           onCreated={() => {
                             void loadPostings();
                             setLinksOpen(false);

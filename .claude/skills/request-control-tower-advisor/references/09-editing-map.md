@@ -14177,3 +14177,6 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
   - Autopost (`AutopostDialog.ensureGroupLinks`): ส่ง = หา/สร้างลิงก์ของทุกกลุ่มที่ติ๊ก (ชื่อเดียวกับ Gen link · มีแล้วใช้ตัวเดิม) → `job_snapshot.group_links [{group_id, apply_link, link_code}]` · server ตรวจ `soGroupLinksError` + ทุก link_code เป็นของใบนี้ · สเปกฝั่ง So Scraping `reports-local/so-scraping-spec-group-links.md`
   - ภาพรวมงานสรรหา ตัวกรอง "งานย่อย" (`RequestTab` · `RecruitRequestRow.subtype` · `requestSubtypeOptions`) — server คิดด้วย `drivingSubtypeOf` ตัวเดียวกับกล่องงาน เฉพาะงานขับรถ (`homeOnlineSql` ดึง job_name2 + boss_nationality เพิ่ม) · เลือกแล้วตารางช่องทางนับเฉพาะคนที่กรอกใบงานย่อยนั้น
   - เทสต์ `tests/api/fbGroupLinks2569-11-02.test.ts`
+- **3 พ.ย. 2569 Gen link กลุ่ม Facebook ขึ้นเว็บ (So Scraping 53eb305 รับ group_links แล้ว)** — เจ้าของ *"ขึ้นแล้วๆ"*
+  · เพิ่ม: ปุ่ม "Gen link เพิ่ม" ของใบที่มีลิงก์แล้ว (`AddChannelLinks.tsx`) เลือกกลุ่มได้แบบเดียวกับป๊อปแรก — เดิมได้ลิงก์ Facebook Group ก้อนเดียวบอกกลุ่มไม่ได้
+    (`jobBu` จาก `jobBuOf(job)` ที่ BoardPostingPage · ไม่เลือกกลุ่มกด Gen ไม่ได้)

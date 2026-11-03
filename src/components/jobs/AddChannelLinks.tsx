@@ -2,6 +2,9 @@ import React from 'react';
 import { copyText } from '@/lib/copyText';
 import { Check, Copy, Link2, Loader2 } from 'lucide-react';
 import MultiChannelPicker from '@/components/shared/MultiChannelPicker';
+import SoGroupPicker from '@/components/jobs/SoGroupPicker';
+import { fetchSoGroups } from '@/lib/jobPostingRequestsApi';
+import { isFacebookGroupChannel, soGroupLinkLabel, type SoGroup } from '@/lib/soScraping';
 import { Button } from '@/components/ui/button';
 import { addPostingLink } from '@/lib/recruitPostingsApi';
 import {
@@ -40,26 +43,62 @@ function useCopy() {
  * - ใช้ข้อความประกาศเดิม (หัวข้อ/รายละเอียด) — เพิ่มลิงก์ใต้ประกาศเดียวกัน ไม่สร้างประกาศใหม่ซ้ำ
  * - ลิงก์ละช่องทาง (ผู้สมัครมาทางไหนนับแยกได้) · ไม่เลือกช่องทาง = ลิงก์กลาง 1 อัน
  * - สร้างเสร็จโชว์ลิงก์ใหม่ทั้งหมดทันที กดคัดลอกทีละอันหรือทั้งหมด (ห้ามซ้อน Dialog — กางในที่เดิม)
+ * - ช่องทาง Facebook Group = เลือกกลุ่มจากรายชื่อ So Scraping · กลุ่มละ 1 ลิงก์ (3 พ.ย. 2569 · แบบเดียวกับ GenApplyLinkDialog)
+ *   ใบที่มีลิงก์แล้วกด "Gen link เพิ่ม" มาที่นี่ — เดิมเลือกกลุ่มไม่ได้ ได้ลิงก์ Facebook Group ก้อนเดียว
  */
 const AddChannelLinks: React.FC<{
   posting: RecruitPosting;
+  /** ธุรกิจของใบขอ (LBD/LBA/…) — กลุ่ม Facebook ของธุรกิจนี้ขึ้นก่อน */
+  jobBu?: string | null;
   onCreated?: () => void;
-}> = ({ posting, onCreated }) => {
+}> = ({ posting, jobBu = null, onCreated }) => {
   const [picked, setPicked] = React.useState<RecruitChannelMatch[]>([]);
+  const [soGroups, setSoGroups] = React.useState<SoGroup[] | null>(null);
+  const [groupPick, setGroupPick] = React.useState<string[]>([]);
   const [busy, setBusy] = React.useState(false);
   const [done, setDone] = React.useState<RecruitPostingLink[]>([]);
   const [error, setError] = React.useState<string | null>(null);
   const { copied, copy } = useCopy();
   const resultRef = React.useRef<HTMLDivElement | null>(null);
 
+  const fbGroupChannels = picked.filter((c) => isFacebookGroupChannel(c.name));
+  const needGroups = fbGroupChannels.length > 0 && soGroups === null;
+  React.useEffect(() => {
+    if (!needGroups) return;
+    let alive = true;
+    fetchSoGroups()
+      .then((g) => alive && setSoGroups(g))
+      .catch((e: unknown) => {
+        if (!alive) return;
+        setSoGroups([]);
+        setError(friendlyErrorText(e, 'โหลดกลุ่ม Facebook ไม่ได้'));
+      });
+    return () => {
+      alive = false;
+    };
+  }, [needGroups]);
+
+  /** ช่องทาง → ลิงก์ที่จะสร้าง · Facebook Group แตกเป็นกลุ่มละลิงก์ (ไม่เลือกช่องทาง = ลิงก์กลาง 1 อัน) */
+  const wanted: ({ channelId: string; channelLabel: string } | null)[] =
+    picked.length === 0
+      ? [null]
+      : picked.flatMap((c) =>
+          isFacebookGroupChannel(c.name)
+            ? (soGroups ?? [])
+                .filter((g) => groupPick.includes(g.id))
+                .map((g) => ({ channelId: c.id, channelLabel: soGroupLinkLabel(recruitChannelLabel(c), g.name) }))
+            : [{ channelId: c.id, channelLabel: recruitChannelLabel(c) }],
+        );
+  const missingGroup = fbGroupChannels.length > 0 && groupPick.length === 0;
+
   const create = async () => {
+    if (missingGroup) return;
     setBusy(true);
     setError(null);
     const made: RecruitPostingLink[] = [];
-    const wanted = picked.length > 0 ? picked : [null];
     try {
       for (const c of wanted) {
-        const link = await addPostingLink(posting.id, c ? { channelId: c.id, channelLabel: recruitChannelLabel(c) } : {});
+        const link = await addPostingLink(posting.id, c ?? {});
         // ไม่มีรหัส = ลิงก์เสีย (/apply/p/undefined) ห้ามโชว์ให้คัดลอก (QA 5 ต.ค. 2569)
         if (!link?.code) throw new Error('Gen link ไม่สำเร็จ');
         made.push(link);
@@ -73,6 +112,7 @@ const AddChannelLinks: React.FC<{
       if (made.length > 0) {
         setDone(made);
         setPicked([]);
+        setGroupPick([]);
         onCreated?.();
         window.setTimeout(() => resultRef.current?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' }), 50);
       }
@@ -89,16 +129,23 @@ const AddChannelLinks: React.FC<{
         ข้อความประกาศ <span className="text-foreground">{posting.title}</span>
       </p>
       <MultiChannelPicker value={picked} onChange={setPicked} reloadKey={posting.id} />
-      <Button type="button" className="w-full" disabled={busy} onClick={() => void create()}>
+      {fbGroupChannels.length > 0 ? (
+        <div className="space-y-1.5" data-testid="add-links-groups">
+          <p className="text-xs font-medium text-foreground">กลุ่ม Facebook · กลุ่มละ 1 ลิงก์</p>
+          <SoGroupPicker groups={soGroups} jobBu={jobBu} value={groupPick} onChange={setGroupPick} />
+          {missingGroup ? <p className={cn('text-xs', TONE.warn.value)}>เลือกกลุ่ม Facebook อย่างน้อย 1 กลุ่ม</p> : null}
+        </div>
+      ) : null}
+      <Button type="button" className="w-full" disabled={busy || missingGroup} onClick={() => void create()}>
         {busy ? <Loader2 className="animate-spin" aria-hidden /> : <Link2 aria-hidden />}
         {/* คำว่า "Gen link" ทั้งก้อน (เจ้าของสั่ง 5 ต.ค. 2569 "สร้างลิงก์ เปลี่ยนเป็น Gen link") */}
         {busy
           ? 'กำลัง Gen link…'
-          : picked.length > 1
-            ? `Gen ${picked.length} ลิงก์`
-            : picked.length === 1
-              ? 'Gen link'
-              : 'Gen link กลาง 1 อัน'}
+          : picked.length === 0
+            ? 'Gen link กลาง 1 อัน'
+            : wanted.length > 1
+              ? `Gen ${wanted.length} ลิงก์`
+              : 'Gen link'}
       </Button>
       {error ? <p className={cn('text-xs', TONE.danger.value)}>{error}</p> : null}
 

@@ -113,3 +113,13 @@ describe('ภาพรวมงานสรรหา ตัวกรอง "ง�
     expect(sql).toContain('AS boss_nationality');
   });
 });
+
+describe('Gen link เพิ่ม (ใบที่มีลิงก์แล้ว) เลือกกลุ่มได้เหมือนป๊อปแรก (3 พ.ย. 2569)', () => {
+  it('AddChannelLinks แตก Facebook Group เป็นกลุ่มละลิงก์ · ไม่เลือกกลุ่มกด Gen ไม่ได้', () => {
+    const src = read('src/components/jobs/AddChannelLinks.tsx');
+    expect(src).toContain('<SoGroupPicker');
+    expect(src).toContain('soGroupLinkLabel(recruitChannelLabel(c), g.name)');
+    expect(src).toContain('disabled={busy || missingGroup}');
+    expect(read('src/pages/jobs/BoardPostingPage.tsx')).toContain('jobBu={jobBuOf(job)}');
+  });
+});
