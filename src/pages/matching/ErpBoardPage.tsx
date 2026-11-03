@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import PageHeader from '@/components/shared/PageHeader';
 import SearchField from '@/components/shared/SearchField';
 import LoadErrorNotice from '@/components/shared/LoadErrorNotice';
@@ -14,6 +15,7 @@ import ErpBoardCardDialog from '@/components/matching/ErpBoardCardDialog';
 import ErpBoardDashboard from '@/components/matching/ErpBoardDashboard';
 import { ErpBoardStepLine, ErpBoardTagBadge } from '@/components/matching/ErpBoardBits';
 import { useHeaderSearch } from '@/hooks/useHeaderSearch';
+import { toast } from 'sonner';
 import { apiFetch } from '@/lib/apiFetch';
 import { friendlyErrorText } from '@/lib/friendlyError';
 import { DASH, TONE } from '@/lib/designTokens';
@@ -29,6 +31,8 @@ import {
   erpCardPosition,
   filterErpBoardCards,
   groupDaysByMonth,
+  postErpBoardAction,
+  type ErpBoardActionBody,
   type ErpBoardCard,
   type ErpBoardFilters,
   type ErpBoardLinkFilter,
@@ -36,9 +40,9 @@ import {
 } from '@/lib/erpBoard';
 
 /**
- * ═══ รายชื่อรอลงงาน = บอร์ดของ ERP (ช่วง 1 อ่านอย่างเดียว · เจ้าของ 2 พ.ย. 2569 "เอาแบบนี้ เริ่มช่วง 1 เลย") ═══
+ * ═══ รายชื่อรอลงงาน = บอร์ดของ ERP (เจ้าของ 2 พ.ย. 2569 "เอาแบบนี้ เริ่มช่วง 1 เลย") ═══
  * หน้าตาตามแบบร่าง 2: แถบซ้ายเดือน → วัน · ตัวกรองแท็ก/ผู้ดูแล/ขั้นตอน/ผูกใบขอ · 8 ช่อง · ป๊อปการ์ด · Board/Dashboard
- * ทีมยังทำงานที่ ERP ⇒ ปุ่มเขียนทุกปุ่มปิดไว้ (ช่วง 2 รอคุยทีม ERP) · หน้ารายชื่อเดิมยังเปิดได้ที่ ?view=list
+ * 3 พ.ย. 2569 ปุ่มบนการ์ด/ป๊อปกดได้แล้ว — จดฝั่ง Jarvis (บัญชี ERP อ่านอย่างเดียว) · หน้ารายชื่อเดิมยังเปิดได้ที่ ?view=list
  */
 const CARDS_PER_COLUMN = 30;
 
@@ -132,6 +136,18 @@ const ErpBoardPage: React.FC = () => {
     if (v === 'dashboard') sp.set('tab', 'dashboard');
     else sp.delete('tab');
     setSearchParams(sp, { replace: true });
+  };
+
+  /** การ์ดหลังกดปุ่ม — แทนใบเดิมในรายการทันที (ย้ายช่องก็ย้ายบนจอเลย) */
+  const replaceCard = (next: ErpBoardCard) => setCards((list) => (list ? list.map((c) => (c.cardId === next.cardId ? next : c)) : list));
+  const act = async (cardId: number, body: ErpBoardActionBody, done: string) => {
+    try {
+      const d = await postErpBoardAction(cardId, body);
+      replaceCard(d.card);
+      toast.success(done);
+    } catch (e) {
+      toast.error(friendlyErrorText(e, 'บันทึกไม่สำเร็จ'));
+    }
   };
 
   const filtered = useMemo(() => filterErpBoardCards(cards ?? [], filters), [cards, filters]);
@@ -342,7 +358,7 @@ const ErpBoardPage: React.FC = () => {
                     </header>
                     {list.length === 0 ? <p className={cn(DASH.sub, 'py-6 text-center')}>ไม่มีคน</p> : null}
                     {list.slice(0, limit).map((c) => (
-                      <ErpBoardCardTile key={c.cardId} card={c} checklistTotal={overview?.checklistTotal ?? 0} onOpen={() => setOpenCard(c.cardId)} />
+                      <ErpBoardCardTile key={c.cardId} card={c} overview={overview} onOpen={() => setOpenCard(c.cardId)} onAction={(body, done) => void act(c.cardId, body, done)} />
                     ))}
                     {list.length > limit ? (
                       <Button variant="ghost" size="sm" className="w-full" onClick={() => setShown((x) => ({ ...x, [column.id]: limit + CARDS_PER_COLUMN }))}>
@@ -357,12 +373,23 @@ const ErpBoardPage: React.FC = () => {
         </div>
       </div>
 
-      <ErpBoardCardDialog cardId={openCard} overview={overview} onClose={() => setOpenCard(null)} />
+      <ErpBoardCardDialog cardId={openCard} overview={overview} onClose={() => setOpenCard(null)} onChanged={replaceCard} />
     </div>
   );
 };
 
-function ErpBoardCardTile({ card: c, checklistTotal, onOpen }: { card: ErpBoardCard; checklistTotal: number; onOpen: () => void }) {
+function ErpBoardCardTile({
+  card: c,
+  overview,
+  onOpen,
+  onAction,
+}: {
+  card: ErpBoardCard;
+  overview: ErpBoardOverview | null;
+  onOpen: () => void;
+  onAction: (body: ErpBoardActionBody, done: string) => void;
+}) {
+  const checklistTotal = overview?.checklist.length ?? 0;
   return (
     <article className={cn(DASH.card, 'space-y-1.5 p-3')} data-testid={`erp-board-card-${c.cardId}`}>
       <button type="button" onClick={onOpen} className="block w-full space-y-1 text-left">
@@ -381,7 +408,9 @@ function ErpBoardCardTile({ card: c, checklistTotal, onOpen }: { card: ErpBoardC
         </div>
       ) : null}
       <div className="flex flex-wrap items-center gap-2 text-xs">
-        {c.assignees[0] ? <NameAvatar name={c.assignees[0]} /> : null}
+        {c.assignees.map((a) => (
+          <NameAvatar key={a} name={a} />
+        ))}
         <span className={cn('inline-flex items-center gap-1', c.calls ? DASH.cell : DASH.sub)}>
           <Phone className="h-3.5 w-3.5" aria-hidden />
           {c.calls ? `โทรแล้ว ${c.calls} ครั้ง` : 'ยังไม่โทร'}
@@ -411,11 +440,53 @@ function ErpBoardCardTile({ card: c, checklistTotal, onOpen }: { card: ErpBoardC
         </p>
       ) : null}
       <div className={cn('flex flex-wrap gap-1 border-t pt-1.5', DASH.divider)}>
-        {['+ ผู้ดูแล', 'บันทึกการโทร', 'แท็ก'].map((a) => (
-          <Button key={a} variant="outline" size="sm" className="h-6 px-2 text-xs" disabled title={ERP_BOARD_READONLY_HINT}>
-            {a}
-          </Button>
-        ))}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm" className="h-6 px-2 text-xs">
+              + ผู้ดูแล
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="max-h-72 overflow-y-auto">
+            {(overview?.staff ?? []).map((s) => {
+              const on = c.assigneeIds.includes(s.id);
+              return (
+                <DropdownMenuCheckboxItem
+                  key={s.id}
+                  checked={on}
+                  onSelect={(e) => e.preventDefault()}
+                  onCheckedChange={() => onAction({ action: on ? 'unassign' : 'assign', staffId: s.id }, on ? `เอา ${s.name} ออกแล้ว` : `มอบหมายให้ ${s.name} แล้ว`)}
+                >
+                  {s.name}
+                </DropdownMenuCheckboxItem>
+              );
+            })}
+          </DropdownMenuContent>
+        </DropdownMenu>
+        <Button variant="outline" size="sm" className="h-6 px-2 text-xs" onClick={() => onAction({ action: 'call' }, 'บันทึกการโทรแล้ว')}>
+          บันทึกการโทร
+        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm" className="h-6 px-2 text-xs">
+              แท็ก
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start">
+            {(overview?.tags ?? []).map((t) => {
+              const on = c.tagIds.includes(t.id);
+              return (
+                <DropdownMenuCheckboxItem
+                  key={t.id}
+                  checked={on}
+                  onSelect={(e) => e.preventDefault()}
+                  onCheckedChange={() => onAction({ action: on ? 'untag' : 'tag', tagId: t.id }, on ? `เอาแท็ก ${t.label} ออกแล้ว` : `ติดแท็ก ${t.label} แล้ว`)}
+                >
+                  {t.label}
+                </DropdownMenuCheckboxItem>
+              );
+            })}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </article>
   );

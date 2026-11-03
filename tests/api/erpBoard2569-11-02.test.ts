@@ -28,15 +28,19 @@ const card = (p: Partial<ErpBoardCard>): ErpBoardCard => ({
   site: 'งานคุณปุ๊ก ฐาน18000',
   mobile: '081-234-5678',
   tags: ['นายไทย', 'รถตู้'],
+  tagIds: [2, 3],
+  stepId: 1,
   step: 'ส่งประวัติพนักงาน',
   outcome: null,
   scheduledAt: null,
   checklistDone: 8,
+  checkedItemIds: [1, 2, 3, 4, 5, 6, 7, 8],
   requestNos: ['OPL6909092'],
   comments: 2,
   lastComment: 'ยิมจ๊อป',
   calls: 1,
   assignees: ['น้ำหวาน'],
+  assigneeIds: ['1460500229184'],
   createdAt: '2026-11-02T13:13:00Z',
   lastActivityAt: '2026-11-02T16:48:00Z',
   ...p,
@@ -87,8 +91,8 @@ describe('ตัวกรอง', () => {
 describe('ช่องว่างไม่หาย · ตำแหน่งแบบ ERP · วันไทย · สีแท็กคงที่', () => {
   it('ทุกช่องอยู่ครบแม้ไม่มีการ์ด', () => {
     const cols = [
-      { id: 1, key: null, label: 'Checklist', seq: 1, isDone: false, cards: 0 },
-      { id: 3, key: null, label: 'In process', seq: 5, isDone: false, cards: 0 },
+      { id: 1, key: null, label: 'Checklist', seq: 1, isDone: false, requiresLink: false },
+      { id: 3, key: null, label: 'In process', seq: 5, isDone: false, requiresLink: true },
     ];
     const r = cardsByColumn(cols, [card({})]);
     expect(r.map((x) => [x.column.label, x.cards.length])).toEqual([
@@ -109,12 +113,13 @@ describe('ช่องว่างไม่หาย · ตำแหน่งแ
   });
 });
 
-describe('ช่วง 1 อ่านอย่างเดียว', () => {
+describe('ERP อ่านอย่างเดียว · ปุ่มจดฝั่ง Jarvis (3 พ.ย. 2569)', () => {
   const sql = readFileSync('api/_lib/erpBoardSql.ts', 'utf8');
   const handler = readFileSync('api/_handlers/matching-board.ts', 'utf8');
-  it('ไม่มีคำสั่งเขียน ERP · เส้น API รับ GET เท่านั้น · staff เท่านั้น', () => {
+  it('ไม่มีคำสั่งเขียน ERP · POST จดผ่าน erp_board_events · staff เท่านั้น', () => {
     expect(sql).not.toMatch(/\b(INSERT\s+INTO|UPDATE\s+dbo|DELETE\s+FROM|MERGE\s+dbo)\b/i);
-    expect(handler).toContain("!== 'GET'");
+    expect(handler).toContain('insertErpBoardEvents');
+    expect(handler).toContain('checkErpBoardAction');
     expect(readFileSync('api/_lib/rbac.ts', 'utf8')).toMatch(/case 'matching-board':[\s\S]*?return 'staff'/);
     expect(readFileSync('api/_handlers/registry.ts', 'utf8')).toContain("'/api/matching/board': matchingBoardHandler");
   });
@@ -126,10 +131,12 @@ describe('ช่วง 1 อ่านอย่างเดียว', () => {
     expect(route).toContain("sp.get('view') === 'list' || sp.has('bucket')");
     expect(readFileSync('src/App.tsx', 'utf8')).toContain('import("@/pages/matching/CandidatesBoardRoute")');
   });
-  it('ปุ่มเขียนบนจอปิดไว้ทุกปุ่ม', () => {
+  it('ปุ่มบนการ์ด/ป๊อปกดได้ · เหลือปิดแค่นำเข้าจากผู้สมัคร', () => {
     const page = readFileSync('src/pages/matching/ErpBoardPage.tsx', 'utf8') + readFileSync('src/components/matching/ErpBoardCardDialog.tsx', 'utf8');
-    const writeButtons = page.match(/<Button[^>]*title=\{ERP_BOARD_READONLY_HINT\}/g) ?? [];
-    expect(writeButtons.length).toBeGreaterThanOrEqual(5);
-    for (const b of writeButtons) expect(b).toContain('disabled');
+    const stillOff = page.match(/<Button[^>]*title=\{ERP_BOARD_READONLY_HINT\}/g) ?? [];
+    expect(stillOff).toHaveLength(1);
+    for (const a of ["action: 'call'", "action: on ? 'unassign' : 'assign'", "action: on ? 'untag' : 'tag'", "action: 'move'", "action: 'link'", "action: 'unlink'", "action: 'step'", "action: 'comment'", "action: 'comment_delete'"]) {
+      expect(page).toContain(a);
+    }
   });
 });

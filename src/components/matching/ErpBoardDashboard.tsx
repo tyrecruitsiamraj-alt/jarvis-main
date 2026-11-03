@@ -11,7 +11,7 @@ const ErpBoardDashboard: React.FC<{ overview: ErpBoardOverview | null; cards: re
   const total = cards.length;
   const linked = cards.filter((c) => c.requestNos.length > 0).length;
   const called = cards.filter((c) => c.calls > 0).length;
-  const chkTotal = overview?.checklistTotal ?? 0;
+  const chkTotal = overview?.checklist.length ?? 0;
   const chkDone = cards.filter((c) => chkTotal > 0 && c.checklistDone >= chkTotal).length;
 
   const byColumn = (overview?.columns ?? []).map((col) => ({ label: col.label, count: cards.filter((c) => c.columnId === col.id).length }));

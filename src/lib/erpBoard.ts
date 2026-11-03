@@ -1,17 +1,19 @@
 /**
  * ═══ บอร์ดรายชื่อรอลงงานของ ERP — ฝั่งหน้าเว็บ (ช่วง 1 อ่านอย่างเดียว · เจ้าของ 2 พ.ย. 2569) ═══
  * ชนิดข้อมูลตรงกับ `api/_lib/erpBoardSql.ts` · ตัวกรอง/จัดกลุ่มเป็นฟังก์ชันล้วน (มีเทสต์)
- * ทีมยังทำงานที่ ERP — ปุ่มเขียนทุกปุ่มบนจอปิดไว้จนกว่าช่วง 2 คุยกับทีม ERP เสร็จ
+ * 3 พ.ย. 2569 ปุ่มบนบอร์ดกดได้แล้ว — จดฝั่ง Jarvis (ERP อ่านอย่างเดียว) · ชนกัน = อันที่เปลี่ยนล่าสุดชนะ
  */
 import type { ToneKey } from '@/lib/designTokens';
+import { apiFetch } from '@/lib/apiFetch';
+import { readErrorMessage } from '@/lib/api';
 
-export const ERP_BOARD_URL = 'https://erp.siamrajathanee.dev/ir/w-sheet-ir-board?board=1';
-/** ปุ่มเขียนที่ยังกดไม่ได้ในช่วง 1 */
+/** ปุ่มที่ยังกดไม่ได้ (นำเข้าจากผู้สมัคร) */
 export const ERP_BOARD_READONLY_HINT = 'ช่วงนี้ทำใน ERP';
 
-export type ErpBoardColumn = { id: number; key: string | null; label: string; seq: number; isDone: boolean; cards: number };
+export type ErpBoardColumn = { id: number; key: string | null; label: string; seq: number; isDone: boolean; requiresLink: boolean };
 export type ErpBoardDay = { itemId: number; date: string; label: string; cards: number };
 export type ErpBoardStep = { id: number; seq: number; label: string; hasDate: boolean; dateLabel: string | null };
+export type ErpBoardOutcome = { id: number; stepId: number; label: string; reject: boolean; toColumnIds: number[] };
 export type ErpBoardTag = { id: number; label: string };
 export type ErpBoardOverview = {
   boardId: number;
@@ -20,9 +22,12 @@ export type ErpBoardOverview = {
   columns: ErpBoardColumn[];
   days: ErpBoardDay[];
   steps: ErpBoardStep[];
+  outcomes: ErpBoardOutcome[];
   tags: ErpBoardTag[];
-  checklistTotal: number;
+  checklist: { itemId: number; group: string; item: string }[];
+  staff: { id: string; name: string }[];
 };
+/** การ์ดหลังรวม ERP + การกดบน Jarvis (api/_lib/erpBoardMerge.ts) */
 export type ErpBoardCard = {
   cardId: number;
   columnId: number;
@@ -33,25 +38,51 @@ export type ErpBoardCard = {
   site: string | null;
   mobile: string | null;
   tags: string[];
+  tagIds: number[];
+  stepId: number | null;
   step: string | null;
   outcome: string | null;
   scheduledAt: string | null;
   checklistDone: number;
+  checkedItemIds: number[];
   requestNos: string[];
   comments: number;
   lastComment: string | null;
   calls: number;
   assignees: string[];
+  assigneeIds: string[];
   createdAt: string | null;
   lastActivityAt: string | null;
 };
 export type ErpBoardCardDetail = {
   card: ErpBoardCard;
-  comments: { who: string | null; text: string; at: string | null }[];
-  checklist: { group: string; item: string; checked: boolean }[];
+  comments: { id: string; who: string | null; text: string; at: string | null; mine: boolean }[];
+  checklist: { itemId: number; group: string; item: string; checked: boolean }[];
   activity: { type: string; message: string | null; actor: string | null; at: string | null }[];
   track: { requestNo: string | null; step: string; outcome: string | null; scheduledAt: string | null; at: string | null; by: string | null; remark: string | null }[];
 };
+
+export type ErpBoardActionBody =
+  | { action: 'move'; columnId: number }
+  | { action: 'step'; stepId: number; outcomeId?: number | null; scheduledAt?: string | null; requestNo?: string | null; toColumnId?: number | null; remark?: string | null }
+  | { action: 'link' | 'unlink'; requestNo: string }
+  | { action: 'check' | 'uncheck'; itemId: number }
+  | { action: 'assign' | 'unassign'; staffId: string }
+  | { action: 'tag' | 'untag'; tagId: number }
+  | { action: 'call' }
+  | { action: 'comment'; body: string }
+  | { action: 'comment_delete'; commentId: number };
+
+/** กดปุ่มบนบอร์ด → ได้ป๊อปการ์ดชุดใหม่ (ไม่ผ่าน = โยนข้อความจากเซิร์ฟเวอร์) */
+export async function postErpBoardAction(cardId: number, body: ErpBoardActionBody): Promise<ErpBoardCardDetail> {
+  const r = await apiFetch('/api/matching/board', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ cardId, ...body }),
+  });
+  if (!r.ok) throw new Error(await readErrorMessage(r, 'บันทึกไม่สำเร็จ'));
+  return (await r.json()) as ErpBoardCardDetail;
+}
 
 const TH_MONTHS = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
 const TH_MONTHS_SHORT = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
@@ -157,5 +188,14 @@ const ACTIVITY_LABEL: Record<string, string> = {
   card_assigned: 'มอบหมาย',
   card_unassigned: 'เอาผู้ดูแลออก',
   card_called: 'โทรหาผู้สมัคร',
+  card_step: 'ลงขั้นตอน',
+  card_linked: 'ผูกใบขอ',
+  card_unlinked: 'เอาใบขอออก',
+  card_checked: 'ติ๊กข้อตรวจ',
+  card_unchecked: 'เอาติ๊กออก',
+  card_tagged: 'ติดแท็ก',
+  card_untagged: 'เอาแท็กออก',
+  card_commented: 'เขียนความคิดเห็น',
+  card_comment_deleted: 'ลบความคิดเห็น',
 };
 export const erpActivityLabel = (type: string) => ACTIVITY_LABEL[type] ?? type;
