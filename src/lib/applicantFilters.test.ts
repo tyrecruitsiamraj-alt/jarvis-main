@@ -302,7 +302,8 @@ describe('ตัวกรองแท็บผู้สมัคร + การ�
 });
 
 describe('สถานะการตอบของ AI (เจ้าของ 22 ต.ค. 2569 "AI โทรแล้ว 1 ครั้ง ไม่ตอบ / ส่ง AI แล้ว ยังไม่มีผล")', () => {
-  const sent = new Date(NOW.getTime() - 2 * 3600_000).toISOString();
+  // ส่งเกิน 24 ชม. ยังไม่มีผล (3 พ.ย. 2569 เกณฑ์เปลี่ยนจาก 30 นาที)
+  const sent = new Date(NOW.getTime() - 25 * 3600_000).toISOString();
   const rowsAi = [
     app({ last_call_status: 'pending', last_call_attempts: 2, last_call_followup: 'retry_scheduled', last_call_prev_outcome: 'no_answer', last_call_next_at: new Date(NOW.getTime() + 3600_000).toISOString() } as Partial<PublicApplication>),
     app({ last_call_status: 'pending', last_call_attempts: 1, last_call_sent_at: sent } as Partial<PublicApplication>),
