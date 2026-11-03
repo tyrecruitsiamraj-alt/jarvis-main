@@ -8,20 +8,21 @@ import { describe, expect, it } from 'vitest';
 
 const read = (f: string) => fs.readFileSync(path.join(process.cwd(), f), 'utf8');
 
-describe('ปุ่ม Autopost ในป๊อปประกาศ', () => {
+describe('ฟอร์มสั่ง So Scraping ในป๊อปประกาศ (3 พ.ย. 2569: dropdown Autopost / Scrap · ข้อ 1-2-3)', () => {
   const order = read('src/components/jobs/OrderPostButton.tsx');
   const dialog = read('src/components/jobs/AutopostDialog.tsx');
 
-  it('มีปุ่มข้างบรรทัดโพสต์ · กดไม่ได้ระหว่างมีคำสั่งค้าง', () => {
+  it('เลือกว่าสั่งอะไรจาก dropdown · Autopost ฝังเป็นฟอร์มเดิม · กดส่งไม่ได้ระหว่างมีคำสั่งค้าง (เช็กใน AutopostBody)', () => {
+    expect(order).toContain('testId="so-order-kind"');
     expect(order).toContain('data-testid="so-order-autopost"');
-    expect(order).toContain('disabled={latest === null || Boolean(contentView?.open)}');
+    expect(dialog).toContain('disabled={busy !== null || problems.length > 0 || openOrder !== null}');
   });
 
-  it('🔴 ฝังฟอร์มเดิม ไม่เปิด Dialog ซ้อน', () => {
+  it('🔴 ฝังฟอร์มเดิม ไม่เปิด Dialog ซ้อน · ป๊อปจากการ์ดก็ใช้ฟอร์มเดียวกัน', () => {
     expect(order).toContain('<AutopostBody');
     expect(order).toContain('embedded');
     expect(order).not.toMatch(/<AutopostDialog\b/);
     expect(dialog).toContain('export function AutopostBody');
-    expect(dialog).toMatch(/embedded \? \(\s*<h3/);
+    expect(dialog).toContain('<OrderPostButton key={job.id} job={job} defaultKind="autopost" onSent={onSent} />');
   });
 });

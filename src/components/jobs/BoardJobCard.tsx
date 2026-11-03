@@ -244,7 +244,7 @@ const BoardJobCard: React.FC<BoardJobCardProps> = ({ job, readiness, applicants,
                 className="rounded-lg"
               >
                 <Megaphone aria-hidden />
-                Autopost
+                Autopost / Scrap
               </Button>
             ) : null}
             {onImport ? (

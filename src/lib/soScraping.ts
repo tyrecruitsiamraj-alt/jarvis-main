@@ -757,6 +757,34 @@ export function soPlatformLabel(p: string): string {
   return p === 'jobthai' ? 'JobThai' : p === 'jobbkk' ? 'JobBKK' : p || 'อื่น ๆ';
 }
 
+/** โควต้าที่เว็บของบัญชีนี้เหลือวันนี้ = เพดานจำนวนคนที่สั่ง Scrap ได้ · ไม่รู้เพดาน = null (ไม่จำกัด) */
+export function soScrapeRemaining(s: Pick<SoScrapeAccount, 'cap' | 'usedToday'>): number | null {
+  return s.cap === null ? null : Math.max(0, s.cap - s.usedToday);
+}
+
+/** ตัวเลือกบัญชี JobThai/JobBKK — ชื่อ · คำสถานะ + สี (แบบเดียวกับบัญชี Facebook · เจ้าของ 3 พ.ย. 2569 "เลือกได้แบบเดียวกัน") */
+export function soScrapeChoice(s: Pick<SoScrapeAccount, 'platform' | 'label' | 'status' | 'cap' | 'usedToday' | 'cooldownUntil' | 'warning'>): {
+  label: string;
+  disabled: boolean;
+  tone: 'success' | 'warn' | 'danger';
+} {
+  const name = `${soPlatformLabel(s.platform)} · ${s.label}`;
+  const left = soScrapeRemaining(s);
+  if (s.status === 'ready') return { label: `${name} · พร้อมใช้${left !== null ? ` · เหลือ ${left.toLocaleString('th-TH')} คนวันนี้` : ''}`, disabled: false, tone: 'success' };
+  if (s.status === 'full') return { label: `${name} · ครบโควต้าวันนี้ (${s.usedToday.toLocaleString('th-TH')}/${(s.cap ?? s.usedToday).toLocaleString('th-TH')})`, disabled: false, tone: 'warn' };
+  if (s.status === 'cooldown') {
+    const until = s.cooldownUntil && !Number.isNaN(Date.parse(s.cooldownUntil)) ? ` ใช้ได้ ${BKK_TIME.format(new Date(s.cooldownUntil))}` : '';
+    return { label: `${name} · พักชั่วคราว${until}`, disabled: true, tone: 'danger' };
+  }
+  return { label: `${name} · ${s.warning ?? 'ปิดใช้งาน'}`, disabled: true, tone: 'danger' };
+}
+
+/** บัญชี Scrap ตั้งต้น = พร้อมใช้ที่เหลือโควต้ามากสุด · ไม่มี = null */
+export function soDefaultScrapeAccount<A extends Pick<SoScrapeAccount, 'status' | 'cap' | 'usedToday'>>(list: readonly A[]): A | null {
+  const ready = list.filter((s) => s.status === 'ready');
+  return ready.sort((a, b) => (soScrapeRemaining(b) ?? Infinity) - (soScrapeRemaining(a) ?? Infinity))[0] ?? null;
+}
+
 /** ติ๊กไว้ให้ก่อน = บัญชีพร้อมใช้ตัวแรกของแต่ละเว็บ */
 export function defaultScrapeIds(list: readonly SoScrapeAccount[]): string[] {
   const seen = new Set<string>();
@@ -799,6 +827,14 @@ export function soPickError(
       const s = o.scrapeAccounts.find((x) => x.id === id);
       if (!s) return 'ไม่พบบัญชี JobThai/JobBKK นี้ในระบบ So Scraping แล้ว — ปิดแล้วเลือกใหม่';
       if (!soScrapeSelectable(s.status)) return soWarningText(s.label, s.status, s.warning);
+    }
+    // จำนวนคน (3 พ.ย. 2569): ต้องเป็นจำนวนเต็ม ≥ 1 และไม่เกินโควต้าที่เว็บของบัญชีแรกเหลือวันนี้
+    if (snap.scrape_target !== undefined) {
+      const t = snap.scrape_target;
+      if (typeof t !== 'number' || !Number.isInteger(t) || t < 1) return 'จำนวนคนต้องเป็นตัวเลข 1 ขึ้นไป';
+      const first = o.scrapeAccounts.find((x) => x.id === ids[0]);
+      const left = first ? soScrapeRemaining(first) : null;
+      if (left !== null && t > left) return `เว็บนี้วันนี้เหลือโควต้า ${left} คน — ลดจำนวน หรือเลือกเว็บอื่น`;
     }
     return null;
   }

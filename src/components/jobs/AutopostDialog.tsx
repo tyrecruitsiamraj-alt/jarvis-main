@@ -72,6 +72,7 @@ import {
   type SoPostMode,
 } from '@/lib/soScraping';
 import SoStartLine from '@/components/jobs/SoStartLine';
+import OrderPostButton from '@/components/jobs/OrderPostButton';
 import { AUTOPOST_CAPTION_MAX, autopostMissing, buildAutopostCaption, captionLeaks } from '@/lib/autopostCaption';
 
 /**
@@ -101,7 +102,16 @@ export default function AutopostDialog({
   return (
     <Dialog open={job !== null} onOpenChange={(o) => (!o ? onClose() : undefined)}>
       <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
-        {job ? <AutopostBody key={job.id} job={job} onSent={onSent} onClose={onClose} /> : null}
+        {job ? (
+          <>
+            <DialogHeader>
+              <DialogTitle>Autopost / Scrap · {jobBoardCardTitle(job)}</DialogTitle>
+              <DialogDescription>{publicJobTitle(job)}</DialogDescription>
+            </DialogHeader>
+            {/* ฟอร์มเดียวกับหน้าใบขอ/ป๊อปประกาศ (เจ้าของ 3 พ.ย. 2569 "ไม่ใช่แค่หน้านี้ หมายถึงหน้างานสรรหาด้วย") · ปุ่มบนการ์ดเปิดมาที่ Autopost */}
+            <OrderPostButton key={job.id} job={job} defaultKind="autopost" onSent={onSent} />
+          </>
+        ) : null}
       </DialogContent>
     </Dialog>
   );
@@ -348,9 +358,7 @@ export function AutopostBody({
 
   return (
     <div className="space-y-4" data-testid="autopost-dialog">
-      {embedded ? (
-        <h3 className="text-base font-medium text-foreground">Autopost</h3>
-      ) : (
+      {embedded ? null : (
         <DialogHeader>
           <DialogTitle>Autopost · {jobBoardCardTitle(job)}</DialogTitle>
           <DialogDescription>{publicJobTitle(job)}</DialogDescription>
@@ -380,6 +388,144 @@ export function AutopostBody({
               มีคำสั่งโพสต์ค้างอยู่ · {soStatusView(openOrder).label} — รอให้เสร็จก่อนถึงสั่งใหม่ได้
             </p>
           ) : null}
+
+          {openPosting ? null : (
+            <p className={cn('text-sm', TONE.warn.value)} data-testid="autopost-auto-release">
+              ใบนี้ยังไม่ได้ประกาศ — กดส่งแล้วระบบประกาศและสร้างลิงก์ให้
+            </p>
+          )}
+
+          <section className="space-y-2">
+            <p className="text-sm font-medium text-foreground">1 · บัญชี Facebook</p>
+            {opts.accounts.length === 0 ? (
+              <p className={cn('text-sm', TONE.warn.value)}>ยังไม่มีบัญชี ให้เพิ่มที่ระบบ So Scraping</p>
+            ) : (
+              <>
+                {jobBu && soAccountsForJob(opts.accounts, jobBu).length === 0 ? (
+                  <p className={cn('text-sm', TONE.warn.value)} data-testid="autopost-bu-no-account">
+                    {soBuNoAccountText(jobBu)}
+                  </p>
+                ) : null}
+                {!opts.accounts.some((a) => a.recommended) ? (
+                  <p className={cn('text-sm', TONE.danger.value)} data-testid="autopost-no-ready-account">
+                    {soNoAccountReadyText(opts.accounts)}
+                  </p>
+                ) : null}
+                <FieldSelect
+                  value={accountId}
+                  onChange={pickAccount}
+                  placeholder="เลือกบัญชี"
+                  ariaLabel="บัญชี Facebook"
+                  testId="autopost-account"
+                  options={soAccountsByBu(opts.accounts, jobBu).map(({ account: a, group }) => {
+                    // คำสถานะ + สี (สเปค 6.1 · ห้ามใช้สีอย่างเดียว)
+                    const c = soAccountChoice(a, opts.workers);
+                    return { value: a.id, label: c.label, disabled: c.disabled, className: TONE[c.tone].value, group };
+                  })}
+                />
+                {account ? (
+                  <div className="space-y-0.5 text-xs" data-testid="autopost-account-status">
+                    <p className={cn('font-medium', TONE[soAccountStatusText(account).tone].value)}>{soAccountStatusText(account).text}</p>
+                    <p className="tabular-nums text-muted-foreground">
+                      {[
+                        `วันนี้โพสต์ ${NUM.format(account.postedToday)}${account.dailyCap !== null ? `/${NUM.format(account.dailyCap)}` : ''}`,
+                        account.worker ? `เครื่องหลัก ${account.worker} ${account.workerOnline ? 'ออนไลน์' : 'ออฟไลน์'}` : 'ยังไม่ผูกเครื่อง',
+                        account.queue.running + account.queue.queued > 0
+                          ? `งานของบัญชีนี้ ${NUM.format(account.queue.running + account.queue.queued)}`
+                          : null,
+                      ]
+                        .filter(Boolean)
+                        .join(' · ')}
+                    </p>
+                    {account.warning ? <p className={TONE.warn.value}>{account.warning}</p> : null}
+                  </div>
+                ) : null}
+              </>
+            )}
+          </section>
+
+          <section className="space-y-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-sm font-medium text-foreground">2 · กลุ่ม Facebook</p>
+              {account && cap !== null ? (
+                <span className={cn('text-xs tabular-nums', picked.length > cap ? TONE.danger.value : DASH.muted)} data-testid="autopost-group-count">
+                  เลือกแล้ว {NUM.format(picked.length)}/{NUM.format(cap)}
+                </span>
+              ) : null}
+            </div>
+            {account && cap === 0 ? (
+              <p className={cn('text-sm', TONE.warn.value)} data-testid="autopost-cap-zero">
+                บัญชีนี้ไม่เหลือโพสต์วันนี้ ติ๊กกลุ่มไม่ได้ — เลือกบัญชีอื่น
+              </p>
+            ) : null}
+            {!account ? null : accountGroups.length === 0 ? (
+              <p className={cn('text-sm', TONE.warn.value)}>บัญชีนี้ยังไม่มีกลุ่ม ให้เพิ่มที่ระบบ So Scraping</p>
+            ) : (
+              <div className="space-y-2" data-testid="autopost-groups">
+                {/* หมวดตามธุรกิจ (เจ้าของ 2 พ.ย. 2569): ธุรกิจของใบขอกางและติ๊กให้ครบ · ที่เหลือพับ ไม่ติ๊ก */}
+                {jobBu && !sections.some((x) => x.forJob) ? (
+                  <p className={cn('text-sm', TONE.warn.value)} data-testid="autopost-bu-empty">
+                    {soBuEmptyText(jobBu)}
+                  </p>
+                ) : null}
+                {!jobBu ? <p className={cn('text-sm', TONE.warn.value)}>ใบขอนี้ไม่ระบุธุรกิจ — เลือกกลุ่มเอง</p> : null}
+                {sections.map((sec) => (
+                  <GroupSection
+                    key={sec.bu ?? '__none__'}
+                    jobId={job.id}
+                    section={sec}
+                    account={account}
+                    picked={picked}
+                    recent={recent}
+                    cap={cap}
+                    onToggle={(ids, on) => setPicked((prev) => (on ? soAddWithinCap(prev, ids, cap) : prev.filter((x) => !ids.includes(x))))}
+                  />
+                ))}
+              </div>
+            )}
+          </section>
+
+          <section className="space-y-2">
+            <p className="text-sm font-medium text-foreground">3 · เครื่อง</p>
+            {postWorkers.length === 0 ? (
+              <p className={cn('text-sm', TONE.warn.value)}>ยังไม่มีเครื่องที่รับงานโพสต์</p>
+            ) : (
+              // สถานะเครื่องเป็นสี + คำเสมอ (So Scraping 28 ต.ค. 2569): ออนไลน์ = จุดเขียว · ออฟไลน์ = จุดเทา เลือกไม่ได้ · API เรียงออนไลน์ไว้บนให้แล้ว
+              <Select
+                value={workerName || undefined}
+                onValueChange={(v) => {
+                  setWorkerName(v);
+                  if (warn?.kind !== 'block') setWarn(null);
+                }}
+              >
+                <SelectTrigger className="h-10 text-sm" aria-label="เครื่อง" data-testid="autopost-worker">
+                  <SelectValue placeholder="เลือกเครื่อง" />
+                </SelectTrigger>
+                <SelectContent>
+                  {postWorkers.map((w) => {
+                    const extra = [
+                      `งานค้าง ${NUM.format(w.load)}`,
+                      account && w.name === account.worker ? 'เครื่องหลัก' : null,
+                      account && !soAccountOnWorker(account, w) ? 'ยังไม่เคยล็อกอินบัญชีนี้' : null,
+                    ]
+                      .filter(Boolean)
+                      .join(' · ');
+                    const tone = w.online ? TONE.success : TONE.neutral;
+                    return (
+                      <SelectItem key={w.name} value={w.name} disabled={!w.online}>
+                        <span className="flex items-center gap-2">
+                          <span className={cn('h-2 w-2 shrink-0 rounded-full', tone.dot)} aria-hidden />
+                          <span className="text-foreground">{w.name}</span>
+                          <span className={cn('text-xs font-medium', tone.value)}>{w.online ? 'ออนไลน์' : soWorkerOfflineText(w)}</span>
+                          <span className="text-xs text-muted-foreground">{extra}</span>
+                        </span>
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+            )}
+          </section>
 
           <section className="space-y-2">
             <div className="flex flex-wrap items-center justify-between gap-2">
@@ -430,144 +576,6 @@ export function AutopostBody({
                 </div>
               ))}
             </RadioGroup>
-          </section>
-
-          {openPosting ? null : (
-            <p className={cn('text-sm', TONE.warn.value)} data-testid="autopost-auto-release">
-              ใบนี้ยังไม่ได้ประกาศ — กดส่งแล้วระบบประกาศและสร้างลิงก์ให้
-            </p>
-          )}
-
-          <section className="space-y-2">
-            <p className="text-sm font-medium text-foreground">บัญชี Facebook</p>
-            {opts.accounts.length === 0 ? (
-              <p className={cn('text-sm', TONE.warn.value)}>ยังไม่มีบัญชี ให้เพิ่มที่ระบบ So Scraping</p>
-            ) : (
-              <>
-                {jobBu && soAccountsForJob(opts.accounts, jobBu).length === 0 ? (
-                  <p className={cn('text-sm', TONE.warn.value)} data-testid="autopost-bu-no-account">
-                    {soBuNoAccountText(jobBu)}
-                  </p>
-                ) : null}
-                {!opts.accounts.some((a) => a.recommended) ? (
-                  <p className={cn('text-sm', TONE.danger.value)} data-testid="autopost-no-ready-account">
-                    {soNoAccountReadyText(opts.accounts)}
-                  </p>
-                ) : null}
-                <FieldSelect
-                  value={accountId}
-                  onChange={pickAccount}
-                  placeholder="เลือกบัญชี"
-                  ariaLabel="บัญชี Facebook"
-                  testId="autopost-account"
-                  options={soAccountsByBu(opts.accounts, jobBu).map(({ account: a, group }) => {
-                    // คำสถานะ + สี (สเปค 6.1 · ห้ามใช้สีอย่างเดียว)
-                    const c = soAccountChoice(a, opts.workers);
-                    return { value: a.id, label: c.label, disabled: c.disabled, className: TONE[c.tone].value, group };
-                  })}
-                />
-                {account ? (
-                  <div className="space-y-0.5 text-xs" data-testid="autopost-account-status">
-                    <p className={cn('font-medium', TONE[soAccountStatusText(account).tone].value)}>{soAccountStatusText(account).text}</p>
-                    <p className="tabular-nums text-muted-foreground">
-                      {[
-                        `วันนี้โพสต์ ${NUM.format(account.postedToday)}${account.dailyCap !== null ? `/${NUM.format(account.dailyCap)}` : ''}`,
-                        account.worker ? `เครื่องหลัก ${account.worker} ${account.workerOnline ? 'ออนไลน์' : 'ออฟไลน์'}` : 'ยังไม่ผูกเครื่อง',
-                        account.queue.running + account.queue.queued > 0
-                          ? `งานของบัญชีนี้ ${NUM.format(account.queue.running + account.queue.queued)}`
-                          : null,
-                      ]
-                        .filter(Boolean)
-                        .join(' · ')}
-                    </p>
-                    {account.warning ? <p className={TONE.warn.value}>{account.warning}</p> : null}
-                  </div>
-                ) : null}
-              </>
-            )}
-          </section>
-
-          <section className="space-y-2">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-sm font-medium text-foreground">กลุ่ม Facebook</p>
-              {account && cap !== null ? (
-                <span className={cn('text-xs tabular-nums', picked.length > cap ? TONE.danger.value : DASH.muted)} data-testid="autopost-group-count">
-                  เลือกแล้ว {NUM.format(picked.length)}/{NUM.format(cap)}
-                </span>
-              ) : null}
-            </div>
-            {account && cap === 0 ? (
-              <p className={cn('text-sm', TONE.warn.value)} data-testid="autopost-cap-zero">
-                บัญชีนี้ไม่เหลือโพสต์วันนี้ ติ๊กกลุ่มไม่ได้ — เลือกบัญชีอื่น
-              </p>
-            ) : null}
-            {!account ? null : accountGroups.length === 0 ? (
-              <p className={cn('text-sm', TONE.warn.value)}>บัญชีนี้ยังไม่มีกลุ่ม ให้เพิ่มที่ระบบ So Scraping</p>
-            ) : (
-              <div className="space-y-2" data-testid="autopost-groups">
-                {/* หมวดตามธุรกิจ (เจ้าของ 2 พ.ย. 2569): ธุรกิจของใบขอกางและติ๊กให้ครบ · ที่เหลือพับ ไม่ติ๊ก */}
-                {jobBu && !sections.some((x) => x.forJob) ? (
-                  <p className={cn('text-sm', TONE.warn.value)} data-testid="autopost-bu-empty">
-                    {soBuEmptyText(jobBu)}
-                  </p>
-                ) : null}
-                {!jobBu ? <p className={cn('text-sm', TONE.warn.value)}>ใบขอนี้ไม่ระบุธุรกิจ — เลือกกลุ่มเอง</p> : null}
-                {sections.map((sec) => (
-                  <GroupSection
-                    key={sec.bu ?? '__none__'}
-                    jobId={job.id}
-                    section={sec}
-                    account={account}
-                    picked={picked}
-                    recent={recent}
-                    cap={cap}
-                    onToggle={(ids, on) => setPicked((prev) => (on ? soAddWithinCap(prev, ids, cap) : prev.filter((x) => !ids.includes(x))))}
-                  />
-                ))}
-              </div>
-            )}
-          </section>
-
-          <section className="space-y-2">
-            <p className="text-sm font-medium text-foreground">เครื่อง</p>
-            {postWorkers.length === 0 ? (
-              <p className={cn('text-sm', TONE.warn.value)}>ยังไม่มีเครื่องที่รับงานโพสต์</p>
-            ) : (
-              // สถานะเครื่องเป็นสี + คำเสมอ (So Scraping 28 ต.ค. 2569): ออนไลน์ = จุดเขียว · ออฟไลน์ = จุดเทา เลือกไม่ได้ · API เรียงออนไลน์ไว้บนให้แล้ว
-              <Select
-                value={workerName || undefined}
-                onValueChange={(v) => {
-                  setWorkerName(v);
-                  if (warn?.kind !== 'block') setWarn(null);
-                }}
-              >
-                <SelectTrigger className="h-10 text-sm" aria-label="เครื่อง" data-testid="autopost-worker">
-                  <SelectValue placeholder="เลือกเครื่อง" />
-                </SelectTrigger>
-                <SelectContent>
-                  {postWorkers.map((w) => {
-                    const extra = [
-                      `งานค้าง ${NUM.format(w.load)}`,
-                      account && w.name === account.worker ? 'เครื่องหลัก' : null,
-                      account && !soAccountOnWorker(account, w) ? 'ยังไม่เคยล็อกอินบัญชีนี้' : null,
-                    ]
-                      .filter(Boolean)
-                      .join(' · ');
-                    const tone = w.online ? TONE.success : TONE.neutral;
-                    return (
-                      <SelectItem key={w.name} value={w.name} disabled={!w.online}>
-                        <span className="flex items-center gap-2">
-                          <span className={cn('h-2 w-2 shrink-0 rounded-full', tone.dot)} aria-hidden />
-                          <span className="text-foreground">{w.name}</span>
-                          <span className={cn('text-xs font-medium', tone.value)}>{w.online ? 'ออนไลน์' : soWorkerOfflineText(w)}</span>
-                          <span className="text-xs text-muted-foreground">{extra}</span>
-                        </span>
-                      </SelectItem>
-                    );
-                  })}
-                </SelectContent>
-              </Select>
-            )}
           </section>
 
           {problems.length > 0 ? (

@@ -1,8 +1,8 @@
 import React from 'react';
-import { LoaderCircle, Megaphone, Search } from 'lucide-react';
+import { LoaderCircle, Search } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { FieldSelect } from '@/components/shared/FieldSelect';
 import { cn } from '@/lib/utils';
@@ -11,16 +11,18 @@ import type { JobRequest } from '@/types';
 import { publicJobTitle } from '@/lib/publicJobTitle';
 import { createJobPostingRequest, fetchSoOptions, fetchSoRunMessage, listLatestJobPostingsForJob, type JobPostingRequest } from '@/lib/jobPostingRequestsApi';
 import {
-  SO_SCRAPE_STATUS_LABEL,
   SO_SCRAP_REASON,
-  defaultScrapeIds,
+  jobQtyOf,
+  soDefaultScrapeAccount,
+  soDefaultWorker,
   soPlatformLabel,
   soScrapMissing,
   soScrapConfirmWarnings,
   soScrapSnapshot,
+  soScrapeChoice,
+  soScrapeRemaining,
   soScrapeSelectable,
   soStatusView,
-  soDefaultWorker,
   soWorkerOfflineText,
   soWorkersFor,
   type SoOptWorker,
@@ -30,43 +32,58 @@ import { AutopostBody } from '@/components/jobs/AutopostDialog';
 import SoStartLine from '@/components/jobs/SoStartLine';
 
 /**
- * ═══ So Scraping ใต้การ์ดตัวอย่างในป๊อปประกาศ — สถานะ + ขอ Scrap (เจ้าของ 20 ต.ค. 2569) ═══
- * - สถานะโพสต์/Scrap ล่าสุดที่ So Scraping เขียนกลับ · ไม่รับงาน = เหตุผลจาก notes
- * - ขอ Scrap: ที่นี่ที่เดียว (Choice "ย้ายมาไว้หน้านี้เท่านั้น") · ต้องมีตำแหน่ง/จังหวัด/จำนวนคน · ขาดอะไรบอก
- *   ตำแหน่ง = ชื่อที่โชว์บนประกาศ (`publicJobTitle`) ไม่ใช่ "พนักงาน" ของ ERP
- * - สั่งโพสต์ = ปุ่ม **Autopost บนการ์ดกล่องงาน** (`AutopostDialog`) และปุ่ม Autopost ข้างบรรทัดโพสต์ที่นี่
- *   (เจ้าของ 21 ต.ค. 2569 "ยังไม่ได้สั่ง แล้วจะสั่งยังไง" · Choice "เพิ่มปุ่ม Autopost ในป๊อปนี้") — ฟอร์มเดียวกันฝังแทนที่ (`embedded`) ห้ามซ้อนป๊อป
- * - ยังรอ/กำลังทำ = กดซ้ำไม่ได้ · เสร็จ/ไม่รับงาน = สั่งใหม่ได้
- * - 26 ต.ค. 2569 (เอกสาร options API): เลือกบัญชี JobThai/JobBKK → `scrape_connector_ids` · ติ๊กตัวพร้อมใช้ตัวแรกของแต่ละเว็บไว้ให้
- *   พักชั่วคราว/ปิดใช้งาน = เลือกไม่ได้ · ครบโควต้า = กล่องเตือนในป๊อปเดิมก่อนส่ง (ห้ามซ้อนป๊อป)
- * - เอกสารรอบ 2: เลือกเครื่องที่รับงาน Scrap ได้ → `scrape_worker` (ไม่เลือก = ระบบ So Scraping เลือกเอง) · เครื่องออฟไลน์ = เตือนก่อนส่ง
+ * ═══ ฟอร์มสั่ง So Scraping — เลือกว่าจะ Autopost หรือ Scrap แล้วไล่ข้อ 1-2-3 (เจ้าของ 3 พ.ย. 2569) ═══
+ * > *"เอา Autopost กับ Scrap มาทำเป็น Dropdown … ทุกอย่างอย่าลืมว่าสั่งจากคนทำไม่เป็นนะ มีอะไรให้เลือกก็เลือกหมด บัญชีด้วย"*
+ * Choice: หน้าเดียว เรียงข้อ 1-2-3 เลือกไว้ให้หมด · Scrap เลือกบัญชีแบบเดียวกับ Autopost (อนาคตมีหลายบัญชี) ·
+ * จำนวนคนที่ Scrap = ช่องตัวเลข ค่าเริ่ม "เหลือหา" ของใบขอ เพดาน = โควต้าที่เว็บนั้นเหลือวันนี้ (So Scraping ต้องรับ `scrape_target` · เอกสารที่ส่งให้ 3 พ.ย.)
+ *
+ * ใช้ 3 ที่ด้วยตัวเดียวกัน: หน้ารายละเอียดใบขอ · ป๊อปประกาศ (งานสรรหา) · ป๊อปจากปุ่มบนการ์ดกล่องงาน (`AutopostDialog`)
+ * - สถานะโพสต์/Scrap ล่าสุดที่ So Scraping เขียนกลับ · ไม่รับงาน = เหตุผลจาก notes · ยังรอ/กำลังทำ = กดซ้ำไม่ได้ · เสร็จ/ไม่รับงาน = สั่งใหม่ได้
+ * - Autopost: ข้อ 1 บัญชี · 2 กลุ่ม · 3 เครื่อง · ข้อความ (`AutopostBody` ฝัง ห้ามซ้อนป๊อป) · กลุ่มละ 1 ลิงก์ (แยกว่ากลุ่มไหนได้คนเยอะ)
+ * - Scrap: ข้อ 1 บัญชี JobThai/JobBKK (ตั้งต้น = พร้อมใช้ที่เหลือโควต้ามากสุด) · 2 จำนวนคน · 3 เครื่อง (ตั้งต้น = ที่ So Scraping แนะนำ)
+ *   ตำแหน่ง = ชื่อที่โชว์บนประกาศ (`publicJobTitle`) ไม่ใช่ "พนักงาน" ของ ERP · ขาดตำแหน่ง/จังหวัด/จำนวนคน = สั่งไม่ได้ บอกว่าขาดอะไร
  */
 const AUTO_WORKER = '__auto__';
 const NUM = new Intl.NumberFormat('th-TH');
+type OrderKind = 'autopost' | 'scrap';
+const KIND_OPTIONS: Array<{ value: OrderKind; label: string }> = [
+  { value: 'autopost', label: 'Autopost — โพสต์ลงกลุ่ม Facebook' },
+  { value: 'scrap', label: 'Scrap — ดึงผู้สมัครจาก JobThai / JobBKK' },
+];
+
 export default function OrderPostButton({
   job,
   onCaptionSaved,
+  defaultKind = 'autopost',
+  onSent,
 }: {
   job: JobRequest;
   caption?: string | null;
   /** ข้อความ Autopost ที่แก้ถูกบันทึกแล้ว — หน้าแม่เอาไปแปะการ์ดตัวอย่าง (28 ต.ค. 2569) */
   onCaptionSaved?: (text: string | null) => void;
+  /** เปิดมาที่ข้อไหนก่อน (ปุ่มบนการ์ด = Autopost) */
+  defaultKind?: OrderKind;
+  /** ส่งใบสั่งแล้ว (โพสต์หรือ Scrap) — หน้าแม่โหลดป้ายสถานะใหม่ */
+  onSent?: (item: JobPostingRequest) => void;
 }) {
+  const [kind, setKind] = React.useState<OrderKind>(defaultKind);
   const [latest, setLatest] = React.useState<JobPostingRequest[] | null>(null);
   const [loadError, setLoadError] = React.useState<string | null>(null);
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
-  const [autopost, setAutopost] = React.useState(false);
   const [scrapeAccounts, setScrapeAccounts] = React.useState<SoScrapeAccount[] | null>(null);
   const [scrapeError, setScrapeError] = React.useState<string | null>(null);
-  const [scrapeIds, setScrapeIds] = React.useState<string[]>([]);
+  const [scrapeId, setScrapeId] = React.useState('');
   const [confirmText, setConfirmText] = React.useState<string | null>(null);
   const [scrapeWorkers, setScrapeWorkers] = React.useState<SoOptWorker[]>([]);
   const [scrapeWorker, setScrapeWorker] = React.useState(AUTO_WORKER);
+  /** จำนวนคนที่จะ Scrap — ค่าเริ่ม = เหลือหาของใบขอ · คนสั่งแก้ได้ */
+  const [targetText, setTargetText] = React.useState(() => (jobQtyOf(job) !== null ? String(jobQtyOf(job)) : ''));
   /** คำขอ Scrap ที่เพิ่งส่งในรอบนี้ — โชว์ผลเริ่มงานของ So Scraping */
   const [lastScrap, setLastScrap] = React.useState<JobPostingRequest | null>(null);
   /** ข้อความรอบล่าสุดของงานโพสต์จาก So Scraping เช่น "ข้าม 3 กลุ่มที่เพิ่งลง" (สเปค 6.4 "หน้าใบงานก็เห็น") */
   const [runMessage, setRunMessage] = React.useState<string | null>(null);
+
   React.useEffect(() => {
     let alive = true;
     setRunMessage(null);
@@ -81,21 +98,21 @@ export default function OrderPostButton({
     let alive = true;
     setScrapeAccounts(null);
     setScrapeError(null);
-    fetchSoOptions()
+    fetchSoOptions(job.request_no)
       .then((o) => {
         if (!alive) return;
         setScrapeAccounts(o.scrapeAccounts);
-        setScrapeIds(defaultScrapeIds(o.scrapeAccounts));
+        // เลือกไว้ให้หมด (เจ้าของ 3 พ.ย. 2569): บัญชีพร้อมใช้ที่เหลือโควต้ามากสุด · เครื่องที่ So Scraping แนะนำ
+        setScrapeId(soDefaultScrapeAccount(o.scrapeAccounts)?.id ?? '');
         const ws = soWorkersFor(o, 'scraper');
         setScrapeWorkers(ws);
-        // เครื่องตั้งต้น = เครื่องที่ So Scraping แนะนำ (ออนไลน์ คิวเบาสุด · สเปค 6.3) · ไม่มี = ให้ระบบเลือก
         setScrapeWorker(soDefaultWorker(ws, 'scrape')?.name ?? AUTO_WORKER);
       })
       .catch((e) => alive && setScrapeError(e instanceof Error ? e.message : 'โหลดบัญชี JobThai/JobBKK ไม่ได้'));
     return () => {
       alive = false;
     };
-  }, [job.id]);
+  }, [job.id, job.request_no]);
 
   React.useEffect(() => {
     let alive = true;
@@ -115,14 +132,24 @@ export default function OrderPostButton({
   const scrapingView = scraping ? soStatusView(scraping) : null;
   const title = publicJobTitle(job);
   const scrapMissing = soScrapMissing(job, title);
+  const scrapeAccount = scrapeAccounts?.find((s) => s.id === scrapeId) ?? null;
+  /** เพดานจำนวน = โควต้าที่เว็บนั้นเหลือวันนี้ (So Scraping ส่ง `platform_cap`/`platform_used_today`) · ไม่รู้ = ไม่จำกัด */
+  const scrapeMax = scrapeAccount ? soScrapeRemaining(scrapeAccount) : null;
+  const target = /^\d+$/.test(targetText.trim()) ? Number(targetText.trim()) : null;
 
-  /** มีรายชื่อบัญชีจาก So Scraping แล้วต้องติ๊กอย่างน้อย 1 (start ของ So Scraping บังคับ) */
-  const needScrapeAccount = (scrapeAccounts?.length ?? 0) > 0 && scrapeIds.length === 0;
+  /** สิ่งที่ยังสั่ง Scrap ไม่ได้ — บอกครบ ไม่ใช่ปุ่มเทาเฉย ๆ */
+  const scrapProblems = [
+    ...scrapMissing.map((m) => `ใบขอขาด${m}`),
+    ...((scrapeAccounts?.length ?? 0) > 0 && !scrapeAccount ? ['เลือกบัญชี JobThai/JobBKK'] : []),
+    ...(scrapeAccount && !soScrapeSelectable(scrapeAccount.status) ? [soScrapeChoice(scrapeAccount).label] : []),
+    ...(target === null || target < 1 ? ['ใส่จำนวนคนที่ต้องการ (ตัวเลข 1 ขึ้นไป)'] : []),
+    ...(target !== null && scrapeMax !== null && target > scrapeMax ? [`เว็บนี้วันนี้เหลือโควต้า ${NUM.format(scrapeMax)} คน — ลดจำนวน หรือเลือกเว็บอื่น`] : []),
+  ];
 
   const scrap = async (confirmed = false) => {
-    if (busy) return;
+    if (busy || scrapProblems.length > 0 || target === null) return;
     const worker = scrapeWorkers.find((w) => w.name === scrapeWorker) ?? null;
-    const warnings = soScrapConfirmWarnings((scrapeAccounts ?? []).filter((s) => scrapeIds.includes(s.id)), worker);
+    const warnings = soScrapConfirmWarnings(scrapeAccount ? [scrapeAccount] : [], worker);
     if (!confirmed && warnings.length > 0) {
       setConfirmText(warnings.join(' · '));
       return;
@@ -138,12 +165,15 @@ export default function OrderPostButton({
         requestType: 'scraping',
         jobSnapshot: {
           ...soScrapSnapshot(job, title),
-          ...(scrapeIds.length > 0 ? { scrape_connector_ids: scrapeIds } : {}),
+          ...(scrapeAccount ? { scrape_connector_ids: [scrapeAccount.id] } : {}),
+          // จำนวนคนที่คนสั่งต้องการ — So Scraping ใช้เป็น target_count (เอกสารขอเพิ่ม 3 พ.ย. 2569) · ยังไม่รับ = เขาใช้เหลือหาของใบเอง
+          scrape_target: target,
           ...(scrapeWorker !== AUTO_WORKER ? { scrape_worker: scrapeWorker } : {}),
         },
       });
       setLatest((prev) => [item, ...(prev ?? []).filter((p) => p.request_type !== 'scraping')]);
       setLastScrap(item);
+      onSent?.(item);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'ขอ Scrap ไม่สำเร็จ');
     } finally {
@@ -151,13 +181,7 @@ export default function OrderPostButton({
     }
   };
 
-  const statusRow = (
-    label: string,
-    req: JobPostingRequest | null,
-    view: ReturnType<typeof soStatusView> | null,
-    testId: string,
-    action?: React.ReactNode,
-  ) => (
+  const statusRow = (label: string, req: JobPostingRequest | null, view: ReturnType<typeof soStatusView> | null, testId: string) => (
     <div className="space-y-1" data-testid={testId}>
       <div className="flex flex-wrap items-center gap-2 text-sm">
         <span className="font-medium text-foreground">{label}</span>
@@ -170,7 +194,6 @@ export default function OrderPostButton({
         ) : (
           <span className={cn('text-xs', DASH.muted)}>ยังไม่ได้สั่ง</span>
         )}
-        {action ? <span className="ml-auto">{action}</span> : null}
       </div>
       {req?.status === 'rejected' && req.notes?.trim() ? (
         <p className={cn('text-xs', TONE.danger.value)}>เหตุผล: {req.notes.trim()}</p>
@@ -178,39 +201,12 @@ export default function OrderPostButton({
     </div>
   );
 
-  if (autopost) {
-    return (
-      <div className="rounded-xl border border-border/70 p-3" data-testid="order-post">
-        <AutopostBody
-          embedded
-          job={job}
-          onCaptionSaved={onCaptionSaved}
-          onSent={(item) => setLatest((prev) => [item, ...(prev ?? []).filter((p) => p.request_type !== 'content')])}
-          onClose={() => setAutopost(false)}
-        />
-      </div>
-    );
-  }
+  const scrapOpen = Boolean(scrapingView?.open);
 
   return (
     <div className="space-y-3 rounded-xl border border-border/70 p-3" data-testid="order-post">
       <div className="space-y-2">
-        {statusRow(
-          'โพสต์',
-          content,
-          contentView,
-          'so-status-content',
-          <Button
-            type="button"
-            size="xs"
-            variant="outline"
-            disabled={latest === null || Boolean(contentView?.open)}
-            onClick={() => setAutopost(true)}
-            data-testid="so-order-autopost"
-          >
-            <Megaphone aria-hidden /> Autopost
-          </Button>,
-        )}
+        {statusRow('โพสต์', content, contentView, 'so-status-content')}
         {runMessage ? (
           <p className={cn('text-xs', TONE.warn.value)} data-testid="so-run-message">
             {runMessage}
@@ -219,94 +215,155 @@ export default function OrderPostButton({
         {statusRow('Scrap', scraping, scrapingView, 'so-status-scraping')}
         {loadError ? <p className={cn('text-xs', TONE.danger.value)}>{loadError}</p> : null}
       </div>
-      {scrapeAccounts && scrapeAccounts.length > 0 && !scrapingView?.open ? (
-        <ul className="space-y-1.5" data-testid="so-scrape-accounts">
-          {scrapeAccounts.map((s) => (
-            <li key={s.id} className="flex items-start gap-2">
-              <Checkbox
-                id={`so-scrape-${job.id}-${s.id}`}
-                checked={scrapeIds.includes(s.id)}
-                disabled={!soScrapeSelectable(s.status)}
-                onCheckedChange={(v) => {
-                  setConfirmText(null);
-                  setScrapeIds((prev) => (v === true ? [...new Set([...prev, s.id])] : prev.filter((x) => x !== s.id)));
-                }}
-                className="mt-0.5"
-              />
-              <Label htmlFor={`so-scrape-${job.id}-${s.id}`} className="space-y-0.5 font-normal">
-                <span className="block text-sm text-foreground">
-                  {soPlatformLabel(s.platform)} · {s.label}
-                </span>
-                <span className={cn('block text-xs tabular-nums', soScrapeSelectable(s.status) ? DASH.muted : TONE.danger.value)}>
-                  {[
-                    SO_SCRAPE_STATUS_LABEL[s.status],
-                    `ใช้วันนี้ ${NUM.format(s.usedToday)}${s.cap !== null ? `/${NUM.format(s.cap)}` : ''}`,
-                    s.warning,
-                  ]
-                    .filter(Boolean)
-                    .join(' · ')}
-                </span>
-              </Label>
-            </li>
-          ))}
-        </ul>
-      ) : null}
-      {scrapeWorkers.length > 0 && !scrapingView?.open ? (
+
+      <div className="space-y-1">
+        <Label htmlFor={`so-order-kind-${job.id}`} className="text-sm font-medium">
+          สั่งอะไร
+        </Label>
         <FieldSelect
-          value={scrapeWorker}
+          id={`so-order-kind-${job.id}`}
+          value={kind}
           onChange={(v) => {
-            setScrapeWorker(v);
+            setKind(v as OrderKind);
+            setError(null);
             setConfirmText(null);
           }}
-          ariaLabel="เครื่องที่ Scrap"
-          testId="so-scrape-worker"
-          options={[
-            { value: AUTO_WORKER, label: 'เครื่อง: ให้ระบบเลือก' },
-            ...scrapeWorkers.map((w) => ({
-              value: w.name,
-              label: `เครื่อง ${w.name} · ${w.online ? 'ออนไลน์' : soWorkerOfflineText(w)} · งาน Scrap ค้าง ${NUM.format(w.scrapeQueue.running + w.scrapeQueue.queued)}`,
-            })),
-          ]}
+          ariaLabel="สั่งอะไร"
+          testId="so-order-kind"
+          options={KIND_OPTIONS}
         />
-      ) : null}
-      {scrapeError ? <p className={cn('text-xs', TONE.danger.value)}>{scrapeError}</p> : null}
-      {needScrapeAccount && !scrapingView?.open ? <p className={cn('text-xs', TONE.warn.value)}>เลือกบัญชี JobThai/JobBKK อย่างน้อย 1 บัญชี</p> : null}
-      {lastScrap ? <SoStartLine requestId={lastScrap.id} initial={lastScrap.so_start} /> : null}
-      {confirmText ? (
-        <div role="alert" aria-label="คำเตือนจาก So Scraping" className={cn('space-y-2 rounded-xl border px-3 py-2', TONE.warn.soft)} data-testid="so-scrape-warn">
-          <p className="text-sm text-foreground">{confirmText}</p>
-          <div className="flex flex-wrap gap-2">
-            <Button type="button" size="sm" onClick={() => void scrap(true)} disabled={busy} data-testid="so-scrape-warn-confirm">
-              ส่งต่อ
-            </Button>
-            <Button type="button" size="sm" variant="outline" onClick={() => setConfirmText(null)}>
-              เลือกบัญชีอื่น
-            </Button>
-          </div>
+      </div>
+
+      {kind === 'autopost' ? (
+        <div className="rounded-xl border border-border/70 p-3" data-testid="so-order-autopost">
+          <AutopostBody
+            embedded
+            job={job}
+            onCaptionSaved={onCaptionSaved}
+            onSent={(item) => {
+              setLatest((prev) => [item, ...(prev ?? []).filter((p) => p.request_type !== 'content')]);
+              onSent?.(item);
+            }}
+            onClose={() => setKind('autopost')}
+          />
         </div>
-      ) : null}
-      <Button
-        type="button"
-        size="sm"
-        variant="outline"
-        className="w-full"
-        disabled={latest === null || Boolean(scrapingView?.open) || scrapMissing.length > 0 || busy || needScrapeAccount}
-        onClick={() => void scrap()}
-        data-testid="so-order-scrap"
-      >
-        {busy ? <LoaderCircle className="animate-spin" aria-hidden /> : <Search aria-hidden />}
-        {busy ? 'กำลังส่ง…' : 'ขอ Scrap'}
-      </Button>
-      {scrapMissing.length > 0 && !scrapingView?.open ? (
-        <p className={cn('text-xs', TONE.warn.value)} data-testid="so-scrap-missing">
-          ขอ Scrap ไม่ได้ ขาด{scrapMissing.join(' · ')}
-        </p>
-      ) : null}
-      {error ? (
-        <p role="alert" className={cn('text-xs', TONE.danger.value)}>
-          {error}
-        </p>
-      ) : null}
+      ) : (
+        <div className="space-y-3 rounded-xl border border-border/70 p-3" data-testid="so-order-scrap-form">
+          {scrapOpen ? (
+            <p className={cn('rounded-xl border px-3 py-2 text-sm', TONE.warn.soft)} data-testid="so-scrap-open-order">
+              มีคำขอ Scrap ค้างอยู่ · {scrapingView?.label} — รอให้เสร็จก่อนถึงสั่งใหม่ได้
+            </p>
+          ) : null}
+
+          <section className="space-y-1">
+            <p className="text-sm font-medium text-foreground">1 · บัญชี JobThai / JobBKK</p>
+            {scrapeAccounts === null && !scrapeError ? <p className={cn('text-xs', DASH.muted)}>กำลังโหลดบัญชี…</p> : null}
+            {scrapeError ? <p className={cn('text-xs', TONE.danger.value)}>{scrapeError}</p> : null}
+            {scrapeAccounts && scrapeAccounts.length === 0 ? (
+              <p className={cn('text-xs', DASH.muted)}>ยังไม่มีบัญชีจาก So Scraping — ระบบเลือกบัญชีให้เองตอนเริ่มงาน</p>
+            ) : null}
+            {scrapeAccounts && scrapeAccounts.length > 0 ? (
+              <FieldSelect
+                value={scrapeId}
+                onChange={(v) => {
+                  setScrapeId(v);
+                  setConfirmText(null);
+                }}
+                placeholder="เลือกบัญชี"
+                ariaLabel="บัญชี JobThai/JobBKK"
+                testId="so-scrape-account"
+                options={scrapeAccounts.map((s) => {
+                  // คำสถานะ + สี (แบบเดียวกับบัญชี Facebook) · พักชั่วคราว/ปิดใช้งาน = เลือกไม่ได้
+                  const c = soScrapeChoice(s);
+                  return { value: s.id, label: c.label, disabled: c.disabled, className: TONE[c.tone].value };
+                })}
+              />
+            ) : null}
+          </section>
+
+          <section className="space-y-1">
+            <Label htmlFor={`so-scrape-target-${job.id}`} className="text-sm font-medium text-foreground">
+              2 · จำนวนคนที่ต้องการ
+            </Label>
+            <Input
+              id={`so-scrape-target-${job.id}`}
+              type="text"
+              inputMode="numeric"
+              value={targetText}
+              onChange={(e) => setTargetText(e.target.value)}
+              className="w-32 tabular-nums"
+              data-testid="so-scrape-target"
+            />
+            <p className={cn('text-xs', DASH.muted)}>
+              {[
+                jobQtyOf(job) !== null ? `ใบขอนี้เหลือหา ${NUM.format(jobQtyOf(job)!)} อัตรา` : 'ใบขอนี้ไม่ระบุจำนวน',
+                scrapeMax !== null ? `${soPlatformLabel(scrapeAccount?.platform ?? '')} วันนี้เหลือโควต้า ${NUM.format(scrapeMax)} คน` : null,
+              ]
+                .filter(Boolean)
+                .join(' · ')}
+            </p>
+          </section>
+
+          <section className="space-y-1">
+            <p className="text-sm font-medium text-foreground">3 · เครื่อง</p>
+            <FieldSelect
+              value={scrapeWorker}
+              onChange={(v) => {
+                setScrapeWorker(v);
+                setConfirmText(null);
+              }}
+              ariaLabel="เครื่องที่ Scrap"
+              testId="so-scrape-worker"
+              options={[
+                { value: AUTO_WORKER, label: 'ให้ระบบเลือก' },
+                ...scrapeWorkers.map((w) => ({
+                  value: w.name,
+                  label: `${w.name} · ${w.online ? 'ออนไลน์' : soWorkerOfflineText(w)} · งาน Scrap ค้าง ${NUM.format(w.scrapeQueue.running + w.scrapeQueue.queued)}`,
+                  className: w.online ? undefined : TONE.warn.value,
+                })),
+              ]}
+            />
+          </section>
+
+          {lastScrap ? <SoStartLine requestId={lastScrap.id} initial={lastScrap.so_start} /> : null}
+          {!scrapOpen && scrapProblems.length > 0 ? (
+            <ul className={cn('space-y-0.5 text-xs', TONE.warn.value)} data-testid="so-scrap-problems">
+              {scrapProblems.map((p) => (
+                <li key={p}>{p}</li>
+              ))}
+            </ul>
+          ) : null}
+          {confirmText ? (
+            <div role="alert" aria-label="คำเตือนจาก So Scraping" className={cn('space-y-2 rounded-xl border px-3 py-2', TONE.warn.soft)} data-testid="so-scrape-warn">
+              <p className="text-sm text-foreground">{confirmText}</p>
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" size="sm" onClick={() => void scrap(true)} disabled={busy} data-testid="so-scrape-warn-confirm">
+                  ส่งต่อ
+                </Button>
+                <Button type="button" size="sm" variant="outline" onClick={() => setConfirmText(null)}>
+                  เลือกบัญชีอื่น
+                </Button>
+              </div>
+            </div>
+          ) : null}
+          {error ? (
+            <p role="alert" className={cn('text-xs', TONE.danger.value)}>
+              {error}
+            </p>
+          ) : null}
+          <Button
+            type="button"
+            size="sm"
+            className="w-full"
+            disabled={latest === null || scrapOpen || scrapProblems.length > 0 || busy}
+            onClick={() => void scrap()}
+            data-testid="so-order-scrap"
+          >
+            {busy ? <LoaderCircle className="animate-spin" aria-hidden /> : <Search aria-hidden />}
+            {busy ? 'กำลังส่ง…' : 'ขอ Scrap'}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
