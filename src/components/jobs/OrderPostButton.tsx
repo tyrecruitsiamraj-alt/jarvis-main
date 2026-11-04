@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { FieldSelect } from '@/components/shared/FieldSelect';
+import { JobApplyLinks } from '@/components/jobs/ApplyLinksPanel';
 import { cn } from '@/lib/utils';
 import { DASH, TONE } from '@/lib/designTokens';
 import type { JobRequest } from '@/types';
@@ -45,17 +46,20 @@ import SoStartLine from '@/components/jobs/SoStartLine';
  */
 const AUTO_WORKER = '__auto__';
 const NUM = new Intl.NumberFormat('th-TH');
-type OrderKind = 'autopost' | 'scrap';
+type OrderKind = 'autopost' | 'scrap' | 'genlink';
 const KIND_OPTIONS: Array<{ value: OrderKind; label: string }> = [
   { value: 'autopost', label: 'Autopost — โพสต์ลงกลุ่ม Facebook' },
   { value: 'scrap', label: 'Scrap — ดึงผู้สมัครจาก JobThai / JobBKK' },
 ];
+/** ตัวเลือกที่ 3 — หน้ารายละเอียดใบขอ (เจ้าของ 4 พ.ย. 2569 "เอารวมกันสิ่" · ลิงก์สมัครเดิมเป็นกล่องแยก) */
+const GEN_LINK_OPTION = { value: 'genlink' as const, label: 'Gen link — ลิงก์สมัครเอาไปโพสต์เอง' };
 
 export default function OrderPostButton({
   job,
   onCaptionSaved,
   defaultKind = 'autopost',
   onSent,
+  withGenLink = false,
 }: {
   job: JobRequest;
   caption?: string | null;
@@ -65,6 +69,8 @@ export default function OrderPostButton({
   defaultKind?: OrderKind;
   /** ส่งใบสั่งแล้ว (โพสต์หรือ Scrap) — หน้าแม่โหลดป้ายสถานะใหม่ */
   onSent?: (item: JobPostingRequest) => void;
+  /** มีตัวเลือก Gen link ในช่อง "สั่งอะไร" (หน้ารายละเอียดใบขอ) */
+  withGenLink?: boolean;
 }) {
   const [kind, setKind] = React.useState<OrderKind>(defaultKind);
   const [latest, setLatest] = React.useState<JobPostingRequest[] | null>(null);
@@ -230,7 +236,7 @@ export default function OrderPostButton({
           }}
           ariaLabel="สั่งอะไร"
           testId="so-order-kind"
-          options={KIND_OPTIONS}
+          options={withGenLink ? [...KIND_OPTIONS, GEN_LINK_OPTION] : KIND_OPTIONS}
         />
       </div>
 
@@ -246,6 +252,10 @@ export default function OrderPostButton({
             }}
             onClose={() => setKind('autopost')}
           />
+        </div>
+      ) : kind === 'genlink' ? (
+        <div className="space-y-2 rounded-xl border border-border/70 p-3" data-testid="so-order-genlink">
+          <JobApplyLinks job={job} formOpen />
         </div>
       ) : (
         <div className="space-y-3 rounded-xl border border-border/70 p-3" data-testid="so-order-scrap-form">

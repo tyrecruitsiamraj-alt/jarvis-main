@@ -46,6 +46,6 @@ describe('ฟอร์มเดียว 3 ที่', () => {
     expect(dialog).toContain('3 · เครื่อง');
     expect(dialog).toContain('<OrderPostButton key={job.id} job={job} defaultKind="autopost" onSent={onSent} />');
     expect(readFileSync('src/components/jobs/BoardJobCard.tsx', 'utf8')).toContain('Autopost / Scrap');
-    expect(readFileSync('src/pages/jobs/SiamrajUnitRequestDetailPage.tsx', 'utf8')).toContain('<OrderPostButton job={data} />');
+    expect(readFileSync('src/pages/jobs/SiamrajUnitRequestDetailPage.tsx', 'utf8')).toContain('<OrderPostButton job={data} withGenLink />' /* 4 พ.ย. 2569 + Gen link ในช่องเดียวกัน */);
   });
 });

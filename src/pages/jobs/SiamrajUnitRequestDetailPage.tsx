@@ -25,9 +25,6 @@ import { JOB_STAFF_ROSTER_CHANGED_EVENT } from '@/lib/jobStaffRemote';
 import { UnitRequestNoteDetail } from '@/components/jobs/UnitRequestNoteField';
 import UnitRequestInfoFields from '@/components/jobs/UnitRequestInfoFields';
 import OrderPostButton from '@/components/jobs/OrderPostButton';
-import ApplyLinksPanel from '@/components/jobs/ApplyLinksPanel';
-import { fetchRecruitPostings } from '@/lib/recruitPostingsApi';
-import type { RecruitPosting } from '@/lib/recruitPostings';
 import UnitRequestTabs from '@/components/jobs/UnitRequestTabs';
 import { UnitRequestReplacementSelect } from '@/components/jobs/UnitRequestReplacementToggle';
 import {
@@ -37,7 +34,7 @@ import {
 import type { JobRequest } from '@/types';
 import { cn } from '@/lib/utils';
 import { TONE } from '@/lib/designTokens';
-import { ChevronDown, Database, ExternalLink, History, Landmark, Link2, Megaphone, Users, StickyNote, UserCheck, ClipboardList } from 'lucide-react';
+import { ChevronDown, Database, ExternalLink, History, Landmark, Megaphone, Users, StickyNote, UserCheck, ClipboardList } from 'lucide-react';
 import UnitEditLogSection from '@/components/jobs/UnitEditLogSection';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { RequestRateLinesBlock, ResignedEmployeeBlock } from '@/components/jobs/UnitRequestPayBlocks';
@@ -291,22 +288,14 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
             {/* เกณฑ์ความเร่งเฉพาะใบ ย้ายไป ตั้งค่า › เกณฑ์ความเร่งใบขอ แล้ว (เจ้าของ 3 พ.ย. 2569) */}
 
             {/* สั่ง Autopost / ขอ Scrap จากหน้าใบขอ (เจ้าของ 3 พ.ย. 2569 "ทำให้สั่ง autopost กับ Scrap ตรงนี้ได้ด้วยเลย")
-                ตัวเดียวกับป๊อปประกาศ (`OrderPostButton`) — สถานะล่าสุด + Autopost กดทีเดียวจบ + ขอ Scrap */}
+                ตัวเดียวกับป๊อปประกาศ (`OrderPostButton`) — สถานะล่าสุด + Autopost กดทีเดียวจบ + ขอ Scrap
+                + Gen link เป็นตัวเลือกที่ 3 ในช่องเดียวกัน (เจ้าของ 4 พ.ย. 2569 "เอารวมกันสิ่" — เดิมเป็นกล่องลิงก์สมัครแยก) */}
             <section className="glass-card rounded-3xl p-4 border border-white/70 space-y-3" data-testid="detail-order-post">
               <h3 className="text-sm font-medium flex items-center gap-1.5">
                 <Megaphone className={cn('w-4 h-4', TONE.primary.value)} aria-hidden />
-                Autopost / Scrap
+                Autopost / Scrap / Gen link
               </h3>
-              <OrderPostButton job={data} />
-            </section>
-
-            {/* ลิงก์สมัคร + Gen link แบบหน้างานสรรหา (เจ้าของ 4 พ.ย. 2569 "gen link ตรงนี้ไม่ได้หรอ" → "ก็แบบหน้างานสรรหาไง") */}
-            <section className="glass-card rounded-3xl p-4 border border-white/70 space-y-3" data-testid="detail-apply-links">
-              <h3 className="text-sm font-medium flex items-center gap-1.5">
-                <Link2 className={cn('w-4 h-4', TONE.primary.value)} aria-hidden />
-                ลิงก์สมัคร
-              </h3>
-              <DetailApplyLinks job={data} />
+              <OrderPostButton job={data} withGenLink />
             </section>
 
             <section className="glass-card rounded-3xl p-4 border border-white/70 space-y-2">
@@ -553,22 +542,3 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
 };
 
 export default SiamrajUnitRequestDetailPage;
-
-/** ลิงก์สมัครของใบนี้ — โหลดประกาศของใบเอง แล้วใช้ชิ้นเดียวกับหน้างานสรรหา (`ApplyLinksPanel`) */
-function DetailApplyLinks({ job }: { job: JobRequest }) {
-  const [postings, setPostings] = React.useState<RecruitPosting[] | null>(null);
-  const [failed, setFailed] = React.useState(false);
-  const load = React.useCallback(async () => {
-    try {
-      setPostings(await fetchRecruitPostings({ jobId: job.id }));
-      setFailed(false);
-    } catch {
-      setPostings([]);
-      setFailed(true);
-    }
-  }, [job.id]);
-  React.useEffect(() => {
-    void load();
-  }, [load]);
-  return <ApplyLinksPanel job={job} postings={postings} failed={failed} onReload={() => void load()} />;
-}
