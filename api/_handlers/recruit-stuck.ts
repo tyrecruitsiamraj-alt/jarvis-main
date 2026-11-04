@@ -18,9 +18,9 @@ import { loadMatchingBuScope, loadUserDepartmentScope } from '../_lib/department
 import { pickDashboardBuSet, appBuJoin, buMatchSql, appBuSql } from '../_lib/homeBuSql.js';
 import { logError } from '../_lib/logger.js';
 import { readUnitRequestListThroughCache } from './siamraj-unit-requests.js';
-import { loadFactsForJobs } from './recruit-overview.js';
+import { attachRequestRecruiters, loadFactsForJobs, toRequestRows } from './recruit-overview.js';
 import { listLatestJobPostingsForBoard } from '../_lib/jobPostingRequests.js';
-import { loadOnlineRequestRows } from '../_lib/homeOnlineSql.js';
+import { loadErpExtras, loadOnlineRequestRows, type ErpExtra } from '../_lib/homeOnlineSql.js';
 import { loadInformDaysByPhone } from '../_lib/applicantSourceSql.js';
 import { informedSince, phone9Of } from '../../src/lib/applicantSourceMatch.js';
 import { countsOf } from '../../src/lib/requestPipeline.js';
@@ -30,10 +30,10 @@ import { districtMatcherFor } from '../../src/lib/districtMatch.js';
 import { getDistrictOptionsForProvince } from '../../src/lib/thaiDistricts.js';
 import { publicJobTitle } from '../../src/lib/publicJobTitle.js';
 import { jobUnitSectorOf } from '../../src/lib/unitRequestDisplay.js';
-import { requestSectorOf } from '../../src/lib/recruitRequestTab.js';
+import { onlineRequestStateOf, type OnlineRequestRow } from '../../src/lib/homeOnline.js';
 import { toBangkokYmd } from '../_lib/businessDate.js';
 import { APPOINTMENT_AT_SQL } from '../_lib/applicantOverviewSql.js';
-import { stuckReasonOf, type StuckMonthlyRow, type StuckPostStatus, type StuckRequest } from '../../src/lib/recruitStuck.js';
+import { stuckReasonOf, type StuckMonthlyRow, type StuckPostStatus, type StuckRequest, type StuckState } from '../../src/lib/recruitStuck.js';
 import type { RecruitAppFact } from '../../src/lib/recruitOverviewTypes.js';
 import type { JobRequest } from '../../src/types/index.js';
 
@@ -48,6 +48,8 @@ export type RecruitStuckResponse = {
   generatedAt: string;
   today: string;
   bu: string | null;
+  /** ช่วงที่ใช้คิด "ขอใหม่" */
+  window: { from: string; to: string };
   requests: StuckRequest[] | null;
   monthly: StuckMonthlyRow[] | null;
   errors: Partial<Record<'requests' | 'monthly', string>>;
@@ -69,14 +71,26 @@ function placeOf(job: JobRequest): { province: string | null; district: string |
   return { province, district, subdistrict: text(job.override_subdistrict) };
 }
 
-export async function buildRecruitStuck(user: AuthedReq['user'], requestedBu: unknown, now = new Date()): Promise<RecruitStuckResponse> {
+const YMD = /^\d{4}-\d{2}-\d{2}$/;
+/** ช่วงของหน้า (ตัวเดียวกับภาพรวม) · ไม่ส่ง/ผิดรูป = 7 วันล่าสุด */
+export function stuckWindowOf(from: unknown, to: unknown, today: string): Win {
+  const okTo = typeof to === 'string' && YMD.test(to) ? to : today;
+  if (typeof from === 'string' && YMD.test(from) && from <= okTo) return { from, to: okTo };
+  const d = new Date(`${okTo}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - 6);
+  return { from: d.toISOString().slice(0, 10), to: okTo };
+}
+
+export async function buildRecruitStuck(user: AuthedReq['user'], requestedBu: unknown, range: { from?: unknown; to?: unknown } = {}, now = new Date()): Promise<RecruitStuckResponse> {
   const [departmentScope, buScope] = await Promise.all([loadUserDepartmentScope(user), loadMatchingBuScope(user)]);
   const picked = pickDashboardBuSet(buScope, requestedBu);
   const buSet = picked.buSet;
-  const body: RecruitStuckResponse = { generatedAt: now.toISOString(), today: toBangkokYmd(now), bu: picked.bu, requests: null, monthly: null, errors: {} };
+  const today = toBangkokYmd(now);
+  const win = stuckWindowOf(range.from, range.to, today);
+  const body: RecruitStuckResponse = { generatedAt: now.toISOString(), today, bu: picked.bu, window: win, requests: null, monthly: null, errors: {} };
   if (buScope.mode === 'none') return body;
 
-  const [reqR, monR] = await Promise.allSettled([loadStuckRequests(departmentScope, buSet, now), loadMonthly(departmentScope, buSet, body.today)]);
+  const [reqR, monR] = await Promise.allSettled([loadStuckRequests(departmentScope, buSet, win), loadMonthly(departmentScope, buSet, body.today)]);
   if (reqR.status === 'fulfilled') body.requests = reqR.value;
   else {
     logError('recruit-stuck: requests', reqR.reason);
@@ -90,12 +104,73 @@ export async function buildRecruitStuck(user: AuthedReq['user'], requestedBu: un
   return body;
 }
 
-async function loadStuckRequests(departmentScope: Awaited<ReturnType<typeof loadUserDepartmentScope>>, buSet: readonly string[] | null, now: Date): Promise<StuckRequest[]> {
-  const all = (await readUnitRequestListThroughCache({ limit: 500, departmentScope })).value as unknown as JobRequest[];
-  const jobs = all.filter((j) => j.status === 'open' && (buSet === null || (j.department_code != null && buSet.includes(j.department_code))));
-  const jobIds = jobs.map((j) => String(j.id));
-  if (jobIds.length === 0) return [];
-  const [facts, releases, links, postings] = await Promise.all([
+type Scope = Awaited<ReturnType<typeof loadUserDepartmentScope>>;
+type Win = { from: string; to: string };
+const SQL_PREFIX = 'siamraj-sql:';
+
+/** ใบที่ยังเปิด (เมนูใบขอ) → แถวรูปเดียวกับใบขอในช่วง ให้ตัวอ่านพื้นที่/ประเภทงานตัวเดียวกัน (`toRequestRows`) */
+function onlineRowOfJob(j: JobRequest, x: ErpExtra | undefined): OnlineRequestRow {
+  const id = String(j.id);
+  const requested = Number(j.request_positions ?? j.position_units ?? 0) || 0;
+  const filled = Number(j.filled_positions ?? 0) || 0;
+  const cancelled = Number(j.cancelled_positions ?? 0) || 0;
+  const subtype = drivingSubtypeOf(j);
+  return {
+    requestNo: String(j.request_no ?? id),
+    jobId: id,
+    day: String(j.request_date ?? '').slice(0, 10),
+    bu: text(j.department_code),
+    requested,
+    filled,
+    cancelled,
+    remaining: Math.max(0, requested - filled - cancelled),
+    unitName: text(j.work_site_name) ?? text(j.unit_name),
+    industry: text(x?.industry),
+    sector: jobUnitSectorOf(j),
+    position: text(publicJobTitle(j)),
+    releasedAt: null,
+    applications: 0,
+    siteCode: text(j.site_code),
+    subtype: subtype === UNSPECIFIED ? null : subtype,
+    leadKind: null,
+    erp: x ? { siteName: text(x.site_name), province: text(x.province_name), workAddr: text(x.work_addr), customerGroup: text(x.customer_group) } : null,
+  };
+}
+
+const STATE_OF: Record<ReturnType<typeof onlineRequestStateOf>, StuckState> = { open: 'open', fullyClosed: 'filled', partialCancelled: 'filled', cancelledAll: 'cancelled' };
+
+/**
+ * ใบของหน้า = ใบที่ส่งเข้ามาในช่วง (ทุกสถานะ · ชุดเดียวกับหน้าหลัก `loadOnlineRequestRows`) + ใบก่อนช่วงที่ยังต้องหา (เมนูใบขอ)
+ * พื้นที่/ประเภทงาน = `toRequestRows` ตัวเดียวกับแท็บใบขอเดิม (ที่แก้ในใบ › ที่อยู่หน้างาน ERP › จังหวัดไซต์ · ธนาคารจากอุตสาหกรรม ERP)
+ * อ่านไม่ได้ = ใช้ที่ทีมพิมพ์ในใบ/ที่อยู่ของใบ (`placeOf`) ต่อ
+ */
+async function loadStuckRequests(departmentScope: Scope, buSet: readonly string[] | null, win: Win): Promise<StuckRequest[]> {
+  const [all, ranged] = await Promise.all([
+    readUnitRequestListThroughCache({ limit: 500, departmentScope }).then((r) => r.value as unknown as JobRequest[]),
+    loadOnlineRequestRows({ from: win.from, to: win.to, bu: buSet, departmentScope }),
+  ]);
+  const openJobs = all.filter((j) => j.status === 'open' && (buSet === null || (j.department_code != null && buSet.includes(j.department_code))));
+  const jobById = new Map(openJobs.map((j) => [String(j.id), j]));
+  const rangedIds = new Set(ranged.map((r) => r.jobId ?? `${SQL_PREFIX}${r.requestNo}`));
+  const carriedJobs = openJobs.filter((j) => !rangedIds.has(String(j.id)));
+  const realNos = carriedJobs.filter((j) => String(j.id).startsWith(SQL_PREFIX)).map((j) => String(j.request_no ?? '').trim()).filter(Boolean);
+  const extras = realNos.length
+    ? await loadErpExtras(realNos).catch((e) => {
+        logError('recruit-stuck: ERP ของใบยกมา', e);
+        return new Map<string, ErpExtra>();
+      })
+    : new Map<string, ErpExtra>();
+  const base: Array<{ online: OnlineRequestRow; job: JobRequest | null; inRange: boolean }> = [
+    ...ranged.map((r) => ({ online: { ...r, jobId: r.jobId ?? `${SQL_PREFIX}${r.requestNo}` }, job: jobById.get(r.jobId ?? `${SQL_PREFIX}${r.requestNo}`) ?? null, inRange: true })),
+    ...carriedJobs.map((j) => ({ online: onlineRowOfJob(j, String(j.id).startsWith(SQL_PREFIX) ? extras.get(String(j.request_no ?? '').trim()) : undefined), job: j, inRange: false })),
+  ]
+    // ยกมา = ยังต้องหาวันนี้เท่านั้น (สถานะเปิดแต่ไม่เหลืออัตรา = จบแล้ว ไม่อยู่ในสมการ)
+    .filter((b) => b.inRange || onlineRequestStateOf(b.online) === 'open');
+  if (base.length === 0) return [];
+
+  const jobIds = base.map((b) => b.online.jobId as string);
+  const [rows, facts, releases, links, postings] = await Promise.all([
+    toRequestRows(base.map((b) => b.online)),
     loadFactsForJobs(jobIds, null),
     dbQuery<{ job_id: string; at: string | Date; who: string | null }>(
       `select job_id, min(released_at) as at, max(released_by_name) as who from ${RELEASES} where job_id = any($1::text[]) group by job_id`,
@@ -107,6 +182,7 @@ async function loadStuckRequests(departmentScope: Awaited<ReturnType<typeof load
     ),
     listLatestJobPostingsForBoard(),
   ]);
+  await attachRequestRecruiters(rows);
   const factsBy = new Map<string, RecruitAppFact[]>();
   for (const f of facts) {
     if (!f.jobId) continue;
@@ -119,13 +195,12 @@ async function loadStuckRequests(departmentScope: Awaited<ReturnType<typeof load
   const postBy = new Map<string, StuckPostStatus>();
   for (const p of postings) if (p.request_type === 'content' && POST_STATUSES.includes(p.status as StuckPostStatus) && !postBy.has(p.job_id)) postBy.set(p.job_id, p.status as StuckPostStatus);
 
-  return jobs.map((j) => {
-    const id = String(j.id);
+  return base.map((b, i) => {
+    const id = b.online.jobId as string;
+    const row = rows[i];
+    const j = b.job;
     const fs = factsBy.get(id) ?? [];
     const counts = countsOf(fs, 0, 0);
-    const requested = Number(j.request_positions ?? j.position_units ?? 0) || 0;
-    const filled = Number(j.filled_positions ?? 0) || 0;
-    const cancelled = Number(j.cancelled_positions ?? 0) || 0;
     const rel = relBy.get(id);
     const signals = {
       released: Boolean(rel),
@@ -135,39 +210,32 @@ async function loadStuckRequests(departmentScope: Awaited<ReturnType<typeof load
       uncalled: fs.filter((f) => !f.calledByAi && !f.calledByStaff).length,
       queued: fs.filter((f) => f.aiQueued).length,
     };
-    const place = placeOf(j);
-    const subtype = drivingSubtypeOf(j);
+    const state = STATE_OF[onlineRequestStateOf(b.online)];
+    // พื้นที่: ตัวอ่านของแท็บใบขอ › ที่ทีมพิมพ์ในใบ/ที่อยู่ของใบ (ตัวกรองกล่องงาน)
+    const place = j && (!row.province || !row.district) ? placeOf(j) : null;
+    const province = row.province ?? place?.province ?? null;
+    // อำเภอจากที่อยู่ของใบ ใช้ได้เมื่อจังหวัดตรงกัน (กันอำเภอของอีกจังหวัด)
+    const samePlace = place && place.province === province;
     return {
-      requestNo: String(j.request_no ?? id),
-      jobId: id,
-      day: String(j.request_date ?? '').slice(0, 10),
-      unitName: text(j.work_site_name) ?? text(j.unit_name),
-      position: text(publicJobTitle(j)),
-      siteCode: text(j.site_code),
-      siteName: text(j.work_site_name),
-      sector: requestSectorOf(null, null, jobUnitSectorOf(j)),
-      province: place.province,
-      district: place.district,
-      subdistrict: place.subdistrict,
-      leadKind: null,
-      subtype: subtype === UNSPECIFIED ? null : subtype,
-      requested,
-      filled,
-      cancelled,
-      remaining: Math.max(0, requested - filled - cancelled),
+      ...row,
+      province,
+      district: row.district ?? (samePlace ? place.district : null),
+      subdistrict: row.subdistrict ?? (samePlace ? place.subdistrict : null),
+      siteName: row.siteName ?? text(j?.work_site_name),
       released: signals.released,
       applications: counts.apps,
-      recruiter: text(j.recruiter_name),
-      ageDays: getJobRequestAgeDays(j),
-      bu: text(j.department_code),
-      screener: text(j.screener_name),
+      recruiter: row.recruiter ?? text(j?.recruiter_name),
+      ageDays: state === 'open' && j ? getJobRequestAgeDays(j) : null,
+      bu: b.online.bu,
+      screener: text(j?.screener_name),
       signals,
       reason: stuckReasonOf(signals),
       releasedAt: rel ? (rel.at instanceof Date ? rel.at.toISOString() : String(rel.at)) : null,
       releasedBy: rel ? text(rel.who) : null,
-      // ไม่ใช่ใบที่ยังเปิด = ไม่อยู่ในรายการนี้อยู่แล้ว (ตัดจาก status ข้างบน) — ค่าในแถวใช้กับ `onlineRequestStateOf` ได้
-    } satisfies StuckRequest & { ageDays: number | null };
-  }).filter((r) => r.remaining > 0 || r.signals.counts.apps > 0 || !r.released);
+      state,
+      inRange: b.inRange,
+    } satisfies StuckRequest;
+  });
 }
 
 const monthOf = (ymd: string) => ymd.slice(0, 7);
@@ -180,7 +248,7 @@ function monthsBack(today: string, n: number): string {
 }
 
 /** ยอดต่อ (เดือน, ใบขอ) ย้อน 6 เดือน — ใบขอเข้ามา · รายชื่อที่กรอก · นัดได้ · ได้ลงงาน (แจ้งเข้า ERP หลังวันกรอก) */
-async function loadMonthly(departmentScope: Awaited<ReturnType<typeof loadUserDepartmentScope>>, buSet: readonly string[] | null, today: string): Promise<StuckMonthlyRow[]> {
+async function loadMonthly(departmentScope: Scope, buSet: readonly string[] | null, today: string): Promise<StuckMonthlyRow[]> {
   const from = monthsBack(today, MONTHS_BACK - 1);
   const acc = new Map<string, StuckMonthlyRow>();
   const row = (month: string, jobId: string) => {
@@ -225,7 +293,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
     return sendError(res, 405, 'Method not allowed');
   }
   try {
-    const body = await buildRecruitStuck(req.user, req.query?.bu);
+    const body = await buildRecruitStuck(req.user, req.query?.bu, { from: req.query?.from, to: req.query?.to });
     res.setHeader?.('Cache-Control', 'no-store');
     return res.status(200).json(body);
   } catch (e) {

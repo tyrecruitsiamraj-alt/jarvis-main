@@ -13,7 +13,17 @@ import { GrowStack } from './GrowBar';
  * ═══ ส่วนที่ 4: พื้นที่ที่ยังต้องหา — จังหวัด → อำเภอ (เจ้าของ 4 พ.ย. 2569 "งานค้างที่จังหวัดไหน อำเภอไหน") ═══
  * แถวจังหวัดกดกางอำเภอ · แถบ 4 สีบอกติดช่วงไหน · กดเลขเปิดรายการใบ
  */
-export default function StuckAreaTable({ rows, onPick }: { rows: readonly StuckRequest[]; onPick: (title: string, list: StuckRequest[]) => void }) {
+export default function StuckAreaTable({
+  rows,
+  onPick,
+  title = 'พื้นที่ที่ยังต้องหา',
+  countLabel = 'ใบที่ต้องหา',
+}: {
+  rows: readonly StuckRequest[];
+  onPick: (title: string, list: StuckRequest[]) => void;
+  title?: string;
+  countLabel?: string;
+}) {
   const places = React.useMemo(() => stuckByPlace(rows), [rows]);
   const [open, setOpen] = React.useState<Set<string>>(() => new Set());
   const toggle = (name: string) =>
@@ -56,13 +66,13 @@ export default function StuckAreaTable({ rows, onPick }: { rows: readonly StuckR
     </TableRow>
   );
   return (
-    <OverviewCard icon={MapPin} title="พื้นที่ที่ยังต้องหา" sub="กดจังหวัดดูอำเภอ · กดเลขดูใบ">
+    <OverviewCard icon={MapPin} title={title} sub="กดจังหวัดดูอำเภอ · กดเลขดูใบ">
       <div className="overflow-x-auto" data-testid="stuck-area">
         <Table className="min-w-[48rem]">
           <TableHeader>
             <TableRow className={DASH.tableHead}>
               <TableHead className="text-xs">จังหวัด / อำเภอ</TableHead>
-              <TableHead className="whitespace-nowrap text-right text-xs">ใบที่ต้องหา</TableHead>
+              <TableHead className="whitespace-nowrap text-right text-xs">{countLabel}</TableHead>
               <TableHead className="whitespace-nowrap text-right text-xs">เหลือหา (อัตรา)</TableHead>
               <TableHead className="text-xs">ติดตรงไหน</TableHead>
               {STUCK_PHASES.map((p) => (
@@ -76,7 +86,7 @@ export default function StuckAreaTable({ rows, onPick }: { rows: readonly StuckR
             {places.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={8} className={cn('py-4 text-center text-sm', DASH.sub)}>
-                  ไม่มีใบที่ต้องหา
+                  ไม่มี{countLabel}
                 </TableCell>
               </TableRow>
             ) : null}

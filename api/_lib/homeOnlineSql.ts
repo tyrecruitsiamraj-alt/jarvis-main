@@ -32,7 +32,7 @@ const RELEASES = tableInAppSchema('job_public_releases');
 const APPS = tableInAppSchema('public_job_applications');
 const CANCELLATIONS = tableInAppSchema('application_cancellations');
 
-type ErpExtra = {
+export type ErpExtra = {
   request_no: string;
   industry: string | null;
   job_name1: string | null;
@@ -49,7 +49,7 @@ type ErpExtra = {
 };
 
 /** กลุ่มอุตสาหกรรม + ตำแหน่งของใบขอ — ทีละ 300 ใบ (พารามิเตอร์ SQL Server จำกัด) */
-async function loadErpExtras(requestNos: readonly string[]): Promise<Map<string, ErpExtra>> {
+export async function loadErpExtras(requestNos: readonly string[]): Promise<Map<string, ErpExtra>> {
   const out = new Map<string, ErpExtra>();
   for (let i = 0; i < requestNos.length; i += 300) {
     const chunk = requestNos.slice(i, i + 300);

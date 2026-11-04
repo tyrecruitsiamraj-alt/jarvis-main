@@ -64,12 +64,14 @@ describe('หน้าภาพรวมโฉมใหม่', () => {
     const steps = await screen.findByTestId('stuck-steps');
     expect(steps.querySelectorAll('[data-stuck="1"]')).toHaveLength(1);
     expect(steps.querySelector('[data-stuck="1"]')?.textContent).toContain('ประกาศ');
-    // ติดที่ใคร: แบงค์ 2 · หมิว 1 · กดเลขของหมิว → รายการใบของหมิว
-    const owners = screen.getByTestId('stuck-owners');
-    expect(within(owners).getAllByTestId('stuck-owner-row').map((r) => [r.querySelector('td')?.textContent, r.querySelectorAll('td')[1]?.textContent])).toEqual([
+    // ติดที่ใคร ตามเหตุที่กดอยู่ (4 พ.ย. 2569 ทั้งหน้าตาม "ติดตรงไหน"): ยังไม่ประกาศ = แบงค์ 1 · กดซ้ำ = ทุกใบ แบงค์ 2 · หมิว 1
+    const ownerCells = () => within(screen.getByTestId('stuck-owners')).getAllByTestId('stuck-owner-row').map((r) => [r.querySelector('td')?.textContent, r.querySelectorAll('td')[1]?.textContent]);
+    expect(ownerCells()).toEqual([['แบงค์', '1']]);
+    fireEvent.click(screen.getByTestId('stuck-reason-not_released'));
+    await waitFor(() => expect(ownerCells()).toEqual([
       ['แบงค์', '2'],
       ['หมิว', '1'],
-    ]);
+    ]));
     // พื้นที่: กรุงเทพ 2 · ชลบุรี 1 · กดจังหวัดกางอำเภอ
     const area = screen.getByTestId('stuck-area');
     expect(within(area).getAllByTestId('stuck-area-province')).toHaveLength(2);
@@ -80,6 +82,39 @@ describe('หน้าภาพรวมโฉมใหม่', () => {
     fireEvent.mouseDown(screen.getByTestId('stuck-trend-apps'));
     fireEvent.click(screen.getByTestId('stuck-trend-apps'));
     await waitFor(() => expect(screen.getByTestId('stuck-trend').textContent).toContain('5'));
+  });
+
+  it('สมการบนสุดลงตัว · กดกล่องยกเลิก = ทั้งหน้าดูเฉพาะใบยกเลิก · เส้นรายชื่อแตกทางครบ + ใครโทรต่อ', async () => {
+    const withState = [
+      { ...REQS[0], state: 'open', inRange: false },
+      { ...REQS[1], state: 'open', inRange: true },
+      { ...REQS[2], state: 'open', inRange: true },
+      row('D', { state: 'cancelled', inRange: true, recruiter: 'ฟอร์ด', reason: 'no_apps' }),
+    ];
+    fetchRecruitStuck.mockResolvedValue({ generatedAt: '', today: '2026-11-04', bu: null, window: { from: '2026-10-29', to: '2026-11-04' }, requests: withState, monthly: [], errors: {} });
+    const apps = [
+      { id: 'x1', createdAt: '2026-11-02T03:00:00.000Z', jobId: 'siamraj-sql:C', calledByAi: true, aiAnswer: 'said_yes', aiAnswerAt: '2026-11-02T04:00:00.000Z', claimedBy: 'อ้น', phoneOk: true },
+      { id: 'x2', createdAt: '2026-11-02T03:00:00.000Z', jobId: 'siamraj-sql:D', calledByAi: true, aiAnswer: 'no_pickup', phoneOk: true },
+    ];
+    render(
+      <MemoryRouter>
+        <RecruitStuckBody data={{ ...data, apps } as unknown as RecruitOverviewResponse} win={data.window} onOpenNames={() => {}} onPickMonth={() => {}} />
+      </MemoryRouter>,
+    );
+    const eq = await screen.findByTestId('stuck-equation');
+    const v = (k: string) => Number(within(eq).getByTestId(`stuck-eq-${k}`).textContent?.match(/\d+/)?.[0]);
+    expect([v('carried'), v('new'), v('filled'), v('cancelled'), v('remaining')]).toEqual([1, 3, 0, 1, 3]);
+    expect(fetchRecruitStuck).toHaveBeenLastCalledWith(null, { from: '2026-10-29', to: '2026-11-04' });
+    // ค่าเริ่ม: รายชื่อทุกคนในช่วง 2 คน · AI สนใจ 1 → อ้นเก็บไป ยังไม่โทร
+    expect(screen.getByTestId('person-stage-apps').textContent).toMatch(/^รายชื่อที่กรอกมา2/);
+    expect(within(screen.getByTestId('follow-callers')).getAllByTestId('follow-caller-row').map((r) => r.querySelector('td')?.textContent)).toEqual(['อ้น']);
+    fireEvent.click(within(eq).getByTestId('stuck-eq-cancelled'));
+    await waitFor(() => expect(screen.getByTestId('stuck-total').textContent).toContain('1'));
+    expect(screen.getByText('ใบที่ยกเลิก ไปถึงขั้นไหน')).toBeTruthy();
+    expect(within(screen.getByTestId('stuck-owners')).getAllByTestId('stuck-owner-row').map((r) => r.querySelector('td')?.textContent)).toEqual(['ฟอร์ด']);
+    // รายชื่อเหลือเฉพาะของใบที่ยกเลิก (x2) — ไม่มีคนสนใจ
+    expect(within(screen.getByTestId('person-stage-ai')).getByTestId('person-part-ai-noPickup').textContent).toContain('1');
+    expect(screen.getByText('ไม่มีรายชื่อที่สนใจ')).toBeTruthy();
   });
 
   it('ตัวกรองเจ้าหน้าที่: เลือกหมิว ทั้งหน้าเหลือของหมิว · อ่านใบไม่ได้ = บอกเหตุ ไม่โชว์ 0', async () => {

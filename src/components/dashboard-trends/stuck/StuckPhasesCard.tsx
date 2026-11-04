@@ -9,6 +9,7 @@ import { formatTrendNumber as fmt } from '@/lib/trends/format';
 import {
   STUCK_PHASES,
   STUCK_REASON_LABEL,
+  STUCK_SCOPE_LABEL,
   recruiterLabelOf,
   sortStuck,
   stuckByPhase,
@@ -35,7 +36,15 @@ export default function StuckPhasesCard({
   onOpenRequest,
   listOverride,
   onCloseList,
+  title = 'ใบขอที่ยังต้องหา ติดตรงไหน',
+  sub = 'ใบที่ยังเปิดอยู่ทั้งหมด ณ วันนี้ · กดได้ทุกตัวเลข',
+  onFocus,
 }: {
+  /** ใบชุดอื่น (ปิดแล้ว · ยกเลิก · ขอใหม่) = "ไปถึงขั้นไหน" (4 พ.ย. 2569) */
+  title?: string;
+  sub?: string;
+  /** ช่วง/เหตุที่กดอยู่ — ให้ส่วนอื่นของหน้าดูเฉพาะใบชุดนั้น */
+  onFocus?: (focus: { phase: StuckPhaseKey | null; reason: StuckReasonKey | null }) => void;
   rows: readonly StuckRequest[];
   /** เปิดใบในกล่องงาน/หน้าใบขอ */
   onOpenRequest?: (r: StuckRequest) => void;
@@ -46,6 +55,9 @@ export default function StuckPhasesCard({
   const [phase, setPhase] = React.useState<StuckPhaseKey | null>(null);
   const [reason, setReason] = React.useState<StuckReasonKey | null>(null);
   const [detail, setDetail] = React.useState<string | null>(null);
+  React.useEffect(() => {
+    onFocus?.({ phase, reason });
+  }, [phase, reason, onFocus]);
   const total = rows.length;
   const need = rows.reduce((s, r) => s + r.remaining, 0);
   const byPhase = React.useMemo(() => stuckByPhase(rows), [rows]);
@@ -56,7 +68,7 @@ export default function StuckPhasesCard({
   const detailRow = detail ? rows.find((r) => r.requestNo === detail) ?? null : null;
 
   return (
-    <OverviewCard icon={FileText} title="ใบขอที่ยังต้องหา ติดตรงไหน" sub="ใบที่ยังเปิดอยู่ทั้งหมด ณ วันนี้ · กดได้ทุกตัวเลข">
+    <OverviewCard icon={FileText} title={title} sub={sub}>
       <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
         <span className="text-3xl font-medium tabular-nums text-foreground" data-testid="stuck-total">
           {fmt(total)} <span className={cn('text-base font-normal', DASH.sub)}>ใบ</span>
@@ -165,7 +177,7 @@ export default function StuckPhasesCard({
                     <TableRow key={r.requestNo} className={cn('cursor-pointer', detail === r.requestNo && 'bg-muted/60')} onClick={() => setDetail((cur) => (cur === r.requestNo ? null : r.requestNo))} data-testid="stuck-list-row">
                       <TableCell className="whitespace-nowrap text-sm tabular-nums">
                         {r.requestNo}
-                        <span className={cn('block text-xs', DASH.sub)}>{r.bu ?? ''}</span>
+                        <span className={cn('block text-xs', DASH.sub)}>{[r.bu, r.state && r.state !== 'open' ? STUCK_SCOPE_LABEL[r.state] : null].filter(Boolean).join(' · ')}</span>
                       </TableCell>
                       <TableCell className="text-sm">
                         {r.unitName ?? '—'}

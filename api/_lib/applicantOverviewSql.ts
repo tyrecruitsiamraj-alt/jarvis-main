@@ -337,6 +337,22 @@ export const STAFF_LAST_AT_SQL = `(
 )`;
 
 /**
+ * เวลาที่เจ้าหน้าที่ลงมือครั้งแรก **ตั้งแต่** เวลาหนึ่ง (หลักฐานชุดเดียวกับ `STAFF_LAST_AT_SQL`)
+ * หน้าภาพรวม "โทรต่อภายใน 1 วันไหม" (เจ้าของ 4 พ.ย. 2569) — นับจากเวลาที่ AI ได้คำตอบ · ไม่ผ่าน AI = นับจากเวลากรอก
+ */
+export const firstStaffAtSinceSql = (since: string) => `(
+  select min(at) from (
+    select c.created_at as at from ${CONTACTS} c where c.application_id = a.id
+    union all
+    select ${qcol('h', HOLD_EVENT_AT)} from ${HOLDS} h
+     where ((h.source = 'application' and h.candidate_ref = a.id::text)
+            or (a.phone_e164 is not null and h.phone_e164 = a.phone_e164
+                and ${qcol('h', HOLD_EVENT_AT)} >= a.created_at))
+       and h.result_outcome is not null
+  ) t where at >= ${since}
+)`;
+
+/**
  * ถังของ drill-down `?bucket=` — เงื่อนไขเดียวกับตัวนับ **ห้ามนิยามซ้ำที่อื่น**
  * (เทสต์ bucket-parity บังคับว่ากล่องกับตารางใช้ fragment ตัวเดียวกัน)
  */

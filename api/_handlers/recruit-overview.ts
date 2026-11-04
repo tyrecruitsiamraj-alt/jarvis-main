@@ -38,6 +38,7 @@ import {
   LATEST_STAFF_RESULT_LATERAL,
   OVERVIEW_BUCKETS,
   STAFF_LAST_AT_SQL,
+  firstStaffAtSinceSql,
   UPCOMING_7D_NO_RESULT_SQL,
   holdEventAtSql,
 } from '../_lib/applicantOverviewSql.js';
@@ -134,6 +135,7 @@ export function factsSql(
          air.outcome as ai_outcome, air.summary as ai_summary, air.reply as ai_reply, air.at as ai_at,
          str.outcome as staff_outcome, str.at as staff_at,
          ${STAFF_LAST_AT_SQL} as staff_last_at,
+         ${firstStaffAtSinceSql('coalesce(air.at, a.created_at)')} as staff_first_at,
          lc.cls as contact_class, lc.src as contact_src,
          lcl.ok as log_ok, lcl.reason_label as log_reason, lcl.created_at as log_at,
          lcl.appointment_at as log_appointment_at,
@@ -322,6 +324,7 @@ export function toFact(r: Row, boardPhones: Set<string> | null, sources?: AppSou
     staffAnswer: micro(r.staff_outcome, null, null),
     staffAnswerAt: iso(r.staff_at),
     staffLastAt: iso(r.staff_last_at),
+    staffFirstAt: iso(r.staff_first_at),
     contact,
     contactBy: contact ? src : null,
     logOk: typeof r.log_ok === 'boolean' ? r.log_ok : null,

@@ -7,7 +7,7 @@ import { cohortOf, reasonGroups } from '@/lib/recruitOverview';
 import { buildChannelFunnelTree } from '@/lib/channelFunnel';
 import type { RecruitOverviewResponse } from '@/lib/recruitOverviewTypes';
 import { fetchRecruitStuck, type RecruitStuckResponse } from '@/lib/recruitStuckApi';
-import type { StuckRequest } from '@/lib/recruitStuck';
+import { STUCK_PHASES, STUCK_REASON_LABEL, STUCK_SCOPE_LABEL, stuckInScope, stuckPhaseOf, type StuckPhaseKey, type StuckReasonKey, type StuckRequest, type StuckScope } from '@/lib/recruitStuck';
 import { friendlyErrorText } from '@/lib/friendlyError';
 import { OverviewCard, ReasonColumns, SectionError } from '../RecruitOverviewParts';
 import ChannelFunnelTable from '../ChannelFunnelTable';
@@ -16,6 +16,16 @@ import StuckPhasesCard from './StuckPhasesCard';
 import StuckOwnerTable from './StuckOwnerTable';
 import StuckAreaTable from './StuckAreaTable';
 import MonthlyBarsCard from './MonthlyBarsCard';
+import StuckEquationCard from './StuckEquationCard';
+import PersonJourneyCard from './PersonJourneyCard';
+
+const SCOPE_TITLE: Record<StuckScope, { title: string; sub: string }> = {
+  remaining: { title: 'ใบขอที่ยังต้องหา ติดตรงไหน', sub: 'ใบที่ยังเปิดอยู่ ณ วันนี้ · กดได้ทุกตัวเลข' },
+  carried: { title: 'ใบยกมา ติดตรงไหน', sub: 'ใบก่อนช่วงที่ยังต้องหา · กดได้ทุกตัวเลข' },
+  new: { title: 'ใบขอใหม่ ไปถึงขั้นไหน', sub: 'ใบที่ส่งเข้ามาในช่วง ทุกสถานะ · กดได้ทุกตัวเลข' },
+  filled: { title: 'ใบที่ปิดแล้ว ไปถึงขั้นไหน', sub: 'ใบขอใหม่ที่ได้คนแล้ว · กดได้ทุกตัวเลข' },
+  cancelled: { title: 'ใบที่ยกเลิก ไปถึงขั้นไหน', sub: 'ใบขอใหม่ที่ยกเลิกทั้งใบ · กดได้ทุกตัวเลข' },
+};
 
 /**
  * ═══ ตัวหน้าภาพรวมงานสรรหาโฉมใหม่ (เจ้าของ 4 พ.ย. 2569 นิยามเอง · Choice "เอาทำเลย") ═══
@@ -40,23 +50,40 @@ export default function RecruitStuckBody({
   const [rev, setRev] = React.useState(0);
   React.useEffect(() => {
     let alive = true;
-    fetchRecruitStuck(data.bu)
+    fetchRecruitStuck(data.bu, { from: win.from, to: win.to })
       .then((d) => alive && setStuck({ data: d, error: null }))
       .catch((e: unknown) => alive && setStuck({ data: null, error: friendlyErrorText(e, 'โหลดใบขอที่ยังต้องหาไม่ได้') }));
     return () => {
       alive = false;
     };
-  }, [data.bu, data.generatedAt, rev]);
+  }, [data.bu, data.generatedAt, win.from, win.to, rev]);
 
   const [filter, setFilter] = React.useState<RequestTabFilter>(EMPTY_REQUEST_FILTER);
+  /** สมการบนสุด: ใบชุดไหน (ค่าเริ่ม = ยังต้องหา) · ช่วง/เหตุที่กดในการ์ดติดตรงไหน */
+  const [scope, setScope] = React.useState<StuckScope>('remaining');
+  const [focus, setFocus] = React.useState<{ phase: StuckPhaseKey | null; reason: StuckReasonKey | null }>({ phase: null, reason: null });
   const allRows = React.useMemo(() => stuck.data?.requests ?? [], [stuck.data]);
-  const rows = React.useMemo(() => filterRequestRows(allRows, filter) as StuckRequest[], [allRows, filter]);
+  /** ใบที่ผ่านตัวกรองบนสุด (ทุกสถานะ) — สมการนับจากชุดนี้ */
+  const filtered = React.useMemo(() => filterRequestRows(allRows, filter) as StuckRequest[], [allRows, filter]);
+  const rows = React.useMemo(() => filtered.filter((r) => stuckInScope(r, scope)), [filtered, scope]);
+  const focused = React.useMemo(
+    () => rows.filter((r) => (focus.reason ? r.reason === focus.reason : focus.phase ? stuckPhaseOf(r.reason) === focus.phase : true)),
+    [rows, focus],
+  );
+  const focusLabel = focus.reason ? STUCK_REASON_LABEL[focus.reason] : focus.phase ? STUCK_PHASES.find((p) => p.key === focus.phase)?.label ?? null : null;
+  /** เลือกชุดใบ/ช่วง/เหตุแล้ว = รายชื่อทั้งหน้าเหลือเฉพาะของใบชุดนั้น · ค่าเริ่ม = รายชื่อทุกคนในช่วง (รวมใบที่ปิดแล้ว/ไม่ผูกใบ) */
+  const narrow = scope !== 'remaining' || focusLabel !== null;
+  const narrowIds = React.useMemo(() => (narrow ? new Set(focused.map((r) => r.jobId).filter((v): v is string => Boolean(v))) : null), [narrow, focused]);
   const recruiterOf = React.useCallback((jobId: string) => data.appJobs?.[jobId]?.recruiter ?? null, [data.appJobs]);
-  const jobOk = React.useMemo(() => jobFilterOf(filter, allRows, recruiterOf), [filter, allRows, recruiterOf]);
+  const jobOkBase = React.useMemo(() => jobFilterOf(filter, allRows, recruiterOf), [filter, allRows, recruiterOf]);
+  const jobOk = React.useCallback((jobId: string | null) => (narrowIds ? Boolean(jobId && narrowIds.has(jobId)) : jobOkBase(jobId)), [narrowIds, jobOkBase]);
   const cohort = React.useMemo(() => {
     const all = cohortOf(data.apps ?? [], win.from, win.to);
-    return appsOfFilter(all, filter, allRows, recruiterOf);
-  }, [data.apps, win.from, win.to, filter, allRows, recruiterOf]);
+    const byFilter = appsOfFilter(all, filter, allRows, recruiterOf);
+    return narrowIds ? byFilter.filter((f) => Boolean(f.jobId && narrowIds.has(f.jobId))) : byFilter;
+  }, [data.apps, win.from, win.to, filter, allRows, recruiterOf, narrowIds]);
+  const narrowText = [scope !== 'remaining' ? `ใบ${STUCK_SCOPE_LABEL[scope]}` : null, focusLabel].filter(Boolean).join(' · ');
+  const cohortSub = `รายชื่อที่กรอกในช่วงที่เลือก ${cohort.length.toLocaleString('th-TH')} คน${narrowText ? ` · เฉพาะ${narrowText}` : ''}`;
   const channels = React.useMemo(() => buildChannelFunnelTree(cohort), [cohort]);
   const reasons = React.useMemo(() => reasonGroups(cohort), [cohort]);
   const appRecruiters = React.useMemo(() => Object.values(data.appJobs ?? {}).map((j) => j.recruiter), [data.appJobs]);
@@ -80,10 +107,20 @@ export default function RecruitStuckBody({
       {/* อ่านไม่ได้ = บอกเหตุอย่างเดียว ห้ามโชว์ 0 แทน (กติกาเดิมของหน้า) · ยังโหลด = โครงรอ */}
       {stuck.data?.requests ? (
         <>
+          <StuckEquationCard rows={filtered} window={stuck.data.window ?? null} value={scope} onChange={setScope} />
           <div ref={phasesRef} className="scroll-mt-20">
-            <StuckPhasesCard rows={rows} onOpenRequest={openRequest} listOverride={picked} onCloseList={() => setPicked(null)} />
+            <StuckPhasesCard
+              key={scope}
+              rows={rows}
+              title={SCOPE_TITLE[scope].title}
+              sub={SCOPE_TITLE[scope].sub}
+              onFocus={setFocus}
+              onOpenRequest={openRequest}
+              listOverride={picked}
+              onCloseList={() => setPicked(null)}
+            />
           </div>
-          <StuckOwnerTable rows={rows} onPick={pick} />
+          <StuckOwnerTable rows={focused} countLabel={scope === 'remaining' ? 'ใบที่ต้องหา' : `ใบ${STUCK_SCOPE_LABEL[scope]}`} onPick={pick} />
         </>
       ) : stuck.error || stuck.data ? null : (
         <div className="space-y-3" aria-busy>
@@ -92,16 +129,18 @@ export default function RecruitStuckBody({
         </div>
       )}
 
+      <PersonJourneyCard list={cohort} sub={cohortSub} onOpenNames={onOpenNames} />
+
       {/* 3 รายชื่อมาจากไหน ไปถึงไหน — ตารางเดิม 4 กลุ่ม → ช่องทาง → กลุ่ม/เพจ · ถึงแจ้งเข้า */}
-      <OverviewCard icon={Megaphone} title="รายชื่อมาจากไหน ไปถึงไหน" sub={`รายชื่อที่กรอกในช่วงที่เลือก ${cohort.length.toLocaleString('th-TH')} คน${data.errors.informs ? ' · อ่านแจ้งเข้า ERP ไม่ได้' : ''}`}>
+      <OverviewCard icon={Megaphone} title="รายชื่อมาจากไหน ไปถึงไหน" sub={`${cohortSub}${data.errors.informs ? ' · อ่านแจ้งเข้า ERP ไม่ได้' : ''}`}>
         <ChannelFunnelTable groups={channels.groups} total={channels.total} onOpen={onOpenNames} />
       </OverviewCard>
 
-      {stuck.data?.requests ? <StuckAreaTable rows={rows} onPick={pick} /> : null}
+      {stuck.data?.requests ? <StuckAreaTable rows={focused} title={scope === 'remaining' ? undefined : `พื้นที่ · ใบ${STUCK_SCOPE_LABEL[scope]}`} countLabel={scope === 'remaining' ? undefined : `ใบ${STUCK_SCOPE_LABEL[scope]}`} onPick={pick} /> : null}
 
       <MonthlyBarsCard rows={stuck.data?.monthly ?? null} error={stuck.data?.errors.monthly ?? stuck.error} ok={jobOk} onPickMonth={onPickMonth} />
 
-      <OverviewCard icon={AlertCircle} title="ทำไมไม่สำเร็จ" sub="รายชื่อที่กรอกในช่วงที่เลือก · ผลล่าสุดของแต่ละคน · กดเลขดูรายชื่อ">
+      <OverviewCard icon={AlertCircle} title="ทำไมไม่สำเร็จ" sub={`${cohortSub} · ผลล่าสุดของแต่ละคน`}>
         <ReasonColumns groups={reasons} onOpen={onOpenNames} />
       </OverviewCard>
     </div>

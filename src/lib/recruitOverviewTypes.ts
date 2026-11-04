@@ -41,6 +41,8 @@ export type RecruitAppFact = {
   staffAnswerAt: string | null;
   /** เวลาล่าสุดที่เจ้าหน้าที่ลงมือ (ลงผลโทร หรือ บันทึกผลติดต่อ) — `STAFF_LAST_AT_SQL` */
   staffLastAt: string | null;
+  /** เวลาที่เจ้าหน้าที่ลงมือครั้งแรกหลัง AI ได้คำตอบ (ไม่ผ่าน AI = หลังกรอก) — "โทรต่อภายใน 1 วันไหม" (4 พ.ย. 2569) · ไม่มี = เส้นรุ่นเก่า */
+  staffFirstAt?: string | null;
   /** ผลติดต่อล่าสุด (ศูนย์คุมงานสรรหา) + ใครได้ผลนั้น — `LATEST_CONTACT_LATERAL` */
   contact: 'success' | 'failed' | null;
   contactBy: RecruitSide | null;

@@ -99,8 +99,18 @@ export function stuckReasonOf(s: StuckSignals): StuckReasonKey {
   return 'waiting_start';
 }
 
-/** ใบที่ยังต้องหา 1 ใบ — ตัวกรองของหน้าใช้ช่องชุดเดียวกับใบขอในช่วง (`RecruitRequestRow`) */
+/**
+ * สถานะใบ ณ วันนี้ — `onlineRequestStateOf` ตัวเดียวกับหน้าหลัก
+ * ยังต้องหา (เหลืออัตรา) · ปิดแล้ว (ได้คนครบ หรือได้บางส่วนแล้วยกเลิกที่เหลือ) · ยกเลิก (ยกเลิกทั้งใบ ไม่ได้คนสักอัตรา)
+ */
+export type StuckState = 'open' | 'filled' | 'cancelled';
+
+/** ใบขอ 1 ใบของหน้า — ตัวกรองของหน้าใช้ช่องชุดเดียวกับใบขอในช่วง (`RecruitRequestRow`) */
 export type StuckRequest = RecruitRequestRow & {
+  /** ไม่มี = เส้นรุ่นเก่า (ใบที่ยังเปิดทั้งหมด) */
+  state?: StuckState;
+  /** ใบส่งเข้ามาในช่วงที่เลือก (ขอใหม่) · false = ใบก่อนช่วงที่ยังต้องหา (ยกมา) */
+  inRange?: boolean;
   /** ผ่านมากี่วัน (วันทำงาน ตัวเดียวกับเมนูใบขอ) · null = ล่วงหน้า/ไม่มีวันที่ */
   ageDays: number | null;
   bu: string | null;
@@ -111,6 +121,31 @@ export type StuckRequest = RecruitRequestRow & {
   releasedAt: string | null;
   releasedBy: string | null;
 };
+
+/* ═══ สมการบนสุด (เจ้าของ 4 พ.ย. 2569 "กรองแค่ใบที่ไม่มีคน … มันต้อง Fil ดูได้หมดเลย") ═══
+ * ยกมา + ขอใหม่ − ปิดแล้ว − ยกเลิก = ยังต้องหา
+ * ยกมา = ใบก่อนช่วงที่ยังต้องหาวันนี้ · ขอใหม่ = ใบที่ส่งเข้ามาในช่วง (ทุกสถานะ) · ปิดแล้ว/ยกเลิก = ของใบขอใหม่
+ * 🔴 ใบก่อนช่วงที่ปิดไปแล้วไม่อยู่ในสมการ (ไม่มีวันปิดรายใบ) — สมการลงตัวเสมอ มีเทสต์ */
+export type StuckScope = 'remaining' | 'carried' | 'new' | 'filled' | 'cancelled';
+export const STUCK_SCOPE_LABEL: Record<StuckScope, string> = {
+  carried: 'ยกมา',
+  new: 'ขอใหม่',
+  filled: 'ปิดแล้ว',
+  cancelled: 'ยกเลิก',
+  remaining: 'ยังต้องหา',
+};
+const stateOf = (r: StuckRequest): StuckState => r.state ?? 'open';
+export function stuckInScope(r: StuckRequest, scope: StuckScope): boolean {
+  if (scope === 'remaining') return stateOf(r) === 'open';
+  if (scope === 'carried') return stateOf(r) === 'open' && r.inRange === false;
+  if (scope === 'new') return r.inRange !== false;
+  return r.inRange !== false && stateOf(r) === scope;
+}
+export function stuckEquation(rows: readonly StuckRequest[]): Record<StuckScope, StuckRequest[]> {
+  const out: Record<StuckScope, StuckRequest[]> = { carried: [], new: [], filled: [], cancelled: [], remaining: [] };
+  for (const r of rows) for (const k of Object.keys(out) as StuckScope[]) if (stuckInScope(r, k)) out[k].push(r);
+  return out;
+}
 
 export const NO_RECRUITER_LABEL = 'ยังไม่ได้ตั้งเจ้าหน้าที่สรรหา';
 export const recruiterLabelOf = (r: Pick<StuckRequest, 'recruiter'>) => r.recruiter?.trim() || NO_RECRUITER_LABEL;
