@@ -333,7 +333,7 @@ export const REASON_GROUP_LABEL: Record<ReasonGroupKey, string> = {
   attend: 'ไม่มา',
 };
 
-export type ReasonGroup = { key: ReasonGroupKey; label: string; total: number; reasons: { label: string; count: number }[] };
+export type ReasonGroup = { key: ReasonGroupKey; label: string; total: number; reasons: { label: string; count: number; /** id ใบสมัคร — กดดูรายชื่อ (4 พ.ย. 2569) */ ids: string[] }[] };
 
 const NOT_REACHED: readonly CallMicroOutcome[] = ['no_pickup', 'picked_silent', 'wrong_person'];
 const TALKED_NOT_YES: readonly CallMicroOutcome[] = ['said_no', 'not_yet', 'talked_unclear'];
@@ -356,31 +356,36 @@ export function latestSignal(f: RecruitAppFact): Signal | null {
 
 /** รายชื่อที่ไปต่อไม่ได้ แยกตามขั้น + เหตุผล (ถังผลโทรใช้คำในพจนานุกรม `lumos.result.*` ชุดเดียวกับหน้าหลัก) */
 export function reasonGroups(cohort: readonly RecruitAppFact[]): ReasonGroup[] {
-  const groups: Record<ReasonGroupKey, Map<string, number>> = { contact: new Map(), appoint: new Map(), attend: new Map() };
-  const add = (g: ReasonGroupKey, label: string) => groups[g].set(label, (groups[g].get(label) ?? 0) + 1);
+  const groups: Record<ReasonGroupKey, Map<string, string[]>> = { contact: new Map(), appoint: new Map(), attend: new Map() };
+  const add = (g: ReasonGroupKey, label: string, f: RecruitAppFact) => {
+    const list = groups[g].get(label) ?? [];
+    if (f.id) list.push(f.id);
+    else list.length += 1; // ไม่มี id (ใบเก่า) = นับได้ กดดูไม่ได้
+    groups[g].set(label, list);
+  };
   for (const f of cohort) {
     if (f.attendance === 'no_show') {
-      add('attend', 'ไม่มา');
+      add('attend', 'ไม่มา', f);
       continue;
     }
     if (f.attendance === 'rescheduled') {
-      add('attend', 'เลื่อนนัด');
+      add('attend', 'เลื่อนนัด', f);
       continue;
     }
     if (f.appointmentAt) continue;
     const s = latestSignal(f);
     if (!s) continue;
     if (s.kind === 'log') {
-      if (!s.ok) add('contact', s.reason ?? 'ไม่ระบุเหตุผล');
-      else add('appoint', s.reason ?? 'ยังนัดไม่ได้');
+      if (!s.ok) add('contact', s.reason ?? 'ไม่ระบุเหตุผล', f);
+      else add('appoint', s.reason ?? 'ยังนัดไม่ได้', f);
       continue;
     }
-    if (NOT_REACHED.includes(s.micro)) add('contact', callResultLabel('interest', s.micro));
-    else if (TALKED_NOT_YES.includes(s.micro)) add('appoint', callResultLabel('interest', s.micro));
+    if (NOT_REACHED.includes(s.micro)) add('contact', callResultLabel('interest', s.micro), f);
+    else if (TALKED_NOT_YES.includes(s.micro)) add('appoint', callResultLabel('interest', s.micro), f);
   }
   return (['contact', 'appoint', 'attend'] as const).map((key) => {
     const reasons = [...groups[key].entries()]
-      .map(([label, count]) => ({ label, count }))
+      .map(([label, ids]) => ({ label, count: ids.length, ids: ids.filter(Boolean) }))
       .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label, 'th'));
     return { key, label: REASON_GROUP_LABEL[key], total: reasons.reduce((s, r) => s + r.count, 0), reasons };
   });

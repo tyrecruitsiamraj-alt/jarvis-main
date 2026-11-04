@@ -592,7 +592,8 @@ export function PositionList({ rows }: { rows: readonly PositionRow[] }) {
 
 /* ─────────── เหตุผลที่ไม่สำเร็จ ─────────── */
 
-export function ReasonColumns({ groups }: { groups: readonly ReasonGroup[] }) {
+/** `onOpen` = กดเหตุผลแล้วเปิดรายชื่อ (4 พ.ย. 2569 "ทุกข้อมูลต้องกดดูได้") · ไม่ส่ง = ตัวเลขเฉย ๆ แบบเดิม */
+export function ReasonColumns({ groups, onOpen }: { groups: readonly ReasonGroup[]; onOpen?: (title: string, ids: readonly string[]) => void }) {
   return (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
       {groups.map((g) => (
@@ -609,7 +610,13 @@ export function ReasonColumns({ groups }: { groups: readonly ReasonGroup[] }) {
                 <li key={r.label} className="space-y-1">
                   <div className="flex items-baseline justify-between gap-2 text-sm">
                     <span className="min-w-0 break-words text-foreground">{r.label}</span>
-                    <span className={cn('shrink-0 tabular-nums', DASH.cell)}>{fmt(r.count)}</span>
+                    {onOpen && r.ids.length > 0 ? (
+                      <Button type="button" variant="ghost" size="xs" className="-mr-2 h-6 shrink-0 px-2 tabular-nums" onClick={() => onOpen(`${g.label} · ${r.label}`, r.ids)}>
+                        {fmt(r.count)}
+                      </Button>
+                    ) : (
+                      <span className={cn('shrink-0 tabular-nums', DASH.cell)}>{fmt(r.count)}</span>
+                    )}
                   </div>
                   <RatioBar pct={g.total > 0 ? (r.count / g.total) * 100 : null} tone="danger" />
                 </li>

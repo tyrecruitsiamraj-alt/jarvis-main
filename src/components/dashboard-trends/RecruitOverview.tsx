@@ -16,6 +16,8 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { useSearchParams } from 'react-router-dom';
+import RecruitStuckBody from './stuck/RecruitStuckBody';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ChoiceDropdown } from '@/components/shared/ChoiceDropdown';
@@ -191,6 +193,11 @@ const RecruitOverview: React.FC<{
 
   /** ป๊อปรายชื่อของเลขที่กดในเส้นทาง */
   const [names, setNames] = useState<{ title: string; ids: readonly string[] } | null>(null);
+  /**
+   * โฉมใหม่ (เจ้าของ 4 พ.ย. 2569 นิยามเอง "เอาทำเลย") = ค่าเริ่ม · โฉมการ์ดเดิมยังเปิดได้ที่ `?dash=cards` (ทางถอย ห้ามลบจนกว่าเจ้าของสั่ง)
+   */
+  const [searchParams] = useSearchParams();
+  const legacyCards = searchParams.get('dash') === 'cards';
 
   const view = useMemo(() => (data && win ? overviewViewOf(apps ?? [], data, win) : null), [data, win, apps]);
 
@@ -405,6 +412,15 @@ const RecruitOverview: React.FC<{
        * ตัวกรองบนสุด (รวมเจ้าหน้าที่สรรหา) คุมทุกการ์ด · การติดต่อ / นัดหมาย เรียงต่อท้าย พับไว้ กดกางค่อยโชว์
        * การ์ดที่นับฝั่งเซิร์ฟเวอร์ (งานค้างตอนนี้ · ผลงานรายคน · คนแจ้งเข้า) ตามตัวกรองด้วย — เซิร์ฟเวอร์ส่งแยกต่อใบขอ (`recruitOverviewScope.ts`)
        */}
+      {legacyCards ? null : (
+        <RecruitStuckBody
+          data={data}
+          win={win}
+          onOpenNames={(title, ids) => setNames({ title, ids })}
+          onPickMonth={(m) => setMonth(m)}
+        />
+      )}
+      {legacyCards ? (
       <div className="space-y-3">
           <RequestTab
             appJobs={data.appJobs}
@@ -503,6 +519,7 @@ const RecruitOverview: React.FC<{
             }}
           </RequestTab>
       </div>
+      ) : null}
 
       <JourneyNamesDialog
         open={names !== null}

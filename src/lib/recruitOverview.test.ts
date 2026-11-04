@@ -241,10 +241,10 @@ describe('เหตุผลที่ไม่สำเร็จ — หนึ�
     ]);
     const by = Object.fromEntries(groups.map((g) => [g.key, g]));
     expect(by.contact.total).toBe(3);
-    expect(by.contact.reasons[0]).toEqual({ label: 'ไม่รับสาย', count: 2 });
-    expect(by.contact.reasons).toContainEqual({ label: 'ปิดเครื่อง', count: 1 });
+    expect(by.contact.reasons[0]).toMatchObject({ label: 'ไม่รับสาย', count: 2 }); // 4 พ.ย. 2569 มี ids ให้กดดูรายชื่อ (fixture ไม่มี id = ว่าง)
+    expect(by.contact.reasons.map((r) => [r.label, r.count])).toContainEqual(['ปิดเครื่อง', 1]);
     expect(by.appoint).toMatchObject({ total: 1 });
-    expect(by.attend.reasons).toEqual([{ label: 'ไม่มา', count: 1 }]);
+    expect(by.attend.reasons.map((r) => [r.label, r.count])).toEqual([['ไม่มา', 1]]);
   });
 });
 
