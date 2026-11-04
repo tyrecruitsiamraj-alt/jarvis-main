@@ -44,13 +44,11 @@ import {
   soGroupLabel,
   soGroupsOfAccount,
   soGroupSections,
-  defaultSoGroupPick,
   jobBuOf,
   soBuEmptyText,
   isFacebookGroupChannel,
   soGroupLinkKey,
   soSectorBlocks,
-  soSectorFoldOpen,
   soGroupLinkLabel,
   soGroupLinkName,
   soGroupLinkOf,
@@ -144,7 +142,7 @@ export function AutopostBody({
 }) {
   const looked = useRecruiterContact(job.recruiter_contact ? null : job.recruiter_name);
   const contact = job.recruiter_contact ?? looked;
-  /** ธุรกิจของใบขอ — หมวดกลุ่มที่ติ๊กไว้ให้ (เจ้าของ 2 พ.ย. 2569) */
+  /** ธุรกิจของใบขอ — หมวดกลุ่มที่กางไว้ (เจ้าของ 2 พ.ย. 2569) */
   const jobBu = jobBuOf(job);
   /** ราชการ/เอกชนของใบขอ — ติ๊กกลุ่มให้เฉพาะประเภทเดียวกัน (4 พ.ย. 2569) */
   const jobSector = jobUnitSectorOf(job);
@@ -207,14 +205,14 @@ export function AutopostBody({
           setAccountId(acc.id);
           // เครื่องตั้งต้น = เครื่องที่ So Scraping แนะนำ (ออนไลน์ คิวเบาสุด · สเปค 6.3) · ไม่มี = เครื่องหลักของบัญชี
           setWorkerName(soDefaultWorker(soWorkersFor(o, 'autopost'), 'post')?.name ?? acc.worker ?? '');
-          setPicked(defaultSoGroupPick(soGroupsOfAccount(o, acc), jobBu, acc, jobSector));
+          // ไม่ติ๊กกลุ่มให้ — คนสั่งเลือกเอง (เจ้าของ 4 พ.ย. 2569 "ไม่ติ๊กกลุ่มให้เลย" · เดิมติ๊กตามสเปค 6.2)
         }
       })
       .catch((e) => alive && setLoadError(e instanceof Error ? e.message : 'โหลดข้อมูลไม่ได้'));
     return () => {
       alive = false;
     };
-  }, [job.id, job.request_no, jobBu, jobSector]);
+  }, [job.id, job.request_no, jobBu]);
 
   const openPosting = postings?.find((p) => p.status === 'open') ?? null;
   /**
@@ -308,7 +306,9 @@ export function AutopostBody({
     setWarn(a.status === 'worker_offline' ? offlineWarn(a) : null);
     setAccountId(id);
     setWorkerName(soDefaultWorker(soWorkersFor(opts, 'autopost'), 'post')?.name ?? a.worker ?? '');
-    setPicked(defaultSoGroupPick(soGroupsOfAccount(opts, a), jobBu, a, jobSector));
+    // สลับบัญชี = คงกลุ่มที่เลือกไว้ เท่าที่บัญชีนี้โพสต์ได้และไม่เกินโพสต์ที่เหลือ (ไม่ติ๊กเพิ่มให้)
+    const allowed = new Set(soGroupsOfAccount(opts, a).map((g) => g.id));
+    setPicked((prev) => soAddWithinCap([], prev.filter((id) => allowed.has(id)), soGroupCap(a)));
   };
 
   const send = async (confirmed = false) => {
@@ -716,7 +716,7 @@ function GroupSection({
       <CollapsibleContent>
         <div className="space-y-3 border-t border-border/70 px-3 py-2">
           {/* แยก ราชการ / เอกชน ในหมวดธุรกิจ (เจ้าของ 4 พ.ย. 2569) */}
-          {soSectorBlocks(section.groups, jobSector).map((block, i) => (
+          {soSectorBlocks(section.groups, jobSector).map((block) => (
             <SoSectorFold
               key={block.sector ?? 'none'}
               label={block.label}
@@ -724,7 +724,6 @@ function GroupSection({
               picked={picked}
               onToggle={onToggle}
               checkId={`autopost-sector-${jobId}-${section.bu ?? 'none'}-${block.sector ?? 'none'}`}
-              defaultOpen={soSectorFoldOpen(block.sector, jobSector, i)}
               testId={`autopost-sector-${block.sector ?? 'none'}`}
             >
               <ul className="space-y-2">

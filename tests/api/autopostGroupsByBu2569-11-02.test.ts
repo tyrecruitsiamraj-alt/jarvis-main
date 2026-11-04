@@ -7,7 +7,6 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import {
-  defaultSoGroupPick,
   jobBuOf,
   parseSoOptions,
   soAccountsByBu,
@@ -57,19 +56,16 @@ describe('กลุ่ม Facebook ตามธุรกิจของใบข
       ['LM', false, 1],
       ['ไม่ระบุธุรกิจ', false, 1],
     ]);
-    expect(defaultSoGroupPick(GROUPS, 'LBD').sort()).toEqual(['mvhmloovlppmpi5o6fg', 'mvhmlowwseq4bvkqq4', 'mvhmlotjormpp7jfim'].sort());
   });
 
   it('ใบ LBA ที่ธุรกิจยังไม่มีกลุ่ม: ไม่มีหมวดของใบ · ไม่ติ๊กอะไร · ข้อความบอกที่เพิ่ม', () => {
     const sections = soGroupSections(GROUPS, 'LBA');
     expect(sections.some((s) => s.forJob)).toBe(false);
     expect(sections.map((s) => s.label)).toEqual(['LBD', 'LM', 'ไม่ระบุธุรกิจ']);
-    expect(defaultSoGroupPick(GROUPS, 'LBA')).toEqual([]);
     expect(soBuEmptyText('LBA')).toBe('ยังไม่มีกลุ่มของ LBA ใน So Scraping — เพิ่มที่ ตั้งค่า → กลุ่มโพสต์ หรือเลือกจากธุรกิจอื่น');
   });
 
   it('ใบขอไม่ระบุธุรกิจ: ไม่ติ๊ก · หมวดเรียงรหัส ไม่ระบุท้ายสุด', () => {
-    expect(defaultSoGroupPick(GROUPS, null)).toEqual([]);
     expect(soGroupSections(GROUPS, null).map((s) => s.label)).toEqual(['LBD', 'LM', 'ไม่ระบุธุรกิจ']);
   });
 
@@ -105,7 +101,8 @@ describe('กลุ่ม Facebook ตามธุรกิจของใบข
 
   it('ป๊อปใช้หมวดตามธุรกิจ · server เติมธุรกิจตอนเรียก API · อ่านทุกกลุ่มไม่กรองตามบัญชีผูก', () => {
     const dialog = readFileSync('src/components/jobs/AutopostDialog.tsx', 'utf8');
-    expect(dialog).toContain('defaultSoGroupPick(soGroupsOfAccount(o, acc), jobBu, acc, jobSector)' /* 4 พ.ย. 2569 + ราชการ/เอกชน */);
+    // 4 พ.ย. 2569 เจ้าของ "ไม่ติ๊กกลุ่มให้เลย" — เปิดป๊อปไม่ติ๊กกลุ่มใด
+    expect(dialog).not.toContain('defaultSoGroupPick');
     expect(dialog).toContain('data-testid="autopost-bu-empty"');
     // 4 พ.ย. 2569 ช่องติ๊กทั้งหมดย้ายไปหัวข้อย่อย ราชการ / เอกชน (SoSectorFold) — หัวธุรกิจไม่มีช่องติ๊กแล้ว
     expect(readFileSync('src/components/jobs/SoGroupPicker.tsx', 'utf8')).toContain("checked={n === 0 ? false : n === ids.length ? true : 'indeterminate'}");
@@ -206,8 +203,7 @@ describe('กลุ่ม Facebook ตามธุรกิจของใบข
     expect(soGroupView(g('mvhmlov27vqejwuh96m'), deanna)).toMatchObject({ label: 'ต้องเข้ากลุ่มเอง (มีคำถาม)', recommended: false, url: 'https://www.facebook.com/groups/792186948245459' });
     expect(soGroupView(g('mvhmlox9aax3n5phpqj'), deanna)).toMatchObject({ label: 'โพสต์ได้', recommended: true });
     expect(soGroupView(g('mvhmloovlppmpi5o6fg'), deanna)).toEqual({ label: 'ยังไม่เคยลอง', recommended: true, detail: null, url: null });
-    const pick = defaultSoGroupPick(o.groups, 'LBD', deanna);
-    expect(pick.sort()).toEqual(['mvhmlox9aax3n5phpqj', 'mvhmloovlppmpi5o6fg'].sort());
+    const pick = ['mvhmlox9aax3n5phpqj', 'mvhmloovlppmpi5o6fg'];
     const [sec] = soGroupSections(o.groups, 'LBD');
     expect(soSectionHeadText(sec, pick, deanna)).toBe('LBD · ติ๊กไว้ 2 จาก 5 · ติด 3');
   });
@@ -216,16 +212,14 @@ describe('กลุ่ม Facebook ตามธุรกิจของใบข
     const o = parseSoOptions(RAW) as SoOptions;
     const drost = o.accounts[1];
     expect(o.groups.map((x) => soGroupView(x, drost).label)).toEqual(['แอดมินพักกลุ่ม', 'แอดมินพักกลุ่ม', 'ยังไม่เคยลอง', 'ยังไม่เคยลอง', 'ยังไม่เคยลอง']);
-    expect(defaultSoGroupPick(o.groups, 'LBD', drost).sort()).toEqual(['mvhmlov27vqejwuh96m', 'mvhmlox9aax3n5phpqj', 'mvhmloovlppmpi5o6fg'].sort());
-    // ไม่ส่งบัญชี (ทางถอยอ่านฐาน · ยังไม่เลือกบัญชี) = ติ๊กทุกกลุ่มธุรกิจเดียวกันที่ไม่โดนพัก
-    expect(defaultSoGroupPick(o.groups, 'LBD').length).toBe(3);
     const [sec] = soGroupSections(o.groups, 'LBD');
     expect(soSectionHeadText(sec, [], drost)).toBe('LBD · ติ๊กไว้ 0 จาก 5 · ติด 2');
   });
 
   it('ป๊อป: สถานะเป็นคำ · ลิงก์เปิดกลุ่มเปิดแท็บใหม่ · ค่าติ๊กคิดใหม่ตอนสลับบัญชี · ทางถอยอ่านฐานไม่มีสถานะ', () => {
     const dialog = readFileSync('src/components/jobs/AutopostDialog.tsx', 'utf8');
-    expect(dialog).toContain('defaultSoGroupPick(soGroupsOfAccount(opts, a), jobBu, a, jobSector)');
+    // 4 พ.ย. 2569 ไม่ติ๊กให้ — สลับบัญชีคงกลุ่มเดิมเท่าที่บัญชีนี้โพสต์ได้
+    expect(dialog).toContain('setPicked((prev) => soAddWithinCap([], prev.filter((id) => allowed.has(id)), soGroupCap(a)));');
     expect(dialog).toContain('const view = soGroupView(g, account);');
     expect(dialog).toContain('target="_blank" rel="noopener noreferrer" data-testid="autopost-group-open"');
     const opts = readFileSync('api/_lib/soScrapingOptions.ts', 'utf8');

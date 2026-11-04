@@ -6,7 +6,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
-  defaultSoGroupPick,
   parseSoOptions,
   soAccountChoice,
   soAccountSelectable,
@@ -85,12 +84,7 @@ describe('6.2 กลุ่ม: ไม่เกินโพสต์ที่เ�
     expect(g2.repostWait).toEqual({ requestNo: 'OPL6910065', lastPostedAt: '2026-11-02T03:12:00.000Z', availableAt: '2026-11-04T03:12:00.000Z' });
     expect(soRepostWaitText(g2.repostWait!)).toBe('ใบนี้เพิ่งลง 2 พ.ย. 10:12 โพสต์ได้อีก 4 พ.ย. 10:12');
   });
-  it('ค่าเริ่มต้น = ธุรกิจเดียวกับใบ · ไม่เพิ่งลง · เรียงโพสต์ได้ 30 วันมากไปน้อย · ตัดที่โพสต์ที่เหลือ', () => {
-    const groups: SoOptGroup[] = o.groups;
-    expect(defaultSoGroupPick(groups, 'LBD', acc('acc-r'))).toEqual(['g3', 'g1']);
-    expect(defaultSoGroupPick(groups, 'LBD', { ...acc('acc-r'), remainingToday: 1 })).toEqual(['g3']);
-    expect(defaultSoGroupPick(groups, 'LBD', { ...acc('acc-r'), remainingToday: 0 })).toEqual([]);
-  });
+  // 4 พ.ย. 2569 เจ้าของ "ไม่ติ๊กกลุ่มให้เลย" — ถอดค่าเริ่มต้นของกลุ่ม (defaultSoGroupPick) แล้ว (soGroupSector2569-11-04)
   it('server กันเลือกเกินโพสต์ที่เหลือ', () => {
     const snap = { account_id: 'acc-r', group_ids: Array.from({ length: 13 }, (_, i) => `x${i}`) };
     const many = { ...o, groups: [...o.groups, ...snap.group_ids.map((id) => ({ ...o.groups[0], id }))] };

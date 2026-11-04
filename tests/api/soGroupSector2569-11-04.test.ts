@@ -6,7 +6,6 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   SO_GROUP_SECTOR_BEFORE_TAG,
-  defaultSoGroupPick,
   soGroupSectorOf,
   soSectorBlocks,
   withSoDepartments,
@@ -61,11 +60,6 @@ describe('แบ่งหัวข้อย่อยในหมวดธุร�
     expect(soSectorBlocks([g('a', 'private')], 'government').map((b) => b.label)).toEqual(['เอกชน']);
   });
 
-  it('ติ๊กให้เฉพาะกลุ่มประเภทเดียวกับใบขอ · ใบขอยังไม่ระบุ = ติ๊กทั้งธุรกิจแบบเดิม', () => {
-    expect(defaultSoGroupPick(groups, 'LBD', null, 'government')).toEqual(['b']);
-    expect(defaultSoGroupPick(groups, 'LBD', null, 'private').sort()).toEqual(['a', 'd']);
-    expect(defaultSoGroupPick(groups, 'LBD', null, null).sort()).toEqual(['a', 'b', 'c', 'd']);
-  });
 
   it('options API ยังไม่ส่งช่องนี้ — เติมจากรายชื่อกลุ่มในฐาน So Scraping', () => {
     const o = { source: 'api', accounts: [], groups: [g('a', null), g('b', 'government')], workers: [], scrapeAccounts: [] } as unknown as SoOptions;
@@ -81,10 +75,12 @@ describe('จอและฐาน', () => {
     expect(src).toContain('sector: tagged ? soGroupSectorOf(r.sector) : SO_GROUP_SECTOR_BEFORE_TAG,');
   });
 
-  it('ป๊อป Autopost และ Gen link แบ่งหัวข้อย่อย · Autopost ติ๊กตามประเภทของใบขอ', () => {
+  it('ป๊อป Autopost และ Gen link แบ่งหัวข้อย่อย · ไม่ติ๊กกลุ่มให้ · หัวข้อย่อยพับไว้ตอนเปิด (เจ้าของ 4 พ.ย. 2569)', () => {
     const ap = readFileSync('src/components/jobs/AutopostDialog.tsx', 'utf8');
     expect(ap).toContain('soSectorBlocks(section.groups, jobSector)');
-    expect(ap).toContain('defaultSoGroupPick(soGroupsOfAccount(opts, a), jobBu, a, jobSector)');
+    expect(ap).not.toContain('defaultSoGroupPick');
+    expect(readFileSync('src/lib/soScraping.ts', 'utf8')).not.toContain('export function defaultSoGroupPick');
+    expect(readFileSync('src/components/jobs/SoGroupPicker.tsx', 'utf8')).toContain('const [open, setOpen] = React.useState(false);');
     expect(readFileSync('src/components/jobs/SoGroupPicker.tsx', 'utf8')).toContain('soSectorBlocks(section.groups, jobSector)');
     expect(readFileSync('src/components/jobs/GenApplyLinkDialog.tsx', 'utf8')).toContain('jobSector={job ? jobUnitSectorOf(job) : null}');
     expect(readFileSync('src/pages/jobs/BoardPostingPage.tsx', 'utf8')).toContain('jobSector={jobUnitSectorOf(job)}');

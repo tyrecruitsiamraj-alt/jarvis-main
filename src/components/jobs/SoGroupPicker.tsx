@@ -6,7 +6,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { TONE } from '@/lib/designTokens';
-import { soGroupLinkName, soGroupSections, soSectorBlocks, soSectorFoldOpen, type SoGroup, type SoGroupSection } from '@/lib/soScraping';
+import { soGroupLinkName, soGroupSections, soSectorBlocks, type SoGroup, type SoGroupSection } from '@/lib/soScraping';
 import type { UnitSector } from '@/lib/unitSector';
 
 /**
@@ -77,7 +77,7 @@ function Section({
       <CollapsibleContent>
         <div className="max-h-64 space-y-3 overflow-y-auto border-t border-border/70 px-3 py-2">
           {/* แยก ราชการ / เอกชน ในหมวดธุรกิจ (เจ้าของ 4 พ.ย. 2569) */}
-          {soSectorBlocks(section.groups, jobSector).map((block, i) => (
+          {soSectorBlocks(section.groups, jobSector).map((block) => (
             <SoSectorFold
               key={block.sector ?? 'none'}
               label={block.label}
@@ -85,7 +85,6 @@ function Section({
               picked={value}
               onToggle={onToggle}
               checkId={`genlink-sector-${section.bu ?? 'none'}-${block.sector ?? 'none'}`}
-              defaultOpen={soSectorFoldOpen(block.sector, jobSector, i)}
               testId={`genlink-sector-${block.sector ?? 'none'}`}
             >
               <ul className="space-y-1.5">
@@ -108,7 +107,7 @@ function Section({
 
 
 /**
- * หัวข้อย่อย ราชการ / เอกชน ในหมวดธุรกิจ (เจ้าของ 4 พ.ย. 2569) — พับ/กางได้ · ช่องติ๊กเลือก/เอาออกทั้งหัวข้อ
+ * หัวข้อย่อย ราชการ / เอกชน ในหมวดธุรกิจ (เจ้าของ 4 พ.ย. 2569) — พับไว้ตอนเปิด ("อันนี้ย่อไว้") · ช่องติ๊กเลือก/เอาออกทั้งหัวข้อ
  * (ย้ายมาจากหัวธุรกิจ — ติ๊กหัวธุรกิจเดียวเคยได้ทุกกลุ่มรวมราชการ 2,400 กลุ่ม)
  * พับอยู่ = ไม่วาดแถว (วาด 2,400 แถวพร้อมกันทำป๊อปหน่วง)
  */
@@ -118,7 +117,6 @@ export function SoSectorFold({
   picked,
   onToggle,
   checkId,
-  defaultOpen,
   testId,
   children,
 }: {
@@ -127,11 +125,10 @@ export function SoSectorFold({
   picked: readonly string[];
   onToggle: (ids: string[], on: boolean) => void;
   checkId: string;
-  defaultOpen: boolean;
   testId: string;
   children: React.ReactNode;
 }) {
-  const [open, setOpen] = React.useState(defaultOpen);
+  const [open, setOpen] = React.useState(false);
   const n = ids.filter((id) => picked.includes(id)).length;
   return (
     <Collapsible open={open} onOpenChange={setOpen} className="space-y-1.5" data-testid={testId}>

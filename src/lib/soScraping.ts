@@ -495,7 +495,7 @@ export function soGroupsOfAccount(o: Pick<SoOptions, 'groups'>, acc: Pick<SoOptA
 }
 
 /* ═══ กลุ่มแยกตามธุรกิจของใบขอ (เจ้าของ 2 พ.ย. 2569 · So Scraping ติดป้ายธุรกิจให้ทุกกลุ่มแล้ว) ═══
- * ป๊อปสั่งโพสต์: หมวดธุรกิจเดียวกับใบขอ ติ๊กไว้ให้ทั้งหมด · ธุรกิจอื่น/ไม่ระบุ พับไว้ ไม่ติ๊ก
+ * ป๊อปสั่งโพสต์: หมวดธุรกิจเดียวกับใบขอกางไว้ · ธุรกิจอื่น/ไม่ระบุ พับไว้ · ไม่ติ๊กกลุ่มให้ (4 พ.ย. 2569)
  * รหัสบนจอใช้ตามที่ทีมเรียก (LBD · LBA · …) ไม่ตั้งชื่อใหม่
  */
 export const SO_BU_NONE_LABEL = 'ไม่ระบุธุรกิจ';
@@ -509,7 +509,7 @@ export type SoGroupSection<G extends { department: string | null } = SoOptGroup>
   /** รหัสธุรกิจ · null = ไม่ระบุ */
   bu: string | null;
   label: string;
-  /** หมวดธุรกิจเดียวกับใบขอ (เปิดกางและติ๊กไว้ให้) */
+  /** หมวดธุรกิจเดียวกับใบขอ (เปิดกางไว้) */
   forJob: boolean;
   groups: G[];
 };
@@ -617,29 +617,11 @@ export function soGroupView(g: Pick<SoOptGroup, 'id' | 'blocked'>, acc: Pick<SoO
   return { label: SO_GROUP_UNTRIED, recommended: true, detail: null, url: null };
 }
 
-/**
- * ติ๊กไว้ให้ตั้งแต่เปิดป๊อป (สเปค So Scraping 6.2) = กลุ่มธุรกิจเดียวกับใบขอ ที่ไม่ติด (ไม่โดนพัก · สถานะของบัญชีไม่บอกว่าไม่ควร)
- * และใบนี้ไม่ได้เพิ่งลง (`repostWait`) · เรียงโพสต์ได้ 30 วันมากไปน้อย · ตัดที่โพสต์ที่บัญชีเหลือวันนี้ · ใบขอไม่ระบุธุรกิจ = ไม่ติ๊ก
- */
-export function defaultSoGroupPick(
-  groups: readonly SoOptGroup[],
-  jobBu: string | null,
-  acc: (Pick<SoOptAccount, 'groupStatus'> & Partial<Pick<SoOptAccount, 'remainingToday'>>) | null = null,
-  /** ราชการ/เอกชนของใบขอ (4 พ.ย. 2569) — ระบุแล้วติ๊กเฉพาะกลุ่มประเภทเดียวกัน · ยังไม่ระบุ = ติ๊กทั้งธุรกิจแบบเดิม */
-  jobSector: UnitSector | null = null,
-): string[] {
-  if (!jobBu) return [];
-  const ok = groups
-    .filter((g) => g.department === jobBu && (!jobSector || g.sector === jobSector) && !g.repostWait && soGroupView(g, acc).recommended)
-    .sort((a, b) => (b.stats30d?.posted ?? 0) - (a.stats30d?.posted ?? 0));
-  const cap = acc?.remainingToday ?? null;
-  return (cap === null ? ok : ok.slice(0, Math.max(0, cap))).map((g) => g.id);
-}
-
 /* ═══ กลุ่มราชการ/เอกชน (เจ้าของ 4 พ.ย. 2569 "ตอนเลือกกลุ่มทำให้แยกไว้หน่อย") ═══
  * กลุ่มที่มีอยู่ตอนนี้ทั้งหมด = เอกชน (เจ้าของ "ก็ไอกลุ่มที่มีอะเพื่อโพสต์ เอกชนไง แล้วเดี๋ยวจะเพิ่มกลุ่มที่เป็นราชการมา")
- * ป้ายอยู่ที่รายชื่อกลุ่มของ So Scraping ช่อง `sector` (ที่เดียวกับป้ายธุรกิจ · ขอไว้ docs/so-scraping-brief-2569-11-04-group-sector.md)
- * So Scraping ยังไม่มีช่องนี้ = ทุกกลุ่มเอกชน · มีช่องแต่ว่าง = ยังไม่ระบุ (ไม่เดา)
+ * ป้ายอยู่ที่รายชื่อกลุ่มของ So Scraping ช่อง `sector` (ที่เดียวกับป้ายธุรกิจ · So Scraping เพิ่มแล้ว c2cb964 + ส่งใน options API)
+ * ไม่มีช่องนี้ = ทุกกลุ่มเอกชน · มีช่องแต่ว่าง = ยังไม่ระบุ (ไม่เดา)
+ * ป๊อปไม่ติ๊กกลุ่มให้ และหัวข้อย่อยพับไว้ทุกหัวข้อตอนเปิด (เจ้าของ 4 พ.ย. 2569 "ไม่ติ๊กกลุ่มให้เลย" · "อันนี้ย่อไว้")
  */
 export const SO_GROUP_SECTOR_BEFORE_TAG: UnitSector = 'private';
 
@@ -659,11 +641,6 @@ export function soSectorBlocks<G extends { sector?: UnitSector | null }>(groups:
   return order
     .map((sector) => ({ sector, label: sector ? UNIT_SECTOR_LABEL[sector] : UNIT_SECTOR_UNSET_LABEL, groups: groups.filter((g) => (g.sector ?? null) === sector) }))
     .filter((b) => b.groups.length > 0);
-}
-
-/** หัวข้อย่อยที่กางไว้ตอนเปิด: ประเภทเดียวกับใบขอ · ใบขอยังไม่ระบุ = หัวข้อแรก (ที่เหลือพับ ไม่วาดแถว) */
-export function soSectorFoldOpen(sector: UnitSector | null, jobSector: UnitSector | null, index: number): boolean {
-  return jobSector ? sector === jobSector : index === 0;
 }
 
 /** หัวหมวด "LBD · ติ๊กไว้ 29 จาก 37 · ติด 8" — ติด = กลุ่มที่ไม่ควรติ๊กสำหรับบัญชีนี้ */
