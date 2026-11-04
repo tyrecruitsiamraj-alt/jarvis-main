@@ -15,12 +15,13 @@ import {
   getJobPostingRequestById,
   createJobPostingRequest,
   updateJobPostingRequest,
+  cancelPendingJobPostingRequest,
   normalizeJobPostingStatus,
   normalizeJobPostingRequestType,
 } from '../_lib/jobPostingRequests.js';
 import { isSiamrajRequestInScope, loadScopedRequestNoSet } from '../_lib/siamrajUnitRequests.js';
 import { listSoGroups } from '../_lib/soScrapingGroups.js';
-import { fetchSoOptions, fetchSoRunMessage, SoOptionsError, startSoRequest } from '../_lib/soScrapingOptions.js';
+import { fetchSoOptions, fetchSoRunMessage, fetchSoStatusOf, SoOptionsError, startSoRequest } from '../_lib/soScrapingOptions.js';
 import { dbQuery } from '../_lib/postgres.js';
 import { tableInAppSchema } from '../_lib/schema.js';
 
@@ -38,7 +39,28 @@ async function linkCodeBelongsToJob(code: string, jobId: string): Promise<boolea
   return rows.length > 0;
 }
 
-/** กลุ่มที่ใบนี้เพิ่งสั่งโพสต์ไป (3 วัน · ไม่นับที่ยกเลิก/ไม่รับงาน) — ป๊อปเตือนโพสต์ซ้ำ กันบัญชีโดนแบน */
+/**
+ * ใบที่ค้าง (pending) — แนบเหตุจาก So Scraping ให้การ์ดบอร์ดบอกได้เลยไม่ต้องเปิดป๊อป (เจ้าของ 4 พ.ย. 2569 ฉบับ 9 ข้อ 6)
+ * ใบค้างมีไม่กี่ใบ · รอใบละไม่เกิน 4 วิ · อ่านไม่ได้ = ไม่มีเหตุ (การ์ดยังขึ้นป้ายสถานะ)
+ */
+const STUCK_ISSUE_WAIT_MS = 4_000;
+async function withStuckIssues<T extends { status: string; request_no: string | null; request_type: string }>(items: T[]): Promise<Array<T & { issues?: string[] }>> {
+  const stuck = items.filter((it) => it.status === 'pending' && it.request_no).slice(0, 20);
+  if (stuck.length === 0) return items;
+  const found = new Map<T, string[]>();
+  await Promise.all(
+    stuck.map(async (it) => {
+      const info = await Promise.race([
+        fetchSoStatusOf(it.request_no!, it.request_type === 'scraping' ? 'scraping' : 'content'),
+        new Promise<null>((r) => setTimeout(() => r(null), STUCK_ISSUE_WAIT_MS)),
+      ]).catch(() => null);
+      if (info?.issues.length) found.set(it, info.issues);
+    }),
+  );
+  return items.map((it) => (found.has(it) ? { ...it, issues: found.get(it) } : it));
+}
+
+/** กลุ่มที่ใบนี้เพิ่งสั่งโพสต์ไป (3 วัน · ไม่นับที่ยกเลิก/ไม่สำเร็จ) — ป๊อปเตือนโพสต์ซ้ำ กันบัญชีโดนแบน */
 async function recentGroupsOfJob(jobId: string): Promise<string[]> {
   try {
     const { rows } = await dbQuery<{ g: string }>(
@@ -115,11 +137,20 @@ async function handler(req: AuthedReq, res: ApiRes) {
         if (!(await isSiamrajRequestInScope(req.user, requestNo))) return res.status(200).json({ run_message: null });
         return res.status(200).json({ run_message: await fetchSoRunMessage(requestNo) });
       }
+      // เหตุที่ใบค้าง/ไม่สำเร็จ จาก So Scraping (เจ้าของ 4 พ.ย. 2569 ฉบับ 9) — `issues` เช่น "บัญชี Burkhart Debe ถูกพักอยู่"
+      if (getQuery(req, 'so_status') === '1') {
+        const requestNo = (getQuery(req, 'request_no') ?? '').trim();
+        if (!requestNo) return sendError(res, 400, 'Bad request', 'request_no is required');
+        if (!(await isSiamrajRequestInScope(req.user, requestNo))) return res.status(200).json({ issues: [], run_message: null });
+        const type = getQuery(req, 'type') === 'scraping' ? 'scraping' : 'content';
+        const info = await fetchSoStatusOf(requestNo, type);
+        return res.status(200).json({ issues: info?.issues ?? [], run_message: info?.runMessage ?? null });
+      }
       // ป้ายสถานะบนการ์ดกล่องงาน + ตัวกรอง (20 ต.ค. 2569) — ล่าสุดต่อ (ใบ, ประเภท) ของใบที่ผู้ใช้เห็นได้
       if (getQuery(req, 'board') === '1') {
         const scoped = await loadScopedRequestNoSet(req.user);
         const items = scopePostings(await listLatestJobPostingsForBoard(), scoped);
-        return res.status(200).json({ items });
+        return res.status(200).json({ items: await withStuckIssues(items) });
       }
       const status = normalizeJobPostingStatus(getQuery(req, 'status'));
       const scoped = await loadScopedRequestNoSet(req.user);
@@ -130,6 +161,31 @@ async function handler(req: AuthedReq, res: ApiRes) {
       return res.status(200).json({ items });
     } catch (e) {
       return handleApiError(res, e, 'matching-job-postings GET', { userId: req.user.sub });
+    }
+  }
+
+  // ยกเลิกใบที่ค้างแล้วสั่งใหม่ (เจ้าของ 4 พ.ย. 2569 ฉบับ 9) — ได้เฉพาะตอนยัง pending · คนกดบันทึกใน notes ฝั่ง server
+  if (method === 'POST' && getQuery(req, 'action') === 'cancel') {
+    try {
+      const existing = await getJobPostingRequestById(getQuery(req, 'id'));
+      if (!existing) return sendError(res, 404, 'Not found', 'ไม่พบคำขอนี้');
+      if (!(await isSiamrajRequestInScope(req.user, existing.request_no || existing.job_id))) {
+        return sendError(res, 403, 'Forbidden', OUT_OF_SCOPE);
+      }
+      const r = await cancelPendingJobPostingRequest(existing.id, `ยกเลิกโดย ${req.user.email ?? req.user.sub}`);
+      if (!r.ok) {
+        return sendError(res, 409, 'Conflict', r.status === 'in_progress' ? 'So Scraping เริ่มงานแล้ว ยกเลิกไม่ได้' : 'ใบนี้ไม่ได้ค้างแล้ว ยกเลิกไม่ได้');
+      }
+      await auditFromAuthed(req, {
+        action: 'job_posting_request.cancel',
+        entityType: 'job_posting_request',
+        entityId: existing.id,
+        before: { status: existing.status },
+        after: { status: r.item.status },
+      });
+      return res.status(200).json(r.item);
+    } catch (e) {
+      return handleApiError(res, e, 'matching-job-postings cancel', { userId: req.user.sub });
     }
   }
 

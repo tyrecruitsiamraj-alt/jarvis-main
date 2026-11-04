@@ -224,6 +224,19 @@ export const SO_STATUS_PATH = '/api/integrations/jarvis/status';
  * ยังไม่ใส่ key / เรียกไม่ได้ = null (ข้อมูลเสริม ไม่ทำให้หน้าใบขอพัง)
  */
 export async function fetchSoRunMessage(requestNo: string, fetchImpl: typeof fetch = fetch): Promise<string | null> {
+  return (await fetchSoStatusOf(requestNo, 'content', fetchImpl))?.runMessage ?? null;
+}
+
+/**
+ * สถานะของใบจาก So Scraping (`/status`) — `issues` = เหตุที่ยังเริ่ม/ทำไม่ได้ เป็นคำไทยจากฝั่งนั้น เช่น "บัญชี Burkhart Debe ถูกพักอยู่"
+ * (เจ้าของ 4 พ.ย. 2569 ฉบับ 9 "ใบที่ค้างหรือไม่สำเร็จ ต้องสั่งใหม่ได้") · ยังไม่ใส่ key / เรียกไม่ได้ / ไม่พบ = null (ข้อมูลเสริม)
+ */
+export type SoStatusInfo = { issues: string[]; runMessage: string | null };
+export async function fetchSoStatusOf(
+  requestNo: string,
+  type: 'content' | 'scraping',
+  fetchImpl: typeof fetch = fetch,
+): Promise<SoStatusInfo | null> {
   const k = await loadSoKey();
   if (!k) return null;
   const ctrl = new AbortController();
@@ -236,9 +249,11 @@ export async function fetchSoRunMessage(requestNo: string, fetchImpl: typeof fet
     if (!res.ok) return null;
     const body = ((await res.json().catch(() => null)) ?? {}) as { requests?: unknown };
     const list = Array.isArray(body.requests) ? (body.requests as Array<Record<string, unknown>>) : [];
-    const hit = list.find((r) => r && r.type === 'content' && String(r.request_no ?? '').trim() === requestNo);
-    const msg = hit?.run_message;
-    return typeof msg === 'string' && msg.trim() ? msg.trim() : null;
+    const hit = list.find((r) => r && r.type === type && String(r.request_no ?? '').trim() === requestNo);
+    if (!hit) return null;
+    const msg = hit.run_message;
+    const issues = Array.isArray(hit.issues) ? hit.issues.map((x) => (typeof x === 'string' ? x.trim() : '')).filter(Boolean) : [];
+    return { issues, runMessage: typeof msg === 'string' && msg.trim() ? msg.trim() : null };
   } catch {
     return null;
   } finally {

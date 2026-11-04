@@ -17,6 +17,7 @@ import {
   soDefaultScrapeAccount,
   soDefaultWorker,
   soPlatformLabel,
+  soRejectReason,
   soScrapMissing,
   soScrapConfirmWarnings,
   soScrapSnapshot,
@@ -31,6 +32,7 @@ import {
 } from '@/lib/soScraping';
 import { AutopostBody } from '@/components/jobs/AutopostDialog';
 import SoStartLine from '@/components/jobs/SoStartLine';
+import SoStuckPanel from '@/components/jobs/SoStuckPanel';
 
 /**
  * ═══ ฟอร์มสั่ง So Scraping — เลือกว่าจะ Autopost หรือ Scrap แล้วไล่ข้อ 1-2-3 (เจ้าของ 3 พ.ย. 2569) ═══
@@ -39,7 +41,7 @@ import SoStartLine from '@/components/jobs/SoStartLine';
  * จำนวนคนที่ Scrap = ช่องตัวเลข ค่าเริ่ม "เหลือหา" ของใบขอ เพดาน = โควต้าที่เว็บนั้นเหลือวันนี้ (So Scraping ต้องรับ `scrape_target` · เอกสารที่ส่งให้ 3 พ.ย.)
  *
  * ใช้ 3 ที่ด้วยตัวเดียวกัน: หน้ารายละเอียดใบขอ · ป๊อปประกาศ (งานสรรหา) · ป๊อปจากปุ่มบนการ์ดกล่องงาน (`AutopostDialog`)
- * - สถานะโพสต์/Scrap ล่าสุดที่ So Scraping เขียนกลับ · ไม่รับงาน = เหตุผลจาก notes · ยังรอ/กำลังทำ = กดซ้ำไม่ได้ · เสร็จ/ไม่รับงาน = สั่งใหม่ได้
+ * - สถานะโพสต์/Scrap ล่าสุดที่ So Scraping เขียนกลับ · ไม่สำเร็จ = เหตุผลจาก notes · กำลังทำ = กดซ้ำไม่ได้ · ค้าง = ส่งอีกครั้ง/ยกเลิกแล้วสั่งใหม่ · เสร็จ/ไม่สำเร็จ = สั่งใหม่ได้
  * - Autopost: ข้อ 1 บัญชี · 2 กลุ่ม · 3 เครื่อง · ข้อความ (`AutopostBody` ฝัง ห้ามซ้อนป๊อป) · กลุ่มละ 1 ลิงก์ (แยกว่ากลุ่มไหนได้คนเยอะ)
  * - Scrap: ข้อ 1 บัญชี JobThai/JobBKK (ตั้งต้น = พร้อมใช้ที่เหลือโควต้ามากสุด) · 2 จำนวนคน · 3 เครื่อง (ตั้งต้น = ที่ So Scraping แนะนำ)
  *   ตำแหน่ง = ชื่อที่โชว์บนประกาศ (`publicJobTitle`) ไม่ใช่ "พนักงาน" ของ ERP · ขาดตำแหน่ง/จังหวัด/จำนวนคน = สั่งไม่ได้ บอกว่าขาดอะไร
@@ -204,8 +206,8 @@ export default function OrderPostButton({
           <span className={cn('text-xs', DASH.muted)}>ยังไม่ได้สั่ง</span>
         )}
       </div>
-      {req?.status === 'rejected' && req.notes?.trim() ? (
-        <p className={cn('text-xs', TONE.danger.value)}>เหตุผล: {req.notes.trim()}</p>
+      {req?.status === 'rejected' && soRejectReason(req.notes) ? (
+        <p className={cn('text-xs', TONE.danger.value)}>เหตุผล: {soRejectReason(req.notes)}</p>
       ) : null}
     </div>
   );
@@ -254,6 +256,7 @@ export default function OrderPostButton({
               onSent?.(item);
             }}
             onClose={() => setKind('autopost')}
+            onOrderChanged={(item) => setLatest((prev) => [item, ...(prev ?? []).filter((p) => p.request_type !== 'content')])}
           />
         </div>
       ) : kind === 'genlink' ? (
@@ -263,9 +266,15 @@ export default function OrderPostButton({
         </div>
       ) : (
         <div className="space-y-3 rounded-xl border border-border/70 p-3" data-testid="so-order-scrap-form">
-          {scrapOpen ? (
+          {/* ค้าง = บอกเหตุ + ส่งอีกครั้ง / ยกเลิกแล้วสั่งใหม่ · กำลังทำ = รอ (เจ้าของ 4 พ.ย. 2569 ฉบับ 9) */}
+          {scraping?.status === 'pending' ? (
+            <SoStuckPanel
+              order={scraping}
+              onCancelled={(item) => setLatest((prev) => [item, ...(prev ?? []).filter((p) => p.request_type !== 'scraping')])}
+            />
+          ) : scrapOpen ? (
             <p className={cn('rounded-xl border px-3 py-2 text-sm', TONE.warn.soft)} data-testid="so-scrap-open-order">
-              มีคำขอ Scrap ค้างอยู่ · {scrapingView?.label} — รอให้เสร็จก่อนถึงสั่งใหม่ได้
+              So Scraping กำลัง Scrap ใบนี้อยู่ — รอให้เสร็จก่อนถึงสั่งใหม่ได้
             </p>
           ) : null}
 
@@ -374,7 +383,7 @@ export default function OrderPostButton({
             data-testid="so-order-scrap"
           >
             {busy ? <LoaderCircle className="animate-spin" aria-hidden /> : <Search aria-hidden />}
-            {busy ? 'กำลังส่ง…' : 'ขอ Scrap'}
+            {busy ? 'กำลังส่ง…' : scraping?.status === 'rejected' || scraping?.status === 'cancelled' ? 'สั่งใหม่' : 'ขอ Scrap'}
           </Button>
         </div>
       )}

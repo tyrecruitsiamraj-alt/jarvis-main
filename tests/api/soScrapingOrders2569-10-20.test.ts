@@ -116,9 +116,9 @@ describe('กันสั่งซ้ำ + สถานะที่ So Scraping 
     expect(soStatusView({ status: 'in_progress', created_at: at }, now)).toMatchObject({ label: 'กำลังทำ', tone: 'warn', open: true });
     expect(soStatusView({ status: 'posted', created_at: at }, now)).toMatchObject({ label: 'โพสต์แล้ว', tone: 'success', open: false });
     expect(soStatusView({ status: 'completed', created_at: at }, now)).toMatchObject({ label: 'เสร็จ', tone: 'success' });
-    expect(soStatusView({ status: 'rejected', created_at: at }, now)).toMatchObject({ label: 'ไม่รับงาน', tone: 'danger', open: false });
+    expect(soStatusView({ status: 'rejected', created_at: at }, now)).toMatchObject({ label: 'ไม่สำเร็จ', tone: 'danger', open: false }); // 4 พ.ย. 2569 ฉบับ 9 เดิม "ไม่รับงาน"
     expect(soStatusView({ status: 'pending', created_at: '2026-10-20T08:30:00Z' }, now)).toMatchObject({ waitLong: true, tone: 'danger' });
-    expect(read('src/components/jobs/OrderPostButton.tsx')).toContain("req?.status === 'rejected' && req.notes?.trim()");
+    expect(read('src/components/jobs/OrderPostButton.tsx')).toContain("req?.status === 'rejected' && soRejectReason(req.notes)"); // 4 พ.ย. 2569 ตัด "ตีกลับ: "
   });
 });
 
@@ -135,7 +135,7 @@ describe('ตามงานได้โดยไม่ต้องเปิด�
   });
   it('แจ้งเตือนคนสั่งเมื่อ โพสต์แล้ว / เสร็จ / ไม่รับงาน — ครั้งเดียวต่อสถานะ · กดแล้วเปิดใบนั้น', () => {
     expect(soNoticeTitle('content', 'posted')).toBe('สั่งโพสต์ · โพสต์แล้ว');
-    expect(soNoticeTitle('scraping', 'rejected')).toBe('Scrap · ไม่รับงาน');
+    expect(soNoticeTitle('scraping', 'rejected')).toBe('Scrap · ไม่สำเร็จ');
     expect(soNoticeTitle('content', 'in_progress')).toBeNull();
     const w = read('api/_lib/soScrapingNotices.ts');
     expect(w).toContain('dedupeKey: `so_scraping:${r.id}:${r.status}`');

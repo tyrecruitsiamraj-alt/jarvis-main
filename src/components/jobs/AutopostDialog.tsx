@@ -52,6 +52,7 @@ import {
   soAccountStatusText,
   soAddWithinCap,
   soDefaultAccount,
+  soRejectReason,
   soDefaultWorker,
   soGroupCap,
   soNoAccountReadyText,
@@ -65,6 +66,7 @@ import {
   type SoPostMode,
 } from '@/lib/soScraping';
 import SoStartLine from '@/components/jobs/SoStartLine';
+import SoStuckPanel from '@/components/jobs/SoStuckPanel';
 import OrderPostButton from '@/components/jobs/OrderPostButton';
 import { AUTOPOST_CAPTION_MAX, autopostMissing, buildAutopostCaption, captionLeaks } from '@/lib/autopostCaption';
 
@@ -119,11 +121,14 @@ export function AutopostBody({
   onClose,
   embedded = false,
   onCaptionSaved,
+  onOrderChanged,
 }: {
   job: JobRequest;
   onSent?: (item: JobPostingRequest) => void;
   onClose: () => void;
   embedded?: boolean;
+  /** ยกเลิกใบที่ค้างแล้ว — หน้าแม่เปลี่ยนป้ายสถานะตาม (ฉบับ 9 · 4 พ.ย. 2569) */
+  onOrderChanged?: (item: JobPostingRequest) => void;
   /** ข้อความที่แก้ถูกบันทึกกับใบขอแล้ว (null = กลับไปใช้ข้อความที่ระบบร่าง) — การ์ดตัวอย่างเปลี่ยนตาม (28 ต.ค. 2569) */
   onCaptionSaved?: (text: string | null) => void;
 }) {
@@ -176,6 +181,10 @@ export function AutopostBody({
   const [busy, setBusy] = React.useState<'send' | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [sent, setSent] = React.useState<JobPostingRequest | null>(null);
+  /** ใบที่เพิ่งยกเลิกในป๊อปนี้ (ค้างอยู่ → ยกเลิกแล้วสั่งใหม่) */
+  const [cancelledOrder, setCancelledOrder] = React.useState<JobPostingRequest | null>(null);
+  /** ใบที่เติมฟอร์มให้แล้ว — เติมครั้งเดียว คนแก้ต่อได้ */
+  const [prefilledFrom, setPrefilledFrom] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     let alive = true;
@@ -227,7 +236,17 @@ export function AutopostBody({
   const recent = new Set(state?.recentGroups ?? []);
   /** ติ๊กกลุ่มได้ไม่เกินโพสต์ที่บัญชีเหลือวันนี้ (สเปค 6.2) — เกินแล้ว worker หยุดเองที่เพดาน กลุ่มที่เหลือไม่ได้โพสต์ */
   const cap = soGroupCap(account);
-  const openOrder = state?.latest.find((r) => r.request_type === 'content' && soStatusView(r).open) ?? null;
+  /**
+   * ใบล่าสุดของใบขอนี้ (เจ้าของ 4 พ.ย. 2569 ฉบับ 9 "ใบที่ค้างหรือไม่สำเร็จ ต้องสั่งใหม่ได้")
+   * ค้าง (pending) = บอกเหตุ + ส่งอีกครั้ง / ยกเลิกแล้วสั่งใหม่ · กำลังทำ = รอ · ไม่สำเร็จ = บอกเหตุ + ปุ่ม "สั่งใหม่"
+   * สั่งใหม่ = เติมข้อความ กลุ่ม โหมด จากใบเดิม · บัญชีตั้งต้นไม่ใช่บัญชีเดิม (เหตุที่ไม่สำเร็จบ่อยสุด: Facebook จำกัดการโพสต์)
+   */
+  const lastOrder = cancelledOrder ?? state?.latest.find((r) => r.request_type === 'content') ?? null;
+  const stuckOrder = lastOrder?.status === 'pending' ? lastOrder : null;
+  const runningOrder = lastOrder?.status === 'in_progress' ? lastOrder : null;
+  const rejectedOrder = lastOrder?.status === 'rejected' ? lastOrder : null;
+  const retryFrom = rejectedOrder ?? (cancelledOrder?.status === 'cancelled' ? cancelledOrder : null);
+  const openOrder = stuckOrder ?? runningOrder;
 
   // แคปชั่นร่างใหม่ตามลิงก์ที่เลือก จนกว่าคนจะแก้เอง · แก้แล้ว = แทนเฉพาะลิงก์สมัครในข้อความ (syncCaptionLink)
   const draft = React.useMemo(() => buildAutopostCaption(job, { contact, link: captionLink }), [job, contact, captionLink]);
@@ -296,6 +315,29 @@ export function AutopostBody({
     const allowed = new Set(soGroupsOfAccount(opts, a).map((g) => g.id));
     setPicked((prev) => soAddWithinCap([], prev.filter((id) => allowed.has(id)), soGroupCap(a)));
   };
+
+  // สั่งใหม่: เติมข้อความ กลุ่ม โหมด จากใบเดิม · บัญชี = ตัวแรกที่ So Scraping แนะนำที่ไม่ใช่บัญชีเดิม (ไม่มี = ให้เลือกเอง)
+  React.useEffect(() => {
+    if (!opts || !retryFrom || prefilledFrom === retryFrom.id) return;
+    setPrefilledFrom(retryFrom.id);
+    const snap = (retryFrom.job_snapshot ?? {}) as Record<string, unknown>;
+    if (typeof snap.caption === 'string' && snap.caption.trim()) {
+      setCaption(syncCaptionLink(snap.caption, AUTOPOST_LINK_PLACEHOLDER));
+      setCaptionEdited(true);
+    }
+    if (snap.post_mode === 'caption_only' || snap.post_mode === 'caption_image' || snap.post_mode === 'image_only') setMode(snap.post_mode);
+    const prevAccount = typeof snap.account_id === 'string' ? snap.account_id : null;
+    const acc = soDefaultAccount(
+      opts.accounts.filter((a) => a.id !== prevAccount),
+      jobBu,
+    );
+    const groups = Array.isArray(snap.group_ids) ? snap.group_ids.filter((g): g is string => typeof g === 'string') : [];
+    setWarn(null);
+    setAccountId(acc?.id ?? '');
+    if (acc) setWorkerName(soDefaultWorker(soWorkersFor(opts, 'autopost'), 'post')?.name ?? acc.worker ?? '');
+    const allowed = acc ? new Set(soGroupsOfAccount(opts, acc).map((g) => g.id)) : null;
+    setPicked(acc ? soAddWithinCap([], groups.filter((id) => allowed!.has(id)), soGroupCap(acc)) : groups);
+  }, [opts, retryFrom, prefilledFrom, jobBu]);
 
   const send = async (confirmed = false) => {
     if (busy || problems.length > 0 || !account) return;
@@ -379,9 +421,28 @@ export function AutopostBody({
         </div>
       ) : loading ? null : (
         <>
-          {openOrder ? (
+          {stuckOrder ? (
+            <SoStuckPanel
+              order={stuckOrder}
+              onCancelled={(item) => {
+                setCancelledOrder(item);
+                onOrderChanged?.(item);
+              }}
+            />
+          ) : null}
+          {runningOrder ? (
             <p className={cn('rounded-xl border px-3 py-2 text-sm', TONE.warn.soft)} data-testid="autopost-open-order">
-              มีคำสั่งโพสต์ค้างอยู่ · {soStatusView(openOrder).label} — รอให้เสร็จก่อนถึงสั่งใหม่ได้
+              So Scraping กำลังโพสต์ใบนี้อยู่ — รอให้เสร็จก่อนถึงสั่งใหม่ได้
+            </p>
+          ) : null}
+          {rejectedOrder ? (
+            <p className={cn('rounded-xl border px-3 py-2 text-sm', TONE.danger.soft, TONE.danger.value)} data-testid="autopost-rejected">
+              ไม่สำเร็จ{soRejectReason(rejectedOrder.notes) ? ` · ${soRejectReason(rejectedOrder.notes)}` : ''}
+            </p>
+          ) : null}
+          {cancelledOrder ? (
+            <p className={cn('text-sm', DASH.muted)} data-testid="autopost-cancelled">
+              ยกเลิกใบเดิมแล้ว
             </p>
           ) : null}
 
@@ -609,7 +670,7 @@ export function AutopostBody({
               data-testid="autopost-send"
             >
               {busy === 'send' ? <LoaderCircle className="animate-spin" aria-hidden /> : <Send aria-hidden />}
-              {busy === 'send' ? 'กำลังส่ง…' : 'ส่ง Autopost'}
+              {busy === 'send' ? 'กำลังส่ง…' : retryFrom ? 'สั่งใหม่' : 'ส่ง Autopost'}
             </Button>
             <Button type="button" variant="ghost" onClick={onClose} disabled={busy !== null}>
               ยกเลิก

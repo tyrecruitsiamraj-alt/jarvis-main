@@ -12,7 +12,7 @@ import { publicJobTitle } from '@/lib/publicJobTitle';
 import JobPublicFacts from '@/components/jobs/JobPublicFacts';
 import { useRecruiterContact } from '@/hooks/useRecruiterContact';
 import { Badge } from '@/components/ui/badge';
-import { soStatusView } from '@/lib/soScraping';
+import { soStatusView, soStuckLine } from '@/lib/soScraping';
 import type { JobPostingRequest } from '@/lib/jobPostingRequestsApi';
 import { getJobAgeChipInfo, JOB_AGE_CHIP_META } from '@/lib/jobUrgency';
 import PublishReadinessChip from '@/components/jobs/PublishReadinessChip';
@@ -135,7 +135,7 @@ const BoardJobCard: React.FC<BoardJobCardProps> = ({ job, readiness, applicants,
         )
       ) : null}
 
-      {/* ── สถานะที่ So Scraping เขียนกลับ (20 ต.ค. 2569) — เหลือง รอ/กำลังทำ · เขียว โพสต์แล้ว/เสร็จ · แดง ไม่รับงาน/รอนาน ── */}
+      {/* ── สถานะที่ So Scraping เขียนกลับ (20 ต.ค. 2569) — เหลือง รอ/กำลังทำ · เขียว โพสต์แล้ว/เสร็จ · แดง ไม่สำเร็จ/รอนาน ── */}
       {/* ยังไม่เคยสั่ง = ขึ้นป้ายเทาให้รู้ว่ายังว่าง (1 พ.ย. 2569 เจ้าของ "ต้องมีสถานะบอก" กันสั่งซ้ำ) · null = ยังโหลดไม่เสร็จ */}
       {so && so.length === 0 ? (
         <div className="flex flex-wrap gap-1.5" data-testid="board-card-so-none">
@@ -158,6 +158,15 @@ const BoardJobCard: React.FC<BoardJobCardProps> = ({ job, readiness, applicants,
           })}
         </div>
       ) : null}
+      {/* ใบที่ไม่สำเร็จ/ค้าง: เหตุ 1 บรรทัดบนการ์ดเลย ไม่ต้องเปิดป๊อปก่อนถึงรู้ (เจ้าของ 4 พ.ย. 2569 ฉบับ 9 ข้อ 6) */}
+      {(so ?? []).map((r) => {
+        const why = soStuckLine(r);
+        return why ? (
+          <p key={`why-${r.request_type}`} className={cn('line-clamp-1 text-xs', r.status === 'rejected' ? TONE.danger.value : TONE.warn.value)} data-testid="board-card-so-why">
+            {r.request_type === 'content' ? 'โพสต์' : 'Scrap'}: {why}
+          </p>
+        ) : null;
+      })}
 
       {/* ── ข้อมูลงาน: ตัวเดียวกับการ์ดหน้า /apply (`JobPublicFacts`) — ติ๊กซ่อนในขั้น 3 แล้วที่นี่ก็หายด้วย
           (เจ้าของ 5 ต.ค. 2569: *"ไม่งั้นจะเช็คยังไงหล่ะว่าถูกต้องหรือเปล่า"*) ── */}

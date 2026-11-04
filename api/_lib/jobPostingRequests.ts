@@ -7,7 +7,7 @@ const MAX_LONG_TEXT = 2000;
 
 export type JobPostingStatus = 'pending' | 'in_progress' | 'posted' | 'completed' | 'filled' | 'cancelled' | 'rejected';
 export type JobPostingRequestType = 'content' | 'scraping';
-/** `rejected` = So Scraping ไม่รับงาน (157 · เจ้าของ 20 ต.ค. 2569) */
+/** `rejected` = So Scraping ตีกลับ — บนจอ "ไม่สำเร็จ" (157 · 20 ต.ค. 2569 · คำเปลี่ยน 4 พ.ย. 2569) */
 const STATUSES: JobPostingStatus[] = ['pending', 'in_progress', 'posted', 'completed', 'filled', 'cancelled', 'rejected'];
 const REQUEST_TYPES: JobPostingRequestType[] = ['content', 'scraping'];
 /**
@@ -166,7 +166,7 @@ export async function listActiveJobPostingsForJob(jobId: string): Promise<JobPos
 }
 
 /**
- * คำขอล่าสุดต่อประเภทของใบนี้ (ทุกสถานะ) — ป๊อปประกาศโชว์ผลที่ So Scraping เขียนกลับ (โพสต์แล้ว / เสร็จ / ไม่รับงาน)
+ * คำขอล่าสุดต่อประเภทของใบนี้ (ทุกสถานะ) — ป๊อปประกาศโชว์ผลที่ So Scraping เขียนกลับ (โพสต์แล้ว / เสร็จ / ไม่สำเร็จ)
  * ไม่ใช่แค่ที่ยังเปิด (20 ต.ค. 2569 เจ้าของ: "สั่งแล้วดูไม่ได้จะตามงานยังไง")
  */
 export async function listLatestJobPostingsForJob(jobId: string): Promise<JobPostingRequest[]> {
@@ -208,7 +208,7 @@ export async function listLatestJobPostingsForBoard(days = 90): Promise<JobPosti
 }
 
 /**
- * คำขอที่สถานะเพิ่งเปลี่ยนเป็น โพสต์แล้ว / เสร็จ / ไม่รับงาน — ตัวแจ้งเตือนคนสั่ง (กันซ้ำด้วย dedupe_key ของแจ้งเตือน)
+ * คำขอที่สถานะเพิ่งเปลี่ยนเป็น โพสต์แล้ว / เสร็จ / ไม่สำเร็จ — ตัวแจ้งเตือนคนสั่ง (กันซ้ำด้วย dedupe_key ของแจ้งเตือน)
  */
 export async function listRecentlyResolvedJobPostings(hours = 48): Promise<JobPostingRequest[]> {
   try {
@@ -370,3 +370,23 @@ export async function updateJobPostingRequest(
     return rows[0] ? mapRow(rows[0]) : null;
   }
 }
+
+/**
+ * ยกเลิกใบที่ค้าง (ยังเป็น pending) แล้วสั่งใหม่ได้ (เจ้าของ 4 พ.ย. 2569 ฉบับ 9) — DB ตัดสินด้วย `where status = 'pending'`
+ * So Scraping เริ่มงานไปแล้ว (in_progress ฯลฯ) = ยกเลิกไม่ได้ คืนสถานะปัจจุบัน · ใบ cancelled So Scraping ไม่หยิบไปทำ
+ */
+export async function cancelPendingJobPostingRequest(
+  id: string,
+  notes: string,
+): Promise<{ ok: true; item: JobPostingRequest } | { ok: false; status: JobPostingStatus | null }> {
+  const key = id.trim();
+  if (!key || !uuidRe.test(key)) throw new Error('valid job posting id is required');
+  const { rows } = await dbQuery<Row>(
+    `update ${table} set status = 'cancelled', notes = $2, updated_at = now() where id = $1 and status = 'pending' returning ${COLS_BASE}`,
+    [key, trimTo(notes, MAX_LONG_TEXT)],
+  );
+  if (rows[0]) return { ok: true, item: mapRow(rows[0]) };
+  const cur = await getJobPostingRequestById(key);
+  return { ok: false, status: cur?.status ?? null };
+}
+

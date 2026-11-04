@@ -130,7 +130,7 @@ describe('6.4 กดสั่งแล้วมีกลุ่มถูกข้
     await callSoOptions('https://so-scraping.vercel.app', 'k', spy, 'OPL6910065');
     expect(url).toBe('https://so-scraping.vercel.app/api/integrations/jarvis/options?request_no=OPL6910065');
     const lib = readFileSync('api/_lib/soScrapingOptions.ts', 'utf8');
-    expect(lib).toContain("hit?.run_message");
+    expect(lib).toContain("const msg = hit.run_message;"); // 4 พ.ย. 2569 อ่านผ่าน fetchSoStatusOf ตัวเดียวกับ issues
     expect(readFileSync('api/_handlers/matching-job-postings.ts', 'utf8')).toContain("getQuery(req, 'run_message') === '1'");
     expect(readFileSync('src/components/jobs/OrderPostButton.tsx', 'utf8')).toContain('data-testid="so-run-message"');
   });

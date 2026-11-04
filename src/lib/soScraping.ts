@@ -4,7 +4,7 @@
  * ข้อมูลใหม่อยู่ใน `job_snapshot`: post_mode · caption · group_ids (โพสต์) / position · location · qty (Scrap)
  *
  * ไฟล์นี้ = กติกาล้วน ใช้ทั้งจอและ server (ตรวจซ้ำฝั่ง server ด้วยตัวเดียวกัน)
- * Choice ของเจ้าของ: ปุ่มขอ Scrap อยู่ในป๊อปประกาศที่เดียว · เก็บ "ไม่รับงาน" ได้ · โพสต์แล้วสั่งซ้ำได้ ·
+ * Choice ของเจ้าของ: ปุ่มขอ Scrap อยู่ในป๊อปประกาศที่เดียว · เก็บ "ไม่สำเร็จ" (เดิม "ไม่รับงาน") ได้ · โพสต์แล้วสั่งซ้ำได้ ·
  * ผล Scrap (Resume) อยู่ที่ So Scraping — Jarvis บอกแค่สถานะ
  */
 import type { JobRequest } from '@/types';
@@ -157,12 +157,13 @@ export const SO_STATUS_LABEL: Record<SoStatus, string> = {
   completed: 'เสร็จ',
   filled: 'เสร็จ',
   cancelled: 'ยกเลิก',
-  rejected: 'ไม่รับงาน',
+  // 4 พ.ย. 2569 ฉบับ 9: So Scraping ตีกลับเมื่อโพสต์/ค้นไม่สำเร็จ ไม่ได้ปฏิเสธงาน ⇒ "ไม่สำเร็จ" (เดิม "ไม่รับงาน")
+  rejected: 'ไม่สำเร็จ',
 };
 
 export type SoStatusView = { label: string; tone: ToneKey; open: boolean; waitLong: boolean };
 
-/** สถานะเป็นคำคน + สี — เหลือง = รอ/กำลังทำ · เขียว = โพสต์แล้ว/เสร็จ · แดง = ไม่รับงาน/รอนาน */
+/** สถานะเป็นคำคน + สี — เหลือง = รอ/กำลังทำ · เขียว = โพสต์แล้ว/เสร็จ · แดง = ไม่สำเร็จ/รอนาน */
 export function soStatusView(r: { status: string; created_at: string }, nowMs = Date.now()): SoStatusView {
   const status = (r.status in SO_STATUS_LABEL ? r.status : 'pending') as SoStatus;
   const waitLong = status === 'pending' && nowMs - Date.parse(r.created_at) > SO_WAIT_LONG_MS;
@@ -172,6 +173,19 @@ export function soStatusView(r: { status: string; created_at: string }, nowMs = 
   return { label: SO_STATUS_LABEL[status], tone, open: status === 'pending' || status === 'in_progress', waitLong };
 }
 
+/** เหตุที่ไม่สำเร็จจาก notes — ตัด "ตีกลับ: " ที่ So Scraping ใส่ข้างหน้า (4 พ.ย. 2569 ฉบับ 9) · ว่าง = null */
+export function soRejectReason(notes: string | null | undefined): string | null {
+  const t = (notes ?? '').replace(/^\s*ตีกลับ\s*[:：]\s*/u, '').trim();
+  return t || null;
+}
+
+/** เหตุ 1 บรรทัดของใบล่าสุด — ไม่สำเร็จ = notes · ค้าง = issues จาก So Scraping · อื่น ๆ = null (การ์ดบอร์ด · ฉบับ 9 ข้อ 6) */
+export function soStuckLine(r: { status: string; notes?: string | null; issues?: readonly string[] }): string | null {
+  if (r.status === 'rejected') return soRejectReason(r.notes);
+  if (r.status === 'pending' && r.issues?.length) return `ยังเริ่มไม่ได้: ${r.issues.join(' · ')}`;
+  return null;
+}
+
 /** ค่าของตัวกรองกล่องงาน "So Scraping" ต่อใบ */
 export type SoFacetValue = 'none' | 'open' | 'done' | 'rejected';
 export const SO_FACET_LABEL: Record<SoFacetValue, string> = {
@@ -179,7 +193,7 @@ export const SO_FACET_LABEL: Record<SoFacetValue, string> = {
   none: 'ยังไม่สั่ง',
   open: 'สั่งแล้วยังไม่เสร็จ',
   done: 'โพสต์แล้ว / เสร็จ',
-  rejected: 'ไม่รับงาน',
+  rejected: 'ไม่สำเร็จ',
 };
 export function soFacetValues(latest: ReadonlyArray<{ status: string }>): SoFacetValue[] {
   if (latest.length === 0) return ['none'];
@@ -197,7 +211,7 @@ export function soNoticeTitle(type: 'content' | 'scraping', status: string): str
   const what = type === 'scraping' ? 'Scrap' : 'สั่งโพสต์';
   if (status === 'posted') return `${what} · โพสต์แล้ว`;
   if (status === 'completed') return `${what} · เสร็จ`;
-  if (status === 'rejected') return `${what} · ไม่รับงาน`;
+  if (status === 'rejected') return `${what} · ไม่สำเร็จ`;
   return null;
 }
 

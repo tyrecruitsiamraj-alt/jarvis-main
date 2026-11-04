@@ -30,6 +30,8 @@ export type JobPostingRequest = {
   job_snapshot: JobSnapshot | null;
   created_at: string;
   updated_at: string;
+  /** เหตุที่ใบค้างจาก So Scraping — มากับป้ายบนบอร์ด (`?board=1`) เฉพาะใบ pending (4 พ.ย. 2569 ฉบับ 9) */
+  issues?: string[];
 };
 
 /** snapshot ที่ MatchingPage แนบมา (composeJobSnapshot) */
@@ -217,6 +219,21 @@ export function composeJobSnapshot(job: JobRequest): Record<string, unknown> {
   };
 }
 
+
+/** เหตุที่ใบค้าง/ไม่สำเร็จ จาก So Scraping (`issues` เช่น "บัญชี Burkhart Debe ถูกพักอยู่") · อ่านไม่ได้ = ว่าง */
+export async function fetchSoIssues(requestNo: string, type: 'content' | 'scraping'): Promise<string[]> {
+  const r = await apiFetch(`/api/matching/job-postings?so_status=1&request_no=${encodeURIComponent(requestNo)}&type=${type}`);
+  if (!r.ok) return [];
+  const d = (await r.json().catch(() => ({}))) as { issues?: unknown };
+  return Array.isArray(d.issues) ? d.issues.filter((x): x is string => typeof x === 'string' && x.trim() !== '') : [];
+}
+
+/** ยกเลิกใบที่ค้างแล้วสั่งใหม่ — ได้เฉพาะตอนยังค้าง (So Scraping เริ่มแล้ว = 409 พร้อมเหตุ) */
+export async function cancelJobPostingRequest(id: string): Promise<JobPostingRequest> {
+  const r = await apiFetch(`/api/matching/job-postings?action=cancel&id=${encodeURIComponent(id)}`, { method: 'POST' });
+  if (!r.ok) return readError(r, 'ยกเลิกไม่สำเร็จ');
+  return (await r.json()) as JobPostingRequest;
+}
 
 /** เริ่มงานที่ So Scraping อีกครั้ง (ครั้งก่อนติดปัญหา) — เรียกซ้ำได้ ไม่สร้างงานซ้ำ */
 export async function startJobPostingRequest(id: string): Promise<SoStartView> {
