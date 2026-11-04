@@ -23,10 +23,18 @@ describe('publicPostText', () => {
 });
 
 describe('การ์ดหน้าสมัคร', () => {
-  it('หน้าสมัคร/การ์ดตัวอย่างโชว์ข้อความที่แก้ · การ์ดกล่องงานของเจ้าหน้าที่ไม่โชว์', () => {
+  it('หน้าสมัคร/การ์ดตัวอย่างโชว์ข้อความที่แก้อย่างเดียว · การ์ดกล่องงานของเจ้าหน้าที่ไม่โชว์', () => {
     render(<JobPublicFacts job={job} />);
     expect(screen.getByTestId('job-public-post-text').textContent).toContain('มีโอที ขึ้นอยู่กับหน่วยงาน');
     expect(screen.getByTestId('job-public-post-text').textContent).not.toContain('https://');
+    // 4 พ.ย. 2569 "เจอข้อมูลเบิ้ล" → มีข้อความที่แก้ = โชว์ข้อความอย่างเดียว ไม่มีบรรทัดของใบขอซ้อน
+    expect(screen.getByTestId('job-public-facts').textContent).toBe(screen.getByTestId('job-public-post-text').textContent);
+    expect(screen.queryByText('ไม่ระบุวันเวลาทำงาน')).toBeNull();
+    cleanup();
+    // ใบที่ไม่มีข้อความที่แก้ = บรรทัดของใบขอเหมือนเดิม
+    render(<JobPublicFacts job={{ ...job, public_post_text: undefined }} />);
+    expect(screen.queryByTestId('job-public-post-text')).toBeNull();
+    expect(screen.getByText('ไม่ระบุวันเวลาทำงาน')).toBeTruthy();
     cleanup();
     render(<JobPublicFacts job={job} staff />);
     expect(screen.queryByTestId('job-public-post-text')).toBeNull();

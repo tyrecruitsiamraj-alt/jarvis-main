@@ -73,6 +73,17 @@ export default function JobPublicFacts({
   // ข้อความประกาศที่แก้ใน Autopost (เจ้าของ 28 ต.ค. 2569 "แก้ข้อความประกาศ ให้ไปแก้ที่ผู้สมัครจะเห็นแบบนี้ด้วย")
   // การ์ดกล่องงานของเจ้าหน้าที่ (`staff`) ไม่โชว์ — ยาว · ขึ้นเฉพาะหน้าสมัครกับการ์ดตัวอย่าง "ผู้สมัครจะเห็นแบบนี้"
   const postText = staff ? null : publicPostText(job.public_post_text);
+  // 🔴 มีข้อความที่แก้ = โชว์ข้อความนั้นอย่างเดียว (เจ้าของ 4 พ.ย. 2569 "เจอข้อมูลเบิ้ล" → Choice "มีข้อความที่แก้ = โชว์ข้อความอย่างเดียว")
+  // ข้อความ Autopost มีสถานที่/เวลา/รายได้/สวัสดิการ/คุณสมบัติครบอยู่แล้ว — โชว์บรรทัดของใบขอซ้อนด้านบนอีกชุด = ผู้สมัครเห็นซ้ำสองรอบ
+  if (postText) {
+    return (
+      <div className={cn('space-y-1', className)} data-testid="job-public-facts">
+        <p className="whitespace-pre-line text-sm text-foreground" data-testid="job-public-post-text">
+          {postText}
+        </p>
+      </div>
+    );
+  }
 
   const row = cn('flex min-w-0 items-start gap-1.5 text-sm', DASH.muted);
   const icon = 'mt-0.5 h-4 w-4 shrink-0';
@@ -191,11 +202,6 @@ export default function JobPublicFacts({
               นายสัญชาติ {boss}
             </span>
           ) : null}
-        </p>
-      ) : null}
-      {postText ? (
-        <p className="whitespace-pre-line border-t border-border/70 pt-2 text-sm text-foreground" data-testid="job-public-post-text">
-          {postText}
         </p>
       ) : null}
     </div>
