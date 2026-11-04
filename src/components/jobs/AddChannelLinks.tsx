@@ -82,15 +82,15 @@ const AddChannelLinks: React.FC<{
   }, [needGroups]);
 
   /**
-   * ช่องทาง → ลิงก์ที่จะสร้าง · Facebook Group เลือกกลุ่ม = กลุ่มละลิงก์ · ไม่เลือกกลุ่ม = 1 ลิงก์ของช่องทาง
-   * (เจ้าของ 3 พ.ย. 2569 "ไม่เลือกกลุ่มก็ gen ได้") · ไม่เลือกช่องทาง = ลิงก์กลาง 1 อัน
+   * ช่องทาง → ลิงก์ที่จะสร้าง · Facebook Group = กลุ่มละลิงก์ · ไม่เลือกช่องทาง = ลิงก์กลาง 1 อัน
+   * 🔴 Facebook Group ต้องเลือกกลุ่มก่อน (เจ้าของ 4 พ.ย. 2569 "ต้องเลือกกลุ่ม แบบเดิม" — ถอนข้อ 3 พ.ย.)
    */
   const pickedGroups = (soGroups ?? []).filter((g) => groupPick.includes(g.id));
   const wanted: ({ channelId: string; channelLabel: string; fbGroupId?: string } | null)[] =
     picked.length === 0
       ? [null]
       : picked.flatMap((c) =>
-          isFacebookGroupChannel(c.name) && pickedGroups.length > 0
+          isFacebookGroupChannel(c.name)
             ? pickedGroups.map((g) => ({
                 channelId: c.id,
                 // ลิงก์ผูกรหัสกลุ่ม ชื่อซ้ำต่อท้ายรหัส (4 พ.ย. 2569)
@@ -99,8 +99,10 @@ const AddChannelLinks: React.FC<{
               }))
             : [{ channelId: c.id, channelLabel: recruitChannelLabel(c) }],
         );
+  const missingGroup = fbGroupChannels.length > 0 && pickedGroups.length === 0;
 
   const create = async () => {
+    if (missingGroup) return;
     setBusy(true);
     setError(null);
     const made: RecruitPostingLink[] = [];
@@ -140,9 +142,10 @@ const AddChannelLinks: React.FC<{
       {fbGroupChannels.length > 0 ? (
         <div className="space-y-1.5" data-testid="add-links-groups">
           <SoGroupPicker groups={soGroups} jobBu={jobBu} jobSector={jobSector} value={groupPick} onChange={setGroupPick} />
+          {missingGroup ? <p className={cn('text-xs', TONE.warn.value)}>เลือกกลุ่ม Facebook อย่างน้อย 1 กลุ่ม</p> : null}
         </div>
       ) : null}
-      <Button type="button" className="w-full" disabled={busy} onClick={() => void create()}>
+      <Button type="button" className="w-full" disabled={busy || missingGroup} onClick={() => void create()}>
         {busy ? <Loader2 className="animate-spin" aria-hidden /> : <Link2 aria-hidden />}
         {/* คำว่า "Gen link" ทั้งก้อน (เจ้าของสั่ง 5 ต.ค. 2569 "สร้างลิงก์ เปลี่ยนเป็น Gen link") */}
         {busy

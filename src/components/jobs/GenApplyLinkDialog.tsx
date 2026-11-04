@@ -236,12 +236,13 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
   }, [open]);
 
   /**
-   * ช่องทาง → ลิงก์ที่จะสร้าง · Facebook Group เลือกกลุ่ม = กลุ่มละลิงก์ ชื่อกลุ่มตามรายชื่อ So Scraping
-   * ไม่เลือกกลุ่ม = 1 ลิงก์ของช่องทางหลัก/รอง (เจ้าของ 3 พ.ย. 2569 "ไม่เลือกกลุ่มก็ gen ได้")
+   * ช่องทาง → ลิงก์ที่จะสร้าง · Facebook Group = กลุ่มละลิงก์ ชื่อกลุ่มตามรายชื่อ So Scraping
+   * 🔴 ต้องเลือกกลุ่มก่อน (เจ้าของ 4 พ.ย. 2569 "เอากลับไปเป็น เลือกช่องทางหลัก ช่องทางรอง แล้วก็ต้องเลือกกลุ่ม แบบเดิม"
+   *    — ถอนข้อ 3 พ.ย. "ไม่เลือกกลุ่มก็ gen ได้")
    */
   const pickedGroups = (soGroups ?? []).filter((g) => groupPick.includes(g.id));
   const linkChannels = picked.flatMap((c) =>
-    isFacebookGroupChannel(c.name) && pickedGroups.length > 0
+    isFacebookGroupChannel(c.name)
       ? pickedGroups.map((g) => ({
           channelId: c.id,
           // ลิงก์ผูกรหัสกลุ่ม ชื่อซ้ำต่อท้ายรหัส (4 พ.ย. 2569)
@@ -250,6 +251,7 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
         }))
       : [{ channelId: c.id, label: recruitChannelLabel(c) }],
   );
+  const missingGroup = fbGroupChannels.length > 0 && pickedGroups.length === 0;
 
   /**
    * ⚠️ ล้มแล้วต้องคืนเป็นลิงก์ยาว ไม่ใช่ปล่อยติ๊กค้างทั้งที่ยังเป็นลิงก์เดิม
@@ -275,7 +277,7 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
   };
 
   const submit = async () => {
-    if (saving) return;
+    if (saving || missingGroup) return;
     setSaving(true);
     setError(null);
     try {
@@ -525,6 +527,11 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
               {standalone ? null : channelSection}
 
               {error ? <p className="text-xs text-red-600">{error}</p> : null}
+              {missingGroup ? (
+                <p className={cn('text-xs', TONE.warn.value)} data-testid="genlink-need-group">
+                  เลือกกลุ่ม Facebook อย่างน้อย 1 กลุ่ม
+                </p>
+              ) : null}
 
               {/**
                * 🔴 ดูตัวอย่างหน้าสมัครก่อน gen link (เจ้าของเคาะ 22 ก.ย. 2569 นิยามข้อ 4)
@@ -563,7 +570,7 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
               <button
                 type="button"
                 onClick={() => void submit()}
-                disabled={saving || !title.trim()}
+                disabled={saving || !title.trim() || missingGroup}
                 className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-2.5 text-sm font-medium text-primary-foreground disabled:opacity-60"
               >
                 {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Link2 className="h-4 w-4" />}

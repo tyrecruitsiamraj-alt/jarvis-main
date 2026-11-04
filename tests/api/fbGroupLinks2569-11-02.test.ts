@@ -45,14 +45,15 @@ describe('Gen link ช่องทาง Facebook Group = กลุ่มละ�
     ]);
   });
 
-  it('ป๊อป Gen link: Facebook Group เลือกกลุ่ม = กลุ่มละลิงก์ · ไม่เลือกกลุ่ม = 1 ลิงก์ของช่องทาง (3 พ.ย. 2569) · ปุ่มบอกจำนวนลิงก์', () => {
+  it('ป๊อป Gen link: Facebook Group = กลุ่มละลิงก์ · ต้องเลือกกลุ่มก่อน (4 พ.ย. 2569 กลับเป็นแบบเดิม — ถอนข้อ 3 พ.ย. ไม่เลือกก็ได้)', () => {
     const src = read('src/components/jobs/GenApplyLinkDialog.tsx');
     expect(src).toContain('channels: linkChannels,');
     // 4 พ.ย. 2569 ชื่อซ้ำต่อท้ายรหัสกลุ่ม + เก็บรหัสกลุ่มที่ลิงก์ (fbGroupLinkById2569-11-04)
     expect(src).toContain('soGroupLinkLabel(recruitChannelLabel(c), soGroupLinkName(g, soGroups ?? []))');
-    expect(src).toContain('isFacebookGroupChannel(c.name) && pickedGroups.length > 0');
-    expect(src).not.toContain('missingGroup');
-    expect(src).toContain('disabled={saving || !title.trim()}');
+    expect(src).not.toContain('isFacebookGroupChannel(c.name) && pickedGroups.length > 0');
+    expect(src).toContain('const missingGroup = fbGroupChannels.length > 0 && pickedGroups.length === 0;');
+    expect(src).toContain('disabled={saving || !title.trim() || missingGroup}');
+    expect(src).toContain('เลือกกลุ่ม Facebook อย่างน้อย 1 กลุ่ม');
   });
 });
 
@@ -118,14 +119,14 @@ describe('ภาพรวมงานสรรหา ตัวกรอง "ง�
 });
 
 describe('Gen link เพิ่ม (ใบที่มีลิงก์แล้ว) เลือกกลุ่มได้เหมือนป๊อปแรก (3 พ.ย. 2569)', () => {
-  it('AddChannelLinks แตก Facebook Group เป็นกลุ่มละลิงก์ · ไม่เลือกกลุ่ม = 1 ลิงก์ของช่องทาง (3 พ.ย. 2569)', () => {
+  it('AddChannelLinks แตก Facebook Group เป็นกลุ่มละลิงก์ · ต้องเลือกกลุ่มก่อน (4 พ.ย. 2569 แบบเดิม)', () => {
     const src = read('src/components/jobs/AddChannelLinks.tsx');
     expect(src).toContain('<SoGroupPicker');
     // 4 พ.ย. 2569 ชื่อซ้ำต่อท้ายรหัสกลุ่ม + เก็บรหัสกลุ่มที่ลิงก์ (fbGroupLinkById2569-11-04)
     expect(src).toContain('soGroupLinkLabel(recruitChannelLabel(c), soGroupLinkName(g, soGroups ?? []))');
-    expect(src).toContain('isFacebookGroupChannel(c.name) && pickedGroups.length > 0');
-    expect(src).not.toContain('missingGroup');
-    expect(src).toContain('disabled={busy}');
+    expect(src).not.toContain('isFacebookGroupChannel(c.name) && pickedGroups.length > 0');
+    expect(src).toContain('const missingGroup = fbGroupChannels.length > 0 && pickedGroups.length === 0;');
+    expect(src).toContain('disabled={busy || missingGroup}');
     expect(read('src/pages/jobs/BoardPostingPage.tsx')).toContain('jobBu={jobBuOf(job)}');
   });
 });
