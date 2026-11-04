@@ -60,6 +60,7 @@ export default function OrderPostButton({
   defaultKind = 'autopost',
   onSent,
   withGenLink = false,
+  onLinksChanged,
 }: {
   job: JobRequest;
   caption?: string | null;
@@ -69,8 +70,10 @@ export default function OrderPostButton({
   defaultKind?: OrderKind;
   /** ส่งใบสั่งแล้ว (โพสต์หรือ Scrap) — หน้าแม่โหลดป้ายสถานะใหม่ */
   onSent?: (item: JobPostingRequest) => void;
-  /** มีตัวเลือก Gen link ในช่อง "สั่งอะไร" (หน้ารายละเอียดใบขอ) */
+  /** มีตัวเลือก Gen link ในช่อง "สั่งอะไร" (หน้ารายละเอียดใบขอ + ป๊อปประกาศ) */
   withGenLink?: boolean;
+  /** Gen link / แก้ลิงก์แล้ว — หน้าแม่โหลดลิงก์ใหม่ (ป๊อปประกาศเอาลิงก์ไปต่อท้ายข้อความโพสต์) */
+  onLinksChanged?: () => void;
 }) {
   const [kind, setKind] = React.useState<OrderKind>(defaultKind);
   const [latest, setLatest] = React.useState<JobPostingRequest[] | null>(null);
@@ -256,7 +259,7 @@ export default function OrderPostButton({
       ) : kind === 'genlink' ? (
         <div className="space-y-2 rounded-xl border border-border/70 p-3" data-testid="so-order-genlink">
           {/* ฟอร์ม Gen link พับไว้ กดกางค่อยใช้ (เจ้าของ 4 พ.ย. 2569 "ย่อไว้กดกางออกค่อยให้ทำงานได้") */}
-          <JobApplyLinks job={job} />
+          <JobApplyLinks job={job} onChanged={onLinksChanged} />
         </div>
       ) : (
         <div className="space-y-3 rounded-xl border border-border/70 p-3" data-testid="so-order-scrap-form">

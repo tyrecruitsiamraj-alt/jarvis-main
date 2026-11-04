@@ -25,13 +25,16 @@ describe('Gen link รวมในกล่อง Autopost / Scrap', () => {
     const order = read('src/components/jobs/OrderPostButton.tsx');
     expect(order).toContain("options={withGenLink ? [...KIND_OPTIONS, GEN_LINK_OPTION] : KIND_OPTIONS}");
     // 4 พ.ย. 2569 เจ้าของ "ย่อไว้กดกางออกค่อยให้ทำงานได้" — ไม่กางฟอร์มค้าง
-    expect(order).toContain('<JobApplyLinks job={job} />');
+    expect(order).toContain('<JobApplyLinks job={job} onChanged={onLinksChanged} />');
     expect(read('src/components/jobs/ApplyLinksPanel.tsx')).not.toContain('formOpen');
   });
 
-  it('หน้างานสรรหาใช้ชิ้นเดียวกัน ไม่มีโค้ด Gen link ซ้ำในหน้า', () => {
+  it('ป๊อปประกาศ: Gen link รวมในกล่องเดียวกับหน้าใบขอ (เจ้าของ 4 พ.ย. 2569 "ทำไมไม่รวมกันแบบหน้าใบขอ") · ไม่มีการ์ดลิงก์สมัครแยก', () => {
     const board = read('src/pages/jobs/BoardPostingPage.tsx');
-    expect(board).toContain('<ApplyLinksPanel');
+    expect(board).toContain('withGenLink onLinksChanged={() => void loadPostings()}');
+    expect(board).not.toContain('<ApplyLinksPanel');
+    expect(board).not.toContain('title="ลิงก์สมัคร"');
+    expect(board).not.toContain('wantLink');
     expect(board).not.toContain('<AddChannelLinks');
     expect(board).not.toContain('<PostingLinksList');
   });

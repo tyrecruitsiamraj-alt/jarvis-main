@@ -17,10 +17,9 @@ describe('BoardPostingPage — อ่านไม่ได้ ≠ ไม่ม�
   });
 
   it('🔴 อ่านลิงก์ไม่ได้ = ไม่กางฟอร์ม Gen link เอง + ปุ่ม Gen link กดไม่ได้ + มีลองใหม่', () => {
-    expect(src).toContain('const noLinkYet = !postingsFailed && linkCount === 0;');
-    // 4 พ.ย. 2569 ส่วนลิงก์ย้ายเป็นชิ้นกลาง ApplyLinksPanel (หน้าไล่งาน + หน้ารายละเอียดใบขอใช้ตัวเดียว)
-    expect(src).toContain('failed={postingsFailed}');
-    expect(src).toContain('onReload={() => void loadPostings()}');
+    // 4 พ.ย. 2569 ลิงก์อยู่ในกล่อง Autopost / Scrap / Gen link (JobApplyLinks โหลดเอง · อ่านไม่ได้ = ปิดปุ่ม + ลองใหม่)
+    expect(src).not.toContain('noLinkYet');
+    expect(src).toContain('onLinksChanged={() => void loadPostings()}');
     const panel = readFileSync('src/components/jobs/ApplyLinksPanel.tsx', 'utf8');
     expect(panel).toContain('<Collapsible open={want && !failed}');
     expect(panel).toMatch(/data-testid="gen-link-toggle" disabled=\{failed\}/);

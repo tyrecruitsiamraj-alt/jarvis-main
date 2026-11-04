@@ -121,7 +121,7 @@ export default function ApplyLinksPanel({
 }
 
 /** ลิงก์สมัครของใบหนึ่ง — โหลดประกาศของใบเอง แล้วใช้ ApplyLinksPanel (ช่อง "สั่งอะไร" › Gen link · 4 พ.ย. 2569) */
-export function JobApplyLinks({ job }: { job: JobRequest }) {
+export function JobApplyLinks({ job, onChanged }: { job: JobRequest; onChanged?: () => void }) {
   const [postings, setPostings] = React.useState<RecruitPosting[] | null>(null);
   const [failed, setFailed] = React.useState(false);
   const load = React.useCallback(async () => {
@@ -136,5 +136,15 @@ export function JobApplyLinks({ job }: { job: JobRequest }) {
   React.useEffect(() => {
     void load();
   }, [load]);
-  return <ApplyLinksPanel job={job} postings={postings} failed={failed} onReload={() => void load()} />;
+  return (
+    <ApplyLinksPanel
+      job={job}
+      postings={postings}
+      failed={failed}
+      onReload={() => {
+        void load();
+        onChanged?.();
+      }}
+    />
+  );
 }

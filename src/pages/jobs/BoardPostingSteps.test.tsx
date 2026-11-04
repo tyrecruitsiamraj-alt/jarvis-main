@@ -116,8 +116,9 @@ describe('ป๊อปไล่งานโฉมใหม่ (30 ก.ย. 2569)
     renderSteps(onDone);
     fireEvent.click(await screen.findByRole('button', { name: /สรุป \+ ส่งประกาศ/ }));
     expect(screen.getByRole('heading', { name: 'สรุปก่อนส่ง' })).toBeTruthy();
-    expect(await screen.findByText('ยังไม่มีลิงก์')).toBeTruthy();
-    const send = screen.getByRole('button', { name: 'ส่งประกาศ' });
+    // 4 พ.ย. 2569 ลิงก์สมัครรวมในกล่อง "Autopost / Scrap / Gen link" แล้ว ไม่มีการ์ดแยก
+    expect(screen.queryByRole('heading', { name: 'ลิงก์สมัคร' })).toBeNull();
+    const send = await screen.findByRole('button', { name: 'ส่งประกาศ' });
     await waitFor(() => expect(send.hasAttribute('disabled')).toBe(false));
     fetchJobReleases.mockResolvedValue(released);
     fireEvent.click(send);
@@ -135,20 +136,6 @@ describe('ป๊อปไล่งานโฉมใหม่ (30 ก.ย. 2569)
     fireEvent.click(screen.getByRole('button', { name: 'บันทึกแบบร่าง' }));
     expect(onDone).toHaveBeenCalled();
     expect(releaseJobsToPublic).not.toHaveBeenCalled();
-  });
-
-  it('ขั้น 4: ปุ่ม "Gen link" แบบกางลง — พับไว้ก่อน · กดกางฟอร์ม · กดซ้ำพับ (เจ้าของสั่ง 5 ต.ค. 2569)', async () => {
-    fetchJobReleases.mockResolvedValue([]);
-    renderSteps();
-    fireEvent.click(await screen.findByRole('button', { name: /สรุป \+ ส่งประกาศ/ }));
-    const toggle = await screen.findByTestId('gen-link-toggle');
-    expect(toggle.textContent).toContain('Gen link');
-    expect(screen.queryByRole('checkbox', { name: 'สร้างลิงก์' })).toBeNull();
-    expect(screen.getAllByRole('button', { name: 'Gen link' })).toHaveLength(1); // ปุ่มกางอย่างเดียว ยังไม่มีฟอร์ม
-    fireEvent.click(toggle);
-    await waitFor(() => expect(screen.getAllByRole('button', { name: 'Gen link' }).length).toBe(2)); // + ปุ่มส่งในฟอร์ม
-    fireEvent.click(toggle);
-    await waitFor(() => expect(screen.getAllByRole('button', { name: 'Gen link' })).toHaveLength(1));
   });
 
   it('แถบ 4 ขั้นอยู่แถวเดียว (กริด 4 ช่อง) · ป้ายค้างที่นี่อยู่ในช่องของขั้น (เจ้าของสั่ง 5 ต.ค. 2569)', async () => {
@@ -287,11 +274,10 @@ describe('ป๊อปประกาศ 2 จอ (6 ต.ค. 2569)', () => {
     const onDone = vi.fn();
     renderQuick(onDone);
     fireEvent.click(await screen.findByRole('button', { name: /ถัดไป ประกาศ \+ Gen link/ }));
-    expect(screen.getByRole('heading', { name: 'ลิงก์สมัคร' })).toBeTruthy();
+    expect(screen.queryByRole('heading', { name: 'ลิงก์สมัคร' })).toBeNull(); // 4 พ.ย. 2569 รวมในกล่อง Autopost / Scrap / Gen link
     expect(screen.getByRole('heading', { name: 'ข้อความโพสต์' })).toBeTruthy();
     expect(screen.getByRole('heading', { name: 'ผู้สมัครจะเห็นแบบนี้' })).toBeTruthy();
     expect(screen.queryByRole('heading', { name: 'สรุปก่อนส่ง' })).toBeNull();
-    await waitFor(() => expect(screen.getAllByRole('button', { name: 'Gen link' }).length).toBe(2));
     const send = screen.getByRole('button', { name: 'ส่งประกาศ' });
     await waitFor(() => expect(send.hasAttribute('disabled')).toBe(false));
     fetchJobReleases.mockResolvedValue(released);
@@ -352,7 +338,10 @@ describe('ป๊อปประกาศหน้าเดียว 9 กล่�
     expect(screen.queryByTestId('post-text-paste')).toBeNull();
     // เจ้าของ 6 ต.ค. ค่ำ: การ์ด "ข้อมูลใบขอ" — "เอาออก"
     expect(screen.queryByTestId('quick-master-toggle')).toBeNull();
-    expect(screen.getByRole('heading', { name: 'ลิงก์สมัคร' })).toBeTruthy();
+    // 4 พ.ย. 2569 "ทำไมไม่รวมกันแบบหน้าใบขอ" — ลิงก์สมัครอยู่ในกล่อง Autopost / Scrap / Gen link (พับไว้) ไม่มีการ์ดแยก
+    expect(screen.queryByRole('heading', { name: 'ลิงก์สมัคร' })).toBeNull();
+    expect(screen.queryByTestId('gen-link-toggle')).toBeNull();
+    expect((await screen.findByTestId('order-post-toggle')).textContent).toContain('Autopost / Scrap / Gen link');
     // เจ้าของ 7 ต.ค.: "ข้อความโพสต์ เปลี่ยนเป็นหน้าตาที่จะเห็นเลย"
     expect(screen.queryByRole('heading', { name: 'ข้อความโพสต์' })).toBeNull();
     expect(screen.getByRole('heading', { name: 'ผู้สมัครจะเห็นแบบนี้' })).toBeTruthy();
@@ -360,8 +349,9 @@ describe('ป๊อปประกาศหน้าเดียว 9 กล่�
   });
 
   it('ฟอร์ม Gen link ใบแรก = เลือกช่องทางอย่างเดียว ไม่มีช่องหัวข้อ/รายละเอียด/ค่าตอบแทน/ผู้ติดต่อ (เจ้าของ Choice 7 ต.ค. 2569)', async () => {
-    fetchJobReleases.mockResolvedValue([]);
-    renderOne();
+    // 4 พ.ย. 2569 ฟอร์มอยู่ในกล่อง Autopost / Scrap / Gen link (ApplyLinksPanel ชิ้นเดียวกับหน้าใบขอ) — ตรวจที่ชิ้นนั้นตรง ๆ
+    const { default: ApplyLinksPanel } = await import('@/components/jobs/ApplyLinksPanel');
+    render(<ApplyLinksPanel job={currentJob} postings={[]} failed={false} onReload={() => {}} wantLink />);
     await waitFor(() => expect(screen.getAllByRole('button', { name: 'Gen link' }).length).toBe(2));
     for (const t of ['หัวข้อประกาศ', 'รายละเอียดที่ผู้สมัครเห็น', 'ค่าตอบแทน', 'ผู้ติดต่อ', 'ดูตัวอย่างหน้าสมัคร']) {
       expect(screen.queryByText(new RegExp(t))).toBeNull();

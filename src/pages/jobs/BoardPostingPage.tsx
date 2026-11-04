@@ -39,7 +39,6 @@ import PostTextPasteCard from '@/components/jobs/PostTextPasteCard';
 import ScheduleRequirementsFields from '@/components/jobs/ScheduleRequirementsFields';
 import { buildPostText } from '@/lib/postText';
 import { applyLinkPath } from '@/lib/recruitPostings';
-import ApplyLinksPanel from '@/components/jobs/ApplyLinksPanel';
 import JobApplicantsDialog from '@/components/jobs/JobApplicantsDialog';
 import ReleaseSkipControl from '@/components/jobs/ReleaseSkipControl';
 import UnitRequestInfoFields, { UnitRequestBriefFields } from '@/components/jobs/UnitRequestInfoFields';
@@ -348,9 +347,6 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
   const latestPosting = jobPostings?.[0] ?? null;
   /** ประกาศที่ยังเปิดล่าสุด — สร้างลิงก์เพิ่มใต้ประกาศนี้ (ไม่สร้างประกาศใหม่ซ้ำ) */
   const openPosting = jobPostings?.find((p) => p.status === 'open') ?? null;
-  const linkCount = jobPostings
-    ? jobPostings.filter((p) => p.status === 'open').reduce((sum, p) => sum + p.links.length, 0)
-    : null;
 
   const released = React.useMemo(() => {
     if (!releases || !job) return null;
@@ -431,8 +427,6 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
   /** "คนเก่า + รายได้ย้อนหลัง" — หุบเป็นค่าตั้งต้น (เจ้าของ Choice 1 ต.ค. 2569 "4 ขั้นเดิม แต่ตัดของรก") */
   /** "ดูเพิ่ม" ใต้หน้า 1 — ส่วนเกินของใบขอ (ใบเต็ม + รายละเอียดคนเก่า) พับไว้เป็นค่าตั้งต้น */
   const [moreOpen, setMoreOpen] = React.useState(false);
-  /** ขั้น 4: ติ๊ก "สร้างลิงก์" ถึงกางฟอร์ม (ลิงก์ไม่บังคับ — Choice 30 ก.ย. 2569) */
-  const [wantLink, setWantLink] = React.useState(false);
   const step: ReleaseStepKey = openStep;
   /** จอที่เปิดอยู่ของโฉม 2 จอ — เริ่มที่วางโพสต์เสมอ */
   const [quickStep, setQuickStep] = React.useState<QuickStepKey>('fill');
@@ -456,11 +450,6 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
     else if (quick) setQuickStep('fill');
     else setOpenStep(k);
   };
-  /** โฉม 2 จอ: ใบที่ยังไม่มีลิงก์ = ฟอร์ม Gen link กางรอเลย (จอ 2 คือจอประกาศ + Gen link) */
-  const noLinkYet = !postingsFailed && linkCount === 0;
-  React.useEffect(() => {
-    if ((quick || one) && noLinkYet) setWantLink(true);
-  }, [quick, one, noLinkYet]);
 
   /**
    * ขั้นนี้ผ่านแล้วหรือยัง — ใช้ระบายสีบนแถบ
@@ -503,10 +492,12 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
   // ── ชิ้นของจอประกาศ — ใช้ทั้งหน้า 4 (โฉม 4 หน้า) และจอ 2 (โฉม 2 จอ) ──
   const previewCard = (
     <>
+                {/* ลิงก์สมัครรวมในกล่อง "Autopost / Scrap / Gen link" แล้ว — แบบเดียวกับหน้าใบขอ (เจ้าของ 4 พ.ย. 2569 "ทำไมไม่รวมกันแบบหน้าใบขอ")
+                    เดิมเป็นการ์ด "ลิงก์สมัคร" แยก */}
                 {/* ผู้สมัครจะเห็นแบบไหน (เจ้าของ 4 ต.ค. 2569: *"หน้าสรุปต้องบอกว่าผู้สมัครจะเห็นหน้าตาแบบไหน จะได้ตรวจว่าครบไหม"*)
                     การ์ดตัวเดียวกับหน้าประกาศ — ช่องที่ติ๊กซ่อนก็ซ่อนในนี้ด้วย */}
                 <StepCard title="ผู้สมัครจะเห็นแบบนี้">
-                  {jobWithPatch ? <PublicJobCardPreview job={jobWithPatch} action={<OrderPostFold className="rounded-xl border border-border/70 p-3" job={jobWithPatch} caption={postText} onCaptionSaved={(t) => setPublicPatch((p) => ({ ...p, public_post_text: t ?? undefined }))} />} /> : <Loading />}
+                  {jobWithPatch ? <PublicJobCardPreview job={jobWithPatch} action={<OrderPostFold className="rounded-xl border border-border/70 p-3" job={jobWithPatch} caption={postText} withGenLink onLinksChanged={() => void loadPostings()} onCaptionSaved={(t) => setPublicPatch((p) => ({ ...p, public_post_text: t ?? undefined }))} />} /> : <Loading />}
                 </StepCard>
 
     </>
@@ -525,22 +516,6 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
                   ) : (
                     <Loading />
                   )}
-                </StepCard>
-
-    </>
-  );
-  const linksCard = (
-    <>
-                <StepCard title="ลิงก์สมัคร" aside={<span className="text-xs text-muted-foreground">ไม่บังคับ</span>}>
-                  {/* ชิ้นเดียวกับหน้ารายละเอียดใบขอ (ApplyLinksPanel · 4 พ.ย. 2569) */}
-                  <ApplyLinksPanel
-                    job={job}
-                    postings={jobPostings}
-                    failed={postingsFailed}
-                    onReload={() => void loadPostings()}
-                    wantLink={wantLink}
-                    onWantLinkChange={setWantLink}
-                  />
                 </StepCard>
 
     </>
@@ -629,7 +604,6 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
   const publishTail = (
     <>
       {postTextCard}
-      {linksCard}
       {publishActions}
     </>
   );
@@ -918,8 +892,7 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
           {...boxProps('requirements')}
         />
 
-        {linksCard}
-        {/* การ์ดที่ผู้สมัครเห็นแทนข้อความโพสต์ (เจ้าของ 7 ต.ค. 2569: *"ข้อความโพสต์ เปลี่ยนเป็นหน้าตาที่จะเห็นเลย"* —
+          {/* การ์ดที่ผู้สมัครเห็นแทนข้อความโพสต์ (เจ้าของ 7 ต.ค. 2569: *"ข้อความโพสต์ เปลี่ยนเป็นหน้าตาที่จะเห็นเลย"* —
             หน้าลิงก์ที่ Gen · หน้า /apply · การ์ดโพสต์ประกาศ ต้องเห็นแบบเดียวกัน = `JobPublicFacts` ตัวเดียวกันทั้งสามที่) */}
         {previewCard}
         {publishActions}
@@ -976,8 +949,7 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
     ) : (
       <>
         {gapBar}
-        {linksCard}
-        {postTextCard}
+          {postTextCard}
         {previewCard}
         {publishActions}
       </>
