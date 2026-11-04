@@ -518,7 +518,7 @@ export type SoGroupSection<G extends { department: string | null } = SoOptGroup>
   groups: G[];
 };
 
-/** จัดหมวด: ธุรกิจของใบขอก่อน → ธุรกิจอื่นเรียงรหัส → ไม่ระบุท้ายสุด · หมวดว่างไม่ขึ้น (ใบขอที่ธุรกิจไม่มีกลุ่มเลยให้บอกด้วย `soBuEmptyText`) */
+/** จัดหมวด: ธุรกิจของใบขอก่อน → ธุรกิจอื่นเรียงรหัส → ไม่ระบุท้ายสุด · หมวดว่างไม่ขึ้น */
 export function soGroupSections<G extends { department: string | null }>(groups: readonly G[], jobBu: string | null): SoGroupSection<G>[] {
   const by = new Map<string | null, G[]>();
   for (const g of groups) {
@@ -698,16 +698,6 @@ export function soSectionHeadText(sec: Pick<SoGroupSection, 'label' | 'groups'>,
   const n = sec.groups.filter((g) => picked.includes(g.id)).length;
   const stuck = sec.groups.filter((g) => !soGroupView(g, acc).recommended).length;
   return [sec.label, `ติ๊กไว้ ${n} จาก ${sec.groups.length}`, ...(stuck ? [`ติด ${stuck}`] : [])].join(' · ');
-}
-
-/** ธุรกิจของใบขอยังไม่มีกลุ่มเลย — บอกว่าไปเพิ่มที่ไหน ไม่ปล่อยรายการว่าง */
-export function soBuEmptyText(bu: string): string {
-  return `ยังไม่มีกลุ่มของ ${bu} ใน So Scraping — เพิ่มที่ ตั้งค่า → กลุ่มโพสต์ หรือเลือกจากธุรกิจอื่น`;
-}
-
-/** ธุรกิจของใบขอยังไม่มีบัญชี Facebook เลย — บอกว่าไปเพิ่มที่ไหน */
-export function soBuNoAccountText(bu: string): string {
-  return `ยังไม่มีบัญชี Facebook ของธุรกิจ ${bu} ใน So Scraping — เพิ่มที่ ตั้งค่า → บัญชีที่ใช้งาน หรือเลือกจากธุรกิจอื่น`;
 }
 
 /** ลำดับหัวธุรกิจ: ของใบขอก่อน → ธุรกิจอื่นเรียงรหัส → ไม่ระบุท้ายสุด (ใช้ทั้งบัญชีและกลุ่ม) */

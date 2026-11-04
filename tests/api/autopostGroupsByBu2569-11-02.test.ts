@@ -11,8 +11,6 @@ import {
   parseSoOptions,
   soAccountsByBu,
   soAccountsForJob,
-  soBuEmptyText,
-  soBuNoAccountText,
   soGroupView,
   soSectionHeadText,
   soGroupSections,
@@ -58,11 +56,10 @@ describe('กลุ่ม Facebook ตามธุรกิจของใบข
     ]);
   });
 
-  it('ใบ LBA ที่ธุรกิจยังไม่มีกลุ่ม: ไม่มีหมวดของใบ · ไม่ติ๊กอะไร · ข้อความบอกที่เพิ่ม', () => {
+  it('ใบ LBA ที่ธุรกิจยังไม่มีกลุ่ม: ไม่มีหมวดของใบ · ไม่ติ๊กอะไร', () => {
     const sections = soGroupSections(GROUPS, 'LBA');
     expect(sections.some((s) => s.forJob)).toBe(false);
     expect(sections.map((s) => s.label)).toEqual(['LBD', 'LM', 'ไม่ระบุธุรกิจ']);
-    expect(soBuEmptyText('LBA')).toBe('ยังไม่มีกลุ่มของ LBA ใน So Scraping — เพิ่มที่ ตั้งค่า → กลุ่มโพสต์ หรือเลือกจากธุรกิจอื่น');
   });
 
   it('ใบขอไม่ระบุธุรกิจ: ไม่ติ๊ก · หมวดเรียงรหัส ไม่ระบุท้ายสุด', () => {
@@ -103,7 +100,10 @@ describe('กลุ่ม Facebook ตามธุรกิจของใบข
     const dialog = (readFileSync('src/components/jobs/AutopostDialog.tsx', 'utf8') + readFileSync('src/components/jobs/SoGroupPicker.tsx', 'utf8')) /* 4 พ.ย. 2569 ตัวเลือกกลุ่มย้ายเป็นชิ้นกลาง */;
     // 4 พ.ย. 2569 เจ้าของ "ไม่ติ๊กกลุ่มให้เลย" — เปิดป๊อปไม่ติ๊กกลุ่มใด
     expect(dialog).not.toContain('defaultSoGroupPick');
-    expect(dialog).toContain('-bu-empty`}');
+    // 4 พ.ย. 2569 เจ้าของ "เอาออก" — ไม่มีข้อความ "ยังไม่มีกลุ่ม/บัญชีของ <ธุรกิจ> … หรือเลือกจากธุรกิจอื่น" แล้ว
+    expect(dialog).not.toContain('-bu-empty`}');
+    expect(dialog).not.toContain('autopost-bu-no-account');
+    expect(readFileSync('src/lib/soScraping.ts', 'utf8')).not.toContain('หรือเลือกจากธุรกิจอื่น');
     // 4 พ.ย. 2569 ช่องติ๊กทั้งหมดย้ายไปหัวข้อย่อย ราชการ / เอกชน (SoSectorFold) — หัวธุรกิจไม่มีช่องติ๊กแล้ว
     expect(readFileSync('src/components/jobs/SoGroupPicker.tsx', 'utf8')).toContain("checked={n === 0 ? false : n === ids.length ? true : 'indeterminate'}");
     expect(dialog).not.toContain('เลือกทุกกลุ่มของ ${section.label}');
@@ -115,7 +115,6 @@ describe('กลุ่ม Facebook ตามธุรกิจของใบข
     expect(grp).toContain('select u.id::text as id, u.department::text as department from ${SCHEMA}.users u`');
     // 3 พ.ย. 2569 สเปค So Scraping 6.1: บัญชีตั้งต้น = บัญชีแรกที่ So Scraping แนะนำ (ธุรกิจของใบขอก่อน)
     expect(dialog).toContain('const acc = soDefaultAccount(o.accounts, jobBu);');
-    expect(dialog).toContain('data-testid="autopost-bu-no-account"');
     const groups = readFileSync('api/_lib/soScrapingGroups.ts', 'utf8');
     expect(groups).not.toContain('unknownSoGroupIds');
     expect(groups).not.toMatch(/from \$\{SCHEMA\}\.groups g\s+where exists/);
@@ -137,7 +136,6 @@ describe('กลุ่ม Facebook ตามธุรกิจของใบข
     expect(soAccountsForJob(accounts, 'LBD').map((a) => a.name)).toEqual(['Rudge Marita', 'Tyni Aiit']);
     expect(soAccountsForJob(accounts, 'LBA')).toEqual([]);
     expect(soAccountsForJob(accounts, null)).toHaveLength(4);
-    expect(soBuNoAccountText('LBA')).toBe('ยังไม่มีบัญชี Facebook ของธุรกิจ LBA ใน So Scraping — เพิ่มที่ ตั้งค่า → บัญชีที่ใช้งาน หรือเลือกจากธุรกิจอื่น');
   });
 
   /* ── สถานะกลุ่มของบัญชีที่เลือก (So Scraping acc6821 · เจ้าของ 2 พ.ย. 2569 "เลือกมาก็เหมือนไม่มีไร") ── */

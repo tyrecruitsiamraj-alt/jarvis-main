@@ -46,9 +46,7 @@ import {
   soGroupLinkName,
   soGroupLinkOf,
   type SoGroupLink,
-  soBuNoAccountText,
   soAccountsByBu,
-  soAccountsForJob,
   soAccountUsable,
   soAccountChoice,
   soAccountStatusText,
@@ -399,11 +397,6 @@ export function AutopostBody({
               <p className={cn('text-sm', TONE.warn.value)}>ยังไม่มีบัญชี ให้เพิ่มที่ระบบ So Scraping</p>
             ) : (
               <>
-                {jobBu && soAccountsForJob(opts.accounts, jobBu).length === 0 ? (
-                  <p className={cn('text-sm', TONE.warn.value)} data-testid="autopost-bu-no-account">
-                    {soBuNoAccountText(jobBu)}
-                  </p>
-                ) : null}
                 {!opts.accounts.some((a) => a.recommended) ? (
                   <p className={cn('text-sm', TONE.danger.value)} data-testid="autopost-no-ready-account">
                     {soNoAccountReadyText(opts.accounts)}

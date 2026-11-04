@@ -5,7 +5,6 @@ import { FieldSelect } from '@/components/shared/FieldSelect';
 import { cn } from '@/lib/utils';
 import { DASH, TONE } from '@/lib/designTokens';
 import {
-  soBuEmptyText,
   soFilterBus,
   soFilterGroups,
   soFilterProvinces,
@@ -130,11 +129,6 @@ export function SoGroupFilterPicker({
   }
   return (
     <div className="space-y-2" data-testid={`${testPrefix}-groups`}>
-      {jobBu && !bus.some((b) => b.value === jobBu) ? (
-        <p className={cn('text-sm', TONE.warn.value)} data-testid={`${testPrefix}-bu-empty`}>
-          {soBuEmptyText(jobBu)}
-        </p>
-      ) : null}
       <div className="grid gap-2 sm:grid-cols-3">
         <div className="space-y-1">
           <Label className="text-xs text-muted-foreground">ธุรกิจ</Label>
