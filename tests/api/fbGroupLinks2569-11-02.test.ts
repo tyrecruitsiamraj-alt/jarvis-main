@@ -127,6 +127,6 @@ describe('Gen link เพิ่ม (ใบที่มีลิงก์แล�
     expect(src).not.toContain('isFacebookGroupChannel(c.name) && pickedGroups.length > 0');
     expect(src).toContain('const missingGroup = fbGroupChannels.length > 0 && pickedGroups.length === 0;');
     expect(src).toContain('disabled={busy || missingGroup}');
-    expect(read('src/pages/jobs/BoardPostingPage.tsx')).toContain('jobBu={jobBuOf(job)}');
+    expect(read('src/components/jobs/ApplyLinksPanel.tsx')).toContain('jobBu={jobBuOf(job)}'); // 4 พ.ย. 2569 ย้ายเป็นชิ้นกลาง
   });
 });

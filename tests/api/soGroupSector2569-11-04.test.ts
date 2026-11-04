@@ -83,7 +83,7 @@ describe('จอและฐาน', () => {
     expect(readFileSync('src/components/jobs/SoGroupPicker.tsx', 'utf8')).toContain('const [open, setOpen] = React.useState(false);');
     expect(readFileSync('src/components/jobs/SoGroupPicker.tsx', 'utf8')).toContain('soSectorBlocks(section.groups, jobSector)');
     expect(readFileSync('src/components/jobs/GenApplyLinkDialog.tsx', 'utf8')).toContain('jobSector={job ? jobUnitSectorOf(job) : null}');
-    expect(readFileSync('src/pages/jobs/BoardPostingPage.tsx', 'utf8')).toContain('jobSector={jobUnitSectorOf(job)}');
+    expect(readFileSync('src/components/jobs/ApplyLinksPanel.tsx', 'utf8')).toContain('jobSector={jobUnitSectorOf(job)}');
   });
 
   it('ช่องติ๊กทั้งหมดอยู่ที่หัวข้อย่อย ราชการ / เอกชน ไม่ใช่หัวธุรกิจ (เจ้าของ 4 พ.ย. 2569 · ติ๊กหัว LBD เดียวได้ 212 ลิงก์)', () => {

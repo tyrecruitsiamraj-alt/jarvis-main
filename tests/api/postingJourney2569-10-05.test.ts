@@ -50,7 +50,9 @@ describe('ป๊อปโพสต์ประกาศ — ของที่�
   });
   it('แถวตำแหน่งใช้ postingPositionText · Gen link เป็นปุ่มกางลง ไม่ใช่ช่องติ๊ก', () => {
     expect(src).toContain('<SummaryRow label="ตำแหน่ง">{postingPositionText(jobWithPatch)}</SummaryRow>');
-    expect(src).toContain('data-testid="gen-link-toggle"');
+    // 4 พ.ย. 2569 ปุ่ม Gen link อยู่ในชิ้นกลาง ApplyLinksPanel
+    expect(src).toContain('<ApplyLinksPanel');
+    expect(readFileSync('src/components/jobs/ApplyLinksPanel.tsx', 'utf8')).toContain('data-testid="gen-link-toggle"');
     expect(src).not.toContain('id="posting-want-link"');
   });
 });

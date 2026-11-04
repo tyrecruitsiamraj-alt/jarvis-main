@@ -18,9 +18,13 @@ describe('BoardPostingPage — อ่านไม่ได้ ≠ ไม่ม�
 
   it('🔴 อ่านลิงก์ไม่ได้ = ไม่กางฟอร์ม Gen link เอง + ปุ่ม Gen link กดไม่ได้ + มีลองใหม่', () => {
     expect(src).toContain('const noLinkYet = !postingsFailed && linkCount === 0;');
-    expect(src).toContain('<Collapsible open={wantLink && !postingsFailed}');
-    expect(src).toMatch(/data-testid="gen-link-toggle" disabled=\{postingsFailed\}/);
-    expect(src).toMatch(/data-testid="links-failed"[\s\S]{0,200}อ่านลิงก์ไม่ได้[\s\S]{0,200}loadPostings\(\)[\s\S]{0,80}ลองใหม่/);
+    // 4 พ.ย. 2569 ส่วนลิงก์ย้ายเป็นชิ้นกลาง ApplyLinksPanel (หน้าไล่งาน + หน้ารายละเอียดใบขอใช้ตัวเดียว)
+    expect(src).toContain('failed={postingsFailed}');
+    expect(src).toContain('onReload={() => void loadPostings()}');
+    const panel = readFileSync('src/components/jobs/ApplyLinksPanel.tsx', 'utf8');
+    expect(panel).toContain('<Collapsible open={want && !failed}');
+    expect(panel).toMatch(/data-testid="gen-link-toggle" disabled=\{failed\}/);
+    expect(panel).toMatch(/data-testid="links-failed"[\s\S]{0,200}อ่านลิงก์ไม่ได้[\s\S]{0,200}onReload[\s\S]{0,80}ลองใหม่/);
   });
 
   it('🔴 อ่านทะเบียนประกาศไม่ได้ = ไม่โชว์ปุ่มส่งประกาศ/ดึงลง (เช็คก่อนสาขา released)', () => {

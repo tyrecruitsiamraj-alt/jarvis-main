@@ -30,19 +30,16 @@ import { copyText } from '@/lib/copyText';
 import React from 'react';
 import { lazyPage } from '@/lib/staleChunkReload';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
-import { Check, ChevronDown, ChevronRight, ClipboardCheck, Copy, Link2, Send, UserMinus, Users } from 'lucide-react';
+import { Check, ChevronDown, ChevronRight, ClipboardCheck, Copy, Send, UserMinus, Users } from 'lucide-react';
 
 import PageHeader from '@/components/shared/PageHeader';
-import GenApplyLinkDialog from '@/components/jobs/GenApplyLinkDialog';
 import GenderPicker from '@/components/jobs/GenderPicker';
 import AgeRangeFields from '@/components/jobs/AgeRangeFields';
 import PostTextPasteCard from '@/components/jobs/PostTextPasteCard';
 import ScheduleRequirementsFields from '@/components/jobs/ScheduleRequirementsFields';
 import { buildPostText } from '@/lib/postText';
 import { applyLinkPath } from '@/lib/recruitPostings';
-import PostingLinksList from '@/components/jobs/PostingLinksList';
-import { jobBuOf } from '@/lib/soScraping';
-import AddChannelLinks from '@/components/jobs/AddChannelLinks';
+import ApplyLinksPanel from '@/components/jobs/ApplyLinksPanel';
 import JobApplicantsDialog from '@/components/jobs/JobApplicantsDialog';
 import ReleaseSkipControl from '@/components/jobs/ReleaseSkipControl';
 import UnitRequestInfoFields, { UnitRequestBriefFields } from '@/components/jobs/UnitRequestInfoFields';
@@ -74,7 +71,7 @@ import {
   releaseStepOf,
   type ReleaseStepKey,
 } from '@/lib/boardRelease';
-import { jobBoardCardTitle, jobUnitSectorOf } from '@/lib/unitRequestDisplay';
+import { jobBoardCardTitle } from '@/lib/unitRequestDisplay';
 import { postingPositionText } from '@/lib/publicJobTitle';
 import { publicSafeAddress } from '@/lib/publicJobPrivacy';
 import { INCOME_PERIOD_LABEL, buildIncomeDisplay } from '@/lib/incomeBreakdown';
@@ -351,8 +348,6 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
   const latestPosting = jobPostings?.[0] ?? null;
   /** ประกาศที่ยังเปิดล่าสุด — สร้างลิงก์เพิ่มใต้ประกาศนี้ (ไม่สร้างประกาศใหม่ซ้ำ) */
   const openPosting = jobPostings?.find((p) => p.status === 'open') ?? null;
-  /** ลิงก์สมัครที่ยังใช้ได้ (ประกาศที่ยังเปิด) */
-  const openPostingCount = jobPostings ? jobPostings.filter((p) => p.status === 'open').length : 0;
   const linkCount = jobPostings
     ? jobPostings.filter((p) => p.status === 'open').reduce((sum, p) => sum + p.links.length, 0)
     : null;
@@ -438,8 +433,6 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
   const [moreOpen, setMoreOpen] = React.useState(false);
   /** ขั้น 4: ติ๊ก "สร้างลิงก์" ถึงกางฟอร์ม (ลิงก์ไม่บังคับ — Choice 30 ก.ย. 2569) */
   const [wantLink, setWantLink] = React.useState(false);
-  /** "มีแล้ว N ลิงก์" กดแล้วกางรายการลิงก์ทีละอัน (เจ้าของ 4 ต.ค. 2569 — Choice "ครบ") */
-  const [linksOpen, setLinksOpen] = React.useState(false);
   const step: ReleaseStepKey = openStep;
   /** จอที่เปิดอยู่ของโฉม 2 จอ — เริ่มที่วางโพสต์เสมอ */
   const [quickStep, setQuickStep] = React.useState<QuickStepKey>('fill');
@@ -539,71 +532,15 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
   const linksCard = (
     <>
                 <StepCard title="ลิงก์สมัคร" aside={<span className="text-xs text-muted-foreground">ไม่บังคับ</span>}>
-                  {/* "มีแล้ว N ลิงก์" กดแล้วกางดูทีละลิงก์ว่าเกี่ยวกับอะไร (เจ้าของ 4 ต.ค. 2569 → Choice "ครบ") */}
-                  {postingsFailed ? (
-                    <p className={cn('flex flex-wrap items-center gap-2 text-sm', TONE.danger.value)} data-testid="links-failed">
-                      อ่านลิงก์ไม่ได้
-                      <Button type="button" variant="outline" size="xs" onClick={() => void loadPostings()}>
-                        ลองใหม่
-                      </Button>
-                    </p>
-                  ) : linkCount === null ? (
-                    <p className="text-sm text-muted-foreground">กำลังโหลด…</p>
-                  ) : linkCount > 0 ? (
-                    <Collapsible open={linksOpen} onOpenChange={setLinksOpen}>
-                      <CollapsibleTrigger asChild>
-                        <Button type="button" variant="ghost" size="sm" className="-ml-2">
-                          มีแล้ว {NUM.format(linkCount)} ลิงก์
-                          {/* หลายชุดประกาศ = บอกจำนวนชุด (QA 17 ต.ค. 2569: หัว 4 ลิงก์ แต่ชุดที่เปิดดูบอก 3) */}
-                          {openPostingCount > 1 ? ` · ${NUM.format(openPostingCount)} ชุด` : ''}
-                          <ChevronDown className={cn('transition-transform', linksOpen && 'rotate-180')} aria-hidden />
-                        </Button>
-                      </CollapsibleTrigger>
-                      <CollapsibleContent className="pt-2">
-                        <PostingLinksList postings={(jobPostings ?? []).filter((p) => p.status === 'open')} onChanged={() => void loadPostings()} />
-                      </CollapsibleContent>
-                    </Collapsible>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">ยังไม่มีลิงก์</p>
-                  )}
-                  {/* 🔴 "Gen link" เป็นปุ่มกางลง (เจ้าของสั่ง 5 ต.ค. 2569: *"สร้างลิงก์ เปลี่ยนเป็น Gen link และพอกดไป
-                      ให้มันเป็น Dropdown ไม่ใช่ค้างโชว์ไว้"*) — เดิมเป็นช่องติ๊กที่กางฟอร์มค้างไว้ · กดอีกครั้ง = พับ
-                      มีประกาศแล้ว = เลือกช่องทางอย่างเดียว ข้อความเดิม · ยังไม่มี = กรอกข้อความประกาศครั้งแรกครั้งเดียว */}
-                  <Collapsible open={wantLink && !postingsFailed} onOpenChange={setWantLink}>
-                    <CollapsibleTrigger asChild>
-                      <Button type="button" variant="outline" size="sm" data-testid="gen-link-toggle" disabled={postingsFailed}>
-                        <Link2 aria-hidden />
-                        {linkCount ? 'Gen link เพิ่ม' : 'Gen link'}
-                        <ChevronDown className={cn('transition-transform', wantLink && 'rotate-180')} aria-hidden />
-                      </Button>
-                    </CollapsibleTrigger>
-                    <CollapsibleContent className="pt-3">
-                      {job && openPosting ? (
-                        <AddChannelLinks
-                          posting={openPosting}
-                          jobBu={jobBuOf(job)}
-                          jobSector={jobUnitSectorOf(job)}
-                          onCreated={() => {
-                            void loadPostings();
-                            setLinksOpen(false);
-                          }}
-                        />
-                      ) : job ? (
-                        <GenApplyLinkDialog
-                          embedded
-                          open
-                          hidePreview
-                          channelOnly
-                          job={job}
-                          onClose={() => setWantLink(false)}
-                          onCreated={() => {
-                            void loadPostings();
-                            setLinksOpen(true);
-                          }}
-                        />
-                      ) : null}
-                    </CollapsibleContent>
-                  </Collapsible>
+                  {/* ชิ้นเดียวกับหน้ารายละเอียดใบขอ (ApplyLinksPanel · 4 พ.ย. 2569) */}
+                  <ApplyLinksPanel
+                    job={job}
+                    postings={jobPostings}
+                    failed={postingsFailed}
+                    onReload={() => void loadPostings()}
+                    wantLink={wantLink}
+                    onWantLinkChange={setWantLink}
+                  />
                 </StepCard>
 
     </>
