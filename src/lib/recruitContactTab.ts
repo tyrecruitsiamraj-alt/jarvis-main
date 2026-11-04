@@ -51,16 +51,18 @@ export type ContactRow = {
   total: number;
   ok: number;
   booked: number;
+  /** โทรแล้ว = ติดต่อไม่ได้ + ติดต่อได้ (ตารางรายคน · 4 พ.ย. 2569) */
+  called: number;
   counts: Record<ContactBucket, number>;
   /** id ต่อช่อง — กดดูรายชื่อ */
-  ids: Record<ContactBucket | 'total' | 'ok' | 'booked', string[]>;
+  ids: Record<ContactBucket | 'total' | 'ok' | 'booked' | 'called', string[]>;
   children?: ContactRow[];
 };
 
 const BUCKETS = Object.keys(CONTACT_BUCKET_LABEL) as ContactBucket[];
 
 function rowOf(key: string, name: string, list: readonly RecruitAppFact[], now: Date): ContactRow {
-  const ids = Object.fromEntries([...BUCKETS, 'total', 'ok', 'booked'].map((k) => [k, [] as string[]])) as ContactRow['ids'];
+  const ids = Object.fromEntries([...BUCKETS, 'total', 'ok', 'booked', 'called'].map((k) => [k, [] as string[]])) as ContactRow['ids'];
   for (const f of list) {
     const b = contactBucketOf(f, now);
     const id = f.id ?? '';
@@ -68,9 +70,10 @@ function rowOf(key: string, name: string, list: readonly RecruitAppFact[], now: 
     ids.total.push(id);
     if (CONTACT_OK.includes(b)) ids.ok.push(id);
     if (CONTACT_BOOKED.includes(b)) ids.booked.push(id);
+    if (b !== 'waiting') ids.called.push(id);
   }
   const counts = Object.fromEntries(BUCKETS.map((b) => [b, ids[b].length])) as Record<ContactBucket, number>;
-  return { key, name, total: list.length, ok: ids.ok.length, booked: ids.booked.length, counts, ids };
+  return { key, name, total: list.length, ok: ids.ok.length, booked: ids.booked.length, called: ids.called.length, counts, ids };
 }
 
 /** แถวรวม + ช่องทางหลัก (มากไปน้อย) › ช่องทางรอง · `apps` = ทุกใบสมัครของช่วง (กรองคนสนใจข้างใน) */
@@ -90,3 +93,20 @@ export function buildContactRows(apps: readonly RecruitAppFact[], now: Date): { 
   });
   return { total: rowOf('total', 'รวมทุกช่องทาง', yes, now), groups: out.sort((a, b) => b.total - a.total) };
 }
+
+/**
+ * ═══ รายคน: เก็บไปหน้าการติดต่อแล้วเป็นไง (เจ้าของ 4 พ.ย. 2569) ═══
+ * > *"แบงค์เก็บไปหน้าการติดต่อ 30 โทรแล้ว 30 ติดต่อได้เท่าไหร่ ติดต่อไม่ได้เท่าไหร่ รอโทรเท่าไหร่ … นัดได้เท่าไหร่"*
+ * ฐาน = ใบของช่วงที่มีคนเก็บ (`claimedBy`) ทุกใบ ไม่กรองว่าสนใจ — คนเก็บคือคนที่ต้องโทร
+ * เก็บไป = รอโทร + โทรแล้ว · โทรแล้ว = ติดต่อไม่ได้ + ติดต่อได้ · นัดได้อยู่ในติดต่อได้ (ตัวนับเดียวกับแถวช่องทาง `contactBucketOf`)
+ */
+export function buildClaimRows(apps: readonly RecruitAppFact[], now: Date): { total: ContactRow; people: ContactRow[] } {
+  const claimed = apps.filter((f) => !!f.claimedBy);
+  const by = new Map<string, RecruitAppFact[]>();
+  for (const f of claimed) by.set(f.claimedBy!, [...(by.get(f.claimedBy!) ?? []), f]);
+  const people = [...by.entries()]
+    .map(([name, list]) => rowOf(`claim:${name}`, name, list, now))
+    .sort((a, b) => b.total - a.total || a.name.localeCompare(b.name, 'th'));
+  return { total: rowOf('claim:total', 'รวมทุกคน', claimed, now), people };
+}
+

@@ -67,6 +67,7 @@ import TrendLinesCard, { type ComparePeriod, type TrendStack } from './TrendLine
 import RequestTab from './RequestTab';
 import ContactTab from './ContactTab';
 import DrillDownCard from './DrillDownCard';
+import RecruiterAppsCard from './RecruiterAppsCard';
 import { drillTreeOf } from '@/lib/recruitDrill';
 import { toYmdBangkok } from '@/lib/dateTh';
 
@@ -451,6 +452,13 @@ const RecruitOverview: React.FC<{
                 <>
               {compareCard('apps', fv)}
               {drillCard('apps', 'รายชื่อที่กรอกมา', fv)}
+              {/* เป็นงานของใคร → ใบไหน (เจ้าของ 4 พ.ย. 2569 "แบงค์ เข้ามา 50 คน แบ่งเป็น งาน ก 5 ข 5 ค 40") */}
+              <RecruiterAppsCard
+                apps={fv.cohort}
+                jobs={data.appJobs}
+                jobsError={data.errors.appJobs ?? null}
+                onOpenNames={(title, ids) => setNames({ title, ids })}
+              />
               {/* งานค้างของขั้นนี้ ณ วันนี้ (ย้ายจากแท็บใบขอ · เจ้าของ 29 ต.ค. 2569 "ย้ายไปให้ถูกเรื่องของมัน") */}
               <OverviewCard icon={ClipboardList} title="งานค้างตอนนี้" sub={sc.active ? 'ณ วันนี้ · ทุกใบขอ' : 'ณ วันนี้'}>
                 {data.backlog ? <BacklogBody backlog={data.backlog} only="uncalled" /> : <SectionError message={data.errors.backlog ?? 'อ่านงานค้างไม่ได้'} />}

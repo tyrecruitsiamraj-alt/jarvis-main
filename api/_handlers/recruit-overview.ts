@@ -50,6 +50,8 @@ import { normalizeTrendBu } from '../../src/lib/trends/bu.js';
 import { emptyRegionCount, regionOfProvince, type Region } from '../../src/lib/bkkRegion.js';
 import { boardProvinceOf } from '../../src/lib/boardFilters.js';
 import { listSiamrajUnitRequests } from '../_lib/siamrajUnitRequests.js';
+import { getUnitAssignmentsMap } from '../_lib/siamrajUnitAssignments.js';
+import { publicJobTitle } from '../../src/lib/publicJobTitle.js';
 import type { JobRequest } from '../../src/types/index.js';
 import { addDays } from '../../src/lib/trends/timeBuckets.js';
 import { monthWindow, rangeWindow } from '../../src/lib/recruitOverviewWindow.js';
@@ -69,6 +71,7 @@ import { firstDaySince, informedSince, irecruitSourceAt, phone9Of } from '../../
 import type {
   RecruitAiRow,
   RecruitAppFact,
+  RecruitAppJob,
   RecruitAttendance,
   RecruitBacklog,
   RecruitOverviewResponse,
@@ -137,7 +140,9 @@ export function factsSql(
          ${IN_QUEUE_SQL} as in_queue,
          ${APPOINTMENT_AT_SQL} as appointment_at,
          ${attendance} as attendance,
-         ${screening} as screening
+         ${screening} as screening,
+         -- คนที่เก็บไปหน้าการติดต่อ (4 พ.ย. 2569 "แบงค์เก็บไปหน้าการติดต่อ 30 …") — อีเมลแปลงเป็นชื่อเล่นฝั่ง Node
+         case when a.claimed_by is not null then coalesce(nullif(btrim(a.claimed_by_name), ''), 'ไม่ระบุชื่อ') end as claimed_by
     from ${APPS} a
     ${appBuJoin('a')}
     ${LATEST_AI_RESULT_LATERAL}
@@ -328,6 +333,7 @@ export function toFact(r: Row, boardPhones: Set<string> | null, sources?: AppSou
     // นัดไม่สำเร็จ = บันทึกติดต่อสำเร็จ + เหตุผล + ไม่มีวันนัด (ตัวเดียวกับ `isAppointmentFailedLog`)
     appointmentFailed: r.log_ok === true && Boolean(text(r.log_reason)) && !r.log_appointment_at,
     screening: r.screening === 'passed' || r.screening === 'not_passed' ? r.screening : null,
+    claimedBy: text(r.claimed_by),
     overAge: isOverAge(r.age as number | string | null),
     aiOutOfArea: Boolean(r.ai_outcome) && isOutOfAreaAnswer(text(r.ai_summary), text(r.ai_reply)),
     onBoard: boardPhones ? Boolean(phone && boardPhones.has(phone)) : null,
@@ -549,16 +555,50 @@ export function toBacklog(
 /**
  * ใบขอ → กรุงเทพ+ปริมณฑล / ต่างจังหวัด (28 ต.ค. 2569) — จังหวัดของงาน `boardProvinceOf` ตัวเดียวกับการ์ดงานตามจังหวัด
  * จากสำเนาใบขอ (ใบล่าสุด 2,000 ใบ ทุกสถานะ) · อ่านไม่ได้ = ไม่ระบุทั้งหมด (การ์ดยังขึ้นยอดรวมได้)
+ * + เลขที่ใบ/ตำแหน่ง/หน่วยงาน ของการ์ด "แยกตามเจ้าหน้าที่สรรหา" (4 พ.ย. 2569) จากสำเนาชุดเดียวกัน
  */
-async function loadJobRegionOf(): Promise<(jobId: string | null) => Region> {
+type JobIndex = { regionOf: (jobId: string | null) => Region; jobs: Map<string, JobRequest> };
+async function loadJobIndex(): Promise<JobIndex> {
   try {
-    const jobs = (await listSiamrajUnitRequests({ limit: 2000, mode: 'all' })) as unknown as JobRequest[];
-    const map = new Map(jobs.map((j) => [String(j.id), regionOfProvince(boardProvinceOf(j))]));
-    return (jobId) => (jobId ? (map.get(jobId) ?? 'unknown') : 'unknown');
+    const list = (await listSiamrajUnitRequests({ limit: 2000, mode: 'all' })) as unknown as JobRequest[];
+    const jobs = new Map(list.map((j) => [String(j.id), j]));
+    const map = new Map(list.map((j) => [String(j.id), regionOfProvince(boardProvinceOf(j))]));
+    return { regionOf: (jobId) => (jobId ? (map.get(jobId) ?? 'unknown') : 'unknown'), jobs };
   } catch (e) {
     logError('recruit-overview: จังหวัดของงาน', e);
-    return () => 'unknown';
+    return { regionOf: () => 'unknown', jobs: new Map() };
   }
+}
+
+const PREQUEST_PREFIX = 'siamraj-pre:';
+const SQL_PREFIX = 'siamraj-sql:';
+const trimOrNull = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null);
+
+/**
+ * jobId ของใบสมัคร → ใบขอ + เจ้าหน้าที่สรรหา (เจ้าของ 4 พ.ย. 2569 "เป็นงานใครเท่าไหร่ แล้วเป็นงานไหนบ้าง")
+ * เจ้าหน้าที่ = `siamraj_unit_assignments.recruiter_name` คีย์เดียวกับหน้ากล่องงาน (ใบล่วงหน้าใช้ id เต็ม · ใบจริงใช้เลขที่ใบ)
+ * ใบที่ไม่อยู่ในสำเนา = เลขที่ใบจาก id · ตำแหน่ง/หน่วยงานว่าง (ไม่เดา)
+ */
+export async function loadAppJobs(jobIds: readonly string[], jobs: ReadonlyMap<string, JobRequest>): Promise<Record<string, RecruitAppJob>> {
+  const ids = [...new Set(jobIds.filter(Boolean))];
+  const keyOf = (id: string, no: string | null) => (id.startsWith(PREQUEST_PREFIX) ? id : no ?? id);
+  const base = ids.map((id) => {
+    const j = jobs.get(id);
+    const no = trimOrNull(j?.request_no) ?? (id.startsWith(SQL_PREFIX) ? id.slice(SQL_PREFIX.length) : id.startsWith(PREQUEST_PREFIX) ? id.slice(PREQUEST_PREFIX.length) : null);
+    return { id, no, j };
+  });
+  const assigned = await getUnitAssignmentsMap(base.map((b) => keyOf(b.id, b.no)));
+  const out: Record<string, RecruitAppJob> = {};
+  for (const b of base) {
+    out[b.id] = {
+      requestNo: b.no,
+      unitName: trimOrNull(b.j?.work_site_name) ?? trimOrNull(b.j?.unit_name),
+      // ชื่อตำแหน่งแบบหน้าประกาศ (ตัวเดียวกับการ์ดงานสรรหา) — ตำแหน่ง ERP ส่วนมากขึ้นแค่ "พนักงาน"
+      position: b.j ? trimOrNull(publicJobTitle(b.j)) : null,
+      recruiter: trimOrNull(assigned.get(keyOf(b.id, b.no))?.recruiter_name) ?? trimOrNull(b.j?.recruiter_name),
+    };
+  }
+  return out;
 }
 
 const NO_NAME = 'ไม่ระบุชื่อ';
@@ -711,7 +751,7 @@ export async function buildRecruitOverview(
   const nowMs = now.getTime();
 
   // จังหวัดของงาน (การ์ดงานค้าง) — วิ่งพร้อมก้อนอื่น ครั้งแรกหลังสำเนาใบขอหมดอายุใช้ ~4 วิ (28 ต.ค. 2569)
-  const regionOfP = loadJobRegionOf();
+  const jobIndexP = loadJobIndex();
   const [boardR, factsR, backlogR, apptR, staffR, showedR, aiR, firstR, everR, chR, reqR, informR, irecR, irAppR] = await Promise.all([
     settle('รายชื่อบนบอร์ด', loadBoardPhoneSet),
     settle('ใบสมัคร', () => loadFacts(bothRange)),
@@ -766,13 +806,32 @@ export async function buildRecruitOverview(
     irecruitApplicants: irAppR.ok ? irAppR.value : null,
   };
   if (!informR.ok) body.errors.informs = informR.error;
-  if (factsR.ok) body.apps = factsR.value.map((r) => toFact(r, boardPhones, sources));
-  else {
+  if (factsR.ok) {
+    const apps = factsR.value.map((r) => toFact(r, boardPhones, sources));
+    // ชื่อคนเก็บที่เป็นอีเมล → ชื่อเล่น (กติกาเดียวกับตารางผลงานรายคน)
+    if (apps.some((a) => a.claimedBy?.includes('@'))) {
+      const displayOf = await loadStaffDisplay();
+      for (const a of apps) if (a.claimedBy?.includes('@')) a.claimedBy = displayOf(a.claimedBy.toLowerCase()) ?? a.claimedBy;
+    }
+    body.apps = apps;
+  } else {
     body.apps = null;
     body.errors.apps = factsR.error;
   }
+  if (body.apps) {
+    try {
+      body.appJobs = await loadAppJobs(
+        body.apps.map((a) => a.jobId).filter((j): j is string => !!j),
+        (await jobIndexP).jobs,
+      );
+    } catch (e) {
+      logError('recruit-overview: เจ้าหน้าที่สรรหาของใบขอ', e);
+      body.appJobs = null;
+      body.errors.appJobs = 'อ่านเจ้าหน้าที่สรรหาของใบขอไม่ได้';
+    }
+  }
 
-  if (backlogR.ok && apptR.ok) body.backlog = toBacklog(backlogR.value, apptR.value, nowMs, await regionOfP);
+  if (backlogR.ok && apptR.ok) body.backlog = toBacklog(backlogR.value, apptR.value, nowMs, (await jobIndexP).regionOf);
   else body.errors.backlog = !backlogR.ok ? backlogR.error : (apptR as { error: string }).error;
 
   if (staffR.ok && showedR.ok) body.staff = toStaffRows(staffR.value, showedR.value, await loadStaffDisplay());

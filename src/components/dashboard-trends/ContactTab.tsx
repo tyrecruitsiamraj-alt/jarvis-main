@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils';
 import { DASH, TONE, type ToneKey } from '@/lib/designTokens';
 import { formatTrendNumber as fmt } from '@/lib/trends/format';
 import type { RecruitAppFact } from '@/lib/recruitOverviewTypes';
-import { CONTACT_BUCKET_LABEL, buildContactRows, type ContactBucket, type ContactRow } from '@/lib/recruitContactTab';
+import { CONTACT_BUCKET_LABEL, buildClaimRows, buildContactRows, type ContactBucket, type ContactRow } from '@/lib/recruitContactTab';
 import { OverviewCard } from './RecruitOverviewParts';
 
 /**
@@ -14,8 +14,8 @@ import { OverviewCard } from './RecruitOverviewParts';
  * ตัวคิดอยู่ `recruitContactTab.ts` ที่เดียว · ทุกเลขกดดูรายชื่อได้ (`onOpenNames` ป๊อปรายชื่อเดิมของหน้า)
  * `children` = ของเดิมในแท็บ (กดลงลึก · งานค้างตอนนี้ · ผลงานรายคน)
  */
-type Key = ContactBucket | 'total' | 'ok' | 'booked';
-const LABEL: Record<Key, string> = { ...CONTACT_BUCKET_LABEL, total: 'สนใจ', ok: 'ติดต่อได้', booked: 'นัดได้' };
+type Key = ContactBucket | 'total' | 'ok' | 'booked' | 'called';
+const LABEL: Record<Key, string> = { ...CONTACT_BUCKET_LABEL, total: 'สนใจ', ok: 'ติดต่อได้', booked: 'นัดได้', called: 'โทรแล้ว' };
 const TONE_OF: Partial<Record<Key, ToneKey>> = { fail: 'danger', ok: 'success', apptFailed: 'danger', booked: 'info', showed: 'success', noShow: 'danger', overdue: 'warn' };
 
 export default function ContactTab({
@@ -29,9 +29,10 @@ export default function ContactTab({
   children?: React.ReactNode;
 }) {
   const { total, groups } = useMemo(() => buildContactRows(apps, new Date()), [apps]);
+  const claims = useMemo(() => buildClaimRows(apps, new Date()), [apps]);
   const open = (k: Key, row: ContactRow = total) => onOpenNames(row === total ? LABEL[k] : `${row.name} · ${LABEL[k]}`, row.ids[k]);
   const tile = (k: Key) => {
-    const n = k === 'total' ? total.total : k === 'ok' ? total.ok : k === 'booked' ? total.booked : total.counts[k];
+    const n = valueOf(total, k);
     const tone = TONE_OF[k];
     return (
       <Button
@@ -82,6 +83,8 @@ export default function ContactTab({
         </div>
       </OverviewCard>
 
+      <ClaimCard total={claims.total} people={claims.people} onOpenNames={onOpenNames} />
+
       <ChannelCard total={total} groups={groups} open={open} />
 
       {children}
@@ -101,7 +104,8 @@ const COLS: ReadonlyArray<{ key: Key; divider?: boolean }> = [
   { key: 'upcoming' },
   { key: 'overdue' },
 ];
-const valueOf = (r: ContactRow, k: Key) => (k === 'total' ? r.total : k === 'ok' ? r.ok : k === 'booked' ? r.booked : r.counts[k]);
+const valueOf = (r: ContactRow, k: Key) =>
+  k === 'total' ? r.total : k === 'ok' ? r.ok : k === 'booked' ? r.booked : k === 'called' ? r.called : r.counts[k];
 
 function ChannelCard({ total, groups, open }: { total: ContactRow; groups: ContactRow[]; open: (k: Key, row: ContactRow) => void }) {
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
@@ -170,3 +174,78 @@ function ChannelCard({ total, groups, open }: { total: ContactRow; groups: Conta
     </OverviewCard>
   );
 }
+
+/**
+ * รายคน: เก็บไปหน้าการติดต่อแล้วเป็นไง (เจ้าของ 4 พ.ย. 2569 "แบงค์เก็บไปหน้าการติดต่อ 30 โทรแล้ว 30 ติดต่อได้ … รอโทร … นัดได้")
+ * เก็บไป = รอโทร + โทรแล้ว · โทรแล้ว = ติดต่อไม่ได้ + ติดต่อได้ · นัดได้ อยู่ในติดต่อได้ — ตัวคิด `buildClaimRows`
+ */
+const CLAIM_COLS: ReadonlyArray<{ key: Key; label?: string; divider?: boolean }> = [
+  { key: 'total', label: 'เก็บไป' },
+  { key: 'waiting', divider: true },
+  { key: 'called' },
+  { key: 'fail', divider: true },
+  { key: 'ok' },
+  { key: 'booked', divider: true },
+  { key: 'showed' },
+];
+
+function ClaimCard({ total, people, onOpenNames }: { total: ContactRow; people: ContactRow[]; onOpenNames: (title: string, ids: readonly string[]) => void }) {
+  const line = (r: ContactRow, strong: boolean) => (
+    <TableRow key={r.key} className={cn(strong && 'bg-muted/40 font-medium hover:bg-muted/40')} data-testid={strong ? 'contact-claim-total' : 'contact-claim-person'}>
+      <TableCell className="whitespace-nowrap text-sm">{r.name}</TableCell>
+      {CLAIM_COLS.map((c) => {
+        const n = valueOf(r, c.key);
+        const tone = TONE_OF[c.key];
+        const label = c.label ?? LABEL[c.key];
+        return (
+          <TableCell key={c.key} className={cn('p-1 text-right tabular-nums', c.divider && 'border-l border-border')}>
+            {n > 0 ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="xs"
+                className={cn('h-7 px-2 tabular-nums', tone && TONE[tone].value)}
+                onClick={() => onOpenNames(`${r.name} · ${label}`, r.ids[c.key])}
+              >
+                {fmt(n)}
+              </Button>
+            ) : (
+              <span className={cn('px-2', DASH.sub)}>0</span>
+            )}
+          </TableCell>
+        );
+      })}
+    </TableRow>
+  );
+  return (
+    <OverviewCard icon={PhoneCall} title="เก็บไปหน้าการติดต่อ แยกรายคน">
+      <div className="overflow-x-auto rounded-xl border border-border" data-testid="contact-claims">
+        <Table>
+          <TableHeader>
+            <TableRow className={DASH.tableHead}>
+              <TableHead className="text-xs">เจ้าหน้าที่</TableHead>
+              {CLAIM_COLS.map((c) => (
+                <TableHead key={c.key} className={cn('whitespace-nowrap text-right text-xs', c.divider && 'border-l border-border', TONE_OF[c.key] && TONE[TONE_OF[c.key]!].value)}>
+                  {c.label ?? LABEL[c.key]}
+                </TableHead>
+              ))}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {people.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={CLAIM_COLS.length + 1} className={cn('py-4 text-center text-xs', DASH.sub)}>
+                  ช่วงนี้ยังไม่มีใครเก็บรายชื่อไป
+                </TableCell>
+              </TableRow>
+            ) : (
+              people.map((p) => line(p, false))
+            )}
+            {line(total, true)}
+          </TableBody>
+        </Table>
+      </div>
+    </OverviewCard>
+  );
+}
+

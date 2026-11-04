@@ -58,6 +58,8 @@ export type RecruitAppFact = {
   aiQueued?: boolean;
   /** บันทึกติดต่อสำเร็จแต่นัดไม่ได้ (ok + เหตุผล + ไม่มีวันนัด) */
   appointmentFailed?: boolean;
+  /** คนที่เก็บไปหน้าการติดต่อ (ชื่อเล่น) · null = ยังไม่มีใครเก็บ · ไม่มี = เส้นรุ่นเก่า (4 พ.ย. 2569) */
+  claimedBy?: string | null;
   /** ผ่าน/ไม่ผ่าน หลังมาตามนัด (151) */
   screening?: 'passed' | 'not_passed' | null;
   /** อายุ 58 ปีขึ้นไป — ระบบไม่ส่งให้ AI (`isOverAge` · 19 ต.ค. 2569) */
@@ -172,6 +174,14 @@ export type RecruitOverviewWindow = {
   all?: boolean;
 };
 
+/** ใบขอของใบสมัคร — การ์ด "แยกตามเจ้าหน้าที่สรรหา" (4 พ.ย. 2569) · recruiter = ชื่อเล่นที่ตั้งในใบขอ · null = ยังไม่ได้ตั้ง */
+export type RecruitAppJob = {
+  requestNo: string | null;
+  unitName: string | null;
+  position: string | null;
+  recruiter: string | null;
+};
+
 export type RecruitOverviewResponse = {
   version: 1;
   generatedAt: string;
@@ -205,6 +215,8 @@ export type RecruitOverviewResponse = {
   requestRows?: RecruitRequestRow[] | null;
   /** ใบขอช่วงก่อน — การ์ดแนวโน้มใบขอเทียบช่วงก่อน (30 ต.ค. 2569) */
   requestRowsPrev?: RecruitRequestRow[] | null;
+  /** jobId ของใบสมัคร → ใบขอ + เจ้าหน้าที่สรรหา (4 พ.ย. 2569) · null = อ่านไม่ได้ (ดู errors.appJobs) · ไม่มี = เส้นรุ่นเก่า */
+  appJobs?: Record<string, RecruitAppJob> | null;
   /** ก้อนที่อ่านไม่ได้ + เหตุ (ก้อนล้มแยกกัน — ห้ามโชว์ 0 แทน) */
-  errors: Partial<Record<'apps' | 'backlog' | 'staff' | 'board' | 'requests' | 'channels' | 'informs', string>>;
+  errors: Partial<Record<'apps' | 'backlog' | 'staff' | 'board' | 'requests' | 'channels' | 'informs' | 'appJobs', string>>;
 };
