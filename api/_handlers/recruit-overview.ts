@@ -574,6 +574,19 @@ const PREQUEST_PREFIX = 'siamraj-pre:';
 const SQL_PREFIX = 'siamraj-sql:';
 const trimOrNull = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null);
 
+/** คีย์ของตารางผู้รับผิดชอบ — ใบล่วงหน้าใช้ id เต็ม · ใบจริงใช้เลขที่ใบ (ตัวเดียวกับหน้ากล่องงาน) */
+const assignmentKeyOf = (jobId: string | null, requestNo: string | null) => (jobId?.startsWith(PREQUEST_PREFIX) ? jobId : requestNo ?? jobId ?? '');
+
+/** เจ้าหน้าที่สรรหาของใบขอรายใบ — ตัวกรองเจ้าหน้าที่ของหน้าภาพรวม (4 พ.ย. 2569) · อ่านไม่ได้ = ไม่ใส่ (ตัวกรองยังใช้ได้กับใบที่มี) */
+export async function attachRequestRecruiters(rows: RecruitRequestRow[]): Promise<void> {
+  try {
+    const map = await getUnitAssignmentsMap(rows.map((r) => assignmentKeyOf(r.jobId, r.requestNo)));
+    for (const r of rows) r.recruiter = trimOrNull(map.get(assignmentKeyOf(r.jobId, r.requestNo))?.recruiter_name);
+  } catch (e) {
+    logError('recruit-overview: เจ้าหน้าที่สรรหาของใบขอ (รายใบ)', e);
+  }
+}
+
 /**
  * jobId ของใบสมัคร → ใบขอ + เจ้าหน้าที่สรรหา (เจ้าของ 4 พ.ย. 2569 "เป็นงานใครเท่าไหร่ แล้วเป็นงานไหนบ้าง")
  * เจ้าหน้าที่ = `siamraj_unit_assignments.recruiter_name` คีย์เดียวกับหน้ากล่องงาน (ใบล่วงหน้าใช้ id เต็ม · ใบจริงใช้เลขที่ใบ)
@@ -581,13 +594,12 @@ const trimOrNull = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim()
  */
 export async function loadAppJobs(jobIds: readonly string[], jobs: ReadonlyMap<string, JobRequest>): Promise<Record<string, RecruitAppJob>> {
   const ids = [...new Set(jobIds.filter(Boolean))];
-  const keyOf = (id: string, no: string | null) => (id.startsWith(PREQUEST_PREFIX) ? id : no ?? id);
   const base = ids.map((id) => {
     const j = jobs.get(id);
     const no = trimOrNull(j?.request_no) ?? (id.startsWith(SQL_PREFIX) ? id.slice(SQL_PREFIX.length) : id.startsWith(PREQUEST_PREFIX) ? id.slice(PREQUEST_PREFIX.length) : null);
     return { id, no, j };
   });
-  const assigned = await getUnitAssignmentsMap(base.map((b) => keyOf(b.id, b.no)));
+  const assigned = await getUnitAssignmentsMap(base.map((b) => assignmentKeyOf(b.id, b.no)));
   const out: Record<string, RecruitAppJob> = {};
   for (const b of base) {
     out[b.id] = {
@@ -595,7 +607,7 @@ export async function loadAppJobs(jobIds: readonly string[], jobs: ReadonlyMap<s
       unitName: trimOrNull(b.j?.work_site_name) ?? trimOrNull(b.j?.unit_name),
       // ชื่อตำแหน่งแบบหน้าประกาศ (ตัวเดียวกับการ์ดงานสรรหา) — ตำแหน่ง ERP ส่วนมากขึ้นแค่ "พนักงาน"
       position: b.j ? trimOrNull(publicJobTitle(b.j)) : null,
-      recruiter: trimOrNull(assigned.get(keyOf(b.id, b.no))?.recruiter_name) ?? trimOrNull(b.j?.recruiter_name),
+      recruiter: trimOrNull(assigned.get(assignmentKeyOf(b.id, b.no))?.recruiter_name) ?? trimOrNull(b.j?.recruiter_name),
     };
   }
   return out;
@@ -859,6 +871,7 @@ export async function buildRecruitOverview(
     body.requestDays = toRequestDays(reqR.value);
     body.requestList = await loadRequestList(inRange(window.from, window.to));
     const [rowsCur, rowsPrev] = await Promise.all([toRequestRows(inRange(window.from, window.to)), toRequestRows(inRange(window.prevFrom, window.prevTo))]);
+    await attachRequestRecruiters([...rowsCur, ...rowsPrev]);
     body.requestRows = rowsCur;
     // ช่วงก่อน — การ์ดแนวโน้มใบขอคิดเทียบจากใบชุดเดียวกับการ์ดบน + ตัวกรอง (QA 30 ต.ค. 2569)
     body.requestRowsPrev = rowsPrev;

@@ -6,9 +6,13 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 const src = readFileSync('src/components/dashboard-trends/RecruitOverview.tsx', 'utf8');
+/** 4 พ.ย. 2569 หน้าเดียว (ไม่มีแท็บ) — ช่วงของแต่ละขั้น: ใบขอ = ก่อนส่วนการติดต่อ · การติดต่อ/นัดหมาย = ใน FoldSection ของมัน */
 const section = (tab: string) => {
-  const a = src.indexOf(`<TabsContent value="${tab}"`);
-  return src.slice(a, src.indexOf('</TabsContent>', a));
+  const contact = src.indexOf('<FoldSection title="การติดต่อ"');
+  const appt = src.indexOf('<FoldSection title="นัดหมาย"');
+  if (tab === 'requests') return src.slice(0, contact);
+  if (tab === 'staff') return src.slice(contact, appt);
+  return src.slice(appt, src.indexOf('</FoldSection>', appt));
 };
 
 describe('งานค้างอยู่ในแท็บของมัน', () => {

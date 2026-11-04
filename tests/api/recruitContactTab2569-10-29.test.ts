@@ -71,7 +71,7 @@ describe('แยกช่องทาง', () => {
   });
   it('จอ: แท็บการติดต่อใช้ ContactTab · ของเดิมต่อท้าย · ไม่มี % Success', () => {
     const ov = readFileSync('src/components/dashboard-trends/RecruitOverview.tsx', 'utf8');
-    expect(ov).toContain('<ContactTab apps={view.cohort} onOpenNames={(title, ids) => setNames({ title, ids })}>');
+    expect(ov).toContain('<ContactTab apps={fv.cohort} onOpenNames={(title, ids) => setNames({ title, ids })}>'); // 4 พ.ย. 2569 ตามตัวกรองบนสุด
     const ui = readFileSync('src/components/dashboard-trends/ContactTab.tsx', 'utf8');
     expect(ui).not.toContain('%');
     expect(ui).toContain('data-testid="contact-tab-channels"');

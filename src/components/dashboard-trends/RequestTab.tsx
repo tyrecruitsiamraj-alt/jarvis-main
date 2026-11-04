@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils';
 import { DASH, TONE } from '@/lib/designTokens';
 import { formatTrendNumber as fmt } from '@/lib/trends/format';
 import { REQUEST_LEAD_KIND_LABEL, type RequestLeadKind } from '@/lib/requestLeadKind';
-import type { RecruitAppFact } from '@/lib/recruitOverviewTypes';
+import type { RecruitAppFact, RecruitAppJob } from '@/lib/recruitOverviewTypes';
 import {
   APPLICANT_BUCKET_LABEL,
   APPLICANT_NOT_CALLED,
@@ -24,7 +24,8 @@ import {
   REQUEST_SECTOR_LABEL,
   REQUEST_SECTOR_UNSET,
   appsOfChannelKey,
-  appsOfRequests,
+  appsOfFilter,
+  requestRecruiterOptions,
   applicantSuccessRanking,
   buildApplicantChannelRows,
   buildProvinceAreas,
@@ -202,6 +203,7 @@ export default function RequestTab({
   prevRows = null,
   rowsError,
   apps,
+  appJobs,
   trend,
   children,
   scoped,
@@ -212,6 +214,8 @@ export default function RequestTab({
   rowsError: string | null;
   /** ใบสมัครที่กรอกในช่วง (cohort) */
   apps: readonly RecruitAppFact[];
+  /** ใบขอ + เจ้าหน้าที่สรรหาของใบสมัคร — ตัวกรองเจ้าหน้าที่กรองรายชื่อด้วยชุดนี้ (4 พ.ย. 2569) */
+  appJobs?: Readonly<Record<string, RecruitAppJob>> | null;
   trend: (scope: RequestTabScope) => React.ReactNode;
   children?: (scope: RequestTabScope) => React.ReactNode;
   /**
@@ -226,6 +230,10 @@ export default function RequestTab({
   const options = useMemo(() => requestAreaOptions(rows ?? [], f), [rows, f]);
   const sites = useMemo(() => requestSiteOptions(rows ?? []), [rows]);
   const subtypes = useMemo(() => requestSubtypeOptions(rows ?? []), [rows]);
+  const recruiters = useMemo(
+    () => requestRecruiterOptions(rows ?? [], Object.values(appJobs ?? {}).map((j) => j.recruiter)),
+    [rows, appJobs],
+  );
   const funnel = useMemo(() => buildRequestFunnel(picked), [picked]);
   const areas = useMemo(() => buildProvinceAreas(picked), [picked]);
   const pickedPrev = useMemo(() => (prevRows ? filterRequestRows(prevRows, f) : null), [prevRows, f]);
@@ -236,9 +244,9 @@ export default function RequestTab({
       active,
       rows: rows ? picked : null,
       prevRows: pickedPrev,
-      appsOf: (list) => appsOfRequests(list, active ? all : null),
+      appsOf: (list) => appsOfFilter(list, f, all, (jobId) => appJobs?.[jobId]?.recruiter ?? null),
     };
-  }, [active, rows, picked, pickedPrev]);
+  }, [active, rows, picked, pickedPrev, f, appJobs]);
   const filteredApps = useMemo(() => scope.appsOf(apps), [scope, apps]);
   const appRows = useMemo(() => buildApplicantChannelRows(filteredApps), [filteredApps]);
   /** แถวช่องทางที่กด (คีย์ของ `buildApplicantChannelRows`) · null = ทุกช่องทาง */
@@ -254,6 +262,18 @@ export default function RequestTab({
     <div className="space-y-3">
       {/* ─── ตัวกรอง (เจ้าของ 29 ต.ค. 2569): ประเภทงาน · งานย่อย (2 พ.ย.) · Code Site จากไซต์ที่มีใบขอ · จังหวัด อำเภอ ตำบล ─── */}
       <div className="flex flex-wrap items-end gap-2 rounded-2xl border border-border bg-card p-3" data-testid="request-tab-filters">
+        {/* เจ้าหน้าที่สรรหา (เจ้าของ 4 พ.ย. 2569 "ใบขอของแบงค์เข้ามาเท่าไหร่ … filter เปลี่ยน ข้อมูลเปลี่ยนตาม") — ทั้งหน้าเปลี่ยนตาม */}
+        <div className="flex min-w-40 flex-1 flex-col gap-1">
+          <Label className={cn('text-xs font-normal', DASH.sub)}>เจ้าหน้าที่สรรหา</Label>
+          <SearchableSelect
+            value={f.recruiter ?? ALL}
+            onChange={(v) => set({ recruiter: v === ALL ? null : v })}
+            options={[{ value: ALL, label: 'ทุกคน' }, ...recruiters.map((o) => ({ value: o.value, label: `${o.label} · ${fmt(o.n)} ใบ` }))]}
+            searchPlaceholder="พิมพ์ชื่อเจ้าหน้าที่"
+            ariaLabel="เจ้าหน้าที่สรรหา"
+            className="h-9 text-sm"
+          />
+        </div>
         <div className="flex min-w-32 flex-1 flex-col gap-1">
           <Label className={cn('text-xs font-normal', DASH.sub)}>ประเภทงาน</Label>
           <Select value={f.sector ?? ALL} onValueChange={(v) => set({ sector: v === ALL ? null : (v as RequestSector | 'unset') })}>
@@ -315,44 +335,58 @@ export default function RequestTab({
 
       {rows === null ? <SectionError message={rowsError ?? 'อ่านใบขอไม่ได้'} /> : null}
 
-      {/* ─── 1. ใบขอเข้ามา ─── */}
+      {/* ─── 1. ใบขอเข้ามา — ไล่เป็นชั้น (เจ้าของ 4 พ.ย. 2569):
+           เข้ามา → ยกเลิก · ปิดแล้ว · ดำเนินการสรรหา → ประกาศแล้ว · ยังไม่ประกาศ → มีคนกรอก · ไม่มีคนกรอก → กดดูใบละกี่คน
+           🔴 ลูกรวมเท่าแม่ทุกชั้น (ตัวแบ่ง `buildRequestFunnel` / `requestsOfFunnelKey` ชุดเดียว) ─── */}
       <OverviewCard icon={FileText} title="ใบขอเข้ามา">
-        <div className="grid grid-cols-2 gap-2 lg:grid-cols-4" data-testid="request-tab-funnel">
-          <Tile label="ใบขอเข้ามา" value={funnel.total} unit="ใบ" sub={`ขอ ${fmt(funnel.requested)} อัตรา`} picked={pick === 'all'} onPick={() => togglePick('all')} testId="request-tab-total" />
-          <Tile label="ยกเลิก" value={funnel.cancelled.requests} unit="ใบ" sub={`ยกเลิก ${fmt(funnel.cancelled.people)} อัตรา`} tone="danger" picked={pick === 'cancelled'} onPick={() => togglePick('cancelled')} testId="request-tab-cancelled" />
-          <Tile label="ปิดแล้ว" value={funnel.closed.requests} unit="ใบ" sub={`หาได้ ${fmt(funnel.closed.filled)} อัตรา`} tone="success" picked={pick === 'closed'} onPick={() => togglePick('closed')} testId="request-tab-closed" />
-          <Tile label="ดำเนินการสรรหา" value={funnel.active.requests} unit="ใบ" sub={`เหลือหา ${fmt(funnel.active.remaining)} อัตรา`} tone="primary" picked={pick === 'active'} onPick={() => togglePick('active')} testId="request-tab-active" />
-        </div>
-        <div className="space-y-2 rounded-xl border border-border p-3">
-          <p className="flex justify-between gap-3 text-sm">
-            <span>ดำเนินการสรรหา</span>
-            <span className="font-medium tabular-nums">{fmt(funnel.active.requests)} ใบ</span>
-          </p>
-          <div className="grid gap-2 text-sm sm:grid-cols-3">
-            {(
-              [
-                [
-                  'notReleased',
-                  `${fmt(funnel.active.notReleased)} ใบ${funnel.active.notReleasedWithApps.requests ? ` · มีคนกรอก ${fmt(funnel.active.notReleasedWithApps.requests)} ใบ ${fmt(funnel.active.notReleasedWithApps.applications)} คน` : ''}`,
-                  'request-tab-not-released',
-                ],
-                ['releasedNoApps', `${fmt(funnel.active.releasedNoApps)} ใบ`, 'request-tab-released-empty'],
-                ['releasedWithApps', `${fmt(funnel.active.releasedWithApps)} ใบ · ${fmt(funnel.active.applications)} คน`, 'request-tab-released-apps'],
-              ] as const
-            ).map(([k, value, testId]) => (
-              <Button
-                key={k}
-                type="button"
-                variant="ghost"
-                aria-pressed={pick === k}
-                onClick={() => togglePick(k)}
-                className={cn('h-auto justify-between gap-2 whitespace-normal rounded-lg bg-muted/50 px-3 py-2 text-left font-normal hover:bg-muted', pick === k && 'ring-2 ring-ring')}
-                data-testid={testId}
-              >
-                <span>{REQUEST_FUNNEL_LABEL[k]}</span>
-                <span className="font-medium tabular-nums">{value}</span>
-              </Button>
-            ))}
+        <div className="space-y-2" data-testid="request-tab-funnel">
+          <div className="grid">
+            <Tile label="ใบขอเข้ามา" value={funnel.total} unit="ใบ" sub={`ขอ ${fmt(funnel.requested)} อัตรา`} picked={pick === 'all'} onPick={() => togglePick('all')} testId="request-tab-total" />
+          </div>
+          <div className="grid gap-2 sm:grid-cols-3">
+            <Tile label="ยกเลิก" value={funnel.cancelled.requests} unit="ใบ" sub={`ยกเลิก ${fmt(funnel.cancelled.people)} อัตรา`} tone="danger" picked={pick === 'cancelled'} onPick={() => togglePick('cancelled')} testId="request-tab-cancelled" />
+            <Tile label="ปิดแล้ว" value={funnel.closed.requests} unit="ใบ" sub={`หาได้ ${fmt(funnel.closed.filled)} อัตรา`} tone="success" picked={pick === 'closed'} onPick={() => togglePick('closed')} testId="request-tab-closed" />
+            <Tile label="ดำเนินการสรรหา" value={funnel.active.requests} unit="ใบ" sub={`เหลือหา ${fmt(funnel.active.remaining)} อัตรา`} tone="primary" picked={pick === 'active'} onPick={() => togglePick('active')} testId="request-tab-active" />
+          </div>
+          <div className="space-y-2 rounded-xl border border-border p-2 sm:ml-8" data-testid="request-tab-active-split">
+            <p className={cn('px-1 text-xs', DASH.sub)}>ดำเนินการสรรหา {fmt(funnel.active.requests)} ใบ</p>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <Tile
+                label="ยังไม่ประกาศ"
+                value={funnel.active.notReleased}
+                unit="ใบ"
+                sub={funnel.active.notReleasedWithApps.requests ? `มีคนกรอก ${fmt(funnel.active.notReleasedWithApps.requests)} ใบ ${fmt(funnel.active.notReleasedWithApps.applications)} คน` : ''}
+                picked={pick === 'notReleased'}
+                onPick={() => togglePick('notReleased')}
+                testId="request-tab-not-released"
+              />
+              <Tile
+                label="ประกาศแล้ว"
+                value={funnel.active.releasedNoApps + funnel.active.releasedWithApps}
+                unit="ใบ"
+                sub=""
+                tone="success"
+                picked={pick === 'released'}
+                onPick={() => togglePick('released')}
+                testId="request-tab-released"
+              />
+            </div>
+            <div className="space-y-2 rounded-xl border border-border p-2 sm:ml-8" data-testid="request-tab-released-split">
+              <p className={cn('px-1 text-xs', DASH.sub)}>ประกาศแล้ว {fmt(funnel.active.releasedNoApps + funnel.active.releasedWithApps)} ใบ</p>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <Tile label="ไม่มีคนกรอก" value={funnel.active.releasedNoApps} unit="ใบ" sub="" tone="danger" picked={pick === 'releasedNoApps'} onPick={() => togglePick('releasedNoApps')} testId="request-tab-released-empty" />
+                <Tile
+                  label="มีคนกรอก"
+                  value={funnel.active.releasedWithApps}
+                  unit="ใบ"
+                  sub={`${fmt(funnel.active.applications)} คน`}
+                  tone="primary"
+                  picked={pick === 'releasedWithApps'}
+                  onPick={() => togglePick('releasedWithApps')}
+                  testId="request-tab-released-apps"
+                />
+              </div>
+            </div>
           </div>
         </div>
         {pick ? <RequestList title={REQUEST_FUNNEL_LABEL[pick]} rows={requestsOfFunnelKey(picked, pick)} onClose={() => setPick(null)} /> : null}
@@ -377,12 +411,12 @@ export default function RequestTab({
         }}
       />
 
-      {children ? children(scope) : null}
       {scoped ? (
         <div ref={scopedRef} className="scroll-mt-20">
           {scoped(channelApps, channel?.name ?? null)}
         </div>
       ) : null}
+      {children ? children(scope) : null}
     </div>
   );
 }

@@ -14,9 +14,8 @@ import {
   Timer,
   Users,
 } from 'lucide-react';
-import { useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ChoiceDropdown } from '@/components/shared/ChoiceDropdown';
@@ -61,7 +60,7 @@ import JourneyNamesDialog from './JourneyNamesDialog';
 import ChannelPlacementTable from './ChannelPlacementTable';
 import ChannelFunnelTable from './ChannelFunnelTable';
 import { buildChannelFunnelTree } from '@/lib/channelFunnel';
-import { OVERVIEW_TABS, overviewTabOf, type OverviewTabId } from '@/lib/recruitOverviewTabs';
+import type { OverviewTabId } from '@/lib/recruitOverviewTabs';
 import { compareRowsOf, dailySeriesOf } from '@/lib/recruitCompare';
 import TrendLinesCard, { type ComparePeriod, type TrendStack } from './TrendLinesCard';
 import RequestTab from './RequestTab';
@@ -190,19 +189,6 @@ const RecruitOverview: React.FC<{
 
   /** ป๊อปรายชื่อของเลขที่กดในเส้นทาง */
   const [names, setNames] = useState<{ title: string; ids: readonly string[] } | null>(null);
-  /** แท็บย่อย — จำใน URL (`?ov=`) ส่งลิงก์ให้กันได้ · ค่าแปลก = ใบขอ */
-  const [searchParams, setSearchParams] = useSearchParams();
-  const tab = overviewTabOf(searchParams.get('ov'));
-  const setTab = (v: string) =>
-    setSearchParams(
-      (prev) => {
-        const next = new URLSearchParams(prev);
-        if (v === OVERVIEW_TABS[0].id) next.delete('ov');
-        else next.set('ov', v);
-        return next;
-      },
-      { replace: true },
-    );
 
   const view = useMemo(() => (data && win ? overviewViewOf(apps ?? [], data, win) : null), [data, win, apps]);
 
@@ -412,21 +398,14 @@ const RecruitOverview: React.FC<{
       {state.error ? <SectionError message={state.error} onRetry={() => setRev((n) => n + 1)} /> : null}
       {appsError ? <SectionError message={appsError} /> : null}
 
-      <Tabs value={tab} onValueChange={setTab}>
-        <TabsList variant="glass" className="h-10 max-w-full justify-start overflow-x-auto" aria-label="ภาพรวมแยกขั้น">
-          {OVERVIEW_TABS.map((t) => (
-            <TabsTrigger key={t.id} value={t.id} className="rounded-full px-4" data-testid={`recruit-ov-tab-${t.id}`}>
-              {t.label}
-            </TabsTrigger>
-          ))}
-        </TabsList>
-
-        {/*
-         * ─── ใบขอ (เจ้าของ 29 ต.ค. 2569 แบบร่างที่เคาะ "อะงั้นทำเลย"): ตัวกรอง · 1 ใบขอเข้ามา · 2 แนวโน้มใบขอ · 3 พื้นที่ขาดคน · 4 คนที่กรอกมา
-         * แล้วต่อด้วยของแท็บกรอกเข้ามาเดิมทั้งหมด ("หน้า กรอกเข้ามา … เอาออกเลย ไปรวมกับ แท็บใบขอ")
-         */}
-        <TabsContent value="requests" className="mt-3 space-y-3">
+      {/*
+       * หน้าเดียว (เจ้าของ 4 พ.ย. 2569 "เอา 3 แท็บมันรวมกันเลย … filter เปลี่ยน ข้อมูลเปลี่ยนตาม Filter เป็นเหมือน query")
+       * ตัวกรองบนสุด (รวมเจ้าหน้าที่สรรหา) คุมทุกการ์ด · การติดต่อ / นัดหมาย เรียงต่อท้าย พับไว้ กดกางค่อยโชว์
+       * การ์ดที่นับฝั่งเซิร์ฟเวอร์ (งานค้างตอนนี้ · ผลงานรายคน · คนแจ้งเข้า) ไม่ตามตัวกรอง — บอก "ทุกใบขอ" ตอนกรองอยู่
+       */}
+      <div className="space-y-3">
           <RequestTab
+            appJobs={data.appJobs}
             rows={data.requestRows ?? null}
             prevRows={data.requestRowsPrev ?? null}
             rowsError={data.errors.requests ?? null}
@@ -479,45 +458,42 @@ const RecruitOverview: React.FC<{
               >
                 <ChannelFunnelTable groups={fv.channels.groups} total={fv.channels.total} onOpen={(title, ids) => setNames({ title, ids })} />
               </OverviewCard>
+
+              {/* ─── การติดต่อ (เดิมแท็บ "การติดต่อ" · 29 ต.ค. 2569): คนที่สนใจ โทรแล้วเป็นไง · รายคนที่เก็บไป · แยกช่องทาง ─── */}
+              <FoldSection title="การติดต่อ" testId="recruit-ov-contact">
+                <ContactTab apps={fv.cohort} onOpenNames={(title, ids) => setNames({ title, ids })}>
+                  {compareCard('staff', fv)}
+                  {drillCard('staff', 'การติดต่อ', fv)}
+                  <OverviewCard icon={ClipboardList} title="งานค้างตอนนี้" sub={sc.active ? 'ณ วันนี้ · ทุกใบขอ' : 'ณ วันนี้'}>
+                    {data.backlog ? <BacklogBody backlog={data.backlog} only="waiting" /> : <SectionError message={data.errors.backlog ?? 'อ่านงานค้างไม่ได้'} />}
+                  </OverviewCard>
+                  <OverviewCard icon={Users} title="ผลงานรายคน" sub={sc.active ? 'งานที่ลงผลในช่วงนี้ · ทุกใบขอ' : 'งานที่ลงผลในช่วงนี้'}>
+                    {data.staff ? <StaffTable staff={data.staff} ai={data.ai} /> : <SectionError message={data.errors.staff ?? 'อ่านผลงานรายคนไม่ได้'} />}
+                  </OverviewCard>
+                </ContactTab>
+              </FoldSection>
+
+              {/* ─── นัดหมาย (เดิมแท็บ "นัดหมาย"): นัด · มาไหม + คนแจ้งเข้ามาจากช่องทางไหน ─── */}
+              <FoldSection title="นัดหมาย" testId="recruit-ov-appt">
+                {compareCard('appt', fv)}
+                {drillCard('appt', 'นัดหมาย', fv)}
+                <OverviewCard icon={ClipboardList} title="งานค้างตอนนี้" sub={sc.active ? 'ณ วันนี้ · ทุกใบขอ' : 'ณ วันนี้'}>
+                  {data.backlog ? <BacklogBody backlog={data.backlog} only="appointments" /> : <SectionError message={data.errors.backlog ?? 'อ่านงานค้างไม่ได้'} />}
+                </OverviewCard>
+                {/* ช่องทางที่ได้คนลงงาน (เจ้าของ 19 ต.ค. 2569 — ทีม Online ดูว่าเด็กมาจากไหน ลงงานจากช่องทางไหนเยอะ) */}
+                <OverviewCard icon={Megaphone} title="คนแจ้งเข้าในช่วงนี้ มาจากช่องทางไหน" sub="นับตามวันแจ้งเข้า · ทุก BU">
+                  {data.channelPlacement ? (
+                    <ChannelPlacementTable data={data.channelPlacement} />
+                  ) : (
+                    <SectionError message={data.errors.channels ?? 'อ่านช่องทางไม่ได้'} />
+                  )}
+                </OverviewCard>
+              </FoldSection>
                 </>
               );
             }}
           </RequestTab>
-        </TabsContent>
-
-        {/* ─── การติดต่อ (เจ้าของ 29 ต.ค. 2569): คนที่สนใจ โทรแล้วเป็นไง ถึงนัด ถึงมา · แยกช่องทาง · ของเดิมต่อท้าย ─── */}
-        <TabsContent value="staff" className="mt-3 space-y-3">
-          <ContactTab apps={view.cohort} onOpenNames={(title, ids) => setNames({ title, ids })}>
-          {compareCard('staff')}
-          {drillCard('staff', 'การติดต่อ')}
-          {/* งานค้างของขั้นนี้ ณ วันนี้ (ย้ายจากแท็บใบขอ · เจ้าของ 29 ต.ค. 2569 "ย้ายไปให้ถูกเรื่องของมัน") */}
-          <OverviewCard icon={ClipboardList} title="งานค้างตอนนี้" sub="ณ วันนี้">
-            {data.backlog ? <BacklogBody backlog={data.backlog} only="waiting" /> : <SectionError message={data.errors.backlog ?? 'อ่านงานค้างไม่ได้'} />}
-          </OverviewCard>
-          <OverviewCard icon={Users} title="ผลงานรายคน" sub="งานที่ลงผลในช่วงนี้">
-            {data.staff ? <StaffTable staff={data.staff} ai={data.ai} /> : <SectionError message={data.errors.staff ?? 'อ่านผลงานรายคนไม่ได้'} />}
-          </OverviewCard>
-          </ContactTab>
-        </TabsContent>
-
-        {/* ─── นัดหมาย: นัด · มาไหม + คนแจ้งเข้ามาจากช่องทางไหน ─── */}
-        <TabsContent value="appt" className="mt-3 space-y-3">
-          {compareCard('appt')}
-          {drillCard('appt', 'นัดหมาย')}
-          {/* งานค้างของขั้นนี้ ณ วันนี้ (ย้ายจากแท็บใบขอ · เจ้าของ 29 ต.ค. 2569 "ย้ายไปให้ถูกเรื่องของมัน") */}
-          <OverviewCard icon={ClipboardList} title="งานค้างตอนนี้" sub="ณ วันนี้">
-            {data.backlog ? <BacklogBody backlog={data.backlog} only="appointments" /> : <SectionError message={data.errors.backlog ?? 'อ่านงานค้างไม่ได้'} />}
-          </OverviewCard>
-          {/* ช่องทางที่ได้คนลงงาน (เจ้าของ 19 ต.ค. 2569 — ทีม Online ดูว่าเด็กมาจากไหน ลงงานจากช่องทางไหนเยอะ) */}
-          <OverviewCard icon={Megaphone} title="คนแจ้งเข้าในช่วงนี้ มาจากช่องทางไหน" sub="นับตามวันแจ้งเข้า · ทุก BU">
-            {data.channelPlacement ? (
-              <ChannelPlacementTable data={data.channelPlacement} />
-            ) : (
-              <SectionError message={data.errors.channels ?? 'อ่านช่องทางไม่ได้'} />
-            )}
-          </OverviewCard>
-        </TabsContent>
-      </Tabs>
+      </div>
 
       <JourneyNamesDialog
         open={names !== null}
@@ -530,3 +506,20 @@ const RecruitOverview: React.FC<{
 };
 
 export default RecruitOverview;
+
+/** ส่วนที่พับไว้ — กดหัวแล้วค่อยกาง (เจ้าของ 4 พ.ย. 2569 "ย่อไว้ก็ได้กดกางค่อยโชว์") · พับอยู่ = การ์ดข้างในยังไม่วาด */
+function FoldSection({ title, testId, children }: { title: string; testId: string; children: React.ReactNode }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <Collapsible open={open} onOpenChange={setOpen} className="rounded-2xl border border-border bg-card p-3" data-testid={testId}>
+      <CollapsibleTrigger asChild>
+        <Button type="button" variant="ghost" className="h-10 w-full justify-between px-2 text-base font-medium">
+          {title}
+          <ChevronDown className={cn('transition-transform', open && 'rotate-180')} aria-hidden />
+        </Button>
+      </CollapsibleTrigger>
+      <CollapsibleContent className="space-y-3 pt-3">{children}</CollapsibleContent>
+    </Collapsible>
+  );
+}
+

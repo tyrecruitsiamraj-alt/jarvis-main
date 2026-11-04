@@ -50,6 +50,8 @@ export type RecruitRequestRow = {
   remaining: number;
   released: boolean;
   applications: number;
+  /** เจ้าหน้าที่สรรหาของใบ (ชื่อเล่น) · null = ยังไม่ได้ตั้ง — ตัวกรองเจ้าหน้าที่ (4 พ.ย. 2569) */
+  recruiter?: string | null;
 };
 
 /** ธนาคาร (อุตสาหกรรม ERP) › กลุ่มลูกค้า ERP › ที่ทีมระบุเอง */
@@ -80,11 +82,20 @@ export type RequestTabFilter = {
   province: string | null;
   district: string | null;
   subdistrict: string | null;
+  /**
+   * เจ้าหน้าที่สรรหาของใบขอ (เจ้าของ 4 พ.ย. 2569 "ใบขอของแบงค์เข้ามาเท่าไหร่ … filter เปลี่ยน ข้อมูลเปลี่ยนตาม เป็นเหมือน query")
+   * `NO_RECRUITER_KEY` = ใบที่ยังไม่ได้ตั้ง · รายชื่อกรองด้วยเจ้าหน้าที่ของใบที่กรอก (ทุกใบ ไม่ใช่แค่ใบที่เข้ามาในช่วง)
+   */
+  recruiter?: string | null;
 };
-export const EMPTY_REQUEST_FILTER: RequestTabFilter = { sector: null, subtype: null, siteCode: null, province: null, district: null, subdistrict: null };
+export const EMPTY_REQUEST_FILTER: RequestTabFilter = { sector: null, subtype: null, siteCode: null, province: null, district: null, subdistrict: null, recruiter: null };
+export const NO_RECRUITER_KEY = '__none__';
 
 export const isRequestFilterActive = (f: RequestTabFilter) =>
-  Boolean(f.sector || f.subtype || f.siteCode || f.province || f.district || f.subdistrict);
+  Boolean(f.sector || f.subtype || f.siteCode || f.province || f.district || f.subdistrict || f.recruiter);
+/** ตัวกรองที่ผูกกับใบขอที่เข้ามาในช่วง (ทุกตัวยกเว้นเจ้าหน้าที่) */
+const isRowFilterActive = (f: RequestTabFilter) => isRequestFilterActive({ ...f, recruiter: null });
+const recruiterMatch = (name: string | null | undefined, want: string) => (want === NO_RECRUITER_KEY ? !name?.trim() : name?.trim() === want);
 
 export const provinceOf = (r: RecruitRequestRow) => r.province || NO_PROVINCE;
 export const districtOf = (r: RecruitRequestRow) => r.district || NO_DISTRICT;
@@ -98,8 +109,29 @@ export function filterRequestRows(rows: readonly RecruitRequestRow[], f: Request
       (!f.siteCode || r.siteCode === f.siteCode) &&
       (!f.province || provinceOf(r) === f.province) &&
       (!f.district || districtOf(r) === f.district) &&
-      (!f.subdistrict || subdistrictOf(r) === f.subdistrict),
+      (!f.subdistrict || subdistrictOf(r) === f.subdistrict) &&
+      (!f.recruiter || recruiterMatch(r.recruiter, f.recruiter)),
   );
+}
+
+/** ตัวเลือกเจ้าหน้าที่ — ใบในช่วง + เจ้าหน้าที่ของใบที่มีคนกรอก · ใบมากสุดก่อน · ยังไม่ได้ตั้งอยู่ท้าย */
+export function requestRecruiterOptions(
+  rows: readonly RecruitRequestRow[],
+  appRecruiters: Iterable<string | null>,
+): Array<{ value: string; label: string; n: number }> {
+  const m = new Map<string, number>();
+  let none = 0;
+  for (const r of rows) {
+    const k = r.recruiter?.trim();
+    if (k) m.set(k, (m.get(k) ?? 0) + 1);
+    else none += 1;
+  }
+  for (const a of appRecruiters) {
+    const k = a?.trim();
+    if (k && !m.has(k)) m.set(k, 0);
+  }
+  const out = [...m.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'th')).map(([value, n]) => ({ value, label: value, n }));
+  return none ? [...out, { value: NO_RECRUITER_KEY, label: 'ยังไม่ได้ตั้งเจ้าหน้าที่สรรหา', n: none }] : out;
 }
 
 /** ตัวเลือกงานย่อย — เฉพาะที่มีใบในช่วง (ใบมากสุดก่อน) · ลำดับ/ชื่อตาม `DRIVING_SUBTYPES` ของกล่องงาน */
@@ -191,13 +223,14 @@ export function buildRequestFunnel(rows: readonly RecruitRequestRow[]): RequestF
 }
 
 /** กล่องในการ์ดใบขอเข้ามาที่กดดูรายการได้ (เจ้าของ 29 ต.ค. 2569 "มันต้องกดแล้วบอกสิ่ว่าใบไหนบ้าง") */
-export type RequestFunnelKey = 'all' | 'cancelled' | 'closed' | 'active' | 'notReleased' | 'releasedNoApps' | 'releasedWithApps';
+export type RequestFunnelKey = 'all' | 'cancelled' | 'closed' | 'active' | 'notReleased' | 'released' | 'releasedNoApps' | 'releasedWithApps';
 export const REQUEST_FUNNEL_LABEL: Record<RequestFunnelKey, string> = {
   all: 'ใบขอเข้ามา',
   cancelled: 'ยกเลิก',
   closed: 'ปิดแล้ว',
   active: 'ดำเนินการสรรหา',
   notReleased: 'ยังไม่ประกาศ',
+  released: 'ประกาศแล้ว',
   releasedNoApps: 'ประกาศแล้ว ไม่มีคนกรอก',
   releasedWithApps: 'ประกาศแล้ว มีคนกรอก',
 };
@@ -212,9 +245,12 @@ export function requestsOfFunnelKey(rows: readonly RecruitRequestRow[], key: Req
     if (s !== 'open') return false;
     if (key === 'active') return true;
     if (key === 'notReleased') return !r.released;
+    if (key === 'released') return r.released;
     if (key === 'releasedNoApps') return r.released && r.applications === 0;
     return r.released && r.applications > 0;
   });
+  // มีคนกรอก = ดูว่าใบละกี่คน (เจ้าของ 4 พ.ย. 2569) — คนกรอกมากสุดก่อน
+  if (key === 'releasedWithApps') return [...pick].sort((a, b) => b.applications - a.applications || a.requestNo.localeCompare(b.requestNo));
   return sortRequests(pick);
 }
 
@@ -392,4 +428,20 @@ export function appsOfRequests(apps: readonly RecruitAppFact[], rows: readonly R
   if (!rows) return [...apps];
   const ids = new Set(rows.map((r) => r.jobId).filter((v): v is string => Boolean(v)));
   return apps.filter((f) => f.jobId && ids.has(f.jobId));
+}
+
+/**
+ * รายชื่อตามตัวกรองบนสุด — ตัวกรองพื้นที่/ไซต์/ประเภท = ใบที่ผ่านตัวกรอง (`rows` ของช่วงนี้ + ช่วงก่อน · แบบเดิม)
+ * เจ้าหน้าที่ = เจ้าหน้าที่ของใบที่กรอก (`recruiterOf` จาก appJobs ทุกใบ) — ใบเก่าที่ยังมีคนกรอกก็นับ (4 พ.ย. 2569)
+ */
+export function appsOfFilter(
+  apps: readonly RecruitAppFact[],
+  f: RequestTabFilter,
+  rows: readonly RecruitRequestRow[],
+  recruiterOf: (jobId: string) => string | null | undefined,
+): RecruitAppFact[] {
+  const byRows = isRowFilterActive(f) ? appsOfRequests(apps, rows) : [...apps];
+  if (!f.recruiter) return byRows;
+  const want = f.recruiter;
+  return byRows.filter((a) => a.jobId && recruiterMatch(recruiterOf(a.jobId), want));
 }

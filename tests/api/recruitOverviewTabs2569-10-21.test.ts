@@ -5,25 +5,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { OVERVIEW_TABS, journeyStepsOfTab, overviewTabOf } from '@/lib/recruitOverviewTabs';
+import { journeyStepsOfTab } from '@/lib/recruitOverviewTabs';
 import type { JourneyStep } from '@/lib/recruitJourney';
 
 const step = (key: string): JourneyStep => ({ key, label: key, total: 0, parts: [] });
 const journey = ['names', 'ai', 'staff', 'appointment', 'attendance'].map(step);
 
 describe('แท็บภาพรวม', () => {
-  it('ชื่อแท็บตามที่เจ้าของสั่ง เรียงตามนี้', () => {
-    // 29 ต.ค. 2569 เจ้าของ "หน้า กรอกเข้ามา … เอาออกเลย ไปรวมกับ แท็บใบขอ"
-    expect(OVERVIEW_TABS.map((t) => t.label)).toEqual(['ภาพรวม Online', 'การติดต่อ', 'นัดหมาย']);
-  });
-
-  it('?ov= ไม่รู้จัก = ใบขอ', () => {
-    expect(overviewTabOf(null)).toBe('requests');
-    expect(overviewTabOf('xx')).toBe('requests');
-    expect(overviewTabOf('appt')).toBe('appt');
-    expect(overviewTabOf('apps')).toBe('requests');
-  });
-
   it('🔴 เส้นทาง 5 ขั้นกระจายครบทุกขั้น ไม่ซ้ำ · เลขขั้นแรกของแท็บนับจากเส้นทางเต็ม', () => {
     const apps = journeyStepsOfTab(journey, 'apps');
     const staff = journeyStepsOfTab(journey, 'staff');
@@ -33,11 +21,15 @@ describe('แท็บภาพรวม', () => {
     expect([apps.start, staff.start, appt.start]).toEqual([1, 3, 4]);
   });
 
-  it('หน้าใช้แท็บ shadcn + ทุกการ์ดเดิมยังอยู่ (ไม่มีอะไรหาย)', () => {
+  it('4 พ.ย. 2569 "เอา 3 แท็บมันรวมกันเลย" — หน้าเดียว ไม่มีแท็บ/?ov= · การติดต่อ/นัดหมาย พับไว้ · ทุกการ์ดเดิมยังอยู่ (ไม่มีอะไรหาย)', () => {
     const src = fs.readFileSync(path.join(process.cwd(), 'src/components/dashboard-trends/RecruitOverview.tsx'), 'utf8');
-    expect(src).toContain("from '@/components/ui/tabs'");
-    for (const t of ['requests', 'staff', 'appt']) expect(src).toContain(`<TabsContent value="${t}"`);
-    expect(src).not.toContain('<TabsContent value="apps"');
+    expect(src).not.toContain("from '@/components/ui/tabs'");
+    expect(src).not.toContain("searchParams.get('ov')");
+    expect(src).toContain('<FoldSection title="การติดต่อ" testId="recruit-ov-contact">');
+    expect(src).toContain('<FoldSection title="นัดหมาย" testId="recruit-ov-appt">');
+    // ส่วนการติดต่อ/นัดหมายตามตัวกรองบนสุด (ชุดรายชื่อ fv)
+    expect(src).toContain('<ContactTab apps={fv.cohort}');
+    expect(src).toContain("drillCard('appt', 'นัดหมาย', fv)");
     for (const title of [
       // การ์ดใบขอรวมเข้าการ์ดแนวโน้มใบขอ (27 ต.ค. 2569)
       "title: 'แนวโน้มใบขอ'",

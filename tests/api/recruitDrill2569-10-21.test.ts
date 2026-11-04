@@ -61,7 +61,8 @@ describe('หน้าจอ', () => {
     // 30 ต.ค. 2569: แท็บภาพรวม Online ส่งชุดที่ผ่านตัวกรองบนสุดให้การ์ด (ใบขอ = ใบรายใบ · กรอกเข้ามา = fv)
     expect(src).toContain("trend={(sc) => compareCard('requests', view, { rows: sc.rows, prevRows: sc.prevRows })}");
     expect(src).toContain("{compareCard('apps', fv)}");
-    for (const t of ['staff', 'appt']) expect(src).toContain(`{compareCard('${t}')}`);
+    // 4 พ.ย. 2569 หน้าเดียว — ส่วนการติดต่อ/นัดหมายตามตัวกรองบนสุด (fv)
+    for (const t of ['staff', 'appt']) expect(src).toContain(`{compareCard('${t}', fv)}`);
     for (const t of ['apps', 'staff', 'appt']) expect(src).toMatch(new RegExp(`drillCard\\('${t}'`));
     // 30 ต.ค. 2569: กล่องบนการ์ดแนวโน้มใบขอไม่กดแล้ว — กล่องเดียวกันบนการ์ด "ใบขอเข้ามา" ด้านบนกดดูรายการใบได้ (นับชุดเดียวกัน)
     expect(src).not.toContain('REQUEST_DRILL_PATH');
