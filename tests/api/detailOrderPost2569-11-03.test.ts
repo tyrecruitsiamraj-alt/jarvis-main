@@ -8,8 +8,8 @@ import { describe, expect, it } from 'vitest';
 describe('หน้ารายละเอียดใบขอมีกล่อง Autopost / Scrap', () => {
   it('ใช้ OrderPostButton ตัวเดียวกับป๊อปประกาศ', () => {
     const src = readFileSync('src/pages/jobs/SiamrajUnitRequestDetailPage.tsx', 'utf8');
-    expect(src).toContain("import OrderPostButton from '@/components/jobs/OrderPostButton';");
-    expect(src).toContain('<OrderPostButton job={data} withGenLink />' /* 4 พ.ย. 2569 + Gen link · กล่องพับไว้ */);
+    expect(src).toContain("import { OrderPostFold } from '@/components/jobs/OrderPostButton';");
+    expect(src).toContain('<OrderPostFold job={data} withGenLink />' /* 4 พ.ย. 2569 + Gen link · กล่องพับไว้ */);
     expect(src).toContain('data-testid="detail-order-post"');
   });
 });

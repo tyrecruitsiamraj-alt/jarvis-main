@@ -1,5 +1,5 @@
 import React from 'react';
-import { LoaderCircle, Search } from 'lucide-react';
+import { ChevronDown, LoaderCircle, Megaphone, Search } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -375,6 +375,31 @@ export default function OrderPostButton({
           </Button>
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * กล่องสั่งงานแบบพับ — ตอนเปิดเห็นแค่หัวกล่อง กดแล้วค่อยกางให้เลือกว่าจะทำอะไร
+ * (เจ้าของ 4 พ.ย. 2569 หน้าใบขอ "ย่อไว้ พอกดค่อยกางออกมาแล้วค่อยเลือก" → ป๊อปประกาศ "ทำเหมือนกับตรงหน้าใบขอ")
+ * พับอยู่ = ยังไม่โหลดบัญชี/กลุ่มของ So Scraping · ป๊อปจากปุ่ม Autopost บนการ์ดไม่พับ (กดมาเพื่อสั่งอยู่แล้ว)
+ */
+export function OrderPostFold({ className, ...props }: React.ComponentProps<typeof OrderPostButton> & { className?: string }) {
+  const [open, setOpen] = React.useState(false);
+  return (
+    <div className={cn('space-y-3', className)} data-testid="order-post-fold">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="flex min-h-9 w-full items-center gap-1.5 text-left text-sm font-medium"
+        data-testid="order-post-toggle"
+      >
+        <Megaphone className={cn('h-4 w-4', TONE.primary.value)} aria-hidden />
+        {props.withGenLink ? 'Autopost / Scrap / Gen link' : 'Autopost / Scrap'}
+        <ChevronDown className={cn('ml-auto h-4 w-4 shrink-0 text-muted-foreground transition-transform', open && 'rotate-180')} aria-hidden />
+      </button>
+      {open ? <OrderPostButton {...props} /> : null}
     </div>
   );
 }

@@ -87,7 +87,7 @@ import { isRetiredBenefit } from '@/lib/extraBenefits';
 import { resignedMonthlyNetAverage } from '@/lib/resignedIncome';
 import { jobAverageIncome, jobIncomeLine } from '@/lib/jobPublicFacts';
 import PublicJobCardPreview from '@/components/jobs/PublicJobCardPreview';
-import OrderPostButton from '@/components/jobs/OrderPostButton';
+import { OrderPostFold } from '@/components/jobs/OrderPostButton';
 import { EVEN_TYPE, TONE } from '@/lib/designTokens';
 import { cn } from '@/lib/utils';
 import { SEARCH_ALL_POOLS_AND_CALL } from '@/lib/candidateSearchLabels';
@@ -506,7 +506,7 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
                 {/* ผู้สมัครจะเห็นแบบไหน (เจ้าของ 4 ต.ค. 2569: *"หน้าสรุปต้องบอกว่าผู้สมัครจะเห็นหน้าตาแบบไหน จะได้ตรวจว่าครบไหม"*)
                     การ์ดตัวเดียวกับหน้าประกาศ — ช่องที่ติ๊กซ่อนก็ซ่อนในนี้ด้วย */}
                 <StepCard title="ผู้สมัครจะเห็นแบบนี้">
-                  {jobWithPatch ? <PublicJobCardPreview job={jobWithPatch} action={<OrderPostButton job={jobWithPatch} caption={postText} onCaptionSaved={(t) => setPublicPatch((p) => ({ ...p, public_post_text: t ?? undefined }))} />} /> : <Loading />}
+                  {jobWithPatch ? <PublicJobCardPreview job={jobWithPatch} action={<OrderPostFold className="rounded-xl border border-border/70 p-3" job={jobWithPatch} caption={postText} onCaptionSaved={(t) => setPublicPatch((p) => ({ ...p, public_post_text: t ?? undefined }))} />} /> : <Loading />}
                 </StepCard>
 
     </>

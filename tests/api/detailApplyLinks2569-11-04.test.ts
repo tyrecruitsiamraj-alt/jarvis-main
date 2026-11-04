@@ -11,9 +11,13 @@ describe('Gen link รวมในกล่อง Autopost / Scrap', () => {
   it('หน้ารายละเอียดใบขอ: กล่องเดียว หัว "Autopost / Scrap / Gen link" · ไม่มีกล่องลิงก์สมัครแยก', () => {
     const detail = read('src/pages/jobs/SiamrajUnitRequestDetailPage.tsx');
     // 4 พ.ย. 2569 "ย่อไว้ พอกดค่อยกางออกมา" — กล่องพับไว้ กดหัวแล้วค่อยขึ้นฟอร์ม
-    expect(detail).toContain('{orderOpen ? <OrderPostButton job={data} withGenLink /> : null}');
-    expect(detail).toContain('const [orderOpen, setOrderOpen] = React.useState(false);');
-    expect(detail).toContain('Autopost / Scrap / Gen link');
+    // ป๊อปประกาศใช้กล่องพับตัวเดียวกัน (เจ้าของ 4 พ.ย. 2569 "ทำเหมือนกับตรงหน้าใบขอ") · ป๊อปจากปุ่ม Autopost บนการ์ดไม่พับ
+    expect(detail).toContain('<OrderPostFold job={data} withGenLink />');
+    const order = read('src/components/jobs/OrderPostButton.tsx');
+    expect(order).toContain('const [open, setOpen] = React.useState(false);');
+    expect(order).toContain('{open ? <OrderPostButton {...props} /> : null}');
+    expect(order).toContain("{props.withGenLink ? 'Autopost / Scrap / Gen link' : 'Autopost / Scrap'}");
+    expect(read('src/components/jobs/AutopostDialog.tsx')).toContain('<OrderPostButton key={job.id} job={job} defaultKind="autopost" onSent={onSent} />');
     expect(detail).not.toContain('detail-apply-links');
   });
 
