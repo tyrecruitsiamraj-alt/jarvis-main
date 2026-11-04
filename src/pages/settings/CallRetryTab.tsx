@@ -3,6 +3,7 @@
  * 26 ต.ค. 2569 เดิมเป็นรายการเวลาคงที่ → 27 ต.ค. 2569 เจ้าของเปลี่ยนเป็นโทรซ้ำเป็นรอบ:
  * > *"กรอกมาตอนไหนก็โทรเลย ถ้าไม่รับก็โทรซ้ำ 3 รอบ ถ้าไม่รับก็บวกไปอีก 2 ชม แล้วโทรใหม่ ไม่รับก็โทรซ้ำ 3 สาย
  * > ถ้าไม่รับอีกก็ไปรอโทรวันถัดไป คนละเวลา"* · Choice: เว้น 10 นาที · เช้าสลับบ่าย · โทรแค่ 08:00–20:00
+ * 4 พ.ย. 2569 เจ้าของ Choice "ไปเสาร์+อาทิตย์เลย" — วันที่โทรซ้ำ เลือก เสาร์-อาทิตย์ (ค่าเริ่ม) / วันถัดไป (`retryDayMode`)
  * ตัวคำนวณเวลา `nextRetryAt` · ช่วงโทรได้ `clampToCallWindow` (src/lib/callFollowupPolicy.ts) · admin แก้
  * ตารางติดตามคนเริ่มงานมีเวลาของตัวเอง ไม่ใช้ค่านี้
  */
@@ -11,16 +12,17 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import TimeSelect24 from '@/components/shared/TimeSelect24';
 import { useAuth } from '@/contexts/AuthContext';
-import { DEFAULT_CALL_FOLLOWUP_POLICY, ROUND_LIMITS, totalCallsOf } from '@/lib/callFollowupPolicy';
+import { DEFAULT_CALL_FOLLOWUP_POLICY, RETRY_DAY_MODE_LABEL, ROUND_LIMITS, totalCallsOf, type RetryDayMode } from '@/lib/callFollowupPolicy';
 import { fetchCallFollowupPolicy, saveCallFollowupPolicy, type CallRetryRoundInput } from '@/lib/callFollowupPolicyApi';
 import { TONE } from '@/lib/designTokens';
 import { cn } from '@/lib/utils';
 
 type NumKey = keyof typeof ROUND_LIMITS;
 type TimeKey = 'callFrom' | 'callTo' | 'dayMorning' | 'dayAfternoon';
-type Form = Record<NumKey | TimeKey, string>;
+type Form = Record<NumKey | TimeKey, string> & { retryDayMode: RetryDayMode };
 
 const NUM_FIELDS: Array<{ key: NumKey; label: string }> = [
   { key: 'roundCalls', label: 'สายต่อรอบ' },
@@ -32,8 +34,8 @@ const NUM_FIELDS: Array<{ key: NumKey; label: string }> = [
 const TIME_FIELDS: Array<{ key: TimeKey; label: string }> = [
   { key: 'callFrom', label: 'เริ่มโทรได้' },
   { key: 'callTo', label: 'โทรได้ถึง' },
-  { key: 'dayMorning', label: 'วันถัดไป รอบเช้าเริ่ม' },
-  { key: 'dayAfternoon', label: 'วันถัดไป รอบบ่ายเริ่ม' },
+  { key: 'dayMorning', label: 'วันโทรซ้ำ รอบเช้าเริ่ม' },
+  { key: 'dayAfternoon', label: 'วันโทรซ้ำ รอบบ่ายเริ่ม' },
 ];
 
 const toForm = (p: CallRetryRoundInput): Form => ({
@@ -46,6 +48,7 @@ const toForm = (p: CallRetryRoundInput): Form => ({
   callTo: p.callTo,
   dayMorning: p.dayMorning,
   dayAfternoon: p.dayAfternoon,
+  retryDayMode: p.retryDayMode,
 });
 
 const CallRetryTab: React.FC = () => {
@@ -71,7 +74,7 @@ const CallRetryTab: React.FC = () => {
     };
   }, []);
 
-  const set = (key: NumKey | TimeKey, v: string) => {
+  const set = (key: NumKey | TimeKey | 'retryDayMode', v: string) => {
     setForm((cur) => ({ ...cur, [key]: v }));
     setNotice(null);
     setError(null);
@@ -102,6 +105,7 @@ const CallRetryTab: React.FC = () => {
         callTo: form.callTo,
         dayMorning: form.dayMorning,
         dayAfternoon: form.dayAfternoon,
+        retryDayMode: form.retryDayMode,
       });
       setForm(toForm(saved));
       setNotice('บันทึกแล้ว');
@@ -144,6 +148,22 @@ const CallRetryTab: React.FC = () => {
       <p className="text-sm tabular-nums text-foreground" data-testid="retry-total">
         รวมโทรได้ {total ?? '—'} ครั้ง
       </p>
+
+      <div className="space-y-1.5">
+        <Label>ไม่รับสายครบรอบของวัน โทรซ้ำวันไหน</Label>
+        <Select value={form.retryDayMode} disabled={!canEdit || !loaded} onValueChange={(v) => set('retryDayMode', v)}>
+          <SelectTrigger className="w-48" aria-label="โทรซ้ำวันไหน" data-testid="retry-day-mode">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {(Object.keys(RETRY_DAY_MODE_LABEL) as RetryDayMode[]).map((k) => (
+              <SelectItem key={k} value={k}>
+                {RETRY_DAY_MODE_LABEL[k]}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         {TIME_FIELDS.map((f) => (

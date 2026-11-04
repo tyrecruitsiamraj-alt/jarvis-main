@@ -209,15 +209,47 @@ describe('isCallOutcome', () => {
 describe('โทรซ้ำเป็นรอบ 3 สาย × 2 รอบ × 3 วัน', () => {
   const bkk = (d: Date) => new Date(d.getTime() + 7 * 3_600_000).toISOString().slice(0, 16).replace('T', ' ');
   /** ไล่ทั้ง 18 สาย: กรอก `startIso` แล้วไม่รับทุกสาย — คืนเวลาไทยของทุกสาย */
-  const chain = (startIso: string) => {
+  /** แบบเดิม: ครบรอบของวัน = โทรวันถัดไป (ตั้งค่า "วันถัดไป") */
+  const NEXT = normalizeCallFollowupPolicy({ retryDayMode: 'next' });
+  const chain = (startIso: string, policy: CallFollowupPolicy = NEXT) => {
     const out: string[] = [];
     let at = new Date(startIso);
     for (let n = 1; n <= 18; n += 1) {
       out.push(bkk(at));
-      if (n < 18) at = nextRetryAt(at, n);
+      if (n < 18) at = nextRetryAt(at, n, policy);
     }
     return out;
   };
+
+  it('ค่าเริ่ม = เสาร์-อาทิตย์ (เจ้าของ 4 พ.ย. 2569) · บันทึกค่าเพี้ยน = ค่าเริ่ม', () => {
+    expect(DEFAULT_CALL_FOLLOWUP_POLICY.retryDayMode).toBe('weekend');
+    expect(normalizeCallFollowupPolicy({ retryDayMode: 'tomorrow' }).retryDayMode).toBe('weekend');
+    expect(normalizeCallFollowupPolicy({ retryDayMode: 'next' }).retryDayMode).toBe('next');
+  });
+
+  it('เสาร์-อาทิตย์: กรอกอังคาร → อังคาร · เสาร์ · อาทิตย์ แล้วครบ 3 วัน (จ–ศ เหลือแต่รายชื่อใหม่)', () => {
+    const W = normalizeCallFollowupPolicy({});
+    const c = chain('2026-10-27T02:00:00Z', W);
+    expect(c.slice(5, 8)).toEqual(['2026-10-27 11:40', '2026-10-31 13:00', '2026-10-31 13:10']);
+    expect(c.slice(11, 14)).toEqual(['2026-10-31 15:40', '2026-11-01 09:00', '2026-11-01 09:10']);
+    expect(c[17]).toBe('2026-11-01 11:40');
+    // ครบ 18 สาย = ส่งให้คนตาม (ไม่โทรต่อ)
+    expect(resolveCallFollowup({ outcome: 'no_answer', attemptCount: 18, now: new Date('2026-11-01T04:40:00Z'), policy: W }).action).toBe('needs_human');
+  });
+
+  it('เสาร์-อาทิตย์: กรอกเสาร์ → อาทิตย์ → เสาร์หน้า · กรอกอาทิตย์ → เสาร์หน้า', () => {
+    const W = normalizeCallFollowupPolicy({});
+    const sat = chain('2026-10-31T02:00:00Z', W);
+    expect([sat[6], sat[12]]).toEqual(['2026-11-01 13:00', '2026-11-07 09:00']);
+    const sun = chain('2026-11-01T02:00:00Z', W);
+    expect([sun[6], sun[12]]).toEqual(['2026-11-07 13:00', '2026-11-08 09:00']);
+  });
+
+  it('ข้อความเหตุบอกวันจริง: โทรซ้ำวันเสาร์', () => {
+    const d = resolveCallFollowup({ outcome: 'no_answer', attemptCount: 6, now: new Date('2026-10-27T04:40:00Z') });
+    expect(d.reason).toBe('ยังไม่ติด — โทรซ้ำครั้งที่ 7/18 วันเสาร์ 13:00');
+    expect(resolveCallFollowup({ outcome: 'no_answer', attemptCount: 1, now: new Date('2026-10-27T02:00:00Z') }).reason).toBe('ยังไม่ติด — โทรซ้ำครั้งที่ 2/18 วันนี้ 09:10');
+  });
 
   it('กรอก 09:00 → วันแรกเช้า · วันถัดไปบ่าย · วันที่สามเช้า', () => {
     expect(chain('2026-10-27T02:00:00Z')).toEqual([
@@ -240,7 +272,7 @@ describe('โทรซ้ำเป็นรอบ 3 สาย × 2 รอบ × 
   });
 
   it('ตั้งค่าเองมีผล: 2 สาย/รอบ เว้น 30 นาที รอบเดียวต่อวัน', () => {
-    const p: CallFollowupPolicy = normalizeCallFollowupPolicy({ roundCalls: 2, roundGapMinutes: 30, roundsPerDay: 1, retryDays: 2 });
+    const p: CallFollowupPolicy = normalizeCallFollowupPolicy({ roundCalls: 2, roundGapMinutes: 30, roundsPerDay: 1, retryDays: 2, retryDayMode: 'next' });
     expect(bkk(nextRetryAt(new Date('2026-10-27T02:00:00Z'), 1, p))).toBe('2026-10-27 09:30');
     expect(bkk(nextRetryAt(new Date('2026-10-27T02:30:00Z'), 2, p))).toBe('2026-10-28 13:00');
   });

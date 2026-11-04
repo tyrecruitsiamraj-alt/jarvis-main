@@ -59,7 +59,17 @@ export type CallFollowupPolicy = {
   /** เวลาเริ่มของวันถัดไป — เช้า/บ่าย สลับกับวันก่อน */
   dayMorning: string;
   dayAfternoon: string;
+  /**
+   * วันที่โทรซ้ำหลังครบรอบของวัน (เจ้าของ 4 พ.ย. 2569 Choice "ไปเสาร์+อาทิตย์เลย")
+   * > *"ไม่งั้น จ-ศ รายชื่อใหม่ๆมันรอยาวเลย … ไม่รับในวันแรกก็ไปรอ เสาร์ อาทิตย์เลย"*
+   * `weekend` = วันถัดไปที่เป็นเสาร์/อาทิตย์ · `next` = วันถัดไป (แบบเดิม) · จำนวนวันรวมยังเป็น `retryDays` (ครบ = ส่งให้คนตาม)
+   * เช่น 3 วัน: กรอกวันพุธ → พุธ · เสาร์ · อาทิตย์ · กรอกเสาร์ → เสาร์ · อาทิตย์ · เสาร์ถัดไป
+   */
+  retryDayMode: RetryDayMode;
 };
+
+export type RetryDayMode = 'weekend' | 'next';
+export const RETRY_DAY_MODE_LABEL: Record<RetryDayMode, string> = { weekend: 'เสาร์-อาทิตย์', next: 'วันถัดไป' };
 
 export const DEFAULT_CALL_FOLLOWUP_POLICY: CallFollowupPolicy = {
   maxAttempts: 18,
@@ -77,6 +87,7 @@ export const DEFAULT_CALL_FOLLOWUP_POLICY: CallFollowupPolicy = {
   callTo: '20:00',
   dayMorning: '09:00',
   dayAfternoon: '13:00',
+  retryDayMode: 'weekend',
 };
 
 const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -122,6 +133,7 @@ export function normalizeCallFollowupPolicy(raw: unknown): CallFollowupPolicy {
   }
   out.dayMorning = hhmmOr(src.dayMorning, out.dayMorning);
   out.dayAfternoon = hhmmOr(src.dayAfternoon, out.dayAfternoon);
+  if (src.retryDayMode === 'weekend' || src.retryDayMode === 'next') out.retryDayMode = src.retryDayMode;
   out.maxAttempts = totalCallsOf(out);
   return out;
 }
@@ -191,6 +203,7 @@ export function shiftOutOfQuietHours(at: Date, policy: CallFollowupPolicy): Date
 }
 
 export const RETRY_LEAD_MINUTES = 10;
+const THAI_WEEKDAY = ['อาทิตย์', 'จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์', 'เสาร์'];
 const minutesOf = (hhmm: string) => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3, 5));
 const MIN = 60_000;
 const BKK = 7 * 60 * MIN;
@@ -199,6 +212,15 @@ function bkkDayAt(at: Date, hhmm: string, dayOffset = 0): Date {
   const b = new Date(at.getTime() + BKK);
   const m = minutesOf(hhmm);
   return new Date(Date.UTC(b.getUTCFullYear(), b.getUTCMonth(), b.getUTCDate() + dayOffset, Math.floor(m / 60), m % 60) - BKK);
+}
+/** วันในสัปดาห์ตามเวลาไทย (0 = อาทิตย์ … 6 = เสาร์) */
+const bkkWeekday = (at: Date) => new Date(at.getTime() + BKK).getUTCDay();
+/** อีกกี่วันถึงวันโทรซ้ำถัดไป — วันถัดไป หรือ เสาร์/อาทิตย์ถัดไป (ไม่นับวันนี้) */
+function daysToNextRetryDay(now: Date, mode: RetryDayMode): number {
+  if (mode === 'next') return 1;
+  const d = bkkWeekday(now);
+  // เสาร์ → อาทิตย์ · อาทิตย์ → เสาร์หน้า · จันทร์–ศุกร์ → เสาร์นี้
+  return d === 6 ? 1 : 6 - d;
 }
 const bkkMinuteOfDay = (at: Date) => {
   const b = new Date(at.getTime() + BKK);
@@ -231,7 +253,7 @@ export function nextRetryAt(now: Date, attemptCount: number, policy: CallFollowu
     const spanMin = (policy.roundsPerDay - 1) * policy.roundsGapHours * 60 + policy.roundsPerDay * (policy.roundCalls - 1) * policy.roundGapMinutes;
     const dayStart = new Date(now.getTime() - spanMin * MIN);
     const startedMorning = bkkMinuteOfDay(dayStart) < 12 * 60;
-    at = bkkDayAt(now, startedMorning ? policy.dayAfternoon : policy.dayMorning, 1);
+    at = bkkDayAt(now, startedMorning ? policy.dayAfternoon : policy.dayMorning, daysToNextRetryDay(now, policy.retryDayMode));
   }
   const floor = new Date(now.getTime() + RETRY_LEAD_MINUTES * MIN);
   return clampToCallWindow(at.getTime() < floor.getTime() ? floor : at, policy);
@@ -334,13 +356,14 @@ export function resolveCallFollowup(input: {
       }
       const at = nextRetryAt(now, attemptCount, policy);
       const atBkk = new Date(at.getTime() + 7 * 3_600_000);
-      const sameDay = atBkk.getUTCDate() === new Date(now.getTime() + 7 * 3_600_000).getUTCDate();
+      const dayDiff = Math.round((Date.UTC(atBkk.getUTCFullYear(), atBkk.getUTCMonth(), atBkk.getUTCDate()) - bkkDayAt(now, '00:00').getTime() - BKK) / 86_400_000);
       const hhmm = `${String(atBkk.getUTCHours()).padStart(2, '0')}:${String(atBkk.getUTCMinutes()).padStart(2, '0')}`;
+      const dayText = dayDiff <= 0 ? 'วันนี้' : dayDiff === 1 ? 'พรุ่งนี้' : `วัน${THAI_WEEKDAY[atBkk.getUTCDay()]}`;
       return {
         action: 'retry',
         nextAttemptAt: iso(at),
         suppressUntil: null,
-        reason: `ยังไม่ติด — โทรซ้ำครั้งที่ ${attemptCount + 1}/${policy.maxAttempts} ${sameDay ? 'วันนี้' : 'พรุ่งนี้'} ${hhmm}`,
+        reason: `ยังไม่ติด — โทรซ้ำครั้งที่ ${attemptCount + 1}/${policy.maxAttempts} ${dayText} ${hhmm}`,
       };
     }
 

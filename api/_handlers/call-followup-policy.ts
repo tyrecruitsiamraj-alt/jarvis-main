@@ -3,7 +3,7 @@
  * > *"ไม่รับสายแล้วโทรวันถัดไป ขอเป็นโทรใหม่ตอนเที่ยง · ขอหน้าไว้ตั้งเวลาผ่าน UI"* · Choice: ทุกงานที่ AI โทร · Admin แก้
  * - GET: ค่าที่ใช้อยู่
  * - PUT (admin): ช่องโทรซ้ำเป็นรอบ (27 ต.ค. 2569) `{ roundCalls, roundGapMinutes, roundsPerDay, roundsGapHours, retryDays,
- *   callFrom, callTo, dayMorning, dayAfternoon }` — maxAttempts คิดให้เอง · ค่าอื่นของนโยบายคงเดิม · จดบันทึกการใช้งานทุกครั้ง
+ *   callFrom, callTo, dayMorning, dayAfternoon, retryDayMode }` — maxAttempts คิดให้เอง · ค่าอื่นของนโยบายคงเดิม · จดบันทึกการใช้งานทุกครั้ง
  * ความหมาย/ตัวกรองค่าอยู่ `src/lib/callFollowupPolicy.ts` ที่เดียว · เก็บใน app_call_followup_policy (073)
  */
 import { withRbac, sendError, handleApiError, type ApiRes, type AuthedReq } from '../_lib/http.js';
@@ -43,6 +43,8 @@ async function handler(req: AuthedReq, res: ApiRes) {
         if (typeof body[k] !== 'string' || !HHMM.test(String(body[k]).trim())) return sendError(res, 400, 'Bad request', 'เวลาต้องเป็นรูปแบบ ชม.:นาที');
       }
       if (String(body.callTo) <= String(body.callFrom)) return sendError(res, 400, 'Bad request', 'เวลาเลิกโทรต้องหลังเวลาเริ่มโทร');
+      // วันที่โทรซ้ำ (4 พ.ย. 2569) — ไม่ส่งมา = คงค่าเดิม
+      if (body.retryDayMode !== undefined && body.retryDayMode !== 'weekend' && body.retryDayMode !== 'next') return sendError(res, 400, 'Bad request', 'วันที่โทรซ้ำไม่ถูกต้อง');
       const before = await getCallFollowupPolicy();
       const pick = (p: typeof before) => ({
         roundCalls: p.roundCalls,
@@ -54,11 +56,16 @@ async function handler(req: AuthedReq, res: ApiRes) {
         callTo: p.callTo,
         dayMorning: p.dayMorning,
         dayAfternoon: p.dayAfternoon,
+        retryDayMode: p.retryDayMode,
         maxAttempts: p.maxAttempts,
       });
       // รับเฉพาะช่องของหน้านี้ — ค่าอื่นของนโยบาย (ห้ามโทร · พักเบอร์ ฯลฯ) คงเดิม
       const roundKeys = [...Object.keys(ROUND_LIMITS), 'callFrom', 'callTo', 'dayMorning', 'dayAfternoon'];
-      const next = normalizeCallFollowupPolicy({ ...before, ...Object.fromEntries(roundKeys.map((k) => [k, body[k]])) });
+      const next = normalizeCallFollowupPolicy({
+        ...before,
+        ...Object.fromEntries(roundKeys.map((k) => [k, body[k]])),
+        retryDayMode: body.retryDayMode ?? before.retryDayMode,
+      });
       const saved = await setCallFollowupPolicy(next, req.user?.email ?? null);
       await auditFromAuthed(req, {
         action: 'call-followup-policy.update',
