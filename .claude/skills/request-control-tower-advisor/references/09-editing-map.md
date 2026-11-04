@@ -14264,3 +14264,4 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
   - Gen link (`SoGroupPicker`) ยังเป็นหมวด + หัวข้อย่อยราชการ/เอกชนแบบเดิม
   - เทสต์ `tests/api/autopostJourney2569-11-04.test.ts`
   - **Gen link ใช้ตัวเลือกเดียวกัน** (เจ้าของ 4 พ.ย. 2569 "Gen link ทำแบบเดียวกันด้วย") — ย้าย `GroupFilterPicker` จาก AutopostDialog เป็น `SoGroupFilterPicker` ใน `SoGroupPicker.tsx` (prop `idPrefix` · `testPrefix` autopost|genlink · `account` null = ซ่อนแค่กลุ่มแอดมินพัก · `cap` null = ไม่จำกัด) · `SoGroupPicker` (Gen link / Gen link เพิ่ม) = ตัวนี้แบบไม่มีบัญชี · ถอด `SoSectorFold` / หมวดธุรกิจพับ · Gen link โหลดกลุ่มจาก `fetchSoOptions()` (มีสถานะแอดมินพัก + จังหวัด) แทน `fetchSoGroups`
+  - **กล่อง Autopost / Scrap / Gen link พับไว้ตอนเปิดหน้า** (เจ้าของ 4 พ.ย. 2569 "ย่อไว้ พอกดค่อยกางออกมาแล้วค่อยเลือก") — `SiamrajUnitRequestDetailPage` state `orderOpen` · หัวกล่องทั้งแถวกดได้แบบ "ข้อมูลใบขอ" · พับอยู่ = ไม่ mount `OrderPostButton` (ไม่โหลด So Scraping)

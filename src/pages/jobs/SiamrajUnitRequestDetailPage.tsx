@@ -71,6 +71,8 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
    * เปิดใบขอมาจะเห็นหัวข้อ + ส่วนอื่น (ผู้รับผิดชอบ/หมายเหตุ/ผู้สมัคร) ก่อน
    */
   const [infoOpen, setInfoOpen] = React.useState(false);
+  /** กล่อง Autopost / Scrap / Gen link พับไว้ตอนเปิดหน้า (4 พ.ย. 2569) */
+  const [orderOpen, setOrderOpen] = React.useState(false);
   /** ประวัติการแก้ไขพับไว้ กดค่อยกาง — โหลดตอนกางครั้งแรก (เจ้าของ 2 พ.ย. 2569 "ย่อไว้ถ้ากดค่อยขยาย ไม่งั้นเกะกะ") */
   const [historyOpen, setHistoryOpen] = useState(false);
   const backPath = resolveUnitDetailBackPath({
@@ -290,12 +292,24 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
             {/* สั่ง Autopost / ขอ Scrap จากหน้าใบขอ (เจ้าของ 3 พ.ย. 2569 "ทำให้สั่ง autopost กับ Scrap ตรงนี้ได้ด้วยเลย")
                 ตัวเดียวกับป๊อปประกาศ (`OrderPostButton`) — สถานะล่าสุด + Autopost กดทีเดียวจบ + ขอ Scrap
                 + Gen link เป็นตัวเลือกที่ 3 ในช่องเดียวกัน (เจ้าของ 4 พ.ย. 2569 "เอารวมกันสิ่" — เดิมเป็นกล่องลิงก์สมัครแยก) */}
+            {/* พับไว้ตอนเปิดหน้า กดหัวกล่องแล้วค่อยกางเลือกว่าจะทำอะไร (เจ้าของ 4 พ.ย. 2569 "ย่อไว้ พอกดค่อยกางออกมาแล้วค่อยเลือก")
+                แบบเดียวกับกล่อง "ข้อมูลใบขอ" — ทั้งแถวกดได้ · พับอยู่ = ยังไม่โหลดบัญชี/กลุ่มของ So Scraping */}
             <section className="glass-card rounded-3xl p-4 border border-white/70 space-y-3" data-testid="detail-order-post">
-              <h3 className="text-sm font-medium flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => setOrderOpen((v) => !v)}
+                aria-expanded={orderOpen}
+                className="flex min-h-9 w-full items-center gap-1.5 text-left text-sm font-medium"
+                data-testid="detail-order-post-toggle"
+              >
                 <Megaphone className={cn('w-4 h-4', TONE.primary.value)} aria-hidden />
                 Autopost / Scrap / Gen link
-              </h3>
-              <OrderPostButton job={data} withGenLink />
+                <ChevronDown
+                  className={cn('ml-auto h-4 w-4 shrink-0 text-muted-foreground transition-transform', orderOpen && 'rotate-180')}
+                  aria-hidden
+                />
+              </button>
+              {orderOpen ? <OrderPostButton job={data} withGenLink /> : null}
             </section>
 
             <section className="glass-card rounded-3xl p-4 border border-white/70 space-y-2">

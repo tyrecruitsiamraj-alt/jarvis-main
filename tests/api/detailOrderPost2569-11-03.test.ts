@@ -9,7 +9,7 @@ describe('หน้ารายละเอียดใบขอมีกล่�
   it('ใช้ OrderPostButton ตัวเดียวกับป๊อปประกาศ', () => {
     const src = readFileSync('src/pages/jobs/SiamrajUnitRequestDetailPage.tsx', 'utf8');
     expect(src).toContain("import OrderPostButton from '@/components/jobs/OrderPostButton';");
-    expect(src).toContain('<OrderPostButton job={data} withGenLink />' /* 4 พ.ย. 2569 + Gen link ในช่องเดียวกัน */);
+    expect(src).toContain('<OrderPostButton job={data} withGenLink />' /* 4 พ.ย. 2569 + Gen link · กล่องพับไว้ */);
     expect(src).toContain('data-testid="detail-order-post"');
   });
 });

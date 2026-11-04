@@ -10,7 +10,9 @@ const read = (p: string) => readFileSync(p, 'utf8');
 describe('Gen link รวมในกล่อง Autopost / Scrap', () => {
   it('หน้ารายละเอียดใบขอ: กล่องเดียว หัว "Autopost / Scrap / Gen link" · ไม่มีกล่องลิงก์สมัครแยก', () => {
     const detail = read('src/pages/jobs/SiamrajUnitRequestDetailPage.tsx');
-    expect(detail).toContain('<OrderPostButton job={data} withGenLink />');
+    // 4 พ.ย. 2569 "ย่อไว้ พอกดค่อยกางออกมา" — กล่องพับไว้ กดหัวแล้วค่อยขึ้นฟอร์ม
+    expect(detail).toContain('{orderOpen ? <OrderPostButton job={data} withGenLink /> : null}');
+    expect(detail).toContain('const [orderOpen, setOrderOpen] = React.useState(false);');
     expect(detail).toContain('Autopost / Scrap / Gen link');
     expect(detail).not.toContain('detail-apply-links');
   });
