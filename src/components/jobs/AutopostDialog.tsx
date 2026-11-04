@@ -697,23 +697,15 @@ function GroupSection({
   onToggle: (ids: string[], on: boolean) => void;
 }) {
   const [open, setOpen] = React.useState(section.forJob);
-  const ids = section.groups.map((g) => g.id);
-  const n = ids.filter((id) => picked.includes(id)).length;
-  const headId = `autopost-bu-${jobId}-${section.bu ?? 'none'}`;
   /** ติ๊กครบเพดานแล้ว — ช่องที่ยังไม่ติ๊กเป็นสีเทา กดไม่ได้ (เอาออกได้เสมอ) */
   const full = cap !== null && picked.length >= cap;
   return (
     <Collapsible open={open} onOpenChange={setOpen} className="rounded-xl border border-border/70" data-testid={`autopost-bu-${section.bu ?? 'none'}`}>
+      {/* ช่องติ๊กทั้งหมดย้ายไปหัวข้อย่อย ราชการ / เอกชน (เจ้าของ 4 พ.ย. 2569 · ติ๊กหัวธุรกิจเดียวได้ 2,437 กลุ่ม) */}
       <div className="flex items-center gap-2 px-3 py-2">
-        <Checkbox
-          id={headId}
-          checked={n === 0 ? false : n === ids.length ? true : 'indeterminate'}
-          onCheckedChange={(v) => onToggle(ids, v === true)}
-          aria-label={`เลือกทุกกลุ่มของ ${section.label}`}
-        />
-        <Label htmlFor={headId} className="flex-1 text-sm font-medium tabular-nums text-foreground" data-testid="autopost-bu-head">
+        <p className="flex-1 text-sm font-medium tabular-nums text-foreground" data-testid="autopost-bu-head">
           {soSectionHeadText(section, picked, account)}
-        </Label>
+        </p>
         <CollapsibleTrigger asChild>
           <Button type="button" size="xs" variant="ghost" aria-label={open ? `พับ ${section.label}` : `กาง ${section.label}`}>
             {open ? 'พับ' : 'กาง'}
@@ -727,7 +719,11 @@ function GroupSection({
           {soSectorBlocks(section.groups, jobSector).map((block, i) => (
             <SoSectorFold
               key={block.sector ?? 'none'}
-              label={`${block.label} · ${block.groups.length} กลุ่ม`}
+              label={block.label}
+              ids={block.groups.map((g) => g.id)}
+              picked={picked}
+              onToggle={onToggle}
+              checkId={`autopost-sector-${jobId}-${section.bu ?? 'none'}-${block.sector ?? 'none'}`}
               defaultOpen={soSectorFoldOpen(block.sector, jobSector, i)}
               testId={`autopost-sector-${block.sector ?? 'none'}`}
             >

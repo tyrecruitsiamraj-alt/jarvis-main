@@ -107,7 +107,9 @@ describe('กลุ่ม Facebook ตามธุรกิจของใบข
     const dialog = readFileSync('src/components/jobs/AutopostDialog.tsx', 'utf8');
     expect(dialog).toContain('defaultSoGroupPick(soGroupsOfAccount(o, acc), jobBu, acc, jobSector)' /* 4 พ.ย. 2569 + ราชการ/เอกชน */);
     expect(dialog).toContain('data-testid="autopost-bu-empty"');
-    expect(dialog).toContain("checked={n === 0 ? false : n === ids.length ? true : 'indeterminate'}");
+    // 4 พ.ย. 2569 ช่องติ๊กทั้งหมดย้ายไปหัวข้อย่อย ราชการ / เอกชน (SoSectorFold) — หัวธุรกิจไม่มีช่องติ๊กแล้ว
+    expect(readFileSync('src/components/jobs/SoGroupPicker.tsx', 'utf8')).toContain("checked={n === 0 ? false : n === ids.length ? true : 'indeterminate'}");
+    expect(dialog).not.toContain('เลือกทุกกลุ่มของ ${section.label}');
     expect(dialog).not.toContain('jobProvinceOf');
     const opts = readFileSync('api/_lib/soScrapingOptions.ts', 'utf8');
     expect(opts).toContain('withSoDepartments(o, { groups, accounts })');

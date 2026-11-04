@@ -60,19 +60,13 @@ function Section({
   const [open, setOpen] = React.useState(section.forJob);
   const ids = section.groups.map((g) => g.id);
   const n = ids.filter((id) => value.includes(id)).length;
-  const headId = `genlink-bu-${section.bu ?? 'none'}`;
   return (
     <Collapsible open={open} onOpenChange={setOpen} className="rounded-xl border border-border/70" data-testid={`genlink-bu-${section.bu ?? 'none'}`}>
+      {/* ช่องติ๊กทั้งหมดย้ายไปหัวข้อย่อย ราชการ / เอกชน (เจ้าของ 4 พ.ย. 2569 · ติ๊กหัวธุรกิจเดียวได้ 212 ลิงก์) */}
       <div className="flex items-center gap-2 px-3 py-2">
-        <Checkbox
-          id={headId}
-          checked={n === 0 ? false : n === ids.length ? true : 'indeterminate'}
-          onCheckedChange={(v) => onToggle(ids, v === true)}
-          aria-label={`เลือกทุกกลุ่มของ ${section.label}`}
-        />
-        <Label htmlFor={headId} className="flex-1 text-sm font-medium tabular-nums text-foreground">
+        <p className="flex-1 text-sm font-medium tabular-nums text-foreground">
           {section.label} · เลือก {n} จาก {ids.length}
-        </Label>
+        </p>
         <CollapsibleTrigger asChild>
           <Button type="button" size="xs" variant="ghost" aria-label={open ? `พับ ${section.label}` : `กาง ${section.label}`}>
             {open ? 'พับ' : 'กาง'}
@@ -86,7 +80,11 @@ function Section({
           {soSectorBlocks(section.groups, jobSector).map((block, i) => (
             <SoSectorFold
               key={block.sector ?? 'none'}
-              label={`${block.label} · ${block.groups.length} กลุ่ม`}
+              label={block.label}
+              ids={block.groups.map((g) => g.id)}
+              picked={value}
+              onToggle={onToggle}
+              checkId={`genlink-sector-${section.bu ?? 'none'}-${block.sector ?? 'none'}`}
               defaultOpen={soSectorFoldOpen(block.sector, jobSector, i)}
               testId={`genlink-sector-${block.sector ?? 'none'}`}
             >
@@ -110,15 +108,43 @@ function Section({
 
 
 /**
- * หัวข้อย่อย ราชการ / เอกชน ในหมวดธุรกิจ (เจ้าของ 4 พ.ย. 2569) — พับ/กางได้
- * พับอยู่ = ไม่วาดแถว (กลุ่มราชการ 2,400 กลุ่ม วาดพร้อมกันทำป๊อปหน่วง)
+ * หัวข้อย่อย ราชการ / เอกชน ในหมวดธุรกิจ (เจ้าของ 4 พ.ย. 2569) — พับ/กางได้ · ช่องติ๊กเลือก/เอาออกทั้งหัวข้อ
+ * (ย้ายมาจากหัวธุรกิจ — ติ๊กหัวธุรกิจเดียวเคยได้ทุกกลุ่มรวมราชการ 2,400 กลุ่ม)
+ * พับอยู่ = ไม่วาดแถว (วาด 2,400 แถวพร้อมกันทำป๊อปหน่วง)
  */
-export function SoSectorFold({ label, defaultOpen, testId, children }: { label: string; defaultOpen: boolean; testId: string; children: React.ReactNode }) {
+export function SoSectorFold({
+  label,
+  ids,
+  picked,
+  onToggle,
+  checkId,
+  defaultOpen,
+  testId,
+  children,
+}: {
+  label: string;
+  ids: readonly string[];
+  picked: readonly string[];
+  onToggle: (ids: string[], on: boolean) => void;
+  checkId: string;
+  defaultOpen: boolean;
+  testId: string;
+  children: React.ReactNode;
+}) {
   const [open, setOpen] = React.useState(defaultOpen);
+  const n = ids.filter((id) => picked.includes(id)).length;
   return (
     <Collapsible open={open} onOpenChange={setOpen} className="space-y-1.5" data-testid={testId}>
       <div className="flex items-center gap-2">
-        <p className="flex-1 text-xs font-medium tabular-nums text-muted-foreground">{label}</p>
+        <Checkbox
+          id={checkId}
+          checked={n === 0 ? false : n === ids.length ? true : 'indeterminate'}
+          onCheckedChange={(v) => onToggle([...ids], v === true)}
+          aria-label={`เลือกทุกกลุ่ม${label}`}
+        />
+        <Label htmlFor={checkId} className="flex-1 text-xs font-medium tabular-nums text-muted-foreground">
+          {label} · เลือก {n} จาก {ids.length}
+        </Label>
         <CollapsibleTrigger asChild>
           <Button type="button" size="xs" variant="ghost" aria-label={open ? `พับ ${label}` : `กาง ${label}`}>
             {open ? 'พับ' : 'กาง'}

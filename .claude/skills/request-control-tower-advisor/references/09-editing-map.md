@@ -14251,3 +14251,4 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
   - จอ: `SoGroupPicker.tsx` `SoSectorFold` (หัวข้อย่อยพับได้ · พับ = ไม่วาดแถว) ใช้ทั้ง Gen link / Gen link เพิ่ม (`AddChannelLinks` · `BoardPostingPage` ส่ง `jobSector`) และ `AutopostDialog.GroupSection`
   - วัดบนเครื่อง (dev): กางราชการ 2,400 แถว 1.5 วิ · ติ๊กตอนกางอยู่ 0.44 วิ · พับอยู่ไม่วาด
   - เทสต์ `tests/api/soGroupSector2569-11-04.test.ts` (+ แก้ `autopostGroupsByBu`)
+  - **ช่องติ๊กทั้งหมดย้ายไปหัวข้อย่อย ราชการ / เอกชน** (เจ้าของ 4 พ.ย. 2569 · เช้านั้นติ๊กหัว LBD เดียวได้ 212 ลิงก์ราชการ OPL6911003) — หัวธุรกิจเหลือแค่ข้อความ · `SoSectorFold` มี `ids/picked/onToggle/checkId` · Autopost ยังไม่เกินเพดานบัญชี (`soAddWithinCap`)

@@ -89,4 +89,14 @@ describe('จอและฐาน', () => {
     expect(readFileSync('src/components/jobs/GenApplyLinkDialog.tsx', 'utf8')).toContain('jobSector={job ? jobUnitSectorOf(job) : null}');
     expect(readFileSync('src/pages/jobs/BoardPostingPage.tsx', 'utf8')).toContain('jobSector={jobUnitSectorOf(job)}');
   });
+
+  it('ช่องติ๊กทั้งหมดอยู่ที่หัวข้อย่อย ราชการ / เอกชน ไม่ใช่หัวธุรกิจ (เจ้าของ 4 พ.ย. 2569 · ติ๊กหัว LBD เดียวได้ 212 ลิงก์)', () => {
+    const picker = readFileSync('src/components/jobs/SoGroupPicker.tsx', 'utf8');
+    const ap = readFileSync('src/components/jobs/AutopostDialog.tsx', 'utf8');
+    expect(picker).toContain('aria-label={`เลือกทุกกลุ่ม${label}`}');
+    expect(picker).not.toContain('เลือกทุกกลุ่มของ ${section.label}');
+    expect(ap).not.toContain('เลือกทุกกลุ่มของ ${section.label}');
+    // Autopost ติ๊กทั้งหัวข้อยังไม่เกินเพดานบัญชี (onToggle เดิม = soAddWithinCap)
+    expect(ap).toContain('picked={picked}\n              onToggle={onToggle}');
+  });
 });
