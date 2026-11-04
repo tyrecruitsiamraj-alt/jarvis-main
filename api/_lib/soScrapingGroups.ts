@@ -11,24 +11,40 @@
  */
 import { dbQuery } from './postgres.js';
 import { logWarn, errorSummaryText } from './logger.js';
-import type { SoGroup } from '../../src/lib/soScraping.js';
+import { SO_GROUP_SECTOR_BEFORE_TAG, soGroupSectorOf, type SoGroup } from '../../src/lib/soScraping.js';
 
 const SCHEMA = 'so_autopost_apiscraper';
 
-export function soGroupsSql(): string {
+/** ช่องที่ So Scraping ยังไม่ได้เพิ่ม (42703) */
+const isUndefinedColumn = (e: unknown) => typeof e === 'object' && e !== null && (e as { code?: string }).code === '42703';
+
+/** `withSector` = อ่านช่อง ราชการ/เอกชน (4 พ.ย. 2569 · So Scraping ยังไม่ได้เพิ่มช่องนี้ = อ่านแบบไม่มีช่อง) */
+export function soGroupsSql(withSector = true): string {
   return `
     select g.id::text as id, g.fb_group_id::text as fb_group_id, g.name::text as name, g.province::text as province,
-           g.department::text as department, g.job_type::text as job_type
+           g.department::text as department, g.job_type::text as job_type${withSector ? ', g.sector::text as sector' : ''}
       from ${SCHEMA}.groups g
      order by g.name`;
 }
 
+type SoGroupRow = Omit<SoGroup, 'sector'> & { fb_group_id: string | null; sector?: string | null };
+
 export async function listSoGroups(): Promise<SoGroup[]> {
   try {
-    const { rows } = await dbQuery<SoGroup & { fb_group_id: string | null }>(soGroupsSql());
+    let rows: SoGroupRow[];
+    let tagged = true;
+    try {
+      ({ rows } = await dbQuery<SoGroupRow>(soGroupsSql(true)));
+    } catch (e) {
+      if (!isUndefinedColumn(e)) throw e;
+      tagged = false;
+      ({ rows } = await dbQuery<SoGroupRow>(soGroupsSql(false)));
+    }
     return rows.map((r) => ({
       id: r.id,
       fbGroupId: (r.fb_group_id ?? '').trim() || null,
+      // ยังไม่มีช่อง = กลุ่มที่มีอยู่ทั้งหมดเป็นเอกชน (เจ้าของ 4 พ.ย. 2569) · มีช่องแต่ว่าง = ยังไม่ระบุ
+      sector: tagged ? soGroupSectorOf(r.sector) : SO_GROUP_SECTOR_BEFORE_TAG,
       name: (r.name ?? '').trim() || r.id,
       province: (r.province ?? '').trim() || null,
       department: (r.department ?? '').trim() || null,

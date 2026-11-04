@@ -14,7 +14,9 @@ import { cn } from '@/lib/utils';
 import { DASH, TONE } from '@/lib/designTokens';
 import type { JobRequest } from '@/types';
 import { useRecruiterContact } from '@/hooks/useRecruiterContact';
-import { jobBoardCardTitle } from '@/lib/unitRequestDisplay';
+import { jobBoardCardTitle, jobUnitSectorOf } from '@/lib/unitRequestDisplay';
+import { SoSectorFold } from '@/components/jobs/SoGroupPicker';
+import type { UnitSector } from '@/lib/unitSector';
 import { publicJobTitle } from '@/lib/publicJobTitle';
 import { addPostingLink, createRecruitPosting, fetchRecruitPostings, searchRecruitChannels } from '@/lib/recruitPostingsApi';
 import { jobPostingBody } from '@/lib/recruitPostingDraft';
@@ -47,6 +49,8 @@ import {
   soBuEmptyText,
   isFacebookGroupChannel,
   soGroupLinkKey,
+  soSectorBlocks,
+  soSectorFoldOpen,
   soGroupLinkLabel,
   soGroupLinkName,
   soGroupLinkOf,
@@ -142,6 +146,8 @@ export function AutopostBody({
   const contact = job.recruiter_contact ?? looked;
   /** ธุรกิจของใบขอ — หมวดกลุ่มที่ติ๊กไว้ให้ (เจ้าของ 2 พ.ย. 2569) */
   const jobBu = jobBuOf(job);
+  /** ราชการ/เอกชนของใบขอ — ติ๊กกลุ่มให้เฉพาะประเภทเดียวกัน (4 พ.ย. 2569) */
+  const jobSector = jobUnitSectorOf(job);
 
   const [postings, setPostings] = React.useState<RecruitPosting[] | null>(null);
   const [opts, setOpts] = React.useState<SoOptions | null>(null);
@@ -201,14 +207,14 @@ export function AutopostBody({
           setAccountId(acc.id);
           // เครื่องตั้งต้น = เครื่องที่ So Scraping แนะนำ (ออนไลน์ คิวเบาสุด · สเปค 6.3) · ไม่มี = เครื่องหลักของบัญชี
           setWorkerName(soDefaultWorker(soWorkersFor(o, 'autopost'), 'post')?.name ?? acc.worker ?? '');
-          setPicked(defaultSoGroupPick(soGroupsOfAccount(o, acc), jobBu, acc));
+          setPicked(defaultSoGroupPick(soGroupsOfAccount(o, acc), jobBu, acc, jobSector));
         }
       })
       .catch((e) => alive && setLoadError(e instanceof Error ? e.message : 'โหลดข้อมูลไม่ได้'));
     return () => {
       alive = false;
     };
-  }, [job.id, job.request_no, jobBu]);
+  }, [job.id, job.request_no, jobBu, jobSector]);
 
   const openPosting = postings?.find((p) => p.status === 'open') ?? null;
   /**
@@ -302,7 +308,7 @@ export function AutopostBody({
     setWarn(a.status === 'worker_offline' ? offlineWarn(a) : null);
     setAccountId(id);
     setWorkerName(soDefaultWorker(soWorkersFor(opts, 'autopost'), 'post')?.name ?? a.worker ?? '');
-    setPicked(defaultSoGroupPick(soGroupsOfAccount(opts, a), jobBu, a));
+    setPicked(defaultSoGroupPick(soGroupsOfAccount(opts, a), jobBu, a, jobSector));
   };
 
   const send = async (confirmed = false) => {
@@ -479,6 +485,7 @@ export function AutopostBody({
                     jobId={job.id}
                     section={sec}
                     allGroups={opts?.groups ?? []}
+                    jobSector={jobSector}
                     account={account}
                     picked={picked}
                     recent={recent}
@@ -668,6 +675,7 @@ function GroupSection({
   jobId,
   section,
   allGroups,
+  jobSector,
   account,
   picked,
   recent,
@@ -678,6 +686,8 @@ function GroupSection({
   section: SoGroupSection;
   /** ทุกกลุ่ม — ชื่อซ้ำต่อท้ายรหัสกลุ่ม ตรงกับชื่อบนลิงก์ */
   allGroups: readonly SoOptGroup[];
+  /** ราชการ/เอกชนของใบขอ — หัวข้อย่อยประเภทเดียวกับใบขอขึ้นก่อน */
+  jobSector: UnitSector | null;
   /** ติ๊กได้สูงสุด (โพสต์ที่บัญชีเหลือวันนี้) · null = ไม่จำกัด */
   cap: number | null;
   /** บัญชีที่เลือก — สถานะกลุ่มคิดจากบัญชีนี้ (สลับบัญชี = สถานะเปลี่ยน) */
@@ -712,8 +722,17 @@ function GroupSection({
         </CollapsibleTrigger>
       </div>
       <CollapsibleContent>
-        <ul className="space-y-2 border-t border-border/70 px-3 py-2">
-          {section.groups.map((g) => {
+        <div className="space-y-3 border-t border-border/70 px-3 py-2">
+          {/* แยก ราชการ / เอกชน ในหมวดธุรกิจ (เจ้าของ 4 พ.ย. 2569) */}
+          {soSectorBlocks(section.groups, jobSector).map((block, i) => (
+            <SoSectorFold
+              key={block.sector ?? 'none'}
+              label={`${block.label} · ${block.groups.length} กลุ่ม`}
+              defaultOpen={soSectorFoldOpen(block.sector, jobSector, i)}
+              testId={`autopost-sector-${block.sector ?? 'none'}`}
+            >
+              <ul className="space-y-2">
+          {block.groups.map((g) => {
             // สถานะเป็นคำจาก So Scraping เสมอ (ไม่บอกด้วยสีอย่างเดียว) · ไม่ควรติ๊ก = ไม่ติ๊กให้ แต่ไม่ล็อก
             const view = soGroupView(g, account);
             return (
@@ -769,7 +788,10 @@ function GroupSection({
               </li>
             );
           })}
-        </ul>
+              </ul>
+            </SoSectorFold>
+          ))}
+        </div>
       </CollapsibleContent>
     </Collapsible>
   );

@@ -6,7 +6,8 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { TONE } from '@/lib/designTokens';
-import { soGroupLinkName, soGroupSections, type SoGroup, type SoGroupSection } from '@/lib/soScraping';
+import { soGroupLinkName, soGroupSections, soSectorBlocks, soSectorFoldOpen, type SoGroup, type SoGroupSection } from '@/lib/soScraping';
+import type { UnitSector } from '@/lib/unitSector';
 
 /**
  * ═══ เลือกกลุ่ม Facebook ตอน Gen link (เจ้าของ 2 พ.ย. 2569) ═══
@@ -16,12 +17,15 @@ import { soGroupLinkName, soGroupSections, type SoGroup, type SoGroupSection } f
 export default function SoGroupPicker({
   groups,
   jobBu,
+  jobSector = null,
   value,
   onChange,
 }: {
   groups: readonly SoGroup[] | null;
   /** ธุรกิจของใบขอ · null = ไม่รู้ (กล่องลอย) ทุกหมวดพับ */
   jobBu: string | null;
+  /** ราชการ/เอกชนของใบขอ — หัวข้อย่อยประเภทเดียวกับใบขอขึ้นก่อน (4 พ.ย. 2569) */
+  jobSector?: UnitSector | null;
   value: readonly string[];
   /** รับตัวอัปเดตจากค่าล่าสุด — กดติดกันเร็ว ๆ ต้องไม่ทับกัน */
   onChange: React.Dispatch<React.SetStateAction<string[]>>;
@@ -33,7 +37,7 @@ export default function SoGroupPicker({
   return (
     <div className="space-y-2" data-testid="genlink-so-groups">
       {sections.map((sec) => (
-        <Section key={sec.bu ?? '__none__'} section={sec} all={groups} value={value} onToggle={toggle} />
+        <Section key={sec.bu ?? '__none__'} section={sec} all={groups} jobSector={jobSector} value={value} onToggle={toggle} />
       ))}
     </div>
   );
@@ -42,12 +46,14 @@ export default function SoGroupPicker({
 function Section({
   section,
   all,
+  jobSector,
   value,
   onToggle,
 }: {
   section: SoGroupSection<SoGroup>;
   /** ทุกกลุ่ม — ชื่อซ้ำต่อท้ายรหัสกลุ่ม ตรงกับชื่อบนลิงก์ */
   all: readonly SoGroup[];
+  jobSector: UnitSector | null;
   value: readonly string[];
   onToggle: (ids: string[], on: boolean) => void;
 }) {
@@ -75,17 +81,52 @@ function Section({
         </CollapsibleTrigger>
       </div>
       <CollapsibleContent>
-        <ul className="max-h-64 space-y-1.5 overflow-y-auto border-t border-border/70 px-3 py-2">
-          {section.groups.map((g) => (
-            <li key={g.id} className="flex items-start gap-2">
-              <Checkbox id={`genlink-group-${g.id}`} checked={value.includes(g.id)} onCheckedChange={(v) => onToggle([g.id], v === true)} className="mt-0.5" />
-              <Label htmlFor={`genlink-group-${g.id}`} className="text-sm font-normal text-foreground">
-                {soGroupLinkName(g, all)}
-              </Label>
-            </li>
+        <div className="max-h-64 space-y-3 overflow-y-auto border-t border-border/70 px-3 py-2">
+          {/* แยก ราชการ / เอกชน ในหมวดธุรกิจ (เจ้าของ 4 พ.ย. 2569) */}
+          {soSectorBlocks(section.groups, jobSector).map((block, i) => (
+            <SoSectorFold
+              key={block.sector ?? 'none'}
+              label={`${block.label} · ${block.groups.length} กลุ่ม`}
+              defaultOpen={soSectorFoldOpen(block.sector, jobSector, i)}
+              testId={`genlink-sector-${block.sector ?? 'none'}`}
+            >
+              <ul className="space-y-1.5">
+                {block.groups.map((g) => (
+                  <li key={g.id} className="flex items-start gap-2">
+                    <Checkbox id={`genlink-group-${g.id}`} checked={value.includes(g.id)} onCheckedChange={(v) => onToggle([g.id], v === true)} className="mt-0.5" />
+                    <Label htmlFor={`genlink-group-${g.id}`} className="text-sm font-normal text-foreground">
+                      {soGroupLinkName(g, all)}
+                    </Label>
+                  </li>
+                ))}
+              </ul>
+            </SoSectorFold>
           ))}
-        </ul>
+        </div>
       </CollapsibleContent>
+    </Collapsible>
+  );
+}
+
+
+/**
+ * หัวข้อย่อย ราชการ / เอกชน ในหมวดธุรกิจ (เจ้าของ 4 พ.ย. 2569) — พับ/กางได้
+ * พับอยู่ = ไม่วาดแถว (กลุ่มราชการ 2,400 กลุ่ม วาดพร้อมกันทำป๊อปหน่วง)
+ */
+export function SoSectorFold({ label, defaultOpen, testId, children }: { label: string; defaultOpen: boolean; testId: string; children: React.ReactNode }) {
+  const [open, setOpen] = React.useState(defaultOpen);
+  return (
+    <Collapsible open={open} onOpenChange={setOpen} className="space-y-1.5" data-testid={testId}>
+      <div className="flex items-center gap-2">
+        <p className="flex-1 text-xs font-medium tabular-nums text-muted-foreground">{label}</p>
+        <CollapsibleTrigger asChild>
+          <Button type="button" size="xs" variant="ghost" aria-label={open ? `พับ ${label}` : `กาง ${label}`}>
+            {open ? 'พับ' : 'กาง'}
+            <ChevronDown className={cn('transition-transform', open && 'rotate-180')} aria-hidden />
+          </Button>
+        </CollapsibleTrigger>
+      </div>
+      <CollapsibleContent>{children}</CollapsibleContent>
     </Collapsible>
   );
 }

@@ -74,7 +74,7 @@ import {
   releaseStepOf,
   type ReleaseStepKey,
 } from '@/lib/boardRelease';
-import { jobBoardCardTitle } from '@/lib/unitRequestDisplay';
+import { jobBoardCardTitle, jobUnitSectorOf } from '@/lib/unitRequestDisplay';
 import { postingPositionText } from '@/lib/publicJobTitle';
 import { publicSafeAddress } from '@/lib/publicJobPrivacy';
 import { INCOME_PERIOD_LABEL, buildIncomeDisplay } from '@/lib/incomeBreakdown';
@@ -582,6 +582,7 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
                         <AddChannelLinks
                           posting={openPosting}
                           jobBu={jobBuOf(job)}
+                          jobSector={jobUnitSectorOf(job)}
                           onCreated={() => {
                             void loadPostings();
                             setLinksOpen(false);

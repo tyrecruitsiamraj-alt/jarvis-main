@@ -1,7 +1,7 @@
 import type { JobRequest } from '@/types';
 import { unitLabel } from '@/lib/unitDisplay';
 import { JOB_TYPE_LABELS, JOB_CATEGORY_LABELS } from '@/types';
-import { unitSectorLabel } from '@/lib/unitSector';
+import { unitSectorLabel, type UnitSector } from '@/lib/unitSector';
 
 /** ชื่อหน่วยงานที่ติ๊กส่งคนแทน — ใช้ใน WL assignment */
 export function unitNamesForSendReplacement(jobs: JobRequest[]): string[] {
@@ -120,6 +120,12 @@ export function jobSectorLabel(job: JobRequest): string {
   return job.unit_sector !== undefined
     ? unitSectorLabel(job.unit_sector)
     : JOB_CATEGORY_LABELS[job.job_category];
+}
+
+/** ราชการ/เอกชนของใบขอเป็นค่า (ตัวแยกเดียวกับ `jobSectorLabel`) · null = ยังไม่ระบุ · งานของเราประเภทธนาคาร = null */
+export function jobUnitSectorOf(job: Pick<JobRequest, 'unit_sector' | 'job_category'>): UnitSector | null {
+  if (job.unit_sector !== undefined) return job.unit_sector ?? null;
+  return job.job_category === 'government' || job.job_category === 'private' ? job.job_category : null;
 }
 
 /** คำค้นหาแบบรวมฟิลด์หลัก */

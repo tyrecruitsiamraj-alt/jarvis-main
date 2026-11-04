@@ -7,6 +7,7 @@ import { fetchSoGroups } from '@/lib/jobPostingRequestsApi';
 import { isFacebookGroupChannel, soGroupLinkKey, soGroupLinkLabel, soGroupLinkName, type SoGroup } from '@/lib/soScraping';
 import { Button } from '@/components/ui/button';
 import { addPostingLink } from '@/lib/recruitPostingsApi';
+import type { UnitSector } from '@/lib/unitSector';
 import {
   applyLinkPath,
   recruitChannelLabel,
@@ -50,8 +51,10 @@ const AddChannelLinks: React.FC<{
   posting: RecruitPosting;
   /** ธุรกิจของใบขอ (LBD/LBA/…) — กลุ่ม Facebook ของธุรกิจนี้ขึ้นก่อน */
   jobBu?: string | null;
+  /** ราชการ/เอกชนของใบขอ — หัวข้อย่อยประเภทเดียวกับใบขอขึ้นก่อน (4 พ.ย. 2569) */
+  jobSector?: UnitSector | null;
   onCreated?: () => void;
-}> = ({ posting, jobBu = null, onCreated }) => {
+}> = ({ posting, jobBu = null, jobSector = null, onCreated }) => {
   const [picked, setPicked] = React.useState<RecruitChannelMatch[]>([]);
   const [soGroups, setSoGroups] = React.useState<SoGroup[] | null>(null);
   const [groupPick, setGroupPick] = React.useState<string[]>([]);
@@ -136,7 +139,7 @@ const AddChannelLinks: React.FC<{
       <MultiChannelPicker value={picked} onChange={setPicked} reloadKey={posting.id} />
       {fbGroupChannels.length > 0 ? (
         <div className="space-y-1.5" data-testid="add-links-groups">
-          <SoGroupPicker groups={soGroups} jobBu={jobBu} value={groupPick} onChange={setGroupPick} />
+          <SoGroupPicker groups={soGroups} jobBu={jobBu} jobSector={jobSector} value={groupPick} onChange={setGroupPick} />
         </div>
       ) : null}
       <Button type="button" className="w-full" disabled={busy} onClick={() => void create()}>

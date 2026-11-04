@@ -138,7 +138,7 @@ async function optionsFromDb(): Promise<SoOptions> {
         groupStatus: [],
       };
     }),
-    groups: groups.map((g) => ({ id: g.id, fbGroupId: null, name: g.name, url: null, accountIds: [], lastPostedAt: null, stats30d: null, department: g.department, blocked: null, repostWait: null })),
+    groups: groups.map((g) => ({ id: g.id, fbGroupId: null, name: g.name, url: null, accountIds: [], lastPostedAt: null, stats30d: null, department: g.department, sector: g.sector ?? null, blocked: null, repostWait: null })),
     // ฐานเดิมอ่านแค่เครื่องโพสต์ (kind autopost)
     workers: workers.map((w) => ({
       name: w.name,

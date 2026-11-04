@@ -11,6 +11,7 @@ import type { JobRequest } from '@/types';
 import type { ToneKey } from '@/lib/designTokens';
 import { inferProvinceFromAddress } from '@/lib/parseThaiJobAddress';
 import { normalizeTrendBu, trendBuFromSiteCode } from '@/lib/trends/bu';
+import { UNIT_SECTOR_LABEL, UNIT_SECTOR_UNSET_LABEL, type UnitSector } from '@/lib/unitSector';
 
 export type SoPostMode = 'caption_only' | 'caption_image' | 'image_only';
 export const SO_POST_MODES: readonly SoPostMode[] = ['caption_only', 'caption_image', 'image_only'];
@@ -31,6 +32,8 @@ export type SoGroup = {
   job_type: string | null;
   /** รหัสกลุ่มท้าย /groups/ ใน URL ของ Facebook (เลข หรือชื่ออังกฤษ) · 4 พ.ย. 2569 ใช้แยกลิงก์ของกลุ่ม */
   fbGroupId?: string | null;
+  /** ราชการ/เอกชน (`soGroupSectorOf`) · null = ยังไม่ระบุ */
+  sector?: UnitSector | null;
 };
 
 /** คำขอโพสต์ครบไหม — คืนข้อความบอกว่าต้องทำอะไร · ครบ = null */
@@ -264,6 +267,8 @@ export type SoOptGroup = {
   stats30d: SoGroupStats | null;
   /** ธุรกิจของกลุ่ม (รหัสแผนก LBD · LBA · LM · DS · SN · ชุดเดียวกับ users.department_code) · null = ไม่ระบุธุรกิจ (So Scraping 2 พ.ย. 2569) */
   department: string | null;
+  /** ราชการ/เอกชน (4 พ.ย. 2569 · `soGroupSectorOf`) · null = ยังไม่ระบุ */
+  sector: UnitSector | null;
   /** กลุ่มโดนพัก ทุกบัญชีโพสต์ไม่ได้ · null = ไม่ติด */
   blocked: SoGroupBlock | null;
   /** ใบขอนี้เพิ่งลงกลุ่มนี้ไม่ถึง 2 วัน (ส่ง ?request_no=) — ติ๊กได้แต่รอบนี้ So Scraping ข้าม · null = ลงได้ (สเปค 6.2) */
@@ -544,11 +549,26 @@ export const soGroupLinkKey = (g: Pick<SoGroupIdentity, 'id' | 'fbGroupId'>): st
 
 const sameGroupName = (n: string | null | undefined) => (n ?? '').replace(/\s+/g, ' ').trim().toLowerCase();
 
+/** ชื่อ → รหัสกลุ่มที่ใช้ชื่อนั้น · คิดครั้งเดียวต่อรายชื่อ (So Scraping มีกลุ่มราชการ 2,400 กลุ่ม 4 พ.ย. 2569 — ไล่เทียบทุกแถวทำป๊อปหน่วง) */
+const nameIndexCache = new WeakMap<readonly SoGroupIdentity[], Map<string, Set<string>>>();
+function nameIndexOf(all: readonly SoGroupIdentity[]): Map<string, Set<string>> {
+  let idx = nameIndexCache.get(all);
+  if (!idx) {
+    idx = new Map();
+    for (const o of all) {
+      const n = sameGroupName(o.name);
+      idx.set(n, (idx.get(n) ?? new Set()).add(soGroupLinkKey(o)));
+    }
+    nameIndexCache.set(all, idx);
+  }
+  return idx;
+}
+
 /** ชื่อกลุ่มบนลิงก์ — ชื่อซ้ำกับกลุ่มอื่นในรายชื่อ So Scraping ต่อท้ายรหัสกลุ่ม ("หางานขับรถผู้บริหาร (423954682082863)") */
 export function soGroupLinkName(g: SoGroupIdentity, all: readonly SoGroupIdentity[]): string {
   const name = (g.name ?? '').trim() || soGroupLinkKey(g);
-  const key = soGroupLinkKey(g);
-  const twin = all.some((o) => soGroupLinkKey(o) !== key && sameGroupName(o.name) === sameGroupName(name));
+  const keys = nameIndexOf(all).get(sameGroupName(name));
+  const twin = Boolean(keys && [...keys].some((k) => k !== soGroupLinkKey(g)));
   return twin ? `${name} (${g.fbGroupId?.trim() || g.id})` : name;
 }
 
@@ -605,13 +625,45 @@ export function defaultSoGroupPick(
   groups: readonly SoOptGroup[],
   jobBu: string | null,
   acc: (Pick<SoOptAccount, 'groupStatus'> & Partial<Pick<SoOptAccount, 'remainingToday'>>) | null = null,
+  /** ราชการ/เอกชนของใบขอ (4 พ.ย. 2569) — ระบุแล้วติ๊กเฉพาะกลุ่มประเภทเดียวกัน · ยังไม่ระบุ = ติ๊กทั้งธุรกิจแบบเดิม */
+  jobSector: UnitSector | null = null,
 ): string[] {
   if (!jobBu) return [];
   const ok = groups
-    .filter((g) => g.department === jobBu && !g.repostWait && soGroupView(g, acc).recommended)
+    .filter((g) => g.department === jobBu && (!jobSector || g.sector === jobSector) && !g.repostWait && soGroupView(g, acc).recommended)
     .sort((a, b) => (b.stats30d?.posted ?? 0) - (a.stats30d?.posted ?? 0));
   const cap = acc?.remainingToday ?? null;
   return (cap === null ? ok : ok.slice(0, Math.max(0, cap))).map((g) => g.id);
+}
+
+/* ═══ กลุ่มราชการ/เอกชน (เจ้าของ 4 พ.ย. 2569 "ตอนเลือกกลุ่มทำให้แยกไว้หน่อย") ═══
+ * กลุ่มที่มีอยู่ตอนนี้ทั้งหมด = เอกชน (เจ้าของ "ก็ไอกลุ่มที่มีอะเพื่อโพสต์ เอกชนไง แล้วเดี๋ยวจะเพิ่มกลุ่มที่เป็นราชการมา")
+ * ป้ายอยู่ที่รายชื่อกลุ่มของ So Scraping ช่อง `sector` (ที่เดียวกับป้ายธุรกิจ · ขอไว้ docs/so-scraping-brief-2569-11-04-group-sector.md)
+ * So Scraping ยังไม่มีช่องนี้ = ทุกกลุ่มเอกชน · มีช่องแต่ว่าง = ยังไม่ระบุ (ไม่เดา)
+ */
+export const SO_GROUP_SECTOR_BEFORE_TAG: UnitSector = 'private';
+
+/** ค่าราชการ/เอกชนของกลุ่ม — รับทั้งรหัส (government/private) และคำไทย · ค่าอื่น = ยังไม่ระบุ */
+export function soGroupSectorOf(v: unknown): UnitSector | null {
+  const t = typeof v === 'string' ? v.trim().toLowerCase() : '';
+  if (t === 'government' || t === 'ราชการ') return 'government';
+  if (t === 'private' || t === 'เอกชน') return 'private';
+  return null;
+}
+
+export type SoSectorBlock<G> = { sector: UnitSector | null; label: string; groups: G[] };
+
+/** แบ่งกลุ่มในหมวดธุรกิจเป็น ราชการ/เอกชน — ประเภทของใบขอขึ้นก่อน · ยังไม่ระบุท้ายสุด · ว่างไม่ขึ้น */
+export function soSectorBlocks<G extends { sector?: UnitSector | null }>(groups: readonly G[], jobSector: UnitSector | null): SoSectorBlock<G>[] {
+  const order: (UnitSector | null)[] = jobSector === 'government' ? ['government', 'private', null] : ['private', 'government', null];
+  return order
+    .map((sector) => ({ sector, label: sector ? UNIT_SECTOR_LABEL[sector] : UNIT_SECTOR_UNSET_LABEL, groups: groups.filter((g) => (g.sector ?? null) === sector) }))
+    .filter((b) => b.groups.length > 0);
+}
+
+/** หัวข้อย่อยที่กางไว้ตอนเปิด: ประเภทเดียวกับใบขอ · ใบขอยังไม่ระบุ = หัวข้อแรก (ที่เหลือพับ ไม่วาดแถว) */
+export function soSectorFoldOpen(sector: UnitSector | null, jobSector: UnitSector | null, index: number): boolean {
+  return jobSector ? sector === jobSector : index === 0;
 }
 
 /** หัวหมวด "LBD · ติ๊กไว้ 29 จาก 37 · ติด 8" — ติด = กลุ่มที่ไม่ควรติ๊กสำหรับบัญชีนี้ */
@@ -657,13 +709,18 @@ export function soAccountsForJob<A extends Pick<SoOptAccount, 'department'>>(acc
  */
 export function withSoDepartments(
   o: SoOptions,
-  db: { groups: ReadonlyArray<{ id: string; department: string | null }>; accounts: ReadonlyArray<{ id: string; department: string | null }> },
+  db: {
+    groups: ReadonlyArray<{ id: string; department: string | null; sector?: UnitSector | null }>;
+    accounts: ReadonlyArray<{ id: string; department: string | null }>;
+  },
 ): SoOptions {
   const g = new Map(db.groups.map((x) => [x.id, normalizeTrendBu(x.department)]));
+  // ราชการ/เอกชน: options API ยังไม่ส่ง — เติมจากรายชื่อกลุ่มในฐาน So Scraping (4 พ.ย. 2569)
+  const sec = new Map(db.groups.map((x) => [x.id, x.sector ?? null]));
   const a = new Map(db.accounts.map((x) => [x.id, normalizeTrendBu(x.department)]));
   return {
     ...o,
-    groups: o.groups.map((x) => (x.department ? x : { ...x, department: g.get(x.id) ?? null })),
+    groups: o.groups.map((x) => ({ ...x, department: x.department ?? g.get(x.id) ?? null, sector: x.sector ?? sec.get(x.id) ?? null })),
     accounts: o.accounts.map((x) => (x.department ? x : { ...x, department: a.get(x.id) ?? null })),
   };
 }
@@ -739,6 +796,7 @@ export function parseSoOptions(raw: unknown): SoOptions | null {
       accountIds: strs(g.account_ids),
       lastPostedAt: str(g.last_posted_at),
       department: normalizeTrendBu(str(g.department)),
+      sector: soGroupSectorOf(g.sector),
       blocked:
         g.blocked && typeof g.blocked === 'object' && str((g.blocked as Record<string, unknown>).label)
           ? (() => {

@@ -105,7 +105,7 @@ describe('กลุ่ม Facebook ตามธุรกิจของใบข
 
   it('ป๊อปใช้หมวดตามธุรกิจ · server เติมธุรกิจตอนเรียก API · อ่านทุกกลุ่มไม่กรองตามบัญชีผูก', () => {
     const dialog = readFileSync('src/components/jobs/AutopostDialog.tsx', 'utf8');
-    expect(dialog).toContain('defaultSoGroupPick(soGroupsOfAccount(o, acc), jobBu, acc)');
+    expect(dialog).toContain('defaultSoGroupPick(soGroupsOfAccount(o, acc), jobBu, acc, jobSector)' /* 4 พ.ย. 2569 + ราชการ/เอกชน */);
     expect(dialog).toContain('data-testid="autopost-bu-empty"');
     expect(dialog).toContain("checked={n === 0 ? false : n === ids.length ? true : 'indeterminate'}");
     expect(dialog).not.toContain('jobProvinceOf');
@@ -223,7 +223,7 @@ describe('กลุ่ม Facebook ตามธุรกิจของใบข
 
   it('ป๊อป: สถานะเป็นคำ · ลิงก์เปิดกลุ่มเปิดแท็บใหม่ · ค่าติ๊กคิดใหม่ตอนสลับบัญชี · ทางถอยอ่านฐานไม่มีสถานะ', () => {
     const dialog = readFileSync('src/components/jobs/AutopostDialog.tsx', 'utf8');
-    expect(dialog).toContain('defaultSoGroupPick(soGroupsOfAccount(opts, a), jobBu, a)');
+    expect(dialog).toContain('defaultSoGroupPick(soGroupsOfAccount(opts, a), jobBu, a, jobSector)');
     expect(dialog).toContain('const view = soGroupView(g, account);');
     expect(dialog).toContain('target="_blank" rel="noopener noreferrer" data-testid="autopost-group-open"');
     const opts = readFileSync('api/_lib/soScrapingOptions.ts', 'utf8');

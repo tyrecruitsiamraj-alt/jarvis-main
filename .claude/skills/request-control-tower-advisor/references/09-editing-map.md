@@ -14244,3 +14244,10 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
   - ทุกทางสร้างลิงก์กลุ่มส่งรหัส: `GenApplyLinkDialog` · `AddChannelLinks` · `AutopostDialog.ensureGroupLinks` · รายชื่อ `SoGroupPicker` ชื่อซ้ำต่อท้ายรหัส
   - ตารางช่องทาง (`funnelSubOf`) ยังอ่านชื่อกลุ่มจากชื่อลิงก์ — ชื่อลิงก์ไม่ชนกันแล้วจึงแยกเอง · ลิงก์ก้อนเดียวที่ 2 กลุ่มเคยใช้ร่วม แยกย้อนหลังไม่ได้
   - เทสต์ `tests/api/fbGroupLinkById2569-11-04.test.ts` (+ แก้ `fbGroupLinks2569-11-02` · `postingLinkOwner2569-10-28`)
+
+- **4 พ.ย. 2569 เลือกกลุ่ม Facebook แยก ราชการ / เอกชน** — เจ้าของ "ตอนเลือกกลุ่มทำให้แยกไว้หน่อย" · กลุ่มเดิม 37 = เอกชน · So Scraping เพิ่มช่อง `groups.sector` + กลุ่มราชการ 2,400 กลุ่ม (c2cb964 · 4 พ.ย. 09:51) และส่ง `sector` ใน options API
+  - `src/lib/soScraping.ts`: `SoOptGroup.sector` / `SoGroup.sector` · `soGroupSectorOf` (รับ government/private/ราชการ/เอกชน) · `SO_GROUP_SECTOR_BEFORE_TAG` (ยังไม่มีช่อง = เอกชน) · `soSectorBlocks` (ประเภทของใบขอขึ้นก่อน) · `soSectorFoldOpen` · `defaultSoGroupPick(…, jobSector)` ติ๊กเฉพาะประเภทเดียวกับใบขอ (ใบขอยังไม่ระบุ = ทั้งธุรกิจแบบเดิม) · `withSoDepartments` เติม sector จากฐาน · `soGroupLinkName` คิดดัชนีชื่อครั้งเดียวต่อรายชื่อ (2,437 กลุ่ม)
+  - `api/_lib/soScrapingGroups.ts` อ่าน `g.sector` · ไม่มีช่อง (42703) อ่านแบบเดิม · `src/lib/unitRequestDisplay.ts` `jobUnitSectorOf` (ตัวแยกเดียวกับ `jobSectorLabel`)
+  - จอ: `SoGroupPicker.tsx` `SoSectorFold` (หัวข้อย่อยพับได้ · พับ = ไม่วาดแถว) ใช้ทั้ง Gen link / Gen link เพิ่ม (`AddChannelLinks` · `BoardPostingPage` ส่ง `jobSector`) และ `AutopostDialog.GroupSection`
+  - วัดบนเครื่อง (dev): กางราชการ 2,400 แถว 1.5 วิ · ติ๊กตอนกางอยู่ 0.44 วิ · พับอยู่ไม่วาด
+  - เทสต์ `tests/api/soGroupSector2569-11-04.test.ts` (+ แก้ `autopostGroupsByBu`)

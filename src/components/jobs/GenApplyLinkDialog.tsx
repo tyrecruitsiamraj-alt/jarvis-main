@@ -5,7 +5,7 @@ import SearchableSelect from '@/components/shared/SearchableSelect';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import type { JobRequest } from '@/types';
-import { jobBoardCardTitle } from '@/lib/unitRequestDisplay';
+import { jobBoardCardTitle, jobUnitSectorOf } from '@/lib/unitRequestDisplay';
 import { buildOnlineNameOptions } from '@/lib/jobStaffNames';
 import { refreshJobStaffFromApi } from '@/lib/jobStaffRemote';
 import {
@@ -352,6 +352,7 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
                         <SoGroupPicker
                           groups={soGroups}
                           jobBu={job ? jobBuOf(job) : normalizeTrendBu(standalone?.departmentCode)}
+                          jobSector={job ? jobUnitSectorOf(job) : null}
                           value={groupPick}
                           onChange={setGroupPick}
                         />
