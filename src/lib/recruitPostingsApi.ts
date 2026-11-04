@@ -156,7 +156,7 @@ export type CreatePostingBody = {
   responsibleUserId?: string | null;
   specificType?: string | null;
   formType?: string | null;
-  channels?: Array<{ channelId?: string | null; label?: string | null }>;
+  channels?: Array<{ channelId?: string | null; label?: string | null; fbGroupId?: string | null }>;
 };
 
 export async function createRecruitPosting(body: CreatePostingBody): Promise<RecruitPosting> {
@@ -171,7 +171,7 @@ export async function createRecruitPosting(body: CreatePostingBody): Promise<Rec
 
 export async function addPostingLink(
   postingId: string,
-  input: { channelId?: string | null; channelLabel?: string | null },
+  input: { channelId?: string | null; channelLabel?: string | null; fbGroupId?: string | null },
 ): Promise<RecruitPostingLink> {
   const r = await apiFetch('/api/recruit/postings', {
     method: 'POST',

@@ -82,6 +82,8 @@ export type RecruitPostingLink = {
   applicationCount?: number;
   /** คนที่กดสร้างลิงก์ = ผู้รับผิดชอบของลิงก์ (28 ต.ค. 2569) · null = ลิงก์เก่า ใช้ผู้รับผิดชอบของประกาศ */
   createdByName?: string | null;
+  /** รหัสกลุ่ม Facebook ของลิงก์ (4 พ.ย. 2569) · ลิงก์ของกลุ่มแยกด้วยรหัสนี้ ไม่ใช่ชื่อ · null = ไม่ใช่ลิงก์กลุ่ม/ลิงก์เก่า */
+  fbGroupId?: string | null;
 };
 
 export type RecruitPosting = {

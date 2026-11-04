@@ -6,7 +6,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { TONE } from '@/lib/designTokens';
-import { soGroupSections, type SoGroup, type SoGroupSection } from '@/lib/soScraping';
+import { soGroupLinkName, soGroupSections, type SoGroup, type SoGroupSection } from '@/lib/soScraping';
 
 /**
  * ═══ เลือกกลุ่ม Facebook ตอน Gen link (เจ้าของ 2 พ.ย. 2569) ═══
@@ -33,7 +33,7 @@ export default function SoGroupPicker({
   return (
     <div className="space-y-2" data-testid="genlink-so-groups">
       {sections.map((sec) => (
-        <Section key={sec.bu ?? '__none__'} section={sec} value={value} onToggle={toggle} />
+        <Section key={sec.bu ?? '__none__'} section={sec} all={groups} value={value} onToggle={toggle} />
       ))}
     </div>
   );
@@ -41,10 +41,13 @@ export default function SoGroupPicker({
 
 function Section({
   section,
+  all,
   value,
   onToggle,
 }: {
   section: SoGroupSection<SoGroup>;
+  /** ทุกกลุ่ม — ชื่อซ้ำต่อท้ายรหัสกลุ่ม ตรงกับชื่อบนลิงก์ */
+  all: readonly SoGroup[];
   value: readonly string[];
   onToggle: (ids: string[], on: boolean) => void;
 }) {
@@ -77,7 +80,7 @@ function Section({
             <li key={g.id} className="flex items-start gap-2">
               <Checkbox id={`genlink-group-${g.id}`} checked={value.includes(g.id)} onCheckedChange={(v) => onToggle([g.id], v === true)} className="mt-0.5" />
               <Label htmlFor={`genlink-group-${g.id}`} className="text-sm font-normal text-foreground">
-                {g.name}
+                {soGroupLinkName(g, all)}
               </Label>
             </li>
           ))}

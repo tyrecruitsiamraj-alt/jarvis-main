@@ -46,7 +46,10 @@ import {
   jobBuOf,
   soBuEmptyText,
   isFacebookGroupChannel,
+  soGroupLinkKey,
   soGroupLinkLabel,
+  soGroupLinkName,
+  soGroupLinkOf,
   type SoGroupLink,
   soGroupView,
   soSectionHeadText,
@@ -263,22 +266,23 @@ export function AutopostBody({
   /**
    * ลิงก์ของแต่ละกลุ่มที่ติ๊ก (เจ้าของ 2 พ.ย. 2569 "อยากรู้ว่ากลุ่มไหนได้คนมาเยอะ" · Choice 1 ลิงก์ = 1 กลุ่ม)
    * ชื่อลิงก์ชุดเดียวกับ Gen link ("Facebook · Facebook Group · <ชื่อกลุ่ม>") — มีแล้วใช้ตัวเดิม ไม่มีค่อยสร้าง (สั่งซ้ำไม่งอกลิงก์)
+   * 4 พ.ย. 2569 ลิงก์เดิมหาด้วยรหัสกลุ่ม (`soGroupLinkOf`) ไม่ใช่ชื่อ — กลุ่มชื่อซ้ำเคยได้ลิงก์เดียวกัน
    */
   const ensureGroupLinks = async (openPosting: RecruitPosting): Promise<SoGroupLink[]> => {
     if (!opts) throw new Error('โหลดข้อมูล So Scraping ไม่ได้');
     const matches = await searchRecruitChannels('Facebook Group', { limit: 20 });
     const fbGroup = matches.find((c) => isFacebookGroupChannel(c.name) && /^facebook$/i.test((c.parentName ?? '').trim())) ?? null;
     const channelLabel = fbGroup ? recruitChannelLabel(fbGroup) : 'Facebook · Facebook Group';
-    const have = new Map(openPosting.links.map((l) => [l.channelLabel ?? '', l]));
+    const have: RecruitPostingLink[] = [...openPosting.links];
     const made: RecruitPostingLink[] = [];
     const out: SoGroupLink[] = [];
     for (const g of opts.groups.filter((x) => picked.includes(x.id))) {
-      const label = soGroupLinkLabel(channelLabel, soGroupLabel(g));
-      let l = have.get(label) ?? null;
+      const label = soGroupLinkLabel(channelLabel, soGroupLinkName(g, opts.groups));
+      let l = soGroupLinkOf(have, g, label);
       if (!l) {
-        l = await addPostingLink(openPosting.id, { channelId: fbGroup?.id ?? null, channelLabel: label });
+        l = await addPostingLink(openPosting.id, { channelId: fbGroup?.id ?? null, channelLabel: label, fbGroupId: soGroupLinkKey(g) });
         made.push(l);
-        have.set(label, l);
+        have.push(l);
       }
       out.push({ group_id: g.id, link_code: l.code, apply_link: `${window.location.origin}${applyLinkPath(l.code)}` });
     }
@@ -474,6 +478,7 @@ export function AutopostBody({
                     key={sec.bu ?? '__none__'}
                     jobId={job.id}
                     section={sec}
+                    allGroups={opts?.groups ?? []}
                     account={account}
                     picked={picked}
                     recent={recent}
@@ -662,6 +667,7 @@ export function firstAccount(list: readonly SoOptAccount[]): SoOptAccount | null
 function GroupSection({
   jobId,
   section,
+  allGroups,
   account,
   picked,
   recent,
@@ -670,6 +676,8 @@ function GroupSection({
 }: {
   jobId: string;
   section: SoGroupSection;
+  /** ทุกกลุ่ม — ชื่อซ้ำต่อท้ายรหัสกลุ่ม ตรงกับชื่อบนลิงก์ */
+  allGroups: readonly SoOptGroup[];
   /** ติ๊กได้สูงสุด (โพสต์ที่บัญชีเหลือวันนี้) · null = ไม่จำกัด */
   cap: number | null;
   /** บัญชีที่เลือก — สถานะกลุ่มคิดจากบัญชีนี้ (สลับบัญชี = สถานะเปลี่ยน) */
@@ -724,7 +732,7 @@ function GroupSection({
                 />
                 <div className="min-w-0 space-y-0.5">
                   <Label htmlFor={`autopost-group-${jobId}-${g.id}`} className="block text-sm font-normal text-foreground">
-                    {soGroupLabel(g)}
+                    {soGroupLabel(g, allGroups)}
                     <span className={cn('font-medium', view.recommended ? DASH.muted : TONE.warn.value)} data-testid="autopost-group-state">
                       {' — '}
                       {view.label}

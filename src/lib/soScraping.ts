@@ -23,7 +23,15 @@ export const SO_POST_MODE_LABEL: Record<SoPostMode, string> = {
 export const SO_POST_REASON = 'สั่งโพสต์จากป๊อปประกาศ';
 export const SO_SCRAP_REASON = 'ขอ Scrap จาก Jarvis';
 
-export type SoGroup = { id: string; name: string; province: string | null; department: string | null; job_type: string | null };
+export type SoGroup = {
+  id: string;
+  name: string;
+  province: string | null;
+  department: string | null;
+  job_type: string | null;
+  /** รหัสกลุ่มท้าย /groups/ ใน URL ของ Facebook (เลข หรือชื่ออังกฤษ) · 4 พ.ย. 2569 ใช้แยกลิงก์ของกลุ่ม */
+  fbGroupId?: string | null;
+};
 
 /** คำขอโพสต์ครบไหม — คืนข้อความบอกว่าต้องทำอะไร · ครบ = null */
 export function soPostOrderError(input: { mode: SoPostMode | null; caption: string; groupIds: readonly string[] }): string | null {
@@ -468,10 +476,11 @@ export function soWarningText(name: string, status: SoAccountStatus | SoScrapeSt
   return (warning ?? '').trim() || `บัญชี ${name} ${label}`;
 }
 
-/** ชื่อกลุ่ม — ยังไม่มีชื่อ (บอทยังไม่เคยเข้าไปอ่าน) ใช้เลขกลุ่มแล้วต่อท้าย "ยังไม่มีชื่อ" */
-export function soGroupLabel(g: Pick<SoOptGroup, 'name' | 'fbGroupId' | 'id'>): string {
+/** ชื่อกลุ่ม — ยังไม่มีชื่อ (บอทยังไม่เคยเข้าไปอ่าน) ใช้เลขกลุ่มแล้วต่อท้าย "ยังไม่มีชื่อ" · ส่ง `all` มา = ชื่อซ้ำต่อท้ายรหัสกลุ่ม */
+export function soGroupLabel(g: Pick<SoOptGroup, 'name' | 'fbGroupId' | 'id'>, all?: readonly Pick<SoOptGroup, 'name' | 'fbGroupId' | 'id'>[]): string {
   const name = (g.name ?? '').trim();
-  return name || `${g.fbGroupId || g.id} · ยังไม่มีชื่อ`;
+  if (!name) return `${g.fbGroupId || g.id} · ยังไม่มีชื่อ`;
+  return all ? soGroupLinkName(g, all) : name;
 }
 
 /** กลุ่มของบัญชีนี้ — อยู่ใน `group_ids` ของบัญชี หรือบัญชีอยู่ใน `account_ids` ของกลุ่ม */
@@ -520,6 +529,37 @@ export const isFacebookGroupChannel = (name: string | null | undefined) => /^fac
 /** ชื่อลิงก์ของกลุ่ม — ชื่อช่องทาง + ชื่อกลุ่มตามรายชื่อ So Scraping (ตัด "·" ในชื่อกลุ่ม กันชื่อแตกเป็นหลายชั้น) */
 export function soGroupLinkLabel(channelLabel: string, groupName: string): string {
   return `${channelLabel} · ${groupName.replace(/\s*·\s*/g, ' ').trim()}`;
+}
+
+/* ═══ ลิงก์ของกลุ่มผูกกับรหัสกลุ่ม ไม่ใช่ชื่อกลุ่ม (เจ้าของ 4 พ.ย. 2569 "อยากแก้แบบทั้งระบบ") ═══
+ * 2 กลุ่มชื่อ "หางานขับรถผู้บริหาร" เป็นคนละกลุ่มแต่ได้ลิงก์เดียวกัน (OPL6910066 · OPL6910069 15 กลุ่มได้ 14 ลิงก์)
+ * - ตัวแยก = รหัสท้าย /groups/ ใน URL (So Scraping `fb_group_id` — เลข หรือชื่ออังกฤษ) เก็บที่ลิงก์ (`fb_group_id` · 173)
+ * - ชื่อลิงก์ของกลุ่มชื่อซ้ำ ต่อท้ายรหัสกลุ่ม → ตารางช่องทางที่อ่านชื่อกลุ่มจากชื่อลิงก์ (`funnelSubOf`) แยกออกเอง
+ * - Autopost ใช้ลิงก์เดิมของกลุ่มด้วยรหัสก่อน · ลิงก์เก่า (ไม่มีรหัส) ใช้ต่อได้เฉพาะชื่อที่ไม่ซ้ำ
+ */
+type SoGroupIdentity = { id: string; name: string | null; fbGroupId?: string | null };
+
+/** รหัสกลุ่มที่ใช้แยกลิงก์ — รหัสใน URL ของ Facebook (ตัวพิมพ์เล็ก) · ไม่มี = รหัสในรายชื่อ So Scraping */
+export const soGroupLinkKey = (g: Pick<SoGroupIdentity, 'id' | 'fbGroupId'>): string => (g.fbGroupId ?? '').trim().toLowerCase() || g.id;
+
+const sameGroupName = (n: string | null | undefined) => (n ?? '').replace(/\s+/g, ' ').trim().toLowerCase();
+
+/** ชื่อกลุ่มบนลิงก์ — ชื่อซ้ำกับกลุ่มอื่นในรายชื่อ So Scraping ต่อท้ายรหัสกลุ่ม ("หางานขับรถผู้บริหาร (423954682082863)") */
+export function soGroupLinkName(g: SoGroupIdentity, all: readonly SoGroupIdentity[]): string {
+  const name = (g.name ?? '').trim() || soGroupLinkKey(g);
+  const key = soGroupLinkKey(g);
+  const twin = all.some((o) => soGroupLinkKey(o) !== key && sameGroupName(o.name) === sameGroupName(name));
+  return twin ? `${name} (${g.fbGroupId?.trim() || g.id})` : name;
+}
+
+/** ลิงก์เดิมของกลุ่มนี้ในประกาศ — รหัสกลุ่มตรงก่อน · ลิงก์เก่าที่ไม่มีรหัสใช้ได้เมื่อชื่อลิงก์ตรง (ชื่อซ้ำมีรหัสต่อท้าย จึงไม่ชนลิงก์เก่า) */
+export function soGroupLinkOf<L extends { channelLabel: string | null; fbGroupId?: string | null }>(
+  links: readonly L[],
+  g: Pick<SoGroupIdentity, 'id' | 'fbGroupId'>,
+  label: string,
+): L | null {
+  const key = soGroupLinkKey(g);
+  return links.find((l) => (l.fbGroupId ?? '') === key) ?? links.find((l) => !l.fbGroupId && l.channelLabel === label) ?? null;
 }
 
 /** ลิงก์ของแต่ละกลุ่มที่ส่งไปกับใบสั่ง Autopost — So Scraping แทน apply_link ใน caption ด้วยลิงก์ของกลุ่มตอนโพสต์ (สเปก 2 พ.ย. 2569) */

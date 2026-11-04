@@ -48,7 +48,8 @@ describe('Gen link ช่องทาง Facebook Group = กลุ่มละ�
   it('ป๊อป Gen link: Facebook Group เลือกกลุ่ม = กลุ่มละลิงก์ · ไม่เลือกกลุ่ม = 1 ลิงก์ของช่องทาง (3 พ.ย. 2569) · ปุ่มบอกจำนวนลิงก์', () => {
     const src = read('src/components/jobs/GenApplyLinkDialog.tsx');
     expect(src).toContain('channels: linkChannels,');
-    expect(src).toContain('soGroupLinkLabel(recruitChannelLabel(c), g.name)');
+    // 4 พ.ย. 2569 ชื่อซ้ำต่อท้ายรหัสกลุ่ม + เก็บรหัสกลุ่มที่ลิงก์ (fbGroupLinkById2569-11-04)
+    expect(src).toContain('soGroupLinkLabel(recruitChannelLabel(c), soGroupLinkName(g, soGroups ?? []))');
     expect(src).toContain('isFacebookGroupChannel(c.name) && pickedGroups.length > 0');
     expect(src).not.toContain('missingGroup');
     expect(src).toContain('disabled={saving || !title.trim()}');
@@ -84,8 +85,9 @@ describe('Autopost ส่งลิงก์กลุ่มละอัน (group
   });
   it('ป๊อป Autopost ใช้ลิงก์ชื่อเดียวกับ Gen link · มีแล้วใช้ตัวเดิม · server ตรวจทุกลิงก์เป็นของใบนี้', () => {
     const dlg = read('src/components/jobs/AutopostDialog.tsx');
-    expect(dlg).toContain('const label = soGroupLinkLabel(channelLabel, soGroupLabel(g));');
-    expect(dlg).toContain('let l = have.get(label) ?? null;');
+    // 4 พ.ย. 2569 ลิงก์เดิมหาด้วยรหัสกลุ่ม ไม่ใช่ชื่อ (fbGroupLinkById2569-11-04)
+    expect(dlg).toContain('const label = soGroupLinkLabel(channelLabel, soGroupLinkName(g, opts.groups));');
+    expect(dlg).toContain('let l = soGroupLinkOf(have, g, label);');
     expect(dlg).toContain('group_links: groupLinks,');
     const api = read('api/_handlers/matching-job-postings.ts');
     expect(api).toContain('const glError = soGroupLinksError(jobSnapshot);');
@@ -119,7 +121,8 @@ describe('Gen link เพิ่ม (ใบที่มีลิงก์แล�
   it('AddChannelLinks แตก Facebook Group เป็นกลุ่มละลิงก์ · ไม่เลือกกลุ่ม = 1 ลิงก์ของช่องทาง (3 พ.ย. 2569)', () => {
     const src = read('src/components/jobs/AddChannelLinks.tsx');
     expect(src).toContain('<SoGroupPicker');
-    expect(src).toContain('soGroupLinkLabel(recruitChannelLabel(c), g.name)');
+    // 4 พ.ย. 2569 ชื่อซ้ำต่อท้ายรหัสกลุ่ม + เก็บรหัสกลุ่มที่ลิงก์ (fbGroupLinkById2569-11-04)
+    expect(src).toContain('soGroupLinkLabel(recruitChannelLabel(c), soGroupLinkName(g, soGroups ?? []))');
     expect(src).toContain('isFacebookGroupChannel(c.name) && pickedGroups.length > 0');
     expect(src).not.toContain('missingGroup');
     expect(src).toContain('disabled={busy}');

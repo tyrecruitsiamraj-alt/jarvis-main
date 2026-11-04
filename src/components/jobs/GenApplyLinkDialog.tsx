@@ -35,7 +35,7 @@ import { RM_FORM_TYPES, RM_SPECIFIC_TYPES } from '@/lib/recruitRmMasters';
 import { createShortLink } from '@/lib/shortLinksApi';
 import SoGroupPicker from '@/components/jobs/SoGroupPicker';
 import { fetchSoGroups } from '@/lib/jobPostingRequestsApi';
-import { isFacebookGroupChannel, jobBuOf, soGroupLinkLabel, type SoGroup } from '@/lib/soScraping';
+import { isFacebookGroupChannel, jobBuOf, soGroupLinkKey, soGroupLinkLabel, soGroupLinkName, type SoGroup } from '@/lib/soScraping';
 import { normalizeTrendBu } from '@/lib/trends/bu';
 
 export type GenApplyLinkDialogProps = {
@@ -242,7 +242,12 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
   const pickedGroups = (soGroups ?? []).filter((g) => groupPick.includes(g.id));
   const linkChannels = picked.flatMap((c) =>
     isFacebookGroupChannel(c.name) && pickedGroups.length > 0
-      ? pickedGroups.map((g) => ({ channelId: c.id, label: soGroupLinkLabel(recruitChannelLabel(c), g.name) }))
+      ? pickedGroups.map((g) => ({
+          channelId: c.id,
+          // ลิงก์ผูกรหัสกลุ่ม ชื่อซ้ำต่อท้ายรหัส (4 พ.ย. 2569)
+          label: soGroupLinkLabel(recruitChannelLabel(c), soGroupLinkName(g, soGroups ?? [])),
+          fbGroupId: soGroupLinkKey(g),
+        }))
       : [{ channelId: c.id, label: recruitChannelLabel(c) }],
   );
 

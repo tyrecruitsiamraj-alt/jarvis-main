@@ -13,7 +13,8 @@ describe('ผู้รับผิดชอบของลิงก์', () => {
   });
   it('ลิงก์ใหม่จำคนกด (ทั้งสร้างประกาศและ Gen link เพิ่ม) · ยังไม่รัน 170 ก็สร้างได้ · Autopost ไม่มีช่องเลือกลิงก์แล้ว (3 พ.ย. 2569)', () => {
     const store = readFileSync('api/_lib/recruitPostings.ts', 'utf8');
-    expect(store).toContain('INSERT INTO ${linksTable} (posting_id, channel_id, channel_label, code, note, created_by_user_id, created_by_name)');
+    // 4 พ.ย. 2569 เพิ่มรหัสกลุ่ม Facebook ต่อท้าย (173) — ยังไม่รัน 173 ตัดทิ้งแล้วลองใหม่
+    expect(store).toContain("INSERT INTO ${linksTable} (posting_id, channel_id, channel_label, code, note, created_by_user_id, created_by_name${withFbGroup ? ', fb_group_id' : ''})");
     expect(store).toContain('if (withCreator && isUndefinedColumn(e)) {');
     expect(readFileSync('api/_handlers/recruit-postings.ts', 'utf8')).toContain('createdByUserId: req.user?.sub ?? null,\n          createdByName: req.user?.email ?? null,\n        });\n        return res.status(201).json(link);');
     expect(readFileSync('src/components/jobs/AutopostDialog.tsx', 'utf8')).not.toContain('testId="autopost-link"');

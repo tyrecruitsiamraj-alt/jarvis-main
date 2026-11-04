@@ -81,6 +81,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
           channelId: typeof body.channelId === 'string' ? body.channelId : null,
           label: typeof body.channelLabel === 'string' ? body.channelLabel : null,
           note: typeof body.note === 'string' ? body.note : null,
+          fbGroupId: typeof body.fbGroupId === 'string' ? body.fbGroupId : null,
           createdByUserId: req.user?.sub ?? null,
           createdByName: req.user?.email ?? null,
         });
@@ -119,6 +120,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
               channelId: typeof c.channelId === 'string' ? c.channelId : null,
               label: typeof c.label === 'string' ? c.label : null,
               note: typeof c.note === 'string' ? c.note : null,
+              fbGroupId: typeof c.fbGroupId === 'string' ? c.fbGroupId : null,
             }))
           : [],
         createdByUserId: req.user?.sub ?? null,

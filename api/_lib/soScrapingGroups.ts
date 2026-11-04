@@ -17,7 +17,7 @@ const SCHEMA = 'so_autopost_apiscraper';
 
 export function soGroupsSql(): string {
   return `
-    select g.id::text as id, g.name::text as name, g.province::text as province,
+    select g.id::text as id, g.fb_group_id::text as fb_group_id, g.name::text as name, g.province::text as province,
            g.department::text as department, g.job_type::text as job_type
       from ${SCHEMA}.groups g
      order by g.name`;
@@ -25,9 +25,10 @@ export function soGroupsSql(): string {
 
 export async function listSoGroups(): Promise<SoGroup[]> {
   try {
-    const { rows } = await dbQuery<SoGroup>(soGroupsSql());
+    const { rows } = await dbQuery<SoGroup & { fb_group_id: string | null }>(soGroupsSql());
     return rows.map((r) => ({
       id: r.id,
+      fbGroupId: (r.fb_group_id ?? '').trim() || null,
       name: (r.name ?? '').trim() || r.id,
       province: (r.province ?? '').trim() || null,
       department: (r.department ?? '').trim() || null,

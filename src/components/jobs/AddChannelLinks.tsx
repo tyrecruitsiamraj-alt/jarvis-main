@@ -4,7 +4,7 @@ import { Check, Copy, Link2, Loader2 } from 'lucide-react';
 import MultiChannelPicker from '@/components/shared/MultiChannelPicker';
 import SoGroupPicker from '@/components/jobs/SoGroupPicker';
 import { fetchSoGroups } from '@/lib/jobPostingRequestsApi';
-import { isFacebookGroupChannel, soGroupLinkLabel, type SoGroup } from '@/lib/soScraping';
+import { isFacebookGroupChannel, soGroupLinkKey, soGroupLinkLabel, soGroupLinkName, type SoGroup } from '@/lib/soScraping';
 import { Button } from '@/components/ui/button';
 import { addPostingLink } from '@/lib/recruitPostingsApi';
 import {
@@ -83,12 +83,17 @@ const AddChannelLinks: React.FC<{
    * (เจ้าของ 3 พ.ย. 2569 "ไม่เลือกกลุ่มก็ gen ได้") · ไม่เลือกช่องทาง = ลิงก์กลาง 1 อัน
    */
   const pickedGroups = (soGroups ?? []).filter((g) => groupPick.includes(g.id));
-  const wanted: ({ channelId: string; channelLabel: string } | null)[] =
+  const wanted: ({ channelId: string; channelLabel: string; fbGroupId?: string } | null)[] =
     picked.length === 0
       ? [null]
       : picked.flatMap((c) =>
           isFacebookGroupChannel(c.name) && pickedGroups.length > 0
-            ? pickedGroups.map((g) => ({ channelId: c.id, channelLabel: soGroupLinkLabel(recruitChannelLabel(c), g.name) }))
+            ? pickedGroups.map((g) => ({
+                channelId: c.id,
+                // ลิงก์ผูกรหัสกลุ่ม ชื่อซ้ำต่อท้ายรหัส (4 พ.ย. 2569)
+                channelLabel: soGroupLinkLabel(recruitChannelLabel(c), soGroupLinkName(g, soGroups ?? [])),
+                fbGroupId: soGroupLinkKey(g),
+              }))
             : [{ channelId: c.id, channelLabel: recruitChannelLabel(c) }],
         );
 
