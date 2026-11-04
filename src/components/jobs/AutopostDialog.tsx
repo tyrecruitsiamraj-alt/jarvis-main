@@ -482,6 +482,7 @@ export function AutopostBody({
                 {sections.map((sec) => (
                   <GroupSection
                     key={sec.bu ?? '__none__'}
+                    defaultOpen={sec.forJob || sections.length === 1}
                     jobId={job.id}
                     section={sec}
                     allGroups={opts?.groups ?? []}
@@ -672,6 +673,7 @@ export function firstAccount(list: readonly SoOptAccount[]): SoOptAccount | null
 
 /** หมวดกลุ่มตามธุรกิจ — ช่องติ๊กที่หัวเลือก/เอาออกทั้งหมวด · หมวดธุรกิจของใบขอเปิดอยู่ ที่เหลือพับ */
 function GroupSection({
+  defaultOpen,
   jobId,
   section,
   allGroups,
@@ -682,6 +684,8 @@ function GroupSection({
   cap,
   onToggle,
 }: {
+  /** กางไว้ตอนเปิด: ธุรกิจของใบขอ หรือมีหมวดเดียว (ตรงกับป๊อป Gen link) */
+  defaultOpen: boolean;
   jobId: string;
   section: SoGroupSection;
   /** ทุกกลุ่ม — ชื่อซ้ำต่อท้ายรหัสกลุ่ม ตรงกับชื่อบนลิงก์ */
@@ -696,7 +700,7 @@ function GroupSection({
   recent: ReadonlySet<string>;
   onToggle: (ids: string[], on: boolean) => void;
 }) {
-  const [open, setOpen] = React.useState(section.forJob);
+  const [open, setOpen] = React.useState(defaultOpen);
   /** ติ๊กครบเพดานแล้ว — ช่องที่ยังไม่ติ๊กเป็นสีเทา กดไม่ได้ (เอาออกได้เสมอ) */
   const full = cap !== null && picked.length >= cap;
   return (

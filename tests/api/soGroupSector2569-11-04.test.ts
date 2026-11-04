@@ -86,6 +86,11 @@ describe('จอและฐาน', () => {
     expect(readFileSync('src/components/jobs/ApplyLinksPanel.tsx', 'utf8')).toContain('jobSector={jobUnitSectorOf(job)}');
   });
 
+  it('หมวดธุรกิจกางไว้ตอนเปิดเมื่อเป็นธุรกิจของใบ หรือมีหมวดเดียว — ทั้ง Gen link และ Autopost (4 พ.ย. 2569 หมวดเดียวเคยพับ ไม่เห็นราชการ/เอกชน)', () => {
+    expect(readFileSync('src/components/jobs/SoGroupPicker.tsx', 'utf8')).toContain('defaultOpen={sec.forJob || sections.length === 1}');
+    expect(readFileSync('src/components/jobs/AutopostDialog.tsx', 'utf8')).toContain('defaultOpen={sec.forJob || sections.length === 1}');
+  });
+
   it('ช่องติ๊กทั้งหมดอยู่ที่หัวข้อย่อย ราชการ / เอกชน ไม่ใช่หัวธุรกิจ (เจ้าของ 4 พ.ย. 2569 · ติ๊กหัว LBD เดียวได้ 212 ลิงก์)', () => {
     const picker = readFileSync('src/components/jobs/SoGroupPicker.tsx', 'utf8');
     const ap = readFileSync('src/components/jobs/AutopostDialog.tsx', 'utf8');

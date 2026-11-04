@@ -37,7 +37,7 @@ export default function SoGroupPicker({
   return (
     <div className="space-y-2" data-testid="genlink-so-groups">
       {sections.map((sec) => (
-        <Section key={sec.bu ?? '__none__'} section={sec} all={groups} jobSector={jobSector} value={value} onToggle={toggle} />
+        <Section key={sec.bu ?? '__none__'} section={sec} defaultOpen={sec.forJob || sections.length === 1} all={groups} jobSector={jobSector} value={value} onToggle={toggle} />
       ))}
     </div>
   );
@@ -45,19 +45,22 @@ export default function SoGroupPicker({
 
 function Section({
   section,
+  defaultOpen,
   all,
   jobSector,
   value,
   onToggle,
 }: {
   section: SoGroupSection<SoGroup>;
+  /** กางไว้ตอนเปิด: ธุรกิจของใบขอ หรือมีหมวดเดียว (4 พ.ย. 2569 — ใบที่ไม่รู้ธุรกิจเคยพับหมวดเดียวที่มี หัวข้อราชการ/เอกชนเลยไม่โผล่) */
+  defaultOpen: boolean;
   /** ทุกกลุ่ม — ชื่อซ้ำต่อท้ายรหัสกลุ่ม ตรงกับชื่อบนลิงก์ */
   all: readonly SoGroup[];
   jobSector: UnitSector | null;
   value: readonly string[];
   onToggle: (ids: string[], on: boolean) => void;
 }) {
-  const [open, setOpen] = React.useState(section.forJob);
+  const [open, setOpen] = React.useState(defaultOpen);
   const ids = section.groups.map((g) => g.id);
   const n = ids.filter((id) => value.includes(id)).length;
   return (
