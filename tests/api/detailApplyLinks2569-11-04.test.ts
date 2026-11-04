@@ -15,10 +15,12 @@ describe('Gen link รวมในกล่อง Autopost / Scrap', () => {
     expect(detail).not.toContain('detail-apply-links');
   });
 
-  it('ช่อง "สั่งอะไร" มี Gen link เฉพาะที่ขอ (หน้ารายละเอียด) · เลือกแล้วขึ้นลิงก์ที่มี + ฟอร์ม Gen link กางเลย', () => {
+  it('ช่อง "สั่งอะไร" มี Gen link เฉพาะที่ขอ (หน้ารายละเอียด) · เลือกแล้วขึ้นลิงก์ที่มี + ปุ่ม Gen link พับไว้ กดกางค่อยใช้', () => {
     const order = read('src/components/jobs/OrderPostButton.tsx');
     expect(order).toContain("options={withGenLink ? [...KIND_OPTIONS, GEN_LINK_OPTION] : KIND_OPTIONS}");
-    expect(order).toContain('<JobApplyLinks job={job} formOpen />');
+    // 4 พ.ย. 2569 เจ้าของ "ย่อไว้กดกางออกค่อยให้ทำงานได้" — ไม่กางฟอร์มค้าง
+    expect(order).toContain('<JobApplyLinks job={job} />');
+    expect(read('src/components/jobs/ApplyLinksPanel.tsx')).not.toContain('formOpen');
   });
 
   it('หน้างานสรรหาใช้ชิ้นเดียวกัน ไม่มีโค้ด Gen link ซ้ำในหน้า', () => {

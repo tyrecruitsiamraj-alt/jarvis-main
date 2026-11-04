@@ -30,7 +30,6 @@ export default function ApplyLinksPanel({
   onReload,
   wantLink,
   onWantLinkChange,
-  formOpen = false,
 }: {
   job: JobRequest | null;
   /** ประกาศทั้งหมดของใบนี้ (ใหม่ → เก่า) · null = กำลังโหลด */
@@ -41,8 +40,6 @@ export default function ApplyLinksPanel({
   /** ฟอร์ม Gen link กางอยู่ไหม — ส่งมาเมื่อหน้าต้องคุมเอง (หน้าไล่งานกางรอให้ใบที่ยังไม่มีลิงก์) */
   wantLink?: boolean;
   onWantLinkChange?: (open: boolean) => void;
-  /** ฟอร์ม Gen link กางค้าง ไม่มีปุ่มกางลง — เลือก "Gen link" จากช่อง "สั่งอะไร" มาแล้ว (4 พ.ย. 2569 "เอารวมกันสิ่") */
-  formOpen?: boolean;
 }) {
   const [linksOpen, setLinksOpen] = React.useState(false);
   const [ownWantLink, setOwnWantLink] = React.useState(false);
@@ -109,30 +106,22 @@ export default function ApplyLinksPanel({
       ) : (
         <p className="text-sm text-muted-foreground">ยังไม่มีลิงก์</p>
       )}
-      {formOpen ? (
-        failed ? null : (
-          <div className="pt-1" data-testid="gen-link-form">
-            {genLinkForm}
-          </div>
-        )
-      ) : (
-        <Collapsible open={want && !failed} onOpenChange={setWant}>
-          <CollapsibleTrigger asChild>
-            <Button type="button" variant="outline" size="sm" data-testid="gen-link-toggle" disabled={failed}>
-              <Link2 aria-hidden />
-              {linkCount ? 'Gen link เพิ่ม' : 'Gen link'}
-              <ChevronDown className={cn('transition-transform', want && 'rotate-180')} aria-hidden />
-            </Button>
-          </CollapsibleTrigger>
-          <CollapsibleContent className="pt-3">{genLinkForm}</CollapsibleContent>
-        </Collapsible>
-      )}
+      <Collapsible open={want && !failed} onOpenChange={setWant}>
+        <CollapsibleTrigger asChild>
+          <Button type="button" variant="outline" size="sm" data-testid="gen-link-toggle" disabled={failed}>
+            <Link2 aria-hidden />
+            {linkCount ? 'Gen link เพิ่ม' : 'Gen link'}
+            <ChevronDown className={cn('transition-transform', want && 'rotate-180')} aria-hidden />
+          </Button>
+        </CollapsibleTrigger>
+        <CollapsibleContent className="pt-3">{genLinkForm}</CollapsibleContent>
+      </Collapsible>
     </>
   );
 }
 
 /** ลิงก์สมัครของใบหนึ่ง — โหลดประกาศของใบเอง แล้วใช้ ApplyLinksPanel (ช่อง "สั่งอะไร" › Gen link · 4 พ.ย. 2569) */
-export function JobApplyLinks({ job, formOpen = false }: { job: JobRequest; formOpen?: boolean }) {
+export function JobApplyLinks({ job }: { job: JobRequest }) {
   const [postings, setPostings] = React.useState<RecruitPosting[] | null>(null);
   const [failed, setFailed] = React.useState(false);
   const load = React.useCallback(async () => {
@@ -147,5 +136,5 @@ export function JobApplyLinks({ job, formOpen = false }: { job: JobRequest; form
   React.useEffect(() => {
     void load();
   }, [load]);
-  return <ApplyLinksPanel job={job} postings={postings} failed={failed} onReload={() => void load()} formOpen={formOpen} />;
+  return <ApplyLinksPanel job={job} postings={postings} failed={failed} onReload={() => void load()} />;
 }

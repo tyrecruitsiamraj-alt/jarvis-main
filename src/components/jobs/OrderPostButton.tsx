@@ -255,7 +255,8 @@ export default function OrderPostButton({
         </div>
       ) : kind === 'genlink' ? (
         <div className="space-y-2 rounded-xl border border-border/70 p-3" data-testid="so-order-genlink">
-          <JobApplyLinks job={job} formOpen />
+          {/* ฟอร์ม Gen link พับไว้ กดกางค่อยใช้ (เจ้าของ 4 พ.ย. 2569 "ย่อไว้กดกางออกค่อยให้ทำงานได้") */}
+          <JobApplyLinks job={job} />
         </div>
       ) : (
         <div className="space-y-3 rounded-xl border border-border/70 p-3" data-testid="so-order-scrap-form">
