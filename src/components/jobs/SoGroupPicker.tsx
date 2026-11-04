@@ -1,18 +1,31 @@
 import React from 'react';
-import { ChevronDown } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Label } from '@/components/ui/label';
+import { FieldSelect } from '@/components/shared/FieldSelect';
 import { cn } from '@/lib/utils';
-import { TONE } from '@/lib/designTokens';
-import { soGroupLinkName, soGroupSections, soSectorBlocks, type SoGroup, type SoGroupSection } from '@/lib/soScraping';
+import { DASH, TONE } from '@/lib/designTokens';
+import {
+  soBuEmptyText,
+  soFilterBus,
+  soFilterGroups,
+  soFilterProvinces,
+  soFilterSectors,
+  soGroupLabel,
+  soGroupStatsText,
+  soGroupUsable,
+  soGroupView,
+  type SoOptAccount,
+  type SoOptGroup,
+} from '@/lib/soScraping';
 import type { UnitSector } from '@/lib/unitSector';
+
+const NUM = new Intl.NumberFormat('th-TH');
+const WHEN = new Intl.DateTimeFormat('th-TH', { timeZone: 'Asia/Bangkok', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 
 /**
  * ═══ เลือกกลุ่ม Facebook ตอน Gen link (เจ้าของ 2 พ.ย. 2569) ═══
- * รายชื่อจาก So Scraping (ไม่พิมพ์เอง) · หมวดตามธุรกิจ ธุรกิจของใบขอกางอยู่ ที่เหลือพับ · ไม่ติ๊กให้ (ทุกกลุ่มที่ติ๊ก = 1 ลิงก์ที่ต้องเอาไปโพสต์เอง)
- * หัวหมวดมีช่องติ๊กเลือก/เอาออกทั้งหมวด
+ * 4 พ.ย. 2569 "Gen link ทำแบบเดียวกันด้วย" — ตัวเลือกเดียวกับป๊อป Autopost (`SoGroupFilterPicker`):
+ * ธุรกิจ → เอกชน/ราชการ → จังหวัด · ขึ้นเฉพาะกลุ่มที่ใช้ได้ (ไม่มีบัญชี = ซ่อนแค่กลุ่มที่แอดมินพัก) · ไม่ติ๊กให้
  */
 export default function SoGroupPicker({
   groups,
@@ -21,10 +34,10 @@ export default function SoGroupPicker({
   value,
   onChange,
 }: {
-  groups: readonly SoGroup[] | null;
-  /** ธุรกิจของใบขอ · null = ไม่รู้ (กล่องลอย) ทุกหมวดพับ */
+  groups: readonly SoOptGroup[] | null;
+  /** ธุรกิจของใบขอ · null = ไม่รู้ (กล่องลอย) */
   jobBu: string | null;
-  /** ราชการ/เอกชนของใบขอ — หัวข้อย่อยประเภทเดียวกับใบขอขึ้นก่อน (4 พ.ย. 2569) */
+  /** ราชการ/เอกชนของใบขอ — ค่าตั้งต้นของช่องเลือก */
   jobSector?: UnitSector | null;
   value: readonly string[];
   /** รับตัวอัปเดตจากค่าล่าสุด — กดติดกันเร็ว ๆ ต้องไม่ทับกัน */
@@ -32,127 +45,183 @@ export default function SoGroupPicker({
 }) {
   if (groups === null) return <p className="text-xs text-muted-foreground">กำลังโหลดกลุ่ม Facebook…</p>;
   if (groups.length === 0) return <p className={cn('text-xs', TONE.warn.value)}>ยังไม่มีกลุ่ม Facebook ใน So Scraping — เพิ่มที่ ตั้งค่า → กลุ่มโพสต์</p>;
-  const sections = soGroupSections(groups, jobBu);
-  const toggle = (ids: string[], on: boolean) => onChange((prev) => (on ? [...new Set([...prev, ...ids])] : prev.filter((x) => !ids.includes(x))));
   return (
-    <div className="space-y-2" data-testid="genlink-so-groups">
-      {sections.map((sec) => (
-        <Section key={sec.bu ?? '__none__'} section={sec} defaultOpen={sec.forJob || sections.length === 1} all={groups} jobSector={jobSector} value={value} onToggle={toggle} />
-      ))}
-    </div>
+    <SoGroupFilterPicker
+      idPrefix="genlink"
+      testPrefix="genlink"
+      groups={groups}
+      allGroups={groups}
+      jobBu={jobBu}
+      jobSector={jobSector}
+      account={null}
+      picked={value}
+      cap={null}
+      onToggle={(ids, on) => onChange((prev) => (on ? [...new Set([...prev, ...ids])] : prev.filter((x) => !ids.includes(x))))}
+    />
   );
 }
 
-function Section({
-  section,
-  defaultOpen,
-  all,
-  jobSector,
-  value,
-  onToggle,
-}: {
-  section: SoGroupSection<SoGroup>;
-  /** กางไว้ตอนเปิด: ธุรกิจของใบขอ หรือมีหมวดเดียว (4 พ.ย. 2569 — ใบที่ไม่รู้ธุรกิจเคยพับหมวดเดียวที่มี หัวข้อราชการ/เอกชนเลยไม่โผล่) */
-  defaultOpen: boolean;
-  /** ทุกกลุ่ม — ชื่อซ้ำต่อท้ายรหัสกลุ่ม ตรงกับชื่อบนลิงก์ */
-  all: readonly SoGroup[];
-  jobSector: UnitSector | null;
-  value: readonly string[];
-  onToggle: (ids: string[], on: boolean) => void;
-}) {
-  const [open, setOpen] = React.useState(defaultOpen);
-  const ids = section.groups.map((g) => g.id);
-  const n = ids.filter((id) => value.includes(id)).length;
-  return (
-    <Collapsible open={open} onOpenChange={setOpen} className="rounded-xl border border-border/70" data-testid={`genlink-bu-${section.bu ?? 'none'}`}>
-      {/* ช่องติ๊กทั้งหมดย้ายไปหัวข้อย่อย ราชการ / เอกชน (เจ้าของ 4 พ.ย. 2569 · ติ๊กหัวธุรกิจเดียวได้ 212 ลิงก์) */}
-      <div className="flex items-center gap-2 px-3 py-2">
-        <p className="flex-1 text-sm font-medium tabular-nums text-foreground">
-          {section.label} · เลือก {n} จาก {ids.length}
-        </p>
-        <CollapsibleTrigger asChild>
-          <Button type="button" size="xs" variant="ghost" aria-label={open ? `พับ ${section.label}` : `กาง ${section.label}`}>
-            {open ? 'พับ' : 'กาง'}
-            <ChevronDown className={cn('transition-transform', open && 'rotate-180')} aria-hidden />
-          </Button>
-        </CollapsibleTrigger>
-      </div>
-      <CollapsibleContent>
-        <div className="max-h-64 space-y-3 overflow-y-auto border-t border-border/70 px-3 py-2">
-          {/* แยก ราชการ / เอกชน ในหมวดธุรกิจ (เจ้าของ 4 พ.ย. 2569) */}
-          {soSectorBlocks(section.groups, jobSector).map((block) => (
-            <SoSectorFold
-              key={block.sector ?? 'none'}
-              label={block.label}
-              ids={block.groups.map((g) => g.id)}
-              picked={value}
-              onToggle={onToggle}
-              checkId={`genlink-sector-${section.bu ?? 'none'}-${block.sector ?? 'none'}`}
-              testId={`genlink-sector-${block.sector ?? 'none'}`}
-            >
-              <ul className="space-y-1.5">
-                {block.groups.map((g) => (
-                  <li key={g.id} className="flex items-start gap-2">
-                    <Checkbox id={`genlink-group-${g.id}`} checked={value.includes(g.id)} onCheckedChange={(v) => onToggle([g.id], v === true)} className="mt-0.5" />
-                    <Label htmlFor={`genlink-group-${g.id}`} className="text-sm font-normal text-foreground">
-                      {soGroupLinkName(g, all)}
-                    </Label>
-                  </li>
-                ))}
-              </ul>
-            </SoSectorFold>
-          ))}
-        </div>
-      </CollapsibleContent>
-    </Collapsible>
-  );
-}
-
+const NONE_KEY = '__none__';
+const ALL_PROVINCES = '__all__';
 
 /**
- * หัวข้อย่อย ราชการ / เอกชน ในหมวดธุรกิจ (เจ้าของ 4 พ.ย. 2569) — พับไว้ตอนเปิด ("อันนี้ย่อไว้") · ช่องติ๊กเลือก/เอาออกทั้งหัวข้อ
- * (ย้ายมาจากหัวธุรกิจ — ติ๊กหัวธุรกิจเดียวเคยได้ทุกกลุ่มรวมราชการ 2,400 กลุ่ม)
- * พับอยู่ = ไม่วาดแถว (วาด 2,400 แถวพร้อมกันทำป๊อปหน่วง)
+ * 2 · กลุ่ม Facebook — ธุรกิจ → เอกชน/ราชการ → จังหวัด (ไม่เลือก = ทุกจังหวัด) แล้วติ๊กกลุ่ม (เจ้าของ 4 พ.ย. 2569 Journey)
+ * ขึ้นเฉพาะกลุ่มที่โพสต์ได้ด้วยบัญชีนี้ (`soGroupUsable`) — แอดมินพัก · ห้ามโพสต์ · ต้องตอบคำถาม · ใบนี้เพิ่งลง = ไม่ขึ้น
+ * ค่าตั้งต้น = ธุรกิจ/ประเภทของใบขอ (ถ้ามีกลุ่ม) · ช่องติ๊กทั้งรายการไม่เกินโพสต์ที่บัญชีเหลือ
  */
-export function SoSectorFold({
-  label,
-  ids,
+export function SoGroupFilterPicker({
+  idPrefix,
+  testPrefix,
+  groups,
+  allGroups,
+  jobBu,
+  jobSector,
+  account,
   picked,
+  recent,
+  cap,
   onToggle,
-  checkId,
-  testId,
-  children,
 }: {
-  label: string;
-  ids: readonly string[];
+  /** id ของช่องติ๊ก (ไม่ชนกันเมื่อมีหลายป๊อป) */
+  idPrefix: string;
+  /** data-testid ขึ้นต้น — autopost · genlink */
+  testPrefix: 'autopost' | 'genlink';
+  /** กลุ่มที่บัญชีนี้โพสต์ได้ (ก่อนกรองสถานะ) เรียงโพสต์ได้ 30 วันมากไปน้อย */
+  groups: readonly SoOptGroup[];
+  /** ทุกกลุ่ม — ชื่อซ้ำต่อท้ายรหัสกลุ่ม ตรงกับชื่อบนลิงก์ */
+  allGroups: readonly SoOptGroup[];
+  jobBu: string | null;
+  jobSector: UnitSector | null;
+  /** บัญชีที่จะโพสต์ — สถานะกลุ่มคิดจากบัญชีนี้ · Gen link = null (ดูแค่กลุ่มโดนพัก) */
+  account: SoOptAccount | null;
   picked: readonly string[];
+  /** กลุ่มที่ใบนี้เพิ่งสั่งโพสต์ใน 3 วัน (Autopost) */
+  recent?: ReadonlySet<string>;
+  /** ติ๊กได้สูงสุด (โพสต์ที่บัญชีเหลือวันนี้) · null = ไม่จำกัด */
+  cap: number | null;
   onToggle: (ids: string[], on: boolean) => void;
-  checkId: string;
-  testId: string;
-  children: React.ReactNode;
 }) {
-  const [open, setOpen] = React.useState(false);
+  const usable = React.useMemo(() => groups.filter((g) => soGroupUsable(g, account)), [groups, account]);
+  const [buPick, setBuPick] = React.useState<string | null | undefined>(undefined);
+  const [sectorPick, setSectorPick] = React.useState<UnitSector | null | undefined>(undefined);
+  const [province, setProvince] = React.useState('');
+
+  // ค่าที่ใช้จริง = ที่เลือกไว้ถ้ายังมีในตัวเลือก ไม่งั้นค่าตั้งต้น (ของใบขอ → ตัวแรก)
+  const bus = soFilterBus(usable, jobBu);
+  const has = <T,>(list: readonly { value: T }[], v: T | undefined) => v !== undefined && list.some((x) => x.value === v);
+  const bu = has(bus, buPick) ? (buPick as string | null) : has(bus, jobBu) ? jobBu : (bus[0]?.value ?? null);
+  const sectors = soFilterSectors(usable, bu, jobSector);
+  const sector = has(sectors, sectorPick) ? (sectorPick as UnitSector | null) : has(sectors, jobSector) ? jobSector : (sectors[0]?.value ?? null);
+  const provinces = soFilterProvinces(usable, bu, sector);
+  const prov = provinces.includes(province) ? province : '';
+  const list = soFilterGroups(usable, { bu, sector, province: prov });
+
+  const ids = list.map((g) => g.id);
   const n = ids.filter((id) => picked.includes(id)).length;
+  /** ติ๊กครบเพดานแล้ว — ช่องที่ยังไม่ติ๊กเป็นสีเทา กดไม่ได้ (เอาออกได้เสมอ) */
+  const full = cap !== null && picked.length >= cap;
+
+  if (usable.length === 0) {
+    return (
+      <p className={cn('rounded-xl border border-border/70 px-3 py-2 text-sm', TONE.warn.value)} data-testid={`${testPrefix}-no-usable-group`}>
+        {account ? 'ไม่มีกลุ่มที่บัญชีนี้โพสต์ได้ตอนนี้ — เลือกบัญชีอื่น' : 'ไม่มีกลุ่มที่โพสต์ได้ตอนนี้'}
+      </p>
+    );
+  }
   return (
-    <Collapsible open={open} onOpenChange={setOpen} className="space-y-1.5" data-testid={testId}>
-      <div className="flex items-center gap-2">
-        <Checkbox
-          id={checkId}
-          checked={n === 0 ? false : n === ids.length ? true : 'indeterminate'}
-          onCheckedChange={(v) => onToggle([...ids], v === true)}
-          aria-label={`เลือกทุกกลุ่ม${label}`}
-        />
-        <Label htmlFor={checkId} className="flex-1 text-xs font-medium tabular-nums text-muted-foreground">
-          {label} · เลือก {n} จาก {ids.length}
-        </Label>
-        <CollapsibleTrigger asChild>
-          <Button type="button" size="xs" variant="ghost" aria-label={open ? `พับ ${label}` : `กาง ${label}`}>
-            {open ? 'พับ' : 'กาง'}
-            <ChevronDown className={cn('transition-transform', open && 'rotate-180')} aria-hidden />
-          </Button>
-        </CollapsibleTrigger>
+    <div className="space-y-2" data-testid={`${testPrefix}-groups`}>
+      {jobBu && !bus.some((b) => b.value === jobBu) ? (
+        <p className={cn('text-sm', TONE.warn.value)} data-testid={`${testPrefix}-bu-empty`}>
+          {soBuEmptyText(jobBu)}
+        </p>
+      ) : null}
+      <div className="grid gap-2 sm:grid-cols-3">
+        <div className="space-y-1">
+          <Label className="text-xs text-muted-foreground">ธุรกิจ</Label>
+          <FieldSelect
+            value={bu ?? NONE_KEY}
+            onChange={(v) => setBuPick(v === NONE_KEY ? null : v)}
+            ariaLabel="ธุรกิจของกลุ่ม"
+            testId={`${testPrefix}-filter-bu`}
+            options={bus.map((b) => ({ value: b.value ?? NONE_KEY, label: b.label }))}
+          />
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs text-muted-foreground">เอกชน / ราชการ</Label>
+          <FieldSelect
+            value={sector ?? NONE_KEY}
+            onChange={(v) => setSectorPick(v === NONE_KEY ? null : (v as UnitSector))}
+            ariaLabel="เอกชนหรือราชการ"
+            testId={`${testPrefix}-filter-sector`}
+            options={sectors.map((x) => ({ value: x.value ?? NONE_KEY, label: x.label }))}
+          />
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs text-muted-foreground">จังหวัด</Label>
+          <FieldSelect
+            value={prov || ALL_PROVINCES}
+            onChange={(v) => setProvince(v === ALL_PROVINCES ? '' : v)}
+            ariaLabel="จังหวัดของกลุ่ม"
+            testId={`${testPrefix}-filter-province`}
+            options={[{ value: ALL_PROVINCES, label: 'ทุกจังหวัด' }, ...provinces.map((p) => ({ value: p, label: p }))]}
+          />
+        </div>
       </div>
-      <CollapsibleContent>{children}</CollapsibleContent>
-    </Collapsible>
+
+      <div className="rounded-xl border border-border/70">
+        <div className="flex items-center gap-2 border-b border-border/70 px-3 py-2">
+          <Checkbox
+            id={`${idPrefix}-all`}
+            checked={n === 0 ? false : n === ids.length ? true : 'indeterminate'}
+            disabled={ids.length === 0}
+            onCheckedChange={(v) => onToggle(ids, v === true)}
+            aria-label="เลือกทุกกลุ่มในรายการนี้"
+          />
+          <Label htmlFor={`${idPrefix}-all`} className="flex-1 text-sm font-medium tabular-nums text-foreground" data-testid={`${testPrefix}-list-head`}>
+            โพสต์ได้ {NUM.format(ids.length)} กลุ่ม · เลือก {NUM.format(n)}
+          </Label>
+        </div>
+        {list.length === 0 ? (
+          <p className="px-3 py-2 text-sm text-muted-foreground">ไม่มีกลุ่มที่โพสต์ได้ในตัวเลือกนี้</p>
+        ) : (
+          <ul className="max-h-96 space-y-2 overflow-y-auto px-3 py-2">
+            {list.map((g) => (
+              // ติ๊กครบเพดานแล้ว = แถวที่ยังไม่ติ๊กเป็นสีเทา (สเปค 6.2)
+              <li key={g.id} className={cn('flex items-start gap-2', full && !picked.includes(g.id) && 'opacity-50')} data-testid={`${testPrefix}-group-row`}>
+                <Checkbox
+                  id={`${idPrefix}-group-${g.id}`}
+                  checked={picked.includes(g.id)}
+                  disabled={full && !picked.includes(g.id)}
+                  onCheckedChange={(v) => onToggle([g.id], v === true)}
+                  className="mt-0.5"
+                />
+                <div className="min-w-0 space-y-0.5">
+                  <Label htmlFor={`${idPrefix}-group-${g.id}`} className="block text-sm font-normal text-foreground">
+                    {soGroupLabel(g, allGroups)}
+                    {/* สถานะเป็นคำจาก So Scraping เสมอ (ไม่บอกด้วยสีอย่างเดียว) · Gen link ไม่มีบัญชี = ไม่มีสถานะ */}
+                    {account ? (
+                      <span className={cn('font-medium', DASH.muted)} data-testid={`${testPrefix}-group-state`}>
+                        {' — '}
+                        {soGroupView(g, account).label}
+                      </span>
+                    ) : null}
+                  </Label>
+                  <p className={cn('text-xs', DASH.muted)}>
+                    {[
+                      prov && !g.provinces.includes(prov) && g.nationwide ? 'ทั่วประเทศ' : null,
+                      soGroupStatsText(g.stats30d),
+                      g.lastPostedAt ? `โพสต์ล่าสุด ${WHEN.format(new Date(g.lastPostedAt))}` : null,
+                      recent?.has(g.id) ? 'ใบนี้เพิ่งสั่งโพสต์กลุ่มนี้ใน 3 วัน' : null,
+                    ]
+                      .filter(Boolean)
+                      .join(' · ')}
+                  </p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
   );
 }

@@ -71,36 +71,21 @@ describe('แบ่งหัวข้อย่อยในหมวดธุร�
 });
 
 describe('จอและฐาน', () => {
+  it('Autopost + Gen link ใช้ช่องเลือก เอกชน/ราชการ ชุดเดียว (4 พ.ย. 2569 แทนหัวข้อย่อยพับ) · ไม่ติ๊กกลุ่มให้ · ติ๊กทั้งรายการที่กรองแล้ว ไม่ใช่ทั้งธุรกิจ', () => {
+    const picker = readFileSync('src/components/jobs/SoGroupPicker.tsx', 'utf8');
+    expect(picker).toContain('testId={`${testPrefix}-filter-sector`}');
+    expect(picker).toContain('aria-label="เลือกทุกกลุ่มในรายการนี้"');
+    expect(picker).not.toContain('เลือกทุกกลุ่มของ ${section.label}');
+    expect(readFileSync('src/components/jobs/AutopostDialog.tsx', 'utf8')).not.toContain('defaultSoGroupPick');
+    expect(readFileSync('src/lib/soScraping.ts', 'utf8')).not.toContain('export function defaultSoGroupPick');
+  });
+
   it('อ่านช่อง sector ของ So Scraping · ยังไม่มีช่อง (42703) อ่านแบบไม่มีช่องแล้วถือเป็นเอกชน', () => {
     const src = readFileSync('api/_lib/soScrapingGroups.ts', 'utf8');
     expect(src).toContain("${withSector ? ', g.sector::text as sector' : ''}");
     expect(src).toContain('sector: tagged ? soGroupSectorOf(r.sector) : SO_GROUP_SECTOR_BEFORE_TAG,');
   });
 
-  it('ป๊อป Autopost และ Gen link แบ่งหัวข้อย่อย · ไม่ติ๊กกลุ่มให้ · หัวข้อย่อยพับไว้ตอนเปิด (เจ้าของ 4 พ.ย. 2569)', () => {
-    const ap = readFileSync('src/components/jobs/AutopostDialog.tsx', 'utf8');
-    // 4 พ.ย. 2569 Journey: Autopost เปลี่ยนเป็นช่องเลือก ธุรกิจ → เอกชน/ราชการ → จังหวัด (autopostJourney2569-11-04) · Gen link ยังเป็นหัวข้อย่อย
-    expect(ap).toContain('testId="autopost-filter-sector"');
-    expect(ap).not.toContain('defaultSoGroupPick');
-    expect(readFileSync('src/lib/soScraping.ts', 'utf8')).not.toContain('export function defaultSoGroupPick');
-    expect(readFileSync('src/components/jobs/SoGroupPicker.tsx', 'utf8')).toContain('const [open, setOpen] = React.useState(false);');
-    expect(readFileSync('src/components/jobs/SoGroupPicker.tsx', 'utf8')).toContain('soSectorBlocks(section.groups, jobSector)');
-    expect(readFileSync('src/components/jobs/GenApplyLinkDialog.tsx', 'utf8')).toContain('jobSector={job ? jobUnitSectorOf(job) : null}');
-    expect(readFileSync('src/components/jobs/ApplyLinksPanel.tsx', 'utf8')).toContain('jobSector={jobUnitSectorOf(job)}');
-  });
 
-  it('หมวดธุรกิจกางไว้ตอนเปิดเมื่อเป็นธุรกิจของใบ หรือมีหมวดเดียว — ป๊อป Gen link (4 พ.ย. 2569 หมวดเดียวเคยพับ ไม่เห็นราชการ/เอกชน)', () => {
-    expect(readFileSync('src/components/jobs/SoGroupPicker.tsx', 'utf8')).toContain('defaultOpen={sec.forJob || sections.length === 1}');
 
-  });
-
-  it('ช่องติ๊กทั้งหมดอยู่ที่หัวข้อย่อย ราชการ / เอกชน ไม่ใช่หัวธุรกิจ (เจ้าของ 4 พ.ย. 2569 · ติ๊กหัว LBD เดียวได้ 212 ลิงก์)', () => {
-    const picker = readFileSync('src/components/jobs/SoGroupPicker.tsx', 'utf8');
-    const ap = readFileSync('src/components/jobs/AutopostDialog.tsx', 'utf8');
-    expect(picker).toContain('aria-label={`เลือกทุกกลุ่ม${label}`}');
-    expect(picker).not.toContain('เลือกทุกกลุ่มของ ${section.label}');
-    expect(ap).not.toContain('เลือกทุกกลุ่มของ ${section.label}');
-    // Autopost ติ๊กทั้งรายการที่กรองแล้ว ไม่เกินเพดานบัญชี (onToggle = soAddWithinCap)
-    expect(ap).toContain('aria-label="เลือกทุกกลุ่มในรายการนี้"');
-  });
 });

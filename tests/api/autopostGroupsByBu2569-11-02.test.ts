@@ -100,10 +100,10 @@ describe('กลุ่ม Facebook ตามธุรกิจของใบข
   });
 
   it('ป๊อปใช้หมวดตามธุรกิจ · server เติมธุรกิจตอนเรียก API · อ่านทุกกลุ่มไม่กรองตามบัญชีผูก', () => {
-    const dialog = readFileSync('src/components/jobs/AutopostDialog.tsx', 'utf8');
+    const dialog = (readFileSync('src/components/jobs/AutopostDialog.tsx', 'utf8') + readFileSync('src/components/jobs/SoGroupPicker.tsx', 'utf8')) /* 4 พ.ย. 2569 ตัวเลือกกลุ่มย้ายเป็นชิ้นกลาง */;
     // 4 พ.ย. 2569 เจ้าของ "ไม่ติ๊กกลุ่มให้เลย" — เปิดป๊อปไม่ติ๊กกลุ่มใด
     expect(dialog).not.toContain('defaultSoGroupPick');
-    expect(dialog).toContain('data-testid="autopost-bu-empty"');
+    expect(dialog).toContain('-bu-empty`}');
     // 4 พ.ย. 2569 ช่องติ๊กทั้งหมดย้ายไปหัวข้อย่อย ราชการ / เอกชน (SoSectorFold) — หัวธุรกิจไม่มีช่องติ๊กแล้ว
     expect(readFileSync('src/components/jobs/SoGroupPicker.tsx', 'utf8')).toContain("checked={n === 0 ? false : n === ids.length ? true : 'indeterminate'}");
     expect(dialog).not.toContain('เลือกทุกกลุ่มของ ${section.label}');
@@ -217,7 +217,7 @@ describe('กลุ่ม Facebook ตามธุรกิจของใบข
   });
 
   it('ป๊อป: สถานะเป็นคำ · ลิงก์เปิดกลุ่มเปิดแท็บใหม่ · ค่าติ๊กคิดใหม่ตอนสลับบัญชี · ทางถอยอ่านฐานไม่มีสถานะ', () => {
-    const dialog = readFileSync('src/components/jobs/AutopostDialog.tsx', 'utf8');
+    const dialog = (readFileSync('src/components/jobs/AutopostDialog.tsx', 'utf8') + readFileSync('src/components/jobs/SoGroupPicker.tsx', 'utf8')) /* 4 พ.ย. 2569 ตัวเลือกกลุ่มย้ายเป็นชิ้นกลาง */;
     // 4 พ.ย. 2569 ไม่ติ๊กให้ — สลับบัญชีคงกลุ่มเดิมเท่าที่บัญชีนี้โพสต์ได้
     expect(dialog).toContain('setPicked((prev) => soAddWithinCap([], prev.filter((id) => allowed.has(id)), soGroupCap(a)));');
     // 4 พ.ย. 2569 Journey — ขึ้นเฉพาะกลุ่มที่โพสต์ได้ สถานะยังเป็นคำจาก So Scraping · กลุ่มที่ต้องไปแก้เอง (มีลิงก์เปิดกลุ่ม) ไม่ขึ้นแล้ว

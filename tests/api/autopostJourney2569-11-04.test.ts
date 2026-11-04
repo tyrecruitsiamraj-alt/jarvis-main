@@ -37,7 +37,7 @@ describe('1 บัญชี: ขึ้นเฉพาะที่ใช้ได
   it('พร้อม / มีงานค้าง / เครื่องหลักออฟไลน์ = ขึ้น · พัก ครบโควต้า รอยืนยันตัวตน ไม่มีเครื่อง ไม่รู้สถานะ = ซ่อน', () => {
     expect(['ready', 'busy', 'worker_offline'].every((s) => soAccountUsable(s as never))).toBe(true);
     expect(['paused', 'full', 'needs_verification', 'no_worker', 'unknown'].some((s) => soAccountUsable(s as never))).toBe(false);
-    expect(readFileSync('src/components/jobs/AutopostDialog.tsx', 'utf8')).toContain('opts.accounts.filter((a) => soAccountUsable(a.status))');
+    expect((readFileSync('src/components/jobs/AutopostDialog.tsx', 'utf8') + readFileSync('src/components/jobs/SoGroupPicker.tsx', 'utf8')) /* 4 พ.ย. 2569 ตัวเลือกกลุ่มย้ายเป็นชิ้นกลาง */).toContain('opts.accounts.filter((a) => soAccountUsable(a.status))');
   });
 });
 
@@ -81,10 +81,29 @@ describe('2 กลุ่ม: ธุรกิจ → เอกชน/ราชก
     expect(soProvincesOf(null)).toEqual({ provinces: [], nationwide: false });
   });
   it('ป๊อป: 3 ช่องเลือก + ติ๊กทั้งรายการไม่เกินเพดาน · รายการว่างไม่หาย (บอกว่าไม่มี)', () => {
-    const src = readFileSync('src/components/jobs/AutopostDialog.tsx', 'utf8');
-    for (const id of ['autopost-filter-bu', 'autopost-filter-sector', 'autopost-filter-province']) expect(src).toContain(`testId="${id}"`);
+    const src = (readFileSync('src/components/jobs/AutopostDialog.tsx', 'utf8') + readFileSync('src/components/jobs/SoGroupPicker.tsx', 'utf8')) /* 4 พ.ย. 2569 ตัวเลือกกลุ่มย้ายเป็นชิ้นกลาง */;
+    expect(src).toContain('testPrefix="autopost"');
+    for (const id of ['filter-bu', 'filter-sector', 'filter-province']) expect(src).toContain('testId={`${testPrefix}-' + id + '`}');
     expect(src).toContain("{ value: ALL_PROVINCES, label: 'ทุกจังหวัด' }");
     expect(src).toContain('ไม่มีกลุ่มที่โพสต์ได้ในตัวเลือกนี้');
-    expect(src).toContain('ไม่มีกลุ่มที่บัญชีนี้โพสต์ได้ตอนนี้ — เลือกบัญชีอื่น');
+    expect(src).toContain("'ไม่มีกลุ่มที่บัญชีนี้โพสต์ได้ตอนนี้ — เลือกบัญชีอื่น'");
+  });
+});
+
+describe('Gen link ใช้ตัวเลือกกลุ่มชุดเดียวกัน (เจ้าของ 4 พ.ย. 2569 "Gen link ทำแบบเดียวกันด้วย")', () => {
+  it('SoGroupPicker = SoGroupFilterPicker ไม่มีบัญชี ไม่จำกัดจำนวน · กลุ่มมาจาก options ของ So Scraping (มีสถานะแอดมินพัก + จังหวัด)', () => {
+    const picker = readFileSync('src/components/jobs/SoGroupPicker.tsx', 'utf8');
+    expect(picker).toContain('testPrefix="genlink"');
+    expect(picker).toContain('account={null}');
+    expect(picker).toContain('cap={null}');
+    for (const p of ['src/components/jobs/GenApplyLinkDialog.tsx', 'src/components/jobs/AddChannelLinks.tsx']) {
+      const src = readFileSync(p, 'utf8');
+      expect(src).toContain('.then((o) => alive && setSoGroups(o.groups))');
+      expect(src).not.toContain('fetchSoGroups');
+    }
+  });
+  it('ไม่มีบัญชี = ซ่อนแค่กลุ่มที่แอดมินพัก', () => {
+    expect(soGroupUsable(g('a'), null)).toBe(true);
+    expect(soGroupUsable(g('b', { blocked: { state: 'admin_paused', label: 'แอดมินพักกลุ่ม', detail: null, seenAt: null } }), null)).toBe(false);
   });
 });

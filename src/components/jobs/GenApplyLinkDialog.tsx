@@ -34,8 +34,8 @@ import { jobPostingDraft } from '@/lib/recruitPostingDraft';
 import { RM_FORM_TYPES, RM_SPECIFIC_TYPES } from '@/lib/recruitRmMasters';
 import { createShortLink } from '@/lib/shortLinksApi';
 import SoGroupPicker from '@/components/jobs/SoGroupPicker';
-import { fetchSoGroups } from '@/lib/jobPostingRequestsApi';
-import { isFacebookGroupChannel, jobBuOf, soGroupLinkKey, soGroupLinkLabel, soGroupLinkName, type SoGroup } from '@/lib/soScraping';
+import { fetchSoOptions } from '@/lib/jobPostingRequestsApi';
+import { isFacebookGroupChannel, jobBuOf, soGroupLinkKey, soGroupLinkLabel, soGroupLinkName, type SoOptGroup } from '@/lib/soScraping';
 import { normalizeTrendBu } from '@/lib/trends/bu';
 
 export type GenApplyLinkDialogProps = {
@@ -118,7 +118,7 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
    * ช่องทาง Facebook Group = ต้องเลือกกลุ่มจากรายชื่อ So Scraping · 1 ลิงก์ = 1 กลุ่ม
    * (เจ้าของ 2 พ.ย. 2569 "อยากรู้ว่ากลุ่มไหนได้คนมาเยอะ กลุ่มไหนเหมาะนายไทย นายต่างชาติ")
    */
-  const [soGroups, setSoGroups] = useState<SoGroup[] | null>(null);
+  const [soGroups, setSoGroups] = useState<SoOptGroup[] | null>(null);
   const [groupPick, setGroupPick] = useState<string[]>([]);
   const fbGroupChannels = picked.filter((c) => isFacebookGroupChannel(c.name));
   /** ลิสต์ช่องทางหุบไว้ก่อน — กางเมื่อจะเลือกจริง (เหตุผลอยู่ที่จุดเรียกใช้) */
@@ -220,8 +220,9 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
   useEffect(() => {
     if (!needGroups) return;
     let alive = true;
-    fetchSoGroups()
-      .then((g) => alive && setSoGroups(g))
+    // กลุ่ม + สถานะกลุ่ม (แอดมินพัก) + จังหวัด จาก options ของ So Scraping — ตัวเดียวกับป๊อป Autopost (4 พ.ย. 2569)
+    fetchSoOptions()
+      .then((o) => alive && setSoGroups(o.groups))
       .catch((e: unknown) => {
         if (!alive) return;
         setSoGroups([]);

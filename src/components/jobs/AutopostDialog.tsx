@@ -2,7 +2,6 @@ import React from 'react';
 import { LoaderCircle, Send } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -14,7 +13,7 @@ import { DASH, TONE } from '@/lib/designTokens';
 import type { JobRequest } from '@/types';
 import { useRecruiterContact } from '@/hooks/useRecruiterContact';
 import { jobBoardCardTitle, jobUnitSectorOf } from '@/lib/unitRequestDisplay';
-import type { UnitSector } from '@/lib/unitSector';
+import { SoGroupFilterPicker } from '@/components/jobs/SoGroupPicker';
 import { publicJobTitle } from '@/lib/publicJobTitle';
 import { addPostingLink, createRecruitPosting, fetchRecruitPostings, searchRecruitChannels } from '@/lib/recruitPostingsApi';
 import { jobPostingBody } from '@/lib/recruitPostingDraft';
@@ -35,30 +34,22 @@ import {
   SO_POST_MODE_LABEL,
   SO_POST_REASON,
   soAccountOnWorker,
-  soGroupStatsText,
   soPostConfirmWarnings,
   soWorkersFor,
   soAccountSelectable,
   soGroupLabel,
   soGroupsOfAccount,
   jobBuOf,
-  soBuEmptyText,
   isFacebookGroupChannel,
   soGroupLinkKey,
   soGroupLinkLabel,
   soGroupLinkName,
   soGroupLinkOf,
   type SoGroupLink,
-  soGroupView,
   soBuNoAccountText,
   soAccountsByBu,
   soAccountsForJob,
   soAccountUsable,
-  soFilterBus,
-  soFilterGroups,
-  soFilterProvinces,
-  soFilterSectors,
-  soGroupUsable,
   soAccountChoice,
   soAccountStatusText,
   soAddWithinCap,
@@ -72,7 +63,6 @@ import {
   soStatusView,
   soWarningText,
   type SoOptAccount,
-  type SoOptGroup,
   type SoOptions,
   type SoPostMode,
 } from '@/lib/soScraping';
@@ -93,7 +83,6 @@ import { AUTOPOST_CAPTION_MAX, autopostMissing, buildAutopostCaption, captionLea
  * 🔴 Jarvis ไม่โพสต์ Facebook เอง — เขียนคำขอให้ So Scraping · ห้ามซ้อน Dialog (เปิดจาก JobBoardView ไม่ใช่ในการ์ด)
  */
 const NUM = new Intl.NumberFormat('th-TH');
-const WHEN = new Intl.DateTimeFormat('th-TH', { timeZone: 'Asia/Bangkok', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 
 export default function AutopostDialog({
   job,
@@ -471,9 +460,10 @@ export function AutopostBody({
             {!account ? null : accountGroups.length === 0 ? (
               <p className={cn('text-sm', TONE.warn.value)}>บัญชีนี้ยังไม่มีกลุ่ม ให้เพิ่มที่ระบบ So Scraping</p>
             ) : (
-              <GroupFilterPicker
+              <SoGroupFilterPicker
                 key={account.id}
-                jobId={job.id}
+                idPrefix={`autopost-${job.id}`}
+                testPrefix="autopost"
                 groups={accountGroups}
                 allGroups={opts?.groups ?? []}
                 jobBu={jobBu}
@@ -658,161 +648,4 @@ export function firstAccount(list: readonly SoOptAccount[]): SoOptAccount | null
     if (a) return a;
   }
   return null;
-}
-
-const NONE_KEY = '__none__';
-const ALL_PROVINCES = '__all__';
-
-/**
- * 2 · กลุ่ม Facebook — ธุรกิจ → เอกชน/ราชการ → จังหวัด (ไม่เลือก = ทุกจังหวัด) แล้วติ๊กกลุ่ม (เจ้าของ 4 พ.ย. 2569 Journey)
- * ขึ้นเฉพาะกลุ่มที่โพสต์ได้ด้วยบัญชีนี้ (`soGroupUsable`) — แอดมินพัก · ห้ามโพสต์ · ต้องตอบคำถาม · ใบนี้เพิ่งลง = ไม่ขึ้น
- * ค่าตั้งต้น = ธุรกิจ/ประเภทของใบขอ (ถ้ามีกลุ่ม) · ช่องติ๊กทั้งรายการไม่เกินโพสต์ที่บัญชีเหลือ
- */
-function GroupFilterPicker({
-  jobId,
-  groups,
-  allGroups,
-  jobBu,
-  jobSector,
-  account,
-  picked,
-  recent,
-  cap,
-  onToggle,
-}: {
-  jobId: string;
-  /** กลุ่มที่บัญชีนี้โพสต์ได้ (ก่อนกรองสถานะ) เรียงโพสต์ได้ 30 วันมากไปน้อย */
-  groups: readonly SoOptGroup[];
-  /** ทุกกลุ่ม — ชื่อซ้ำต่อท้ายรหัสกลุ่ม ตรงกับชื่อบนลิงก์ */
-  allGroups: readonly SoOptGroup[];
-  jobBu: string | null;
-  jobSector: UnitSector | null;
-  account: SoOptAccount | null;
-  picked: readonly string[];
-  recent: ReadonlySet<string>;
-  /** ติ๊กได้สูงสุด (โพสต์ที่บัญชีเหลือวันนี้) · null = ไม่จำกัด */
-  cap: number | null;
-  onToggle: (ids: string[], on: boolean) => void;
-}) {
-  const usable = React.useMemo(() => groups.filter((g) => soGroupUsable(g, account)), [groups, account]);
-  const [buPick, setBuPick] = React.useState<string | null | undefined>(undefined);
-  const [sectorPick, setSectorPick] = React.useState<UnitSector | null | undefined>(undefined);
-  const [province, setProvince] = React.useState('');
-
-  // ค่าที่ใช้จริง = ที่เลือกไว้ถ้ายังมีในตัวเลือก ไม่งั้นค่าตั้งต้น (ของใบขอ → ตัวแรก)
-  const bus = soFilterBus(usable, jobBu);
-  const has = <T,>(list: readonly { value: T }[], v: T | undefined) => v !== undefined && list.some((x) => x.value === v);
-  const bu = has(bus, buPick) ? (buPick as string | null) : has(bus, jobBu) ? jobBu : (bus[0]?.value ?? null);
-  const sectors = soFilterSectors(usable, bu, jobSector);
-  const sector = has(sectors, sectorPick) ? (sectorPick as UnitSector | null) : has(sectors, jobSector) ? jobSector : (sectors[0]?.value ?? null);
-  const provinces = soFilterProvinces(usable, bu, sector);
-  const prov = provinces.includes(province) ? province : '';
-  const list = soFilterGroups(usable, { bu, sector, province: prov });
-
-  const ids = list.map((g) => g.id);
-  const n = ids.filter((id) => picked.includes(id)).length;
-  /** ติ๊กครบเพดานแล้ว — ช่องที่ยังไม่ติ๊กเป็นสีเทา กดไม่ได้ (เอาออกได้เสมอ) */
-  const full = cap !== null && picked.length >= cap;
-
-  if (usable.length === 0) {
-    return (
-      <p className={cn('rounded-xl border border-border/70 px-3 py-2 text-sm', TONE.warn.value)} data-testid="autopost-no-usable-group">
-        ไม่มีกลุ่มที่บัญชีนี้โพสต์ได้ตอนนี้ — เลือกบัญชีอื่น
-      </p>
-    );
-  }
-  return (
-    <div className="space-y-2" data-testid="autopost-groups">
-      {jobBu && !bus.some((b) => b.value === jobBu) ? (
-        <p className={cn('text-sm', TONE.warn.value)} data-testid="autopost-bu-empty">
-          {soBuEmptyText(jobBu)}
-        </p>
-      ) : null}
-      <div className="grid gap-2 sm:grid-cols-3">
-        <div className="space-y-1">
-          <Label className="text-xs text-muted-foreground">ธุรกิจ</Label>
-          <FieldSelect
-            value={bu ?? NONE_KEY}
-            onChange={(v) => setBuPick(v === NONE_KEY ? null : v)}
-            ariaLabel="ธุรกิจของกลุ่ม"
-            testId="autopost-filter-bu"
-            options={bus.map((b) => ({ value: b.value ?? NONE_KEY, label: b.label }))}
-          />
-        </div>
-        <div className="space-y-1">
-          <Label className="text-xs text-muted-foreground">เอกชน / ราชการ</Label>
-          <FieldSelect
-            value={sector ?? NONE_KEY}
-            onChange={(v) => setSectorPick(v === NONE_KEY ? null : (v as UnitSector))}
-            ariaLabel="เอกชนหรือราชการ"
-            testId="autopost-filter-sector"
-            options={sectors.map((x) => ({ value: x.value ?? NONE_KEY, label: x.label }))}
-          />
-        </div>
-        <div className="space-y-1">
-          <Label className="text-xs text-muted-foreground">จังหวัด</Label>
-          <FieldSelect
-            value={prov || ALL_PROVINCES}
-            onChange={(v) => setProvince(v === ALL_PROVINCES ? '' : v)}
-            ariaLabel="จังหวัดของกลุ่ม"
-            testId="autopost-filter-province"
-            options={[{ value: ALL_PROVINCES, label: 'ทุกจังหวัด' }, ...provinces.map((p) => ({ value: p, label: p }))]}
-          />
-        </div>
-      </div>
-
-      <div className="rounded-xl border border-border/70">
-        <div className="flex items-center gap-2 border-b border-border/70 px-3 py-2">
-          <Checkbox
-            id={`autopost-all-${jobId}`}
-            checked={n === 0 ? false : n === ids.length ? true : 'indeterminate'}
-            disabled={ids.length === 0}
-            onCheckedChange={(v) => onToggle(ids, v === true)}
-            aria-label="เลือกทุกกลุ่มในรายการนี้"
-          />
-          <Label htmlFor={`autopost-all-${jobId}`} className="flex-1 text-sm font-medium tabular-nums text-foreground" data-testid="autopost-list-head">
-            โพสต์ได้ {NUM.format(ids.length)} กลุ่ม · เลือก {NUM.format(n)}
-          </Label>
-        </div>
-        {list.length === 0 ? (
-          <p className="px-3 py-2 text-sm text-muted-foreground">ไม่มีกลุ่มที่โพสต์ได้ในตัวเลือกนี้</p>
-        ) : (
-          <ul className="max-h-96 space-y-2 overflow-y-auto px-3 py-2">
-            {list.map((g) => (
-              // ติ๊กครบเพดานแล้ว = แถวที่ยังไม่ติ๊กเป็นสีเทา (สเปค 6.2)
-              <li key={g.id} className={cn('flex items-start gap-2', full && !picked.includes(g.id) && 'opacity-50')} data-testid="autopost-group-row">
-                <Checkbox
-                  id={`autopost-group-${jobId}-${g.id}`}
-                  checked={picked.includes(g.id)}
-                  disabled={full && !picked.includes(g.id)}
-                  onCheckedChange={(v) => onToggle([g.id], v === true)}
-                  className="mt-0.5"
-                />
-                <div className="min-w-0 space-y-0.5">
-                  <Label htmlFor={`autopost-group-${jobId}-${g.id}`} className="block text-sm font-normal text-foreground">
-                    {soGroupLabel(g, allGroups)}
-                    {/* สถานะเป็นคำจาก So Scraping เสมอ (ไม่บอกด้วยสีอย่างเดียว) */}
-                    <span className={cn('font-medium', DASH.muted)} data-testid="autopost-group-state">
-                      {' — '}
-                      {soGroupView(g, account).label}
-                    </span>
-                  </Label>
-                  <p className={cn('text-xs', DASH.muted)}>
-                    {[
-                      prov && !g.provinces.includes(prov) && g.nationwide ? 'ทั่วประเทศ' : null,
-                      soGroupStatsText(g.stats30d),
-                      g.lastPostedAt ? `โพสต์ล่าสุด ${WHEN.format(new Date(g.lastPostedAt))}` : null,
-                      recent.has(g.id) ? 'ใบนี้เพิ่งสั่งโพสต์กลุ่มนี้ใน 3 วัน' : null,
-                    ]
-                      .filter(Boolean)
-                      .join(' · ')}
-                  </p>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-    </div>
-  );
 }

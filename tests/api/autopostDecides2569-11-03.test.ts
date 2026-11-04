@@ -138,7 +138,7 @@ describe('6.4 กดสั่งแล้วมีกลุ่มถูกข้
 
 describe('ป๊อป Autopost ใช้ตัวตัดสินชุดนี้', () => {
   it('บัญชี/เครื่อง/กลุ่มตั้งต้น · ตัวนับเลือกแล้ว N/M · กลุ่มเพิ่งลงบอกเวลา · ไม่มีบัญชีพร้อมบอกเวลา', () => {
-    const src = readFileSync('src/components/jobs/AutopostDialog.tsx', 'utf8');
+    const src = (readFileSync('src/components/jobs/AutopostDialog.tsx', 'utf8') + readFileSync('src/components/jobs/SoGroupPicker.tsx', 'utf8')) /* 4 พ.ย. 2569 ตัวเลือกกลุ่มย้ายเป็นชิ้นกลาง */;
     expect(src).toContain('fetchSoOptions(job.request_no)');
     expect(src).toContain("soDefaultWorker(soWorkersFor(o, 'autopost'), 'post')");
     expect(src).toContain('เลือกแล้ว {NUM.format(picked.length)}/{NUM.format(cap)}');

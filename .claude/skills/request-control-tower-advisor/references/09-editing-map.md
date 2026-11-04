@@ -14263,3 +14263,4 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
   - `AutopostDialog`: ถอด `GroupSection` (หมวดธุรกิจ + หัวข้อย่อยพับ) → `GroupFilterPicker` 3 ช่องเลือก + ติ๊กทั้งรายการ (ไม่เกินเพดาน) · กลุ่มที่ต้องไปแก้เอง/เพิ่งลงไม่ขึ้นแล้ว (ไม่มีลิงก์ "เปิดกลุ่ม")
   - Gen link (`SoGroupPicker`) ยังเป็นหมวด + หัวข้อย่อยราชการ/เอกชนแบบเดิม
   - เทสต์ `tests/api/autopostJourney2569-11-04.test.ts`
+  - **Gen link ใช้ตัวเลือกเดียวกัน** (เจ้าของ 4 พ.ย. 2569 "Gen link ทำแบบเดียวกันด้วย") — ย้าย `GroupFilterPicker` จาก AutopostDialog เป็น `SoGroupFilterPicker` ใน `SoGroupPicker.tsx` (prop `idPrefix` · `testPrefix` autopost|genlink · `account` null = ซ่อนแค่กลุ่มแอดมินพัก · `cap` null = ไม่จำกัด) · `SoGroupPicker` (Gen link / Gen link เพิ่ม) = ตัวนี้แบบไม่มีบัญชี · ถอด `SoSectorFold` / หมวดธุรกิจพับ · Gen link โหลดกลุ่มจาก `fetchSoOptions()` (มีสถานะแอดมินพัก + จังหวัด) แทน `fetchSoGroups`

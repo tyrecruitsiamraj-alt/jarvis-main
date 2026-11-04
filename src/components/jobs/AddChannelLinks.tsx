@@ -3,8 +3,8 @@ import { copyText } from '@/lib/copyText';
 import { Check, Copy, Link2, Loader2 } from 'lucide-react';
 import MultiChannelPicker from '@/components/shared/MultiChannelPicker';
 import SoGroupPicker from '@/components/jobs/SoGroupPicker';
-import { fetchSoGroups } from '@/lib/jobPostingRequestsApi';
-import { isFacebookGroupChannel, soGroupLinkKey, soGroupLinkLabel, soGroupLinkName, type SoGroup } from '@/lib/soScraping';
+import { fetchSoOptions } from '@/lib/jobPostingRequestsApi';
+import { isFacebookGroupChannel, soGroupLinkKey, soGroupLinkLabel, soGroupLinkName, type SoOptGroup } from '@/lib/soScraping';
 import { Button } from '@/components/ui/button';
 import { addPostingLink } from '@/lib/recruitPostingsApi';
 import type { UnitSector } from '@/lib/unitSector';
@@ -56,7 +56,7 @@ const AddChannelLinks: React.FC<{
   onCreated?: () => void;
 }> = ({ posting, jobBu = null, jobSector = null, onCreated }) => {
   const [picked, setPicked] = React.useState<RecruitChannelMatch[]>([]);
-  const [soGroups, setSoGroups] = React.useState<SoGroup[] | null>(null);
+  const [soGroups, setSoGroups] = React.useState<SoOptGroup[] | null>(null);
   const [groupPick, setGroupPick] = React.useState<string[]>([]);
   const [busy, setBusy] = React.useState(false);
   const [done, setDone] = React.useState<RecruitPostingLink[]>([]);
@@ -69,8 +69,9 @@ const AddChannelLinks: React.FC<{
   React.useEffect(() => {
     if (!needGroups) return;
     let alive = true;
-    fetchSoGroups()
-      .then((g) => alive && setSoGroups(g))
+    // กลุ่ม + สถานะกลุ่ม (แอดมินพัก) + จังหวัด จาก options ของ So Scraping — ตัวเดียวกับป๊อป Autopost (4 พ.ย. 2569)
+    fetchSoOptions()
+      .then((o) => alive && setSoGroups(o.groups))
       .catch((e: unknown) => {
         if (!alive) return;
         setSoGroups([]);
