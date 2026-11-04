@@ -1,9 +1,8 @@
 import React from 'react';
-import { ChevronDown, LoaderCircle, Send } from 'lucide-react';
+import { LoaderCircle, Send } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -15,7 +14,6 @@ import { DASH, TONE } from '@/lib/designTokens';
 import type { JobRequest } from '@/types';
 import { useRecruiterContact } from '@/hooks/useRecruiterContact';
 import { jobBoardCardTitle, jobUnitSectorOf } from '@/lib/unitRequestDisplay';
-import { SoSectorFold } from '@/components/jobs/SoGroupPicker';
 import type { UnitSector } from '@/lib/unitSector';
 import { publicJobTitle } from '@/lib/publicJobTitle';
 import { addPostingLink, createRecruitPosting, fetchRecruitPostings, searchRecruitChannels } from '@/lib/recruitPostingsApi';
@@ -43,21 +41,24 @@ import {
   soAccountSelectable,
   soGroupLabel,
   soGroupsOfAccount,
-  soGroupSections,
   jobBuOf,
   soBuEmptyText,
   isFacebookGroupChannel,
   soGroupLinkKey,
-  soSectorBlocks,
   soGroupLinkLabel,
   soGroupLinkName,
   soGroupLinkOf,
   type SoGroupLink,
   soGroupView,
-  soSectionHeadText,
   soBuNoAccountText,
   soAccountsByBu,
   soAccountsForJob,
+  soAccountUsable,
+  soFilterBus,
+  soFilterGroups,
+  soFilterProvinces,
+  soFilterSectors,
+  soGroupUsable,
   soAccountChoice,
   soAccountStatusText,
   soAddWithinCap,
@@ -65,7 +66,6 @@ import {
   soDefaultWorker,
   soGroupCap,
   soNoAccountReadyText,
-  soRepostWaitText,
   soWorkerOfflineText,
   type SoGroupSection,
   soPostSnapshot,
@@ -235,7 +235,6 @@ export function AutopostBody({
         : [],
     [opts, account],
   );
-  const sections = React.useMemo(() => soGroupSections(accountGroups, jobBu), [accountGroups, jobBu]);
   const postWorkers = opts ? soWorkersFor(opts, 'autopost') : [];
   const worker = postWorkers.find((w) => w.name === workerName) ?? null;
   const recent = new Set(state?.recentGroups ?? []);
@@ -427,7 +426,8 @@ export function AutopostBody({
                   placeholder="เลือกบัญชี"
                   ariaLabel="บัญชี Facebook"
                   testId="autopost-account"
-                  options={soAccountsByBu(opts.accounts, jobBu).map(({ account: a, group }) => {
+                  // ขึ้นเฉพาะบัญชีที่ใช้ได้ — โดนพัก ครบโควต้า รอยืนยันตัวตน ไม่มีเครื่อง = ซ่อน (เจ้าของ 4 พ.ย. 2569 "เลือกเฉพาะที่ใช้ได้")
+                  options={soAccountsByBu(opts.accounts.filter((a) => soAccountUsable(a.status)), jobBu).map(({ account: a, group }) => {
                     // คำสถานะ + สี (สเปค 6.1 · ห้ามใช้สีอย่างเดียว)
                     const c = soAccountChoice(a, opts.workers);
                     return { value: a.id, label: c.label, disabled: c.disabled, className: TONE[c.tone].value, group };
@@ -471,30 +471,19 @@ export function AutopostBody({
             {!account ? null : accountGroups.length === 0 ? (
               <p className={cn('text-sm', TONE.warn.value)}>บัญชีนี้ยังไม่มีกลุ่ม ให้เพิ่มที่ระบบ So Scraping</p>
             ) : (
-              <div className="space-y-2" data-testid="autopost-groups">
-                {/* หมวดตามธุรกิจ (เจ้าของ 2 พ.ย. 2569): ธุรกิจของใบขอกางและติ๊กให้ครบ · ที่เหลือพับ ไม่ติ๊ก */}
-                {jobBu && !sections.some((x) => x.forJob) ? (
-                  <p className={cn('text-sm', TONE.warn.value)} data-testid="autopost-bu-empty">
-                    {soBuEmptyText(jobBu)}
-                  </p>
-                ) : null}
-                {!jobBu ? <p className={cn('text-sm', TONE.warn.value)}>ใบขอนี้ไม่ระบุธุรกิจ — เลือกกลุ่มเอง</p> : null}
-                {sections.map((sec) => (
-                  <GroupSection
-                    key={sec.bu ?? '__none__'}
-                    defaultOpen={sec.forJob || sections.length === 1}
-                    jobId={job.id}
-                    section={sec}
-                    allGroups={opts?.groups ?? []}
-                    jobSector={jobSector}
-                    account={account}
-                    picked={picked}
-                    recent={recent}
-                    cap={cap}
-                    onToggle={(ids, on) => setPicked((prev) => (on ? soAddWithinCap(prev, ids, cap) : prev.filter((x) => !ids.includes(x))))}
-                  />
-                ))}
-              </div>
+              <GroupFilterPicker
+                key={account.id}
+                jobId={job.id}
+                groups={accountGroups}
+                allGroups={opts?.groups ?? []}
+                jobBu={jobBu}
+                jobSector={jobSector}
+                account={account}
+                picked={picked}
+                recent={recent}
+                cap={cap}
+                onToggle={(ids, on) => setPicked((prev) => (on ? soAddWithinCap(prev, ids, cap) : prev.filter((x) => !ids.includes(x))))}
+              />
             )}
           </section>
 
@@ -671,12 +660,19 @@ export function firstAccount(list: readonly SoOptAccount[]): SoOptAccount | null
   return null;
 }
 
-/** หมวดกลุ่มตามธุรกิจ — ช่องติ๊กที่หัวเลือก/เอาออกทั้งหมวด · หมวดธุรกิจของใบขอเปิดอยู่ ที่เหลือพับ */
-function GroupSection({
-  defaultOpen,
+const NONE_KEY = '__none__';
+const ALL_PROVINCES = '__all__';
+
+/**
+ * 2 · กลุ่ม Facebook — ธุรกิจ → เอกชน/ราชการ → จังหวัด (ไม่เลือก = ทุกจังหวัด) แล้วติ๊กกลุ่ม (เจ้าของ 4 พ.ย. 2569 Journey)
+ * ขึ้นเฉพาะกลุ่มที่โพสต์ได้ด้วยบัญชีนี้ (`soGroupUsable`) — แอดมินพัก · ห้ามโพสต์ · ต้องตอบคำถาม · ใบนี้เพิ่งลง = ไม่ขึ้น
+ * ค่าตั้งต้น = ธุรกิจ/ประเภทของใบขอ (ถ้ามีกลุ่ม) · ช่องติ๊กทั้งรายการไม่เกินโพสต์ที่บัญชีเหลือ
+ */
+function GroupFilterPicker({
   jobId,
-  section,
+  groups,
   allGroups,
+  jobBu,
   jobSector,
   account,
   picked,
@@ -684,63 +680,107 @@ function GroupSection({
   cap,
   onToggle,
 }: {
-  /** กางไว้ตอนเปิด: ธุรกิจของใบขอ หรือมีหมวดเดียว (ตรงกับป๊อป Gen link) */
-  defaultOpen: boolean;
   jobId: string;
-  section: SoGroupSection;
+  /** กลุ่มที่บัญชีนี้โพสต์ได้ (ก่อนกรองสถานะ) เรียงโพสต์ได้ 30 วันมากไปน้อย */
+  groups: readonly SoOptGroup[];
   /** ทุกกลุ่ม — ชื่อซ้ำต่อท้ายรหัสกลุ่ม ตรงกับชื่อบนลิงก์ */
   allGroups: readonly SoOptGroup[];
-  /** ราชการ/เอกชนของใบขอ — หัวข้อย่อยประเภทเดียวกับใบขอขึ้นก่อน */
+  jobBu: string | null;
   jobSector: UnitSector | null;
-  /** ติ๊กได้สูงสุด (โพสต์ที่บัญชีเหลือวันนี้) · null = ไม่จำกัด */
-  cap: number | null;
-  /** บัญชีที่เลือก — สถานะกลุ่มคิดจากบัญชีนี้ (สลับบัญชี = สถานะเปลี่ยน) */
   account: SoOptAccount | null;
   picked: readonly string[];
   recent: ReadonlySet<string>;
+  /** ติ๊กได้สูงสุด (โพสต์ที่บัญชีเหลือวันนี้) · null = ไม่จำกัด */
+  cap: number | null;
   onToggle: (ids: string[], on: boolean) => void;
 }) {
-  const [open, setOpen] = React.useState(defaultOpen);
+  const usable = React.useMemo(() => groups.filter((g) => soGroupUsable(g, account)), [groups, account]);
+  const [buPick, setBuPick] = React.useState<string | null | undefined>(undefined);
+  const [sectorPick, setSectorPick] = React.useState<UnitSector | null | undefined>(undefined);
+  const [province, setProvince] = React.useState('');
+
+  // ค่าที่ใช้จริง = ที่เลือกไว้ถ้ายังมีในตัวเลือก ไม่งั้นค่าตั้งต้น (ของใบขอ → ตัวแรก)
+  const bus = soFilterBus(usable, jobBu);
+  const has = <T,>(list: readonly { value: T }[], v: T | undefined) => v !== undefined && list.some((x) => x.value === v);
+  const bu = has(bus, buPick) ? (buPick as string | null) : has(bus, jobBu) ? jobBu : (bus[0]?.value ?? null);
+  const sectors = soFilterSectors(usable, bu, jobSector);
+  const sector = has(sectors, sectorPick) ? (sectorPick as UnitSector | null) : has(sectors, jobSector) ? jobSector : (sectors[0]?.value ?? null);
+  const provinces = soFilterProvinces(usable, bu, sector);
+  const prov = provinces.includes(province) ? province : '';
+  const list = soFilterGroups(usable, { bu, sector, province: prov });
+
+  const ids = list.map((g) => g.id);
+  const n = ids.filter((id) => picked.includes(id)).length;
   /** ติ๊กครบเพดานแล้ว — ช่องที่ยังไม่ติ๊กเป็นสีเทา กดไม่ได้ (เอาออกได้เสมอ) */
   const full = cap !== null && picked.length >= cap;
+
+  if (usable.length === 0) {
+    return (
+      <p className={cn('rounded-xl border border-border/70 px-3 py-2 text-sm', TONE.warn.value)} data-testid="autopost-no-usable-group">
+        ไม่มีกลุ่มที่บัญชีนี้โพสต์ได้ตอนนี้ — เลือกบัญชีอื่น
+      </p>
+    );
+  }
   return (
-    <Collapsible open={open} onOpenChange={setOpen} className="rounded-xl border border-border/70" data-testid={`autopost-bu-${section.bu ?? 'none'}`}>
-      {/* ช่องติ๊กทั้งหมดย้ายไปหัวข้อย่อย ราชการ / เอกชน (เจ้าของ 4 พ.ย. 2569 · ติ๊กหัวธุรกิจเดียวได้ 2,437 กลุ่ม) */}
-      <div className="flex items-center gap-2 px-3 py-2">
-        <p className="flex-1 text-sm font-medium tabular-nums text-foreground" data-testid="autopost-bu-head">
-          {soSectionHeadText(section, picked, account)}
+    <div className="space-y-2" data-testid="autopost-groups">
+      {jobBu && !bus.some((b) => b.value === jobBu) ? (
+        <p className={cn('text-sm', TONE.warn.value)} data-testid="autopost-bu-empty">
+          {soBuEmptyText(jobBu)}
         </p>
-        <CollapsibleTrigger asChild>
-          <Button type="button" size="xs" variant="ghost" aria-label={open ? `พับ ${section.label}` : `กาง ${section.label}`}>
-            {open ? 'พับ' : 'กาง'}
-            <ChevronDown className={cn('transition-transform', open && 'rotate-180')} aria-hidden />
-          </Button>
-        </CollapsibleTrigger>
+      ) : null}
+      <div className="grid gap-2 sm:grid-cols-3">
+        <div className="space-y-1">
+          <Label className="text-xs text-muted-foreground">ธุรกิจ</Label>
+          <FieldSelect
+            value={bu ?? NONE_KEY}
+            onChange={(v) => setBuPick(v === NONE_KEY ? null : v)}
+            ariaLabel="ธุรกิจของกลุ่ม"
+            testId="autopost-filter-bu"
+            options={bus.map((b) => ({ value: b.value ?? NONE_KEY, label: b.label }))}
+          />
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs text-muted-foreground">เอกชน / ราชการ</Label>
+          <FieldSelect
+            value={sector ?? NONE_KEY}
+            onChange={(v) => setSectorPick(v === NONE_KEY ? null : (v as UnitSector))}
+            ariaLabel="เอกชนหรือราชการ"
+            testId="autopost-filter-sector"
+            options={sectors.map((x) => ({ value: x.value ?? NONE_KEY, label: x.label }))}
+          />
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs text-muted-foreground">จังหวัด</Label>
+          <FieldSelect
+            value={prov || ALL_PROVINCES}
+            onChange={(v) => setProvince(v === ALL_PROVINCES ? '' : v)}
+            ariaLabel="จังหวัดของกลุ่ม"
+            testId="autopost-filter-province"
+            options={[{ value: ALL_PROVINCES, label: 'ทุกจังหวัด' }, ...provinces.map((p) => ({ value: p, label: p }))]}
+          />
+        </div>
       </div>
-      <CollapsibleContent>
-        <div className="space-y-3 border-t border-border/70 px-3 py-2">
-          {/* แยก ราชการ / เอกชน ในหมวดธุรกิจ (เจ้าของ 4 พ.ย. 2569) */}
-          {soSectorBlocks(section.groups, jobSector).map((block) => (
-            <SoSectorFold
-              key={block.sector ?? 'none'}
-              label={block.label}
-              ids={block.groups.map((g) => g.id)}
-              picked={picked}
-              onToggle={onToggle}
-              checkId={`autopost-sector-${jobId}-${section.bu ?? 'none'}-${block.sector ?? 'none'}`}
-              testId={`autopost-sector-${block.sector ?? 'none'}`}
-            >
-              <ul className="space-y-2">
-          {block.groups.map((g) => {
-            // สถานะเป็นคำจาก So Scraping เสมอ (ไม่บอกด้วยสีอย่างเดียว) · ไม่ควรติ๊ก = ไม่ติ๊กให้ แต่ไม่ล็อก
-            const view = soGroupView(g, account);
-            return (
+
+      <div className="rounded-xl border border-border/70">
+        <div className="flex items-center gap-2 border-b border-border/70 px-3 py-2">
+          <Checkbox
+            id={`autopost-all-${jobId}`}
+            checked={n === 0 ? false : n === ids.length ? true : 'indeterminate'}
+            disabled={ids.length === 0}
+            onCheckedChange={(v) => onToggle(ids, v === true)}
+            aria-label="เลือกทุกกลุ่มในรายการนี้"
+          />
+          <Label htmlFor={`autopost-all-${jobId}`} className="flex-1 text-sm font-medium tabular-nums text-foreground" data-testid="autopost-list-head">
+            โพสต์ได้ {NUM.format(ids.length)} กลุ่ม · เลือก {NUM.format(n)}
+          </Label>
+        </div>
+        {list.length === 0 ? (
+          <p className="px-3 py-2 text-sm text-muted-foreground">ไม่มีกลุ่มที่โพสต์ได้ในตัวเลือกนี้</p>
+        ) : (
+          <ul className="max-h-96 space-y-2 overflow-y-auto px-3 py-2">
+            {list.map((g) => (
               // ติ๊กครบเพดานแล้ว = แถวที่ยังไม่ติ๊กเป็นสีเทา (สเปค 6.2)
-              <li
-                key={g.id}
-                className={cn('flex items-start gap-2', full && !picked.includes(g.id) && 'opacity-50')}
-                data-testid="autopost-group-row"
-              >
+              <li key={g.id} className={cn('flex items-start gap-2', full && !picked.includes(g.id) && 'opacity-50')} data-testid="autopost-group-row">
                 <Checkbox
                   id={`autopost-group-${jobId}-${g.id}`}
                   checked={picked.includes(g.id)}
@@ -751,47 +791,28 @@ function GroupSection({
                 <div className="min-w-0 space-y-0.5">
                   <Label htmlFor={`autopost-group-${jobId}-${g.id}`} className="block text-sm font-normal text-foreground">
                     {soGroupLabel(g, allGroups)}
-                    <span className={cn('font-medium', view.recommended ? DASH.muted : TONE.warn.value)} data-testid="autopost-group-state">
+                    {/* สถานะเป็นคำจาก So Scraping เสมอ (ไม่บอกด้วยสีอย่างเดียว) */}
+                    <span className={cn('font-medium', DASH.muted)} data-testid="autopost-group-state">
                       {' — '}
-                      {view.label}
+                      {soGroupView(g, account).label}
                     </span>
                   </Label>
-                  {g.repostWait ? (
-                    // ใบนี้เพิ่งลงกลุ่มนี้ไม่ถึง 2 วัน (สเปค 6.2) — ไม่ติ๊กให้ · ติ๊กเองได้แต่รอบนี้ So Scraping จะข้าม
-                    <p className={cn('text-xs', DASH.muted)} data-testid="autopost-group-repost-wait">
-                      {soRepostWaitText(g.repostWait)}
-                    </p>
-                  ) : null}
-                  {view.detail || view.url ? (
-                    <p className="flex flex-wrap items-center gap-x-2 text-xs">
-                      {view.detail ? <span className={DASH.muted}>{view.detail}</span> : null}
-                      {view.url ? (
-                        <Button asChild type="button" size="xs" variant="link" className="h-auto p-0">
-                          <a href={view.url} target="_blank" rel="noopener noreferrer" data-testid="autopost-group-open">
-                            เปิดกลุ่ม
-                          </a>
-                        </Button>
-                      ) : null}
-                    </p>
-                  ) : null}
                   <p className={cn('text-xs', DASH.muted)}>
                     {[
+                      prov && !g.provinces.includes(prov) && g.nationwide ? 'ทั่วประเทศ' : null,
                       soGroupStatsText(g.stats30d),
                       g.lastPostedAt ? `โพสต์ล่าสุด ${WHEN.format(new Date(g.lastPostedAt))}` : null,
-                      !g.repostWait && recent.has(g.id) ? 'ใบนี้เพิ่งสั่งโพสต์กลุ่มนี้ใน 3 วัน' : null,
+                      recent.has(g.id) ? 'ใบนี้เพิ่งสั่งโพสต์กลุ่มนี้ใน 3 วัน' : null,
                     ]
                       .filter(Boolean)
                       .join(' · ')}
                   </p>
                 </div>
               </li>
-            );
-          })}
-              </ul>
-            </SoSectorFold>
-          ))}
-        </div>
-      </CollapsibleContent>
-    </Collapsible>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
   );
 }

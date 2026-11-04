@@ -10,6 +10,7 @@ import { dbQuery, isPgUndefinedTable } from './postgres.js';
 import { tableInAppSchema } from './schema.js';
 import { decryptApiKey, encryptApiKey } from './aiSettingsStore.js';
 import { listSoAccountDepartments, listSoGroups, listSoAccounts, listSoWorkers } from './soScrapingGroups.js';
+import { soProvincesOf } from '../../src/lib/soScraping.js';
 import { parseSoOptions, withSoDepartments, type SoOptions } from '../../src/lib/soScraping.js';
 
 const KEYS = tableInAppSchema('app_outbound_api_keys');
@@ -138,7 +139,7 @@ async function optionsFromDb(): Promise<SoOptions> {
         groupStatus: [],
       };
     }),
-    groups: groups.map((g) => ({ id: g.id, fbGroupId: null, name: g.name, url: null, accountIds: [], lastPostedAt: null, stats30d: null, department: g.department, sector: g.sector ?? null, blocked: null, repostWait: null })),
+    groups: groups.map((g) => ({ id: g.id, fbGroupId: null, name: g.name, url: null, accountIds: [], lastPostedAt: null, stats30d: null, department: g.department, sector: g.sector ?? null, ...soProvincesOf(g.province), blocked: null, repostWait: null })),
     // ฐานเดิมอ่านแค่เครื่องโพสต์ (kind autopost)
     workers: workers.map((w) => ({
       name: w.name,

@@ -220,8 +220,9 @@ describe('กลุ่ม Facebook ตามธุรกิจของใบข
     const dialog = readFileSync('src/components/jobs/AutopostDialog.tsx', 'utf8');
     // 4 พ.ย. 2569 ไม่ติ๊กให้ — สลับบัญชีคงกลุ่มเดิมเท่าที่บัญชีนี้โพสต์ได้
     expect(dialog).toContain('setPicked((prev) => soAddWithinCap([], prev.filter((id) => allowed.has(id)), soGroupCap(a)));');
-    expect(dialog).toContain('const view = soGroupView(g, account);');
-    expect(dialog).toContain('target="_blank" rel="noopener noreferrer" data-testid="autopost-group-open"');
+    // 4 พ.ย. 2569 Journey — ขึ้นเฉพาะกลุ่มที่โพสต์ได้ สถานะยังเป็นคำจาก So Scraping · กลุ่มที่ต้องไปแก้เอง (มีลิงก์เปิดกลุ่ม) ไม่ขึ้นแล้ว
+    expect(dialog).toContain('{soGroupView(g, account).label}');
+    expect(dialog).not.toContain('data-testid="autopost-group-open"');
     const opts = readFileSync('api/_lib/soScrapingOptions.ts', 'utf8');
     expect(opts).toContain('groupStatus: [],');
     expect(opts).toContain('blocked: null, repostWait: null })),');

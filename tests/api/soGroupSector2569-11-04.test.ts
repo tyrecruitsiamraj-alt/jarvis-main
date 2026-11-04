@@ -24,6 +24,8 @@ const g = (id: string, sector: SoOptGroup['sector'], posted = 1): SoOptGroup => 
   stats30d: { attempts: posted, posted, comments: 0, phoneLeads: 0 },
   department: 'LBD',
   sector,
+  provinces: [],
+  nationwide: false,
   blocked: null,
   repostWait: null,
 });
@@ -77,7 +79,8 @@ describe('จอและฐาน', () => {
 
   it('ป๊อป Autopost และ Gen link แบ่งหัวข้อย่อย · ไม่ติ๊กกลุ่มให้ · หัวข้อย่อยพับไว้ตอนเปิด (เจ้าของ 4 พ.ย. 2569)', () => {
     const ap = readFileSync('src/components/jobs/AutopostDialog.tsx', 'utf8');
-    expect(ap).toContain('soSectorBlocks(section.groups, jobSector)');
+    // 4 พ.ย. 2569 Journey: Autopost เปลี่ยนเป็นช่องเลือก ธุรกิจ → เอกชน/ราชการ → จังหวัด (autopostJourney2569-11-04) · Gen link ยังเป็นหัวข้อย่อย
+    expect(ap).toContain('testId="autopost-filter-sector"');
     expect(ap).not.toContain('defaultSoGroupPick');
     expect(readFileSync('src/lib/soScraping.ts', 'utf8')).not.toContain('export function defaultSoGroupPick');
     expect(readFileSync('src/components/jobs/SoGroupPicker.tsx', 'utf8')).toContain('const [open, setOpen] = React.useState(false);');
@@ -86,9 +89,9 @@ describe('จอและฐาน', () => {
     expect(readFileSync('src/components/jobs/ApplyLinksPanel.tsx', 'utf8')).toContain('jobSector={jobUnitSectorOf(job)}');
   });
 
-  it('หมวดธุรกิจกางไว้ตอนเปิดเมื่อเป็นธุรกิจของใบ หรือมีหมวดเดียว — ทั้ง Gen link และ Autopost (4 พ.ย. 2569 หมวดเดียวเคยพับ ไม่เห็นราชการ/เอกชน)', () => {
+  it('หมวดธุรกิจกางไว้ตอนเปิดเมื่อเป็นธุรกิจของใบ หรือมีหมวดเดียว — ป๊อป Gen link (4 พ.ย. 2569 หมวดเดียวเคยพับ ไม่เห็นราชการ/เอกชน)', () => {
     expect(readFileSync('src/components/jobs/SoGroupPicker.tsx', 'utf8')).toContain('defaultOpen={sec.forJob || sections.length === 1}');
-    expect(readFileSync('src/components/jobs/AutopostDialog.tsx', 'utf8')).toContain('defaultOpen={sec.forJob || sections.length === 1}');
+
   });
 
   it('ช่องติ๊กทั้งหมดอยู่ที่หัวข้อย่อย ราชการ / เอกชน ไม่ใช่หัวธุรกิจ (เจ้าของ 4 พ.ย. 2569 · ติ๊กหัว LBD เดียวได้ 212 ลิงก์)', () => {
@@ -97,7 +100,7 @@ describe('จอและฐาน', () => {
     expect(picker).toContain('aria-label={`เลือกทุกกลุ่ม${label}`}');
     expect(picker).not.toContain('เลือกทุกกลุ่มของ ${section.label}');
     expect(ap).not.toContain('เลือกทุกกลุ่มของ ${section.label}');
-    // Autopost ติ๊กทั้งหัวข้อยังไม่เกินเพดานบัญชี (onToggle เดิม = soAddWithinCap)
-    expect(ap).toContain('picked={picked}\n              onToggle={onToggle}');
+    // Autopost ติ๊กทั้งรายการที่กรองแล้ว ไม่เกินเพดานบัญชี (onToggle = soAddWithinCap)
+    expect(ap).toContain('aria-label="เลือกทุกกลุ่มในรายการนี้"');
   });
 });

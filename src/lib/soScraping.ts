@@ -269,6 +269,10 @@ export type SoOptGroup = {
   department: string | null;
   /** ราชการ/เอกชน (4 พ.ย. 2569 · `soGroupSectorOf`) · null = ยังไม่ระบุ */
   sector: UnitSector | null;
+  /** จังหวัดที่กลุ่มล็อกไว้ (So Scraping `provinces` · ไม่รวม "ทั่วประเทศ") · [] = ยังไม่ระบุ */
+  provinces: string[];
+  /** กลุ่มทั่วประเทศ — เลือกจังหวัดแล้วขึ้นต่อท้ายกลุ่มของจังหวัดนั้น */
+  nationwide: boolean;
   /** กลุ่มโดนพัก ทุกบัญชีโพสต์ไม่ได้ · null = ไม่ติด */
   blocked: SoGroupBlock | null;
   /** ใบขอนี้เพิ่งลงกลุ่มนี้ไม่ถึง 2 วัน (ส่ง ?request_no=) — ติ๊กได้แต่รอบนี้ So Scraping ข้าม · null = ลงได้ (สเปค 6.2) */
@@ -643,6 +647,52 @@ export function soSectorBlocks<G extends { sector?: UnitSector | null }>(groups:
     .filter((b) => b.groups.length > 0);
 }
 
+/** จังหวัดจากช่อง province ของฐาน So Scraping ("กรุงเทพมหานคร, สมุทรปราการ" · "ทั่วประเทศ") — ทางถอยตอนไม่มี options API */
+export function soProvincesOf(province: string | null | undefined): { provinces: string[]; nationwide: boolean } {
+  const parts = String(province ?? '').split(/[,،]/).map((v) => v.trim()).filter(Boolean);
+  return { provinces: parts.filter((v) => v !== 'ทั่วประเทศ'), nationwide: parts.includes('ทั่วประเทศ') };
+}
+
+/* ═══ Journey เลือกบัญชี/กลุ่มในป๊อป Autopost (เจ้าของ 4 พ.ย. 2569 · "หลักการคือ เลือกเฉพาะที่ใช้ได้") ═══
+ * 1 บัญชี: ขึ้นเฉพาะบัญชีที่ใช้ได้ (โดนพัก ฯลฯ ซ่อน) · 2 กลุ่ม: ธุรกิจ → เอกชน/ราชการ → จังหวัด (ไม่เลือก = ทุกจังหวัด)
+ * รายการกลุ่มขึ้นเฉพาะที่โพสต์ได้ด้วยบัญชีนี้ (แอดมินพัก · ห้ามโพสต์ · ต้องตอบคำถาม · ใบนี้เพิ่งลง = ไม่ขึ้น) · 3 เครื่อง
+ */
+/** บัญชีที่ขึ้นให้เลือก — พร้อม / มีงานค้างต่อคิวได้ / เครื่องหลักออฟไลน์ (เลือกเครื่องอื่นได้) · พัก ครบโควต้า รอยืนยันตัวตน ไม่มีเครื่อง = ซ่อน */
+export const soAccountUsable = (s: SoAccountStatus): boolean => s === 'ready' || s === 'busy' || s === 'worker_offline';
+
+/** กลุ่มที่โพสต์ได้ด้วยบัญชีนี้รอบนี้ — ไม่โดนพัก · สถานะของบัญชีไม่บอกว่าไม่ควร · ใบนี้ไม่ได้เพิ่งลง */
+export function soGroupUsable(g: Pick<SoOptGroup, 'id' | 'blocked' | 'repostWait'>, acc: Pick<SoOptAccount, 'groupStatus'> | null): boolean {
+  return !g.blocked && !g.repostWait && soGroupView(g, acc).recommended;
+}
+
+export type SoGroupFilter = { bu: string | null; sector: UnitSector | null; province: string };
+type FilterGroup = Pick<SoOptGroup, 'department' | 'sector' | 'provinces' | 'nationwide'>;
+
+/** ตัวเลือกธุรกิจ (มีกลุ่มอยู่จริง · ของใบขอก่อน) */
+export function soFilterBus(groups: readonly FilterGroup[], jobBu: string | null): { value: string | null; label: string }[] {
+  const keys = new Set(groups.map((g) => g.department ?? null));
+  return buOrder(keys, jobBu).map((bu) => ({ value: bu, label: bu ?? SO_BU_NONE_LABEL }));
+}
+
+/** ตัวเลือกเอกชน/ราชการ ของธุรกิจที่เลือก (มีกลุ่มอยู่จริง · ประเภทของใบขอก่อน) */
+export function soFilterSectors(groups: readonly FilterGroup[], bu: string | null, jobSector: UnitSector | null): { value: UnitSector | null; label: string }[] {
+  return soSectorBlocks(groups.filter((g) => (g.department ?? null) === bu), jobSector).map((b) => ({ value: b.sector, label: b.label }));
+}
+
+/** ตัวเลือกจังหวัดของธุรกิจ+ประเภทที่เลือก เรียงตามตัวอักษร */
+export function soFilterProvinces(groups: readonly FilterGroup[], bu: string | null, sector: UnitSector | null): string[] {
+  const set = new Set<string>();
+  for (const g of groups) if ((g.department ?? null) === bu && (g.sector ?? null) === sector) for (const p of g.provinces) set.add(p);
+  return [...set].sort((a, b) => a.localeCompare(b, 'th'));
+}
+
+/** กลุ่มตามตัวกรอง — เลือกจังหวัด = กลุ่มของจังหวัดนั้นก่อน แล้วกลุ่มทั่วประเทศต่อท้าย · ไม่เลือก = ทุกกลุ่ม */
+export function soFilterGroups<G extends FilterGroup>(groups: readonly G[], f: SoGroupFilter): G[] {
+  const base = groups.filter((g) => (g.department ?? null) === f.bu && (g.sector ?? null) === f.sector);
+  if (!f.province) return base;
+  return [...base.filter((g) => g.provinces.includes(f.province)), ...base.filter((g) => g.nationwide && !g.provinces.includes(f.province))];
+}
+
 /** หัวหมวด "LBD · ติ๊กไว้ 29 จาก 37 · ติด 8" — ติด = กลุ่มที่ไม่ควรติ๊กสำหรับบัญชีนี้ */
 export function soSectionHeadText(sec: Pick<SoGroupSection, 'label' | 'groups'>, picked: readonly string[], acc: Pick<SoOptAccount, 'groupStatus'> | null): string {
   const n = sec.groups.filter((g) => picked.includes(g.id)).length;
@@ -687,17 +737,24 @@ export function soAccountsForJob<A extends Pick<SoOptAccount, 'department'>>(acc
 export function withSoDepartments(
   o: SoOptions,
   db: {
-    groups: ReadonlyArray<{ id: string; department: string | null; sector?: UnitSector | null }>;
+    groups: ReadonlyArray<{ id: string; department: string | null; sector?: UnitSector | null; province?: string | null }>;
     accounts: ReadonlyArray<{ id: string; department: string | null }>;
   },
 ): SoOptions {
   const g = new Map(db.groups.map((x) => [x.id, normalizeTrendBu(x.department)]));
   // ราชการ/เอกชน: options API ยังไม่ส่ง — เติมจากรายชื่อกลุ่มในฐาน So Scraping (4 พ.ย. 2569)
   const sec = new Map(db.groups.map((x) => [x.id, x.sector ?? null]));
+  // จังหวัด: options API รุ่นก่อน 4 พ.ย. 2569 ยังไม่ส่ง — เติมจากช่อง province ในฐาน
+  const prov = new Map(db.groups.map((x) => [x.id, soProvincesOf(x.province)]));
   const a = new Map(db.accounts.map((x) => [x.id, normalizeTrendBu(x.department)]));
   return {
     ...o,
-    groups: o.groups.map((x) => ({ ...x, department: x.department ?? g.get(x.id) ?? null, sector: x.sector ?? sec.get(x.id) ?? null })),
+    groups: o.groups.map((x) => ({
+      ...x,
+      department: x.department ?? g.get(x.id) ?? null,
+      sector: x.sector ?? sec.get(x.id) ?? null,
+      ...(x.provinces.length || x.nationwide ? {} : (prov.get(x.id) ?? {})),
+    })),
     accounts: o.accounts.map((x) => (x.department ? x : { ...x, department: a.get(x.id) ?? null })),
   };
 }
@@ -774,6 +831,8 @@ export function parseSoOptions(raw: unknown): SoOptions | null {
       lastPostedAt: str(g.last_posted_at),
       department: normalizeTrendBu(str(g.department)),
       sector: soGroupSectorOf(g.sector),
+      provinces: strs(g.provinces).map((p) => p.trim()),
+      nationwide: g.nationwide === true,
       blocked:
         g.blocked && typeof g.blocked === 'object' && str((g.blocked as Record<string, unknown>).label)
           ? (() => {

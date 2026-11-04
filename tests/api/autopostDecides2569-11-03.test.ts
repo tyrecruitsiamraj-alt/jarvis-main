@@ -144,7 +144,8 @@ describe('ป๊อป Autopost ใช้ตัวตัดสินชุดน
     expect(src).toContain('เลือกแล้ว {NUM.format(picked.length)}/{NUM.format(cap)}');
     expect(src).toContain('soAddWithinCap(prev, ids, cap)');
     expect(src).toContain('disabled={full && !picked.includes(g.id)}');
-    expect(src).toContain('{soRepostWaitText(g.repostWait)}');
+    // 4 พ.ย. 2569 Journey "เลือกเฉพาะที่ใช้ได้" — กลุ่มที่ใบนี้เพิ่งลง (repostWait) ไม่ขึ้นในรายการแล้ว (soGroupUsable)
+    expect(src).toContain('groups.filter((g) => soGroupUsable(g, account))');
     expect(src).toContain('{soNoAccountReadyText(opts.accounts)}');
   });
 });
