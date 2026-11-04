@@ -108,7 +108,9 @@ describe('QA หน้าภาพรวม 18 ต.ค. 2569 (แก้ทั้
     expect(ov).toContain("setState({ data: null, loading: false, error: friendlyErrorText(e, 'โหลดภาพรวมไม่ได้') })");
     expect(ov).toContain('<RefreshCw className={cn(state.loading && \'animate-spin\')} aria-hidden /> โหลดใหม่');
     const api = readFileSync('api/_handlers/recruit-overview.ts', 'utf8');
-    expect(api).toContain('toStaffRows(staffR.value, showedR.value, await loadStaffDisplay())');
+    // 4 พ.ย. 2569 ชื่อเล่นตัวเดียวกันใช้กับยอดแยกต่อใบขอด้วย (การ์ดตามตัวกรอง)
+    expect(api).toContain('const displayOf = await loadStaffDisplay();');
+    expect(api).toContain('body.staff = toStaffRows(staffR.value, showedR.value, displayOf);');
     expect(api).toContain("tableInAppSchema('application_cancellations')");
     expect(readFileSync('src/components/dashboard-trends/TrendParts.tsx', 'utf8')).toContain('const big = Math.abs(d) > 300;');
   });

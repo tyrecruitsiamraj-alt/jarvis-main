@@ -440,8 +440,21 @@ export function appsOfFilter(
   rows: readonly RecruitRequestRow[],
   recruiterOf: (jobId: string) => string | null | undefined,
 ): RecruitAppFact[] {
-  const byRows = isRowFilterActive(f) ? appsOfRequests(apps, rows) : [...apps];
-  if (!f.recruiter) return byRows;
-  const want = f.recruiter;
-  return byRows.filter((a) => a.jobId && recruiterMatch(recruiterOf(a.jobId), want));
+  const ok = jobFilterOf(f, rows, recruiterOf);
+  return apps.filter((a) => ok(a.jobId));
+}
+
+/**
+ * ใบขอนี้ผ่านตัวกรองบนสุดไหม — ตัวตัดสินเดียวของทั้งหน้า (รายชื่อ · งานค้าง · ผลงานรายคน · แจ้งเข้า · 4 พ.ย. 2569)
+ * ไม่กรอง = ผ่านทุกใบ (รวมใบสมัครที่ไม่ผูกใบขอ) · กรองอยู่ = ไม่ผูกใบขอไม่ผ่าน
+ */
+export function jobFilterOf(
+  f: RequestTabFilter,
+  rows: readonly RecruitRequestRow[],
+  recruiterOf: (jobId: string) => string | null | undefined,
+): (jobId: string | null | undefined) => boolean {
+  const rowIds = isRowFilterActive(f) ? new Set(rows.map((r) => r.jobId).filter((v): v is string => Boolean(v))) : null;
+  const want = f.recruiter ?? null;
+  if (!rowIds && !want) return () => true;
+  return (jobId) => Boolean(jobId) && (!rowIds || rowIds.has(jobId!)) && (!want || recruiterMatch(recruiterOf(jobId!), want));
 }

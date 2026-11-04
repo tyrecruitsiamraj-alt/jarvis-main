@@ -25,6 +25,7 @@ import {
   REQUEST_SECTOR_UNSET,
   appsOfChannelKey,
   appsOfFilter,
+  jobFilterOf,
   requestRecruiterOptions,
   applicantSuccessRanking,
   buildApplicantChannelRows,
@@ -193,6 +194,8 @@ export type RequestTabScope = {
   rows: RecruitRequestRow[] | null;
   prevRows: RecruitRequestRow[] | null;
   appsOf: (list: readonly RecruitAppFact[]) => RecruitAppFact[];
+  /** ใบขอนี้ผ่านตัวกรองบนสุดไหม — การ์ดที่นับแยกต่อใบขอ (งานค้าง · ผลงานรายคน · แจ้งเข้า) ใช้ตัวเดียวกับรายชื่อ */
+  jobOk: (jobId: string | null | undefined) => boolean;
 };
 
 /** ชื่อความเร่ง · `unknown` = ใบที่ไม่มีวันต้องการคน */
@@ -245,6 +248,7 @@ export default function RequestTab({
       rows: rows ? picked : null,
       prevRows: pickedPrev,
       appsOf: (list) => appsOfFilter(list, f, all, (jobId) => appJobs?.[jobId]?.recruiter ?? null),
+      jobOk: jobFilterOf(f, all, (jobId) => appJobs?.[jobId]?.recruiter ?? null),
     };
   }, [active, rows, picked, pickedPrev, f, appJobs]);
   const filteredApps = useMemo(() => scope.appsOf(apps), [scope, apps]);

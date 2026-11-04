@@ -13,7 +13,10 @@ import { ERP_SUB, UNKNOWN_CHANNEL, type ChannelPlacement } from '@/lib/channelPl
 const pct = (placed: number, registered: number) =>
   registered > 0 ? `${((placed / registered) * 100).toFixed(placed / registered < 0.1 ? 1 : 0)}%` : '—';
 
-const ChannelPlacementTable: React.FC<{ data: ChannelPlacement }> = ({ data }) => {
+/**
+ * `placedOnly` = กรองตามใบขออยู่ (4 พ.ย. 2569) — ลงทะเบียนผูกใบขอไม่ได้ (iRecruit ไม่มีใบขอ) ⇒ ช่องลงทะเบียน / % ขึ้น "—"
+ */
+const ChannelPlacementTable: React.FC<{ data: ChannelPlacement; placedOnly?: boolean }> = ({ data, placedOnly = false }) => {
   const [open, setOpen] = useState<string | null>(null);
   return (
     <div className="space-y-2">
@@ -58,19 +61,19 @@ const ChannelPlacementTable: React.FC<{ data: ChannelPlacement }> = ({ data }) =
                         <span className={cn('pl-5', unknown && 'text-muted-foreground')}>{r.channel}</span>
                       )}
                     </TableCell>
-                    <TableCell className="text-right text-sm tabular-nums">{unknown ? '—' : fmt(r.registered)}</TableCell>
+                    <TableCell className="text-right text-sm tabular-nums">{unknown || placedOnly ? '—' : fmt(r.registered)}</TableCell>
                     <TableCell className="text-right text-sm font-medium tabular-nums">{fmt(r.placed)}</TableCell>
                     <TableCell className="text-right text-sm tabular-nums text-muted-foreground">
-                      {unknown ? '—' : pct(fromReg, r.registered)}
+                      {unknown || placedOnly ? '—' : pct(fromReg, r.registered)}
                     </TableCell>
                   </TableRow>
                   {isOpen
                     ? r.subs.map((s) => (
                         <TableRow key={`${r.channel}|${s.name}`} className="bg-muted/40">
                           <TableCell className="sticky left-0 z-10 bg-muted pl-8 text-xs text-muted-foreground">{s.name}</TableCell>
-                          <TableCell className="text-right text-xs tabular-nums">{fmt(s.registered)}</TableCell>
+                          <TableCell className="text-right text-xs tabular-nums">{placedOnly ? '—' : fmt(s.registered)}</TableCell>
                           <TableCell className="text-right text-xs tabular-nums">{fmt(s.placed)}</TableCell>
-                          <TableCell className="text-right text-xs tabular-nums text-muted-foreground">{pct(s.placed, s.registered)}</TableCell>
+                          <TableCell className="text-right text-xs tabular-nums text-muted-foreground">{placedOnly ? '—' : pct(s.placed, s.registered)}</TableCell>
                         </TableRow>
                       ))
                     : null}

@@ -68,6 +68,8 @@ import ContactTab from './ContactTab';
 import DrillDownCard from './DrillDownCard';
 import RecruiterAppsCard from './RecruiterAppsCard';
 import { drillTreeOf } from '@/lib/recruitDrill';
+import { aiOfJobs, backlogOfJobs, staffOfJobs } from '@/lib/recruitOverviewScope';
+import { placementOfRequests } from '@/lib/channelPlacement';
 import { toYmdBangkok } from '@/lib/dateTh';
 
 /**
@@ -401,7 +403,7 @@ const RecruitOverview: React.FC<{
       {/*
        * หน้าเดียว (เจ้าของ 4 พ.ย. 2569 "เอา 3 แท็บมันรวมกันเลย … filter เปลี่ยน ข้อมูลเปลี่ยนตาม Filter เป็นเหมือน query")
        * ตัวกรองบนสุด (รวมเจ้าหน้าที่สรรหา) คุมทุกการ์ด · การติดต่อ / นัดหมาย เรียงต่อท้าย พับไว้ กดกางค่อยโชว์
-       * การ์ดที่นับฝั่งเซิร์ฟเวอร์ (งานค้างตอนนี้ · ผลงานรายคน · คนแจ้งเข้า) ไม่ตามตัวกรอง — บอก "ทุกใบขอ" ตอนกรองอยู่
+       * การ์ดที่นับฝั่งเซิร์ฟเวอร์ (งานค้างตอนนี้ · ผลงานรายคน · คนแจ้งเข้า) ตามตัวกรองด้วย — เซิร์ฟเวอร์ส่งแยกต่อใบขอ (`recruitOverviewScope.ts`)
        */}
       <div className="space-y-3">
           <RequestTab
@@ -427,6 +429,13 @@ const RecruitOverview: React.FC<{
             {(sc) => {
               // ตามตัวกรองบนสุด (QA 30 ต.ค. 2569) — ไม่กรอง = ชุดเดิมของทั้งหน้า
               const fv = sc.active ? overviewViewOf(sc.appsOf(apps ?? []), data, win) : view;
+              // การ์ดที่นับฝั่งเซิร์ฟเวอร์ ตามตัวกรองด้วย (เจ้าของ 4 พ.ย. 2569) — รวมเฉพาะใบขอที่ผ่าน `sc.jobOk` · ไม่กรอง = ยอดรวมเดิม
+              const backlog = data.backlog && sc.active && data.backlogByJob ? backlogOfJobs(data.backlogByJob, sc.jobOk, data.backlog) : data.backlog;
+              const staff = data.staff && sc.active && data.staffByJob ? staffOfJobs(data.staffByJob, sc.jobOk) : data.staff;
+              const ai = data.ai && sc.active && data.aiByJob ? aiOfJobs(data.aiByJob, sc.jobOk) : data.ai;
+              const placementFiltered = Boolean(sc.active && data.channelPlacement?.byRequest);
+              const placement =
+                data.channelPlacement && placementFiltered ? placementOfRequests(data.channelPlacement, (rq) => sc.jobOk(`siamraj-sql:${rq}`)) : data.channelPlacement;
               return (
                 <>
               {compareCard('apps', fv)}
@@ -439,8 +448,8 @@ const RecruitOverview: React.FC<{
                 onOpenNames={(title, ids) => setNames({ title, ids })}
               />
               {/* งานค้างของขั้นนี้ ณ วันนี้ (ย้ายจากแท็บใบขอ · เจ้าของ 29 ต.ค. 2569 "ย้ายไปให้ถูกเรื่องของมัน") */}
-              <OverviewCard icon={ClipboardList} title="งานค้างตอนนี้" sub={sc.active ? 'ณ วันนี้ · ทุกใบขอ' : 'ณ วันนี้'}>
-                {data.backlog ? <BacklogBody backlog={data.backlog} only="uncalled" /> : <SectionError message={data.errors.backlog ?? 'อ่านงานค้างไม่ได้'} />}
+              <OverviewCard icon={ClipboardList} title="งานค้างตอนนี้" sub="ณ วันนี้">
+                {backlog ? <BacklogBody backlog={backlog} only="uncalled" /> : <SectionError message={data.errors.backlog ?? 'อ่านงานค้างไม่ได้'} />}
               </OverviewCard>
               <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
                 <OverviewCard icon={Timer} title="กรอกแล้วโทรวันไหน">
@@ -464,11 +473,11 @@ const RecruitOverview: React.FC<{
                 <ContactTab apps={fv.cohort} onOpenNames={(title, ids) => setNames({ title, ids })}>
                   {compareCard('staff', fv)}
                   {drillCard('staff', 'การติดต่อ', fv)}
-                  <OverviewCard icon={ClipboardList} title="งานค้างตอนนี้" sub={sc.active ? 'ณ วันนี้ · ทุกใบขอ' : 'ณ วันนี้'}>
-                    {data.backlog ? <BacklogBody backlog={data.backlog} only="waiting" /> : <SectionError message={data.errors.backlog ?? 'อ่านงานค้างไม่ได้'} />}
+                  <OverviewCard icon={ClipboardList} title="งานค้างตอนนี้" sub="ณ วันนี้">
+                    {backlog ? <BacklogBody backlog={backlog} only="waiting" /> : <SectionError message={data.errors.backlog ?? 'อ่านงานค้างไม่ได้'} />}
                   </OverviewCard>
-                  <OverviewCard icon={Users} title="ผลงานรายคน" sub={sc.active ? 'งานที่ลงผลในช่วงนี้ · ทุกใบขอ' : 'งานที่ลงผลในช่วงนี้'}>
-                    {data.staff ? <StaffTable staff={data.staff} ai={data.ai} /> : <SectionError message={data.errors.staff ?? 'อ่านผลงานรายคนไม่ได้'} />}
+                  <OverviewCard icon={Users} title="ผลงานรายคน" sub="งานที่ลงผลในช่วงนี้">
+                    {staff ? <StaffTable staff={staff} ai={ai} /> : <SectionError message={data.errors.staff ?? 'อ่านผลงานรายคนไม่ได้'} />}
                   </OverviewCard>
                 </ContactTab>
               </FoldSection>
@@ -477,13 +486,13 @@ const RecruitOverview: React.FC<{
               <FoldSection title="นัดหมาย" testId="recruit-ov-appt">
                 {compareCard('appt', fv)}
                 {drillCard('appt', 'นัดหมาย', fv)}
-                <OverviewCard icon={ClipboardList} title="งานค้างตอนนี้" sub={sc.active ? 'ณ วันนี้ · ทุกใบขอ' : 'ณ วันนี้'}>
-                  {data.backlog ? <BacklogBody backlog={data.backlog} only="appointments" /> : <SectionError message={data.errors.backlog ?? 'อ่านงานค้างไม่ได้'} />}
+                <OverviewCard icon={ClipboardList} title="งานค้างตอนนี้" sub="ณ วันนี้">
+                  {backlog ? <BacklogBody backlog={backlog} only="appointments" /> : <SectionError message={data.errors.backlog ?? 'อ่านงานค้างไม่ได้'} />}
                 </OverviewCard>
                 {/* ช่องทางที่ได้คนลงงาน (เจ้าของ 19 ต.ค. 2569 — ทีม Online ดูว่าเด็กมาจากไหน ลงงานจากช่องทางไหนเยอะ) */}
-                <OverviewCard icon={Megaphone} title="คนแจ้งเข้าในช่วงนี้ มาจากช่องทางไหน" sub="นับตามวันแจ้งเข้า · ทุก BU">
-                  {data.channelPlacement ? (
-                    <ChannelPlacementTable data={data.channelPlacement} />
+                <OverviewCard icon={Megaphone} title="คนแจ้งเข้าในช่วงนี้ มาจากช่องทางไหน" sub={placementFiltered ? 'นับตามวันแจ้งเข้า' : 'นับตามวันแจ้งเข้า · ทุก BU'}>
+                  {placement ? (
+                    <ChannelPlacementTable data={placement} placedOnly={placementFiltered} />
                   ) : (
                     <SectionError message={data.errors.channels ?? 'อ่านช่องทางไม่ได้'} />
                   )}

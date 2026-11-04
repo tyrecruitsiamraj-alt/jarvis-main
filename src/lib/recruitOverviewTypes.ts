@@ -217,6 +217,13 @@ export type RecruitOverviewResponse = {
   requestRowsPrev?: RecruitRequestRow[] | null;
   /** jobId ของใบสมัคร → ใบขอ + เจ้าหน้าที่สรรหา (4 พ.ย. 2569) · null = อ่านไม่ได้ (ดู errors.appJobs) · ไม่มี = เส้นรุ่นเก่า */
   appJobs?: Record<string, RecruitAppJob> | null;
+  /**
+   * แยกต่อใบขอ (jobId · '' = ไม่ผูกใบขอ) ให้การ์ดงานค้าง/ผลงานรายคนเปลี่ยนตามตัวกรอง (4 พ.ย. 2569)
+   * รวมทุกใบ = `backlog` / `staff` / `ai` · ไม่มี = เส้นรุ่นเก่า
+   */
+  backlogByJob?: Record<string, RecruitBacklog>;
+  staffByJob?: Record<string, RecruitStaffRow[]>;
+  aiByJob?: Record<string, RecruitAiRow>;
   /** ก้อนที่อ่านไม่ได้ + เหตุ (ก้อนล้มแยกกัน — ห้ามโชว์ 0 แทน) */
   errors: Partial<Record<'apps' | 'backlog' | 'staff' | 'board' | 'requests' | 'channels' | 'informs' | 'appJobs', string>>;
 };

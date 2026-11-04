@@ -15,7 +15,7 @@
 
 export type ChannelRegistration = { phone9: string; at: string; channel: string | null; sub: string | null };
 /** `erpNews` = ช่อง "ทราบข่าวจาก" ใน ERP (รหัส + ชื่อ) — ใช้เมื่อหาการลงทะเบียนไม่เจอ (19 ต.ค. 2569) */
-export type ChannelInform = { phone9: string; at: string; erpNews?: { code: string | null; name: string | null } | null };
+export type ChannelInform = { phone9: string; at: string; erpNews?: { code: string | null; name: string | null } | null; /** เลขที่ใบขอของใบแจ้งเข้า — กรองตามตัวกรองหน้าภาพรวม (4 พ.ย. 2569) */ requestNo?: string | null };
 
 export type ChannelSubRow = { name: string; registered: number; placed: number };
 export type ChannelRow = { channel: string; registered: number; placed: number; subs: ChannelSubRow[] };
@@ -25,6 +25,11 @@ export type ChannelPlacement = {
   /** ในนั้นรู้ช่องทาง */
   matched: number;
   rows: ChannelRow[];
+  /**
+   * คนที่แจ้งเข้า แยกตามใบขอของใบแจ้งเข้าแรก — [ช่องทาง, กลุ่มย่อย] ต่อคน (4 พ.ย. 2569 "การ์ดที่เหลือเปลี่ยนตามตัวกรองด้วย")
+   * ลงทะเบียนผูกใบขอไม่ได้ (iRecruit ไม่มีใบขอ) ⇒ ตอนกรองนับแค่แจ้งเข้า · `placementOfRequests`
+   */
+  byRequest?: Record<string, Array<[string, string | null]>>;
 };
 
 export const UNKNOWN_CHANNEL = 'ไม่รู้ช่องทาง';
@@ -133,6 +138,7 @@ export function buildChannelPlacement(
   // ลงงาน — คนละครั้ง (แจ้งเข้าแรกในช่วง)
   const firstInform = new Map<string, number>();
   const erpNewsOf = new Map<string, ChannelInform['erpNews']>();
+  const requestOf = new Map<string, string | null>();
   for (const i of informs) {
     const t = Date.parse(i.at);
     if (!(t >= fromMs && t < toMs) || !/^\d{9}$/.test(i.phone9)) continue;
@@ -140,9 +146,15 @@ export function buildChannelPlacement(
     if (prev === undefined || t < prev) {
       firstInform.set(i.phone9, t);
       erpNewsOf.set(i.phone9, i.erpNews ?? null);
+      requestOf.set(i.phone9, i.requestNo?.trim() || null);
     }
   }
   let matched = 0;
+  const byRequest: Record<string, Array<[string, string | null]>> = {};
+  const note = (phone: string, channel: string, sub: string | null) => {
+    const rq = requestOf.get(phone);
+    if (rq) (byRequest[rq] ??= []).push([channel, sub]);
+  };
   for (const [phone, t] of firstInform) {
     const cands = (byPhone.get(phone) ?? []).filter((r) => {
       const at = Date.parse(r.at);
@@ -153,11 +165,13 @@ export function buildChannelPlacement(
       const erp = erpChannelOf(erpNewsOf.get(phone));
       if (!erp) {
         rowOf(UNKNOWN_CHANNEL).placed += 1;
+        note(phone, UNKNOWN_CHANNEL, null);
         continue;
       }
       const row = rowOf(erp);
       row.placed += 1;
       subOf(row, ERP_SUB).placed += 1;
+      note(phone, erp, ERP_SUB);
       matched += 1;
       continue;
     }
@@ -166,6 +180,7 @@ export function buildChannelPlacement(
     const row = rowOf(ch);
     row.placed += 1;
     subOf(row, subName(last.sub, ch)).placed += 1;
+    note(phone, ch, subName(last.sub, ch));
     matched += 1;
   }
 
@@ -182,5 +197,32 @@ export function buildChannelPlacement(
     a.channel === UNKNOWN_CHANNEL ? 1 : b.channel === UNKNOWN_CHANNEL ? -1 : b.placed - a.placed || b.registered - a.registered,
   );
   if (!rows.has(UNKNOWN_CHANNEL)) out.push({ channel: UNKNOWN_CHANNEL, registered: 0, placed: 0, subs: [] });
-  return { informed: firstInform.size, matched, rows: out };
+  return { informed: firstInform.size, matched, rows: out, byRequest };
+}
+
+/** เฉพาะคนที่แจ้งเข้าใบขอที่ผ่านตัวกรอง — ลงทะเบียน = 0 (ผูกใบขอไม่ได้ · ตารางขึ้น "—") · ตัวแบ่งช่องทางชุดเดียวกับ `buildChannelPlacement` */
+export function placementOfRequests(p: ChannelPlacement, ok: (requestNo: string) => boolean): ChannelPlacement {
+  const rows = new Map<string, { placed: number; subs: Map<string, number> }>();
+  let informed = 0;
+  let matched = 0;
+  for (const [rq, list] of Object.entries(p.byRequest ?? {})) {
+    if (!ok(rq)) continue;
+    for (const [channel, sub] of list) {
+      informed += 1;
+      if (channel !== UNKNOWN_CHANNEL) matched += 1;
+      const r = rows.get(channel) ?? { placed: 0, subs: new Map<string, number>() };
+      r.placed += 1;
+      if (sub) r.subs.set(sub, (r.subs.get(sub) ?? 0) + 1);
+      rows.set(channel, r);
+    }
+  }
+  const out: ChannelRow[] = [...rows.entries()].map(([channel, r]) => ({
+    channel,
+    registered: 0,
+    placed: r.placed,
+    subs: [...r.subs.entries()].map(([name, n]) => ({ name, registered: 0, placed: n })).sort((a, b) => b.placed - a.placed),
+  }));
+  out.sort((a, b) => (a.channel === UNKNOWN_CHANNEL ? 1 : b.channel === UNKNOWN_CHANNEL ? -1 : b.placed - a.placed));
+  if (!rows.has(UNKNOWN_CHANNEL)) out.push({ channel: UNKNOWN_CHANNEL, registered: 0, placed: 0, subs: [] });
+  return { informed, matched, rows: out };
 }

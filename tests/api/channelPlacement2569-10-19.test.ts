@@ -51,7 +51,7 @@ describe('buildChannelPlacement', () => {
 
 describe('หน้าภาพรวม', () => {
   it('การ์ดช่องทางที่ได้คนลงงาน · API อ่าน iRecruit + ลิงก์ระบบเรา + ERP แจ้งเข้าที่ไม่ยกเลิก', () => {
-    expect(readFileSync('src/components/dashboard-trends/RecruitOverview.tsx', 'utf8')).toContain('<ChannelPlacementTable data={data.channelPlacement} />');
+    expect(readFileSync('src/components/dashboard-trends/RecruitOverview.tsx', 'utf8')).toContain('<ChannelPlacementTable data={placement} placedOnly={placementFiltered} />'); // 4 พ.ย. 2569 ตามตัวกรองบนสุด
     const sql = readFileSync('api/_lib/channelPlacementSql.ts', 'utf8');
     expect(sql).toContain('FROM recruit_register r');
     expect(sql).toContain("activeInformWhereSql('IH')");

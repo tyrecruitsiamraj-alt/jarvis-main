@@ -59,8 +59,8 @@ export async function loadChannelPlacement(window: { from: string; to: string })
       [regFrom, regTo],
     ),
     // ช่อง "ทราบข่าวจาก" (news_code) ติดมาด้วย — ใช้เมื่อหาการลงทะเบียนไม่เจอ (19 ต.ค. 2569)
-    siamrajSqlQuery<{ k: string; at: Date | string; nc: string | null; nn: string | null }>(
-      `SELECT RIGHT(REPLACE(REPLACE(RTRIM(r.mobile), '-', ''), ' ', ''), 9) AS k, IH.inform_date AS at,
+    siamrajSqlQuery<{ k: string; at: Date | string; nc: string | null; nn: string | null; rq: string | null }>(
+      `SELECT RIGHT(REPLACE(REPLACE(RTRIM(r.mobile), '-', ''), ' ', ''), 9) AS k, IH.inform_date AS at, RTRIM(IH.request_no) AS rq,
               RTRIM(r.news_code) AS nc, RTRIM(N.news_name) AS nn
          FROM hr_recruitment r
          INNER JOIN st_inform_head IH ON IH.inform_no = r.inform_no
@@ -78,6 +78,7 @@ export async function loadChannelPlacement(window: { from: string; to: string })
     phone9: String(r.k ?? '').trim(),
     at: iso(r.at),
     erpNews: { code: r.nc ?? null, name: r.nn ?? null },
+    requestNo: r.rq ?? null,
   }));
   const value = buildChannelPlacement(regs, inf, window);
   cache.set(key, { at: Date.now(), value });

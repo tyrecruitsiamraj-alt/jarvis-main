@@ -194,12 +194,12 @@ export function appointmentBacklogSql(): string {
 export function staffEventsSql(): string {
   return `
   select 'claim'::text as kind, a.id::text as app_id, nullif(btrim(a.claimed_by_name), '') as name,
-         null::boolean as reached, false as appt
+         null::boolean as reached, false as appt, a.job_id
     from ${APPS} a ${appBuJoin('a')}
    where a.claimed_by is not null and a.claimed_at >= $1::timestamptz and a.claimed_at < $2::timestamptz
      and ${scopeWhere('$3')}
   union all
-  select 'log', a.id::text, nullif(btrim(c.created_by_name), ''), c.ok, (c.ok and c.appointment_at is not null)
+  select 'log', a.id::text, nullif(btrim(c.created_by_name), ''), c.ok, (c.ok and c.appointment_at is not null), a.job_id
     from ${CONTACTS} c
     join ${APPS} a on a.id = c.application_id
     ${appBuJoin('a')}
@@ -207,7 +207,7 @@ export function staffEventsSql(): string {
      and ${scopeWhere('$3')}
   union all
   select 'hold', a.id::text, nullif(btrim(h.held_by_name), ''), (h.result_outcome in ${CONNECTED_OUTCOMES}),
-         (h.appointment_at is not null)
+         (h.appointment_at is not null), a.job_id
     from ${HOLDS} h
     join ${APPS} a on h.source = 'application' and h.candidate_ref = a.id::text
     ${appBuJoin('a')}
@@ -232,7 +232,7 @@ export function aiEventsSql(): string {
   const cols = `a.id::text as app_id, ${AI_RESULT_OUTCOME_SQL} as outcome,
          q.result->>'summary' as summary, ${queueReplySql('q')} as reply,
          ${AI_RESULT_AT_SQL} as at,
-         (${AI_RESULT_OUTCOME_SQL} in ${CONNECTED_OUTCOMES}) as reached`;
+         (${AI_RESULT_OUTCOME_SQL} in ${CONNECTED_OUTCOMES}) as reached, a.job_id`;
   /**
    * 🔴 28 ต.ค. 2569 (เจ้าของ "จะเปลี่ยนวันดู โหลดนานมาก") — เดิม join ด้วย "รหัสตรง OR เบอร์ตรง" ก้อนเดียว ใช้ 5.6–9.8 วิ
    * ⇒ กรองผลในช่วงก่อน แล้วแตกเป็น 2 join (รหัสใบ · เบอร์หลังเวลากรอก) รวมด้วย union — หลักฐานชุดเดิม (`AI_RESULT_OF_APP_SQL`)
@@ -488,6 +488,34 @@ export function toRequestDays(rows: ReadonlyArray<ReqStateRow & { day: string }>
     else d.notReleasedClosed += 1;
   }
   return [...by.values()].sort((a, b) => a.day.localeCompare(b.day));
+}
+
+/** ใบขอของแถวดิบ · '' = ใบสมัครที่ไม่ผูกใบขอ */
+const jobKeyOf = (r: Row) => (typeof r.job_id === 'string' && r.job_id ? r.job_id : '');
+export function groupByJob(rows: readonly Row[]): Map<string, Row[]> {
+  const m = new Map<string, Row[]>();
+  for (const r of rows) {
+    const k = jobKeyOf(r);
+    const list = m.get(k);
+    if (list) list.push(r);
+    else m.set(k, [r]);
+  }
+  return m;
+}
+
+/**
+ * งานค้างแยกต่อใบขอ — หน้าเว็บรวมเฉพาะใบที่ผ่านตัวกรอง (เจ้าของ 4 พ.ย. 2569 "ให้การ์ดที่เหลือเปลี่ยนตามตัวกรองด้วย")
+ * ตัวนับเดียวกับ `toBacklog` ทีละใบ (ใบสมัครหนึ่งใบอยู่ใบขอเดียว ⇒ รวมทุกใบ = ยอดรวมเดิม) · เก็บเฉพาะใบที่มีงานค้าง
+ */
+export function backlogByJob(rows: Row[], apptRows: Row[] | null, now: number, regionOf: (jobId: string | null) => Region): Record<string, RecruitBacklog> {
+  const byJob = groupByJob(rows);
+  const apptByJob = apptRows ? groupByJob(apptRows) : null;
+  const out: Record<string, RecruitBacklog> = {};
+  for (const k of new Set([...byJob.keys(), ...(apptByJob?.keys() ?? [])])) {
+    const b = toBacklog(byJob.get(k) ?? [], apptByJob ? (apptByJob.get(k) ?? []) : null, now, regionOf);
+    if (b.uncalled.total || b.waitingStaff.total || b.appointments?.overdue || b.appointments?.next7) out[k] = b;
+  }
+  return out;
 }
 
 /** งานค้างจากแถวดิบ — อายุเป็นวันเต็ม (ครบ 24 ชม. = 1 วัน) นับจาก `now` */
@@ -832,8 +860,17 @@ export async function buildRecruitOverview(
   }
   if (body.apps) {
     try {
+      // ใบของงานค้าง/ผลงานรายคน/แจ้งเข้า ด้วย — ตัวกรองเจ้าหน้าที่ใช้กับการ์ดพวกนั้นได้ (4 พ.ย. 2569)
+      const placementJobs = Object.keys((chR.ok ? chR.value.byRequest : null) ?? {}).map((rq) => `${SQL_PREFIX}${rq}`);
       body.appJobs = await loadAppJobs(
-        body.apps.map((a) => a.jobId).filter((j): j is string => !!j),
+        [
+          ...body.apps.map((a) => a.jobId).filter((j): j is string => !!j),
+          ...(backlogR.ok ? backlogR.value.map((r) => jobKeyOf(r)) : []),
+          ...(apptR.ok && apptR.value ? apptR.value.map((r) => jobKeyOf(r)) : []),
+          ...(staffR.ok ? staffR.value.map((r) => jobKeyOf(r)) : []),
+          ...(aiR.ok ? aiR.value.map((r) => jobKeyOf(r)) : []),
+          ...placementJobs,
+        ].filter(Boolean),
         (await jobIndexP).jobs,
       );
     } catch (e) {
@@ -843,15 +880,26 @@ export async function buildRecruitOverview(
     }
   }
 
-  if (backlogR.ok && apptR.ok) body.backlog = toBacklog(backlogR.value, apptR.value, nowMs, (await jobIndexP).regionOf);
+  if (backlogR.ok && apptR.ok) {
+    const regionOf = (await jobIndexP).regionOf;
+    body.backlog = toBacklog(backlogR.value, apptR.value, nowMs, regionOf);
+    body.backlogByJob = backlogByJob(backlogR.value, apptR.value, nowMs, regionOf);
+  }
   else body.errors.backlog = !backlogR.ok ? backlogR.error : (apptR as { error: string }).error;
 
-  if (staffR.ok && showedR.ok) body.staff = toStaffRows(staffR.value, showedR.value, await loadStaffDisplay());
+  if (staffR.ok && showedR.ok) {
+    const displayOf = await loadStaffDisplay();
+    body.staff = toStaffRows(staffR.value, showedR.value, displayOf);
+    body.staffByJob = Object.fromEntries([...groupByJob(staffR.value)].map(([k, rows]) => [k, toStaffRows(rows, showedR.value, displayOf)]));
+  }
   else {
     body.staff = null;
     body.errors.staff = !staffR.ok ? staffR.error : (showedR as { error: string }).error;
   }
-  if (aiR.ok) body.ai = toAiRow(aiR.value);
+  if (aiR.ok) {
+    body.ai = toAiRow(aiR.value);
+    body.aiByJob = Object.fromEntries([...groupByJob(aiR.value)].map(([k, rows]) => [k, toAiRow(rows)]));
+  }
   else {
     body.ai = null;
     body.errors.staff = body.errors.staff ?? aiR.error;
