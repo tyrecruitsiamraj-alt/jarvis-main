@@ -87,3 +87,11 @@ describe('เหลือง: ไม่เกิน 1 กลุ่มต่อ�
     expect(src).toContain('soVerifyWarningText(account.worker)');
   });
 });
+
+describe('สลับบัญชี / สั่งใหม่ คงไว้เฉพาะกลุ่มที่บัญชีนี้โพสต์ได้ตอนนี้', () => {
+  it('กลุ่มที่ซ่อน (Facebook ไม่รับโพสต์) ไม่ค้างติ๊กไว้ — เคยกินเพดาน 1/1 ของบัญชีเหลืองจนติ๊กกลุ่มที่ต้องการไม่ได้ (OPL6904029 · 9 พ.ย. 2569)', () => {
+    const src = readFileSync('src/components/jobs/AutopostDialog.tsx', 'utf8');
+    expect(src).toContain('soGroupsOfAccount(opts, a).filter((g) => soGroupUsable(g, a))');
+    expect(src).toContain('soGroupsOfAccount(opts, acc).filter((g) => soGroupUsable(g, acc))');
+  });
+});

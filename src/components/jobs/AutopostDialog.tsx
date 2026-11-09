@@ -48,6 +48,7 @@ import {
   type SoGroupLink,
   soAccountsByBu,
   soAccountsOrdered,
+  soGroupUsable,
   soVerifyWarningText,
   soAccountChoice,
   soAccountStatusText,
@@ -312,7 +313,8 @@ export function AutopostBody({
     setAccountId(id);
     setWorkerName(soDefaultWorker(soWorkersFor(opts, 'autopost'), 'post')?.name ?? a.worker ?? '');
     // สลับบัญชี = คงกลุ่มที่เลือกไว้ เท่าที่บัญชีนี้โพสต์ได้และไม่เกินโพสต์ที่เหลือ (ไม่ติ๊กเพิ่มให้)
-    const allowed = new Set(soGroupsOfAccount(opts, a).map((g) => g.id));
+    // 🔴 9 พ.ย. 2569: เฉพาะกลุ่มที่บัญชีนี้โพสต์ได้ตอนนี้ (`soGroupUsable`) — กลุ่มที่ซ่อนอยู่ (Facebook ไม่รับโพสต์ · เพิ่งลง) เคยค้างติ๊กไว้มองไม่เห็น กินเพดาน 1/1 ของบัญชีเหลือง
+    const allowed = new Set(soGroupsOfAccount(opts, a).filter((g) => soGroupUsable(g, a)).map((g) => g.id));
     setPicked((prev) => soAddWithinCap([], prev.filter((id) => allowed.has(id)), soGroupCap(a)));
   };
 
@@ -335,7 +337,7 @@ export function AutopostBody({
     setWarn(null);
     setAccountId(acc?.id ?? '');
     if (acc) setWorkerName(soDefaultWorker(soWorkersFor(opts, 'autopost'), 'post')?.name ?? acc.worker ?? '');
-    const allowed = acc ? new Set(soGroupsOfAccount(opts, acc).map((g) => g.id)) : null;
+    const allowed = acc ? new Set(soGroupsOfAccount(opts, acc).filter((g) => soGroupUsable(g, acc)).map((g) => g.id)) : null;
     setPicked(acc ? soAddWithinCap([], groups.filter((id) => allowed!.has(id)), soGroupCap(acc)) : groups);
   }, [opts, retryFrom, prefilledFrom, jobBu]);
 
