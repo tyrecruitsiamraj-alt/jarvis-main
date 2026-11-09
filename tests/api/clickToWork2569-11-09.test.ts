@@ -62,3 +62,30 @@ describe('เลขใบ → หน้าใบขอ', () => {
       expect(readFileSync(p, 'utf8')).toContain('requestPathOfJobId(');
   });
 });
+
+describe('แผงติดตาม → รายชื่อ (9 พ.ย. 2569 "ทำแผงติดตามให้กดเห็นชื่อด้วย")', () => {
+  it('รายชื่อกับตัวนับใช้ตัวรวมคนตัวเดียว — แยกตามผลแล้วเท่าเลข "ผลรายคน" · ลิงก์ = สายล่าสุดของคน', async () => {
+    const { buildFollowPersonCells, groupFollowPeople, followPersonLink } = await import('@/lib/homeLumosSummary');
+    const rows = [
+      { key: '812345678|window', bu: 'LBD', team: 'main' as const, bucket: 'failed' as const, name: 'สมชาย ใจดี', phone: '+66812345678', id: '101', at: '2026-11-03T02:00:00.000Z' },
+      { key: '812345678|window', bu: 'LBD', team: 'main' as const, bucket: 'went' as const, name: 'สมชาย ใจดี', phone: '+66812345678', id: '102', at: '2026-11-04T02:00:00.000Z' },
+      { key: '898765432|window', bu: 'LBA', team: 'replacement' as const, bucket: 'waiting' as const, name: 'สมหญิง รักงาน', phone: '+66898765432', id: '201', at: '2026-11-05T01:00:00.000Z' },
+    ];
+    const people = groupFollowPeople(rows);
+    expect(people.map((p) => [p.name, p.bucket, p.calls, p.entryId])).toEqual([
+      ['สมชาย ใจดี', 'went', 2, '102'],
+      ['สมหญิง รักงาน', 'waiting', 1, '201'],
+    ]);
+    const cells = buildFollowPersonCells(rows);
+    for (const c of cells) expect(people.filter((p) => p.bucket === c.bucket && p.team === c.team && p.bu === c.bu).length).toBe(c.n);
+    expect(followPersonLink(people[0])).toBe('/follow?open=102');
+    expect(followPersonLink(people[1])).toBe('/follow?view=replace&open=201');
+  });
+  it('หน้าติดตามอ่าน ?open= แล้วเปิดแผนของคนนั้น · เส้นรายชื่อเช็กสิทธิ์เท่ารายชื่อก้อนติดตาม', () => {
+    const page = readFileSync('src/pages/follow/FollowPage.tsx', 'utf8');
+    expect(page).toContain('searchParams.get(FOLLOW_OPEN_PARAM)');
+    expect(page).toContain("setOpenCell({ key: followGroupKey(e), ymd: '' })");
+    const h = readFileSync('api/_handlers/home-ai-share.ts', 'utf8');
+    expect(h).toContain("canListAiShare(req.user.role, 'follow')");
+  });
+});

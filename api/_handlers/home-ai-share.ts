@@ -56,10 +56,10 @@ import { followMatrixColOfCategory } from '../../src/lib/followCallMatrix.js';
 import { FOLLOW_TEAM_REPLACEMENT } from '../../src/lib/followReplacement.js';
 import { journeyResultOf, type FollowJourneyEvent, type FollowJourneyResponse, type FollowJourneyRow } from '../../src/lib/followJourney.js';
 import { createHash } from 'node:crypto';
-import { FOLLOW_BUCKET_SQL, followLedgerBucket, loadFollowCancelledIds, loadHomeLumosSummary } from '../_lib/homeLumosSummarySql.js';
+import { FOLLOW_BUCKET_SQL, followLedgerBucket, loadFollowCancelledIds, loadFollowPeople, loadHomeLumosSummary } from '../_lib/homeLumosSummarySql.js';
 import { loadInterestJourney, loadTopicReport } from '../_lib/homeTopicReportSql.js';
 import type { TopicReportBlock, TopicReportResponse } from '../../src/lib/homeTopicReport.js';
-import type { HomeLumosSummaryResponse } from '../../src/lib/homeLumosSummary.js';
+import type { FollowPeopleResponse, HomeLumosSummaryResponse } from '../../src/lib/homeLumosSummary.js';
 import {
   AI_SHARE_LIST_PAGE,
   aiShareBounds,
@@ -782,6 +782,26 @@ async function handler(req: AuthedReq, res: ApiRes) {
     // `?summary=lumos` = สรุปแบบบอท Lumos (7 ต.ค. 2569) — งานที่ส่งให้ AI ช่วงเดียวกับปฏิทิน
     if (q.summary !== undefined) {
       if (q.summary !== 'lumos') return sendError(res, 400, 'Bad request', 'ไม่รู้จักก้อนนี้');
+      // `&people=1` = รายชื่อคนติดตามของช่วง (9 พ.ย. 2569 แผงติดตามบนหน้าหลักกดเห็นชื่อ) — สิทธิ์เท่ารายชื่อของก้อนติดตาม
+      if (q.people !== undefined) {
+        if (!canListAiShare(req.user.role, 'follow')) {
+          return sendError(res, 403, 'Forbidden', 'บัญชีนี้ยังไม่มีสิทธิ์ดูรายชื่อส่วนนี้');
+        }
+        const out: FollowPeopleResponse = { generated_at: new Date().toISOString(), from: win.from, to: win.to, people: [], error: null };
+        if (scope.mode === 'none') {
+          out.error = 'บัญชีนี้ยังไม่ได้ผูกแผนก เลยยังดูรายชื่อไม่ได้';
+          return res.status(200).json(out);
+        }
+        try {
+          const { start, end } = followPlanBounds(win);
+          out.people = await loadFollowPeople(start, end, bu);
+        } catch (e) {
+          logWarn('home-ai-share follow people failed', { error: errText(e) });
+          out.error = 'โหลดรายชื่อไม่ขึ้น ลองอีกครั้ง';
+        }
+        res.setHeader?.('Cache-Control', 'no-store');
+        return res.status(200).json(out);
+      }
       const body: HomeLumosSummaryResponse = {
         generated_at: new Date().toISOString(),
         from: win.from,

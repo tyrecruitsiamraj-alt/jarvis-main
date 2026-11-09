@@ -27,6 +27,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
+import { FOLLOW_OPEN_PARAM } from '@/lib/homeLumosSummary';
 import { fetchReplaceSyncStatus, runReplaceSyncNow, setReplaceAiPaused } from '@/lib/irecruitReplaceSyncApi';
 import { followHealthWarnings } from '@/lib/followSystemHealth';
 import { Switch } from '@/components/ui/switch';
@@ -2221,6 +2222,26 @@ const FollowPage: React.FC = () => {
       rounds: openCell.ymd ? row.rounds.filter((r) => r.ymd === openCell.ymd) : row.rounds,
     };
   }, [openCell, allRows]);
+
+  /**
+   * `?open=<สาย>` — ลิงก์จากรายชื่อบนแผงติดตามของหน้าหลัก (เจ้าของ 9 พ.ย. 2569 "ทำแผงติดตามให้กดเห็นชื่อด้วย")
+   * เจอ = ค้นชื่อให้แถวขึ้น + เปิดแผนทั้งหมดของคนนั้น (ป๊อปเดียวกับกดชื่อ) · ไม่เจอ = บอกเหตุ · ใช้แล้วล้างออกจาก URL
+   */
+  const openParam = searchParams.get(FOLLOW_OPEN_PARAM);
+  useEffect(() => {
+    if (!openParam || loading) return;
+    const next = new URLSearchParams(searchParams);
+    next.delete(FOLLOW_OPEN_PARAM);
+    setSearchParams(next, { replace: true });
+    const e = items.find((x) => String(x.id) === openParam);
+    if (!e) {
+      toast.error('ไม่เจอคนนี้ในรายชื่อติดตาม อาจถูกลบไปแล้ว');
+      return;
+    }
+    setFollowSearch(e.recipient_name ?? '');
+    setOpenCell({ key: followGroupKey(e), ymd: '' });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- ทำครั้งเดียวต่อลิงก์ หลังรายชื่อโหลดเสร็จ
+  }, [openParam, loading]);
 
 
   /** เลือกวันจากปฏิทิน = ใช้ช่องกรองวันเดิม (`fDate`) — ห้ามมีตัวกรองวันสองตัวในหน้าเดียว */

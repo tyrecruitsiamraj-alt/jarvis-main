@@ -142,26 +142,77 @@ export function followPersonKey(phone: unknown, ymd: string, fallbackId: string)
   return p ? `${p}|${ymd}` : `id:${fallbackId}`;
 }
 
-/** รวมคนตาม BU/เรื่อง/ผล — `rows` = สายที่ไม่ยกเลิก · ใช้ BU/เรื่องของสายแรกของคน */
-export function buildFollowPersonCells(
-  rows: ReadonlyArray<{ key: string; bu: string | null; team: FollowTeamKey; bucket: FollowBucketKey }>,
-): FollowPersonCell[] {
-  const people = new Map<string, { bu: string | null; team: FollowTeamKey; keys: FollowBucketKey[] }>();
+/** สายหนึ่งของคน (ไม่ยกเลิก) — ชื่อ/เบอร์/id/เวลานัดใช้กับรายชื่อ (ตัวนับไม่ใช้) */
+export type FollowPersonCallRow = {
+  key: string;
+  bu: string | null;
+  team: FollowTeamKey;
+  bucket: FollowBucketKey;
+  name?: string | null;
+  phone?: string | null;
+  id?: string;
+  at?: string | null;
+};
+
+/**
+ * คนหนึ่งในรายชื่อติดตามของช่วง (เจ้าของ 9 พ.ย. 2569 "ทำแผงติดตามให้กดเห็นชื่อด้วย")
+ * `entryId` = สายล่าสุดของคน — ลิงก์เปิดคนนั้นที่หน้าติดตาม (`followPersonLink`)
+ */
+export type FollowPersonName = {
+  bu: string | null;
+  team: FollowTeamKey;
+  bucket: FollowBucketKey;
+  name: string | null;
+  phone: string | null;
+  calls: number;
+  entryId: string;
+};
+
+/**
+ * รวมสายเป็นคน — 🔴 ตัวตัดสินเดียวของ "ผลรายคน" ทั้งตัวนับ (`buildFollowPersonCells`) และรายชื่อ ⇒ กดเลขแล้วรายชื่อเท่าเลข
+ * ใช้ BU/เรื่อง/ชื่อของสายแรกของคน
+ */
+export function groupFollowPeople(rows: readonly FollowPersonCallRow[]): FollowPersonName[] {
+  const people = new Map<string, { first: FollowPersonCallRow; keys: FollowBucketKey[]; latest: FollowPersonCallRow }>();
   for (const r of rows) {
-    const p = people.get(r.key) ?? { bu: r.bu, team: r.team, keys: [] };
+    const p = people.get(r.key);
+    if (!p) {
+      people.set(r.key, { first: r, keys: [r.bucket], latest: r });
+      continue;
+    }
     p.keys.push(r.bucket);
-    people.set(r.key, p);
+    if ((r.at ?? '') > (p.latest.at ?? '')) p.latest = r;
   }
+  return [...people.values()].map((p) => ({
+    bu: p.first.bu,
+    team: p.first.team,
+    bucket: followPersonBucket(p.keys),
+    name: p.first.name ?? null,
+    phone: p.first.phone ?? null,
+    calls: p.keys.length,
+    entryId: p.latest.id ?? '',
+  }));
+}
+
+/** รวมคนตาม BU/เรื่อง/ผล — `rows` = สายที่ไม่ยกเลิก */
+export function buildFollowPersonCells(rows: readonly FollowPersonCallRow[]): FollowPersonCell[] {
   const cells = new Map<string, FollowPersonCell>();
-  for (const p of people.values()) {
-    const bucket = followPersonBucket(p.keys);
-    const ck = `${p.bu ?? ''}|${p.team}|${bucket}`;
-    const c = cells.get(ck) ?? { bu: p.bu, team: p.team, bucket, n: 0 };
+  for (const p of groupFollowPeople(rows)) {
+    const ck = `${p.bu ?? ''}|${p.team}|${p.bucket}`;
+    const c = cells.get(ck) ?? { bu: p.bu, team: p.team, bucket: p.bucket, n: 0 };
     c.n += 1;
     cells.set(ck, c);
   }
   return [...cells.values()];
 }
+
+/** `?summary=lumos&people=1` — รายชื่อคนติดตามของช่วง (โหลดตอนกดเท่านั้น · สิทธิ์เท่ารายชื่อของก้อนติดตาม) */
+export type FollowPeopleResponse = { generated_at: string; from: string | null; to: string | null; people: FollowPersonName[]; error: string | null };
+
+/** เปิดคนนั้นที่หน้าติดตาม — แท็บตามทีม · `?open=<สาย>` ค้นชื่อ + เปิดป๊อปแผนของเขา */
+export const FOLLOW_OPEN_PARAM = 'open';
+export const followPersonLink = (p: Pick<FollowPersonName, 'entryId' | 'team'>) =>
+  `/follow?${p.team === 'replacement' ? 'view=replace&' : ''}${FOLLOW_OPEN_PARAM}=${encodeURIComponent(p.entryId)}`;
 export type FollowBuRow = { bu: string | null; total: number; ai: number; staff: number; buckets: Record<FollowBucketKey, number> };
 
 const emptyBuckets = (): Record<FollowBucketKey, number> =>

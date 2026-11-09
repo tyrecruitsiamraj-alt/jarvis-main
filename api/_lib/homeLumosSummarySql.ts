@@ -11,6 +11,9 @@ import { AFTERCARE_TOPIC } from '../../src/lib/aftercareRounds.js';
 import {
   buildFollowPersonCells,
   doneBucketOf,
+  groupFollowPeople,
+  type FollowPersonCallRow,
+  type FollowPersonName,
   followPersonKey,
   emptyFollowBucket,
   type FollowBucket,
@@ -114,6 +117,44 @@ const bucket = (r: Row | undefined): LumosBucket => ({
   cancelled: Number(r?.cancelled ?? 0),
 });
 
+const isoOf = (v: unknown): string | null => {
+  if (v == null) return null;
+  const d = v instanceof Date ? v : new Date(String(v));
+  return Number.isNaN(d.getTime()) ? null : d.toISOString();
+};
+const textOf = (v: unknown): string | null => (typeof v === 'string' && v.trim() ? v.trim() : null);
+
+/** สายหนึ่ง → แถวของคน (1 คน = 1 เบอร์ทั้งช่วง) — ตัวนับกับรายชื่อใช้ตัวนี้ตัวเดียว */
+function personCallRow(r: Record<string, unknown>, bu: string | null, team: FollowTeamKey, bucket: FollowBucketKey): FollowPersonCallRow {
+  return {
+    key: followPersonKey(r.recipient_phone, 'window', String(r.id)),
+    bu,
+    team,
+    bucket,
+    name: textOf(r.recipient_name),
+    phone: textOf(r.recipient_phone),
+    id: String(r.id),
+    at: isoOf(r.scheduled_at),
+  };
+}
+
+/**
+ * รายชื่อคนติดตามของช่วง (เจ้าของ 9 พ.ย. 2569 "ทำแผงติดตามให้กดเห็นชื่อด้วย") — แถวชุดเดียวกับ `loadHomeLumosSummary`
+ * ไม่นับสายยกเลิก ⇒ แยกตามผลแล้วเท่าเลข "ผลรายคน" บนแผงพอดี
+ */
+export async function loadFollowPeople(start: Date | null, end: Date | null, bu: BuSet): Promise<FollowPersonName[]> {
+  const follow = await loadFollowLedgerRows(start, end, bu);
+  const derived = categorizeFollowRows(follow);
+  const rows: FollowPersonCallRow[] = [];
+  for (const r of follow) {
+    const key = followLedgerBucket(r, derived);
+    if (key === 'cancelled') continue;
+    const rowBu = typeof r.summary_bu === 'string' && r.summary_bu ? r.summary_bu : null;
+    rows.push(personCallRow(r, rowBu, r.follow_team === FOLLOW_TEAM_REPLACEMENT ? 'replacement' : 'main', key));
+  }
+  return groupFollowPeople(rows);
+}
+
 export async function loadHomeLumosSummary(
   start: Date | null,
   end: Date | null,
@@ -155,7 +196,7 @@ export async function loadHomeLumosSummary(
   const derived = categorizeFollowRows(follow);
   const split = { ai: emptyFollowBucket(), staff: emptyFollowBucket() };
   const byBuCells = new Map<string, FollowBuCell>();
-  const personRows: Array<{ key: string; bu: string | null; team: FollowTeamKey; bucket: FollowBucketKey }> = [];
+  const personRows: FollowPersonCallRow[] = [];
   for (const r of follow) {
     const b = r.call_mode === 'manual' ? split.staff : split.ai;
     const key = followLedgerBucket(r, derived);
@@ -171,7 +212,7 @@ export async function loadHomeLumosSummary(
     byBuCells.set(ck, cell);
     if (key !== 'cancelled') {
       // 1 คน = 1 เบอร์ทั้งช่วง (QA 30 ต.ค. 2569: เดิมเบอร์ + วัน ⇒ คนที่ตามหลายวันในช่วงถูกนับหลายคน) · ผลของคนตามลำดับ FOLLOW_PERSON_PRIORITY
-      personRows.push({ key: followPersonKey(r.recipient_phone, 'window', String(r.id)), bu, team, bucket: key });
+      personRows.push(personCallRow(r, bu, team, key));
     }
   }
   return {

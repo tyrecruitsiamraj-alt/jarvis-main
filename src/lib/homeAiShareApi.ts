@@ -10,7 +10,7 @@ import type {
   AiShareWindow,
 } from '@/lib/homeAiShare';
 import type { FollowJourneyResponse } from '@/lib/followJourney';
-import type { HomeLumosSummaryResponse } from '@/lib/homeLumosSummary';
+import type { FollowPeopleResponse, HomeLumosSummaryResponse } from '@/lib/homeLumosSummary';
 import type { TopicReportBlock, TopicReportResponse } from '@/lib/homeTopicReport';
 import type { ProportionPayload } from '@/lib/homeProportion';
 
@@ -63,6 +63,11 @@ export function fetchFollowJourney(q: AiShareWindow & { bu?: string | null }): P
 /** สรุปแบบบอท Lumos (7 ต.ค. 2569) — งานที่ส่งให้ AI ช่วงเดียวกับปฏิทิน */
 export function fetchHomeLumosSummary(q: AiShareWindow & { bu?: string | null }): Promise<HomeLumosSummaryResponse> {
   return read<HomeLumosSummaryResponse>(`/api/home-ai-share${queryOf(q, { summary: 'lumos' })}`);
+}
+
+/** รายชื่อคนติดตามของช่วง (9 พ.ย. 2569) — โหลดตอนกดเลขบนแผงติดตามเท่านั้น */
+export function fetchHomeFollowPeople(q: AiShareWindow & { bu?: string | null }): Promise<FollowPeopleResponse> {
+  return read<FollowPeopleResponse>(`/api/home-ai-share${queryOf(q, { summary: 'lumos', people: '1' })}`);
 }
 
 /** แท็บทีม Online (8 ต.ค. 2569) — ใบขอ → ประกาศ → ผลประกาศ → ประเภทงาน → BU */

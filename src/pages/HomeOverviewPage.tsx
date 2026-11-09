@@ -20,6 +20,8 @@ import PeriodPicker from '@/components/shared/PeriodPicker';
 import BuChoiceSelect from '@/components/shared/BuChoiceSelect';
 import ExecDrill, { useDrill } from '@/components/home-exec/ExecDrill';
 import JourneyNamesDialog from '@/components/dashboard-trends/JourneyNamesDialog';
+import FollowNamesDialog from '@/components/home-overview/FollowNamesDialog';
+import type { FollowBucketKey } from '@/lib/homeLumosSummary';
 import {
   ChannelLegend,
   ChannelStrip,
@@ -368,6 +370,13 @@ const HomeOverviewPage: React.FC = () => {
     setNames({ title, ids });
   };
 
+  /** รายชื่อคนติดตาม — ผลรายคนที่กด (null = ทุกคน) · ปิดแผงก่อน ไม่ซ้อนป๊อป */
+  const [followNames, setFollowNames] = useState<{ title: string; bucket: FollowBucketKey | null } | null>(null);
+  const openFollowNames = (title: string, bucket: FollowBucketKey | null) => {
+    setPanel(null);
+    setFollowNames({ title, bucket });
+  };
+
   const openStep = (s: FunnelStep) => {
     const staffRows = s.key === 'staff' || s.key === 'reached' ? (roNow?.staff ?? []).filter((x) => x.claimed + x.called > 0) : [];
     setPanel({
@@ -424,8 +433,13 @@ const HomeOverviewPage: React.FC = () => {
               label: `${r.label} · ${NUM.format(r.calls)} สาย`,
               value: r.people,
               emphasis: r.key === 'went' ? 'success' : r.key === 'notWent' ? 'danger' : r.key === 'failed' || r.key === 'reschedule' ? 'warn' : null,
+              // กดแถว = รายชื่อคนของผลนั้น (9 พ.ย. 2569 "ทำแผงติดตามให้กดเห็นชื่อด้วย")
+              onOpen: () => openFollowNames(`ติดตาม · ${r.label}`, r.key),
             }))}
           />
+          <Button type="button" variant="outline" className="w-full" onClick={() => openFollowNames('ติดตาม', null)} disabled={peopleTotal === 0} data-testid="overview-follow-names">
+            ดูรายชื่อ {NUM.format(peopleTotal)} คน
+          </Button>
           {teams ? (
             <PanelRows
               unit="สาย"
@@ -640,6 +654,13 @@ const HomeOverviewPage: React.FC = () => {
 
       <OverviewSheet panel={panel} onClose={() => setPanel(null)} />
       <ExecDrill drill={drill} all={openReqs} today={today} />
+      <FollowNamesDialog
+        open={followNames !== null}
+        onOpenChange={(o) => !o && setFollowNames(null)}
+        title={followNames?.title ?? ''}
+        q={winQ}
+        bucket={followNames?.bucket ?? null}
+      />
       <JourneyNamesDialog open={names !== null} onOpenChange={(o) => !o && setNames(null)} title={names?.title ?? ''} ids={names?.ids ?? []} />
     </div>
   );
