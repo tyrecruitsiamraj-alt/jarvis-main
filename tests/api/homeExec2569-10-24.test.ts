@@ -89,7 +89,9 @@ describe('หน้า + เส้น', () => {
   });
   it('ครบทุกส่วนที่เจ้าของสั่ง · มีกราฟ Interactive', () => {
     const page = read('src/pages/HomeExecPage.tsx');
-    for (const id of ['exec-kpis', 'exec-flow', 'exec-follow', 'exec-ai-share']) expect(page).toContain(id);
+    // 9 พ.ย. 2569 ติดตาม/ดูแลหลังเริ่มงานย้ายออกจากหน้าแรก (ตรงกับหน้าหลัก)
+    for (const id of ['exec-kpis', 'exec-flow', 'exec-ai-share']) expect(page).toContain(id);
+    expect(page).not.toContain('testId="exec-follow"');
     expect(page).toContain('<HomeRequestsTab');
     expect(page).toContain('<HomeMoneySection');
     const money = read('src/components/home-exec/HomeMoneySection.tsx');
@@ -198,7 +200,7 @@ describe('อ่านหน้าแบบผู้บริหาร 4 ข้�
     expect(read('src/components/home-ai-share/HomeRequestsTab.tsx')).toContain('มาตามนัด (คน)');
   });
   it('ดูแลหลังเริ่มงานบอกสายที่รออยู่ · ต้องรีบบอกชื่อเจ้าหน้าที่', () => {
-    expect(page).toContain('exec-aftercare-upcoming');
+    expect(page).not.toContain('exec-aftercare-upcoming');
     expect(read('api/_handlers/home-money.ts')).toContain('loadAftercareUpcoming');
     // ส่วนต้องรีบถอดแล้ว 28 ต.ค. 2569 — รายการใบที่เสียเงิน (ExecDrill) ยังบอกชื่อเจ้าหน้าที่ทุกแถว
     expect(read('src/components/home-exec/ExecDrill.tsx')).toContain("{r.owner ?? '—'} · ขาด");

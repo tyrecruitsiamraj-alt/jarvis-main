@@ -48,7 +48,6 @@ import type { RequestPipelineResponse } from '@/lib/requestPipelineTypes';
 import { channelInterestOf } from '@/lib/channelPlatforms';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { CONVEYOR_VAULT, conveyorLabel } from '@/lib/soRecruitNav';
-import { thaiDate } from '@/lib/periodPick';
 import { SITE_BU_TO_DEPT, trendBuLabel } from '@/lib/trends/bu';
 import { toYmdBangkok } from '@/lib/dateTh';
 import { countPill } from '@/lib/teamOnline';
@@ -59,7 +58,8 @@ import { cn } from '@/lib/utils';
 const NUM = new Intl.NumberFormat('th-TH');
 const BAHT = new Intl.NumberFormat('th-TH', { maximumFractionDigits: 0 });
 const BU_OPTIONS = [...new Set(Object.values(SITE_BU_TO_DEPT))];
-const LIVE_MS = 60_000;
+// โหลดใหม่ทุก 5 นาที ตรงกับหน้าหลัก (9 พ.ย. 2569)
+const LIVE_MS = 5 * 60_000;
 /** ช่วง "ทั้งหมด" ของปฏิทิน (start null) = นับตั้งแต่ข้อมูลเก่าสุดของสมุด */
 const ALL_FROM = '2024-01-01';
 
@@ -195,7 +195,6 @@ const HomeExecPage: React.FC = () => {
   const total = moneyNow ? moneyNow.totals.need.fine + moneyNow.totals.need.deduct : 0;
   const prevTotal = prevNow ? prevNow.totals.need.fine + prevNow.totals.need.deduct : undefined;
   const speed = moneyNow?.clocks.speed ?? null;
-  const upcoming = money?.aftercareUpcoming ?? null;
   const late = moneyNow?.clocks.late ?? null;
   /** คีย์คงที่ = เลขในกล่องวิ่งจากค่าเดิมไปค่าใหม่ทุกครั้ง รวมตอนเปลี่ยนช่วง/BU (เจ้าของ "Interactive ที่เวลาเปลี่ยนข้อมูล") */
   /**
@@ -618,71 +617,7 @@ const HomeExecPage: React.FC = () => {
         <HomeMoneySection money={moneyNow} prev={prevNow} error={moneyError} />
       </Folded>
 
-      {/* ── ติดตาม · ดูแลหลังเริ่มงาน (AI / คน / ยังไม่โทร) ── */}
-      <HomeSection
-        title="ติดตาม · ดูแลหลังเริ่มงาน"
-        sub="หน่วย: รายชื่อ"
-        testId="exec-follow"
-        right={
-          <Button type="button" variant="outline" size="sm" onClick={() => openAi('follow')}>
-            ดูรายชื่อ
-          </Button>
-        }
-      >
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-          {(
-            [
-              ['ติดตามคนเริ่มงาน · ส่งคนแทน', ai?.follow ?? null, 'follow'],
-              ['ดูแลหลังเริ่มงาน', ai?.aftercare ?? null, 'aftercare'],
-            ] as const
-          ).map(([title, c, pick]) => (
-            <Card
-              key={title}
-              variant="solid"
-              role="button"
-              tabIndex={0}
-              onClick={() => openAi(pick)}
-              onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && openAi(pick)}
-              className="cursor-pointer space-y-3 p-4 transition-colors hover:bg-muted/50"
-              data-testid={`exec-follow-${pick}`}
-            >
-              <span className="block text-sm font-medium text-foreground">{title}</span>
-              <div className="grid grid-cols-4 gap-2">
-                {(
-                  [
-                    ['ทั้งหมด', c?.total, null],
-                    ['AI โทร', c?.ai, 'primary'],
-                    ['คนโทร', c?.staff, 'violet'],
-                    ['ยังไม่โทร', c?.notCalled, 'neutral'],
-                  ] as const
-                ).map(([label, v, tone]) => (
-                  <div key={label} className="space-y-0.5">
-                    <span className="block text-xs text-muted-foreground">{label}</span>
-                    <span className={cn('block text-xl font-medium tabular-nums', tone ? TONE[tone].value : 'text-foreground')}>
-                      {v == null ? '—' : NUM.format(v)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-              {c && c.total > 0 ? (
-                <Progress value={Math.round((c.ai / c.total) * 100)} className="h-1.5" aria-label={`${title} AI ${Math.round((c.ai / c.total) * 100)}%`} />
-              ) : (
-                <Progress value={0} className="h-1.5" />
-              )}
-              {/* ดูแลหลังเริ่มงาน: 0 ในช่วงแต่มีสายนัดไว้ = ยังไม่ถึงคิว ไม่ใช่ระบบพัง (เจ้าของ 25 ต.ค. 2569) */}
-              {pick === 'aftercare' ? (
-                <span className="block text-xs tabular-nums text-muted-foreground" data-testid="exec-aftercare-upcoming">
-                  {upcoming == null
-                    ? 'รอโทร —'
-                    : upcoming.calls > 0 && upcoming.firstAt
-                      ? `รอโทร ${NUM.format(upcoming.calls)} สาย · เริ่ม ${thaiDate(toYmdBangkok(new Date(upcoming.firstAt)))}`
-                      : 'รอโทร 0 สาย'}
-                </span>
-              ) : null}
-            </Card>
-          ))}
-        </div>
-      </HomeSection>
+      {/* ติดตาม · ดูแลหลังเริ่มงาน → อยู่หน้าของมัน + แท็บติดตามด้านบน (เจ้าของ 9 พ.ย. 2569 "ทำหน้า ?home=exec ให้ตรงกัน" · ชุดเดียวกับหน้าหลัก) */}
       </>
       ) : null}
 
