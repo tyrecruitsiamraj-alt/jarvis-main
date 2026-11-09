@@ -113,6 +113,7 @@ const CANCELLATIONS = tableInAppSchema('application_cancellations');
 /** ลิงก์รับสมัคร — ช่องทาง/กลุ่มติดที่ลิงก์ ไม่ได้คัดลอกลงใบสมัคร (19 ต.ค. 2569 · 383 จาก 502 ใบ) */
 const POSTING_LINKS = tableInAppSchema('recruit_posting_links');
 const JOB_POSTING_REQUESTS = tableInAppSchema('job_posting_requests');
+const POSTINGS_TABLE = tableInAppSchema('recruit_postings');
 const scopeWhere = (bu: string) =>
   `not coalesce(a.is_lead, false) and not exists (select 1 from ${CANCELLATIONS} cx where cx.application_id = a.id) and ${buInSql(bu)}`;
 
@@ -132,6 +133,11 @@ export function factsSql(
          -- ลิงก์ที่กรอกผ่าน → Autopost หรือโพสต์เอง (เจ้าของ 9 พ.ย. 2569) · คิดฝั่ง Node (postSourceOf)
          (select l.code from ${POSTING_LINKS} l where l.id = a.link_id) as link_code,
          (select nullif(btrim(l.note), '') from ${POSTING_LINKS} l where l.id = a.link_id) as link_note,
+         -- ใครหารายชื่อมา: คนสร้างลิงก์ › ผู้รับผิดชอบ/คนสร้างประกาศ (ลิงก์เก่า) · ไม่มีลิงก์ = คนเพิ่ม/นำเข้า (9 พ.ย. 2569)
+         case when a.link_id is not null then
+           (select coalesce(nullif(btrim(l.created_by_name), ''), nullif(btrim(pp.responsible_name), ''), nullif(btrim(pp.created_by_name), ''))
+              from ${POSTING_LINKS} l left join ${POSTINGS_TABLE} pp on pp.id = l.posting_id where l.id = a.link_id)
+         else nullif(btrim(a.created_by_name), '') end as bringer,
          nullif(btrim(a.position_interest), '') as position,
          a.phone_e164, a.age,
          ${CALLED_BY_AI_SQL} as by_ai,
@@ -361,6 +367,7 @@ export function toFact(r: Row, boardPhones: Set<string> | null, sources?: AppSou
     irecruitAt: sources ? firstDaySince(sources.irecruitApplicants ?? null, p9, createdAt) : undefined,
     informedAt: sources ? firstDaySince(sources.informDays, p9, createdAt) : undefined,
     postSource: sources ? postSourceOf(text(r.link_code), text(r.link_note), sources.autopostCodes) : undefined,
+    bringer: sources ? text(r.bringer) : undefined,
   };
 }
 
@@ -881,9 +888,12 @@ export async function buildRecruitOverview(
   if (factsR.ok) {
     const apps = factsR.value.map((r) => toFact(r, boardPhones, sources));
     // ชื่อคนเก็บที่เป็นอีเมล → ชื่อเล่น (กติกาเดียวกับตารางผลงานรายคน)
-    if (apps.some((a) => a.claimedBy?.includes('@'))) {
+    if (apps.some((a) => a.claimedBy?.includes('@') || a.bringer?.includes('@'))) {
       const displayOf = await loadStaffDisplay();
-      for (const a of apps) if (a.claimedBy?.includes('@')) a.claimedBy = displayOf(a.claimedBy.toLowerCase()) ?? a.claimedBy;
+      for (const a of apps) {
+        if (a.claimedBy?.includes('@')) a.claimedBy = displayOf(a.claimedBy.toLowerCase()) ?? a.claimedBy;
+        if (a.bringer?.includes('@')) a.bringer = displayOf(a.bringer.toLowerCase()) ?? a.bringer;
+      }
     }
     body.apps = apps;
   } else {

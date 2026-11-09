@@ -20,7 +20,10 @@ const ChannelFunnelTable: React.FC<{
   groups: readonly FunnelNode[];
   total: ChannelFunnelRow;
   onOpen?: (title: string, ids: readonly string[]) => void;
-}> = ({ groups, total, onOpen }) => {
+  /** หัวคอลัมน์แรก + ชั้นบนสุด — ตาราง "ใครหารายชื่อเข้ามา" ใช้ "คน" (9 พ.ย. 2569) */
+  firstLabel?: string;
+  rootLabel?: string;
+}> = ({ groups, total, onOpen, firstLabel = 'ช่องทาง', rootLabel = 'ทุกช่องทาง' }) => {
   /** ชั้นที่กดลงไป (ว่าง = 4 กลุ่ม) — เก็บเป็นคีย์ เลขเปลี่ยนตามช่วงแล้วชั้นเดิมยังอยู่ */
   const [path, setPath] = useState<string[]>([]);
   const trail: FunnelNode[] = [];
@@ -84,7 +87,7 @@ const ChannelFunnelTable: React.FC<{
     <div className="space-y-2">
       <nav className="flex flex-wrap items-center gap-1 text-sm" aria-label="ชั้นช่องทาง" data-testid="channel-funnel-path">
         <Button type="button" variant="link" size="sm" className="h-auto p-0" disabled={trail.length === 0} onClick={() => setPath([])}>
-          ทุกช่องทาง
+          {rootLabel}
         </Button>
         {trail.map((t, i) => (
           <React.Fragment key={t.key}>
@@ -106,7 +109,7 @@ const ChannelFunnelTable: React.FC<{
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="text-xs">ช่องทาง</TableHead>
+              <TableHead className="text-xs">{firstLabel}</TableHead>
               {FUNNEL_COLUMNS.map((c) => (
                 <TableHead key={c.key} className="whitespace-nowrap text-right text-xs">
                   {c.label}

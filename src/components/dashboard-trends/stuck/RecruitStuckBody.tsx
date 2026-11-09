@@ -1,10 +1,10 @@
 import React from 'react';
-import { AlertCircle, Megaphone } from 'lucide-react';
+import { AlertCircle, Megaphone, UserRound } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EMPTY_REQUEST_FILTER, appsOfFilter, filterRequestRows, jobFilterOf, type RequestTabFilter } from '@/lib/recruitRequestTab';
 import { cohortOf, reasonGroups } from '@/lib/recruitOverview';
-import { buildChannelFunnelTree } from '@/lib/channelFunnel';
+import { buildBringerFunnelTree, buildChannelFunnelTree } from '@/lib/channelFunnel';
 import type { RecruitOverviewResponse } from '@/lib/recruitOverviewTypes';
 import { fetchRecruitStuck, type RecruitStuckResponse } from '@/lib/recruitStuckApi';
 import { STUCK_PHASES, STUCK_REASON_LABEL, STUCK_SCOPE_LABEL, stuckInScope, stuckPhaseOf, type StuckPhaseKey, type StuckReasonKey, type StuckRequest, type StuckScope } from '@/lib/recruitStuck';
@@ -85,6 +85,7 @@ export default function RecruitStuckBody({
   const narrowText = [scope !== 'remaining' ? `ใบ${STUCK_SCOPE_LABEL[scope]}` : null, focusLabel].filter(Boolean).join(' · ');
   const cohortSub = `รายชื่อที่กรอกในช่วงที่เลือก ${cohort.length.toLocaleString('th-TH')} คน${narrowText ? ` · เฉพาะ${narrowText}` : ''}`;
   const channels = React.useMemo(() => buildChannelFunnelTree(cohort), [cohort]);
+  const bringers = React.useMemo(() => buildBringerFunnelTree(cohort), [cohort]);
   const reasons = React.useMemo(() => reasonGroups(cohort), [cohort]);
   const appRecruiters = React.useMemo(() => Object.values(data.appJobs ?? {}).map((j) => j.recruiter), [data.appJobs]);
 
@@ -134,6 +135,11 @@ export default function RecruitStuckBody({
       {/* 3 รายชื่อมาจากไหน ไปถึงไหน — ตารางเดิม 4 กลุ่ม → ช่องทาง → กลุ่ม/เพจ · ถึงแจ้งเข้า */}
       <OverviewCard icon={Megaphone} title="รายชื่อมาจากไหน ไปถึงไหน" sub={`${cohortSub}${data.errors.informs ? ' · อ่านแจ้งเข้า ERP ไม่ได้' : ''}`}>
         <ChannelFunnelTable groups={channels.groups} total={channels.total} onOpen={onOpenNames} />
+      </OverviewCard>
+
+      {/* ใครหารายชื่อเข้ามา (เจ้าของ 9 พ.ย. 2569 "ใครทำก็คนนั้นได้ จะได้วัดผลว่าใครมีรายชื่อเข้ามาเยอะ") — คน → วิธี → ช่องทาง/กลุ่ม */}
+      <OverviewCard icon={UserRound} title="ใครหารายชื่อเข้ามา" sub={cohortSub}>
+        <ChannelFunnelTable groups={bringers.groups} total={bringers.total} onOpen={onOpenNames} firstLabel="คน" rootLabel="ทุกคน" />
       </OverviewCard>
 
       {stuck.data?.requests ? <StuckAreaTable rows={focused} title={scope === 'remaining' ? undefined : `พื้นที่ · ใบ${STUCK_SCOPE_LABEL[scope]}`} countLabel={scope === 'remaining' ? undefined : `ใบ${STUCK_SCOPE_LABEL[scope]}`} onPick={pick} /> : null}

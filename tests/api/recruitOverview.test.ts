@@ -154,7 +154,8 @@ describe('เส้นอ่านอย่างเดียว + ขอบเ�
     expect(body).not.toHaveProperty('releases');
     for (const [text] of dbQuery.mock.calls as [string][]) {
       expect(text).not.toContain('job_public_releases');
-      expect(text).not.toContain('recruit_postings');
+      // 9 พ.ย. 2569 อ่านประกาศได้แค่เพื่อหา "ใครหารายชื่อมา" ของลิงก์เก่า (ผู้รับผิดชอบประกาศ) — ไม่ได้นับใบที่ประกาศ
+      expect(text.replace(/left join \S*recruit_postings pp on pp\.id = l\.posting_id/g, '')).not.toContain('recruit_postings');
     }
   });
 

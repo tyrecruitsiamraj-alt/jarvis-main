@@ -202,3 +202,52 @@ export function buildChannelFunnelTree(cohort: readonly RecruitAppFact[]): { gro
   // "อื่น ๆ · ไม่รู้ช่องทาง" อยู่ท้ายเสมอ · 4 กลุ่มหลักเรียงตามที่เจ้าของบอก
   return { groups: out, total: rowOf('รวม', cohort) };
 }
+
+/* ═══ ใครหารายชื่อเข้ามา (เจ้าของ 9 พ.ย. 2569) ═══
+ * > *"คิวโพสต์เอง ก็บอกว่าคนเข้ามาเป็นของคิวนะไม่ใช่พวกทีม ออนไลน์ … ใครทำก็คนนั้นได้จะได้วัดผลว่าใครมีรายชื่อเข้ามาเยอะ"*
+ * คน (`bringer`) → วิธี (Autopost · โพสต์เอง · เพิ่มเอง/นำเข้า) → ช่องทาง/กลุ่ม · คอลัมน์ชุดเดียวกับตารางช่องทาง · ทุกชั้นบวกกันเท่ารวม */
+export const NO_BRINGER_WEB = 'สมัครเองที่หน้าเว็บ';
+export const NO_BRINGER_LINK = 'ลิงก์ไม่รู้ว่าใครสร้าง';
+const IRECRUIT_BRINGER = /^irecruit$/i;
+export function bringerOf(f: Pick<RecruitAppFact, 'bringer' | 'postSource'>): string {
+  const b = (f.bringer ?? '').trim();
+  if (b) return IRECRUIT_BRINGER.test(b) ? 'ดึงจาก iRecruit' : b;
+  return f.postSource ? NO_BRINGER_LINK : NO_BRINGER_WEB;
+}
+export function bringMethodOf(f: Pick<RecruitAppFact, 'bringer' | 'postSource'>): string {
+  if (f.postSource === 'autopost') return POST_SOURCE_LABEL.autopost;
+  if (f.postSource === 'manual') return POST_SOURCE_LABEL.manual;
+  if (IRECRUIT_BRINGER.test((f.bringer ?? '').trim())) return 'ดึงจาก iRecruit';
+  return f.bringer ? 'เพิ่มเอง / นำเข้า' : NO_BRINGER_WEB;
+}
+/** ชั้นสุดท้าย: ชื่อกลุ่ม/เพจถ้ามี ไม่งั้นช่องทาง */
+const placeNameOf = (f: RecruitAppFact): string => {
+  const sub = funnelSubOf(f);
+  return sub !== NO_SUB ? sub : funnelPlaceOf(f).channel;
+};
+export function buildBringerFunnelTree(cohort: readonly RecruitAppFact[]): { groups: FunnelNode[]; total: ChannelFunnelRow } {
+  const by = new Map<string, Map<string, Map<string, RecruitAppFact[]>>>();
+  for (const f of cohort) {
+    const who = bringerOf(f);
+    const how = bringMethodOf(f);
+    const where = placeNameOf(f);
+    const hows = by.get(who) ?? new Map<string, Map<string, RecruitAppFact[]>>();
+    const wheres = hows.get(how) ?? new Map<string, RecruitAppFact[]>();
+    wheres.set(where, [...(wheres.get(where) ?? []), f]);
+    hows.set(how, wheres);
+    by.set(who, hows);
+  }
+  const groups: FunnelNode[] = [...by.entries()]
+    .map(([who, hows]) => {
+      const howNodes: FunnelNode[] = [...hows.entries()]
+        .map(([how, wheres]) => ({
+          ...rowOf(how, [...wheres.values()].flat()),
+          key: `${who}|${how}`,
+          children: [...wheres.entries()].map(([where, l]) => ({ ...rowOf(where, l), key: `${who}|${how}|${where}` })).sort(byNames),
+        }))
+        .sort(byNames);
+      return { ...rowOf(who, [...hows.values()].flatMap((w) => [...w.values()].flat())), key: who, children: howNodes };
+    })
+    .sort(byNames);
+  return { groups, total: rowOf('รวม', cohort) };
+}

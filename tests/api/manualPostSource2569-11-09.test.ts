@@ -8,7 +8,7 @@ import { describe, expect, it } from 'vitest';
 import { SO_LINK_NOTE, soGroupLinkOf } from '@/lib/soScraping';
 import { postSourceOf } from '../../api/_handlers/recruit-overview';
 import { appsOfChannelKey, buildApplicantChannelRows } from '@/lib/recruitRequestTab';
-import { buildChannelFunnelTree } from '@/lib/channelFunnel';
+import { buildBringerFunnelTree, buildChannelFunnelTree, NO_BRINGER_WEB } from '@/lib/channelFunnel';
 import type { RecruitAppFact } from '@/lib/recruitOverviewTypes';
 
 const G = { id: 'g1', fbGroupId: '884533619479424' };
@@ -58,5 +58,30 @@ describe('ตารางช่องทางชั้นที่ 4', () => {
     expect(readFileSync('src/components/jobs/ManualPostPanel.tsx', 'utf8')).toContain('const current = { ...posting, links: [...posting.links, ...made] };');
     // ปุ่มคัดลอกใช้ตัวก๊อปปี้กลาง (มีทางถอย) — กดจริงในหน้าต่างฝังเคยขึ้นคัดลอกไม่ได้
     expect(readFileSync('src/components/jobs/ManualPostPanel.tsx', 'utf8')).toContain('await copyText(textOf(r));');
+  });
+});
+
+describe('ใครหารายชื่อเข้ามา (เจ้าของ 9 พ.ย. 2569 "คิวโพสต์เอง ก็บอกว่าคนเข้ามาเป็นของคิว")', () => {
+  const f = (id: string, p: Partial<RecruitAppFact>) => ({ ...fact(id, null), ...p }) as RecruitAppFact;
+  it('นับให้คนที่ทำ · แยกวิธี → กลุ่ม · ทุกชั้นบวกกันเท่ารวม', () => {
+    const apps = [
+      f('a', { bringer: 'คิว', postSource: 'manual' }),
+      f('b', { bringer: 'คิว', postSource: 'manual' }),
+      f('c', { bringer: 'คิว', postSource: 'autopost' }),
+      f('d', { bringer: 'เจมส์', postSource: null }),
+      f('e', { bringer: 'iRecruit', postSource: null, channelLabel: 'iRecruit' }),
+      f('g', { bringer: null, postSource: null, channelLabel: 'Tiktok · Tiktok Live' }),
+    ];
+    const t = buildBringerFunnelTree(apps);
+    expect(t.groups.map((g) => [g.channel, g.names.value])).toEqual([['คิว', 3], ['เจมส์', 1], ['ดึงจาก iRecruit', 1], [NO_BRINGER_WEB, 1]]);
+    const q = t.groups[0];
+    expect(q.children!.map((c) => [c.channel, c.names.value])).toEqual([['โพสต์เอง', 2], ['Autopost', 1]]);
+    expect(t.groups.find((g) => g.channel === 'เจมส์')!.children![0].channel).toBe('เพิ่มเอง / นำเข้า');
+    expect(t.groups.reduce((n, g) => n + (g.names.value ?? 0), 0)).toBe(t.total.names.value);
+  });
+  it('เซิร์ฟเวอร์: ลิงก์ = คนสร้างลิงก์ › ผู้รับผิดชอบประกาศ (ลิงก์เก่า) · ไม่มีลิงก์ = คนเพิ่ม · อีเมลเป็นชื่อเล่น', () => {
+    const src = readFileSync('api/_handlers/recruit-overview.ts', 'utf8');
+    expect(src).toContain("coalesce(nullif(btrim(l.created_by_name), ''), nullif(btrim(pp.responsible_name), ''), nullif(btrim(pp.created_by_name), ''))");
+    expect(src).toContain("if (a.bringer?.includes('@')) a.bringer = displayOf(a.bringer.toLowerCase()) ?? a.bringer;");
   });
 });
