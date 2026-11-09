@@ -114,7 +114,7 @@ export default function ManualPostPanel({ job }: { job: JobRequest }) {
               <li key={r.group.id} className="flex flex-wrap items-center gap-2 px-3 py-2" data-testid="manual-post-row">
                 <span className={cn('flex min-w-0 flex-1 items-center gap-1.5 text-sm', done ? DASH.sub : 'text-foreground')}>
                   {done ? <Check className={cn('h-4 w-4 shrink-0', TONE.success.value)} aria-hidden /> : null}
-                  <span className="truncate">{soGroupLinkName(r.group, groups ?? [])}</span>
+                  <span className="min-w-0 break-words">{soGroupLinkName(r.group, groups ?? [])}</span>
                 </span>
                 <Button type="button" size="sm" variant={done ? 'outline' : 'default'} onClick={() => void copy(r)} data-testid="manual-post-copy">
                   <Copy aria-hidden />
