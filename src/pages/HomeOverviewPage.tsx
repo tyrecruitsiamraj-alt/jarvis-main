@@ -12,6 +12,7 @@
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import ProportionTab from '@/components/home-overview/ProportionTab';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -24,7 +25,6 @@ import {
   ChannelTable,
   NUM,
   OverviewBarRow,
-  OverviewGroup,
   OverviewNode,
   OverviewSection,
   OverviewSheet,
@@ -401,7 +401,7 @@ const HomeOverviewPage: React.FC = () => {
   const aiStep = funnel?.[1] ?? null;
 
   return (
-    <div className="space-y-5" data-testid="home-overview">
+    <div className="space-y-6" data-testid="home-overview">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-3">
           <h1 className="text-3xl font-medium text-foreground">หน้าหลัก</h1>
@@ -444,65 +444,65 @@ const HomeOverviewPage: React.FC = () => {
       <>
       {moneyError || roError ? <p className={cn('text-sm', TONE.danger.value)}>{moneyError ?? roError}</p> : null}
 
-      {/* ── ตอนนี้ ── */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4" data-testid="overview-kpis">
-        <OverviewNode
-          big
-          variant="kpi"
-          label="เสียเงิน (ตามสัญญา)"
-          value={contract}
-          unit="บาท"
-          emphasis="danger"
-          tag="ด่วน"
-          sub={moneyNow ? `${NUM.format(costlyAll.total)} ใบ · วันละ ${BAHT.format(perDayTotal)} · ลูกค้าหักจริง ${BAHT.format(moneyNow.customerFines.total)}` : undefined}
-          onClick={moneyNow ? openMoney : undefined}
-          testId="overview-kpi-money"
-        />
-        <OverviewNode
-          big
-          variant="kpi"
-          label="เหลือหา"
-          value={flow?.remainingRequests}
-          unit="ใบ"
-          emphasis="warn"
-          tag="ต้องหา"
-          // 9 พ.ย. 2569 ใบขอชั่วคราวอยู่ในเลขนี้แล้ว (สมุดใบขอ) — บอกว่ารวมกี่ใบ ไม่ใช่ "อีก"
-          sub={flow ? `${NUM.format(flow.remaining)} อัตรา · รวมใบขอชั่วคราว ${NUM.format(preCount)} ใบ` : undefined}
-          onClick={flow ? () => openList('เหลือหา', flowRows((f) => f.open).sort((a, b) => perDayOf(b) - perDayOf(a))) : undefined}
-          testId="overview-kpi-remain"
-        />
-        <OverviewNode
-          big
-          variant="kpi"
-          label="ผู้สมัคร"
-          value={applied?.value}
-          unit="คน"
-          sub={aiStep ? `AI โทรแล้ว ${NUM.format(aiStep.value)} · สนใจ ${NUM.format(aiStep.rows[0].value)}` : undefined}
-          onClick={applied ? () => openStep(applied) : undefined}
-          testId="overview-kpi-apps"
-        />
-        <OverviewNode
-          big
-          variant="kpi"
-          label="ติดตาม"
-          value={people ? peopleTotal : null}
-          unit="คน"
-          sub={people ? `${NUM.format(followLive)} สาย · ไป ${NUM.format(wentPeople)} คน` : undefined}
-          onClick={cells ? openFollow : undefined}
-          testId="overview-kpi-follow"
-        />
-      </div>
-
-      {/* ── 1 ใบขอ (แบบร่าง A 30 ต.ค. 2569: หัวเรื่องนอกการ์ด แยก 3 เรื่องให้ชัด) ── */}
-      <OverviewGroup no={1} title="ใบขอ" testId="overview-group-requests">
-      {/* ── ใบขอ: ยกมา + ขอใหม่ − ปิดครบ − ยกเลิก = เหลือหา ── */}
-      <OverviewSection title="ใบขอ" sub="ใบ (อัตรา) · รวมใบขอชั่วคราว" testId="overview-requests">
-        {/* แบบร่าง B (2 พ.ย. 2569): ลูกโซ่ซ้ายไปขวา ผลลัพธ์พื้นกรมท่า */}
-        <div className="grid grid-cols-2 items-stretch gap-2 sm:grid-cols-5">
-          <OverviewNode label="ยกมา" value={flow?.carryInRequests} unit="ใบ" sub={flow ? `${NUM.format(flow.carryIn)} อัตรา` : undefined} onClick={flow ? () => openList('ยกมา', flowRows((f) => f.carry)) : undefined} testId="overview-req-carry" />
-          <OverviewNode label="+ ขอใหม่" value={flow?.newRequests} unit="ใบ" sub={flow ? `${NUM.format(flow.newPositions)} อัตรา` : undefined} onClick={flow ? openNew : undefined} testId="overview-req-new" />
-          <OverviewNode label="− ปิดครบ" value={flow?.closedRequests} unit="ใบ" emphasis="success" onClick={flow ? () => openList('ปิดครบ', flowRows((f) => f.closed)) : undefined} testId="overview-req-closed" />
+      {/* ── ตอนนี้: แถบกรมท่า (แบบร่าง A "หัวกรมท่า" เจ้าของเลือก 9 พ.ย. 2569 หลัง "บ้านนอกคอกนาสุดๆ") ──
+           เหลือหาตัวใหญ่ 2 ช่อง · เสียเงิน · ผู้สมัคร/ติดตามซ้อนกันช่องขวา */}
+      <Card variant="solid" className="bg-foreground p-3 text-background dark:bg-card dark:text-foreground sm:p-5" data-testid="overview-kpis">
+        <div className="grid grid-cols-1 gap-1 sm:grid-cols-2 lg:grid-cols-4">
           <OverviewNode
+            big
+            variant="hero"
+            label="เหลือหา"
+            value={flow?.remainingRequests}
+            unit="ใบ"
+            emphasis="warn"
+            tag="ต้องหา"
+            // 9 พ.ย. 2569 ใบขอชั่วคราวอยู่ในเลขนี้แล้ว (สมุดใบขอ) — บอกว่ารวมกี่ใบ ไม่ใช่ "อีก"
+            sub={flow ? `${NUM.format(flow.remaining)} อัตรา · รวมใบขอชั่วคราว ${NUM.format(preCount)} ใบ` : undefined}
+            onClick={flow ? () => openList('เหลือหา', flowRows((f) => f.open).sort((a, b) => perDayOf(b) - perDayOf(a))) : undefined}
+            className="justify-center sm:col-span-2 lg:row-span-2"
+            testId="overview-kpi-remain"
+          />
+          <OverviewNode
+            variant="hero"
+            label="เสียเงิน (ตามสัญญา)"
+            value={contract}
+            unit="บาท"
+            emphasis="danger"
+            tag="ด่วน"
+            sub={moneyNow ? `${NUM.format(costlyAll.total)} ใบ · วันละ ${BAHT.format(perDayTotal)} · ลูกค้าหักจริง ${BAHT.format(moneyNow.customerFines.total)}` : undefined}
+            onClick={moneyNow ? openMoney : undefined}
+            className="justify-center lg:row-span-2"
+            testId="overview-kpi-money"
+          />
+          <OverviewNode
+            variant="hero"
+            label="ผู้สมัคร"
+            value={applied?.value}
+            unit="คน"
+            sub={aiStep ? `AI โทรแล้ว ${NUM.format(aiStep.value)} · สนใจ ${NUM.format(aiStep.rows[0].value)}` : undefined}
+            onClick={applied ? () => openStep(applied) : undefined}
+            testId="overview-kpi-apps"
+          />
+          <OverviewNode
+            variant="hero"
+            label="ติดตาม"
+            value={people ? peopleTotal : null}
+            unit="คน"
+            sub={people ? `${NUM.format(followLive)} สาย · ไป ${NUM.format(wentPeople)} คน` : undefined}
+            onClick={cells ? openFollow : undefined}
+            testId="overview-kpi-follow"
+          />
+        </div>
+      </Card>
+
+      {/* ── ใบขอ: ยกมา + ขอใหม่ − ปิดครบ − ยกเลิก = เหลือหา · ลูกโซ่ซ้ายไปขวา ผลลัพธ์พื้นเบอร์กันดี ── */}
+      <OverviewSection title="ใบขอ" sub="ใบ (อัตรา) · รวมใบขอชั่วคราว" testId="overview-requests">
+        <div className="grid grid-cols-2 items-stretch gap-3 sm:grid-cols-5">
+          <OverviewNode big label="ยกมา" value={flow?.carryInRequests} unit="ใบ" sub={flow ? `${NUM.format(flow.carryIn)} อัตรา` : undefined} onClick={flow ? () => openList('ยกมา', flowRows((f) => f.carry)) : undefined} testId="overview-req-carry" />
+          <OverviewNode big label="+ ขอใหม่" value={flow?.newRequests} unit="ใบ" sub={flow ? `${NUM.format(flow.newPositions)} อัตรา` : undefined} onClick={flow ? openNew : undefined} testId="overview-req-new" />
+          <OverviewNode big label="− ปิดครบ" value={flow?.closedRequests} unit="ใบ" emphasis="success" onClick={flow ? () => openList('ปิดครบ', flowRows((f) => f.closed)) : undefined} testId="overview-req-closed" />
+          <OverviewNode
+            big
             label="− ยกเลิก"
             value={flow?.cancelledRequests}
             unit="ใบ"
@@ -518,7 +518,7 @@ const HomeOverviewPage: React.FC = () => {
             }
             testId="overview-req-cancel"
           />
-          <OverviewNode label="= เหลือหา" value={flow?.remainingRequests} unit="ใบ" variant="solid" sub={flow ? `${NUM.format(flow.remaining)} อัตรา` : undefined} onClick={flow ? () => openList('เหลือหา', flowRows((f) => f.open)) : undefined} testId="overview-req-remain" />
+          <OverviewNode big label="= เหลือหา" value={flow?.remainingRequests} unit="ใบ" variant="solid" sub={flow ? `${NUM.format(flow.remaining)} อัตรา` : undefined} onClick={flow ? () => openList('เหลือหา', flowRows((f) => f.open)) : undefined} testId="overview-req-remain" />
         </div>
         {/* หาได้แล้ว (ลงงาน) แยกกล่อง — คนที่หาได้ทุกใบ รวมใบที่ได้บางส่วน ≠ ปิดครบ (CLAUDE.md "ห้ามปน หาได้แล้ว กับ ปิดครบใบขอ") */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -549,11 +549,8 @@ const HomeOverviewPage: React.FC = () => {
 
       {/* ใบขอใหม่ ประกาศไปแค่ไหน → ย้ายไปหน้าภาพรวมงานสรรหา (เจ้าของ 9 พ.ย. 2569 "ตามร่างทั้งหมด") */}
 
-      </OverviewGroup>
-
-      {/* ── 2 ผู้สมัคร 6 ขั้น + แถบช่องทาง ── */}
-      <OverviewGroup no={2} title="ผู้สมัคร" head={applied && funnel ? `กรอกมา ${NUM.format(applied.value)} คน` : null} testId="overview-group-funnel">
-      <OverviewSection title="ไปถึงขั้นไหน" sub="กรอกในช่วงที่เลือก · คน" testId="overview-funnel">
+      {/* ── ผู้สมัคร 6 ขั้น + แถบช่องทาง ── */}
+      <OverviewSection title="ผู้สมัคร" sub="ไปถึงขั้นไหน · คน" testId="overview-funnel">
         {/* แบบร่าง B (2 พ.ย. 2569): แท่งยาวตามจำนวนไล่ลงทีละขั้น · ตัวเลขย่อยขวามือ */}
         <div className="space-y-1">
           {(funnel ?? buildApplicantFunnel([])).map((s) => (
@@ -580,7 +577,6 @@ const HomeOverviewPage: React.FC = () => {
         </div>
         <ChannelLegend channels={funnel?.[0]?.channels} />
       </OverviewSection>
-      </OverviewGroup>
 
       {/* หลังได้คน (ติดตาม · ดูแลหลังเริ่มงาน) → อยู่หน้าติดตาม/ดูแลหลังเริ่มงาน · หน้าหลักเหลือการ์ดสรุป "ติดตาม" ด้านบน (9 พ.ย. 2569) */}
       </>

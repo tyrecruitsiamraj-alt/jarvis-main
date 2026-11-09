@@ -21,39 +21,6 @@ export const NUM = new Intl.NumberFormat('th-TH');
 
 export type Emphasis = 'danger' | 'warn' | 'success' | null;
 
-/**
- * กลุ่มเรื่องของหน้าหลัก (เจ้าของ 30 ต.ค. 2569 "มันดูกลมกลืน … แยกให้ชัดเจนหน่อย")
- * แบบร่าง B (เจ้าของเลือก 2 พ.ย. 2569 หลัง "หน้าหลัก ไม่สวย"): หัวเรื่องอยู่คอลัมน์ซ้าย · เลขลำดับสีเบอร์กันดี · ยอดหลักใต้ชื่อ
- * จอแคบหัวเรื่องขึ้นบน
- */
-export function OverviewGroup({
-  no,
-  title,
-  head,
-  children,
-  testId,
-}: {
-  no: number;
-  title: string;
-  /** ยอดหลักของเรื่อง (ใต้ชื่อ) · ไม่ส่ง = ไม่โชว์ */
-  head?: string | null;
-  children: React.ReactNode;
-  testId?: string;
-}) {
-  return (
-    <section className="grid gap-4 pt-2 lg:grid-cols-5" data-testid={testId}>
-      <div className="min-w-0 lg:pt-1">
-        <span className="text-xs font-medium tabular-nums text-primary" aria-hidden>
-          {String(no).padStart(2, '0')}
-        </span>
-        <h2 className="text-2xl font-medium text-foreground">{title}</h2>
-        {head ? <p className="text-sm tabular-nums text-muted-foreground">{head}</p> : null}
-      </div>
-      <div className="min-w-0 space-y-4 lg:col-span-4">{children}</div>
-    </section>
-  );
-}
-
 /** หัวส่วน — ชื่อ + บรรทัดหน่วย + มุมขวา */
 export function OverviewSection({
   title,
@@ -107,15 +74,18 @@ export function OverviewNode({
   tag?: string;
   big?: boolean;
   /**
-   * แบบร่าง B (2 พ.ย. 2569): fill = พื้นเทาเดิม · outline = กล่องขาวมีเส้นขอบ ·
-   * kpi = การ์ดขาวแถบสีตรงด้านบน (สีตาม emphasis · ไม่มี = กรมท่า) · solid = พื้นกรมท่า ใช้กับผลลัพธ์ของสมการ
+   * fill = พื้นเทา · outline = กล่องขาวมีเส้นขอบ ·
+   * hero = ตัวเลขบนแถบกรมท่าด้านบน (แบบร่าง A "หัวกรมท่า" เจ้าของเลือก 9 พ.ย. 2569 · big = เลขเหลือหาตัวใหญ่) ·
+   * solid = พื้นเบอร์กันดี ใช้กับผลลัพธ์ของสมการ
    */
-  variant?: 'fill' | 'outline' | 'kpi' | 'solid';
+  variant?: 'fill' | 'outline' | 'hero' | 'solid';
   onClick?: () => void;
   testId?: string;
   className?: string;
   children?: React.ReactNode;
 }) {
+  /** ตัวหนังสือรองบนพื้นเข้ม (hero/solid) จางลง · พื้นอ่อนใช้เทา · ธีมมืดแถบ hero เป็นการ์ดเข้ม ตัวหนังสือสว่าง */
+  const dim = variant === 'hero' ? 'text-background/70 dark:text-foreground/70' : variant === 'solid' ? 'text-primary-foreground/80' : 'text-muted-foreground';
   return (
     // ปุ่มของ shadcn (CLAUDE.md "ห้ามสร้าง Button ใหม่เอง") — ghost + จัดเป็นการ์ดแนวตั้ง
     <Button
@@ -128,31 +98,31 @@ export function OverviewNode({
         'h-auto min-w-0 flex-col items-stretch justify-start gap-1 whitespace-normal rounded-xl p-3 text-left font-normal transition-all duration-200 hover:-translate-y-0.5 disabled:opacity-100 motion-reduce:transition-none motion-reduce:hover:translate-y-0',
         variant === 'fill' && (emphasis ? TONE[emphasis].wash : 'bg-muted/50 hover:bg-muted'),
         variant === 'outline' && 'border border-border bg-card hover:bg-muted/50',
-        variant === 'kpi' && 'relative overflow-hidden rounded-2xl bg-card p-5 pt-6 shadow-sm hover:bg-card',
-        variant === 'solid' && 'bg-foreground text-background hover:bg-foreground/90 hover:text-background',
-        big && variant !== 'kpi' && 'p-4',
+        variant === 'hero' && 'gap-2 rounded-2xl p-4 text-background hover:bg-background/10 hover:text-background dark:text-foreground dark:hover:bg-foreground/10 dark:hover:text-foreground',
+        variant === 'solid' && 'bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground',
+        big && 'p-4',
         className,
       )}
     >
-      {/* แถบสีตรงบนการ์ด kpi — เดิมใช้ขอบบนหนา มุมโค้งทำให้เป็นรูปเสี้ยว (เจ้าของ 2 พ.ย. 2569 "ตรงนี้ไม่สวย") */}
-      {variant === 'kpi' ? <span aria-hidden className={cn('absolute inset-x-0 top-0 h-1', emphasis ? TONE[emphasis].dot : 'bg-foreground')} /> : null}
       <span className="flex items-center justify-between gap-2">
-        <span className={cn('text-xs', variant === 'solid' ? 'text-background/70' : 'text-muted-foreground')}>{label}</span>
+        <span className={cn(variant === 'hero' ? 'text-sm' : 'text-xs', dim)}>{label}</span>
         {tag && emphasis ? (
-          <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium', TONE[emphasis].soft, TONE[emphasis].value)}>{tag}</span>
+          <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium', variant === 'hero' ? 'bg-background/15 text-background dark:bg-foreground/15 dark:text-foreground' : [TONE[emphasis].soft, TONE[emphasis].value])}>
+            {tag}
+          </span>
         ) : null}
       </span>
       <span
         className={cn(
           'font-medium tabular-nums',
-          variant === 'kpi' ? 'text-4xl' : big ? 'text-3xl' : 'text-2xl',
-          variant === 'solid' ? 'text-background' : variant === 'kpi' || !emphasis ? 'text-foreground' : TONE[emphasis].num,
+          variant === 'hero' ? (big ? 'text-6xl leading-none sm:text-7xl' : 'text-4xl') : big ? 'text-4xl' : 'text-2xl',
+          variant === 'solid' ? 'text-primary-foreground' : variant === 'hero' ? 'text-background dark:text-foreground' : !emphasis ? 'text-foreground' : TONE[emphasis].num,
         )}
       >
         <Num value={value} />
-        {unit ? <span className={cn('ml-1 text-sm font-normal', variant === 'solid' ? 'text-background/70' : 'text-muted-foreground')}>{unit}</span> : null}
+        {unit ? <span className={cn('ml-1 font-normal', big && variant === 'hero' ? 'text-2xl' : 'text-sm', dim)}>{unit}</span> : null}
       </span>
-      {sub ? <span className={cn('text-xs tabular-nums', variant === 'solid' ? 'text-background/70' : 'text-muted-foreground')}>{sub}</span> : null}
+      {sub ? <span className={cn('tabular-nums', variant === 'hero' ? 'text-sm' : 'text-xs', dim)}>{sub}</span> : null}
       {children}
     </Button>
   );
