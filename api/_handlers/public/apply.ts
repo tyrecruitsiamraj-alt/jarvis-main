@@ -1,5 +1,5 @@
 import { dbQuery, dbTransaction } from '../../_lib/postgres.js';
-import { referralSourceOfChannel } from '../../../src/lib/referralChannel.js';
+import { LINE_BOT_CHANNEL, LINE_BOT_CHANNEL_LABEL, referralSourceOfChannel } from '../../../src/lib/referralChannel.js';
 import { sendError, handleApiError, type ApiReq, type ApiRes } from '../../_lib/http.js';
 import { isRequestClosedForApply, REQUEST_CLOSED_APPLY_MESSAGE } from '../../_lib/requestClosedForApply.js';
 import { readJsonBody } from '../../_lib/body.js';
@@ -128,7 +128,23 @@ export default async function handler(req: ApiReq, res: ApiRes) {
     }
 
     // มาจาก LINE Bot (ลายเซ็นตรง) = referral 'line_oa' ตามที่ทีมบอทขอ · ลิงก์ที่ล็อกช่องทางยังชนะ
-    if (lineUserId && !lockedByLink) v.referralSource = 'line_oa';
+    // ช่องทาง = TikTok Live เสมอ ไม่เชื่อที่หน้าเว็บส่งมา (เจ้าของ 9 พ.ย. 2569 · `LINE_BOT_CHANNEL`) · หาแถวไม่เจอ = ป้ายชื่อเฉย ๆ
+    if (lineUserId && !lockedByLink) {
+      v.referralSource = 'line_oa';
+      channelLabel = LINE_BOT_CHANNEL_LABEL;
+      channelId = null;
+      try {
+        const { rows } = await dbQuery<{ id: string }>(
+          `select c.id::text from ${tableInAppSchema('recruit_channels')} c
+             join ${tableInAppSchema('recruit_channels')} p on p.id = c.parent_id
+            where c.name = $1 and p.name = $2 limit 1`,
+          [LINE_BOT_CHANNEL.name, LINE_BOT_CHANNEL.parent],
+        );
+        channelId = rows[0]?.id ?? null;
+      } catch {
+        /* ป้ายชื่อพอ — ใบสมัครต้องบันทึกได้เสมอ */
+      }
+    }
 
     const docBytes = v.document ? Buffer.from(v.document.base64, 'base64') : null;
     // จำแผนกเจ้าของงานไว้กับใบ — ใบขอปิดแล้วรายชื่อต้องยังอยู่ในคลังกลาง (migration 082)

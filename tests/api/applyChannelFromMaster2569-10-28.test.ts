@@ -7,7 +7,8 @@ describe('ช่อง "เห็นประกาศจากช่องท�
     const dlg = readFileSync('src/components/jobs/PublicApplyDialog.tsx', 'utf8');
     expect(dlg).toContain('fetchPublicChannels()');
     expect(dlg).not.toContain('REFERRAL_SOURCES.map');
-    expect(dlg).toContain('channel_id: lockedChannel ? null : referralSource || null');
+    // 9 พ.ย. 2569 ลิงก์บอท LINE ส่ง id ของ Tiktok Live แทน (`lineBotTiktokLive2569-11-09`)
+    expect(dlg).toContain(': referralSource || null,');
     expect(readFileSync('src/lib/publicApplicationsApi.ts', 'utf8')).toContain("apiFetch('/api/public/channels')");
   });
 

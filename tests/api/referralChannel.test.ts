@@ -31,7 +31,9 @@ describe('ล็อกทั้งหน้าเว็บและฝั่ง 
     expect(src).toContain('data-testid="apply-channel-locked"');
     // 28 ต.ค. 2569: ลิงก์กลางส่ง channel_id ช่องทางหลัก (ไม่ใช่ 5 ค่าเดิม) · ลิงก์ที่ล็อกส่งตามลิงก์
     expect(src).toContain('referral_source: lockedSource,');
-    expect(src).toContain('channel_id: lockedChannel ? null : referralSource || null');
+    // 9 พ.ย. 2569: ลิงก์บอท LINE ส่ง id ของ Tiktok Live (เทสต์ `lineBotTiktokLive2569-11-09`) · ลิงก์ที่ Gen ยังส่ง null ให้ API ใช้ช่องทางของลิงก์
+    expect(src).toContain('channel_id: posting?.channelLabel?.trim()\n            ? null');
+    expect(src).toContain(': referralSource || null,');
     expect(code('src/pages/public/PublicPostingApplyPage.tsx')).toContain('channelLabel: info.channelLabel');
   });
   it('API: มี link_id = บันทึกช่องทางตามลิงก์เสมอ ไม่เชื่อค่าจากหน้าเว็บ', () => {

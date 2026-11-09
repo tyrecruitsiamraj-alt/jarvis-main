@@ -24,7 +24,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { CheckCircle2, ClipboardList, Loader2, Lock, MapPin, Paperclip, PhoneCall, Send, UserRound, X } from 'lucide-react';
-import { referralSourceOfChannel } from '@/lib/referralChannel';
+import { LINE_BOT_CHANNEL, LINE_BOT_CHANNEL_LABEL, referralSourceOfChannel } from '@/lib/referralChannel';
 import PdpaConsentCheck from '@/components/shared/PdpaConsentCheck';
 import { PDPA_CONSENT_REQUIRED_MESSAGE, PDPA_CONSENT_TEXT_APPLICANT } from '@/lib/pdpaConsent';
 
@@ -116,13 +116,17 @@ const PublicApplyDialog: React.FC<PublicApplyDialogProps> = ({ open, job, onClos
   /** id ช่องทางหลักที่ผู้สมัครเลือก — รายการจากหน้าจัดช่องทาง (28 ต.ค. 2569 เดิมล็อก 5 ค่า) */
   const [referralSource, setReferralSource] = useState('');
   const [channels, setChannels] = useState<PublicChannel[]>([]);
-  /** ลิงก์มีช่องทาง = ล็อก (เจ้าของ 6 ต.ค. 2569 "Link ที่ Gen ต้อง Lock ช่องทางด้วยสิ่") · ลิงก์กลาง = เลือกเองได้ */
-  const lockedChannel = posting?.channelLabel?.trim() || null;
+  const [searchParams] = useSearchParams();
+  /**
+   * ลิงก์มีช่องทาง = ล็อก (เจ้าของ 6 ต.ค. 2569 "Link ที่ Gen ต้อง Lock ช่องทางด้วยสิ่") · ลิงก์กลาง = เลือกเองได้
+   * ลิงก์จากบอท LINE (มี lid + lsig) = ล็อก TikTok Live (เจ้าของ 9 พ.ย. 2569) · ลิงก์ที่ Gen ยังชนะ · ฝั่ง API ตัดสินจริงจากลายเซ็น
+   */
+  const fromLineBot = Boolean(searchParams.get('lid') && searchParams.get('lsig'));
+  const lockedChannel = posting?.channelLabel?.trim() || (fromLineBot ? LINE_BOT_CHANNEL_LABEL : null);
   const lockedSource = referralSourceOfChannel(lockedChannel);
   const channelRequired = !lockedChannel && channels.length > 0;
   const [file, setFile] = useState<File | null>(null);
   // ลิงก์จาก ตั้งค่า › ลิงก์หน้าสมัคร ที่เลือก "ไม่มีช่องแนบเอกสาร" (`doc=0` · 27 ต.ค. 2569) = ไม่มีช่องนี้
-  const [searchParams] = useSearchParams();
   const showDocument = applyLinkShowsDocument(searchParams);
   const [note, setNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -240,7 +244,12 @@ const PublicApplyDialog: React.FC<PublicApplyDialogProps> = ({ open, job, onClos
           education: education || null,
           // ช่องทางที่เลือก = id ช่องทางหลัก · ฝั่ง API อ่านชื่อจากฐานแล้วคิด referral_source เอง (ลิงก์ที่ล็อกช่องทางชนะ)
           referral_source: lockedSource,
-          channel_id: lockedChannel ? null : referralSource || null,
+          // ลิงก์บอท LINE = id ของ Tiktok Live (ลายเซ็นไม่ผ่านก็ยังได้ช่องทางนี้) · ลิงก์ที่ Gen = ฝั่ง API ใช้ช่องทางของลิงก์
+          channel_id: posting?.channelLabel?.trim()
+            ? null
+            : fromLineBot
+              ? (channels.find((c) => c.name === LINE_BOT_CHANNEL.parent)?.children.find((k) => k.name === LINE_BOT_CHANNEL.name)?.id ?? null)
+              : referralSource || null,
           // ลิงก์จาก LINE Bot So Work (28 ต.ค. 2569) — ส่งต่อให้ API ตรวจลายเซ็นเอง (หน้าเว็บไม่รู้ secret)
           lid: searchParams.get('lid'),
           lsig: searchParams.get('lsig'),

@@ -58,7 +58,9 @@ describe('LINE Bot So Work (ทีมบอท 28 ต.ค. 2569 · ข้อ 1�
     const { readFileSync } = await import('node:fs');
     expect(readFileSync('src/components/jobs/PublicApplyDialog.tsx', 'utf8')).toContain("lsig: searchParams.get('lsig'),");
     const api = readFileSync('api/_handlers/public/apply.ts', 'utf8');
-    expect(api).toContain("if (lineUserId && !lockedByLink) v.referralSource = 'line_oa';");
+    // 9 พ.ย. 2569 ตั้งช่องทาง Tiktok Live พร้อมกันด้วย (`lineBotTiktokLive2569-11-09`)
+    expect(api).toContain('if (lineUserId && !lockedByLink) {');
+    expect(api).toContain("v.referralSource = 'line_oa';");
     expect(api).toContain('void notifyLineBotApplicationCreated(');
     expect(readFileSync('src/components/jobs/JobBoardView.tsx', 'utf8')).toContain("String(j.request_no ?? '').trim().toUpperCase() === no");
   });

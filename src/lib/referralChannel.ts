@@ -10,6 +10,13 @@
  */
 export type ReferralSourceKey = 'facebook' | 'tiktok' | 'instagram' | 'flyer' | 'other';
 
+/**
+ * ผู้สมัครที่มาจากบอท LINE So Work = ช่องทาง TikTok Live (เจ้าของ 9 พ.ย. 2569 "ไม่มีที่อื่น นับเป็น TikTok Live ได้เลย")
+ * คนจะได้ลิงก์บอทต้องดู TikTok Live ก่อน · ฟอร์มล็อกช่องนี้ ฝั่ง API บันทึกเอง · `referral_source = 'line_oa'` ยังเป็นป้ายว่าผ่านบอท
+ */
+export const LINE_BOT_CHANNEL = { parent: 'Tiktok', name: 'Tiktok Live' } as const;
+export const LINE_BOT_CHANNEL_LABEL = `${LINE_BOT_CHANNEL.parent} · ${LINE_BOT_CHANNEL.name}`;
+
 /** ชื่อช่องทางของลิงก์ → ค่าในใบสมัคร · ไม่มีชื่อช่องทาง = null (ไม่ล็อก) */
 export function referralSourceOfChannel(label: string | null | undefined): ReferralSourceKey | null {
   const t = (label ?? '').trim().toLowerCase();
