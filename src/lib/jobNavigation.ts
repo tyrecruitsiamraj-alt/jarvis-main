@@ -29,6 +29,16 @@ export function unitRequestPath(job: JobRequest): string {
 }
 
 /**
+ * path หน้าใบขอจาก job id (`siamraj-sql:<เลข>` · `siamraj-pre:<เลข>`) — ลิงก์จากเลข/รายการใบบนหน้าหลักและภาพรวม
+ * (เจ้าของ 9 พ.ย. 2569 "ถ้าใบก็ต้องใบ") · กติกา prefix เดียวกับ `unitRequestPath` (ใบล่วงหน้าพก prefix · ใบปกติใช้เลขเปล่า)
+ */
+export function requestPathOfJobId(jobId: string): string {
+  if (jobId.startsWith('siamraj-pre:')) return `/jobs/siamraj/${encodeURIComponent(jobId)}`;
+  if (jobId.startsWith('siamraj-sql:')) return `/jobs/siamraj/${encodeURIComponent(jobId.slice('siamraj-sql:'.length))}`;
+  return `/jobs/siamraj/${encodeURIComponent(jobId)}`;
+}
+
+/**
  * path ของ **แท็บ** ในใบขอ — `'detail'` คือหน้าหลัก (ไม่มีส่วนต่อท้าย)
  *
  * 🔴 ต้องต่อท้าย `unitRequestPath()` เท่านั้น ห้ามประกอบ `/jobs/siamraj/${id}` เอง

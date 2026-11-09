@@ -208,6 +208,13 @@ export function rmListViewFromParam(v: string | null | undefined): RmShownView |
   if (isShownRmListView(v)) return v;
   return isRmListView(v) ? (RM_VIEW_ALIAS[v] ?? null) : null;
 }
+/**
+ * ลิงก์เปิดใบสมัครให้ทำงานต่อ (เจ้าของ 9 พ.ย. 2569 "ถ้าบอกชื่อกดไปต้องเห็นชื่อแล้วกดไปทำงานต่อได้")
+ * แท็บผู้สมัคร · รายชื่อทั้งหมด · ค้นชื่อคนนั้น + เปิดป๊อปข้อมูลของเขา (`RmWorkspace` อ่าน `?open=`)
+ */
+export const RM_OPEN_PARAM = 'open';
+export const applicantWorkLink = (id: string) => `/jobs/board?view=list&list=all&${RM_OPEN_PARAM}=${encodeURIComponent(id)}`;
+
 /** มุมมองตอนเปิดแท็บผู้สมัคร (ไม่มี ?list=) — เจ้าของสั่ง 14 ต.ค. 2569 */
 export const RM_LIST_VIEW_DEFAULT = 'interested' as const satisfies RmListView;
 

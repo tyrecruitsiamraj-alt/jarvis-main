@@ -261,20 +261,40 @@ export function PanelRows({
   rows,
   unit,
 }: {
-  rows: ReadonlyArray<{ label: string; value: number; emphasis?: Emphasis }>;
+  /** `onOpen` = แถวกดได้ (เปิดรายชื่อ/รายใบของแถวนั้น · เจ้าของ 9 พ.ย. 2569 "บอกชื่อกดไปต้องเห็นชื่อ") */
+  rows: ReadonlyArray<{ label: string; value: number; emphasis?: Emphasis; onOpen?: () => void }>;
   unit?: string;
 }) {
   return (
     <ul className="divide-y divide-border rounded-xl border border-border">
-      {rows.map((r) => (
-        <li key={r.label} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
-          <span className={cn(r.emphasis ? TONE[r.emphasis].value : 'text-foreground')}>{r.label}</span>
-          <span className="tabular-nums font-medium">
-            {NUM.format(r.value)}
-            {unit ? <span className="ml-1 text-xs font-normal text-muted-foreground">{unit}</span> : null}
-          </span>
-        </li>
-      ))}
+      {rows.map((r) => {
+        const inner = (
+          <>
+            <span className={cn(r.emphasis ? TONE[r.emphasis].value : 'text-foreground')}>{r.label}</span>
+            <span className="tabular-nums font-medium">
+              {NUM.format(r.value)}
+              {unit ? <span className="ml-1 text-xs font-normal text-muted-foreground">{unit}</span> : null}
+            </span>
+          </>
+        );
+        return (
+          <li key={r.label} className="text-sm">
+            {r.onOpen && r.value > 0 ? (
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={r.onOpen}
+                className="h-auto w-full justify-between gap-3 whitespace-normal rounded-none px-3 py-2 text-left font-normal"
+                data-testid="panel-row-open"
+              >
+                {inner}
+              </Button>
+            ) : (
+              <span className="flex items-center justify-between gap-3 px-3 py-2">{inner}</span>
+            )}
+          </li>
+        );
+      })}
     </ul>
   );
 }

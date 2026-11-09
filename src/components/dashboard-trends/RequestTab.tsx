@@ -1,11 +1,13 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { ChevronDown, FileText, MapPin, Users, X } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import SearchableSelect from '@/components/shared/SearchableSelect';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
+import { requestPathOfJobId } from '@/lib/jobNavigation';
 import { DASH, TONE } from '@/lib/designTokens';
 import { formatTrendNumber as fmt } from '@/lib/trends/format';
 import { REQUEST_LEAD_KIND_LABEL, type RequestLeadKind } from '@/lib/requestLeadKind';
@@ -95,6 +97,7 @@ function Tile({
 
 /** รายการใบขอของกล่อง/อำเภอที่กด — จำนวนแถว = เลขบนกล่อง · ต้องหามากสุดขึ้นก่อน */
 function RequestList({ title, rows, onClose }: { title: string; rows: readonly RecruitRequestRow[]; onClose: () => void }) {
+  const navigate = useNavigate();
   return (
     <div className="space-y-2 rounded-xl border border-border p-3" data-testid="request-tab-list">
       <div className="flex items-center justify-between gap-2">
@@ -131,7 +134,14 @@ function RequestList({ title, rows, onClose }: { title: string; rows: readonly R
             {rows.map((r) => (
               <TableRow key={r.requestNo} data-testid="request-tab-list-row">
                 <TableCell className="whitespace-nowrap text-sm tabular-nums">
-                  {r.requestNo}
+                  {/* กดเลขใบ = ไปหน้าใบขอ (เจ้าของ 9 พ.ย. 2569 "ถ้าใบก็ต้องใบ") */}
+                  {r.jobId ? (
+                    <Button type="button" variant="link" className="h-auto p-0 text-sm tabular-nums" onClick={() => navigate(requestPathOfJobId(r.jobId!))}>
+                      {r.requestNo}
+                    </Button>
+                  ) : (
+                    r.requestNo
+                  )}
                   <span className={cn('block text-xs', DASH.sub)}>{r.released ? 'ประกาศแล้ว' : 'ยังไม่ประกาศ'}</span>
                 </TableCell>
                 <TableCell className="text-sm">

@@ -4,13 +4,15 @@
  * shadcn Dialog · ไม่ซ้อนป๊อป · ล้มแล้วมีปุ่มลองใหม่
  */
 import React, { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import LoadErrorNotice from '@/components/shared/LoadErrorNotice';
 import type { PublicApplication } from '@/lib/publicApplicationsApi';
 import { fetchApplicantNames, type ApplicantNameRow } from '@/lib/recruitOverviewApi';
-import { applicationUnitLabel } from '@/lib/recruitRm';
+import { applicantWorkLink, applicationUnitLabel } from '@/lib/recruitRm';
 import { localThaiPhone } from '@/lib/followDayReport';
 import { formatYmdTh, toYmdBangkok } from '@/lib/dateTh';
 import { friendlyErrorText } from '@/lib/friendlyError';
@@ -32,6 +34,7 @@ export default function JourneyNamesDialog({
   notes?: ReadonlyMap<string, string>;
 }) {
   const cols = notes ? 5 : 4;
+  const navigate = useNavigate();
   /** ชื่อตาม id ที่กด (29 ต.ค. 2569) — เดิมดึงลิสต์ผู้สมัครของผู้ใช้ทั้งก้อน คนที่เจ้าหน้าที่คนอื่นเก็บไปแล้วเลย "เปิดชื่อไม่ได้" */
   const [all, setAll] = useState<ApplicantNameRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -98,7 +101,21 @@ export default function JourneyNamesDialog({
                 ) : (
                   rows.map((a) => (
                     <TableRow key={a.id}>
-                      <TableCell className="min-w-32 font-medium">{a.full_name || '—'}</TableCell>
+                      {/* กดชื่อ = ไปทำงานกับคนนั้นต่อ (เจ้าของ 9 พ.ย. 2569 "บอกชื่อกดไปต้องเห็นชื่อแล้วกดไปทำงานต่อได้") */}
+                      <TableCell className="min-w-32 font-medium">
+                        <Button
+                          type="button"
+                          variant="link"
+                          className="h-auto whitespace-normal p-0 text-left font-medium"
+                          onClick={() => {
+                            onOpenChange(false);
+                            navigate(applicantWorkLink(a.id));
+                          }}
+                          data-testid="journey-name-open"
+                        >
+                          {a.full_name || 'ไม่มีชื่อ'}
+                        </Button>
+                      </TableCell>
                       <TableCell className="whitespace-nowrap tabular-nums">{a.phone ? localThaiPhone(a.phone) : '—'}</TableCell>
                       <TableCell className="max-w-56 truncate">{applicationUnitLabel(a as PublicApplication) || '—'}</TableCell>
                       {notes ? <TableCell className="min-w-32">{notes.get(a.id) ?? '—'}</TableCell> : null}

@@ -76,7 +76,7 @@ import { RM_BUCKET_LABEL, isRmBucket } from '@/lib/recruitRmOverviewApi';
 import RecruitDailyPanel from '@/components/recruit-rm/RecruitDailyPanel';
 import { LEAD_VIEW_LABEL } from '@/lib/recruitLead';
 import { fetchCallHoldsByPhones, type CallHold } from '@/lib/callHoldsApi';
-import { canHoldApplication } from '@/lib/recruitRm';
+import { RM_OPEN_PARAM, canHoldApplication } from '@/lib/recruitRm';
 import { choiceCountdown } from '@/lib/callChoiceGuard';
 import { useAuth } from '@/contexts/AuthContext';
 import {
@@ -343,6 +343,27 @@ const RmWorkspace: React.FC<{
       });
   };
   useEffect(load, [leadView, bucket, cancelledView, refreshKey, everyoneAppointments]);
+
+  /**
+   * `?open=<id>` — ลิงก์จากรายชื่อบนหน้าหลัก/ภาพรวม (เจ้าของ 9 พ.ย. 2569 "กดไปทำงานต่อได้") ·
+   * เจอ = ค้นชื่อให้แถวขึ้นในรายชื่อ + เปิดป๊อปของคนนั้น · ไม่เจอ = บอกเหตุ · ใช้แล้วล้างออกจาก URL
+   */
+  const openParam = searchParams.get(RM_OPEN_PARAM);
+  useEffect(() => {
+    if (!openParam || loading) return;
+    const next = new URLSearchParams(searchParams);
+    next.delete(RM_OPEN_PARAM);
+    setSearchParams(next, { replace: true });
+    const row = rows.find((r) => r.id === openParam);
+    if (!row) {
+      say('ไม่เจอคนนี้ในรายชื่อ อาจเป็น Lead หรือถูกยกเลิกข้อมูลแล้ว');
+      return;
+    }
+    setKeyword(row.full_name ?? '');
+    setPage(1);
+    setProfileApp(row);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- ทำครั้งเดียวต่อลิงก์ หลังรายชื่อโหลดเสร็จ
+  }, [openParam, loading]);
 
   const setCancelledView = (on: boolean) => {
     const next = new URLSearchParams(searchParams);

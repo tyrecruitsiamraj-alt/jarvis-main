@@ -1,9 +1,11 @@
 import React from 'react';
 import { ChevronRight, ListTree, Users } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Pagination, PaginationContent, PaginationItem } from '@/components/ui/pagination';
 import { cn } from '@/lib/utils';
+import { requestPathOfJobId } from '@/lib/jobNavigation';
 import { DASH, TONE } from '@/lib/designTokens';
 import { formatTrendNumber as fmt } from '@/lib/trends/format';
 import { formatYmdTh } from '@/lib/dateTh';
@@ -147,6 +149,7 @@ function DrillRequestTable({
   requests: NonNullable<DrillNode['requests']>;
   onOpenNames: (title: string, ids: readonly string[]) => void;
 }) {
+  const navigate = useNavigate();
   const [page, setPage] = React.useState(0);
   const pages = Math.max(1, Math.ceil(requests.length / REQUEST_PAGE));
   const cur = Math.min(page, pages - 1);
@@ -175,7 +178,14 @@ function DrillRequestTable({
                   <td className={cn('px-3 py-2', DASH.cell)}>
                     <span className="block text-foreground">{[r.unitName, r.position].filter(Boolean).join(' · ') || r.requestNo}</span>
                     <span className="flex items-center gap-2 text-xs tabular-nums text-muted-foreground">
-                      {r.requestNo}
+                      {/* กดเลขใบ = ไปหน้าใบขอ (เจ้าของ 9 พ.ย. 2569 "ถ้าใบก็ต้องใบ") */}
+                      {r.jobId ? (
+                        <Button type="button" variant="link" size="xs" className="h-auto p-0 tabular-nums" onClick={() => navigate(requestPathOfJobId(r.jobId!))}>
+                          {r.requestNo}
+                        </Button>
+                      ) : (
+                        r.requestNo
+                      )}
                       {r.open ? null : <Badge variant="secondary">จบแล้ว</Badge>}
                     </span>
                   </td>

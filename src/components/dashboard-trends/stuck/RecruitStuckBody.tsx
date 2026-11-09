@@ -9,6 +9,7 @@ import type { RecruitOverviewResponse } from '@/lib/recruitOverviewTypes';
 import { fetchRecruitStuck, type RecruitStuckResponse } from '@/lib/recruitStuckApi';
 import { STUCK_PHASES, STUCK_REASON_LABEL, STUCK_SCOPE_LABEL, stuckInScope, stuckPhaseOf, type StuckPhaseKey, type StuckReasonKey, type StuckRequest, type StuckScope } from '@/lib/recruitStuck';
 import { friendlyErrorText } from '@/lib/friendlyError';
+import { requestPathOfJobId } from '@/lib/jobNavigation';
 import { OverviewCard, ReasonColumns, SectionError } from '../RecruitOverviewParts';
 import ChannelFunnelTable from '../ChannelFunnelTable';
 import StuckFilterBar from './StuckFilterBar';
@@ -112,10 +113,10 @@ export default function RecruitStuckBody({
     setPicked({ title, rows: list });
     requestAnimationFrame(() => phasesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
   };
-  const openRequest = (r: StuckRequest) => navigate(`/jobs/siamraj/${encodeURIComponent(r.jobId ?? '')}`);
+  const openRequest = (r: StuckRequest) => r.jobId && navigate(requestPathOfJobId(r.jobId));
 
   return (
-    <div className="space-y-3" data-testid="recruit-stuck">
+    <div className="space-y-5" data-testid="recruit-stuck">
       <StuckFilterBar rows={allRows} appRecruiters={appRecruiters} value={filter} onChange={setFilter} />
 
       {stuck.error || stuck.data?.errors.requests ? (

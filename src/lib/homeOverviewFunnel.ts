@@ -36,7 +36,8 @@ export function funnelChannelOf(f: Pick<RecruitAppFact, 'channelLabel' | 'referr
 }
 
 export type FunnelTone = 'success' | 'warn' | 'danger' | 'neutral';
-export type FunnelRow = { key: string; label: string; value: number; tone: FunnelTone };
+/** `ids` = id ใบของแถว/ขั้น — กดเลขแล้วเปิดรายชื่อ (เจ้าของ 9 พ.ย. 2569 "บอกชื่อกดไปต้องเห็นชื่อ") · ใบที่ไม่มี id ไม่อยู่ในรายชื่อ */
+export type FunnelRow = { key: string; label: string; value: number; tone: FunnelTone; ids: string[] };
 export type FunnelStepKey = 'applied' | 'ai' | 'interested' | 'staff' | 'reached' | 'booked';
 export type FunnelStep = {
   key: FunnelStepKey;
@@ -46,6 +47,7 @@ export type FunnelStep = {
   from?: string;
   rows: FunnelRow[];
   channels: Record<FunnelChannel, number>;
+  ids: string[];
 };
 
 const emptyChannels = (): Record<FunnelChannel, number> =>
@@ -65,7 +67,7 @@ export function appsInWindow(apps: readonly RecruitAppFact[], from: string, to: 
   });
 }
 
-const count = (list: readonly RecruitAppFact[], pick: (f: RecruitAppFact) => boolean) => list.filter(pick).length;
+const idsOf = (list: readonly RecruitAppFact[]) => list.map((f) => f.id).filter((v): v is string => Boolean(v));
 const NUM = new Intl.NumberFormat('th-TH');
 
 /**
@@ -76,85 +78,85 @@ const NUM = new Intl.NumberFormat('th-TH');
  */
 export function buildApplicantFunnel(apps: readonly RecruitAppFact[]): FunnelStep[] {
   const aiCalled = apps.filter((f) => f.calledByAi);
-  const aiQueued = count(apps, (f) => !f.calledByAi && f.aiQueued === true);
+  const aiQueued = apps.filter((f) => !f.calledByAi && f.aiQueued === true);
+  const notCalled = apps.filter((f) => !f.calledByAi && f.aiQueued !== true);
   const interested = aiCalled.filter((f) => f.aiAnswer === 'said_yes');
-  const no = count(aiCalled, (f) => f.aiAnswer === 'said_no');
-  const noPickup = count(aiCalled, (f) => f.aiAnswer === 'no_pickup');
+  const no = aiCalled.filter((f) => f.aiAnswer === 'said_no');
+  const noPickup = aiCalled.filter((f) => f.aiAnswer === 'no_pickup');
+  const aiOther = aiCalled.filter((f) => f.aiAnswer !== 'said_yes' && f.aiAnswer !== 'said_no' && f.aiAnswer !== 'no_pickup');
   const staffCalled = apps.filter((f) => f.calledByStaff);
-  const staffOfInterested = count(interested, (f) => f.calledByStaff);
+  const staffOfInterested = interested.filter((f) => f.calledByStaff);
+  const staffNotYet = interested.filter((f) => !f.calledByStaff);
   const reached = staffCalled.filter((f) => f.logOk === true);
+  const unreached = staffCalled.filter((f) => f.logOk !== true);
   const booked = reached.filter((f) => Boolean(f.appointmentAt));
-  const showed = count(booked, (f) => f.attendance === 'showed');
-  const noShow = count(booked, (f) => f.attendance === 'no_show');
-  const moved = count(booked, (f) => f.attendance === 'rescheduled');
-  const otherStaff = staffCalled.length - staffOfInterested;
+  const notBooked = reached.filter((f) => !f.appointmentAt);
+  const showed = booked.filter((f) => f.attendance === 'showed');
+  const noShow = booked.filter((f) => f.attendance === 'no_show');
+  const moved = booked.filter((f) => f.attendance === 'rescheduled');
+  const pending = booked.filter((f) => f.attendance !== 'showed' && f.attendance !== 'no_show' && f.attendance !== 'rescheduled');
+  const otherStaff = staffCalled.length - staffOfInterested.length;
+  const row = (key: string, label: string, list: readonly RecruitAppFact[], tone: FunnelTone): FunnelRow => ({ key, label, value: list.length, tone, ids: idsOf(list) });
 
   return [
     {
       key: 'applied',
       label: 'กรอกมา',
       value: apps.length,
-      rows: [
-        { key: 'aiCalled', label: 'AI โทรแล้ว', value: aiCalled.length, tone: 'neutral' },
-        { key: 'aiQueued', label: 'รอ AI โทร', value: aiQueued, tone: 'warn' },
-        { key: 'notCalled', label: 'ยังไม่โทร', value: apps.length - aiCalled.length - aiQueued, tone: 'warn' },
-      ],
+      rows: [row('aiCalled', 'AI โทรแล้ว', aiCalled, 'neutral'), row('aiQueued', 'รอ AI โทร', aiQueued, 'warn'), row('notCalled', 'ยังไม่โทร', notCalled, 'warn')],
       channels: channelsOf(apps),
+      ids: idsOf(apps),
     },
     {
       key: 'ai',
       label: 'AI โทรแล้ว',
       value: aiCalled.length,
       rows: [
-        { key: 'yes', label: 'สนใจ', value: interested.length, tone: 'success' },
-        { key: 'no', label: 'ไม่สนใจ', value: no, tone: 'neutral' },
-        { key: 'noPickup', label: 'ไม่รับสาย', value: noPickup, tone: 'neutral' },
-        { key: 'other', label: 'อื่น ๆ', value: aiCalled.length - interested.length - no - noPickup, tone: 'neutral' },
+        row('yes', 'สนใจ', interested, 'success'),
+        row('no', 'ไม่สนใจ', no, 'neutral'),
+        row('noPickup', 'ไม่รับสาย', noPickup, 'neutral'),
+        row('other', 'อื่น ๆ', aiOther, 'neutral'),
       ],
       channels: channelsOf(aiCalled),
+      ids: idsOf(aiCalled),
     },
     {
       key: 'interested',
       label: 'สนใจ',
       value: interested.length,
-      rows: [
-        { key: 'staffCalled', label: 'คนโทรต่อแล้ว', value: staffOfInterested, tone: 'success' },
-        { key: 'staffNotYet', label: 'ยังไม่มีคนโทรต่อ', value: interested.length - staffOfInterested, tone: 'warn' },
-      ],
+      rows: [row('staffCalled', 'คนโทรต่อแล้ว', staffOfInterested, 'success'), row('staffNotYet', 'ยังไม่มีคนโทรต่อ', staffNotYet, 'warn')],
       channels: channelsOf(interested),
+      ids: idsOf(interested),
     },
     {
       key: 'staff',
       label: 'คนโทรต่อ',
       value: staffCalled.length,
-      from: `สนใจ ${NUM.format(staffOfInterested)} + กลุ่มอื่น ${NUM.format(otherStaff)}`,
-      rows: [
-        { key: 'reached', label: 'ติดต่อได้', value: reached.length, tone: 'success' },
-        { key: 'unreached', label: 'ติดต่อไม่ได้', value: staffCalled.length - reached.length, tone: 'danger' },
-      ],
+      from: `สนใจ ${NUM.format(staffOfInterested.length)} + กลุ่มอื่น ${NUM.format(otherStaff)}`,
+      rows: [row('reached', 'ติดต่อได้', reached, 'success'), row('unreached', 'ติดต่อไม่ได้', unreached, 'danger')],
       channels: channelsOf(staffCalled),
+      ids: idsOf(staffCalled),
     },
     {
       key: 'reached',
       label: 'ติดต่อได้',
       value: reached.length,
-      rows: [
-        { key: 'booked', label: 'นัดได้', value: booked.length, tone: 'success' },
-        { key: 'notBooked', label: 'นัดไม่ได้', value: reached.length - booked.length, tone: 'danger' },
-      ],
+      rows: [row('booked', 'นัดได้', booked, 'success'), row('notBooked', 'นัดไม่ได้', notBooked, 'danger')],
       channels: channelsOf(reached),
+      ids: idsOf(reached),
     },
     {
       key: 'booked',
       label: 'นัดได้',
       value: booked.length,
       rows: [
-        { key: 'showed', label: 'มา', value: showed, tone: 'success' },
-        { key: 'noShow', label: 'ไม่มา', value: noShow, tone: 'danger' },
-        ...(moved > 0 ? [{ key: 'moved', label: 'เลื่อนนัด', value: moved, tone: 'neutral' as const }] : []),
-        { key: 'pending', label: 'ยังไม่ลงผล', value: booked.length - showed - noShow - moved, tone: 'warn' },
+        row('showed', 'มา', showed, 'success'),
+        row('noShow', 'ไม่มา', noShow, 'danger'),
+        ...(moved.length > 0 ? [row('moved', 'เลื่อนนัด', moved, 'neutral')] : []),
+        row('pending', 'ยังไม่ลงผล', pending, 'warn'),
       ],
       channels: channelsOf(booked),
+      ids: idsOf(booked),
     },
   ];
 }

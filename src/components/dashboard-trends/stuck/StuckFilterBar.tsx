@@ -49,7 +49,7 @@ export default function StuckFilterBar({
   const active = isRequestFilterActive(f);
 
   return (
-    <div className="flex flex-wrap items-end gap-2 rounded-2xl border border-border bg-card p-3" data-testid="request-tab-filters">
+    <div className="flex flex-wrap items-end gap-2 rounded-2xl bg-card p-3 shadow-sm ring-1 ring-foreground/5" data-testid="request-tab-filters">
       <div className="flex min-w-40 flex-1 flex-col gap-1">
         <Label className={cn('text-xs font-normal', DASH.sub)}>เจ้าหน้าที่สรรหา</Label>
         <SearchableSelect

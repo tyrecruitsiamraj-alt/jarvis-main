@@ -74,12 +74,13 @@ export function OverviewCard({
   children: React.ReactNode;
 }) {
   return (
-    <Card className={cn('flex min-w-0 flex-col gap-3 rounded-2xl p-3 sm:p-4', className)}>
+    // โฉมเดียวกับการ์ดหน้าหลัก (เจ้าของ 9 พ.ย. 2569 "ทำหน้าภาพรวมให้สวยแบบเดียวกัน") — การ์ดขาวทึบ เงานุ่ม หัวใหญ่
+    <Card variant="solid" className={cn('flex min-w-0 flex-col gap-4 p-4 sm:p-6', className)}>
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="flex min-w-0 items-start gap-3">
           {/* ไอคอนหัวการ์ดถอดแล้ว (เจ้าของ 27 ต.ค. 2569 "พวกอิโมจิเอาออกด้วย") — `icon` คงไว้ให้หน้าที่เรียกไม่ต้องแก้ */}
           <div className="min-w-0">
-            <h3 className="flex flex-wrap items-center gap-2 text-sm font-medium text-foreground">
+            <h3 className="flex flex-wrap items-center gap-2 text-lg font-medium text-foreground">
               {title}
               {badge}
             </h3>

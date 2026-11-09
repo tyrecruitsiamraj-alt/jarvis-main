@@ -19,6 +19,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import PeriodPicker from '@/components/shared/PeriodPicker';
 import BuChoiceSelect from '@/components/shared/BuChoiceSelect';
 import ExecDrill, { useDrill } from '@/components/home-exec/ExecDrill';
+import JourneyNamesDialog from '@/components/dashboard-trends/JourneyNamesDialog';
 import {
   ChannelLegend,
   ChannelStrip,
@@ -219,28 +220,48 @@ const HomeOverviewPage: React.FC = () => {
             {[...bus.entries()]
               .sort((a, b) => b[1].perDay - a[1].perDay)
               .map(([k, v]) => (
-                <li key={k} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
-                  <span>{k === 'ไม่ระบุ BU' ? k : trendBuLabel(k)}</span>
-                  <span className="text-right tabular-nums text-muted-foreground">
-                    {NUM.format(v.n)} ใบ · ขาด {NUM.format(v.missing)} คน ·{' '}
-                    <span className={cn('font-medium', TONE.danger.value)}>{BAHT.format(v.perDay)} บาท/วัน</span>
-                  </span>
+                <li key={k}>
+                  {/* กดแถว = รายใบของ BU นั้น (9 พ.ย. 2569 "ถ้าใบก็ต้องใบ") */}
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="h-auto w-full justify-between gap-3 whitespace-normal rounded-none px-3 py-2 text-left text-sm font-normal"
+                    onClick={() => openList(`เสียเงิน · ${k === 'ไม่ระบุ BU' ? k : trendBuLabel(k)}`, rows.filter((x) => (x.bu ?? 'ไม่ระบุ BU') === k))}
+                  >
+                    <span>{k === 'ไม่ระบุ BU' ? k : trendBuLabel(k)}</span>
+                    <span className="text-right tabular-nums text-muted-foreground">
+                      {NUM.format(v.n)} ใบ · ขาด {NUM.format(v.missing)} คน ·{' '}
+                      <span className={cn('font-medium', TONE.danger.value)}>{BAHT.format(v.perDay)} บาท/วัน</span>
+                    </span>
+                  </Button>
                 </li>
               ))}
           </ul>
           <p className="text-sm font-medium text-foreground">ใบที่เสียมากสุด</p>
           <ul className="divide-y divide-border rounded-xl border border-border">
             {costlyAll.rows.slice(0, 5).map((r) => (
-              <li key={r.requestNo} className="flex items-start justify-between gap-3 px-3 py-2 text-sm">
-                <span className="min-w-0">
-                  <span className="line-clamp-2 text-foreground">
-                    {r.unit} · {r.position}
+              <li key={r.requestNo}>
+                {/* กดแถว = เปิดใบนั้นกางรายละเอียด มีปุ่มเปิดใบขอไปทำงานต่อ */}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="h-auto w-full items-start justify-between gap-3 whitespace-normal rounded-none px-3 py-2 text-left text-sm font-normal"
+                  onClick={() => {
+                    setPanel(null);
+                    drill.open({ title: r.requestNo, rows: rowsOf([r]), expand: r.requestNo });
+                  }}
+                  data-testid="overview-money-row"
+                >
+                  <span className="min-w-0">
+                    <span className="line-clamp-2 text-foreground">
+                      {r.unit} · {r.position}
+                    </span>
+                    <span className="block text-xs text-muted-foreground">
+                      {r.requestNo} · ขาด {NUM.format(r.missing)} คน · {r.owner ?? 'ยังไม่มีคนรับผิดชอบ'}
+                    </span>
                   </span>
-                  <span className="block text-xs text-muted-foreground">
-                    {r.requestNo} · ขาด {NUM.format(r.missing)} คน · {r.owner ?? 'ยังไม่มีคนรับผิดชอบ'}
-                  </span>
-                </span>
-                <span className={cn('shrink-0 font-medium tabular-nums', TONE.danger.value)}>{BAHT.format(r.perDay)}/วัน</span>
+                  <span className={cn('shrink-0 font-medium tabular-nums', TONE.danger.value)}>{BAHT.format(r.perDay)}/วัน</span>
+                </Button>
               </li>
             ))}
           </ul>
@@ -299,6 +320,7 @@ const HomeOverviewPage: React.FC = () => {
               label: REQUEST_LEAD_KIND_LABEL[k],
               value: lead.get(k) ?? 0,
               emphasis: k === 'retroactive' ? 'danger' : k === 'urgent' ? 'warn' : null,
+              onOpen: () => openList(`ขอใหม่ · ${REQUEST_LEAD_KIND_LABEL[k]}`, list.filter((r) => requestLeadKindFromYmd(r.keyYmd, r.needYmd) === k)),
             }))}
           />
           <p className="text-sm font-medium text-foreground">งานอะไร</p>
@@ -306,18 +328,44 @@ const HomeOverviewPage: React.FC = () => {
           <PanelRows
             unit="ใบ"
             rows={[
-              ...topKinds.slice(0, 8).map(([label, value]) => ({ label, value })),
-              ...(topKinds.length > 8 ? [{ label: 'อื่น ๆ', value: topKinds.slice(8).reduce((n, [, v]) => n + v, 0) }] : []),
+              ...topKinds.slice(0, 8).map(([label, value]) => ({ label, value, onOpen: () => openList(`ขอใหม่ · ${label}`, list.filter((r) => (r.position || 'ไม่ระบุ').trim() === label)) })),
+              ...(topKinds.length > 8
+                ? [
+                    {
+                      label: 'อื่น ๆ',
+                      value: topKinds.slice(8).reduce((n, [, v]) => n + v, 0),
+                      onOpen: () => {
+                        const top = new Set(topKinds.slice(0, 8).map(([k]) => k));
+                        openList('ขอใหม่ · อื่น ๆ', list.filter((r) => !top.has((r.position || 'ไม่ระบุ').trim())));
+                      },
+                    },
+                  ]
+                : []),
             ]}
           />
           <p className="text-sm font-medium text-foreground">แยก BU</p>
-          <PanelRows unit="ใบ" rows={[...bus.entries()].sort((a, b) => b[1] - a[1]).map(([k, v]) => ({ label: k === 'ไม่ระบุ BU' ? k : trendBuLabel(k), value: v }))} />
+          <PanelRows
+            unit="ใบ"
+            rows={[...bus.entries()]
+              .sort((a, b) => b[1] - a[1])
+              .map(([k, v]) => {
+                const label = k === 'ไม่ระบุ BU' ? k : trendBuLabel(k);
+                return { label, value: v, onOpen: () => openList(`ขอใหม่ · ${label}`, list.filter((r) => (r.bu ?? 'ไม่ระบุ BU') === k)) };
+              })}
+          />
           <Button type="button" variant="outline" className="w-full" onClick={() => openList('ขอใหม่', list)}>
             ดูทุกใบ {NUM.format(list.length)} ใบ
           </Button>
         </div>
       ),
     });
+  };
+
+  /** รายชื่อของเลขที่กด (9 พ.ย. 2569 "บอกชื่อกดไปต้องเห็นชื่อแล้วกดไปทำงานต่อได้") — ปิดแผงก่อน ไม่ซ้อนป๊อป */
+  const [names, setNames] = useState<{ title: string; ids: readonly string[] } | null>(null);
+  const openNames = (title: string, ids: readonly string[]) => {
+    setPanel(null);
+    setNames({ title, ids });
   };
 
   const openStep = (s: FunnelStep) => {
@@ -328,7 +376,12 @@ const HomeOverviewPage: React.FC = () => {
       go: STEP_PAGE[s.key],
       body: (
         <div className="space-y-4">
-          {s.rows.length ? <PanelRows unit="คน" rows={s.rows.map((r) => ({ label: r.label, value: r.value, emphasis: toneOfRow(r.tone) }))} /> : null}
+          {s.rows.length ? (
+            <PanelRows
+              unit="คน"
+              rows={s.rows.map((r) => ({ label: r.label, value: r.value, emphasis: toneOfRow(r.tone), onOpen: () => openNames(`${s.label} · ${r.label}`, r.ids) }))}
+            />
+          ) : null}
           {staffRows.length ? (
             <div className="space-y-2">
               <p className="text-sm font-medium text-foreground">แยกเจ้าหน้าที่</p>
@@ -349,6 +402,9 @@ const HomeOverviewPage: React.FC = () => {
             </div>
           ) : null}
           <ChannelTable channels={s.channels} />
+          <Button type="button" variant="outline" className="w-full" onClick={() => openNames(s.label, s.ids)} disabled={s.value === 0} data-testid="overview-step-names">
+            ดูรายชื่อ {NUM.format(s.value)} คน
+          </Button>
         </div>
       ),
     });
@@ -584,6 +640,7 @@ const HomeOverviewPage: React.FC = () => {
 
       <OverviewSheet panel={panel} onClose={() => setPanel(null)} />
       <ExecDrill drill={drill} all={openReqs} today={today} />
+      <JourneyNamesDialog open={names !== null} onOpenChange={(o) => !o && setNames(null)} title={names?.title ?? ''} ids={names?.ids ?? []} />
     </div>
   );
 };

@@ -4,12 +4,15 @@
  * รายใบในแต่ละชั้นบวกกันเท่าเลขในกล่องที่กดมา (ชุดเดียวกับตัวนับ `requestFlowRole` / `byOwner` / `costliest`)
  */
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { NO_REASON, chargesToday, perDayOf } from '@/lib/homeExec';
 import type { MoneyRequest } from '@/lib/homeMoney';
+import { PREQUEST_LEDGER_PREFIX, ledgerJobIdOf } from '@/lib/requestPenaltyLedger';
+import { requestPathOfJobId } from '@/lib/jobNavigation';
 import { thaiDate } from '@/lib/periodPick';
 import { TONE } from '@/lib/designTokens';
 import { cn } from '@/lib/utils';
@@ -52,6 +55,7 @@ export default function ExecDrill({
   today: string;
 }) {
   const lv = drill.stack[drill.stack.length - 1] ?? null;
+  const navigate = useNavigate();
   const [openRow, setOpenRow] = useState<string | null>(null);
   const [limit, setLimit] = useState(50);
   const levelKey = `${drill.stack.length}|${lv?.title ?? ''}`;
@@ -226,6 +230,18 @@ export default function ExecDrill({
                                 </span>
                               </div>
                               <div className="flex flex-wrap gap-2">
+                                {/* ไปทำงานกับใบนี้ต่อ (เจ้าของ 9 พ.ย. 2569 "ถ้าใบก็ต้องใบ") — หน้าใบขอ ใบจริง/ใบขอชั่วคราว */}
+                                <Button
+                                  type="button"
+                                  size="xs"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    navigate(requestPathOfJobId(ledgerJobIdOf({ requestNo: r.requestNo, prequest: r.requestNo.startsWith(PREQUEST_LEDGER_PREFIX) })));
+                                  }}
+                                  data-testid="exec-drill-open-request"
+                                >
+                                  เปิดใบขอ
+                                </Button>
                                 {r.owner ? (
                                   <Button
                                     type="button"

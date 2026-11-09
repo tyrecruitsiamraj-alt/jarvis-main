@@ -105,7 +105,7 @@ describe('หน้าภาพรวมโฉมใหม่', () => {
       </MemoryRouter>,
     );
     const eq = await screen.findByTestId('stuck-equation');
-    const v = (k: string) => Number(within(eq).getByTestId(`stuck-eq-${k}`).textContent?.match(/\d+/)?.[0]);
+    const v = (k: string) => Number(within(eq).getByTestId(`stuck-eq-${k}-n`).textContent?.match(/\d+/)?.[0]);
     expect([v('carried'), v('new'), v('filled'), v('cancelled'), v('remaining')]).toEqual([1, 3, 0, 1, 3]);
     expect(fetchRecruitStuck).toHaveBeenLastCalledWith(null, { from: '2026-10-29', to: '2026-11-04' });
     // ค่าเริ่ม: รายชื่อทุกคนในช่วง 2 คน · AI สนใจ 1 → อ้นเก็บไป ยังไม่โทร
