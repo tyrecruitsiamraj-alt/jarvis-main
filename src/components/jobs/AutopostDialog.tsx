@@ -15,12 +15,13 @@ import { useRecruiterContact } from '@/hooks/useRecruiterContact';
 import { jobBoardCardTitle, jobUnitSectorOf } from '@/lib/unitRequestDisplay';
 import { SoGroupFilterPicker } from '@/components/jobs/SoGroupPicker';
 import { publicJobTitle } from '@/lib/publicJobTitle';
-import { addPostingLink, createRecruitPosting, fetchRecruitPostings, searchRecruitChannels } from '@/lib/recruitPostingsApi';
+import { createRecruitPosting, fetchRecruitPostings } from '@/lib/recruitPostingsApi';
 import { jobPostingBody } from '@/lib/recruitPostingDraft';
+import { ensureSoGroupLinks } from '@/lib/soGroupLinks';
 import { releaseJobsToPublic } from '@/lib/jobPublicReleaseApi';
 import { AUTOPOST_LINK_PLACEHOLDER } from '@/lib/postText';
 import { saveUnitFieldOverridesPatch } from '@/lib/siamrajUnitRequestsApi';
-import { applyLinkPath, recruitChannelLabel, type RecruitPosting, type RecruitPostingLink } from '@/lib/recruitPostings';
+import { applyLinkPath, type RecruitPosting } from '@/lib/recruitPostings';
 import {
   composeJobSnapshot,
   createJobPostingRequest,
@@ -40,11 +41,6 @@ import {
   soGroupLabel,
   soGroupsOfAccount,
   jobBuOf,
-  isFacebookGroupChannel,
-  soGroupLinkKey,
-  soGroupLinkLabel,
-  soGroupLinkName,
-  soGroupLinkOf,
   type SoGroupLink,
   soAccountsByBu,
   soAccountsOrdered,
@@ -280,24 +276,10 @@ export function AutopostBody({
    */
   const ensureGroupLinks = async (openPosting: RecruitPosting): Promise<SoGroupLink[]> => {
     if (!opts) throw new Error('โหลดข้อมูล So Scraping ไม่ได้');
-    const matches = await searchRecruitChannels('Facebook Group', { limit: 20 });
-    const fbGroup = matches.find((c) => isFacebookGroupChannel(c.name) && /^facebook$/i.test((c.parentName ?? '').trim())) ?? null;
-    const channelLabel = fbGroup ? recruitChannelLabel(fbGroup) : 'Facebook · Facebook Group';
-    const have: RecruitPostingLink[] = [...openPosting.links];
-    const made: RecruitPostingLink[] = [];
-    const out: SoGroupLink[] = [];
-    for (const g of opts.groups.filter((x) => picked.includes(x.id))) {
-      const label = soGroupLinkLabel(channelLabel, soGroupLinkName(g, opts.groups));
-      let l = soGroupLinkOf(have, g, label);
-      if (!l) {
-        l = await addPostingLink(openPosting.id, { channelId: fbGroup?.id ?? null, channelLabel: label, fbGroupId: soGroupLinkKey(g) });
-        made.push(l);
-        have.push(l);
-      }
-      out.push({ group_id: g.id, link_code: l.code, apply_link: `${window.location.origin}${applyLinkPath(l.code)}` });
-    }
+    // ลิงก์ของ Autopost แยกจากลิงก์โพสต์เอง (`note` · 9 พ.ย. 2569) — ผู้สมัครบอกได้ว่ามาทางไหน
+    const { links, made } = await ensureSoGroupLinks(openPosting, opts.groups.filter((x) => picked.includes(x.id)), opts.groups, 'autopost');
     if (made.length) setPostings((prev) => (prev ?? []).map((p) => (p.id === openPosting.id ? { ...p, links: [...p.links, ...made] } : p)));
-    return out;
+    return links.map(({ group, link }) => ({ group_id: group.id, link_code: link.code, apply_link: `${window.location.origin}${applyLinkPath(link.code)}` }));
   };
 
   const pickAccount = (id: string) => {

@@ -569,7 +569,7 @@ function ChannelRow({
   onPick,
 }: {
   r: ApplicantChannelRow;
-  level: 0 | 1 | 2 | 3;
+  level: 0 | 1 | 2 | 3 | 4;
   open?: boolean;
   onToggle?: () => void;
   /** แถวที่กดอยู่ — การ์ดตำแหน่ง/เหตุผลข้างล่างเป็นของช่องทางนี้ */
@@ -580,7 +580,7 @@ function ChannelRow({
   return (
     <TableRow className={cn(level === 0 && 'bg-muted/40 font-medium hover:bg-muted/40', picked && 'bg-muted')} data-testid={`request-tab-channel-${level}`}>
       {/* ชื่อช่องทางค้างซ้ายตอนเลื่อนตาราง (มือถือ · QA 30 ต.ค. 2569) */}
-      <TableCell className={cn('sticky left-0 z-10 whitespace-nowrap text-sm', picked || level === 0 ? 'bg-muted' : 'bg-card', level === 2 && 'pl-9', level === 3 && 'pl-14')}>
+      <TableCell className={cn('sticky left-0 z-10 whitespace-nowrap text-sm', picked || level === 0 ? 'bg-muted' : 'bg-card', level === 2 && 'pl-9', level === 3 && 'pl-14', level === 4 && 'pl-20')}>
         <span className="flex items-center gap-1">
           {onToggle ? (
             <Button type="button" variant="ghost" size="iconXs" className="-ml-2" aria-expanded={open} aria-label={open ? `ปิด ${r.name}` : `เปิด ${r.name}`} onClick={onToggle}>
@@ -665,7 +665,15 @@ function ApplicantCard({
                   ? (g.children ?? []).map((c) => (
                       <React.Fragment key={c.key}>
                         <ChannelRow {...rowProps(c)} level={2} />
-                        {open.has(c.key) ? (c.children ?? []).map((cc) => <ChannelRow key={cc.key} {...rowProps(cc)} level={3} />) : null}
+                        {open.has(c.key)
+                          ? (c.children ?? []).map((cc) => (
+                              <React.Fragment key={cc.key}>
+                                <ChannelRow {...rowProps(cc)} level={3} />
+                                {/* ชั้นที่ 4: Autopost / โพสต์เอง ของกลุ่มนี้ (9 พ.ย. 2569) */}
+                                {open.has(cc.key) ? (cc.children ?? []).map((s4) => <ChannelRow key={s4.key} {...rowProps(s4)} level={4} />) : null}
+                              </React.Fragment>
+                            ))
+                          : null}
                       </React.Fragment>
                     ))
                   : null}

@@ -119,6 +119,8 @@ describe('เส้นอ่านอย่างเดียว + ขอบเ�
       if (text.includes('nickname')) continue;
       // เจ้าหน้าที่สรรหาของใบขอ (4 พ.ย. 2569) — ค้นด้วยเลขที่ใบของรายชื่อที่ผูก BU มาแล้ว ไม่ใช่ข้อมูลใบสมัคร
       if (text.includes('siamraj_unit_assignments')) continue;
+      // รหัสลิงก์ของใบสั่ง Autopost (9 พ.ย. 2569) — ใช้แยกว่ามาจาก Autopost หรือโพสต์เอง ไม่ใช่ข้อมูลใบสมัคร
+      if (text.includes('group_links')) continue;
       expect(params?.[params.length - 1], text.slice(0, 60)).toEqual(['LBD']);
     }
   });
@@ -131,7 +133,8 @@ describe('เส้นอ่านอย่างเดียว + ขอบเ�
       await handler({ method: 'GET', user: { sub: 'u1', role: 'staff' }, query: { month: '2026-09', ...(bu ? { bu } : {}) } }, { status: () => ({ json }), setHeader: vi.fn() });
       const body = json.mock.calls[0][0];
       const sent = (dbQuery.mock.calls as [string, unknown[] | undefined][])
-        .filter(([text]) => !text.includes('any_row') && !text.includes('nickname') && !text.includes('siamraj_unit_assignments'))
+        // group_links = รหัสลิงก์ของใบสั่ง Autopost (9 พ.ย. 2569) ไม่ใช่ข้อมูลใบสมัคร
+        .filter(([text]) => !text.includes('any_row') && !text.includes('nickname') && !text.includes('siamraj_unit_assignments') && !text.includes('group_links'))
         .map(([, params]) => params?.[params.length - 1]);
       return { body, sent };
     };

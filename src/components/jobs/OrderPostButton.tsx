@@ -33,6 +33,7 @@ import {
 import { AutopostBody } from '@/components/jobs/AutopostDialog';
 import SoStartLine from '@/components/jobs/SoStartLine';
 import SoStuckPanel from '@/components/jobs/SoStuckPanel';
+import ManualPostPanel from '@/components/jobs/ManualPostPanel';
 
 /**
  * ═══ ฟอร์มสั่ง So Scraping — เลือกว่าจะ Autopost หรือ Scrap แล้วไล่ข้อ 1-2-3 (เจ้าของ 3 พ.ย. 2569) ═══
@@ -48,9 +49,11 @@ import SoStuckPanel from '@/components/jobs/SoStuckPanel';
  */
 const AUTO_WORKER = '__auto__';
 const NUM = new Intl.NumberFormat('th-TH');
-type OrderKind = 'autopost' | 'scrap' | 'genlink';
+type OrderKind = 'autopost' | 'manual' | 'scrap' | 'genlink';
 const KIND_OPTIONS: Array<{ value: OrderKind; label: string }> = [
   { value: 'autopost', label: 'Autopost — โพสต์ลงกลุ่ม Facebook' },
+  // เจ้าของ 9 พ.ย. 2569 "ฉันจะให้คนสามารถโพสต์เองได้" — คัดลอกข้อความกลุ่มละแถว (`ManualPostPanel`)
+  { value: 'manual', label: 'โพสต์เอง — คัดลอกข้อความไปโพสต์ในกลุ่ม Facebook' },
   { value: 'scrap', label: 'Scrap — ดึงผู้สมัครจาก JobThai / JobBKK' },
 ];
 /** ตัวเลือกที่ 3 — หน้ารายละเอียดใบขอ (เจ้าของ 4 พ.ย. 2569 "เอารวมกันสิ่" · ลิงก์สมัครเดิมเป็นกล่องแยก) */
@@ -258,6 +261,10 @@ export default function OrderPostButton({
             onClose={() => setKind('autopost')}
             onOrderChanged={(item) => setLatest((prev) => [item, ...(prev ?? []).filter((p) => p.request_type !== 'content')])}
           />
+        </div>
+      ) : kind === 'manual' ? (
+        <div className="rounded-xl border border-border/70 p-3" data-testid="so-order-manual">
+          <ManualPostPanel job={job} />
         </div>
       ) : kind === 'genlink' ? (
         <div className="space-y-2 rounded-xl border border-border/70 p-3" data-testid="so-order-genlink">

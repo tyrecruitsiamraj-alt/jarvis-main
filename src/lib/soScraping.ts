@@ -619,14 +619,26 @@ export function soGroupLinkName(g: SoGroupIdentity, all: readonly SoGroupIdentit
   return twin ? `${name} (${g.fbGroupId?.trim() || g.id})` : name;
 }
 
-/** ลิงก์เดิมของกลุ่มนี้ในประกาศ — รหัสกลุ่มตรงก่อน · ลิงก์เก่าที่ไม่มีรหัสใช้ได้เมื่อชื่อลิงก์ตรง (ชื่อซ้ำมีรหัสต่อท้าย จึงไม่ชนลิงก์เก่า) */
-export function soGroupLinkOf<L extends { channelLabel: string | null; fbGroupId?: string | null }>(
+/**
+ * ลิงก์ของกลุ่มแยกตามว่าใครโพสต์ (เจ้าของ 9 พ.ย. 2569 "จะจับยังไงว่าสรรหาเอาไปโพสต์เอง อันไหนสั่ง Autopost")
+ * จดไว้ที่ `note` ของลิงก์ — Autopost ใช้แต่ลิงก์ของ Autopost · โพสต์เองใช้แต่ลิงก์ของโพสต์เอง ⇒ ผู้สมัครบอกได้ว่ามาทางไหน
+ */
+export type SoLinkSource = 'autopost' | 'manual';
+export const SO_LINK_NOTE: Record<SoLinkSource, string> = { autopost: 'Autopost', manual: 'โพสต์เอง' };
+
+/**
+ * ลิงก์เดิมของกลุ่มนี้ในประกาศ — รหัสกลุ่มตรงก่อน · ลิงก์เก่าที่ไม่มีรหัสใช้ได้เมื่อชื่อลิงก์ตรง (ชื่อซ้ำมีรหัสต่อท้าย จึงไม่ชนลิงก์เก่า)
+ * ส่ง `source` = ใช้เฉพาะลิงก์ที่จดว่ามาจากทางนั้น (Gen link ไม่ส่ง = ลิงก์ไหนก็ได้ ตามเดิม)
+ */
+export function soGroupLinkOf<L extends { channelLabel: string | null; fbGroupId?: string | null; note?: string | null }>(
   links: readonly L[],
   g: Pick<SoGroupIdentity, 'id' | 'fbGroupId'>,
   label: string,
+  source?: SoLinkSource,
 ): L | null {
   const key = soGroupLinkKey(g);
-  return links.find((l) => (l.fbGroupId ?? '') === key) ?? links.find((l) => !l.fbGroupId && l.channelLabel === label) ?? null;
+  const pool = source ? links.filter((l) => (l.note ?? '').trim() === SO_LINK_NOTE[source]) : links;
+  return pool.find((l) => (l.fbGroupId ?? '') === key) ?? pool.find((l) => !l.fbGroupId && l.channelLabel === label) ?? null;
 }
 
 /** ลิงก์ของแต่ละกลุ่มที่ส่งไปกับใบสั่ง Autopost — So Scraping แทน apply_link ใน caption ด้วยลิงก์ของกลุ่มตอนโพสต์ (สเปก 2 พ.ย. 2569) */

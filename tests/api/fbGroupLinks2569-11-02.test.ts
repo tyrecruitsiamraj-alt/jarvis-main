@@ -86,9 +86,10 @@ describe('Autopost ส่งลิงก์กลุ่มละอัน (group
   });
   it('ป๊อป Autopost ใช้ลิงก์ชื่อเดียวกับ Gen link · มีแล้วใช้ตัวเดิม · server ตรวจทุกลิงก์เป็นของใบนี้', () => {
     const dlg = read('src/components/jobs/AutopostDialog.tsx');
-    // 4 พ.ย. 2569 ลิงก์เดิมหาด้วยรหัสกลุ่ม ไม่ใช่ชื่อ (fbGroupLinkById2569-11-04)
-    expect(dlg).toContain('const label = soGroupLinkLabel(channelLabel, soGroupLinkName(g, opts.groups));');
-    expect(dlg).toContain('let l = soGroupLinkOf(have, g, label);');
+    // 4 พ.ย. 2569 ลิงก์เดิมหาด้วยรหัสกลุ่ม ไม่ใช่ชื่อ (fbGroupLinkById2569-11-04) · 9 พ.ย. 2569 ย้ายไป `ensureSoGroupLinks` + แยกลิงก์ตามทาง
+    const links = read('src/lib/soGroupLinks.ts');
+    expect(links).toContain('const label = soGroupLinkLabel(channelLabel, soGroupLinkName(g, allGroups));');
+    expect(links).toContain('let l = soGroupLinkOf(have, g, label, source);');
     expect(dlg).toContain('group_links: groupLinks,');
     const api = read('api/_handlers/matching-job-postings.ts');
     expect(api).toContain('const glError = soGroupLinksError(jobSnapshot);');

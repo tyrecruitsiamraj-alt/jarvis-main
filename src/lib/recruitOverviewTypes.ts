@@ -78,6 +78,8 @@ export type RecruitAppFact = {
   irecruitAt?: string | null;
   /** วันแจ้งเข้า ERP แรกตั้งแต่วันกรอก (YYYY-MM-DD) · null = ไม่เจอ · undefined = อ่านไม่ได้ */
   informedAt?: string | null;
+  /** กรอกผ่านลิงก์ของ Autopost หรือโพสต์เอง (Gen link / ปุ่มโพสต์เอง) · null = ไม่ได้มาจากลิงก์ (เจ้าของ 9 พ.ย. 2569) */
+  postSource?: 'autopost' | 'manual' | null;
 };
 
 /**

@@ -49,7 +49,8 @@ describe('ทุกทางที่สร้างลิงก์ของก�
   it('Gen link · Gen link เพิ่ม · Autopost', () => {
     expect(code('src/components/jobs/GenApplyLinkDialog.tsx')).toContain('fbGroupId: soGroupLinkKey(g),');
     expect(code('src/components/jobs/AddChannelLinks.tsx')).toContain('fbGroupId: soGroupLinkKey(g),');
-    expect(code('src/components/jobs/AutopostDialog.tsx')).toContain('fbGroupId: soGroupLinkKey(g) });');
+    // 9 พ.ย. 2569 Autopost กับโพสต์เองสร้างลิงก์ผ่านตัวเดียว (`ensureSoGroupLinks`)
+    expect(code('src/lib/soGroupLinks.ts')).toContain('fbGroupId: soGroupLinkKey(g), note: SO_LINK_NOTE[source] });');
   });
 
   it('API รับ fbGroupId ทั้งลิงก์เดี่ยวและตอนสร้างประกาศ · เก็บที่ fb_group_id · ยังไม่รัน 173 ยังสร้าง/โหลดลิงก์ได้', () => {

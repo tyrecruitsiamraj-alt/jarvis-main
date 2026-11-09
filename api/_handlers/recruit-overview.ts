@@ -69,6 +69,7 @@ import { onlineRequestStateOf, type OnlineRequestRow } from '../../src/lib/homeO
 import { loadChannelPlacement } from '../_lib/channelPlacementSql.js';
 import { loadInformDaysByPhone, loadIrecruitApplicantDays, loadIrecruitRegsByPhone } from '../_lib/applicantSourceSql.js';
 import { firstDaySince, informedSince, irecruitSourceAt, phone9Of } from '../../src/lib/applicantSourceMatch.js';
+import { SO_LINK_NOTE } from '../../src/lib/soScraping.js';
 import type {
   RecruitAiRow,
   RecruitAppFact,
@@ -111,6 +112,7 @@ const buInSql = (bu: string) => `(${bu}::text[] is null or ${appBuSql('a')} = an
 const CANCELLATIONS = tableInAppSchema('application_cancellations');
 /** ลิงก์รับสมัคร — ช่องทาง/กลุ่มติดที่ลิงก์ ไม่ได้คัดลอกลงใบสมัคร (19 ต.ค. 2569 · 383 จาก 502 ใบ) */
 const POSTING_LINKS = tableInAppSchema('recruit_posting_links');
+const JOB_POSTING_REQUESTS = tableInAppSchema('job_posting_requests');
 const scopeWhere = (bu: string) =>
   `not coalesce(a.is_lead, false) and not exists (select 1 from ${CANCELLATIONS} cx where cx.application_id = a.id) and ${buInSql(bu)}`;
 
@@ -127,6 +129,9 @@ export function factsSql(
          coalesce(nullif(btrim(a.channel_label), ''),
                   (select nullif(btrim(l.channel_label), '') from ${POSTING_LINKS} l where l.id = a.link_id)) as channel_label,
          nullif(btrim(a.referral_source), '') as referral_source,
+         -- ลิงก์ที่กรอกผ่าน → Autopost หรือโพสต์เอง (เจ้าของ 9 พ.ย. 2569) · คิดฝั่ง Node (postSourceOf)
+         (select l.code from ${POSTING_LINKS} l where l.id = a.link_id) as link_code,
+         (select nullif(btrim(l.note), '') from ${POSTING_LINKS} l where l.id = a.link_id) as link_note,
          nullif(btrim(a.position_interest), '') as position,
          a.phone_e164, a.age,
          ${CALLED_BY_AI_SQL} as by_ai,
@@ -294,7 +299,17 @@ export type AppSourceMaps = {
   irecruitRegs: ReadonlyMap<string, ReadonlyArray<{ at: string; channel: string; sub?: string | null }>> | null;
   /** วันเป็นผู้สมัครใน iRecruit ต่อเบอร์ (20 ต.ค. 2569) */
   irecruitApplicants?: ReadonlyMap<string, readonly string[]> | null;
+  /** รหัสลิงก์ที่ใบสั่ง Autopost เคยใช้ (ลิงก์รุ่นก่อนจด note · 9 พ.ย. 2569) · null = อ่านไม่ได้ */
+  autopostCodes?: ReadonlySet<string> | null;
 };
+
+/** ลิงก์ของใบ → Autopost / โพสต์เอง · ไม่มีลิงก์ = null · อ่านใบสั่ง Autopost ไม่ได้ + ลิงก์ไม่มี note = null (ไม่เดา) */
+export function postSourceOf(code: string | null, note: string | null, autopostCodes: ReadonlySet<string> | null | undefined): 'autopost' | 'manual' | null {
+  if (!code) return null;
+  if (note === SO_LINK_NOTE.autopost || autopostCodes?.has(code)) return 'autopost';
+  if (note === SO_LINK_NOTE.manual) return 'manual';
+  return autopostCodes ? 'manual' : null;
+}
 
 const IRECRUIT_LABEL = /^irecruit/i;
 
@@ -345,6 +360,7 @@ export function toFact(r: Row, boardPhones: Set<string> | null, sources?: AppSou
     sourceSub: irec?.sub ?? null,
     irecruitAt: sources ? firstDaySince(sources.irecruitApplicants ?? null, p9, createdAt) : undefined,
     informedAt: sources ? firstDaySince(sources.informDays, p9, createdAt) : undefined,
+    postSource: sources ? postSourceOf(text(r.link_code), text(r.link_note), sources.autopostCodes) : undefined,
   };
 }
 
@@ -795,7 +811,7 @@ export async function buildRecruitOverview(
 
   // จังหวัดของงาน (การ์ดงานค้าง) — วิ่งพร้อมก้อนอื่น ครั้งแรกหลังสำเนาใบขอหมดอายุใช้ ~4 วิ (28 ต.ค. 2569)
   const jobIndexP = loadJobIndex();
-  const [boardR, factsR, backlogR, apptR, staffR, showedR, aiR, firstR, everR, chR, reqR, informR, irecR, irAppR] = await Promise.all([
+  const [boardR, factsR, backlogR, apptR, staffR, showedR, aiR, firstR, everR, chR, reqR, informR, irecR, irAppR, apCodesR] = await Promise.all([
     settle('รายชื่อบนบอร์ด', loadBoardPhoneSet),
     settle('ใบสมัคร', () => loadFacts(bothRange)),
     settle('งานค้าง', async () => (await dbQuery<Row>(backlogSql(), [buSet])).rows),
@@ -837,6 +853,18 @@ export async function buildRecruitOverview(
     settle('ช่องทาง iRecruit', () => loadIrecruitRegsByPhone(window.prevFrom, window.to)),
     // ผู้สมัครใน iRecruit (ขั้นคีย์เข้า iRecruit หลังมาตามนัด · 20 ต.ค. 2569)
     settle('ผู้สมัคร iRecruit', () => loadIrecruitApplicantDays(window.prevFrom)),
+    // ลิงก์ของใบสั่ง Autopost ทุกใบ — แยกผู้สมัครที่มาจาก Autopost กับโพสต์เอง (9 พ.ย. 2569)
+    settle('ลิงก์ Autopost', async () =>
+      new Set(
+        (
+          await dbQuery<{ code: string }>(
+            `select distinct gl->>'link_code' as code from ${JOB_POSTING_REQUESTS} p, jsonb_array_elements(coalesce(p.job_snapshot->'group_links', '[]'::jsonb)) gl
+              where p.request_type = 'content'
+             union select p.job_snapshot->>'link_code' from ${JOB_POSTING_REQUESTS} p where p.request_type = 'content' and p.job_snapshot->>'link_code' is not null`,
+          )
+        ).rows.map((r) => r.code).filter(Boolean),
+      ),
+    ),
   ]);
 
   // บอร์ด ERP อ่านไม่ได้ = ไม่รู้ว่าได้ใบสมัครหรือยัง (null) — ไม่ใช่ "ยังไม่ได้"
@@ -847,6 +875,7 @@ export async function buildRecruitOverview(
     informDays: informR.ok ? informR.value : null,
     irecruitRegs: irecR.ok ? irecR.value : null,
     irecruitApplicants: irAppR.ok ? irAppR.value : null,
+    autopostCodes: apCodesR.ok ? apCodesR.value : null,
   };
   if (!informR.ok) body.errors.informs = informR.error;
   if (factsR.ok) {
