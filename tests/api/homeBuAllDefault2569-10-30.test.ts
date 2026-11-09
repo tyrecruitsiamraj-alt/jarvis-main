@@ -28,7 +28,9 @@ describe('หน้าหลัก', () => {
   const page = readFileSync('src/pages/HomeOverviewPage.tsx', 'utf8');
   it('ตัวเลือก BU มี "ทุก BU" · ใบขอชั่วคราวกรองตาม BU · เปลี่ยน BU ล้างเลขเก่า', () => {
     expect(page).toMatch(/<BuChoiceSelect value=\{bu\} [^>]*allOption/);
-    expect(page).toContain('ใบขอชั่วคราวอีก');
+    // 9 พ.ย. 2569 ใบขอชั่วคราวอยู่ในเลขเหลือหาแล้ว — ข้อความเป็น "รวม" ไม่ใช่ "อีก"
+    expect(page).toContain('รวมใบขอชั่วคราว');
+    expect(page).not.toContain('ใบขอชั่วคราวอีก');
     expect(page).not.toContain('ล่วงหน้าอีก');
     expect(page).toContain('(trendBuFromSiteCode(j.site_code) ?? normalizeTrendBu(j.department_code)) === bu');
     expect(page).toContain('ro.bu === bu');

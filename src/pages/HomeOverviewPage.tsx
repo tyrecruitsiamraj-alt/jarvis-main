@@ -515,7 +515,8 @@ const HomeOverviewPage: React.FC = () => {
           unit="ใบ"
           emphasis="warn"
           tag="ต้องหา"
-          sub={flow ? `${NUM.format(flow.remaining)} อัตรา · ใบขอชั่วคราวอีก ${NUM.format(preCount)} ใบ` : undefined}
+          // 9 พ.ย. 2569 ใบขอชั่วคราวอยู่ในเลขนี้แล้ว (สมุดใบขอ) — บอกว่ารวมกี่ใบ ไม่ใช่ "อีก"
+          sub={flow ? `${NUM.format(flow.remaining)} อัตรา · รวมใบขอชั่วคราว ${NUM.format(preCount)} ใบ` : undefined}
           onClick={flow ? () => openList('เหลือหา', flowRows((f) => f.open).sort((a, b) => perDayOf(b) - perDayOf(a))) : undefined}
           testId="overview-kpi-remain"
         />
@@ -544,7 +545,7 @@ const HomeOverviewPage: React.FC = () => {
       {/* ── 1 ใบขอ (แบบร่าง A 30 ต.ค. 2569: หัวเรื่องนอกการ์ด แยก 3 เรื่องให้ชัด) ── */}
       <OverviewGroup no={1} title="ใบขอ" testId="overview-group-requests">
       {/* ── ใบขอ: ยกมา + ขอใหม่ − ปิดครบ − ยกเลิก = เหลือหา ── */}
-      <OverviewSection title="ใบขอจริงใน ERP" sub="ใบ (อัตรา)" testId="overview-requests">
+      <OverviewSection title="ใบขอ" sub="ใบ (อัตรา) · รวมใบขอชั่วคราว" testId="overview-requests">
         {/* แบบร่าง B (2 พ.ย. 2569): ลูกโซ่ซ้ายไปขวา ผลลัพธ์พื้นกรมท่า */}
         <div className="grid grid-cols-2 items-stretch gap-2 sm:grid-cols-5">
           <OverviewNode label="ยกมา" value={flow?.carryInRequests} unit="ใบ" sub={flow ? `${NUM.format(flow.carryIn)} อัตรา` : undefined} onClick={flow ? () => openList('ยกมา', flowRows((f) => f.carry)) : undefined} testId="overview-req-carry" />

@@ -373,13 +373,14 @@ const HomeExecPage: React.FC = () => {
         <KpiTile
           tone="warn"
           icon={Layers}
-          label="เหลือหา (ใบขอจริง)"
+          label="เหลือหา"
           unit="ใบ"
           value={kpi?.flow.remainingRequests ?? 0}
           loading={!kpi}
           liveKey={liveKey}
           pill={flow && prevNow ? countPill(flow.remainingRequests, prevNow.flow.remainingRequests, false) : null}
-          foot={flow ? `${NUM.format(flow.remaining)} อัตรา · ใบขอชั่วคราวอีก ${feedReady ? NUM.format(preCount) : '—'} ใบ` : null}
+          // 9 พ.ย. 2569 ใบขอชั่วคราวอยู่ในเลขนี้แล้ว (สมุดใบขอ) — บอกว่ารวมกี่ใบ ไม่ใช่ "อีก"
+          foot={flow ? `${NUM.format(flow.remaining)} อัตรา · รวมใบขอชั่วคราว ${feedReady ? NUM.format(preCount) : '—'} ใบ` : null}
           onClick={flow ? () => openList('เหลือหา', flowRows((f) => f.open)) : undefined}
         />
         <KpiTile
@@ -552,7 +553,7 @@ const HomeExecPage: React.FC = () => {
 
       {/* ── ใบขอ: ยกมา · ขอใหม่ · ปิดครบ · ยกเลิก · เหลือหา — ใบกับคนอยู่กล่องเดียวกัน (เจ้าของ 25 ต.ค. 2569) ──
            สมการลงตัวทั้งหน่วยใบและหน่วยคน (เจ้าของ "บวกลบกันแล้วต้องเท่ากัน") · กดกล่อง = รายใบชุดเดียวกับเลขใบ */}
-      <HomeSection title="ใบขอ" sub="ใบขอจริงใน ERP" testId="exec-flow">
+      <HomeSection title="ใบขอ" sub="รวมใบขอชั่วคราว" testId="exec-flow">
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-5" data-testid="exec-flow-req">
           {(
             [
@@ -605,7 +606,7 @@ const HomeExecPage: React.FC = () => {
           {range.to >= today ? (
             <p data-testid="exec-flow-board">
               {flow && feedReady
-                ? `เหลือหา ${NUM.format(flow.remainingRequests)} + ใบขอชั่วคราว ${NUM.format(preCount)} = ${NUM.format(flow.remainingRequests + preCount)} ใบ (เท่ากล่องงาน)`
+                ? `เหลือหา ${NUM.format(flow.remainingRequests)} ใบ รวมใบขอชั่วคราว ${NUM.format(preCount)} ใบ (เท่ากล่องงาน)`
                 : '—'}
             </p>
           ) : null}

@@ -61,7 +61,7 @@ export type HomeMoneyResponse = {
   totals: Record<LedgerMode, MoneyTotals>;
   daily: LedgerDaily;
   clocks: { speed: ClockStat; late: ClockStat };
-  /** ยกมา + ขอใหม่ − หาได้ − ยกเลิก = เหลือ (คน) — ใบขอจริงใน ERP ไม่รวมใบขอล่วงหน้า */
+  /** ยกมา + ขอใหม่ − หาได้ − ยกเลิก = เหลือ (คน) — รวมใบขอชั่วคราว (ใบขอล่วงหน้า ERP · 9 พ.ย. 2569) */
   flow: RequestFlow;
   customerFines: { total: number; receipts: number; months: Array<{ ym: string; amount: number; receipts: number }> };
   requests: MoneyRequest[];

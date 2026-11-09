@@ -248,7 +248,7 @@ describe('แท็บ + คำบนจอ (เจ้าของ 25 ต.ค. 2
     expect(page).toContain('exec-flow-pos-sum');
   });
   it('การ์ดเสียเงินไม่มีบรรทัดใบที่เลยวัน · ค้างเกิน 90 วัน · เทียบช่วงก่อน (เจ้าของ 28 ต.ค. 2569 "เอาออก")', () => {
-    const tile = page.slice(page.indexOf('data-testid="exec-money-tile"'), page.indexOf('label="เหลือหา (ใบขอจริง)"'));
+    const tile = page.slice(page.indexOf('data-testid="exec-money-tile"'), page.indexOf('label="เหลือหา"'));
     for (const id of ['data-testid="exec-stale"', 'data-testid="exec-overdue"', 'เทียบช่วงก่อนหน้าที่ยาวเท่ากัน']) expect(tile).not.toContain(id);
   });
 });
