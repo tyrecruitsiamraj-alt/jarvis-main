@@ -12,9 +12,9 @@
 import { siamrajSqlQuery } from './siamrajSqlServer.js';
 import { activeInformWhereSql, effectiveInformQtySql } from './siamrajStaffingOpen.js';
 import { boardStaffingRequestTypeWhereSql, excludeInternalReplacementRoleWhereSql } from './siamrajBoardRequestTypes.js';
-import { scopeCacheKey, sqlServerDepartmentScopeClause, type DepartmentScope } from './departmentScope.js';
+import { scopeCacheKey, sqlServerCodesClause, sqlServerDepartmentScopeClause, type DepartmentScope } from './departmentScope.js';
 import { buFromSiteCode } from '../../src/lib/homeBu.js';
-import type { PenaltyInform, PenaltyRequestRow } from '../../src/lib/requestPenaltyLedger.js';
+import { PREQUEST_LEDGER_PREFIX, type PenaltyInform, type PenaltyRequestRow } from '../../src/lib/requestPenaltyLedger.js';
 
 /** นับตั้งแต่วันนี้ (เจ้าของ "นับทั้งหมด") — เท่ากับขอบเขตเก่าสุดของ feed ใบขอ */
 export const LEDGER_SINCE = (process.env.SIAMRAJ_OPEN_REQUEST_MIN_DATE || '').trim() || '2024-01-01';
@@ -47,6 +47,17 @@ function clsExclude(alias = 'SS'): string {
   return raw === 'false' || raw === '0' || raw === 'no' || raw === 'off' ? '' : `AND RTRIM(${alias}.contract_type_code) <> 'C'`;
 }
 
+type PreSqlRow = {
+  prequest_no: string;
+  bu: string | null;
+  unit: string | null;
+  position: string | null;
+  work_place: string | null;
+  request_qty: number | null;
+  key_ymd: string | null;
+  need_ymd: string | null;
+  end_ymd: string | null;
+};
 type ReqSqlRow = {
   request_no: string;
   site_code: string;
@@ -83,7 +94,14 @@ export async function loadPenaltyLedgerRaw(scope: DepartmentScope): Promise<Pena
         ${dept.sql}
         ${requestTypeWhere()}`;
 
-  const [reqRows, informRows, fineRows] = await Promise.all([
+  // ใบขอชั่วคราว (เจ้าของ 9 พ.ย. 2569 "ทุกหน้านับใบขอชั่วคราวหมด") — แผนกอยู่ที่ bu_department_code (ไม่ใช่ ms_site)
+  const preScope =
+    scope.mode === 'all'
+      ? { sql: '', params: {} as Record<string, string> }
+      : scope.mode === 'none'
+        ? { sql: 'AND 1 = 0', params: {} as Record<string, string> }
+        : sqlServerCodesClause(scope, 'RTRIM(h.bu_department_code)');
+  const [reqRows, informRows, fineRows, preRows] = await Promise.all([
     siamrajSqlQuery<ReqSqlRow>(
       `SELECT RTRIM(A.request_no) AS request_no, RTRIM(A.site_code) AS site_code,
               COALESCE((SELECT TOP 1 z.customer_name FROM st_site_contract_p1 z WHERE z.contract_no = A.contract_no), SS.site_name) AS unit,
@@ -145,6 +163,25 @@ export async function loadPenaltyLedgerRaw(scope: DepartmentScope): Promise<Pena
         GROUP BY CONVERT(varchar(10), H.cheque_date, 120), RTRIM(D.site_code)`,
       params,
     ),
+    siamrajSqlQuery<PreSqlRow>(
+      `SELECT RTRIM(h.prequest_no) AS prequest_no, RTRIM(h.bu_department_code) AS bu,
+              NULLIF(LTRIM(RTRIM(h.customer_name)), N'') AS unit,
+              COALESCE(
+                NULLIF(LTRIM(RTRIM((SELECT z.job_description_name FROM hr_ms_job_description_1 z WHERE z.job_description_code_1 = h.job1_code))), N''),
+                (SELECT z.staff_title_name FROM hr_ms_staff_title z WHERE z.staff_title_code = h.staff_title_code)
+              ) AS position,
+              (SELECT TOP 1 NULLIF(LTRIM(RTRIM(B.work_place1)), N'') FROM st_prequest_p2 B WHERE B.prequest_no = h.prequest_no ORDER BY B.work_place1) AS work_place,
+              h.request_qty,
+              CONVERT(varchar(10), h.prequest_date, 120) AS key_ymd,
+              CONVERT(varchar(10), h.want_date_from, 120) AS need_ymd,
+              -- ERP ปิดใบ (สถานะไม่ใช่ A) หรือแปลงเป็นใบจริงแล้ว = จบ ณ วันที่แก้ล่าสุด
+              CASE WHEN RTRIM(h.status) <> 'A' OR ISNULL(RTRIM(h.is_request), 'N') = 'Y'
+                   THEN CONVERT(varchar(10), COALESCE(h.update_date, h.record_date, h.prequest_date), 120) END AS end_ymd
+         FROM st_prequest_head h
+        WHERE h.prequest_date >= CONVERT(datetime, @since, 120)
+          ${preScope.sql}`,
+      { since: LEDGER_SINCE, ...preScope.params },
+    ),
   ]);
 
   const rows: PenaltyRequestRow[] = [];
@@ -168,6 +205,28 @@ export async function loadPenaltyLedgerRaw(scope: DepartmentScope): Promise<Pena
       replaceAccepted: r.is_replace === 'Y' ? true : r.is_replace === 'N' ? false : null,
       replaceWindow: r.replace_window,
       informedCap: r.eff_informed == null ? null : Number(r.eff_informed) || 0,
+    });
+  }
+  for (const r of preRows) {
+    if (!r.key_ymd || !r.prequest_no) continue;
+    rows.push({
+      requestNo: `${PREQUEST_LEDGER_PREFIX}${r.prequest_no}`,
+      site: '',
+      bu: (r.bu ?? '').trim() || null,
+      unit: (r.unit ?? '').trim() || '—',
+      position: (r.position ?? '').trim(),
+      place: (r.work_place ?? '').trim() || null,
+      qty: Number(r.request_qty) || 1,
+      keyYmd: r.key_ymd,
+      needYmd: r.need_ymd,
+      endYmd: r.end_ymd,
+      stopReason: null,
+      workDays: null,
+      // ใบขอชั่วคราวยังไม่มีสัญญา = ไม่มีค่าปรับ
+      finePerDay: 0,
+      deductPerDay: 0,
+      informedCap: 0,
+      prequest: true,
     });
   }
   const informs: PenaltyInform[] = informRows

@@ -58,7 +58,18 @@ export type PenaltyRequestRow = {
   replaceWindow?: string | null;
   /** ติ๊ก "ต้องส่งคนแทน" ที่หน้าใบขอ — true = ไม่คิดค่าปรับ/ลดมูลค่าทั้งใบ (`penaltyWaivedByReplacement` · 28 ต.ค. 2569) */
   sendReplacement?: boolean | null;
+  /**
+   * ใบขอชั่วคราว (ใบขอล่วงหน้า `st_prequest_*`) — เจ้าของ 9 พ.ย. 2569 "ทุกหน้านับใบขอชั่วคราวหมด" · "ปิดแล้วก็นับไปที่ปิดแล้ว"
+   * จบ (ERP ปิดใบ) = **ปิดแล้ว** ในหน่วยใบ · ไม่มีประวัติแจ้งเข้า ⇒ หน่วยคนเป็นยกเลิก (ห้ามนับเป็นหาได้)
+   * `requestNo` = `PREQUEST_LEDGER_PREFIX` + เลขที่ใบ (เลขซ้ำใบจริงได้ — ห้ามใช้เลขเปล่า)
+   */
+  prequest?: boolean;
 };
+/** ขึ้นต้นเลขใบขอชั่วคราวในสมุด — กันชนเลขใบจริง (ใบขอล่วงหน้าเลขซ้ำใบจริง 64%) */
+export const PREQUEST_LEDGER_PREFIX = 'ชั่วคราว ';
+/** เลขใบในสมุด → id ของใบ (ตัวเดียวกับเมนูใบขอ) */
+export const ledgerJobIdOf = (r: Pick<PenaltyRequestRow, 'requestNo' | 'prequest'>): string =>
+  r.prequest ? `siamraj-pre:${r.requestNo.slice(PREQUEST_LEDGER_PREFIX.length)}` : `siamraj-sql:${r.requestNo}`;
 
 export type PenaltyInform = {
   requestNo: string;
@@ -314,7 +325,8 @@ export function requestFlowRole(r: LedgerRequest, from: string, to: string): Req
   // หน่วยใบ: เปิดต้นช่วง (หรือคีย์ในช่วง) แล้วไม่เปิดปลายช่วง = ปิดครบ (คนครบ) หรือยกเลิก
   if ((b > 0 || keyedIn) && a === 0) {
     const full = r.starts.find(([, cum]) => cum >= r.qty);
-    if (full && full[0] <= to && (r.endYmd == null || full[0] <= r.endYmd)) closed = true;
+    // ใบขอชั่วคราวที่ ERP ปิด = ปิดแล้ว (เจ้าของ 9 พ.ย. 2569) · ใบจริง = ครบคนถึงเป็นปิดแล้ว ไม่ครบ = ยกเลิก
+    if (r.prequest || (full && full[0] <= to && (r.endYmd == null || full[0] <= r.endYmd))) closed = true;
     else cancelledReq = true;
   }
   return {

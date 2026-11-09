@@ -17,7 +17,9 @@ import { drivingSubtypeOf } from '../../src/lib/boardFilters.js';
 import { isDrivingPositionLabel } from '../../src/lib/jobBoardPositionPreset.js';
 import type { JobRequest } from '../../src/types/index.js';
 import type { DepartmentScope } from './departmentScope.js';
-import { trendBuFromSiteCode } from '../../src/lib/trends/bu.js';
+import { normalizeTrendBu, trendBuFromSiteCode } from '../../src/lib/trends/bu.js';
+import { loadPenaltyLedgerRaw } from './siamrajPenaltyLedgerSql.js';
+import { ledgerJobIdOf, PREQUEST_LEDGER_PREFIX } from '../../src/lib/requestPenaltyLedger.js';
 import { groupThroughputByRequest, onlineRequestStateOf, type OnlineApplicantRow, type OnlineRequestRow } from '../../src/lib/homeOnline.js';
 import {
   AI_QUEUED_AT_SQL,
@@ -95,8 +97,25 @@ async function loadOnlineRequestGroups(opts: OnlineRequestOpts) {
   const grouped = groupThroughputByRequest(
     records.map((r) => ({ ...r, requestDate: r.submittedDate || r.requestDate })),
   ).filter((g) => g.day >= opts.from && g.day <= opts.to);
-  const withBu = grouped
-    .map((g) => ({ ...g, bu: trendBuFromSiteCode(g.siteCode) }))
+  // ใบขอชั่วคราวที่ส่งเข้ามาในช่วง (เจ้าของ 9 พ.ย. 2569 "ทุกหน้านับใบขอชั่วคราวหมด") — ชุดเดียวกับสมุดใบขอของหน้าหลัก
+  // จบแล้ว = ปิดแล้ว (`onlineRequestStateOf` · prequest) · ไม่มีประวัติหาได้ ⇒ filled 0 · id siamraj-pre: (เลขซ้ำใบจริงได้)
+  const pre = (await loadPenaltyLedgerRaw(opts.departmentScope)).rows
+    .filter((r) => r.prequest && r.keyYmd >= opts.from && r.keyYmd <= opts.to)
+    .map((r) => ({
+      requestNo: r.requestNo.slice(PREQUEST_LEDGER_PREFIX.length),
+      jobId: ledgerJobIdOf(r),
+      day: r.keyYmd,
+      siteCode: null,
+      unitName: r.unit,
+      leadKind: null,
+      requested: r.qty,
+      filled: 0,
+      cancelled: 0,
+      remaining: r.endYmd ? 0 : r.qty,
+      prequest: true as const,
+      bu: normalizeTrendBu(r.bu),
+    }));
+  const withBu = [...grouped.map((g) => ({ ...g, prequest: false, bu: trendBuFromSiteCode(g.siteCode) })), ...pre]
     .filter((g) => !opts.bu || (typeof opts.bu === 'string' ? g.bu === opts.bu : g.bu != null && opts.bu.includes(g.bu)));
   const jobIds = withBu.map((g) => g.jobId ?? `siamraj-sql:${g.requestNo}`);
   return { withBu, jobIds };
@@ -143,7 +162,8 @@ export async function loadOnlineRequestRows(opts: OnlineRequestOpts): Promise<On
   if (withBu.length === 0) return [];
 
   const [extras, sectors, releases, apps] = await Promise.all([
-    loadErpExtras(withBu.map((g) => g.requestNo)),
+    // ใบขอชั่วคราวไม่อ่านข้อมูลใบจริง (เลขซ้ำกันได้ — ได้ข้อมูลผิดใบ)
+    loadErpExtras(withBu.filter((g) => !g.prequest).map((g) => g.requestNo)),
     getUnitSectorMap(),
     dbQuery<{ job_id: string; released_at: string }>(
       `select job_id, released_at from ${RELEASES} where job_id = any($1::text[])`,
@@ -163,7 +183,7 @@ export async function loadOnlineRequestRows(opts: OnlineRequestOpts): Promise<On
 
   return withBu.map((g, i) => {
     const jobId = jobIds[i];
-    const x = extras.get(g.requestNo);
+    const x = g.prequest ? undefined : extras.get(g.requestNo);
     const position = x ? primaryJobRoleLabel(x.job_name1 ?? undefined, x.staff_title_name ?? undefined, x.job_description_code_1 ?? undefined) : null;
     return {
       requestNo: g.requestNo,
@@ -187,6 +207,7 @@ export async function loadOnlineRequestRows(opts: OnlineRequestOpts): Promise<On
       applications: appCount.get(jobId) ?? 0,
       siteCode: g.siteCode,
       leadKind: g.leadKind,
+      ...(g.prequest ? { prequest: true } : {}),
       erp: x
         ? {
             siteName: x.site_name?.trim() || null,

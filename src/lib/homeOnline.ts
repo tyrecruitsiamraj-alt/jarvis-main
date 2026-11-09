@@ -56,10 +56,13 @@ export type OnlineRequestRow = {
   } | null;
   /** ฉุกเฉิน / ฉุกเฉิน-ย้อนหลัง / ล่วงหน้า ของใบ (ตัวดึง ERP คิดด้วยเกณฑ์ของใบ) */
   leadKind?: RequestLeadKind | null;
+  /** ใบขอชั่วคราว (ใบขอล่วงหน้า ERP) — จบแล้ว = ปิดแล้ว (เจ้าของ 9 พ.ย. 2569) · ไม่มีประวัติหาได้ */
+  prequest?: boolean;
 };
 
-export function onlineRequestStateOf(r: Pick<OnlineRequestRow, 'filled' | 'cancelled' | 'remaining'>): OnlineRequestState {
+export function onlineRequestStateOf(r: Pick<OnlineRequestRow, 'filled' | 'cancelled' | 'remaining'> & { prequest?: boolean }): OnlineRequestState {
   if (r.remaining > 0) return 'open';
+  if (r.prequest) return 'fullyClosed';
   if (r.filled <= 0) return 'cancelledAll';
   return r.cancelled > 0 ? 'partialCancelled' : 'fullyClosed';
 }
