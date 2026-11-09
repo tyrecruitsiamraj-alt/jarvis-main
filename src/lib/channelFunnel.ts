@@ -152,7 +152,19 @@ export function funnelPlaceOf(f: Pick<RecruitAppFact, 'channelLabel' | 'referral
 export type FunnelNode = ChannelFunnelRow & { key: string; children?: FunnelNode[] };
 const byNames = (a: FunnelNode, b: FunnelNode) => (b.names.value ?? 0) - (a.names.value ?? 0) || a.channel.localeCompare(b.channel, 'th');
 
-/** ต้นไม้ 3 ชั้น: กลุ่ม (4 + ไม่รู้) → ช่องทาง → ชื่อกลุ่ม/เพจ · ทุกชั้นบวกกันเท่ารวม · กลุ่มว่างยังอยู่ (เลข 0) */
+/** ชั้นใต้ชื่อกลุ่ม: มาจาก Autopost หรือโพสต์เอง (เจ้าของ 9 พ.ย. 2569) — ตัวเดียวของตารางช่องทางทุกตัว */
+export const POST_SOURCE_LABEL = { autopost: 'Autopost', manual: 'โพสต์เอง', none: 'ไม่ได้มาจากลิงก์' } as const;
+export type PostSourceKey = keyof typeof POST_SOURCE_LABEL;
+export const postSourceKeyOf = (f: Pick<RecruitAppFact, 'postSource'>): PostSourceKey => f.postSource ?? 'none';
+/** แยกรายชื่อตามทางที่มา · ไม่มีใครมาจากลิงก์ Autopost/โพสต์เอง = null (ไม่มีอะไรให้กดลง) */
+export function splitByPostSource<T extends Pick<RecruitAppFact, 'postSource'>>(list: readonly T[]): Array<[PostSourceKey, T[]]> | null {
+  if (!list.some((f) => f.postSource)) return null;
+  const by = new Map<PostSourceKey, T[]>();
+  for (const f of list) by.set(postSourceKeyOf(f), [...(by.get(postSourceKeyOf(f)) ?? []), f]);
+  return (['autopost', 'manual', 'none'] as const).filter((k) => by.has(k)).map((k) => [k, by.get(k)!]);
+}
+
+/** ต้นไม้: กลุ่ม (4 + ไม่รู้) → ช่องทาง → ชื่อกลุ่ม/เพจ → Autopost/โพสต์เอง · ทุกชั้นบวกกันเท่ารวม · กลุ่มว่างยังอยู่ (เลข 0) */
 export function buildChannelFunnelTree(cohort: readonly RecruitAppFact[]): { groups: FunnelNode[]; total: ChannelFunnelRow } {
   const groups = new Map<FunnelGroupKey, Map<string, Map<string, RecruitAppFact[]>>>();
   for (const g of GROUP_ORDER) groups.set(g, new Map());
@@ -169,7 +181,16 @@ export function buildChannelFunnelTree(cohort: readonly RecruitAppFact[]): { gro
     const chanNodes: FunnelNode[] = [...chans.entries()]
       .map(([ch, subs]) => {
         const all = [...subs.values()].flat();
-        const subNodes = [...subs.entries()].map(([name, list]) => ({ ...rowOf(name, list), key: `${ch}|${name}` })).sort(byNames);
+        const subNodes = [...subs.entries()]
+          .map(([name, list]) => {
+            const split = splitByPostSource(list);
+            return {
+              ...rowOf(name, list),
+              key: `${ch}|${name}`,
+              ...(split ? { children: split.map(([k, l]) => ({ ...rowOf(POST_SOURCE_LABEL[k], l), key: `${ch}|${name}|${k}` })) } : {}),
+            };
+          })
+          .sort(byNames);
         // ชั้นชื่อกลุ่มมีแค่ "ไม่ระบุชื่อ" แถวเดียว = ไม่มีอะไรให้กดลง
         const useful = subNodes.length > 1 || (subNodes[0] && subNodes[0].channel !== NO_SUB);
         return { ...rowOf(ch, all), key: ch, ...(useful ? { children: subNodes } : {}) };

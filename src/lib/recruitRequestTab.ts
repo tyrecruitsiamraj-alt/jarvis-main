@@ -14,7 +14,7 @@
  */
 import { onlineRequestStateOf } from '@/lib/homeOnline';
 import { aiStage } from '@/lib/recruitJourney';
-import { FUNNEL_GROUP_LABEL, NO_SUB, funnelPlaceOf, funnelSubOf, type FunnelGroupKey } from '@/lib/channelFunnel';
+import { FUNNEL_GROUP_LABEL, NO_SUB, POST_SOURCE_LABEL, funnelPlaceOf, funnelSubOf, postSourceKeyOf, splitByPostSource, type FunnelGroupKey } from '@/lib/channelFunnel';
 import type { RequestLeadKind } from '@/lib/requestLeadKind';
 import type { RecruitAppFact } from '@/lib/recruitOverviewTypes';
 import { DRIVING_SUBTYPES } from '@/lib/boardFilters';
@@ -370,10 +370,6 @@ function rowOf(key: string, name: string, list: readonly RecruitAppFact[]): Appl
   return { key, name, total: list.length, notCalled, called, counts, yesPct: answered > 0 ? Math.round((counts.yes / answered) * 100) : null };
 }
 
-/** ชั้นที่ 4 ของแถวชื่อกลุ่ม: มาจาก Autopost หรือโพสต์เอง (เจ้าของ 9 พ.ย. 2569) · ไม่ได้มาจากลิงก์ = แถวท้าย */
-export const POST_SOURCE_LABEL = { autopost: 'Autopost', manual: 'โพสต์เอง', none: 'ไม่ได้มาจากลิงก์' } as const;
-const postSourceKeyOf = (f: RecruitAppFact): keyof typeof POST_SOURCE_LABEL => f.postSource ?? 'none';
-
 /** แถวรวม + ช่องทางหลัก (มากไปน้อย) › ช่องทางรอง › ชื่อกลุ่ม › Autopost/โพสต์เอง — ทุกชั้นบวกกันเท่าแถวบน */
 export function buildApplicantChannelRows(apps: readonly RecruitAppFact[]): { total: ApplicantChannelRow; groups: ApplicantChannelRow[] } {
   const groups = new Map<FunnelGroupKey, Map<string, RecruitAppFact[]>>();
@@ -403,13 +399,8 @@ export function buildApplicantChannelRows(apps: readonly RecruitAppFact[]): { to
             .map(([name, l]) => {
               const sub = rowOf(`${g}:${ch}:${name}`, name, l);
               // มีคนมาจากลิงก์ Autopost หรือโพสต์เองอย่างน้อย 1 คน = แตกให้ดู · ไม่งั้นไม่มีอะไรให้กดลง
-              if (l.some((f) => f.postSource)) {
-                const bySrc = new Map<keyof typeof POST_SOURCE_LABEL, RecruitAppFact[]>();
-                for (const f of l) bySrc.set(postSourceKeyOf(f), [...(bySrc.get(postSourceKeyOf(f)) ?? []), f]);
-                sub.children = (['autopost', 'manual', 'none'] as const)
-                  .filter((k) => bySrc.has(k))
-                  .map((k) => rowOf(`${g}:${ch}:${name}:${k}`, POST_SOURCE_LABEL[k], bySrc.get(k)!));
-              }
+              const split = splitByPostSource(l);
+              if (split) sub.children = split.map(([k, list]) => rowOf(`${g}:${ch}:${name}:${k}`, POST_SOURCE_LABEL[k], list));
               return sub;
             })
             .sort(byTotal);

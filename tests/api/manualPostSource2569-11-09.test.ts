@@ -8,6 +8,7 @@ import { describe, expect, it } from 'vitest';
 import { SO_LINK_NOTE, soGroupLinkOf } from '@/lib/soScraping';
 import { postSourceOf } from '../../api/_handlers/recruit-overview';
 import { appsOfChannelKey, buildApplicantChannelRows } from '@/lib/recruitRequestTab';
+import { buildChannelFunnelTree } from '@/lib/channelFunnel';
 import type { RecruitAppFact } from '@/lib/recruitOverviewTypes';
 
 const G = { id: 'g1', fbGroupId: '884533619479424' };
@@ -42,6 +43,12 @@ describe('ตารางช่องทางชั้นที่ 4', () => {
     const groupRow = groups[0].children![0].children![0];
     expect(groupRow.children!.map((r) => [r.name, r.total])).toEqual([['Autopost', 2], ['โพสต์เอง', 1]]);
     expect(appsOfChannelKey(apps, groupRow.children![1].key).map((f) => f.id)).toEqual(['c']);
+  });
+  it('หน้าภาพรวมโฉมใหม่ (ตาราง รายชื่อมาจากไหน ไปถึงไหน) ก็แตกชั้นเดียวกัน', () => {
+    const apps = [fact('a', 'autopost'), fact('b', 'manual'), fact('c', 'manual')];
+    const fb = buildChannelFunnelTree(apps).groups.find((g) => g.children?.length)!;
+    const grp = fb.children![0].children![0];
+    expect(grp.children!.map((r) => [r.channel, r.names.value])).toEqual([['Autopost', 1], ['โพสต์เอง', 2]]);
   });
   it('ปุ่มโพสต์เองอยู่ในช่อง "สั่งอะไร" · ลิงก์จด note โพสต์เอง', () => {
     expect(readFileSync('src/components/jobs/OrderPostButton.tsx', 'utf8')).toContain("{ value: 'manual', label: 'โพสต์เอง — คัดลอกข้อความไปโพสต์ในกลุ่ม Facebook' }");
