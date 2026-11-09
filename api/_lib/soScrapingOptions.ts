@@ -137,6 +137,7 @@ async function optionsFromDb(): Promise<SoOptions> {
         department: accountBu.get(a.id) ?? null,
         // ทางถอยอ่านฐานตรง ไม่คิดสถานะกลุ่ม = ทุกกลุ่ม "ยังไม่เคยลอง"
         groupStatus: [],
+        sortRank: null,
       };
     }),
     groups: groups.map((g) => ({ id: g.id, fbGroupId: null, name: g.name, url: null, accountIds: [], lastPostedAt: null, stats30d: null, department: g.department, sector: g.sector ?? null, ...soProvincesOf(g.province), blocked: null, repostWait: null })),

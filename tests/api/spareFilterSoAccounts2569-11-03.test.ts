@@ -32,13 +32,13 @@ describe('บัญชี Facebook ในป๊อปสั่งโพสต์
   const acc = (p: Partial<SoOptAccount>) =>
     ({ id: 'a1', name: 'Donnomeachi Chardonnay', status: 'ready', pausedUntil: null, sessionWorkers: ['SONB-RM009'], postedToday: 2, dailyCap: 10, remainingToday: 8, worker: 'SONB-RM009', needsVerificationSince: null, warning: null, ...p }) as SoOptAccount;
   const workers = [{ fbAccountIds: ['a9'] }];
-  it('ถูกพัก = บอกเวลาที่ใช้ได้ (เวลาไทย) · เลือกไม่ได้', () => {
-    expect(soAccountChoice(acc({ status: 'paused', pausedUntil: '2026-11-04T03:26:00Z' }), workers)).toEqual({ label: 'Donnomeachi Chardonnay · ถูกพัก ใช้ได้ 4 พ.ย. 10:26', disabled: true, tone: 'danger' });
+  it('ถูกพัก = แดง เลือกไม่ได้ · ใช้คำเตือนของ So Scraping ตรง ๆ (สเปค 3 สี 9 พ.ย. 2569)', () => {
+    expect(soAccountChoice(acc({ status: 'paused', warning: 'บัญชีถูกพักถึง 5 พ.ย. 10:37' }), workers)).toEqual({ label: 'Donnomeachi Chardonnay · บัญชีถูกพักถึง 5 พ.ย. 10:37', disabled: true, tone: 'danger' });
   });
   it('ไม่มี session บนเครื่องไหน = ยังไม่ได้ล็อกอิน · เลือกได้ (เจ้าของ Choice "เลือกได้ แต่เตือนก่อนส่ง") · มีบนเครื่อง (fb_account_ids) = ป้ายปกติ', () => {
-    expect(soAccountChoice(acc({ name: 'Bennie Bobbe', sessionWorkers: [] }), workers)).toEqual({ label: 'Bennie Bobbe · พร้อมโพสต์ · เหลือ 8 โพสต์วันนี้ · ยังไม่ได้ล็อกอิน Facebook', disabled: false, tone: 'success' });
+    expect(soAccountChoice(acc({ name: 'Bennie Bobbe', sessionWorkers: [] }), workers)).toEqual({ label: 'Bennie Bobbe · ใช้ได้ · เหลือ 8 โพสต์วันนี้ · ยังไม่ได้ล็อกอิน Facebook', disabled: false, tone: 'success' });
     expect(soAccountHasSession(acc({ id: 'a9', sessionWorkers: [] }), workers)).toBe(true);
-    expect(soAccountChoice(acc({}), workers)).toEqual({ label: 'Donnomeachi Chardonnay · พร้อมโพสต์ · เหลือ 8 โพสต์วันนี้', disabled: false, tone: 'success' });
+    expect(soAccountChoice(acc({}), workers)).toEqual({ label: 'Donnomeachi Chardonnay · ใช้ได้ · เหลือ 8 โพสต์วันนี้', disabled: false, tone: 'success' });
   });
   it('ยังไม่ได้ล็อกอิน = เตือนก่อนส่ง ทั้งเลือกเครื่องและไม่เลือกเครื่อง', () => {
     const none = acc({ id: 'a2', sessionWorkers: [] }) as SoOptAccount;

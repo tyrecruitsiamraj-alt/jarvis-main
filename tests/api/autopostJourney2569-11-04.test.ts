@@ -6,7 +6,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
-  soAccountUsable,
   soFilterBus,
   soFilterGroups,
   soFilterProvinces,
@@ -33,11 +32,11 @@ const g = (id: string, over: Partial<SoOptGroup> = {}): SoOptGroup => ({
   ...over,
 });
 
-describe('1 บัญชี: ขึ้นเฉพาะที่ใช้ได้', () => {
-  it('พร้อม / มีงานค้าง / เครื่องหลักออฟไลน์ = ขึ้น · พัก ครบโควต้า รอยืนยันตัวตน ไม่มีเครื่อง ไม่รู้สถานะ = ซ่อน', () => {
-    expect(['ready', 'busy', 'worker_offline'].every((s) => soAccountUsable(s as never))).toBe(true);
-    expect(['paused', 'full', 'needs_verification', 'no_worker', 'unknown'].some((s) => soAccountUsable(s as never))).toBe(false);
-    expect((readFileSync('src/components/jobs/AutopostDialog.tsx', 'utf8') + readFileSync('src/components/jobs/SoGroupPicker.tsx', 'utf8')) /* 4 พ.ย. 2569 ตัวเลือกกลุ่มย้ายเป็นชิ้นกลาง */).toContain('opts.accounts.filter((a) => soAccountUsable(a.status))');
+describe('1 บัญชี: ขึ้นทุกบัญชี 3 สี (สเปค 9 พ.ย. 2569 แทน "ซ่อนที่ใช้ไม่ได้" ของ 4 พ.ย.)', () => {
+  it('ช่องเลือกไม่กรองบัญชีทิ้ง · เรียงเขียว → เหลือง → แดง', () => {
+    const src = readFileSync('src/components/jobs/AutopostDialog.tsx', 'utf8');
+    expect(src).toContain('soAccountsByBu(soAccountsOrdered(opts.accounts), jobBu)');
+    expect(src).not.toContain('soAccountUsable');
   });
 });
 

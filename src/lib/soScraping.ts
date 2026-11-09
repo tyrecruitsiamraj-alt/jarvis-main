@@ -253,6 +253,8 @@ export type SoOptAccount = {
   sessionWorkers: string[];
   /** ธุรกิจของบัญชี (LBD · LBA · LM …) · null = ไม่ระบุธุรกิจ (So Scraping 2 พ.ย. 2569 · users.department) */
   department: string | null;
+  /** ลำดับในสีเดียวกันที่ So Scraping ส่งมา (`sort_rank` น้อยก่อน) · null = ไม่ส่ง (ใช้ลำดับเดิม) */
+  sortRank: number | null;
   /** สถานะกลุ่มของบัญชีนี้ — เฉพาะกลุ่มที่เคยลองโพสต์ใน 30 วัน (So Scraping acc6821) · ไม่อยู่ในรายการ = ยังไม่เคยลอง */
   groupStatus: SoGroupState[];
 };
@@ -341,8 +343,39 @@ export const SO_SCRAPE_STATUS_LABEL: Record<SoScrapeStatus, string> = {
   disabled: 'ปิดใช้งาน',
 };
 
-/** เลือกบัญชี Facebook นี้ได้ไหม — ตามตารางในเอกสาร (paused/no_worker/needs_verification/ไม่รู้จัก = ไม่ได้ · worker_offline ได้ แต่ต้องเลือกเครื่องอื่น) */
-export const soAccountSelectable = (s: SoAccountStatus): boolean => s === 'ready' || s === 'busy' || s === 'full' || s === 'worker_offline';
+/**
+ * ═══ สีของบัญชี Facebook ในป๊อป Autopost (สเปค So Scraping 9 พ.ย. 2569 "3 สี") ═══
+ * เขียว = ใช้ได้ (ready · busy) · เหลือง = รอยืนยันตัวตน เลือกได้ แต่ไม่เกิน 1 กลุ่มต่อใบ (needs_verification)
+ * แดง = พักหรือบล็อก เลือกไม่ได้ (paused · full · worker_offline · no_worker · ไม่รู้จัก) · ทุกแถวมีคำคู่สีเสมอ
+ */
+export type SoAccountTone = 'success' | 'warn' | 'danger';
+export function soAccountTone(s: SoAccountStatus): SoAccountTone {
+  if (s === 'ready' || s === 'busy') return 'success';
+  if (s === 'needs_verification') return 'warn';
+  return 'danger';
+}
+/** เลือกบัญชี Facebook นี้ได้ไหม — เขียวกับเหลือง */
+export const soAccountSelectable = (s: SoAccountStatus): boolean => soAccountTone(s) !== 'danger';
+/** บัญชีรอยืนยันตัวตน ติ๊กกลุ่มได้ไม่เกินเท่านี้ต่อใบ */
+export const SO_VERIFY_GROUP_CAP = 1;
+const TONE_RANK: Record<SoAccountTone, number> = { success: 0, warn: 1, danger: 2 };
+/** ลำดับในช่องเลือก: เขียว → เหลือง → แดง · ในสีเดียวกันตาม `sort_rank` (ไม่มี = ลำดับเดิม) */
+export function soAccountsOrdered<A extends Pick<SoOptAccount, 'status' | 'sortRank'>>(accounts: readonly A[]): A[] {
+  return accounts
+    .map((a, i) => ({ a, i }))
+    .sort(
+      (x, y) =>
+        TONE_RANK[soAccountTone(x.a.status)] - TONE_RANK[soAccountTone(y.a.status)] ||
+        (x.a.sortRank ?? Number.MAX_SAFE_INTEGER) - (y.a.sortRank ?? Number.MAX_SAFE_INTEGER) ||
+        x.i - y.i,
+    )
+    .map((x) => x.a);
+}
+/** คำเตือนใต้ช่องบัญชีเมื่อเลือกบัญชีเหลือง (ข้อความตามสเปค) */
+export function soVerifyWarningText(worker: string | null): string {
+  const on = worker ? `เครื่อง ${worker}` : 'เครื่องที่บัญชีนี้ล็อกอินไว้';
+  return `งานนี้จะเปิด Facebook บน${on} ต้องมีคนยืนยันตัวตนในหน้าต่าง Chrome ภายใน 5 นาทีหลังงานเริ่ม ถ้าไม่ทัน งานจะล้มและส่งกลุ่มให้บัญชีอื่นโพสต์แทน`;
+}
 /** เลือกบัญชี JobThai/JobBKK นี้ได้ไหม (cooldown/disabled = ไม่ได้) */
 export const soScrapeSelectable = (s: SoScrapeStatus): boolean => s === 'ready' || s === 'full';
 /** ต้องขึ้นป๊อปเตือนก่อนส่งไหม (full ยืนยันแล้วส่งต่อได้) */
@@ -373,53 +406,40 @@ const whenBkk = (iso: string | null | undefined): string | null =>
   iso && !Number.isNaN(Date.parse(iso)) ? BKK_TIME.format(new Date(iso)) : null;
 
 /**
- * คำสถานะ + สีของบัญชี (สเปค So Scraping 6.1 · 3 พ.ย. 2569 "ห้ามใช้สีอย่างเดียว ทุกสถานะต้องมีคำ")
- * พร้อม = เขียว · มีงานค้าง/ครบโควต้า/เครื่องออฟไลน์ = เหลือง เลือกได้ · ถูกพัก/ต้องยืนยันตัวตน/ไม่ผูกเครื่อง/ไม่รู้จัก = แดง เลือกไม่ได้
+ * คำสถานะ + สีของบัญชี (สเปค So Scraping 9 พ.ย. 2569 "3 สี" · ห้ามใช้สีอย่างเดียว ทุกแถวต้องมีคำ)
+ * เขียว: "ใช้ได้ · เหลือ N โพสต์วันนี้" / "ใช้ได้ · มีงานค้าง งานนี้ต่อคิว" · เหลือง: "รอยืนยันตัวตน · ต้องมีคนอยู่หน้าเครื่อง …"
+ * แดง: `warning` ที่ So Scraping ส่งมาตรง ๆ (ไม่ส่ง = ชื่อสถานะ)
  */
 export function soAccountStatusText(
-  a: Pick<SoOptAccount, 'status' | 'remainingToday' | 'postedToday' | 'dailyCap' | 'worker' | 'pausedUntil' | 'needsVerificationSince' | 'warning'>,
-): { text: string; tone: 'success' | 'warn' | 'danger' } {
+  a: Pick<SoOptAccount, 'status' | 'remainingToday' | 'worker' | 'warning'>,
+): { text: string; tone: SoAccountTone } {
+  const tone = soAccountTone(a.status);
   switch (a.status) {
     case 'ready':
-      return { text: a.remainingToday !== null ? `พร้อมโพสต์ · เหลือ ${a.remainingToday.toLocaleString('th-TH')} โพสต์วันนี้` : 'พร้อมโพสต์', tone: 'success' };
+      return { text: a.remainingToday !== null ? `ใช้ได้ · เหลือ ${a.remainingToday.toLocaleString('th-TH')} โพสต์วันนี้` : 'ใช้ได้', tone };
     case 'busy':
-      return { text: 'มีงานค้าง ต่อคิวได้', tone: 'warn' };
-    case 'full':
-      return { text: `ครบโควต้าวันนี้ (${a.postedToday.toLocaleString('th-TH')}/${(a.dailyCap ?? a.postedToday).toLocaleString('th-TH')})`, tone: 'warn' };
-    case 'worker_offline':
-      return { text: a.worker ? `เครื่อง ${a.worker} ออฟไลน์` : 'เครื่องออฟไลน์', tone: 'warn' };
-    case 'paused': {
-      const until = whenBkk(a.pausedUntil);
-      return { text: until ? `ถูกพัก ใช้ได้ ${until}` : 'ถูกพัก', tone: 'danger' };
-    }
-    case 'needs_verification': {
-      const since = whenBkk(a.needsVerificationSince);
-      return { text: since ? `ต้องยืนยันตัวตนที่เครื่อง ตั้งแต่ ${since}` : 'ต้องยืนยันตัวตนที่เครื่อง', tone: 'danger' };
-    }
-    case 'no_worker':
-      return { text: 'ยังไม่ผูกเครื่อง', tone: 'danger' };
+      return { text: 'ใช้ได้ · มีงานค้าง งานนี้ต่อคิว', tone };
+    case 'needs_verification':
+      return { text: `รอยืนยันตัวตน · ต้องมีคนอยู่หน้า${a.worker ? `เครื่อง ${a.worker}` : 'เครื่อง'} ตอนงานเริ่ม`, tone };
     default:
-      return { text: a.warning ?? 'ใช้ไม่ได้', tone: 'danger' };
+      return { text: (a.warning ?? '').trim() || SO_ACCOUNT_STATUS_LABEL[a.status], tone };
   }
 }
 
 /** ตัวเลือกในช่องบัญชี — ชื่อ · คำสถานะ (+ "ยังไม่ได้ล็อกอิน Facebook" เมื่อไม่มี session · เจ้าของ 3 พ.ย. 2569 เลือกได้ เตือนตอนส่ง) */
 export function soAccountChoice(
-  a: Pick<
-    SoOptAccount,
-    'id' | 'name' | 'status' | 'pausedUntil' | 'sessionWorkers' | 'postedToday' | 'dailyCap' | 'remainingToday' | 'worker' | 'needsVerificationSince' | 'warning'
-  >,
+  a: Pick<SoOptAccount, 'id' | 'name' | 'status' | 'sessionWorkers' | 'remainingToday' | 'worker' | 'warning'>,
   workers: readonly Pick<SoOptWorker, 'fbAccountIds'>[],
-): { label: string; disabled: boolean; tone: 'success' | 'warn' | 'danger' } {
+): { label: string; disabled: boolean; tone: SoAccountTone } {
   const st = soAccountStatusText(a);
   const selectable = soAccountSelectable(a.status);
   const noLogin = selectable && !soAccountHasSession(a, workers) ? ' · ยังไม่ได้ล็อกอิน Facebook' : '';
   return { label: `${a.name} · ${st.text}${noLogin}`, disabled: !selectable, tone: st.tone };
 }
 
-/** บัญชีตั้งต้น = บัญชีแรกที่ So Scraping แนะนำ (สเปค 6.1) — ธุรกิจของใบขอก่อน แล้วธุรกิจอื่น · ไม่มี = null (ช่องว่าง) */
-export function soDefaultAccount<A extends Pick<SoOptAccount, 'recommended' | 'department'>>(accounts: readonly A[], jobBu: string | null): A | null {
-  const rec = accounts.filter((a) => a.recommended);
+/** บัญชีตั้งต้น = บัญชีแรกที่ So Scraping แนะนำ (สเปค 6.1) — ธุรกิจของใบขอก่อน แล้วธุรกิจอื่น · ไม่มี = null (ช่องว่าง) · บัญชีเหลือง (รอยืนยันตัวตน) ไม่เป็นค่าเริ่มต้น */
+export function soDefaultAccount<A extends Pick<SoOptAccount, 'recommended' | 'department' | 'status'>>(accounts: readonly A[], jobBu: string | null): A | null {
+  const rec = accounts.filter((a) => a.recommended && soAccountTone(a.status) === 'success');
   return (jobBu ? rec.find((a) => a.department === jobBu) : undefined) ?? rec[0] ?? null;
 }
 
@@ -432,8 +452,12 @@ export function soNoAccountReadyText(accounts: readonly Pick<SoOptAccount, 'paus
   return next ? `ตอนนี้ไม่มีบัญชีที่พร้อมโพสต์ · บัญชีแรกใช้ได้ ${BKK_TIME.format(new Date(next))}` : 'ตอนนี้ไม่มีบัญชีที่พร้อมโพสต์';
 }
 
-/** ติ๊กกลุ่มได้สูงสุดกี่กลุ่ม = โพสต์ที่บัญชีเหลือวันนี้ (สเปค 6.2) · ไม่รู้ = ไม่จำกัด (null) */
-export const soGroupCap = (a: Pick<SoOptAccount, 'remainingToday'> | null): number | null => (a ? a.remainingToday : null);
+/** ติ๊กกลุ่มได้สูงสุดกี่กลุ่ม = โพสต์ที่บัญชีเหลือวันนี้ (สเปค 6.2) · บัญชีเหลือง ≤ 1 กลุ่มต่อใบ (9 พ.ย. 2569) · ไม่รู้ = ไม่จำกัด (null) */
+export function soGroupCap(a: Pick<SoOptAccount, 'remainingToday' | 'status'> | null): number | null {
+  if (!a) return null;
+  if (a.status === 'needs_verification') return a.remainingToday === null ? SO_VERIFY_GROUP_CAP : Math.min(SO_VERIFY_GROUP_CAP, a.remainingToday);
+  return a.remainingToday;
+}
 
 /** ติ๊กเพิ่มแบบไม่เกินเพดาน — เกินแล้วตัดตามลำดับที่ส่งมา */
 export function soAddWithinCap(prev: readonly string[], ids: readonly string[], cap: number | null): string[] {
@@ -668,11 +692,9 @@ export function soProvincesOf(province: string | null | undefined): { provinces:
 }
 
 /* ═══ Journey เลือกบัญชี/กลุ่มในป๊อป Autopost (เจ้าของ 4 พ.ย. 2569 · "หลักการคือ เลือกเฉพาะที่ใช้ได้") ═══
- * 1 บัญชี: ขึ้นเฉพาะบัญชีที่ใช้ได้ (โดนพัก ฯลฯ ซ่อน) · 2 กลุ่ม: ธุรกิจ → เอกชน/ราชการ → จังหวัด (ไม่เลือก = ทุกจังหวัด)
+ * 1 บัญชี: ขึ้นทุกบัญชี 3 สี (9 พ.ย. 2569 สเปค So Scraping แทน "ซ่อนที่ใช้ไม่ได้") — แดงเลือกไม่ได้ · 2 กลุ่ม: ธุรกิจ → เอกชน/ราชการ → จังหวัด (ไม่เลือก = ทุกจังหวัด)
  * รายการกลุ่มขึ้นเฉพาะที่โพสต์ได้ด้วยบัญชีนี้ (แอดมินพัก · ห้ามโพสต์ · ต้องตอบคำถาม · ใบนี้เพิ่งลง = ไม่ขึ้น) · 3 เครื่อง
  */
-/** บัญชีที่ขึ้นให้เลือก — พร้อม / มีงานค้างต่อคิวได้ / เครื่องหลักออฟไลน์ (เลือกเครื่องอื่นได้) · พัก ครบโควต้า รอยืนยันตัวตน ไม่มีเครื่อง = ซ่อน */
-export const soAccountUsable = (s: SoAccountStatus): boolean => s === 'ready' || s === 'busy' || s === 'worker_offline';
 
 /** กลุ่มที่โพสต์ได้ด้วยบัญชีนี้รอบนี้ — ไม่โดนพัก · สถานะของบัญชีไม่บอกว่าไม่ควร · ใบนี้ไม่ได้เพิ่งลง */
 export function soGroupUsable(g: Pick<SoOptGroup, 'id' | 'blocked' | 'repostWait'>, acc: Pick<SoOptAccount, 'groupStatus'> | null): boolean {
@@ -812,6 +834,7 @@ export function parseSoOptions(raw: unknown): SoOptions | null {
       groupIds: strs(a.group_ids),
       sessionWorkers: strs(a.session_workers),
       department: normalizeTrendBu(str(a.department)),
+      sortRank: num(a.sort_rank),
       groupStatus: rows(Array.isArray(a.group_status) ? a.group_status : [])
         .filter((x) => str(x.group_id) && str(x.label))
         .map((x): SoGroupState => ({
@@ -986,8 +1009,12 @@ export function soPickError(
   if (!acc) return 'ไม่พบบัญชี Facebook นี้ในระบบ So Scraping แล้ว — ปิดแล้วเลือกใหม่';
   if (!soAccountSelectable(acc.status)) return soWarningText(acc.name, acc.status, acc.warning);
   // เกินโพสต์ที่บัญชีเหลือวันนี้ = worker หยุดเองที่เพดาน กลุ่มที่เหลือไม่ได้โพสต์ (สเปค 6.2) — กันฝั่ง server ด้วย
-  if (acc.remainingToday !== null && picked.length > acc.remainingToday) {
-    return `บัญชี ${acc.name} เหลือโพสต์วันนี้ ${acc.remainingToday} กลุ่ม — ลดกลุ่ม หรือสั่งใบใหม่ด้วยบัญชีอื่น`;
+  // บัญชีเหลือง (รอยืนยันตัวตน) ≤ 1 กลุ่มต่อใบ (สเปค 9 พ.ย. 2569) ตัวเดียวกับจอ (`soGroupCap`)
+  const cap = soGroupCap(acc);
+  if (cap !== null && picked.length > cap) {
+    return acc.status === 'needs_verification'
+      ? `บัญชี ${acc.name} รอยืนยันตัวตน เลือกได้ ${SO_VERIFY_GROUP_CAP} กลุ่มต่อใบ — ลดกลุ่ม หรือเลือกบัญชีอื่น`
+      : `บัญชี ${acc.name} เหลือโพสต์วันนี้ ${cap} กลุ่ม — ลดกลุ่ม หรือสั่งใบใหม่ด้วยบัญชีอื่น`;
   }
   const mine = new Set(soGroupsOfAccount(o, acc).map((g) => g.id));
   if (picked.some((g) => !mine.has(g))) return `มีกลุ่มที่บัญชี ${acc.name} โพสต์ไม่ได้ — เลือกกลุ่มใหม่`;

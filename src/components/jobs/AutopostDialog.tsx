@@ -47,7 +47,8 @@ import {
   soGroupLinkOf,
   type SoGroupLink,
   soAccountsByBu,
-  soAccountUsable,
+  soAccountsOrdered,
+  soVerifyWarningText,
   soAccountChoice,
   soAccountStatusText,
   soAddWithinCap,
@@ -302,13 +303,12 @@ export function AutopostBody({
   const pickAccount = (id: string) => {
     const a = opts?.accounts.find((x) => x.id === id);
     if (!opts || !a) return;
-    // ถูกพัก / ยังไม่ผูกเครื่อง = เลือกไม่ได้ (เอกสาร So Scraping) — เตือนแล้วคงบัญชีเดิม · ยังไม่ได้ล็อกอิน = เลือกได้ เตือนตอนกดส่ง
+    // แดง (พัก · ครบโควต้า · เครื่องออฟไลน์ · ไม่ผูกเครื่อง · ไม่รู้จัก) = เลือกไม่ได้ — เตือนแล้วคงบัญชีเดิม (สเปค 9 พ.ย. 2569)
     if (!soAccountSelectable(a.status)) {
       setWarn({ kind: 'block', lines: [soWarningText(a.name, a.status, a.warning)] });
       return;
     }
-    // เครื่องหลักออฟไลน์ = เลือกบัญชีได้ แต่ให้เลือกเครื่องอื่นที่ออนไลน์
-    setWarn(a.status === 'worker_offline' ? offlineWarn(a) : null);
+    setWarn(null);
     setAccountId(id);
     setWorkerName(soDefaultWorker(soWorkersFor(opts, 'autopost'), 'post')?.name ?? a.worker ?? '');
     // สลับบัญชี = คงกลุ่มที่เลือกไว้ เท่าที่บัญชีนี้โพสต์ได้และไม่เกินโพสต์ที่เหลือ (ไม่ติ๊กเพิ่มให้)
@@ -469,9 +469,9 @@ export function AutopostBody({
                   placeholder="เลือกบัญชี"
                   ariaLabel="บัญชี Facebook"
                   testId="autopost-account"
-                  // ขึ้นเฉพาะบัญชีที่ใช้ได้ — โดนพัก ครบโควต้า รอยืนยันตัวตน ไม่มีเครื่อง = ซ่อน (เจ้าของ 4 พ.ย. 2569 "เลือกเฉพาะที่ใช้ได้")
-                  options={soAccountsByBu(opts.accounts.filter((a) => soAccountUsable(a.status)), jobBu).map(({ account: a, group }) => {
-                    // คำสถานะ + สี (สเปค 6.1 · ห้ามใช้สีอย่างเดียว)
+                  // ทุกบัญชี 3 สี เขียว → เหลือง → แดง (สเปค So Scraping 9 พ.ย. 2569 แทน "ซ่อนที่ใช้ไม่ได้" ของ 4 พ.ย.) · แดงกดไม่ได้
+                  options={soAccountsByBu(soAccountsOrdered(opts.accounts), jobBu).map(({ account: a, group }) => {
+                    // คำสถานะ + สี (ห้ามใช้สีอย่างเดียว)
                     const c = soAccountChoice(a, opts.workers);
                     return { value: a.id, label: c.label, disabled: c.disabled, className: TONE[c.tone].value, group };
                   })}
@@ -490,7 +490,13 @@ export function AutopostBody({
                         .filter(Boolean)
                         .join(' · ')}
                     </p>
-                    {account.warning ? <p className={TONE.warn.value}>{account.warning}</p> : null}
+                    {account.status === 'needs_verification' ? (
+                      <p className={cn('rounded-lg border px-2 py-1.5', TONE.warn.soft, TONE.warn.value)} data-testid="autopost-verify-warning">
+                        {soVerifyWarningText(account.worker)}
+                      </p>
+                    ) : account.warning ? (
+                      <p className={TONE.warn.value}>{account.warning}</p>
+                    ) : null}
                   </div>
                 ) : null}
               </>
@@ -683,10 +689,6 @@ export function AutopostBody({
 }
 
 /** บัญชีตั้งต้น = พร้อมโพสต์ก่อน แล้วมีงานค้าง แล้วครบโควต้า แล้วเครื่องหลักออฟไลน์ · ไม่มีที่เลือกได้ = ไม่เลือก */
-/** เครื่องหลักออฟไลน์ — เลือกบัญชีได้ แต่บอกให้เปลี่ยนเครื่อง */
-function offlineWarn(a: SoOptAccount): { kind: 'info'; lines: string[] } {
-  return { kind: 'info', lines: [soWarningText(a.name, a.status, a.warning), 'เลือกเครื่องอื่นที่ออนไลน์ในช่องเครื่อง'] };
-}
 
 /** แทนลิงก์สมัคร (…/apply/p/<รหัส>) และตัวแทนลิงก์ทุกอันในข้อความด้วยลิงก์ที่เลือก */
 export function syncCaptionLink(caption: string, link: string): string {

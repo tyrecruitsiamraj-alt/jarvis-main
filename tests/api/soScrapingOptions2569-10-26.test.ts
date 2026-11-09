@@ -95,9 +95,9 @@ describe('อ่านคำตอบ options API', () => {
   });
 
   it('กฎเลือกได้ตามตารางในเอกสาร', () => {
-    // เอกสารรอบ 2: เครื่องหลักออฟไลน์ยังเลือกบัญชีได้ (ให้เลือกเครื่องอื่น)
-    expect(['ready', 'busy', 'full', 'worker_offline'].every((s) => soAccountSelectable(s as never))).toBe(true);
-    expect(['paused', 'no_worker'].some((s) => soAccountSelectable(s as never))).toBe(false);
+    // 9 พ.ย. 2569 สเปค 3 สี: เขียว ready/busy · เหลือง needs_verification = เลือกได้ · ครบโควต้า/เครื่องออฟไลน์/พัก/ไม่ผูกเครื่อง = แดง เลือกไม่ได้
+    expect(['ready', 'busy', 'needs_verification'].every((s) => soAccountSelectable(s as never))).toBe(true);
+    expect(['paused', 'no_worker', 'full', 'worker_offline', 'unknown'].some((s) => soAccountSelectable(s as never))).toBe(false);
     expect(soAccountNeedsConfirm('full')).toBe(true);
     expect(soAccountNeedsConfirm('busy')).toBe(false);
     expect(soScrapeSelectable('full')).toBe(true);
@@ -139,7 +139,7 @@ describe('อ่านคำตอบ options API', () => {
     const g = 'mvhmloqvry84difvmvr';
     expect(soPickError(o, 'content', { group_ids: [g], account_id: 'fb_898d82093abe46eeab1980d8' })).toBeNull();
     expect(soPickError(o, 'content', { group_ids: [g], account_id: 'fb_paused01' })).toBe('บัญชีนี้ถูกพักถึง 15:00');
-    expect(soPickError(o, 'content', { group_ids: [g], account_id: 'fb_full01' })).toContain('โพสต์ไม่ได้');
+    expect(soPickError(o, 'content', { group_ids: [g], account_id: 'fb_full01' })).toContain('ครบโควต้า'); // ครบโควต้า = แดง (9 พ.ย. 2569)
     expect(soPickError(o, 'content', { group_ids: ['nope'] })).toContain('ไม่อยู่ในระบบ');
     expect(soPickError(o, 'scraping', { scrape_connector_ids: ['8e1c7893-89a5-4adc-869a-2592776bf3ad'] })).toBeNull();
     expect(soPickError(o, 'scraping', { scrape_connector_ids: ['1b2c3d4e-0000-4000-8000-000000000003'] })).toBe('บัญชีพักถึง 14:00');

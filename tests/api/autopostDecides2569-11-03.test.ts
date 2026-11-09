@@ -57,15 +57,17 @@ describe('6.1 บัญชี: ค่าเริ่มต้นคือบั�
       ['acc-x', 'unknown', false],
     ]);
     expect(acc('acc-v').needsVerificationSince).toBe('2026-11-03T01:00:00.000Z');
-    expect(['paused', 'needs_verification', 'unknown', 'no_worker'].map((s) => soAccountSelectable(s as SoOptAccount['status']))).toEqual([false, false, false, false]);
+    // 9 พ.ย. 2569 สเปค 3 สี: รอยืนยันตัวตน = เหลือง เลือกได้ (≤ 1 กลุ่ม) · ที่เหลือแดง
+    expect(['paused', 'needs_verification', 'unknown', 'no_worker'].map((s) => soAccountSelectable(s as SoOptAccount['status']))).toEqual([false, true, false, false]);
   });
   it('คำสถานะ + สีตามสเปค (ห้ามใช้สีอย่างเดียว)', () => {
-    expect(soAccountStatusText(acc('acc-r'))).toEqual({ text: 'พร้อมโพสต์ · เหลือ 12 โพสต์วันนี้', tone: 'success' });
-    expect(soAccountStatusText({ ...acc('acc-r'), status: 'busy' })).toEqual({ text: 'มีงานค้าง ต่อคิวได้', tone: 'warn' });
-    expect(soAccountStatusText({ ...acc('acc-r'), status: 'full', postedToday: 15 })).toEqual({ text: 'ครบโควต้าวันนี้ (15/15)', tone: 'warn' });
-    expect(soAccountStatusText({ ...acc('acc-r'), status: 'worker_offline', worker: 'SONB-RM011' })).toEqual({ text: 'เครื่อง SONB-RM011 ออฟไลน์', tone: 'warn' });
-    expect(soAccountStatusText(acc('acc-p'))).toEqual({ text: 'ถูกพัก ใช้ได้ 4 พ.ย. 09:21', tone: 'danger' });
-    expect(soAccountStatusText(acc('acc-v'))).toEqual({ text: 'ต้องยืนยันตัวตนที่เครื่อง ตั้งแต่ 3 พ.ย. 08:00', tone: 'danger' });
+    // 9 พ.ย. 2569 สเปค 3 สี — แดงใช้ warning ของ So Scraping ตรง ๆ
+    expect(soAccountStatusText(acc('acc-r'))).toEqual({ text: 'ใช้ได้ · เหลือ 12 โพสต์วันนี้', tone: 'success' });
+    expect(soAccountStatusText({ ...acc('acc-r'), status: 'busy' })).toEqual({ text: 'ใช้ได้ · มีงานค้าง งานนี้ต่อคิว', tone: 'success' });
+    expect(soAccountStatusText({ ...acc('acc-r'), status: 'full', warning: 'บัญชีนี้โพสต์ครบโควต้าวันนี้แล้ว (15/15)' })).toEqual({ text: 'บัญชีนี้โพสต์ครบโควต้าวันนี้แล้ว (15/15)', tone: 'danger' });
+    expect(soAccountStatusText({ ...acc('acc-r'), status: 'worker_offline', warning: null })).toEqual({ text: 'เครื่องออฟไลน์', tone: 'danger' });
+    expect(soAccountStatusText(acc('acc-p'))).toEqual({ text: 'ถูกพัก', tone: 'danger' });
+    expect(soAccountStatusText({ ...acc('acc-v'), worker: 'SONB-RM009' })).toEqual({ text: 'รอยืนยันตัวตน · ต้องมีคนอยู่หน้าเครื่อง SONB-RM009 ตอนงานเริ่ม', tone: 'warn' });
     expect(soAccountStatusText(acc('acc-x'))).toEqual({ text: 'Facebook จำกัดการโพสต์', tone: 'danger' });
     expect(soAccountChoice(acc('acc-p'), o.workers)).toMatchObject({ disabled: true, tone: 'danger' });
   });
