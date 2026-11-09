@@ -323,7 +323,8 @@ export function AutopostBody({
     if (!opts || !retryFrom || prefilledFrom === retryFrom.id) return;
     setPrefilledFrom(retryFrom.id);
     const snap = (retryFrom.job_snapshot ?? {}) as Record<string, unknown>;
-    if (typeof snap.caption === 'string' && snap.caption.trim()) {
+    // 🔴 9 พ.ย. 2569: ข้อความที่แก้แล้วบันทึกกับใบขอ (หรือเพิ่งพิมพ์) ชนะข้อความของใบเดิมเสมอ — เคยเปิดป๊อป OPL6910069 แล้วกลับไปข้อความใบ 4 พ.ย. ทั้งที่แก้ไว้ 5 พ.ย.
+    if (!captionEdited && typeof snap.caption === 'string' && snap.caption.trim()) {
       setCaption(syncCaptionLink(snap.caption, AUTOPOST_LINK_PLACEHOLDER));
       setCaptionEdited(true);
     }
@@ -339,7 +340,7 @@ export function AutopostBody({
     if (acc) setWorkerName(soDefaultWorker(soWorkersFor(opts, 'autopost'), 'post')?.name ?? acc.worker ?? '');
     const allowed = acc ? new Set(soGroupsOfAccount(opts, acc).filter((g) => soGroupUsable(g, acc)).map((g) => g.id)) : null;
     setPicked(acc ? soAddWithinCap([], groups.filter((id) => allowed!.has(id)), soGroupCap(acc)) : groups);
-  }, [opts, retryFrom, prefilledFrom, jobBu]);
+  }, [opts, retryFrom, prefilledFrom, jobBu, captionEdited]);
 
   const send = async (confirmed = false) => {
     if (busy || problems.length > 0 || !account) return;

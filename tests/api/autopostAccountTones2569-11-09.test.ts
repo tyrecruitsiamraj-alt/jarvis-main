@@ -94,4 +94,9 @@ describe('สลับบัญชี / สั่งใหม่ คงไว้
     expect(src).toContain('soGroupsOfAccount(opts, a).filter((g) => soGroupUsable(g, a))');
     expect(src).toContain('soGroupsOfAccount(opts, acc).filter((g) => soGroupUsable(g, acc))');
   });
+  it('สั่งใหม่: ข้อความที่แก้บันทึกไว้กับใบขอชนะข้อความของใบเดิม — OPL6910069 แก้ไว้ 5 พ.ย. เปิดป๊อปแล้วกลับไปข้อความใบ 4 พ.ย.', () => {
+    const src = readFileSync('src/components/jobs/AutopostDialog.tsx', 'utf8');
+    expect(src).toContain('React.useState(Boolean(savedCaption))');
+    expect(src).toContain("if (!captionEdited && typeof snap.caption === 'string' && snap.caption.trim()) {");
+  });
 });
