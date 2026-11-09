@@ -461,7 +461,12 @@ export function AutopostBody({
               <p className={cn('text-sm', TONE.warn.value)}>ยังไม่มีบัญชี ให้เพิ่มที่ระบบ So Scraping</p>
             ) : (
               <>
-                {!opts.accounts.some((a) => a.recommended) ? (
+                {/* So Scraping ข้อ 12 (9 พ.ย. 2569): can_order false = แสดง message ตามที่ส่งมา · ไม่ส่งมา = คำเดิม · บัญชีเหลืองยังเลือกได้ */}
+                {opts.postingAvailability?.canOrder === false && opts.postingAvailability.message ? (
+                  <p className={cn('text-sm', TONE.danger.value)} data-testid="autopost-no-ready-account">
+                    {opts.postingAvailability.message}
+                  </p>
+                ) : !opts.postingAvailability && !opts.accounts.some((a) => a.recommended) ? (
                   <p className={cn('text-sm', TONE.danger.value)} data-testid="autopost-no-ready-account">
                     {soNoAccountReadyText(opts.accounts)}
                   </p>

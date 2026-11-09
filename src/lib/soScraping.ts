@@ -239,6 +239,8 @@ export type SoOptAccount = {
   postedToday: number;
   dailyCap: number | null;
   remainingToday: number | null;
+  /** กลุ่มที่สั่งไว้แล้วยังไม่ได้โพสต์ (รอคิว) · ติ๊กได้ไม่เกิน remainingToday − pendingGroups (9 พ.ย. 2569) */
+  pendingGroups?: number;
   pausedUntil: string | null;
   pauseReason: string | null;
   queue: SoQueue;
@@ -324,6 +326,8 @@ export type SoOptions = {
   groups: SoOptGroup[];
   workers: SoOptWorker[];
   scrapeAccounts: SoScrapeAccount[];
+  /** ตอนนี้สั่งโพสต์ได้ไหม (So Scraping ข้อ 12) · `canOrder` false = แสดง `message` ตามที่ส่งมา · ไม่ส่ง = ไม่แสดง */
+  postingAvailability?: { canOrder: boolean; message: string | null } | null;
 };
 
 export const SO_ACCOUNT_STATUS_LABEL: Record<SoAccountStatus, string> = {
@@ -374,7 +378,7 @@ export function soAccountsOrdered<A extends Pick<SoOptAccount, 'status' | 'sortR
 /** คำเตือนใต้ช่องบัญชีเมื่อเลือกบัญชีเหลือง (ข้อความตามสเปค) */
 export function soVerifyWarningText(worker: string | null): string {
   const on = worker ? `เครื่อง ${worker}` : 'เครื่องที่บัญชีนี้ล็อกอินไว้';
-  return `งานนี้จะเปิด Facebook บน${on} ต้องมีคนยืนยันตัวตนในหน้าต่าง Chrome ภายใน 5 นาทีหลังงานเริ่ม ถ้าไม่ทัน งานจะล้มและส่งกลุ่มให้บัญชีอื่นโพสต์แทน`;
+  return `งานนี้จะเปิด Facebook บน${on} ต้องมีคนยืนยันตัวตนในหน้าต่าง Chrome ภายใน 5 นาทีหลังงานเริ่ม`;
 }
 /** เลือกบัญชี JobThai/JobBKK นี้ได้ไหม (cooldown/disabled = ไม่ได้) */
 export const soScrapeSelectable = (s: SoScrapeStatus): boolean => s === 'ready' || s === 'full';
@@ -452,11 +456,15 @@ export function soNoAccountReadyText(accounts: readonly Pick<SoOptAccount, 'paus
   return next ? `ตอนนี้ไม่มีบัญชีที่พร้อมโพสต์ · บัญชีแรกใช้ได้ ${BKK_TIME.format(new Date(next))}` : 'ตอนนี้ไม่มีบัญชีที่พร้อมโพสต์';
 }
 
-/** ติ๊กกลุ่มได้สูงสุดกี่กลุ่ม = โพสต์ที่บัญชีเหลือวันนี้ (สเปค 6.2) · บัญชีเหลือง ≤ 1 กลุ่มต่อใบ (9 พ.ย. 2569) · ไม่รู้ = ไม่จำกัด (null) */
-export function soGroupCap(a: Pick<SoOptAccount, 'remainingToday' | 'status'> | null): number | null {
+/**
+ * ติ๊กกลุ่มได้สูงสุดกี่กลุ่ม = โพสต์ที่บัญชีเหลือวันนี้ − กลุ่มที่ค้างคิว (สเปค 6.2 · 9 พ.ย. 2569) · บัญชีเหลือง ≤ 1 กลุ่มต่อใบ
+ * ไม่รู้ = ไม่จำกัด (null)
+ */
+export function soGroupCap(a: Pick<SoOptAccount, 'remainingToday' | 'status' | 'pendingGroups'> | null): number | null {
   if (!a) return null;
-  if (a.status === 'needs_verification') return a.remainingToday === null ? SO_VERIFY_GROUP_CAP : Math.min(SO_VERIFY_GROUP_CAP, a.remainingToday);
-  return a.remainingToday;
+  const room = a.remainingToday === null ? null : Math.max(0, a.remainingToday - (a.pendingGroups ?? 0));
+  if (a.status === 'needs_verification') return room === null ? SO_VERIFY_GROUP_CAP : Math.min(SO_VERIFY_GROUP_CAP, room);
+  return room;
 }
 
 /** ติ๊กเพิ่มแบบไม่เกินเพดาน — เกินแล้วตัดตามลำดับที่ส่งมา */
@@ -824,6 +832,7 @@ export function parseSoOptions(raw: unknown): SoOptions | null {
       postedToday: num(a.posted_today) ?? 0,
       dailyCap: num(a.daily_cap),
       remainingToday: num(a.remaining_today),
+      pendingGroups: num(a.pending_groups) ?? 0,
       pausedUntil: str(a.paused_until),
       pauseReason: str(a.pause_reason),
       queue: queueOf(a.queue),
@@ -910,7 +919,9 @@ export function parseSoOptions(raw: unknown): SoOptions | null {
       cap: num(s.platform_cap),
       cooldownUntil: str(s.cooldown_until),
     }));
-  return { source: 'api', accounts, groups, workers, scrapeAccounts };
+  const pa = r.posting_availability && typeof r.posting_availability === 'object' ? (r.posting_availability as Record<string, unknown>) : null;
+  const postingAvailability = pa && typeof pa.can_order === 'boolean' ? { canOrder: pa.can_order, message: str(pa.message) } : null;
+  return { source: 'api', accounts, groups, workers, scrapeAccounts, postingAvailability };
 }
 
 /** ชื่อเว็บของบัญชี Scrap */

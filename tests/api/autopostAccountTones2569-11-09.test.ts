@@ -80,7 +80,7 @@ describe('เหลือง: ไม่เกิน 1 กลุ่มต่อ�
   });
   it('คำเตือนใต้ช่องบัญชีตามสเปค · ป๊อปขึ้นเมื่อเลือกบัญชีเหลือง', () => {
     expect(soVerifyWarningText('SONB-RM009')).toBe(
-      'งานนี้จะเปิด Facebook บนเครื่อง SONB-RM009 ต้องมีคนยืนยันตัวตนในหน้าต่าง Chrome ภายใน 5 นาทีหลังงานเริ่ม ถ้าไม่ทัน งานจะล้มและส่งกลุ่มให้บัญชีอื่นโพสต์แทน',
+      'งานนี้จะเปิด Facebook บนเครื่อง SONB-RM009 ต้องมีคนยืนยันตัวตนในหน้าต่าง Chrome ภายใน 5 นาทีหลังงานเริ่ม',
     );
     const src = readFileSync('src/components/jobs/AutopostDialog.tsx', 'utf8');
     expect(src).toContain("account.status === 'needs_verification'");
@@ -98,5 +98,27 @@ describe('สลับบัญชี / สั่งใหม่ คงไว้
     const src = readFileSync('src/components/jobs/AutopostDialog.tsx', 'utf8');
     expect(src).toContain('React.useState(Boolean(savedCaption))');
     expect(src).toContain("if (!captionEdited && typeof snap.caption === 'string' && snap.caption.trim()) {");
+  });
+});
+
+describe('ข้อ 12 + กลุ่มค้างคิว (So Scraping 9 พ.ย. 2569 รอบ 2)', () => {
+  it('posting_availability: can_order false = แสดง message ตามที่ส่งมา · ไม่ส่ง = null (ใช้คำเดิม)', () => {
+    const msg = 'สั่งโพสต์ไม่ได้ตอนนี้ เพราะไม่มีบัญชีที่โพสต์ได้: รอยืนยันตัวตนที่เครื่อง 7 บัญชี';
+    expect(parseSoOptions({ ...RAW, posting_availability: { can_order: false, message: msg } })!.postingAvailability).toEqual({ canOrder: false, message: msg });
+    expect(o.postingAvailability).toBeNull();
+    const src = readFileSync('src/components/jobs/AutopostDialog.tsx', 'utf8');
+    expect(src).toContain('opts.postingAvailability?.canOrder === false && opts.postingAvailability.message');
+  });
+  it('เพดานกลุ่ม = remaining_today − pending_groups · เหลืองยัง ≤ 1', () => {
+    const p = parseSoOptions({
+      ...RAW,
+      accounts: [
+        { id: 'g', name: 'G', status: 'ready', remaining_today: 4, pending_groups: 3, group_ids: [] },
+        { id: 'y', name: 'Y', status: 'needs_verification', remaining_today: 4, pending_groups: 4, group_ids: [] },
+      ],
+    })!;
+    expect(soGroupCap(p.accounts[0])).toBe(1);
+    expect(soGroupCap(p.accounts[1])).toBe(0);
+    expect(soGroupCap(acc('yel'))).toBe(1);
   });
 });
