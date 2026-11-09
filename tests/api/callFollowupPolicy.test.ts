@@ -245,6 +245,17 @@ describe('โทรซ้ำเป็นรอบ 3 สาย × 2 รอบ × 
     expect([sun[6], sun[12]]).toEqual(['2026-11-07 13:00', '2026-11-08 09:00']);
   });
 
+  it('เสาร์-อาทิตย์: กรอกพุธ 19:00 → รอบสองเลย 20:00 ไปเสาร์ ไม่ใช่พฤหัสเช้า (review 9 พ.ย. 2569)', () => {
+    const W = normalizeCallFollowupPolicy({});
+    const c = chain('2026-10-28T12:00:00Z', W);
+    expect(c.slice(0, 6)).toEqual(['2026-10-28 19:00', '2026-10-28 19:10', '2026-10-28 19:20', '2026-10-31 08:00', '2026-10-31 08:10', '2026-10-31 08:20']);
+    // ทุกสายหลังวันแรกอยู่เสาร์/อาทิตย์เท่านั้น
+    const dow = (s: string) => new Date(`${s.replace(' ', 'T')}:00Z`).getUTCDay();
+    expect(c.slice(3).every((s) => dow(s) === 6 || dow(s) === 0)).toBe(true);
+    // เสาร์ 19:30 เลยช่วง = อาทิตย์ (ยังเป็นวันโทรซ้ำ)
+    expect(bkk(nextRetryAt(new Date('2026-10-31T12:30:00Z'), 3, W))).toBe('2026-11-01 08:00');
+  });
+
   it('ข้อความเหตุบอกวันจริง: โทรซ้ำวันเสาร์', () => {
     const d = resolveCallFollowup({ outcome: 'no_answer', attemptCount: 6, now: new Date('2026-10-27T04:40:00Z') });
     expect(d.reason).toBe('ยังไม่ติด — โทรซ้ำครั้งที่ 7/18 วันเสาร์ 13:00');

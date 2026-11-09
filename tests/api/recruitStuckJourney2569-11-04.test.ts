@@ -16,25 +16,29 @@ describe('สมการบนสุด', () => {
   const rows = [
     req('OLD1', 'open', false),
     req('OLD2', 'open', false),
+    // ยกมาที่จบในช่วง — นับในปิดแล้ว/ยกเลิก (นิยามหน้าหลัก · review 9 พ.ย. 2569)
+    req('OLD3', 'filled', false),
+    req('OLD4', 'cancelled', false),
     req('NEW1', 'open', true),
     req('NEW2', 'filled', true),
     req('NEW3', 'cancelled', true),
     req('NEW4', 'cancelled', true),
   ];
-  it('ยกมา + ขอใหม่ − ปิดแล้ว − ยกเลิก = ยังต้องหา', () => {
+  it('ยกมา + ขอใหม่ − ปิดแล้ว − ยกเลิก = เหลือหา', () => {
     const eq = stuckEquation(rows);
-    expect([eq.carried, eq.new, eq.filled, eq.cancelled, eq.remaining].map((l) => l.length)).toEqual([2, 4, 1, 2, 3]);
+    expect([eq.carried, eq.new, eq.filled, eq.cancelled, eq.remaining].map((l) => l.length)).toEqual([4, 4, 2, 3, 3]);
     expect(eq.carried.length + eq.new.length - eq.filled.length - eq.cancelled.length).toBe(eq.remaining.length);
   });
-  it('ใบชุดที่เลือก: ยกมาเป็นของใบเก่าที่ยังเปิด · ปิดแล้ว/ยกเลิกเป็นของใบขอใหม่ · แถวรุ่นเก่าไม่มีสถานะ = ยังต้องหา', () => {
-    expect(rows.filter((r) => stuckInScope(r, 'carried')).map((r) => r.requestNo)).toEqual(['OLD1', 'OLD2']);
-    expect(rows.filter((r) => stuckInScope(r, 'cancelled')).map((r) => r.requestNo)).toEqual(['NEW3', 'NEW4']);
+  it('ใบชุดที่เลือก: ยกมา = เปิดก่อนเริ่มช่วงทุกสถานะ · ปิดแล้ว/ยกเลิก = จบในช่วงทั้งยกมาและขอใหม่ · แถวรุ่นเก่าไม่มีสถานะ = เหลือหา', () => {
+    expect(rows.filter((r) => stuckInScope(r, 'carried')).map((r) => r.requestNo)).toEqual(['OLD1', 'OLD2', 'OLD3', 'OLD4']);
+    expect(rows.filter((r) => stuckInScope(r, 'cancelled')).map((r) => r.requestNo)).toEqual(['OLD4', 'NEW3', 'NEW4']);
     expect(stuckInScope({ requestNo: 'X' } as StuckRequest, 'remaining')).toBe(true);
   });
-  it('เซิร์ฟเวอร์: ขอใหม่ = ชุดเดียวกับหน้าหลัก · ยกมา = ยังต้องหาวันนี้เท่านั้น · พื้นที่ใช้ตัวอ่านของแท็บใบขอเดิม', () => {
+  it('เซิร์ฟเวอร์: ใบขอจริงใช้บทบาทจากสมุดใบขอตัวเดียวกับสมการหน้าหลัก · ยกเลิกบางส่วน = ยกเลิก · พื้นที่ใช้ตัวอ่านของแท็บใบขอเดิม', () => {
     const src = readFileSync('api/_handlers/recruit-stuck.ts', 'utf8');
     expect(src).toContain('loadOnlineRequestRows({ from: win.from, to: win.to');
-    expect(src).toContain("b.inRange || onlineRequestStateOf(b.online) === 'open'");
+    expect(src).toContain('const role = requestFlowRole(r, win.from, toEff);');
+    expect(src).toContain("partialCancelled: 'cancelled'");
     expect(src).toContain('toRequestRows(base.map((b) => b.online))');
   });
 });

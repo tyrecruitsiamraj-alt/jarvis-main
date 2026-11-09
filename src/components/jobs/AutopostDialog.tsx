@@ -63,7 +63,6 @@ import {
   soPostSnapshot,
   soStatusView,
   soWarningText,
-  type SoOptAccount,
   type SoOptions,
   type SoPostMode,
 } from '@/lib/soScraping';
@@ -704,12 +703,4 @@ export function syncCaptionLink(caption: string, link: string): string {
     .replace(/https?:\/\/[^\s]*\/apply\/p\/[A-Za-z0-9]+/g, link)
     .split(AUTOPOST_LINK_PLACEHOLDER)
     .join(link);
-}
-
-export function firstAccount(list: readonly SoOptAccount[]): SoOptAccount | null {
-  for (const st of ['ready', 'busy', 'full', 'worker_offline'] as const) {
-    const a = list.find((x) => x.status === st);
-    if (a) return a;
-  }
-  return null;
 }

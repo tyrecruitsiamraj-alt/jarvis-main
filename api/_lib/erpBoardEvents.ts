@@ -78,7 +78,9 @@ export async function boardActorName(userId: string, email: string): Promise<str
       [userId],
     );
     return rows[0]?.n || email;
-  } catch {
+  } catch (e) {
+    // ชื่อเล่นเป็นของประกอบ — อ่านไม่ได้ใช้อีเมลแทนได้ แต่ต้องจดไว้ (review 9 พ.ย. 2569 เดิมกลืนเงียบ)
+    logError('erp-board: อ่านชื่อผู้กดไม่ได้', e);
     return email;
   }
 }

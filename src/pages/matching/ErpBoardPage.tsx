@@ -392,14 +392,19 @@ function ErpBoardCardTile({
   const checklistTotal = overview?.checklist.length ?? 0;
   return (
     <article className={cn(DASH.card, 'space-y-1.5 p-3')} data-testid={`erp-board-card-${c.cardId}`}>
-      <button type="button" onClick={onOpen} className="block w-full space-y-1 text-left">
+      <Button
+        type="button"
+        variant="ghost"
+        onClick={onOpen}
+        className="h-auto w-full flex-col items-stretch gap-1 whitespace-normal rounded-lg p-0 text-left font-normal hover:bg-transparent"
+      >
         <p className={cn(DASH.cellStrong, 'text-sm')}>{c.title}</p>
         <p className={DASH.sub}>ตำแหน่ง: {erpCardPosition(c)}</p>
         <p className={DASH.sub}>
           ไซต์งาน: <span className={DASH.cell}>{c.site ?? '—'}</span>
         </p>
         <ErpBoardStepLine card={c} />
-      </button>
+      </Button>
       {c.tags.length ? (
         <div className="flex flex-wrap gap-1">
           {c.tags.map((t) => (

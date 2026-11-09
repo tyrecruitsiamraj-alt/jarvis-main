@@ -6,6 +6,7 @@
  * ⚠️ แท็กใน ERP ไม่มีเวลา ⇒ แท็กที่เคยกดบน Jarvis ใช้ของ Jarvis เสมอ · ไม่เคยกด = ของ ERP
  * ⚠️ เวลา ERP เป็นเวลาไทยแต่ไดรเวอร์ติดป้าย UTC ⇒ แปลงที่ `erpTime` ก่อนเทียบทุกครั้ง (เคยขึ้นเวลาล่วงหน้า 7 ชม.)
  */
+import type { ErpBoardCard, ErpBoardColumn, ErpBoardOutcome, ErpBoardStep } from '../../src/lib/erpBoard.js';
 
 export const ERP_BOARD_EVENT_KINDS = [
   'move',
@@ -56,9 +57,10 @@ export function erpTime(v: Date | string | null | undefined): string | null {
 
 const ms = (iso: string | null | undefined) => (iso ? Date.parse(iso) : Number.NEGATIVE_INFINITY);
 
-export type ErpBoardColumnMeta = { id: number; key: string | null; label: string; seq: number; isDone: boolean; requiresLink: boolean };
-export type ErpBoardStepMeta = { id: number; seq: number; label: string; hasDate: boolean; dateLabel: string | null };
-export type ErpBoardOutcomeMeta = { id: number; stepId: number; label: string; reject: boolean; toColumnIds: number[] };
+// ชนิดที่หน้าเว็บใช้ ประกาศที่เดียวใน `src/lib/erpBoard.ts` (review 9 พ.ย. 2569 เดิมเขียนซ้ำทุกช่อง) — import แบบ type ไม่ลากโค้ดหน้าเว็บมาฝั่งนี้
+export type ErpBoardColumnMeta = ErpBoardColumn;
+export type ErpBoardStepMeta = ErpBoardStep;
+export type ErpBoardOutcomeMeta = ErpBoardOutcome;
 export type ErpBoardChecklistMeta = { itemId: number; group: string; item: string };
 export type ErpBoardMeta = {
   boardId: number;
@@ -96,32 +98,7 @@ export type ErpRawCard = {
   calls: number;
 };
 
-export type ErpBoardCard = {
-  cardId: number;
-  columnId: number;
-  itemId: number | null;
-  title: string;
-  position: string | null;
-  jobType: string | null;
-  site: string | null;
-  mobile: string | null;
-  tags: string[];
-  tagIds: number[];
-  stepId: number | null;
-  step: string | null;
-  outcome: string | null;
-  scheduledAt: string | null;
-  checklistDone: number;
-  checkedItemIds: number[];
-  requestNos: string[];
-  comments: number;
-  lastComment: string | null;
-  calls: number;
-  assignees: string[];
-  assigneeIds: string[];
-  createdAt: string | null;
-  lastActivityAt: string | null;
-};
+export type { ErpBoardCard };
 
 type Toggle = { on: boolean; at: number };
 /** สถานะทีละกุญแจ: ของ ERP แล้วทับด้วยการกดบน Jarvis ที่ใหม่กว่า */

@@ -400,17 +400,18 @@ export function OrderPostFold({ className, ...props }: React.ComponentProps<type
   const [open, setOpen] = React.useState(false);
   return (
     <div className={cn('space-y-3', className)} data-testid="order-post-fold">
-      <button
+      <Button
         type="button"
+        variant="ghost"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className="flex min-h-9 w-full items-center gap-1.5 text-left text-sm font-medium"
+        className="h-auto min-h-9 w-full justify-start gap-1.5 rounded-lg px-0 text-left text-sm font-medium hover:bg-transparent"
         data-testid="order-post-toggle"
       >
         <Megaphone className={cn('h-4 w-4', TONE.primary.value)} aria-hidden />
         {props.withGenLink ? 'Autopost / Scrap / Gen link' : 'Autopost / Scrap'}
         <ChevronDown className={cn('ml-auto h-4 w-4 shrink-0 text-muted-foreground transition-transform', open && 'rotate-180')} aria-hidden />
-      </button>
+      </Button>
       {open ? <OrderPostButton {...props} /> : null}
     </div>
   );

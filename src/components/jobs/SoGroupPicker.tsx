@@ -1,4 +1,5 @@
 import React from 'react';
+import { bkkWhen } from '@/lib/bkkWhen';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { FieldSelect } from '@/components/shared/FieldSelect';
@@ -19,7 +20,6 @@ import {
 import type { UnitSector } from '@/lib/unitSector';
 
 const NUM = new Intl.NumberFormat('th-TH');
-const WHEN = new Intl.DateTimeFormat('th-TH', { timeZone: 'Asia/Bangkok', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 
 /**
  * ═══ เลือกกลุ่ม Facebook ตอน Gen link (เจ้าของ 2 พ.ย. 2569) ═══
@@ -204,7 +204,7 @@ export function SoGroupFilterPicker({
                     {[
                       prov && !g.provinces.includes(prov) && g.nationwide ? 'ทั่วประเทศ' : null,
                       soGroupStatsText(g.stats30d),
-                      g.lastPostedAt ? `โพสต์ล่าสุด ${WHEN.format(new Date(g.lastPostedAt))}` : null,
+                      bkkWhen(g.lastPostedAt) ? `โพสต์ล่าสุด ${bkkWhen(g.lastPostedAt)}` : null,
                       recent?.has(g.id) ? 'ใบนี้เพิ่งสั่งโพสต์กลุ่มนี้ใน 3 วัน' : null,
                     ]
                       .filter(Boolean)

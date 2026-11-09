@@ -1,4 +1,5 @@
 import type { PublicApplication } from '@/lib/publicApplicationsApi';
+import { bkkWhen } from '@/lib/bkkWhen';
 import { aiQueueStatusOf, type AiQueueStatus } from '@/lib/applicantAiQueueStatus';
 import { callResultLabel } from '@/lib/homeCallResults';
 import { FOLLOW_STATUS_LABEL, isFollowCallStatus } from '@/lib/followApi';
@@ -70,8 +71,7 @@ export function aiAnswerTextOf(r: PublicApplication, now: number = Date.now()): 
  */
 export type RmRowStatus = { view: ReturnType<typeof rmShownViewOf>; title: string; detail: string | null; tone: 'success' | 'warn' | 'danger' | 'neutral' | 'info' };
 
-const ROW_DATE = new Intl.DateTimeFormat('th-TH', { timeZone: 'Asia/Bangkok', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
-const rowWhen = (iso: string | null | undefined) => (iso && Number.isFinite(Date.parse(iso)) ? ROW_DATE.format(new Date(iso)) : null);
+const rowWhen = bkkWhen;
 const OUTCOME_SHORT: Record<string, string> = { no_answer: 'ไม่รับสาย', busy: 'สายไม่ว่าง', unresponsive: 'รับแต่ไม่ตอบ', failed: 'โทรไม่ติด' };
 const TALKED_DETAIL: Record<string, string> = { picked_silent: 'รับสายแต่ไม่พูด', talked_unclear: 'คุยแล้วตอบไม่ชัด', not_yet: 'ยังไม่ตัดสินใจ' };
 

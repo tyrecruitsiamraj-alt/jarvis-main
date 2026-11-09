@@ -16,6 +16,7 @@
  */
 import { siamrajSqlQuery } from './siamrajSqlServer.js';
 import { erpTime, type ErpBoardMeta, type ErpRawCard, type ErpRawDetail } from './erpBoardMerge.js';
+import type { ErpBoardDay } from '../../src/lib/erpBoard.js';
 
 const DEFAULT_BOARD_ID = () => Number(process.env.BOARD_READY_BOARD_ID || 1);
 const CARD_LIMIT_MAX = 2000;
@@ -34,7 +35,7 @@ const staffName = (alias: string) => `COALESCE(NULLIF(RTRIM(${alias}.nick_name),
 const iso126 = (col: string) => `CONVERT(varchar(19), ${col}, 126)`;
 const MIN_ITEMS = `SELECT item_id FROM dbo.ir_board_item WHERE board_id = @boardId AND item_date >= CONVERT(date, @minDate, 23)`;
 
-export type ErpBoardDay = { itemId: number; date: string; label: string; cards: number };
+export type { ErpBoardDay } from '../../src/lib/erpBoard.js';
 
 /* ─────────────── ของที่ไม่เปลี่ยนรายนาที (เก็บไว้ 10 นาที) ─────────────── */
 

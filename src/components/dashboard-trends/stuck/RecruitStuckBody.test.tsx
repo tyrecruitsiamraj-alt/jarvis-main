@@ -55,7 +55,7 @@ describe('หน้าภาพรวมโฉมใหม่', () => {
     const phases = screen.getByTestId('stuck-phases');
     const nums = ['before', 'uncalled', 'calling', 'closing'].map((k) => Number(within(phases).getByTestId(`stuck-phase-${k}`).textContent?.match(/\d+/)?.[0]));
     expect(nums).toEqual([2, 1, 0, 0]);
-    for (const t of ['ติดที่ใคร', 'รายชื่อมาจากไหน ไปถึงไหน', 'พื้นที่ที่ยังต้องหา', 'เทียบเดือน', 'ทำไมไม่สำเร็จ']) expect(screen.getByText(t)).toBeTruthy();
+    for (const t of ['ติดที่ใคร', 'รายชื่อมาจากไหน ไปถึงไหน', 'พื้นที่ที่เหลือหา', 'เทียบเดือน', 'ทำไมไม่สำเร็จ']) expect(screen.getByText(t)).toBeTruthy();
     // กดเหตุ "ยังไม่ประกาศ" → รายการใบ 1 ใบ → กดใบ → เส้นทาง ขั้นที่ติด = ประกาศ
     fireEvent.click(screen.getByTestId('stuck-reason-not_released'));
     const list = await screen.findByTestId('stuck-list');
@@ -128,7 +128,7 @@ describe('หน้าภาพรวมโฉมใหม่', () => {
     cleanup();
     fetchRecruitStuck.mockRejectedValue(new Error('ล่ม'));
     renderBody();
-    expect((await screen.findAllByText(/โหลดใบขอที่ยังต้องหาไม่ได้|ล่ม/)).length).toBeGreaterThan(0); // ขึ้นทั้งส่วนใบขอและเทียบเดือน
+    expect((await screen.findAllByText(/โหลดใบขอที่เหลือหาไม่ได้|ล่ม/)).length).toBeGreaterThan(0); // ขึ้นทั้งส่วนใบขอและเทียบเดือน
     expect(screen.queryByTestId('stuck-total')).toBeNull();
   });
 });

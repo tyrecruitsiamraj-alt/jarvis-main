@@ -1,5 +1,5 @@
 /**
- * ═══ GET /api/recruit-stuck — ใบขอที่ยังต้องหา ติดตรงไหน + เทียบเดือน (หน้าภาพรวมงานสรรหาโฉมใหม่ · เจ้าของ 4 พ.ย. 2569) ═══
+ * ═══ GET /api/recruit-stuck — ใบขอที่เหลือหา ติดตรงไหน + เทียบเดือน (หน้าภาพรวมงานสรรหาโฉมใหม่ · เจ้าของ 4 พ.ย. 2569) ═══
  *
  * > *"ใบขอมา มาแล้วไปประกาศแล้ว แต่ปิดไม่ได้เพราะไม่มีคนนะ หรือ มีคนแต่คนไม่โทรนะ หรือ ปิดไม่ได้เพราะไม่ได้โพสต์ด้วยซ้ำ
  * > แล้วต้องบอกเลยว่า อ้อใบนี้ของใครรับผิดชอบบ้าง ช้าที่ใครเท่าไหร่"*
@@ -15,7 +15,7 @@ import { withRbac, sendError, handleApiError, type ApiRes, type AuthedReq } from
 import { dbQuery } from '../_lib/postgres.js';
 import { tableInAppSchema } from '../_lib/schema.js';
 import { loadMatchingBuScope, loadUserDepartmentScope } from '../_lib/departmentScope.js';
-import { pickDashboardBuSet, appBuJoin, buMatchSql, appBuSql } from '../_lib/homeBuSql.js';
+import { pickDashboardBuSet, appBuJoin, buMatchSql, appBuSql, inBuSet } from '../_lib/homeBuSql.js';
 import { logError } from '../_lib/logger.js';
 import { readUnitRequestListThroughCache } from './siamraj-unit-requests.js';
 import { attachRequestRecruiters, loadFactsForJobs, toRequestRows } from './recruit-overview.js';
@@ -32,6 +32,9 @@ import { publicJobTitle } from '../../src/lib/publicJobTitle.js';
 import { jobUnitSectorOf } from '../../src/lib/unitRequestDisplay.js';
 import { onlineRequestStateOf, type OnlineRequestRow } from '../../src/lib/homeOnline.js';
 import { toBangkokYmd } from '../_lib/businessDate.js';
+import { loadPenaltyLedgerRaw } from '../_lib/siamrajPenaltyLedgerSql.js';
+import { buildPenaltyLedger, requestFlowRole, type LedgerRequest, type RequestFlowRole } from '../../src/lib/requestPenaltyLedger.js';
+import { normalizeTrendBu, trendBuFromSiteCode } from '../../src/lib/trends/bu.js';
 import { APPOINTMENT_AT_SQL } from '../_lib/applicantOverviewSql.js';
 import { stuckReasonOf, type StuckMonthlyRow, type StuckPostStatus, type StuckRequest, type StuckState } from '../../src/lib/recruitStuck.js';
 import type { RecruitAppFact } from '../../src/lib/recruitOverviewTypes.js';
@@ -90,11 +93,11 @@ export async function buildRecruitStuck(user: AuthedReq['user'], requestedBu: un
   const body: RecruitStuckResponse = { generatedAt: now.toISOString(), today, bu: picked.bu, window: win, requests: null, monthly: null, errors: {} };
   if (buScope.mode === 'none') return body;
 
-  const [reqR, monR] = await Promise.allSettled([loadStuckRequests(departmentScope, buSet, win), loadMonthly(departmentScope, buSet, body.today)]);
+  const [reqR, monR] = await Promise.allSettled([loadStuckRequests(departmentScope, buSet, win, today), loadMonthly(departmentScope, buSet, body.today)]);
   if (reqR.status === 'fulfilled') body.requests = reqR.value;
   else {
     logError('recruit-stuck: requests', reqR.reason);
-    body.errors.requests = 'อ่านใบขอที่ยังต้องหาไม่ได้';
+    body.errors.requests = 'อ่านใบขอที่เหลือหาไม่ได้';
   }
   if (monR.status === 'fulfilled') body.monthly = monR.value;
   else {
@@ -137,35 +140,103 @@ function onlineRowOfJob(j: JobRequest, x: ErpExtra | undefined): OnlineRequestRo
   };
 }
 
-const STATE_OF: Record<ReturnType<typeof onlineRequestStateOf>, StuckState> = { open: 'open', fullyClosed: 'filled', partialCancelled: 'filled', cancelledAll: 'cancelled' };
+/** ใบที่ไม่อยู่ในสมุดใบขอ (ใบขอชั่วคราว) — สถานะจากตัวเลขในใบ ตัวเดียวกับหน้าหลัก · ยกเลิกบางส่วน = ยกเลิก (ไม่ได้คนครบ) */
+const STATE_OF: Record<ReturnType<typeof onlineRequestStateOf>, StuckState> = { open: 'open', fullyClosed: 'filled', partialCancelled: 'cancelled', cancelledAll: 'cancelled' };
+/** บทบาทในสมการช่วง (`requestFlowRole` ตัวเดียวกับสมการหน้าหลัก) → สถานะของหน้า */
+const stateOfRole = (r: RequestFlowRole): StuckState => (r.closed ? 'filled' : r.cancelledReq ? 'cancelled' : 'open');
+
+/** ใบยกมาที่จบในช่วง (ไม่อยู่ในใบเปิด/ใบในช่วง) → แถวรูปเดียวกัน จากสมุดใบขอ + ข้อมูล ERP */
+function onlineRowOfLedger(r: LedgerRequest, role: RequestFlowRole, x: ErpExtra | undefined): OnlineRequestRow {
+  const filled = Math.min(r.qty, r.filled);
+  return {
+    requestNo: r.requestNo,
+    jobId: `${SQL_PREFIX}${r.requestNo}`,
+    day: r.keyYmd,
+    bu: trendBuFromSiteCode(r.site),
+    requested: r.qty,
+    filled,
+    cancelled: Math.max(0, r.qty - filled - role.remaining),
+    remaining: role.remaining,
+    unitName: text(r.unit),
+    industry: text(x?.industry),
+    sector: null,
+    position: text(r.position),
+    releasedAt: null,
+    applications: 0,
+    siteCode: text(r.site),
+    subtype: null,
+    leadKind: null,
+    erp: x ? { siteName: text(x.site_name), province: text(x.province_name), workAddr: text(x.work_addr), customerGroup: text(x.customer_group) } : null,
+  };
+}
 
 /**
- * ใบของหน้า = ใบที่ส่งเข้ามาในช่วง (ทุกสถานะ · ชุดเดียวกับหน้าหลัก `loadOnlineRequestRows`) + ใบก่อนช่วงที่ยังต้องหา (เมนูใบขอ)
- * พื้นที่/ประเภทงาน = `toRequestRows` ตัวเดียวกับแท็บใบขอเดิม (ที่แก้ในใบ › ที่อยู่หน้างาน ERP › จังหวัดไซต์ · ธนาคารจากอุตสาหกรรม ERP)
- * อ่านไม่ได้ = ใช้ที่ทีมพิมพ์ในใบ/ที่อยู่ของใบ (`placeOf`) ต่อ
+ * ═══ ใบของหน้า · สมการ ยกมา + ขอใหม่ − ปิดแล้ว − ยกเลิก = เหลือหา (หน่วยใบ) ═══
+ * 🔴 ใบขอจริง: นิยามเดียวกับสมการหน้าหลัก (`requestFlowRole` ในสมุดใบขอ · review 9 พ.ย. 2569 เจ้าของเลือก "เหมือนหน้าหลัก")
+ *    ยกมา = เปิดอยู่ก่อนวันเริ่มช่วง · ขอใหม่ = คีย์ในช่วง · ปิดแล้ว = ได้คนครบในช่วง · ยกเลิก = จบในช่วงโดยไม่ครบ (รวมยกเลิกบางส่วน) · เหลือหา = เปิดปลายช่วง
+ *    เดิมยกมา = "ยังเปิดวันนี้" ⇒ ใบยกมาที่ปิด/ยกเลิกระหว่างช่วงหายจากทั้งสองกล่อง เลขไม่ตรงหน้าหลัก
+ * ใบขอชั่วคราว (ไม่อยู่ในสมุด): ยังเปิด = ยกมา/ขอใหม่ตามวันที่ขอ
+ * พื้นที่/ประเภทงาน = `toRequestRows` ตัวเดียวกับแท็บใบขอเดิม · อ่านไม่ได้ = ที่ทีมพิมพ์ในใบ/ที่อยู่ของใบ (`placeOf`)
  */
-async function loadStuckRequests(departmentScope: Scope, buSet: readonly string[] | null, win: Win): Promise<StuckRequest[]> {
-  const [all, ranged] = await Promise.all([
+async function loadStuckRequests(departmentScope: Scope, buSet: readonly string[] | null, win: Win, today: string): Promise<StuckRequest[]> {
+  const toEff = win.to > today ? today : win.to;
+  const [all, ranged, raw] = await Promise.all([
     readUnitRequestListThroughCache({ limit: 500, departmentScope }).then((r) => r.value as unknown as JobRequest[]),
     loadOnlineRequestRows({ from: win.from, to: win.to, bu: buSet, departmentScope }),
+    loadPenaltyLedgerRaw(departmentScope),
   ]);
+  // สมุดใบขอชุดเดียวกับหน้าหลัก (`home-money`) — BU ของสมุดเป็นรหัสยาว แปลงก่อนเทียบ
+  const ledger = buildPenaltyLedger(
+    raw.rows.filter((r) => inBuSet(normalizeTrendBu(r.bu), buSet)),
+    raw.informs,
+    today,
+    { from: win.from, to: toEff },
+    {},
+  );
+  const roleByNo = new Map<string, { r: LedgerRequest; role: RequestFlowRole }>();
+  for (const r of ledger.requests) {
+    const role = requestFlowRole(r, win.from, toEff);
+    if (role.relevant && (role.carry || role.isNew)) roleByNo.set(r.requestNo.trim().toUpperCase(), { r, role });
+  }
+  const roleOf = (jobId: string, no: string | null | undefined) => (jobId.startsWith(SQL_PREFIX) ? roleByNo.get(String(no ?? '').trim().toUpperCase()) : undefined);
+
   const openJobs = all.filter((j) => j.status === 'open' && (buSet === null || (j.department_code != null && buSet.includes(j.department_code))));
   const jobById = new Map(openJobs.map((j) => [String(j.id), j]));
   const rangedIds = new Set(ranged.map((r) => r.jobId ?? `${SQL_PREFIX}${r.requestNo}`));
   const carriedJobs = openJobs.filter((j) => !rangedIds.has(String(j.id)));
-  const realNos = carriedJobs.filter((j) => String(j.id).startsWith(SQL_PREFIX)).map((j) => String(j.request_no ?? '').trim()).filter(Boolean);
+  const seenNos = new Set([...ranged.map((r) => r.requestNo.trim().toUpperCase()), ...carriedJobs.map((j) => String(j.request_no ?? '').trim().toUpperCase())]);
+  // ยกมาที่จบในช่วง — ไม่อยู่ในใบเปิดตอนนี้และไม่ได้คีย์ในช่วง
+  const endedCarried = [...roleByNo.entries()].filter(([no, v]) => v.role.carry && !seenNos.has(no)).map(([, v]) => v);
+  const realNos = [
+    ...carriedJobs.filter((j) => String(j.id).startsWith(SQL_PREFIX)).map((j) => String(j.request_no ?? '').trim()),
+    ...endedCarried.map((v) => v.r.requestNo.trim()),
+  ].filter(Boolean);
+  // อ่าน ERP ไม่ได้ = ไม่มีพื้นที่/อุตสาหกรรมของใบยกมา (แถวยังอยู่ · ตัวกรองขึ้น "ไม่ระบุ") — จด log ไว้ ไม่ทำทั้งหน้าล่ม
   const extras = realNos.length
     ? await loadErpExtras(realNos).catch((e) => {
         logError('recruit-stuck: ERP ของใบยกมา', e);
         return new Map<string, ErpExtra>();
       })
     : new Map<string, ErpExtra>();
-  const base: Array<{ online: OnlineRequestRow; job: JobRequest | null; inRange: boolean }> = [
-    ...ranged.map((r) => ({ online: { ...r, jobId: r.jobId ?? `${SQL_PREFIX}${r.requestNo}` }, job: jobById.get(r.jobId ?? `${SQL_PREFIX}${r.requestNo}`) ?? null, inRange: true })),
-    ...carriedJobs.map((j) => ({ online: onlineRowOfJob(j, String(j.id).startsWith(SQL_PREFIX) ? extras.get(String(j.request_no ?? '').trim()) : undefined), job: j, inRange: false })),
-  ]
-    // ยกมา = ยังต้องหาวันนี้เท่านั้น (สถานะเปิดแต่ไม่เหลืออัตรา = จบแล้ว ไม่อยู่ในสมการ)
-    .filter((b) => b.inRange || onlineRequestStateOf(b.online) === 'open');
+  type Base = { online: OnlineRequestRow; job: JobRequest | null; inRange: boolean; state: StuckState };
+  const base: Base[] = [];
+  for (const r of ranged) {
+    const jobId = r.jobId ?? `${SQL_PREFIX}${r.requestNo}`;
+    const v = roleOf(jobId, r.requestNo);
+    base.push({ online: { ...r, jobId }, job: jobById.get(jobId) ?? null, inRange: true, state: v ? stateOfRole(v.role) : STATE_OF[onlineRequestStateOf(r)] });
+  }
+  for (const j of carriedJobs) {
+    const jobId = String(j.id);
+    const real = jobId.startsWith(SQL_PREFIX);
+    const v = roleOf(jobId, j.request_no);
+    // ใบจริงที่ไม่อยู่ในสมการช่วงของสมุด (เช่น เปิดในเมนูแต่ไม่เหลืออัตรา) = ไม่อยู่ในสมการ ตรงกับหน้าหลัก
+    if (real && !v) continue;
+    const online = onlineRowOfJob(j, real ? extras.get(String(j.request_no ?? '').trim()) : undefined);
+    const state = v ? stateOfRole(v.role) : STATE_OF[onlineRequestStateOf(online)];
+    if (!v && state !== 'open') continue;
+    base.push({ online, job: j, inRange: v ? v.role.isNew : false, state });
+  }
+  for (const v of endedCarried) base.push({ online: onlineRowOfLedger(v.r, v.role, extras.get(v.r.requestNo.trim())), job: null, inRange: false, state: stateOfRole(v.role) });
   if (base.length === 0) return [];
 
   const jobIds = base.map((b) => b.online.jobId as string);
@@ -210,7 +281,7 @@ async function loadStuckRequests(departmentScope: Scope, buSet: readonly string[
       uncalled: fs.filter((f) => !f.calledByAi && !f.calledByStaff).length,
       queued: fs.filter((f) => f.aiQueued).length,
     };
-    const state = STATE_OF[onlineRequestStateOf(b.online)];
+    const state = b.state;
     // พื้นที่: ตัวอ่านของแท็บใบขอ › ที่ทีมพิมพ์ในใบ/ที่อยู่ของใบ (ตัวกรองกล่องงาน)
     const place = j && (!row.province || !row.district) ? placeOf(j) : null;
     const province = row.province ?? place?.province ?? null;
@@ -255,7 +326,7 @@ async function loadMonthly(departmentScope: Scope, buSet: readonly string[] | nu
     const k = `${month}|${jobId}`;
     let r = acc.get(k);
     if (!r) {
-      r = { month, jobId, requests: 0, apps: 0, booked: 0, informed: 0 };
+      r = { month, jobId, requests: 0, apps: 0, booked: 0, informed: informs ? 0 : null };
       acc.set(k, r);
     }
     return r;
@@ -282,7 +353,7 @@ async function loadMonthly(departmentScope: Scope, buSet: readonly string[] | nu
     const r = row(monthOf(a.day), a.job_id ?? '');
     r.apps += 1;
     if (a.booked) r.booked += 1;
-    if (informs && informedSince(informs, phone9Of(a.phone), `${a.day}T00:00:00+07:00`) === true) r.informed += 1;
+    if (informs && r.informed !== null && informedSince(informs, phone9Of(a.phone), `${a.day}T00:00:00+07:00`) === true) r.informed += 1;
   }
   return [...acc.values()].sort((a, b) => a.month.localeCompare(b.month) || a.jobId.localeCompare(b.jobId));
 }

@@ -10,13 +10,13 @@ import { OverviewCard } from '../RecruitOverviewParts';
 import { GrowStack } from './GrowBar';
 
 /**
- * ═══ ส่วนที่ 4: พื้นที่ที่ยังต้องหา — จังหวัด → อำเภอ (เจ้าของ 4 พ.ย. 2569 "งานค้างที่จังหวัดไหน อำเภอไหน") ═══
+ * ═══ ส่วนที่ 4: พื้นที่ที่เหลือหา — จังหวัด → อำเภอ (เจ้าของ 4 พ.ย. 2569 "งานค้างที่จังหวัดไหน อำเภอไหน") ═══
  * แถวจังหวัดกดกางอำเภอ · แถบ 4 สีบอกติดช่วงไหน · กดเลขเปิดรายการใบ
  */
 export default function StuckAreaTable({
   rows,
   onPick,
-  title = 'พื้นที่ที่ยังต้องหา',
+  title = 'พื้นที่ที่เหลือหา',
   countLabel = 'ใบที่ต้องหา',
 }: {
   rows: readonly StuckRequest[];

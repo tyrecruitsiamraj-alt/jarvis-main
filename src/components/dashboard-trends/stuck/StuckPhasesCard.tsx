@@ -36,7 +36,7 @@ export default function StuckPhasesCard({
   onOpenRequest,
   listOverride,
   onCloseList,
-  title = 'ใบขอที่ยังต้องหา ติดตรงไหน',
+  title = 'ใบขอที่เหลือหา ติดตรงไหน',
   sub = 'ใบที่ยังเปิดอยู่ทั้งหมด ณ วันนี้ · กดได้ทุกตัวเลข',
   onFocus,
 }: {

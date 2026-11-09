@@ -1,11 +1,12 @@
 import React from 'react';
 import { BarChart3 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 import { DASH, TONE } from '@/lib/designTokens';
 import { formatTrendNumber as fmt } from '@/lib/trends/format';
 import { monthLabel } from '@/lib/recruitOverviewWindow';
-import { STUCK_TREND_LABEL, monthlySeries, type StuckMonthlyRow, type StuckTrendKey } from '@/lib/recruitStuck';
+import { STUCK_TREND_LABEL, monthlySeries, monthlyUnreadable, type StuckMonthlyRow, type StuckTrendKey } from '@/lib/recruitStuck';
 import { OverviewCard, SectionError } from '../RecruitOverviewParts';
 import { useGrown } from './GrowBar';
 
@@ -30,6 +31,8 @@ export default function MonthlyBarsCard({
   const [key, setKey] = React.useState<StuckTrendKey>('requests');
   const grown = useGrown();
   const series = React.useMemo(() => (rows ? monthlySeries(rows, key, ok) : []), [rows, key, ok]);
+  /** อ่านแจ้งเข้า ERP ไม่ได้ = บอกตรง ๆ ห้ามขึ้นแท่ง 0 (review 9 พ.ย. 2569) */
+  const unreadable = rows ? monthlyUnreadable(rows, key) : false;
   const max = Math.max(1, ...series.map((s) => s.value));
   const last = series[series.length - 1];
   const prev = series[series.length - 2];
@@ -53,17 +56,25 @@ export default function MonthlyBarsCard({
     >
       {rows === null ? (
         <SectionError message={error ?? 'อ่านยอดรายเดือนไม่ได้'} />
+      ) : unreadable ? (
+        <p className={cn('flex h-44 items-center justify-center text-sm', DASH.sub)} data-testid="stuck-trend-unreadable">
+          อ่านแจ้งเข้า ERP ไม่ได้
+        </p>
       ) : (
         <>
           <div className="grid h-44 grid-flow-col auto-cols-fr items-end gap-2 pt-6" data-testid="stuck-trend">
             {series.map((s, i) => (
               <div key={s.month} className="flex h-full min-w-0 flex-col items-center justify-end gap-1">
                 <span className="text-xs font-medium tabular-nums text-foreground">{fmt(s.value)}</span>
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
                   aria-label={`${monthLabel(s.month)} ${fmt(s.value)}`}
                   onClick={() => onPickMonth?.(s.month)}
-                  className={cn('w-full max-w-14 rounded-t-lg transition-all duration-700 ease-out motion-reduce:transition-none', i === series.length - 1 ? TONE.primary.dot : TONE.info.dot)}
+                  className={cn(
+                    'h-auto min-h-0 w-full max-w-14 rounded-none rounded-t-lg p-0 transition-all duration-700 ease-out hover:opacity-80 motion-reduce:transition-none',
+                    i === series.length - 1 ? TONE.primary.dot : TONE.info.dot,
+                  )}
                   style={{ height: `${grown ? (s.value / max) * 100 : 0}%` }}
                 />
                 <span className={cn('whitespace-nowrap text-xs', DASH.sub)}>{monthLabel(s.month).replace(/ \d+$/, '')}</span>
@@ -73,7 +84,6 @@ export default function MonthlyBarsCard({
           <p className={cn('text-xs tabular-nums', DASH.sub)}>
             {last ? `${STUCK_TREND_LABEL[key]} ${monthLabel(last.month)} ${fmt(last.value)}` : 'ยังไม่มีข้อมูล'}
             {prev ? ` · เดือนก่อน ${fmt(prev.value)}${pct !== null ? ` (${pct >= 0 ? '+' : ''}${pct}%)` : ''}` : ''}
-            {' · กดแท่งเพื่อดูเดือนนั้น'}
           </p>
         </>
       )}

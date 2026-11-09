@@ -8,6 +8,7 @@
  * ผล Scrap (Resume) อยู่ที่ So Scraping — Jarvis บอกแค่สถานะ
  */
 import type { JobRequest } from '@/types';
+import { bkkWhen } from './bkkWhen';
 import type { ToneKey } from '@/lib/designTokens';
 import { inferProvinceFromAddress } from '@/lib/parseThaiJobAddress';
 import { normalizeTrendBu, trendBuFromSiteCode } from '@/lib/trends/bu';
@@ -404,10 +405,6 @@ export function soAccountHasSession(acc: Pick<SoOptAccount, 'id' | 'sessionWorke
   return acc.sessionWorkers.length > 0 || workers.some((w) => w.fbAccountIds.includes(acc.id));
 }
 
-const BKK_TIME = new Intl.DateTimeFormat('th-TH', { timeZone: 'Asia/Bangkok', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
-
-const whenBkk = (iso: string | null | undefined): string | null =>
-  iso && !Number.isNaN(Date.parse(iso)) ? BKK_TIME.format(new Date(iso)) : null;
 
 /**
  * คำสถานะ + สีของบัญชี (สเปค So Scraping 9 พ.ย. 2569 "3 สี" · ห้ามใช้สีอย่างเดียว ทุกแถวต้องมีคำ)
@@ -453,7 +450,7 @@ export function soNoAccountReadyText(accounts: readonly Pick<SoOptAccount, 'paus
     .map((a) => Date.parse(a.pausedUntil ?? ''))
     .filter((t) => Number.isFinite(t) && t > now)
     .sort((x, y) => x - y)[0];
-  return next ? `ตอนนี้ไม่มีบัญชีที่พร้อมโพสต์ · บัญชีแรกใช้ได้ ${BKK_TIME.format(new Date(next))}` : 'ตอนนี้ไม่มีบัญชีที่พร้อมโพสต์';
+  return next ? `ตอนนี้ไม่มีบัญชีที่พร้อมโพสต์ · บัญชีแรกใช้ได้ ${bkkWhen(new Date(next).toISOString())}` : 'ตอนนี้ไม่มีบัญชีที่พร้อมโพสต์';
 }
 
 /**
@@ -480,8 +477,8 @@ export function soAddWithinCap(prev: readonly string[], ids: readonly string[], 
 
 /** "ใบนี้เพิ่งลง 2 พ.ย. 10:12 โพสต์ได้อีก 4 พ.ย. 10:12" (สเปค 6.2) */
 export function soRepostWaitText(w: SoRepostWait): string {
-  const last = whenBkk(w.lastPostedAt);
-  const avail = whenBkk(w.availableAt);
+  const last = bkkWhen(w.lastPostedAt);
+  const avail = bkkWhen(w.availableAt);
   return [last ? `ใบนี้เพิ่งลง ${last}` : 'ใบนี้เพิ่งลงกลุ่มนี้', avail ? `โพสต์ได้อีก ${avail}` : null].filter(Boolean).join(' ');
 }
 
@@ -492,7 +489,7 @@ export function soDefaultWorker(workers: readonly SoOptWorker[], kind: 'post' | 
 
 /** "ออฟไลน์ ตั้งแต่ 3 พ.ย. 14:20" */
 export function soWorkerOfflineText(w: Pick<SoOptWorker, 'lastSeen'>): string {
-  const since = whenBkk(w.lastSeen);
+  const since = bkkWhen(w.lastSeen);
   return since ? `ออฟไลน์ ตั้งแต่ ${since}` : 'ออฟไลน์';
 }
 
@@ -945,7 +942,8 @@ export function soScrapeChoice(s: Pick<SoScrapeAccount, 'platform' | 'label' | '
   if (s.status === 'ready') return { label: `${name} · พร้อมใช้${left !== null ? ` · เหลือ ${left.toLocaleString('th-TH')} คนวันนี้` : ''}`, disabled: false, tone: 'success' };
   if (s.status === 'full') return { label: `${name} · ครบโควต้าวันนี้ (${s.usedToday.toLocaleString('th-TH')}/${(s.cap ?? s.usedToday).toLocaleString('th-TH')})`, disabled: false, tone: 'warn' };
   if (s.status === 'cooldown') {
-    const until = s.cooldownUntil && !Number.isNaN(Date.parse(s.cooldownUntil)) ? ` ใช้ได้ ${BKK_TIME.format(new Date(s.cooldownUntil))}` : '';
+    const when = bkkWhen(s.cooldownUntil);
+    const until = when ? ` ใช้ได้ ${when}` : '';
     return { label: `${name} · พักชั่วคราว${until}`, disabled: true, tone: 'danger' };
   }
   return { label: `${name} · ${s.warning ?? 'ปิดใช้งาน'}`, disabled: true, tone: 'danger' };

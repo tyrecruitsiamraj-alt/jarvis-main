@@ -256,7 +256,13 @@ export function nextRetryAt(now: Date, attemptCount: number, policy: CallFollowu
     at = bkkDayAt(now, startedMorning ? policy.dayAfternoon : policy.dayMorning, daysToNextRetryDay(now, policy.retryDayMode));
   }
   const floor = new Date(now.getTime() + RETRY_LEAD_MINUTES * MIN);
-  return clampToCallWindow(at.getTime() < floor.getTime() ? floor : at, policy);
+  const inWindow = clampToCallWindow(at.getTime() < floor.getTime() ? floor : at, policy);
+  // 🔴 เสาร์-อาทิตย์: รอบในวันที่เลยช่วงโทรของวันนี้ ห้ามไปเบียดวันธรรมดา → ต้นช่วงของวันโทรซ้ำถัดไป
+  // (review 9 พ.ย. 2569: กรอกพุธ 19:00 → รอบสองเคยไปพฤหัส 08:00 กินคิวรายชื่อใหม่ รวมเป็น 4 วัน)
+  if (pos < perDay && policy.retryDayMode === 'weekend' && bkkDayAt(inWindow, '00:00').getTime() !== bkkDayAt(now, '00:00').getTime()) {
+    return bkkDayAt(now, policy.callFrom, daysToNextRetryDay(now, policy.retryDayMode));
+  }
+  return inWindow;
 }
 
 /**

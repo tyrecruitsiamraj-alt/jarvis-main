@@ -218,11 +218,4 @@ describe('เริ่มงานทันที (start · เอกสาร�
   });
 });
 
-describe('บัญชีตั้งต้นในป๊อป Autopost', () => {
-  it('เครื่องหลักออฟไลน์อย่างเดียวก็ยังเลือกให้ (เจอจริงบนเว็บ 26 ต.ค. — ช่องบัญชีว่าง)', async () => {
-    const { firstAccount } = await import('@/components/jobs/AutopostDialog');
-    const o = parseSoOptions({ ...SAMPLE, accounts: [{ ...SAMPLE.accounts[0], status: 'worker_offline' }] })!;
-    expect(firstAccount(o.accounts)?.id).toBe('fb_898d82093abe46eeab1980d8');
-    expect(firstAccount(parseSoOptions(SAMPLE)!.accounts.filter((a) => a.status === 'paused'))).toBeNull();
-  });
-});
+// 9 พ.ย. 2569: ถอด `firstAccount` แล้ว (ไม่มีที่เรียก · เรียงสถานะขัดกับ 3 สี) — บัญชีตั้งต้นคือ `soDefaultAccount` (เทสต์ autopostAccountTones2569-11-09)

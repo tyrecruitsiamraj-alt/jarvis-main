@@ -1,5 +1,5 @@
 /**
- * ═══ ใบขอที่ยังต้องหา ติดตรงไหน · ติดที่ใคร (หน้าภาพรวมงานสรรหาโฉมใหม่ · เจ้าของ 4 พ.ย. 2569) ═══
+ * ═══ ใบขอที่เหลือหา ติดตรงไหน · ติดที่ใคร (หน้าภาพรวมงานสรรหาโฉมใหม่ · เจ้าของ 4 พ.ย. 2569) ═══
  *
  * > *"มันต้องตอบได้ว่า ใบขอมา มาแล้วไปประกาศแล้ว แต่ปิดไม่ได้เพราะไม่มีคนนะ หรือ มีคนแต่คนไม่โทรนะ หรือ ปิดไม่ได้เพราะไม่ได้โพสต์ด้วยซ้ำ
  * > แล้วต้องบอกเลยว่า อ้อใบนี้ของใครรับผิดชอบบ้าง ช้าที่ใครเท่าไหร่ ไม่ประกาศเท่านี้ หรือ คิวมีชื่อของงานเนี้ยแต่ปิดไม่ได้ก็เพราะไม่โทรไง
@@ -100,8 +100,8 @@ export function stuckReasonOf(s: StuckSignals): StuckReasonKey {
 }
 
 /**
- * สถานะใบ ณ วันนี้ — `onlineRequestStateOf` ตัวเดียวกับหน้าหลัก
- * ยังต้องหา (เหลืออัตรา) · ปิดแล้ว (ได้คนครบ หรือได้บางส่วนแล้วยกเลิกที่เหลือ) · ยกเลิก (ยกเลิกทั้งใบ ไม่ได้คนสักอัตรา)
+ * สถานะใบ ณ ปลายช่วง — `requestFlowRole` ตัวเดียวกับสมการหน้าหลัก (review 9 พ.ย. 2569)
+ * เหลือหา (เปิดปลายช่วง) · ปิดแล้ว (ได้คนครบ) · ยกเลิก (จบโดยไม่ครบ รวมได้บางส่วนแล้วยกเลิกที่เหลือ)
  */
 export type StuckState = 'open' | 'filled' | 'cancelled';
 
@@ -109,7 +109,7 @@ export type StuckState = 'open' | 'filled' | 'cancelled';
 export type StuckRequest = RecruitRequestRow & {
   /** ไม่มี = เส้นรุ่นเก่า (ใบที่ยังเปิดทั้งหมด) */
   state?: StuckState;
-  /** ใบส่งเข้ามาในช่วงที่เลือก (ขอใหม่) · false = ใบก่อนช่วงที่ยังต้องหา (ยกมา) */
+  /** ใบส่งเข้ามาในช่วงที่เลือก (ขอใหม่) · false = ใบที่เปิดอยู่ก่อนเริ่มช่วง (ยกมา) */
   inRange?: boolean;
   /** ผ่านมากี่วัน (วันทำงาน ตัวเดียวกับเมนูใบขอ) · null = ล่วงหน้า/ไม่มีวันที่ */
   ageDays: number | null;
@@ -123,23 +123,23 @@ export type StuckRequest = RecruitRequestRow & {
 };
 
 /* ═══ สมการบนสุด (เจ้าของ 4 พ.ย. 2569 "กรองแค่ใบที่ไม่มีคน … มันต้อง Fil ดูได้หมดเลย") ═══
- * ยกมา + ขอใหม่ − ปิดแล้ว − ยกเลิก = ยังต้องหา
- * ยกมา = ใบก่อนช่วงที่ยังต้องหาวันนี้ · ขอใหม่ = ใบที่ส่งเข้ามาในช่วง (ทุกสถานะ) · ปิดแล้ว/ยกเลิก = ของใบขอใหม่
- * 🔴 ใบก่อนช่วงที่ปิดไปแล้วไม่อยู่ในสมการ (ไม่มีวันปิดรายใบ) — สมการลงตัวเสมอ มีเทสต์ */
+ * ยกมา + ขอใหม่ − ปิดแล้ว − ยกเลิก = เหลือหา — นิยามเดียวกับสมการหน้าหลัก (review 9 พ.ย. 2569 เจ้าของเลือก "เหมือนหน้าหลัก")
+ * ยกมา = ใบที่เปิดอยู่ก่อนวันเริ่มช่วง · ขอใหม่ = ใบที่ส่งเข้ามาในช่วง · ปิดแล้ว/ยกเลิก = ใบที่จบในช่วง (ทั้งยกมาและขอใหม่)
+ * แต่ละใบเป็นยกมาหรือขอใหม่อย่างเดียว และจบที่สถานะเดียว ⇒ สมการลงตัวเสมอ มีเทสต์ */
 export type StuckScope = 'remaining' | 'carried' | 'new' | 'filled' | 'cancelled';
 export const STUCK_SCOPE_LABEL: Record<StuckScope, string> = {
   carried: 'ยกมา',
   new: 'ขอใหม่',
   filled: 'ปิดแล้ว',
   cancelled: 'ยกเลิก',
-  remaining: 'ยังต้องหา',
+  remaining: 'เหลือหา',
 };
 const stateOf = (r: StuckRequest): StuckState => r.state ?? 'open';
 export function stuckInScope(r: StuckRequest, scope: StuckScope): boolean {
   if (scope === 'remaining') return stateOf(r) === 'open';
-  if (scope === 'carried') return stateOf(r) === 'open' && r.inRange === false;
+  if (scope === 'carried') return r.inRange === false;
   if (scope === 'new') return r.inRange !== false;
-  return r.inRange !== false && stateOf(r) === scope;
+  return stateOf(r) === scope;
 }
 export function stuckEquation(rows: readonly StuckRequest[]): Record<StuckScope, StuckRequest[]> {
   const out: Record<StuckScope, StuckRequest[]> = { carried: [], new: [], filled: [], cancelled: [], remaining: [] };
@@ -185,7 +185,7 @@ export function stuckByOwner(rows: readonly StuckRequest[]): StuckOwnerRow[] {
 export type StuckPlaceRow = { name: string; rows: StuckRequest[]; byPhase: Record<StuckPhaseKey, StuckRequest[]>; need: number; children: StuckPlaceRow[] };
 
 const NO_PLACE = 'ไม่ระบุ';
-/** พื้นที่ที่ยังต้องหา — จังหวัด → อำเภอ · ใบมากสุดก่อน · ไม่ระบุท้าย */
+/** พื้นที่ที่เหลือหา — จังหวัด → อำเภอ · ใบมากสุดก่อน · ไม่ระบุท้าย */
 export function stuckByPlace(rows: readonly StuckRequest[]): StuckPlaceRow[] {
   const group = (list: readonly StuckRequest[], keyOf: (r: StuckRequest) => string, deeper: (l: StuckRequest[]) => StuckPlaceRow[]): StuckPlaceRow[] => {
     const by = new Map<string, StuckRequest[]>();
@@ -244,16 +244,20 @@ export type StuckMonthlyRow = {
   requests: number;
   apps: number;
   booked: number;
-  informed: number;
+  /** null = อ่านแจ้งเข้า ERP ไม่ได้ (ห้ามยุบเป็น 0) */
+  informed: number | null;
 };
 export type StuckTrendKey = 'requests' | 'apps' | 'booked' | 'informed';
 export const STUCK_TREND_LABEL: Record<StuckTrendKey, string> = { requests: 'ใบขอเข้ามา', apps: 'รายชื่อที่กรอกมา', booked: 'นัดได้', informed: 'ได้ลงงาน' };
+
+/** ยอดชุดนี้อ่านไม่ได้ (แจ้งเข้า ERP) — การ์ดบอกว่าอ่านไม่ได้แทนแท่ง 0 */
+export const monthlyUnreadable = (rows: readonly StuckMonthlyRow[], key: StuckTrendKey): boolean => rows.some((r) => r[key] === null);
 
 export function monthlySeries(rows: readonly StuckMonthlyRow[], key: StuckTrendKey, ok: (jobId: string | null) => boolean): Array<{ month: string; value: number }> {
   const by = new Map<string, number>();
   for (const r of rows) {
     if (!ok(r.jobId || null)) continue;
-    by.set(r.month, (by.get(r.month) ?? 0) + r[key]);
+    by.set(r.month, (by.get(r.month) ?? 0) + (r[key] ?? 0));
   }
   return [...by.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([month, value]) => ({ month, value }));
 }

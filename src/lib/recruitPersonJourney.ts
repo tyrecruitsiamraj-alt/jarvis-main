@@ -4,14 +4,15 @@
  * > *"อยากดูว่างานแบงค์ไม่มีคนเลยหรอ หรือ มีแต่ปิดไม่ได้ หรือ เพราะแบงค์ไม่ทำงาน … คนที่เข้ามาที่มันทำให้ปิดไม่ได้มาจากช่องทางไหน"*
  *
  * เส้นหลัก: กรอกมา → AI โทร → สนใจ → คนโทรต่อติดต่อได้ → นัดได้ → มา → ผ่าน · แต่ละขั้นแตกทางที่หลุดครบ (รวมกันเท่าขั้นนั้น)
- * 🔴 สนใจ = ตอบ AI ว่าสนใจ (`isAiSaidYes`) คนละพื้นที่ไม่ทับ — เลขเดียวกับตาราง "รายชื่อมาจากไหน ไปถึงไหน" ที่อยู่หน้าเดียวกัน
+ * 🔴 สนใจ = ตอบ AI ว่าสนใจ (`isInterested`) คนละพื้นที่ไม่ทับ — เลขเดียวกับตาราง "รายชื่อมาจากไหน ไปถึงไหน" ที่อยู่หน้าเดียวกัน
  *    (AI สนใจ · คนโทรต่อสำเร็จ) · ที่เหลือแยกตาม `aiResultOf` · คนโทรต่อ = `isStaffFollowed` / `isFollowedReached`
  */
 import type { ToneKey } from './designTokens';
 import type { RecruitAppFact } from './recruitOverviewTypes';
 import { aiResultOf } from './requestPipeline';
 import { aiStage } from './recruitJourney';
-import { isAiSaidYes, isFollowedReached, isStaffFollowed } from './recruitOverview';
+import { isFollowedReached, isStaffFollowed } from './recruitOverview';
+import { isInterested } from './recruitContactTab';
 
 export type PersonPart = { key: string; label: string; tone: ToneKey; ids: string[]; /** ทางนี้ไปขั้นถัดไป */ next?: boolean; note?: string };
 export type PersonStage = { key: string; label: string; total: number; ids: string[]; parts: PersonPart[] };
@@ -25,8 +26,11 @@ const noteOf = (pairs: ReadonlyArray<[string, number]>) => pairs.filter(([, n]) 
 
 export const DAY_MS = 86_400_000;
 const ms = (iso: string | null | undefined) => (iso ? Date.parse(iso) : NaN);
-/** ผล AI ของขั้น "AI โทรแล้ว" — สนใจก่อน แล้วค่อยคนละพื้นที่ · ไม่สนใจ · ไม่รับสาย · ยังสรุปไม่ได้ */
-export const aiBranchOf = (f: RecruitAppFact): ReturnType<typeof aiResultOf> => (isAiSaidYes(f) ? 'yes' : aiResultOf(f));
+/**
+ * ผล AI ของขั้น "AI โทรแล้ว" — สนใจก่อน แล้วค่อยคนละพื้นที่ · ไม่สนใจ · ไม่รับสาย · ยังสรุปไม่ได้
+ * สนใจ = `isInterested` ตัวเดียวกับแท็บการติดต่อ (review 9 พ.ย. 2569 เดิมหน้าเดียวกันใช้ตัวตัดสินสองตัว)
+ */
+export const aiBranchOf = (f: RecruitAppFact): ReturnType<typeof aiResultOf> => (isInterested(f) ? 'yes' : aiResultOf(f));
 
 export function buildPersonJourney(list: readonly RecruitAppFact[], now: Date = new Date()): PersonStage[] {
   const aiCalled = list.filter((f) => f.calledByAi);

@@ -20,8 +20,8 @@ import StuckEquationCard from './StuckEquationCard';
 import PersonJourneyCard from './PersonJourneyCard';
 
 const SCOPE_TITLE: Record<StuckScope, { title: string; sub: string }> = {
-  remaining: { title: 'ใบขอที่ยังต้องหา ติดตรงไหน', sub: 'ใบที่ยังเปิดอยู่ ณ วันนี้ · กดได้ทุกตัวเลข' },
-  carried: { title: 'ใบยกมา ติดตรงไหน', sub: 'ใบก่อนช่วงที่ยังต้องหา · กดได้ทุกตัวเลข' },
+  remaining: { title: 'ใบขอที่เหลือหา ติดตรงไหน', sub: 'ใบที่ยังเปิดอยู่ ณ วันนี้ · กดได้ทุกตัวเลข' },
+  carried: { title: 'ใบยกมา ติดตรงไหน', sub: 'ใบที่เปิดอยู่ก่อนเริ่มช่วง · กดได้ทุกตัวเลข' },
   new: { title: 'ใบขอใหม่ ไปถึงขั้นไหน', sub: 'ใบที่ส่งเข้ามาในช่วง ทุกสถานะ · กดได้ทุกตัวเลข' },
   filled: { title: 'ใบที่ปิดแล้ว ไปถึงขั้นไหน', sub: 'ใบขอใหม่ที่ได้คนแล้ว · กดได้ทุกตัวเลข' },
   cancelled: { title: 'ใบที่ยกเลิก ไปถึงขั้นไหน', sub: 'ใบขอใหม่ที่ยกเลิกทั้งใบ · กดได้ทุกตัวเลข' },
@@ -30,7 +30,7 @@ const SCOPE_TITLE: Record<StuckScope, { title: string; sub: string }> = {
 /**
  * ═══ ตัวหน้าภาพรวมงานสรรหาโฉมใหม่ (เจ้าของ 4 พ.ย. 2569 นิยามเอง · Choice "เอาทำเลย") ═══
  * 6 ส่วน เรียงตามคำถามของเจ้าของ · ตัวกรองบนสุดคุมทุกส่วน · กดได้ทุกเลข
- * 1 ใบขอที่ยังต้องหา ติดตรงไหน (ใบที่เปิดอยู่ ณ วันนี้ · `/api/recruit-stuck`)
+ * 1 ใบขอที่เหลือหา ติดตรงไหน (ใบที่เปิดอยู่ ณ วันนี้ · `/api/recruit-stuck`)
  * 2 ติดที่ใคร · 3 รายชื่อมาจากไหน ไปถึงไหน (ช่วงที่เลือก · ชุดเดิม `buildChannelFunnelTree`) · 4 พื้นที่ · 5 เทียบเดือน · 6 ทำไมไม่สำเร็จ (`reasonGroups`)
  * ตัวกรองใบขอ (ประเภท/ไซต์/พื้นที่/เจ้าหน้าที่) กรองรายชื่อด้วยตัวตัดสินเดียวกัน (`jobFilterOf`) — รายชื่อของใบที่ปิดแล้วหายตอนกรองใบ (ตั้งใจ)
  */
@@ -52,14 +52,14 @@ export default function RecruitStuckBody({
     let alive = true;
     fetchRecruitStuck(data.bu, { from: win.from, to: win.to })
       .then((d) => alive && setStuck({ data: d, error: null }))
-      .catch((e: unknown) => alive && setStuck({ data: null, error: friendlyErrorText(e, 'โหลดใบขอที่ยังต้องหาไม่ได้') }));
+      .catch((e: unknown) => alive && setStuck({ data: null, error: friendlyErrorText(e, 'โหลดใบขอที่เหลือหาไม่ได้') }));
     return () => {
       alive = false;
     };
   }, [data.bu, data.generatedAt, win.from, win.to, rev]);
 
   const [filter, setFilter] = React.useState<RequestTabFilter>(EMPTY_REQUEST_FILTER);
-  /** สมการบนสุด: ใบชุดไหน (ค่าเริ่ม = ยังต้องหา) · ช่วง/เหตุที่กดในการ์ดติดตรงไหน */
+  /** สมการบนสุด: ใบชุดไหน (ค่าเริ่ม = เหลือหา) · ช่วง/เหตุที่กดในการ์ดติดตรงไหน */
   const [scope, setScope] = React.useState<StuckScope>('remaining');
   const [focus, setFocus] = React.useState<{ phase: StuckPhaseKey | null; reason: StuckReasonKey | null }>({ phase: null, reason: null });
   const allRows = React.useMemo(() => stuck.data?.requests ?? [], [stuck.data]);
@@ -102,7 +102,7 @@ export default function RecruitStuckBody({
       <StuckFilterBar rows={allRows} appRecruiters={appRecruiters} value={filter} onChange={setFilter} />
 
       {stuck.error || stuck.data?.errors.requests ? (
-        <SectionError message={stuck.error ?? stuck.data?.errors.requests ?? 'อ่านใบขอที่ยังต้องหาไม่ได้'} onRetry={() => setRev((n) => n + 1)} />
+        <SectionError message={stuck.error ?? stuck.data?.errors.requests ?? 'อ่านใบขอที่เหลือหาไม่ได้'} onRetry={() => setRev((n) => n + 1)} />
       ) : null}
       {/* อ่านไม่ได้ = บอกเหตุอย่างเดียว ห้ามโชว์ 0 แทน (กติกาเดิมของหน้า) · ยังโหลด = โครงรอ */}
       {stuck.data?.requests ? (
