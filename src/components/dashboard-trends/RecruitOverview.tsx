@@ -154,8 +154,8 @@ const RecruitOverview: React.FC<{
    * ช่วงที่เลือกเอง — รายวันหรือช่วง (เจ้าของสั่ง 5 ต.ค. 2569: *"อยากดูแบบรายวันหรือ ช่วงได้ด้วย"*)
    * มีค่า = ไม่ใช้เดือน · เลือกเดือนจากปุ่มเดือน = กลับแบบเดือน
    */
-  // ค่าเริ่ม = 7 วันล่าสุด เทียบ 7 วันก่อนหน้า (เจ้าของ 21 ต.ค. 2569 "Default เป็น 7 วันย้อนหลัง") · เลือกเดือน/วัน/ช่วงได้จากปุ่มช่วงเวลา
-  const [range, setRange] = useState<(DateRangeYmd & { all?: boolean }) | null>(() => lastDays(7));
+  // ค่าเริ่ม = เดือนนี้ (null) ทุกหน้าเหมือนกัน (เจ้าของ 9 พ.ย. 2569 Choice "เดือนนี้" · แทน 7 วันล่าสุดของ 21 ต.ค.) · เลือกเดือน/วัน/ช่วงได้จากปุ่มช่วงเวลา
+  const [range, setRange] = useState<(DateRangeYmd & { all?: boolean }) | null>(null);
   /** ป๊อปเลือกช่วง — ปุ่มลัด (7/30 วัน · ทั้งหมด) เลือกแล้วปิดเอง */
   const [periodOpen, setPeriodOpen] = useState(false);
   const pickRange = (r: DateRangeYmd & { all?: boolean }) => {

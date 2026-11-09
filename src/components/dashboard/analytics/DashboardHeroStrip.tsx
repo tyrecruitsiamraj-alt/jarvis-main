@@ -11,6 +11,8 @@ type Props = {
   /** ตัวเลขบนชิป "คงเหลือทั้งระบบ" — เท่าการ์ด KPI คงเหลือ */
   remainingPositions: number;
   siteCount: number;
+  /** เลือกช่วงวัน = เหลือหาของใบที่ต้องการคนในช่วง ไม่ใช่ทั้งระบบ (9 พ.ย. 2569 ป้ายเดิมเขียน "ทั้งระบบ" ทั้งที่เป็นแค่ช่วง) */
+  inRange?: boolean;
   trend: DashboardActivityTrendPoint[];
   trendLabel: string;
   onBucketClick?: (bucket: DashboardAgeDaysBreakdown['bucket'], label: string) => void;
@@ -55,6 +57,7 @@ const DashboardHeroStrip: React.FC<Props> = ({
   positionTotal,
   remainingPositions,
   siteCount,
+  inRange = false,
   trend,
   trendLabel,
   onBucketClick,
@@ -155,7 +158,7 @@ const DashboardHeroStrip: React.FC<Props> = ({
                   : 'border border-white/20 bg-white/10 text-emerald-200',
               )}
             >
-              เหลือหาทั้งระบบ {remainingPositions.toLocaleString('th-TH')} อัตรา ·{' '}
+              {inRange ? 'เหลือหา (ใบที่ต้องการคนในช่วง)' : 'เหลือหาทั้งระบบ'} {remainingPositions.toLocaleString('th-TH')} อัตรา ·{' '}
               {siteCount.toLocaleString('th-TH')} ไซต์
             </span>
             <span className={cn('text-[10px]', S.muted)}>

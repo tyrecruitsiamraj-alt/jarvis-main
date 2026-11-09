@@ -346,6 +346,7 @@ const DashboardShell: React.FC<Props> = ({
                 positionTotal={data.ageDaysPositionTotal}
                 remainingPositions={remainingKpiValue}
                 siteCount={activeSiteCount}
+                inRange={dateRange != null}
                 trend={heroTrend && heroTrend.length >= 2 ? heroTrend : data.activityTrend}
                 trendLabel={data.activityTrendLabel || data.periodLabel}
                 onBucketClick={onAgeBucketClick}
@@ -355,7 +356,8 @@ const DashboardShell: React.FC<Props> = ({
 
               <div className="space-y-3">
                 <div>
-                  <p className={cn(DASH.eyebrow, 'mb-1')}>สรุปอัตราในช่วงที่เลือก</p>
+                  {/* 9 พ.ย. 2569 เจ้าของเลือกให้ Dashboard นับตามวันที่ต้องการคน — บอกบนหัวให้รู้ว่าทำไมไม่เท่าหน้าหลัก */}
+                  <p className={cn(DASH.eyebrow, 'mb-1')}>สรุปอัตราในช่วงที่เลือก · นับตามวันที่ต้องการคน</p>
                   <p className="text-[11px] text-slate-600 dark:text-slate-400 mb-2">
                     {data.kpis.some((k) => k.unavailable) ? (
                       <span>โหลดยอดตามช่วงไม่สำเร็จ</span>

@@ -104,9 +104,10 @@ describe('ลูกศรแนวโน้มการ์ด', () => {
   });
 
   it('เปิด Dashboard มาที่เดือนก่อนเต็มเดือน (Choice "เดือนก่อน") ลูกศรขึ้นเลย', () => {
-    expect(defaultDashboardDateRange(new Date(2026, 10, 1, 10))).toEqual({ from: '2026-10-01', to: '2026-10-31' });
-    expect(defaultDashboardDateRange(new Date(2027, 0, 15))).toEqual({ from: '2026-12-01', to: '2026-12-31' });
-    expect(defaultDashboardDateRange(new Date(2028, 2, 3))).toEqual({ from: '2028-02-01', to: '2028-02-29' });
+    // 9 พ.ย. 2569 เดือนนี้ (แทนเดือนก่อน)
+    expect(defaultDashboardDateRange(new Date(2026, 10, 1, 10))).toEqual({ from: '2026-11-01', to: '2026-11-30' });
+    expect(defaultDashboardDateRange(new Date(2027, 0, 15))).toEqual({ from: '2027-01-01', to: '2027-01-31' });
+    expect(defaultDashboardDateRange(new Date(2028, 1, 3))).toEqual({ from: '2028-02-01', to: '2028-02-29' });
   });
 
   it('แท่งเข้ามารายเดือนบน hero ไม่ขึ้นกับงวด · เดือนที่ไม่มีใบ = 0', () => {

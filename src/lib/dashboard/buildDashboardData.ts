@@ -448,13 +448,12 @@ export function filterJobsByRequestDate(jobs: JobRequest[], from: string, to: st
 }
 
 /**
- * ช่วงวันที่เริ่มต้นสำหรับ Dashboard = **เดือนก่อนเต็มเดือน**
- * (เจ้าของ 1 พ.ย. 2569 Choice "เดือนก่อน" — เปิดมาลูกศรแนวโน้มขึ้นเลย และไม่แกว่งช่วงต้นเดือน)
- * เดิม = ทั้งหมด (null) · เหลือหาทั้งระบบยังดูได้ที่ปุ่ม "ทั้งหมด"
+ * ช่วงวันที่เริ่มต้นสำหรับ Dashboard = **เดือนนี้เต็มเดือน** (นับตามวันที่ต้องการคน — ใบที่ต้องการปลายเดือนอยู่ในช่วงด้วย)
+ * เจ้าของ 9 พ.ย. 2569 Choice "เดือนนี้" ทุกหน้าเหมือนกัน (แทน "เดือนก่อน" ของ 1 พ.ย.) · เหลือหาทั้งระบบยังดูได้ที่ปุ่ม "ทั้งหมด"
  */
 export function defaultDashboardDateRange(now = new Date()): { from: string; to: string } | null {
-  const y = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
-  const m = now.getMonth() === 0 ? 12 : now.getMonth();
+  const y = now.getFullYear();
+  const m = now.getMonth() + 1;
   const last = new Date(y, m, 0).getDate();
   const mm = String(m).padStart(2, '0');
   return { from: `${y}-${mm}-01`, to: `${y}-${mm}-${String(last).padStart(2, '0')}` };
