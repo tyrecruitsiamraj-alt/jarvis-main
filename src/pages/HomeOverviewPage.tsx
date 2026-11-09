@@ -44,7 +44,7 @@ import type { MoneyRequest } from '@/lib/homeMoney';
 import { fetchRecruitOverview } from '@/lib/recruitOverviewApi';
 import type { RecruitOverviewResponse } from '@/lib/recruitOverviewTypes';
 import { appsInWindow, buildApplicantFunnel, type FunnelStep } from '@/lib/homeOverviewFunnel';
-import { followBuSplit, followCallsMade, followPersonResults, followPersonTeams, followResultSplit, followTeamTotals } from '@/lib/homeSplit';
+import { followBuSplit, followPersonResults, followResultSplit, followTeamTotals } from '@/lib/homeSplit';
 import { REQUEST_LEAD_KIND_LABEL, requestLeadKindFromYmd, type RequestLeadKind } from '@/lib/requestLeadKind';
 import { SITE_BU_TO_DEPT, normalizeTrendBu, trendBuFromSiteCode, trendBuLabel } from '@/lib/trends/bu';
 import { toYmdBangkok } from '@/lib/dateTh';
@@ -55,7 +55,8 @@ import { cn } from '@/lib/utils';
 
 const BAHT = new Intl.NumberFormat('th-TH', { maximumFractionDigits: 0 });
 const BU_OPTIONS = [...new Set(Object.values(SITE_BU_TO_DEPT))];
-const LIVE_MS = 60_000;
+// โหลดใหม่เองทุก 5 นาที (เจ้าของ 9 พ.ย. 2569 "ตามร่างทั้งหมด" · หน้าโหลดช้า — เดิมทุก 1 นาที)
+const LIVE_MS = 5 * 60_000;
 const ALL_FROM = '2024-01-01';
 
 /** หน้าเต็มของแต่ละเรื่อง — ปุ่ม "ไปหน้าเต็ม" ในแผง */
@@ -81,7 +82,6 @@ const STEP_PAGE: Record<FunnelStep['key'], (typeof PAGE)[keyof typeof PAGE]> = {
 
 const toneOfRow = (t: 'success' | 'warn' | 'danger' | 'neutral') => (t === 'neutral' ? null : t);
 /** สีของผลติดตาม — ไป เขียว · ไม่ไป แดง · โทรไม่ติด/ขอเลื่อน เหลือง · ที่เหลือเทา */
-const followTone = (key: string) => (key === 'went' ? 'success' : key === 'notWent' ? 'danger' : key === 'failed' || key === 'reschedule' ? 'warn' : 'neutral');
 
 const HomeOverviewPage: React.FC = () => {
   usePageTitle('หน้าหลัก');
@@ -167,7 +167,6 @@ const HomeOverviewPage: React.FC = () => {
   const roNow = ro && ro.window.from === range.from && ro.window.to === range.to && ro.bu === bu ? ro : null;
   const apps = useMemo(() => (roNow?.apps ? appsInWindow(roNow.apps, range.from, range.to) : null), [roNow, range]);
   const funnel = useMemo(() => (apps ? buildApplicantFunnel(apps) : null), [apps]);
-  const req = roNow?.requests ?? null;
   const backlog = roNow?.backlog ?? null;
 
   // ── ติดตาม ──
@@ -188,11 +187,7 @@ const HomeOverviewPage: React.FC = () => {
     [people, liveCells],
   );
   const peopleTotal = personRows.reduce((n, r) => n + r.people, 0);
-  const peopleTeams = useMemo(() => (people ? followPersonTeams(people) : null), [people]);
-  const calls = useMemo(() => (liveCells ? followCallsMade(liveCells) : null), [liveCells]);
   const wentPeople = personRows.find((r) => r.key === 'went')?.people ?? 0;
-  const aftercare = ai?.aftercare ?? null;
-  const upcoming = money?.aftercareUpcoming ?? null;
 
   // ── แผง ──
   const drill = useDrill();
@@ -325,33 +320,6 @@ const HomeOverviewPage: React.FC = () => {
     });
   };
 
-  const openRequestList = (title: string, pick: (r: NonNullable<RecruitOverviewResponse['requestList']>[number]) => boolean) => {
-    const list = (roNow?.requestList ?? []).filter(pick);
-    setPanel({
-      title,
-      sub: `${NUM.format(list.length)} ใบ`,
-      go: PAGE.board,
-      body: (
-        <ul className="divide-y divide-border rounded-xl border border-border" data-testid="overview-request-list">
-          {list.length === 0 ? <li className="px-3 py-2 text-sm text-muted-foreground">0 ใบ</li> : null}
-          {list.map((r) => (
-            <li key={r.requestNo} className="flex items-start justify-between gap-3 px-3 py-2 text-sm">
-              <span className="min-w-0">
-                <span className="line-clamp-2 text-foreground">
-                  {r.unitName ?? '—'} · {r.position ?? '—'}
-                </span>
-                <span className="block text-xs text-muted-foreground">
-                  {r.requestNo} · เข้ามา {thaiDate(r.day)}
-                </span>
-              </span>
-              <span className="shrink-0 tabular-nums text-muted-foreground">{NUM.format(r.applications)} คน</span>
-            </li>
-          ))}
-        </ul>
-      ),
-    });
-  };
-
   const openStep = (s: FunnelStep) => {
     const staffRows = s.key === 'staff' || s.key === 'reached' ? (roNow?.staff ?? []).filter((x) => x.claimed + x.called > 0) : [];
     setPanel({
@@ -426,23 +394,6 @@ const HomeOverviewPage: React.FC = () => {
             rows={followBus.map((r) => ({ label: `${r.label} · AI ${NUM.format(r.parts.ai ?? 0)} · คน ${NUM.format(r.parts.staff ?? 0)}`, value: r.total }))}
           />
         </div>
-      ),
-    });
-
-  const openAftercare = () =>
-    setPanel({
-      title: 'ดูแลหลังเริ่มงาน',
-      go: PAGE.aftercare,
-      body: (
-        <PanelRows
-          unit="สาย"
-          rows={[
-            { label: 'ทั้งหมด', value: aftercare?.total ?? 0 },
-            { label: 'AI โทร', value: aftercare?.ai ?? 0 },
-            { label: 'คนโทร', value: aftercare?.staff ?? 0 },
-            { label: 'ยังไม่โทร', value: aftercare?.notCalled ?? 0, emphasis: (aftercare?.notCalled ?? 0) > 0 ? 'warn' : null },
-          ]}
-        />
       ),
     });
 
@@ -596,31 +547,7 @@ const HomeOverviewPage: React.FC = () => {
         </div>
       </OverviewSection>
 
-      {/* ── ใบขอใหม่ประกาศแค่ไหน ── */}
-      <OverviewSection title="ใบขอใหม่ ประกาศไปแค่ไหน" sub={req ? `${NUM.format(req.total)} ใบ` : undefined} testId="overview-release">
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-          <OverviewNode variant="outline" label="ขอใหม่" value={req?.total} unit="ใบ" onClick={req ? () => openRequestList('ขอใหม่', () => true) : undefined} testId="overview-rel-total" />
-          <OverviewNode variant="outline" label="ประกาศแล้ว" value={req?.released} unit="ใบ" onClick={req ? () => openRequestList('ประกาศแล้ว', (r) => r.released) : undefined} testId="overview-rel-released" />
-          <OverviewNode variant="outline" label="ยังไม่ประกาศ · ยังเปิด" value={req?.notReleasedOpen} unit="ใบ" emphasis={req && req.notReleasedOpen > 0 ? 'warn' : null} tag="ต้องประกาศ" onClick={req ? () => openRequestList('ยังไม่ประกาศ · ยังเปิด', (r) => !r.released && r.open) : undefined} testId="overview-rel-open" />
-          <OverviewNode variant="outline" label="ไม่ได้ประกาศ · ปิดไปแล้ว" value={req?.notReleasedClosed} unit="ใบ" onClick={req ? () => openRequestList('ไม่ได้ประกาศ · ปิดไปแล้ว', (r) => !r.released && !r.open) : undefined} testId="overview-rel-closed" />
-          <OverviewNode
-            variant="outline"
-            label="มีคนกรอก"
-            value={req?.releasedWithApps}
-            unit="ใบ"
-            emphasis="success"
-            sub={req ? `${NUM.format(req.appsOnReleased)} คน${req.releasedWithApps ? ` · ใบละ ~${NUM.format(Math.round(req.appsOnReleased / req.releasedWithApps))} คน` : ''}` : undefined}
-            onClick={req ? () => openRequestList('มีคนกรอก', (r) => r.released && r.applications > 0) : undefined}
-            testId="overview-rel-apps"
-          />
-          <OverviewNode variant="outline" label="ไม่มีคนกรอก" value={req?.releasedNoApps} unit="ใบ" emphasis={req && req.releasedNoApps > 0 ? 'warn' : null} tag="ต้องดู" onClick={req ? () => openRequestList('ประกาศแล้ว ไม่มีคนกรอก', (r) => r.released && r.applications === 0) : undefined} testId="overview-rel-noapps" />
-        </div>
-        <p className="text-xs tabular-nums text-muted-foreground">
-          {req
-            ? `ประกาศแล้ว ${NUM.format(req.released)} + ยังไม่ประกาศ ${NUM.format(req.notReleasedOpen)} + ปิดไปแล้ว ${NUM.format(req.notReleasedClosed)} = ${NUM.format(req.total)} · มีคนกรอก ${NUM.format(req.releasedWithApps)} + ไม่มี ${NUM.format(req.releasedNoApps)} = ${NUM.format(req.released)}`
-            : '—'}
-        </p>
-      </OverviewSection>
+      {/* ใบขอใหม่ ประกาศไปแค่ไหน → ย้ายไปหน้าภาพรวมงานสรรหา (เจ้าของ 9 พ.ย. 2569 "ตามร่างทั้งหมด") */}
 
       </OverviewGroup>
 
@@ -655,92 +582,7 @@ const HomeOverviewPage: React.FC = () => {
       </OverviewSection>
       </OverviewGroup>
 
-      {/* ── 3 หลังได้คน: ติดตาม · ดูแลหลังเริ่มงาน ── */}
-      <OverviewGroup no={3} title="หลังได้คน" head={people ? `ติดตาม ${NUM.format(peopleTotal)} คน · ${NUM.format(followLive)} สาย` : null} testId="overview-group-after">
-      <div className="grid grid-cols-1 gap-4">
-        <OverviewSection
-          title="ติดตามคนเริ่มงาน / ติดตามส่งคนแทน"
-          sub={cells ? `ยกเลิก ${NUM.format(followCancelled)} สาย ไม่นับ` : undefined}
-          testId="overview-follow"
-          right={
-            <Button type="button" variant="link" size="sm" className="h-auto p-0" onClick={openFollow} disabled={!cells}>
-              ดูทั้งหมด
-            </Button>
-          }
-        >
-          <div className="grid grid-cols-3 gap-2">
-            <OverviewNode
-              variant="outline"
-              label="ทั้งหมด"
-              value={people ? peopleTotal : null}
-              unit="คน"
-              sub={people && peopleTeams ? `${NUM.format(followLive)} สาย · เริ่มงาน ${NUM.format(peopleTeams.main)} · คนแทน ${NUM.format(peopleTeams.replacement)} คน` : undefined}
-              onClick={cells ? openFollow : undefined}
-              testId="overview-follow-total"
-            />
-            <OverviewNode variant="outline" label="AI โทรแล้ว" value={calls?.aiDone} unit="สาย" sub={calls ? `รอ AI โทร ${NUM.format(calls.aiWaiting)} สาย` : undefined} onClick={cells ? openFollow : undefined} testId="overview-follow-ai" />
-            <OverviewNode variant="outline" label="คนโทรแล้ว" value={calls?.staffDone} unit="สาย" sub={calls ? `รอคนโทร ${NUM.format(calls.staffWaiting)} สาย` : undefined} onClick={cells ? openFollow : undefined} testId="overview-follow-staff" />
-          </div>
-          {/* แบบร่าง B (2 พ.ย. 2569): แถบเดียวแบ่งตามผล · ป้ายคำทุกสีใต้แถบ */}
-          <div className="space-y-3" data-testid="overview-follow-results">
-            <span className="flex h-8 w-full overflow-hidden rounded-lg bg-muted" aria-hidden>
-              {personRows.map((r) => (
-                <span
-                  key={r.key}
-                  className={cn('block h-full border-r-2 border-card transition-all duration-700 last:border-r-0 motion-reduce:transition-none', TONE[followTone(r.key)].dot)}
-                  style={{ width: peopleTotal ? `${(r.people / peopleTotal) * 100}%` : '0%' }}
-                  title={`${r.label} ${NUM.format(r.people)} คน`}
-                />
-              ))}
-            </span>
-            <ul className="grid grid-cols-1 gap-x-6 sm:grid-cols-2 xl:grid-cols-4">
-              {personRows.map((r) => (
-                <li key={r.key} className="flex items-center justify-between gap-2 border-b border-border py-1.5 text-sm">
-                  <span className="flex min-w-0 items-center gap-2">
-                    <span className={cn('size-2 shrink-0 rounded-full', TONE[followTone(r.key)].dot)} aria-hidden />
-                    <span className="truncate">{r.label}</span>
-                  </span>
-                  <span className="shrink-0 tabular-nums">
-                    {NUM.format(r.people)}
-                    <span className="ml-1 text-xs text-muted-foreground">คน · {NUM.format(r.calls)} สาย</span>
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </div>
-          <p className="text-xs tabular-nums text-muted-foreground" data-testid="overview-follow-people-sum">
-            {personRows.length ? `${personRows.map((r) => `${r.label} ${NUM.format(r.people)}`).join(' + ')} = ${NUM.format(peopleTotal)} คน` : '—'}
-          </p>
-          <p className="text-xs tabular-nums text-muted-foreground" data-testid="overview-follow-calls-sum">
-            {calls
-              ? `AI โทรแล้ว ${NUM.format(calls.aiDone)} + รอ AI ${NUM.format(calls.aiWaiting)} + คนโทรแล้ว ${NUM.format(calls.staffDone)} + รอคน ${NUM.format(calls.staffWaiting)} = ${NUM.format(followLive)} สาย`
-              : '—'}
-          </p>
-          <p className="text-xs tabular-nums text-muted-foreground" data-testid="overview-follow-bu">
-            {followBus.length ? `แต่ละ BU: ${followBus.map((r) => `${r.label} ${NUM.format(r.total)}`).join(' · ')}` : null}
-          </p>
-        </OverviewSection>
-        <OverviewSection
-          title="ดูแลหลังเริ่มงาน"
-          testId="overview-aftercare"
-          right={
-            <Button type="button" variant="link" size="sm" className="h-auto p-0" onClick={openAftercare}>
-              ดูทั้งหมด
-            </Button>
-          }
-        >
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            <OverviewNode variant="outline" label="โทรในช่วงนี้" value={aftercare?.total ?? (ai ? 0 : null)} unit="สาย" onClick={openAftercare} testId="overview-aftercare-total" />
-            <OverviewNode variant="outline" label="ยังไม่โทร" value={aftercare?.notCalled ?? (ai ? 0 : null)} emphasis={(aftercare?.notCalled ?? 0) > 0 ? 'warn' : null} onClick={openAftercare} />
-          </div>
-          <p className="text-xs tabular-nums text-muted-foreground">
-            {upcoming && upcoming.calls > 0
-              ? `รอโทร ${NUM.format(upcoming.calls)} สาย${upcoming.firstAt ? ` · เริ่ม ${thaiDate(toYmdBangkok(new Date(upcoming.firstAt)))}` : ''}`
-              : 'รอโทร 0 สาย'}
-          </p>
-        </OverviewSection>
-      </div>
-      </OverviewGroup>
+      {/* หลังได้คน (ติดตาม · ดูแลหลังเริ่มงาน) → อยู่หน้าติดตาม/ดูแลหลังเริ่มงาน · หน้าหลักเหลือการ์ดสรุป "ติดตาม" ด้านบน (9 พ.ย. 2569) */}
       </>
       )}
 

@@ -5,8 +5,9 @@ import { describe, expect, it } from 'vitest';
 const page = readFileSync('src/pages/HomeOverviewPage.tsx', 'utf8');
 
 describe('หน้าหลักสรุปหน้าเดียว', () => {
-  it('เรียงส่วนตามที่เคาะ: ตอนนี้ → ใบขอ → ประกาศ → ผู้สมัคร → ติดตาม · ดูแล', () => {
-    const ids = ['overview-kpis', 'overview-requests', 'overview-release', 'overview-funnel', 'overview-follow', 'overview-aftercare'];
+  it('เรียงส่วนตามที่เคาะ: ตอนนี้ → ใบขอ → ผู้สมัคร (9 พ.ย. 2569 ประกาศ → ภาพรวม · ติดตาม/ดูแล → หน้าติดตาม)', () => {
+    for (const id of ['overview-release', 'overview-follow', 'overview-aftercare']) expect(page).not.toContain(`"${id}"`);
+    const ids = ['overview-kpis', 'overview-requests', 'overview-funnel'];
     const at = ids.map((id) => page.indexOf(`"${id}"`));
     for (const i of at) expect(i).toBeGreaterThan(0);
     expect([...at].sort((a, b) => a - b)).toEqual(at);
@@ -20,7 +21,7 @@ describe('หน้าหลักสรุปหน้าเดียว', () =
   });
   it('สมการลงตัวบนจอ · ไม่มี "ไม่ระบุ" ในช่องทาง', () => {
     expect(page).toContain('= เหลือหา ${NUM.format(flow.remainingRequests)} ใบ');
-    expect(page).toContain('มีคนกรอก ${NUM.format(req.releasedWithApps)} + ไม่มี ${NUM.format(req.releasedNoApps)} = ${NUM.format(req.released)}');
+    expect(readFileSync('src/components/dashboard-trends/stuck/ReleaseProgressCard.tsx', 'utf8')).toContain('มีคนกรอก {fmt(withApps.length)} + ไม่มี {fmt(noApps.length)} = {fmt(released.length)}');
     expect(readFileSync('src/lib/homeOverviewFunnel.ts', 'utf8')).not.toContain("'ไม่ระบุ'");
   });
 });

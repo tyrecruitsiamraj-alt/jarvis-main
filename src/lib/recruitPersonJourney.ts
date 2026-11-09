@@ -5,13 +5,13 @@
  *
  * เส้นหลัก: กรอกมา → AI โทร → สนใจ → คนโทรต่อติดต่อได้ → นัดได้ → มา → ผ่าน · แต่ละขั้นแตกทางที่หลุดครบ (รวมกันเท่าขั้นนั้น)
  * 🔴 สนใจ = ตอบ AI ว่าสนใจ (`isInterested`) คนละพื้นที่ไม่ทับ — เลขเดียวกับตาราง "รายชื่อมาจากไหน ไปถึงไหน" ที่อยู่หน้าเดียวกัน
- *    (AI สนใจ · คนโทรต่อสำเร็จ) · ที่เหลือแยกตาม `aiResultOf` · คนโทรต่อ = `isStaffFollowed` / `isFollowedReached`
+ *    (AI สนใจ · คนโทรต่อสำเร็จ) · ที่เหลือแยกตาม `aiResultOf` · ติดต่อได้ = `staffResultOf` (ตัวเดียวกับแท็บการติดต่อ · 9 พ.ย. 2569) · ความเร็วโทรต่อ = `isStaffFollowed`
  */
 import type { ToneKey } from './designTokens';
 import type { RecruitAppFact } from './recruitOverviewTypes';
 import { aiResultOf } from './requestPipeline';
-import { aiStage } from './recruitJourney';
-import { isFollowedReached, isStaffFollowed } from './recruitOverview';
+import { aiStage, staffResultOf } from './recruitJourney';
+import { isStaffFollowed } from './recruitOverview';
 import { isInterested } from './recruitContactTab';
 
 export type PersonPart = { key: string; label: string; tone: ToneKey; ids: string[]; /** ทางนี้ไปขั้นถัดไป */ next?: boolean; note?: string };
@@ -43,9 +43,10 @@ export function buildPersonJourney(list: readonly RecruitAppFact[], now: Date = 
 
   const ai = (k: ReturnType<typeof aiResultOf>) => aiCalled.filter((f) => aiBranchOf(f) === k);
   const yes = ai('yes');
-  const reached = yes.filter(isFollowedReached);
-  const failed = yes.filter((f) => isStaffFollowed(f) && !isFollowedReached(f));
-  const waiting = yes.filter((f) => !isStaffFollowed(f));
+  // 🔴 ติดต่อได้/ไม่ได้ = `staffResultOf` ตัวเดียวกับแท็บการติดต่อ + ตารางช่องทาง (เจ้าของ 9 พ.ย. 2569 "ตามร่างทั้งหมด" — เดิมหน้าเดียวกัน 3 นิยาม)
+  const reached = yes.filter((f) => staffResultOf(f) === 'ok');
+  const failed = yes.filter((f) => staffResultOf(f) === 'fail');
+  const waiting = yes.filter((f) => staffResultOf(f) === 'waiting');
 
   const booked = reached.filter((f) => Boolean(f.appointmentAt));
   const notBooked = reached.filter((f) => !f.appointmentAt);
@@ -150,8 +151,8 @@ export function buildFollowCallers(list: readonly RecruitAppFact[], now: Date = 
         notCalledLate: idsOf(notCalled.filter((f) => now.getTime() - ms(f.aiAnswerAt) > DAY_MS)),
         in1d: idsOf(fs.filter((f) => followSpeedOf(f) === 'in1d')),
         late: idsOf(fs.filter((f) => followSpeedOf(f) === 'late')),
-        reached: idsOf(fs.filter(isFollowedReached)),
-        booked: idsOf(fs.filter((f) => isFollowedReached(f) && f.appointmentAt)),
+        reached: idsOf(fs.filter((f) => staffResultOf(f) === 'ok')),
+        booked: idsOf(fs.filter((f) => staffResultOf(f) === 'ok' && f.appointmentAt)),
       };
     })
     .sort((a, b) => (a.name === NO_CLAIMER ? 1 : 0) - (b.name === NO_CLAIMER ? 1 : 0) || b.all.length - a.all.length || a.name.localeCompare(b.name, 'th'));

@@ -13,9 +13,11 @@ export type RecruitStuckResponse = {
   errors: Partial<Record<'requests' | 'monthly', string>>;
 };
 
-export async function fetchRecruitStuck(bu?: string | null, range?: { from: string; to: string }): Promise<RecruitStuckResponse> {
+/** `part: 'monthly'` = เทียบเดือนอย่างเดียว (โหลดตอนกางการ์ด · 9 พ.ย. 2569) · ไม่ส่ง = ใบขอ */
+export async function fetchRecruitStuck(bu?: string | null, range?: { from: string; to: string }, part?: 'monthly'): Promise<RecruitStuckResponse> {
   const q = new URLSearchParams();
   if (bu) q.set('bu', bu);
+  if (part) q.set('part', part);
   if (range) {
     q.set('from', range.from);
     q.set('to', range.to);

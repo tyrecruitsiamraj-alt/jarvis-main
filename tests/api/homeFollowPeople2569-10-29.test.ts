@@ -54,10 +54,9 @@ describe('ผลรายคน', () => {
   });
   it('การ์ดหน้าหลัก: ทั้งหมดเป็นคน · AI/คน "โทรแล้ว" + รอ · บรรทัดบวกทั้งคนและสาย · ไม่มีกล่อง "AI โทร" แบบรวมสายที่รอ', () => {
     const page = read('src/pages/HomeOverviewPage.tsx');
-    expect(page).toContain('label="AI โทรแล้ว"');
-    expect(page).toContain('label="คนโทรแล้ว"');
-    expect(page).toContain('data-testid="overview-follow-people-sum"');
-    expect(page).toContain('data-testid="overview-follow-calls-sum"');
+    // 9 พ.ย. 2569 รายละเอียดติดตามย้ายออกจากหน้าหลัก (เจ้าของ "ตามร่างทั้งหมด") — เหลือการ์ดสรุป "ติดตาม" กดดูแผงคน/สาย
+    expect(page).not.toContain('data-testid="overview-follow-people-sum"');
+    expect(page).toContain('NUM.format(peopleTotal)} คน · ${NUM.format(followLive)} สาย');
     expect(page).not.toContain('label="AI โทร" value={follow?.ai}');
     expect(read('api/_lib/homeLumosSummarySql.ts')).toContain('followPeople: buildFollowPersonCells(personRows)');
   });

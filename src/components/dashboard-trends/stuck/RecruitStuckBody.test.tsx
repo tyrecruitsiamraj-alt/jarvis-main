@@ -78,7 +78,10 @@ describe('หน้าภาพรวมโฉมใหม่', () => {
     fireEvent.click(within(area).getByRole('button', { name: /ชลบุรี/ }));
     expect(within(area).getByTestId('stuck-area-district').textContent).toContain('ศรีราชา');
     // เทียบเดือน: แท่ง 2 เดือน · สลับไปรายชื่อ
-    expect(screen.getByTestId('stuck-trend').querySelectorAll('button')).toHaveLength(2);
+    // เทียบเดือนพับไว้ กดเปิดดูค่อยโหลด (9 พ.ย. 2569) — ยิงเส้น part=monthly
+    fireEvent.click(screen.getByTestId('stuck-trend-open'));
+    await waitFor(() => expect(fetchRecruitStuck).toHaveBeenLastCalledWith(null, expect.anything(), 'monthly'));
+    expect((await screen.findByTestId('stuck-trend')).querySelectorAll('button')).toHaveLength(2);
     fireEvent.mouseDown(screen.getByTestId('stuck-trend-apps'));
     fireEvent.click(screen.getByTestId('stuck-trend-apps'));
     await waitFor(() => expect(screen.getByTestId('stuck-trend').textContent).toContain('5'));

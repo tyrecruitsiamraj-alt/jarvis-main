@@ -22,11 +22,16 @@ export default function MonthlyBarsCard({
   error,
   ok,
   onPickMonth,
+  open = true,
+  onOpen,
 }: {
   rows: readonly StuckMonthlyRow[] | null;
   error?: string | null;
   ok: (jobId: string | null) => boolean;
   onPickMonth?: (month: string) => void;
+  /** พับไว้ = ยังไม่โหลด 6 เดือน (เจ้าของ 9 พ.ย. 2569 "ตามร่างทั้งหมด" · หน้าโหลดช้า) · กดเปิดดูค่อยโหลด */
+  open?: boolean;
+  onOpen?: () => void;
 }) {
   const [key, setKey] = React.useState<StuckTrendKey>('requests');
   const grown = useGrown();
@@ -43,7 +48,7 @@ export default function MonthlyBarsCard({
       title="เทียบเดือน"
       sub="6 เดือนล่าสุด · เดือนนี้ยังไม่จบ"
       actions={
-        <Tabs value={key} onValueChange={(v) => setKey(v as StuckTrendKey)}>
+        !open ? null : <Tabs value={key} onValueChange={(v) => setKey(v as StuckTrendKey)}>
           <TabsList className="h-8">
             {KEYS.map((k) => (
               <TabsTrigger key={k} value={k} className="h-7 text-xs" data-testid={`stuck-trend-${k}`}>
@@ -54,7 +59,13 @@ export default function MonthlyBarsCard({
         </Tabs>
       }
     >
-      {rows === null ? (
+      {!open ? (
+        <Button type="button" variant="outline" size="sm" className="self-start" onClick={onOpen} data-testid="stuck-trend-open">
+          เปิดดู
+        </Button>
+      ) : rows === null && !error ? (
+        <p className={cn('flex h-44 items-center justify-center text-sm', DASH.sub)}>กำลังโหลด…</p>
+      ) : rows === null ? (
         <SectionError message={error ?? 'อ่านยอดรายเดือนไม่ได้'} />
       ) : unreadable ? (
         <p className={cn('flex h-44 items-center justify-center text-sm', DASH.sub)} data-testid="stuck-trend-unreadable">

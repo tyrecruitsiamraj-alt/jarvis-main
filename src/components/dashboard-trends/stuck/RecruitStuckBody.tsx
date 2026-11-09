@@ -18,6 +18,7 @@ import StuckAreaTable from './StuckAreaTable';
 import MonthlyBarsCard from './MonthlyBarsCard';
 import StuckEquationCard from './StuckEquationCard';
 import PersonJourneyCard from './PersonJourneyCard';
+import ReleaseProgressCard from './ReleaseProgressCard';
 
 const SCOPE_TITLE: Record<StuckScope, { title: string; sub: string }> = {
   remaining: { title: 'ใบขอที่เหลือหา ติดตรงไหน', sub: 'ใบที่ยังเปิดอยู่ ณ วันนี้ · กดได้ทุกตัวเลข' },
@@ -57,6 +58,21 @@ export default function RecruitStuckBody({
       alive = false;
     };
   }, [data.bu, data.generatedAt, win.from, win.to, rev]);
+
+  // เทียบเดือน: พับไว้ โหลดตอนกด (9 พ.ย. 2569 · หน้าโหลดช้า) — อ่าน 6 เดือนแยกเส้น `part=monthly`
+  const [monthlyOpen, setMonthlyOpen] = React.useState(false);
+  const [monthly, setMonthly] = React.useState<{ data: RecruitStuckResponse['monthly']; error: string | null }>({ data: null, error: null });
+  React.useEffect(() => {
+    if (!monthlyOpen) return;
+    let alive = true;
+    setMonthly({ data: null, error: null });
+    fetchRecruitStuck(data.bu, { from: win.from, to: win.to }, 'monthly')
+      .then((d) => alive && setMonthly({ data: d.monthly, error: d.errors.monthly ?? (d.monthly ? null : 'อ่านยอดรายเดือนไม่ได้') }))
+      .catch((e: unknown) => alive && setMonthly({ data: null, error: friendlyErrorText(e, 'อ่านยอดรายเดือนไม่ได้') }));
+    return () => {
+      alive = false;
+    };
+  }, [monthlyOpen, data.bu, win.from, win.to]);
 
   const [filter, setFilter] = React.useState<RequestTabFilter>(EMPTY_REQUEST_FILTER);
   /** สมการบนสุด: ใบชุดไหน (ค่าเริ่ม = เหลือหา) · ช่วง/เหตุที่กดในการ์ดติดตรงไหน */
@@ -122,6 +138,8 @@ export default function RecruitStuckBody({
             />
           </div>
           <StuckOwnerTable rows={focused} countLabel={scope === 'remaining' ? 'ใบที่ต้องหา' : `ใบ${STUCK_SCOPE_LABEL[scope]}`} onPick={pick} />
+          {/* ย้ายมาจากหน้าหลัก (9 พ.ย. 2569 "ตามร่างทั้งหมด") — ใบขอใหม่ของช่วง ตามตัวกรองบนสุด */}
+          <ReleaseProgressCard rows={filtered} onPick={pick} />
         </>
       ) : stuck.error || stuck.data ? null : (
         <div className="space-y-3" aria-busy>
@@ -144,7 +162,14 @@ export default function RecruitStuckBody({
 
       {stuck.data?.requests ? <StuckAreaTable rows={focused} title={scope === 'remaining' ? undefined : `พื้นที่ · ใบ${STUCK_SCOPE_LABEL[scope]}`} countLabel={scope === 'remaining' ? undefined : `ใบ${STUCK_SCOPE_LABEL[scope]}`} onPick={pick} /> : null}
 
-      <MonthlyBarsCard rows={stuck.data?.monthly ?? null} error={stuck.data?.errors.monthly ?? stuck.error} ok={jobOk} onPickMonth={onPickMonth} />
+      <MonthlyBarsCard
+        rows={monthly.data}
+        error={monthly.error}
+        ok={jobOk}
+        onPickMonth={onPickMonth}
+        open={monthlyOpen}
+        onOpen={() => setMonthlyOpen(true)}
+      />
 
       <OverviewCard icon={AlertCircle} title="ทำไมไม่สำเร็จ" sub={`${cohortSub} · ผลล่าสุดของแต่ละคน`}>
         <ReasonColumns groups={reasons} onOpen={onOpenNames} />

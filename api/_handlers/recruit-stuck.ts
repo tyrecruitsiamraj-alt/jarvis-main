@@ -84,7 +84,18 @@ export function stuckWindowOf(from: unknown, to: unknown, today: string): Win {
   return { from: d.toISOString().slice(0, 10), to: okTo };
 }
 
-export async function buildRecruitStuck(user: AuthedReq['user'], requestedBu: unknown, range: { from?: unknown; to?: unknown } = {}, now = new Date()): Promise<RecruitStuckResponse> {
+/**
+ * `part` (9 พ.ย. 2569 "ตามร่างทั้งหมด" · หน้าโหลดช้า): ค่าเริ่ม = ใบขอ (ตอนเปิดหน้า) · `monthly` = เทียบเดือนอย่างเดียว (โหลดตอนกางการ์ด)
+ * เทียบเดือนอ่านย้อน 6 เดือน (throughput + ERP + แจ้งเข้า) — เดิมโหลดทุกครั้งที่เปิดหน้า
+ */
+export type StuckPart = 'requests' | 'monthly';
+export async function buildRecruitStuck(
+  user: AuthedReq['user'],
+  requestedBu: unknown,
+  range: { from?: unknown; to?: unknown } = {},
+  now = new Date(),
+  part: StuckPart = 'requests',
+): Promise<RecruitStuckResponse> {
   const [departmentScope, buScope] = await Promise.all([loadUserDepartmentScope(user), loadMatchingBuScope(user)]);
   const picked = pickDashboardBuSet(buScope, requestedBu);
   const buSet = picked.buSet;
@@ -93,7 +104,11 @@ export async function buildRecruitStuck(user: AuthedReq['user'], requestedBu: un
   const body: RecruitStuckResponse = { generatedAt: now.toISOString(), today, bu: picked.bu, window: win, requests: null, monthly: null, errors: {} };
   if (buScope.mode === 'none') return body;
 
-  const [reqR, monR] = await Promise.allSettled([loadStuckRequests(departmentScope, buSet, win, today), loadMonthly(departmentScope, buSet, body.today)]);
+  const skip = Promise.resolve(null);
+  const [reqR, monR] = await Promise.allSettled([
+    part === 'requests' ? loadStuckRequests(departmentScope, buSet, win, today) : skip,
+    part === 'monthly' ? loadMonthly(departmentScope, buSet, body.today) : skip,
+  ]);
   if (reqR.status === 'fulfilled') body.requests = reqR.value;
   else {
     logError('recruit-stuck: requests', reqR.reason);
@@ -365,7 +380,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
     return sendError(res, 405, 'Method not allowed');
   }
   try {
-    const body = await buildRecruitStuck(req.user, req.query?.bu, { from: req.query?.from, to: req.query?.to });
+    const body = await buildRecruitStuck(req.user, req.query?.bu, { from: req.query?.from, to: req.query?.to }, new Date(), req.query?.part === 'monthly' ? 'monthly' : 'requests');
     res.setHeader?.('Cache-Control', 'no-store');
     return res.status(200).json(body);
   } catch (e) {
