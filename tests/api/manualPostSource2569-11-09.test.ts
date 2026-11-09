@@ -56,5 +56,7 @@ describe('ตารางช่องทางชั้นที่ 4', () => {
     expect(readFileSync('src/components/jobs/AutopostDialog.tsx', 'utf8')).toContain("opts.groups, 'autopost')");
     // เตรียมซ้ำในป๊อปเดิมต้องได้ลิงก์เดิม (ทดสอบผ่านหน้าจอ 9 พ.ย. 2569 — เดิมป๊อปไม่จำลิงก์ที่เพิ่งสร้าง)
     expect(readFileSync('src/components/jobs/ManualPostPanel.tsx', 'utf8')).toContain('const current = { ...posting, links: [...posting.links, ...made] };');
+    // ปุ่มคัดลอกใช้ตัวก๊อปปี้กลาง (มีทางถอย) — กดจริงในหน้าต่างฝังเคยขึ้นคัดลอกไม่ได้
+    expect(readFileSync('src/components/jobs/ManualPostPanel.tsx', 'utf8')).toContain('await copyText(textOf(r));');
   });
 });

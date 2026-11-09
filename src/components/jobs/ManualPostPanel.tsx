@@ -17,6 +17,7 @@ import { ensureSoGroupLinks } from '@/lib/soGroupLinks';
 import { jobBuOf, soGroupLinkName, type SoOptGroup } from '@/lib/soScraping';
 import SoGroupPicker from '@/components/jobs/SoGroupPicker';
 import { syncCaptionLink } from '@/components/jobs/AutopostDialog';
+import { copyText } from '@/lib/copyText';
 
 type Row = { group: SoOptGroup; link: RecruitPostingLink };
 
@@ -84,9 +85,10 @@ export default function ManualPostPanel({ job }: { job: JobRequest }) {
   };
 
   const textOf = (r: Row) => syncCaptionLink(caption, `${window.location.origin}${applyLinkPath(r.link.code)}`);
+  // ตัวก๊อปปี้กลางของระบบ — clipboard ถูกกัน (หน้าต่างฝัง/บางเบราว์เซอร์) ถอยไปวิธีเดิมเอง (ทดสอบผ่านหน้าจอ 9 พ.ย. 2569 เคยขึ้นคัดลอกไม่ได้)
   const copy = async (r: Row) => {
     try {
-      await navigator.clipboard.writeText(textOf(r));
+      await copyText(textOf(r));
       setCopied((prev) => new Set(prev).add(r.group.id));
       setError(null);
     } catch {
