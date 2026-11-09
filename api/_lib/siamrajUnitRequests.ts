@@ -19,7 +19,7 @@ import { getSiamrajSqlServerPrequestById, isPrequestId, listSiamrajSqlServerPreq
 import { inferJobTypeFromDescription, primaryJobRoleLabel } from './siamrajJobMapping.js';
 import { toBangkokYmd } from './businessDate.js';
 import { listSiamrajSqlServerUnits } from './siamrajSqlServerUnits.js';
-import { jobAllowedByDepartmentScope, loadUserDepartmentScope } from './departmentScope.js';
+import { jobAllowedByDepartmentScope, loadUserDepartmentScope, scopeCacheKey } from './departmentScope.js';
 import { rememberJobSites } from './jobSiteMap.js';
 import type { DepartmentScope } from './departmentScope.js';
 import type { UserRole } from './auth.js';
@@ -516,6 +516,14 @@ export async function loadScopedJobIdSet(user: ScopeUser): Promise<Set<string> |
 
 export type { SiamrajThroughputRecord, ResignationUnitRank };
 
+/**
+ * จำผลอ่าน ERP ไว้ 10 นาที (เจ้าของ 9 พ.ย. 2569 "ตามร่างทั้งหมด" · หน้าโหลดช้า) — Dashboard ยิงเส้นนี้ 3 รอบต่อการเปิดหน้า
+ * ช่วงเดียวกัน + ขอบเขตแผนกเดียวกัน + ฐานวันที่เดียวกัน = ผลเดิม · ยิงพร้อมกันรอผลก้อนเดียว · อายุเท่าสมุดใบขอของหน้าหลัก
+ */
+const THROUGHPUT_CACHE_MS = 10 * 60_000;
+const THROUGHPUT_CACHE_MAX = 60;
+const throughputCache = new Map<string, { at: number; value: Promise<SiamrajThroughputRecord[]> }>();
+
 export async function listSiamrajThroughput(options: {
   from: string;
   to: string;
@@ -524,10 +532,16 @@ export async function listSiamrajThroughput(options: {
   dateBasis?: 'cohort' | 'submitted';
 }): Promise<SiamrajThroughputRecord[]> {
   const source = getSiamrajDbSource();
-  if (source === 'sqlserver') {
-    return listSiamrajSqlServerThroughput(options);
-  }
-  return [];
+  if (source !== 'sqlserver') return [];
+  const key = JSON.stringify([options.from, options.to, options.dateBasis ?? 'cohort', scopeCacheKey(options.departmentScope ?? { mode: 'all' })]);
+  const hit = throughputCache.get(key);
+  if (hit && Date.now() - hit.at < THROUGHPUT_CACHE_MS) return hit.value;
+  const value = listSiamrajSqlServerThroughput(options);
+  throughputCache.set(key, { at: Date.now(), value });
+  // อ่านไม่สำเร็จ = ไม่จำ (ครั้งหน้าอ่านใหม่) · เกินจำนวน = ทิ้งตัวเก่าสุด
+  value.catch(() => throughputCache.delete(key));
+  if (throughputCache.size > THROUGHPUT_CACHE_MAX) throughputCache.delete(throughputCache.keys().next().value as string);
+  return value;
 }
 
 /** อันดับหน่วยงานที่มีใบขอลาออกบ่อยในช่วง — [] เมื่อไม่ได้ต่อ SQL Server */

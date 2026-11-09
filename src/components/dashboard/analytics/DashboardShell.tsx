@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useHeaderSearch } from '@/hooks/useHeaderSearch';
 import { DASH, TONE, type ToneKey } from '@/lib/designTokens';
-import type { DashboardActivityTrendPoint, DashboardData, DashboardFilters, DashboardKpi, DashboardResponsibleRole, DashboardStatusFilter } from '@/lib/dashboard/types';
+import type { DashboardActivityTrendPoint, DashboardData, DashboardFilters, DashboardResponsibleRole, DashboardStatusFilter } from '@/lib/dashboard/types';
 import type { UnitRequestFilterState } from '@/hooks/useSiamrajUnitRequestFilters';
 import type { DateRangeYmd } from '@/components/shared/DateRangeCalendarPicker';
 import DashboardFilterBar from './DashboardFilterBar';
@@ -179,23 +179,9 @@ const DashboardShell: React.FC<Props> = ({
       remaining: rows.reduce((sum, r) => sum + r.remaining, 0),
     };
   });
-  const remainingKpiValue = data.kpis.find((k) => k.id === 'remaining')?.value ?? 0;
+  // โหมดเลือกช่วง: เหลือหาของ ERP ไม่มีใบขอชั่วคราว → บวกใบชั่วคราวที่ต้องการคนในช่วง (เจ้าของ 9 พ.ย. 2569 "นับใบขอชั่วคราวด้วย")
+  const remainingKpiValue = (data.kpis.find((k) => k.id === 'remaining')?.value ?? 0) + (dateRange != null ? data.prequestKpi?.value ?? 0 : 0);
 
-  /**
-   * แถบสัดส่วนใต้ตัวเลข KPI (mockup rev.3) — เทียบกับ "เข้ามา" ของช่วงเดียวกัน
-   * รองรับทั้งชุด stock (total_requests/closed/…) และชุด throughput (total/completed/…)
-   * แสดงเฉพาะเมื่อฐานเป็นบวก · การ์ด % ไม่ใส่ (ตัวเลขเป็น % อยู่แล้ว)
-   */
-  const kpiDenominator =
-    data.kpis.find((k) => k.id === 'total_requests' || k.id === 'total')?.value ?? 0;
-  const kpiProgress = (kpi: DashboardKpi): number | null => {
-    if (kpiDenominator <= 0 || kpi.format === 'percent') return null;
-    if (kpi.id === 'total_requests' || kpi.id === 'total') return 100;
-    if (['closed', 'completed', 'cancelled', 'remaining'].includes(kpi.id)) {
-      return Math.min(100, Math.round((kpi.value / kpiDenominator) * 100));
-    }
-    return null;
-  };
 
   /** แผงตัวกรองชุดเดียว — มือถือเอาไปใส่ Collapsible · เดสก์ท็อปวางตรง ๆ เหมือนเดิม */
   const filterBar = (
@@ -355,92 +341,10 @@ const DashboardShell: React.FC<Props> = ({
               />
 
               <div className="space-y-3">
-                <div>
-                  {/* 9 พ.ย. 2569 เจ้าของเลือกให้ Dashboard นับตามวันที่ต้องการคน — บอกบนหัวให้รู้ว่าทำไมไม่เท่าหน้าหลัก */}
-                  <p className={cn(DASH.eyebrow, 'mb-1')}>สรุปอัตราในช่วงที่เลือก · นับตามวันที่ต้องการคน</p>
-                  <p className="text-[11px] text-slate-600 dark:text-slate-400 mb-2">
-                    {data.kpis.some((k) => k.unavailable) ? (
-                      <span>โหลดยอดตามช่วงไม่สำเร็จ</span>
-                    ) : dateRange == null ? (
-                      /**
-                       * 🔴 สมการต้องขึ้นเสมอ ไม่ใช่เฉพาะตอนเลือกช่วงวัน (แผนแก้จุดงงข้อ 2
-                       * · 2 ก.ย. 2569) — Haiku ทดสอบแล้วเอา เข้ามา−ปิด−ยกเลิก ได้ 350
-                       * แล้วถามว่า "หายไปไหน" เพราะจอไม่พิมพ์บรรทัดผลลัพธ์ให้
-                       * ⚠️ ตัวเลขชุดเดิมทั้งหมด ไม่มีนิยามใหม่ — แค่พิมพ์ผลบวกลบให้เห็น
-                       */
-                      (() => {
-                        const intake = data.kpis.find((k) => k.id === 'total_requests')?.value ?? 0;
-                        const closed = data.kpis.find((k) => k.id === 'closed')?.value ?? 0;
-                        const cancelled = data.kpis.find((k) => k.id === 'cancelled')?.value ?? 0;
-                        const n = (v: number) => v.toLocaleString('th-TH');
-                        const b = data.remainingBridge;
-                        // 31 ต.ค. 2569 เจ้าของ Choice "เลขเดียว 398 + แตกให้เห็น" — สมการจบที่การ์ดเหลือหาเสมอ
-                        const parts = b
-                          ? ([
-                              ['ใบขอชั่วคราว', b.prequest],
-                              ['ต้องการคนหลังช่วงนี้', b.after],
-                              ['ต้องการคนก่อนช่วงนี้', b.before],
-                              ['ไม่มีในยอด ERP', b.noRecord],
-                              ['ยอดในกล่องงานต่างจาก ERP', b.adjust],
-                            ] as const).filter(([, v]) => v !== 0)
-                          : [];
-                        return (
-                          <>
-                            เข้ามา {n(intake)} − หาได้แล้ว {n(closed)} − ยกเลิก {n(cancelled)} = {n(intake - closed - cancelled)}
-                            {parts.map(([label, v]) => (
-                              <span key={label}>
-                                {' '}
-                                {v < 0 ? '−' : '+'} {label} {n(Math.abs(v))}
-                              </span>
-                            ))}
-                            {b ? (
-                              <>
-                                {' '}= <b>เหลือหา {n(b.total)} อัตรา</b>
-                              </>
-                            ) : null}
-                          </>
-                        );
-                      })()
-                    ) : (
-                      (() => {
-                        const intake = data.kpis.find((k) => k.id === 'total_requests')?.value ?? 0;
-                        const closed = data.kpis.find((k) => k.id === 'closed')?.value ?? 0;
-                        const cancelled = data.kpis.find((k) => k.id === 'cancelled')?.value ?? 0;
-                        const remaining = data.kpis.find((k) => k.id === 'remaining')?.value ?? 0;
-                        return (
-                          <>
-                            เข้ามา − หาได้แล้ว − ยกเลิก = เหลือหา · ตอนนี้ {intake.toLocaleString('th-TH')} −{' '}
-                            {closed.toLocaleString('th-TH')} − {cancelled.toLocaleString('th-TH')} ={' '}
-                            {remaining.toLocaleString('th-TH')}
-                          </>
-                        );
-                      })()
-                    )}
-                  </p>
-                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                    {data.kpis.map((kpi) => (
-                      <div key={kpi.id} className="flex flex-col gap-1">
-                        <DashboardKpiCard
-                          kpi={kpi}
-                          progressPercent={kpiProgress(kpi)}
-                          selected={statusPick?.kpiId === kpi.id}
-                          onClick={onKpiClick ? () => onKpiClick(kpi.id, kpi.label, kpi.secondaryCount ?? null) : undefined}
-                        />
-                        {/*
-                         * ตำหนิ QA รอบสอง (6 ก.ย. 2569): ประโยค "คงเหลือ = ใบเปิดทั้งระบบ
-                         * คนละเลขกับสามตัวแรก" จมอยู่ในย่อหน้ายาวด้านบน — ย้ายมาติดการ์ด
-                         * "คงเหลือ" เองเป็นบรรทัดรอง (เฉพาะตอนไม่ได้เลือกช่วงวัน ซึ่งเป็น
-                         * กรณีเดียวที่คงเหลือคนละที่มากับสามตัวแรก — ไม่แตะวิธีคำนวณ)
-                         */}
-                        {kpi.id === 'remaining' && dateRange == null ? (
-                          <p className="px-1 text-[10px] leading-snug text-slate-500 dark:text-slate-400">
-                            ทั้งระบบ
-                          </p>
-                        ) : null}
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                {/*
+                 * 9 พ.ย. 2569 ถอด "สรุปอัตราในช่วงที่เลือก" (เข้ามา − หาได้ − ยกเลิก = เหลือหา) — เจ้าของ "ตามร่างทั้งหมด":
+                 * Dashboard = ไล่ SLA · สมการใบขออยู่หน้าหลักที่เดียว (นับต่างแบบกันแล้วงง · ได้บางส่วนแล้วยกเลิกเคยนับซ้ำทั้งสองกล่อง)
+                 */}
                 <div>
                   <p className={cn(DASH.eyebrow, 'mb-2')}>สถานะทำงาน (นับอัตรา)</p>
                   {/* ใช้การ์ดทรงเดียวกับ "สรุปอัตราในช่วงที่เลือก" ตามที่เจ้าของสั่ง — กวาดตาอ่านง่ายกว่าชิป

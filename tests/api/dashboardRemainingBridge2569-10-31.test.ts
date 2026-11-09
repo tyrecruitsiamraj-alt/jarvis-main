@@ -42,10 +42,9 @@ describe('buildRemainingBridge', () => {
     expect(b.inPeriod + b.prequest + b.before + b.after + b.noRecord + b.adjust).toBe(b.total);
   });
 
-  it('จอใช้สะพานนี้ในสมการโหมดทั้งหมด', () => {
+  it('9 พ.ย. 2569 ถอดสมการ "สรุปอัตราในช่วงที่เลือก" จาก Dashboard (เจ้าของ "ตามร่างทั้งหมด" — สมการอยู่หน้าหลักที่เดียว)', () => {
     const src = readFileSync('src/components/dashboard/analytics/DashboardShell.tsx', 'utf8');
-    expect(src).toContain("['ต้องการคนหลังช่วงนี้', b.after]");
-    expect(src).toContain('= <b>เหลือหา {n(b.total)} อัตรา</b>');
+    expect(src).not.toContain('สรุปอัตราในช่วงที่เลือก · นับตามวันที่ต้องการคน</p>');
     expect(src).not.toContain('ยังเปิดหาอยู่');
   });
 });

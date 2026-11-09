@@ -175,9 +175,11 @@ describe('QA 30 ต.ค. 2569 ก้อน 3 Dashboard', () => {
     const dlg = readFileSync('src/components/shared/DetailListDialog.tsx', 'utf8');
     expect(dlg).toContain('rounded-2xl border border-border bg-card p-3.5');
   });
-  it('โหมดมีงวด: ถังอายุ/ภาระงาน = ชุดเดียวกับคงเหลือ (ไม่มีใบขอชั่วคราว)', () => {
+  it('โหมดมีงวด: ถังอายุ/ภาระงาน = ชุดเดียวกับเหลือหา · 9 พ.ย. 2569 รวมใบขอชั่วคราวแล้ว (เจ้าของ "ตามร่างทั้งหมด")', () => {
     const src = readFileSync('src/lib/dashboard/buildDashboardData.ts', 'utf8');
-    expect(src).toContain('buildAgeDaysBreakdown(period ? periodStockReal : openRemainingJobs, today)');
-    expect(src).toContain('buildUnitOverview(period ? openRemainingJobs.filter((j) => !isPrequestJob(j)) : openRemainingJobs, today)');
+    expect(src).toContain('buildAgeDaysBreakdown(period ? stockJobs : openRemainingJobs, today)');
+    expect(src).toContain('buildUnitOverview(openRemainingJobs, today)');
+    // ชิปเหลือหาโหมดมีงวดบวกใบขอชั่วคราวให้ชุดเดียวกัน
+    expect(readFileSync('src/components/dashboard/analytics/DashboardShell.tsx', 'utf8')).toContain("(dateRange != null ? data.prequestKpi?.value ?? 0 : 0)");
   });
 });
