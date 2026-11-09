@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest';
 
 import {
   DEFAULT_CALL_FOLLOWUP_POLICY,
-  clampToCallWindow,
   isCallOutcome,
   nextRetryAt,
   normalizeCallFollowupPolicy,
@@ -102,12 +101,11 @@ describe('ขอเลื่อน → นัดใหม่ตามเวล�
 });
 
 describe('ห้ามโทรช่วงเงียบ 20:00–08:00', () => {
-  it('ไม่รับสายตอนตี 2 → โทรซ้ำ 08:00 วันนั้น (ช่วงโทรได้ 08:00–20:00)', () => {
+  it('ไม่รับสายตอนตี 2 → โทรซ้ำอีก 10 นาที ไม่เลื่อนไปเช้า (ถอดช่วงโทร 08:00–20:00 · เจ้าของ 9 พ.ย. 2569 "ไม่จำกัดเลย")', () => {
     // 5 ส.ค. 19:00Z = 6 ส.ค. 02:00 ไทย
     const night = new Date('2026-08-05T19:00:00.000Z');
     const d = resolveCallFollowup({ outcome: 'no_answer', attemptCount: 1, now: night });
-    expect(bkkHour(d.nextAttemptAt as string)).toBe(8);
-    expect(hoursFrom(night, d.nextAttemptAt as string)).toBe(6);
+    expect(Date.parse(d.nextAttemptAt as string) - night.getTime()).toBe(10 * 60_000);
   });
 
   it('ผู้สมัครนัดเองตอน 22:00 ก็ยังถูกเลื่อนออกจากช่วงเงียบ', () => {
@@ -178,8 +176,8 @@ describe('normalize นโยบาย', () => {
     expect(normalizeCallFollowupPolicy({ roundCalls: 2, roundsPerDay: 1, retryDays: 2 }).maxAttempts).toBe(4);
     expect(normalizeCallFollowupPolicy({ roundCalls: 99 }).roundCalls).toBe(5);
     expect(normalizeCallFollowupPolicy({ roundGapMinutes: 1 }).roundGapMinutes).toBe(10);
-    expect(normalizeCallFollowupPolicy({ callFrom: '25:00', callTo: 'x' })).toMatchObject({ callFrom: '08:00', callTo: '20:00' });
-    expect(normalizeCallFollowupPolicy({ callFrom: '20:00', callTo: '08:00' })).toMatchObject({ callFrom: '08:00', callTo: '20:00' });
+    // ช่วงโทรได้ถอดแล้ว (9 พ.ย. 2569) — ค่าเก่าที่บันทึกไว้ไม่มีผล
+    expect(normalizeCallFollowupPolicy({ callFrom: '08:00', callTo: '20:00' })).not.toHaveProperty('callFrom');
     expect(normalizeCallFollowupPolicy(null)).toEqual(DEFAULT_CALL_FOLLOWUP_POLICY);
     expect(normalizeCallFollowupPolicy('x')).toEqual(DEFAULT_CALL_FOLLOWUP_POLICY);
   });
@@ -245,15 +243,14 @@ describe('โทรซ้ำเป็นรอบ 3 สาย × 2 รอบ × 
     expect([sun[6], sun[12]]).toEqual(['2026-11-07 13:00', '2026-11-08 09:00']);
   });
 
-  it('เสาร์-อาทิตย์: กรอกพุธ 19:00 → รอบสองเลย 20:00 ไปเสาร์ ไม่ใช่พฤหัสเช้า (review 9 พ.ย. 2569)', () => {
+  it('ไม่มีเวลาห้ามโทร: กรอกพุธ 19:00 → รอบสอง 21:20 วันเดียวกัน → เสาร์ → อาทิตย์ (เจ้าของ 9 พ.ย. 2569 "เขากรอกมาตอนนั้นแปลว่าสะดวกคุยเวลานั้น")', () => {
     const W = normalizeCallFollowupPolicy({});
     const c = chain('2026-10-28T12:00:00Z', W);
-    expect(c.slice(0, 6)).toEqual(['2026-10-28 19:00', '2026-10-28 19:10', '2026-10-28 19:20', '2026-10-31 08:00', '2026-10-31 08:10', '2026-10-31 08:20']);
-    // ทุกสายหลังวันแรกอยู่เสาร์/อาทิตย์เท่านั้น
+    expect(c.slice(0, 7)).toEqual(['2026-10-28 19:00', '2026-10-28 19:10', '2026-10-28 19:20', '2026-10-28 21:20', '2026-10-28 21:30', '2026-10-28 21:40', '2026-10-31 09:00']);
+    // ครบ 18 สายภายในอาทิตย์เดียวกัน · หลังวันแรกเป็นเสาร์/อาทิตย์เท่านั้น
     const dow = (s: string) => new Date(`${s.replace(' ', 'T')}:00Z`).getUTCDay();
-    expect(c.slice(3).every((s) => dow(s) === 6 || dow(s) === 0)).toBe(true);
-    // เสาร์ 19:30 เลยช่วง = อาทิตย์ (ยังเป็นวันโทรซ้ำ)
-    expect(bkk(nextRetryAt(new Date('2026-10-31T12:30:00Z'), 3, W))).toBe('2026-11-01 08:00');
+    expect(c.slice(6).every((s) => dow(s) === 6 || dow(s) === 0)).toBe(true);
+    expect(c[17].slice(0, 10)).toBe('2026-11-01');
   });
 
   it('ข้อความเหตุบอกวันจริง: โทรซ้ำวันเสาร์', () => {
@@ -270,16 +267,9 @@ describe('โทรซ้ำเป็นรอบ 3 สาย × 2 รอบ × 
     ]);
   });
 
-  it('กรอก 18:50 → รอบสองเลย 20:00 ไปต้นช่วงพรุ่งนี้ 08:00', () => {
-    const c = chain('2026-10-27T11:50:00Z');
-    expect(c.slice(0, 4)).toEqual(['2026-10-27 18:50', '2026-10-27 19:00', '2026-10-27 19:10', '2026-10-28 08:00']);
-  });
-
-  it('สายแรกนอกช่วงโทรได้ (กรอกตี 2 / 21:00) = ต้นช่วงถัดไป · ในช่วง = ไม่ขยับ', () => {
-    expect(bkk(clampToCallWindow(new Date('2026-10-26T19:00:00Z')))).toBe('2026-10-27 08:00');
-    expect(bkk(clampToCallWindow(new Date('2026-10-27T14:00:00Z')))).toBe('2026-10-28 08:00');
-    const ok = new Date('2026-10-27T05:00:00Z');
-    expect(clampToCallWindow(ok).getTime()).toBe(ok.getTime());
+  it('กรอก 23:00 → รอบสองตี 1:20 (ไม่จำกัดเวลา · เจ้าของเลือก "ไม่จำกัดเลย")', () => {
+    const c = chain('2026-10-27T16:00:00Z');
+    expect(c.slice(0, 4)).toEqual(['2026-10-27 23:00', '2026-10-27 23:10', '2026-10-27 23:20', '2026-10-28 01:20']);
   });
 
   it('ตั้งค่าเองมีผล: 2 สาย/รอบ เว้น 30 นาที รอบเดียวต่อวัน', () => {

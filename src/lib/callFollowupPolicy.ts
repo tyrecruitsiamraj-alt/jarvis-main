@@ -53,9 +53,6 @@ export type CallFollowupPolicy = {
   roundsPerDay: number;
   roundsGapHours: number;
   retryDays: number;
-  /** ช่วงที่ AI โทรสายผู้สมัครได้ (เวลาไทย HH:MM) — นอกช่วงเลื่อนไปต้นช่วงถัดไป ทั้งสายแรกและสายโทรซ้ำ */
-  callFrom: string;
-  callTo: string;
   /** เวลาเริ่มของวันถัดไป — เช้า/บ่าย สลับกับวันก่อน */
   dayMorning: string;
   dayAfternoon: string;
@@ -83,8 +80,6 @@ export const DEFAULT_CALL_FOLLOWUP_POLICY: CallFollowupPolicy = {
   roundsPerDay: 2,
   roundsGapHours: 2,
   retryDays: 3,
-  callFrom: '08:00',
-  callTo: '20:00',
   dayMorning: '09:00',
   dayAfternoon: '13:00',
   retryDayMode: 'weekend',
@@ -125,12 +120,6 @@ export function normalizeCallFollowupPolicy(raw: unknown): CallFollowupPolicy {
   num('quietToHour', 0, 23);
   num('suppressDays', 1, 365);
   for (const k of Object.keys(ROUND_LIMITS) as Array<keyof typeof ROUND_LIMITS>) num(k, ROUND_LIMITS[k][0], ROUND_LIMITS[k][1]);
-  out.callFrom = hhmmOr(src.callFrom, out.callFrom);
-  out.callTo = hhmmOr(src.callTo, out.callTo);
-  if (out.callTo <= out.callFrom) {
-    out.callFrom = DEFAULT_CALL_FOLLOWUP_POLICY.callFrom;
-    out.callTo = DEFAULT_CALL_FOLLOWUP_POLICY.callTo;
-  }
   out.dayMorning = hhmmOr(src.dayMorning, out.dayMorning);
   out.dayAfternoon = hhmmOr(src.dayAfternoon, out.dayAfternoon);
   if (src.retryDayMode === 'weekend' || src.retryDayMode === 'next') out.retryDayMode = src.retryDayMode;
@@ -227,18 +216,10 @@ const bkkMinuteOfDay = (at: Date) => {
   return b.getUTCHours() * 60 + b.getUTCMinutes();
 };
 
-/** เลื่อนเข้าช่วงที่โทรได้ (`callFrom`–`callTo` เวลาไทย) — ก่อนช่วง = ต้นช่วงวันนั้น · เลยช่วง = ต้นช่วงวันถัดไป */
-export function clampToCallWindow(at: Date, policy: CallFollowupPolicy = DEFAULT_CALL_FOLLOWUP_POLICY): Date {
-  const m = bkkMinuteOfDay(at);
-  if (m < minutesOf(policy.callFrom)) return bkkDayAt(at, policy.callFrom);
-  if (m >= minutesOf(policy.callTo)) return bkkDayAt(at, policy.callFrom, 1);
-  return at;
-}
-
 /**
  * เวลาโทรซ้ำหลังสายที่ `attemptCount` ไม่ติด (นับรวมสายนี้) — ดูหัวข้อใน `CallFollowupPolicy`
  * เช่น 3 สาย/รอบ เว้น 10 นาที · 2 รอบห่าง 2 ชม.: กรอก 09:00 → 09:00 · 09:10 · 09:20 → 11:20 · 11:30 · 11:40 → พรุ่งนี้ 13:00 …
- * ทุกเวลาอยู่ในช่วงโทรได้ (`clampToCallWindow`) และห่างจากตอนนี้อย่างน้อย `RETRY_LEAD_MINUTES`
+ * ห่างจากตอนนี้อย่างน้อย `RETRY_LEAD_MINUTES` · ไม่มีช่วงห้ามโทร (9 พ.ย. 2569)
  */
 export function nextRetryAt(now: Date, attemptCount: number, policy: CallFollowupPolicy = DEFAULT_CALL_FOLLOWUP_POLICY): Date {
   const perDay = policy.roundCalls * policy.roundsPerDay;
@@ -255,14 +236,10 @@ export function nextRetryAt(now: Date, attemptCount: number, policy: CallFollowu
     const startedMorning = bkkMinuteOfDay(dayStart) < 12 * 60;
     at = bkkDayAt(now, startedMorning ? policy.dayAfternoon : policy.dayMorning, daysToNextRetryDay(now, policy.retryDayMode));
   }
+  // 🔴 ไม่มีช่วงเวลาห้ามโทร (เจ้าของ 9 พ.ย. 2569 "ไม่ต้องมี limit ว่าโทรถึงแค่ 2 ทุ่ม … เขากรอกมาตอนนั้นแปลว่าสะดวกคุยเวลานั้น" · Choice "ไม่จำกัดเลย")
+  //    กรอก 19:00 → รอบสอง 21:20 · กรอก 23:00 → รอบสอง 01:20 · ถอดช่อง "เริ่มโทรได้ / โทรได้ถึง" ออกทั้งระบบ
   const floor = new Date(now.getTime() + RETRY_LEAD_MINUTES * MIN);
-  const inWindow = clampToCallWindow(at.getTime() < floor.getTime() ? floor : at, policy);
-  // 🔴 เสาร์-อาทิตย์: รอบในวันที่เลยช่วงโทรของวันนี้ ห้ามไปเบียดวันธรรมดา → ต้นช่วงของวันโทรซ้ำถัดไป
-  // (review 9 พ.ย. 2569: กรอกพุธ 19:00 → รอบสองเคยไปพฤหัส 08:00 กินคิวรายชื่อใหม่ รวมเป็น 4 วัน)
-  if (pos < perDay && policy.retryDayMode === 'weekend' && bkkDayAt(inWindow, '00:00').getTime() !== bkkDayAt(now, '00:00').getTime()) {
-    return bkkDayAt(now, policy.callFrom, daysToNextRetryDay(now, policy.retryDayMode));
-  }
-  return inWindow;
+  return at.getTime() < floor.getTime() ? floor : at;
 }
 
 /**

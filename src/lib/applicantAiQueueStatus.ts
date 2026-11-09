@@ -1,6 +1,6 @@
 import type { ToneKey } from '@/lib/designTokens';
 import { CALL_OUTCOME_LABEL } from '@/lib/callOutcomeTone';
-import { clampToCallWindow, type CallOutcome } from '@/lib/callFollowupPolicy';
+import type { CallOutcome } from '@/lib/callFollowupPolicy';
 
 /**
  * ═══ ป้าย "รอ AI โทร" แบบบอกครบ — แท็บผู้สมัคร (เจ้าของ Choice 14 ต.ค. 2569 "บอกครบ + แก้คนที่ตกหล่น") ═══
@@ -129,9 +129,8 @@ export function aiQueueStatusOf(r: AiQueueInput, now: number = Date.now()): AiQu
     const at = whenText(r.last_call_next_at);
     return { kind: 'waiting', label: 'ส่ง AI ใหม่แล้ว รอโทร', sub: at ? `โทร ${at}` : null, tone: 'neutral', atRisk: false };
   }
-  // กรอกนอกช่วงโทรได้ (ค่าเริ่ม 08:00–20:00 · 27 ต.ค. 2569) = Lumos นัดต้นช่วงถัดไป ⇒ นับช้าจากเวลานั้น ไม่ใช่เวลาส่ง
-  const sentRaw = Date.parse(r.last_call_sent_at ?? '');
-  const sent = Number.isFinite(sentRaw) ? clampToCallWindow(new Date(sentRaw)).getTime() : sentRaw;
+  // ไม่มีช่วงห้ามโทรแล้ว (9 พ.ย. 2569) — นับช้าจากเวลาส่ง
+  const sent = Date.parse(r.last_call_sent_at ?? '');
   if (Number.isFinite(sent) && sent > now) {
     return { kind: 'waiting', label: 'รอ AI โทร', sub: `โทร ${whenText(new Date(sent).toISOString())}`, tone: 'neutral', atRisk: false };
   }
@@ -140,7 +139,7 @@ export function aiQueueStatusOf(r: AiQueueInput, now: number = Date.now()): AiQu
   }
   // ส่งแล้ว รอคิว Lumos (3 พ.ย. 2569 เจ้าของ "บอกไปเลยว่าส่งกี่โมง คิวก่อนหน้าเท่าไหร่") — ไม่เดาเวลาโทร
   const parts = [
-    Number.isFinite(sentRaw) ? `ส่ง ${whenText(r.last_call_sent_at)}` : null,
+    Number.isFinite(sent) ? `ส่ง ${whenText(r.last_call_sent_at)}` : null,
     typeof r.last_call_queue_ahead === 'number' ? `คิวก่อนหน้า ${r.last_call_queue_ahead.toLocaleString('th-TH')} คน` : null,
   ].filter(Boolean);
   return { kind: 'waiting', label: 'รอ AI โทร', sub: parts.length ? parts.join(' · ') : null, tone: 'neutral', atRisk: false };

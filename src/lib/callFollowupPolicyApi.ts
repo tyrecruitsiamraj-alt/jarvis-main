@@ -16,7 +16,7 @@ export async function fetchCallFollowupPolicy(): Promise<CallFollowupPolicy> {
 /** ช่องที่หน้า ตั้งค่า › โทรซ้ำคนไม่รับสาย แก้ได้ (27 ต.ค. 2569 โทรซ้ำเป็นรอบ) */
 export type CallRetryRoundInput = Pick<
   CallFollowupPolicy,
-  'roundCalls' | 'roundGapMinutes' | 'roundsPerDay' | 'roundsGapHours' | 'retryDays' | 'callFrom' | 'callTo' | 'dayMorning' | 'dayAfternoon' | 'retryDayMode'
+  'roundCalls' | 'roundGapMinutes' | 'roundsPerDay' | 'roundsGapHours' | 'retryDays' | 'dayMorning' | 'dayAfternoon' | 'retryDayMode'
 >;
 
 export async function saveCallFollowupPolicy(input: CallRetryRoundInput): Promise<CallFollowupPolicy> {

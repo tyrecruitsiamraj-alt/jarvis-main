@@ -39,7 +39,6 @@ import { checkQueueImports } from './lumosQueueImportWatch.js';
 import { listSiamrajUnitRequests } from './siamrajUnitRequests.js';
 import {
   DEFAULT_CALL_FOLLOWUP_POLICY,
-  clampToCallWindow,
   RETRY_LEAD_MINUTES,
   type CallFollowupPolicy,
 } from '../../src/lib/callFollowupPolicy.js';
@@ -546,7 +545,7 @@ export async function runLumosPushRetryOnce(
       UNREACHED.has(String(r.last_outcome ?? '')) &&
       lateMinutes > RETRY_REPLAN_AFTER_MINUTES
     ) {
-      const at = clampToCallWindow(new Date(now.getTime() + RETRY_LEAD_MINUTES * 60_000), policy);
+      const at = new Date(now.getTime() + RETRY_LEAD_MINUTES * 60_000);
       run.retriesReplanned += 1;
       await replanRetry(r.id, at);
       continue;

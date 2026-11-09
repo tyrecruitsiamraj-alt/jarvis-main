@@ -178,9 +178,9 @@ describe('สายไฟ — ทุกทางที่ส่งใบสม�
     const w = code('api/_lib/lumosPushRetryWorker.ts');
     expect(w).not.toContain('isListedRetryTime');
     expect(w).toContain('lateMinutes > RETRY_REPLAN_AFTER_MINUTES');
-    expect(w).toContain('const at = clampToCallWindow(new Date(now.getTime() + RETRY_LEAD_MINUTES * 60_000), policy);');
-    // สายสัมภาษณ์ทุกเส้นเข้าช่วงโทรได้ที่จุดส่งเดียว
-    expect(code('api/_lib/lumosPushClient.ts')).toContain('const inWindow = clampToCallWindow(at, policy);');
+    expect(w).toContain('const at = new Date(now.getTime() + RETRY_LEAD_MINUTES * 60_000);');
+    // 9 พ.ย. 2569 ถอดช่วงโทรได้ (เจ้าของ "ไม่จำกัดเลย") — ไม่มีจุดไหนเลื่อนเวลานัดออกจาก 08:00–20:00 แล้ว
+    expect(code('api/_lib/lumosPushClient.ts')).not.toContain('clampToCallWindow');
     expect(code('api/_handlers/call-followup-policy.ts')).toContain("if (req.user?.role !== 'admin')");
     expect(code('src/lib/settingsNav.ts')).toContain("callRetry: 'โทรซ้ำคนไม่รับสาย'");
   });

@@ -3,7 +3,7 @@
  * > *"ไม่รับสายแล้วโทรวันถัดไป ขอเป็นโทรใหม่ตอนเที่ยง · ขอหน้าไว้ตั้งเวลาผ่าน UI"* · Choice: ทุกงานที่ AI โทร · Admin แก้
  * - GET: ค่าที่ใช้อยู่
  * - PUT (admin): ช่องโทรซ้ำเป็นรอบ (27 ต.ค. 2569) `{ roundCalls, roundGapMinutes, roundsPerDay, roundsGapHours, retryDays,
- *   callFrom, callTo, dayMorning, dayAfternoon, retryDayMode }` — maxAttempts คิดให้เอง · ค่าอื่นของนโยบายคงเดิม · จดบันทึกการใช้งานทุกครั้ง
+ *   dayMorning, dayAfternoon, retryDayMode }` — maxAttempts คิดให้เอง · ค่าอื่นของนโยบายคงเดิม · จดบันทึกการใช้งานทุกครั้ง
  * ความหมาย/ตัวกรองค่าอยู่ `src/lib/callFollowupPolicy.ts` ที่เดียว · เก็บใน app_call_followup_policy (073)
  */
 import { withRbac, sendError, handleApiError, type ApiRes, type AuthedReq } from '../_lib/http.js';
@@ -39,10 +39,9 @@ async function handler(req: AuthedReq, res: ApiRes) {
         const v = Number(body[k]);
         if (!Number.isInteger(v) || v < min || v > max) return sendError(res, 400, 'Bad request', `${ROUND_FIELD_LABEL[k as keyof typeof ROUND_LIMITS]} ต้องเป็น ${min}–${max}`);
       }
-      for (const k of ['callFrom', 'callTo', 'dayMorning', 'dayAfternoon'] as const) {
+      for (const k of ['dayMorning', 'dayAfternoon'] as const) {
         if (typeof body[k] !== 'string' || !HHMM.test(String(body[k]).trim())) return sendError(res, 400, 'Bad request', 'เวลาต้องเป็นรูปแบบ ชม.:นาที');
       }
-      if (String(body.callTo) <= String(body.callFrom)) return sendError(res, 400, 'Bad request', 'เวลาเลิกโทรต้องหลังเวลาเริ่มโทร');
       // วันที่โทรซ้ำ (4 พ.ย. 2569) — ไม่ส่งมา = คงค่าเดิม
       if (body.retryDayMode !== undefined && body.retryDayMode !== 'weekend' && body.retryDayMode !== 'next') return sendError(res, 400, 'Bad request', 'วันที่โทรซ้ำไม่ถูกต้อง');
       const before = await getCallFollowupPolicy();
@@ -52,15 +51,13 @@ async function handler(req: AuthedReq, res: ApiRes) {
         roundsPerDay: p.roundsPerDay,
         roundsGapHours: p.roundsGapHours,
         retryDays: p.retryDays,
-        callFrom: p.callFrom,
-        callTo: p.callTo,
         dayMorning: p.dayMorning,
         dayAfternoon: p.dayAfternoon,
         retryDayMode: p.retryDayMode,
         maxAttempts: p.maxAttempts,
       });
       // รับเฉพาะช่องของหน้านี้ — ค่าอื่นของนโยบาย (ห้ามโทร · พักเบอร์ ฯลฯ) คงเดิม
-      const roundKeys = [...Object.keys(ROUND_LIMITS), 'callFrom', 'callTo', 'dayMorning', 'dayAfternoon'];
+      const roundKeys = [...Object.keys(ROUND_LIMITS), 'dayMorning', 'dayAfternoon'];
       const next = normalizeCallFollowupPolicy({
         ...before,
         ...Object.fromEntries(roundKeys.map((k) => [k, body[k]])),

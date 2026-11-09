@@ -294,13 +294,13 @@ describe('โทรซ้ำที่ถึงเวลา (โทรซ้ำ�
     expect(updates().some((s) => /followup_state = null/.test(s))).toBe(true);
   });
 
-  it('ใบสมัคร: นัดค้างเกินเวลา ⇒ นัดใหม่เร็วสุดในช่วงโทรได้ (07:45 + 10 นาที → 08:00) ไม่โทรทันที · 27 ต.ค. 2569', async () => {
+  it('ใบสมัคร: นัดค้างเกินเวลา ⇒ นัดใหม่อีก 10 นาที ไม่โทรทันที (07:45 → 07:55 · ไม่มีช่วงห้ามโทรแล้ว 9 พ.ย. 2569)', async () => {
     stub([], [retry({ next_attempt_at: bkk('2026-09-26T14:05:00'), last_call_at: bkk('2026-09-25T14:05:00') })]);
     const run = await runLumosPushRetryOnce(CFG, bkk('2026-09-29T07:45:00'));
     expect(run.retriesReplanned).toBe(1);
     expect(pushInterviews).not.toHaveBeenCalled();
     const call = dbQuery.mock.calls.find((c) => /set next_attempt_at = \$2::timestamptz/.test(String(c[0])));
-    expect(call?.[1]).toEqual(['800', bkk('2026-09-29T08:00:00').toISOString()]);
+    expect(call?.[1]).toEqual(['800', bkk('2026-09-29T07:55:00').toISOString()]);
   });
 
   it('🔴 นัดที่ยังไม่ถึง ไม่ย้าย (โทรซ้ำเป็นรอบคิดเวลาตอนได้ผล · 27 ต.ค. 2569) — ถึงเวลาก็ส่งตามนัดเดิม', async () => {
