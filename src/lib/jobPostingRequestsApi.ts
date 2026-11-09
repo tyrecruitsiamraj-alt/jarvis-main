@@ -164,6 +164,8 @@ export async function fetchSoOptions(requestNo?: string | null): Promise<SoOptio
     groups: d.groups ?? [],
     workers: d.workers ?? [],
     scrapeAccounts: d.scrapeAccounts ?? [],
+    // ข้อ 12 (9 พ.ย. 2569) — เคยตกหล่นตรงนี้ ป๊อปเลยขึ้นคำเดิมทั้งที่ server ส่ง message มาแล้ว
+    postingAvailability: d.postingAvailability ?? null,
   };
 }
 

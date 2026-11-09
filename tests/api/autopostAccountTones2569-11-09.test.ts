@@ -108,6 +108,8 @@ describe('ข้อ 12 + กลุ่มค้างคิว (So Scraping 9 พ
     expect(o.postingAvailability).toBeNull();
     const src = readFileSync('src/components/jobs/AutopostDialog.tsx', 'utf8');
     expect(src).toContain('opts.postingAvailability?.canOrder === false && opts.postingAvailability.message');
+    // ตัวโหลดฝั่งหน้าเว็บต้องส่งต่อ — เคยตกหล่น จอขึ้นคำเดิม (เจอบนเว็บจริง 9 พ.ย. 2569)
+    expect(readFileSync('src/lib/jobPostingRequestsApi.ts', 'utf8')).toContain('postingAvailability: d.postingAvailability ?? null');
   });
   it('เพดานกลุ่ม = remaining_today − pending_groups · เหลืองยัง ≤ 1', () => {
     const p = parseSoOptions({
