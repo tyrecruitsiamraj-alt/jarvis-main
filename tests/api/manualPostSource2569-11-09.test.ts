@@ -54,5 +54,7 @@ describe('ตารางช่องทางชั้นที่ 4', () => {
     expect(readFileSync('src/components/jobs/OrderPostButton.tsx', 'utf8')).toContain("{ value: 'manual', label: 'โพสต์เอง — คัดลอกข้อความไปโพสต์ในกลุ่ม Facebook' }");
     expect(readFileSync('src/components/jobs/ManualPostPanel.tsx', 'utf8')).toContain("ensureSoGroupLinks(posting, groups.filter((g) => picked.includes(g.id)), groups, 'manual')");
     expect(readFileSync('src/components/jobs/AutopostDialog.tsx', 'utf8')).toContain("opts.groups, 'autopost')");
+    // เตรียมซ้ำในป๊อปเดิมต้องได้ลิงก์เดิม (ทดสอบผ่านหน้าจอ 9 พ.ย. 2569 — เดิมป๊อปไม่จำลิงก์ที่เพิ่งสร้าง)
+    expect(readFileSync('src/components/jobs/ManualPostPanel.tsx', 'utf8')).toContain('const current = { ...posting, links: [...posting.links, ...made] };');
   });
 });

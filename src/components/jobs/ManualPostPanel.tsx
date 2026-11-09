@@ -70,7 +70,10 @@ export default function ManualPostPanel({ job }: { job: JobRequest }) {
         posting = await createRecruitPosting(jobPostingBody(job));
         await releaseJobsToPublic([job.id]);
       }
-      const { links } = await ensureSoGroupLinks(posting, groups.filter((g) => picked.includes(g.id)), groups, 'manual');
+      const { links, made } = await ensureSoGroupLinks(posting, groups.filter((g) => picked.includes(g.id)), groups, 'manual');
+      // จำลิงก์ที่เพิ่งสร้าง — กด "เลือกกลุ่มใหม่" แล้วเตรียมซ้ำต้องได้ลิงก์เดิม ไม่สร้างซ้ำ
+      const current = { ...posting, links: [...posting.links, ...made] };
+      setPostings((prev) => [current, ...(prev ?? []).filter((p) => p.id !== current.id)]);
       setRows(links);
       setCopied(new Set());
     } catch (e) {
