@@ -46,6 +46,7 @@ import { queueReplySql } from '../_lib/lumosQueueDefs.js';
 import { loadBoardPhoneSet } from '../_lib/applicationBoardLink.js';
 import { toBangkokYmd } from '../_lib/businessDate.js';
 import { logError } from '../_lib/logger.js';
+import { loadStaffDisplay } from '../_lib/staffDisplay.js';
 import { INTEREST_VOCAB, classifyCallMicro } from '../../src/lib/callMicroOutcome.js';
 import { normalizeTrendBu } from '../../src/lib/trends/bu.js';
 import { emptyRegionCount, regionOfProvince, type Region } from '../../src/lib/bkkRegion.js';
@@ -668,23 +669,6 @@ export async function loadAppJobs(jobIds: readonly string[], jobs: ReadonlyMap<s
 }
 
 const NO_NAME = 'ไม่ระบุชื่อ';
-const USERS = tableInAppSchema('users');
-
-/** อีเมล (ตัวเล็ก) → ชื่อเล่น → ชื่อจริง (กติกาเดียวกับ created_by_display หน้าติดตาม) · อ่านไม่ได้ = ใช้อีเมลเดิม */
-async function loadStaffDisplay(): Promise<(email: string) => string | null> {
-  try {
-    const { rows } = await dbQuery<{ email: string; name: string | null }>(
-      `select lower(btrim(email)) as email, coalesce(nullif(btrim(nickname), ''), nullif(btrim(full_name), '')) as name
-         from ${USERS} where email is not null`,
-    );
-    const map = new Map(rows.map((r) => [r.email, r.name]));
-    return (email) => map.get(email) ?? null;
-  } catch (e) {
-    logError('recruit-overview: users', e);
-    return () => null;
-  }
-}
-
 /** แถวดิบ (ใบ × คน) → ยอดรายชื่อไม่ซ้ำต่อคน เรียงนัดได้มากสุดก่อน */
 /**
  * @param displayOf อีเมลของเจ้าหน้าที่ → ชื่อเล่น/ชื่อจริง (QA 18 ต.ค. 2569: ตารางเคยขึ้นอีเมล) · ไม่รู้จัก = คงค่าเดิม

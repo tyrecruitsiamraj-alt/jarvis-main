@@ -27,6 +27,7 @@ import {
   applicationJobLabel,
   applicationUnitLabel,
   canHoldApplication,
+  claimerOf,
   daysSinceApplied,
   splitApplicantName,
   type RmRowAction,
@@ -516,6 +517,8 @@ const RmTable: React.FC<{
                   ) : null}
                   {tab === 'contact' ? (
                     <td className={cn('px-1.5 py-2 text-xs', DASH.cellMuted)}>
+                      {/* ปุ่ม "ทุกคน" (10 พ.ย. 2569) — บอกว่าใครเก็บ · ของฉันไม่ขึ้น */}
+                      {claimerOf(r) ? <span className="block font-medium text-foreground" data-testid="rm-claimer">เก็บโดย {claimerOf(r)}</span> : null}
                       {/**
                         * ลำดับความจริง: เวลาที่ **กดโทรจริง** (095) > เวลาที่ถือไว้ >
                         * เวลาที่ได้ผลโทร · อันแรกคือสิ่งที่เจ้าหน้าที่ทำเองกับมือ

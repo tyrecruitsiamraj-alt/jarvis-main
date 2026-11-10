@@ -167,7 +167,8 @@ describe('หน้าเว็บ: ปุ่ม ของฉัน / ทุก�
     expect(block).toContain('type="single"');
     expect(block).toContain('size="xs"');
     expect(block).toContain('RM_APPOINTMENT_SCOPE_LABEL[s]');
-    expect(code.match(/<ToggleGroup\b/g)?.length).toBe(1);
+    // 10 พ.ย. 2569 แท็บการติดต่อมีปุ่ม ของฉัน/ทุกคน ของตัวเองอีกตัว (เจ้าของ Choice) — นัดหมาย 1 + การติดต่อ 1
+    expect(code.match(/<ToggleGroup\b/g)?.length).toBe(2);
     const head = code.slice(code.indexOf("{!bucket && tab === 'appointments' ?"), code.indexOf('<FilterChips', code.indexOf("{!bucket && tab === 'appointments' ?")));
     expect(head).toContain('<ToggleGroup');
     const toggle = readFileSync(new URL('../../src/components/ui/toggle.tsx', import.meta.url), 'utf8');
@@ -183,14 +184,18 @@ describe('หน้าเว็บ: ปุ่ม ของฉัน / ทุก�
   it('ทุกคน = ยิง ?view=appointments&scope=all · ของฉัน = เส้นเดิมไม่มี param เพิ่ม', () => {
     expect(api).toContain("qs.set('view', 'appointments')");
     expect(api).toContain("qs.set('scope', 'all')");
-    expect(code).toContain('fetchAllJobApplications(leadView, bucket, cancelledView, everyoneAppointments)');
+    expect(code).toContain('fetchAllJobApplications(leadView, bucket, cancelledView, everyoneAppointments, everyoneContact)');
     expect(code).toMatch(/const everyoneAppointments =\s*tab === 'appointments' &&\s*appointmentScope === 'all' &&\s*canSeeEveryoneAppointments\(user\?\.role\)/);
-    expect(code).toMatch(/useEffect\(load, \[[^\]]*everyoneAppointments\]\)/);
+    // ชุดที่โหลด (ของฉัน · นัดทุกคน · การติดต่อทุกคน) ตัดสินจาก everyoneAppointments ตัวเดิม
+    expect(code).toContain("const rowsScope = everyoneAppointments ? 'appointments' : everyoneContact ? 'contact' : 'mine';");
+    expect(code).toMatch(/useEffect\(load, \[[^\]]*rowsScope\]\)/);
   });
 
   it('🔴 ชุด "ทุกคน" มีแต่แถวนัด — ไม่เอาไปนับให้แท็บอื่น / กองเลือกวิธีโทร', () => {
-    expect(code).toMatch(/if \(bucket \|\| everyoneAppointments \|\|/);
-    expect(code).toContain('everyoneAppointments ? [] : rows.filter((r) => r.unclaimed_at');
+    // 10 พ.ย. 2569 ครอบชุดการติดต่อของทุกคนด้วย (everyoneView = นัดทุกคน หรือ การติดต่อทุกคน)
+    expect(code).toContain("const everyoneView = rowsScope !== 'mine';");
+    expect(code).toMatch(/if \(bucket \|\| everyoneView \|\|/);
+    expect(code).toContain('everyoneView ? [] : rows.filter((r) => r.unclaimed_at');
   });
 
   it('สลับเร็ว ๆ แล้วคำตอบเก่ามาทีหลัง ต้องไม่ทับ (ลำดับคำขอ)', () => {
@@ -199,7 +204,7 @@ describe('หน้าเว็บ: ปุ่ม ของฉัน / ทุก�
   });
 
   it('🔴 สลับชุดแล้วเส้นล้ม = ไม่ค้างรายชื่อชุดเก่า (QA รอบ 3 ข้อ 23)', () => {
-    expect(code).toContain('if (rowsScopeRef.current !== null && rowsScopeRef.current !== everyoneAppointments) setRows([]);');
-    expect(code).toContain('rowsScopeRef.current = everyoneAppointments;');
+    expect(code).toContain('if (rowsScopeRef.current !== null && rowsScopeRef.current !== rowsScope) setRows([]);');
+    expect(code).toContain('rowsScopeRef.current = rowsScope;');
   });
 });

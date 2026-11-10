@@ -68,6 +68,13 @@ export const RM_TAB_STATUSES: Record<RmTab, ApplicationStatus[] | null> = {
 export const RM_APPOINTMENT_SCOPES = ['mine', 'all'] as const;
 export type RmAppointmentScope = (typeof RM_APPOINTMENT_SCOPES)[number];
 
+/** ป้าย "เก็บโดย …" ในแท็บการติดต่อปุ่ม "ทุกคน" — ของฉันไม่ขึ้น · ไม่รู้ชื่อ = null */
+export function claimerOf(r: Pick<PublicApplication, 'claimed_by_me' | 'claimed_by_name' | 'lead_by_me' | 'lead_by_name' | 'claimed' | 'is_lead'>): string | null {
+  if (r.claimed_by_me || (r.is_lead && r.lead_by_me && !r.claimed)) return null;
+  const name = r.claimed ? r.claimed_by_name : r.is_lead ? r.lead_by_name : null;
+  return name?.trim() || null;
+}
+
 export const RM_APPOINTMENT_SCOPE_LABEL: Record<RmAppointmentScope, string> = {
   mine: 'ของฉัน',
   all: 'ทุกคน',
@@ -93,7 +100,12 @@ export function canSeeEveryoneAppointments(role: UserRole | null | undefined): b
  * server กรองใบที่คนอื่นเก็บออกจาก feed อยู่แล้ว ฝั่งนี้แค่แยก "ของฉัน" ออกจาก "ยังว่าง")
  * · ใบที่เก็บแล้วออกจากแท็บ "ข้อมูลผู้สมัคร" (ไปอยู่การติดต่อแทน — ไม่โผล่สองที่ให้งง)
  */
-export function isInRmTab(r: PublicApplication, tab: RmTab): boolean {
+export function isInRmTab(
+  r: PublicApplication,
+  tab: RmTab,
+  /** แท็บการติดต่อปุ่ม "ทุกคน" (10 พ.ย. 2569) — "เก็บไว้" = ใครเก็บก็นับ ไม่ใช่แค่ของฉัน */
+  everyone = false,
+): boolean {
   // ⚠️ **คนที่ตอบว่าไม่สนใจ กลับเข้าคลังกลาง** (เจ้าของสั่ง 13 ส.ค. 2569:
   // "กรณีคนไม่สนใจให้ไปอยู่ในนี้" ชี้ที่แท็บรายชื่อผู้สมัคร)
   // เหตุผล: งาน**ใบนั้น**จบแล้ว ไม่ต้องตามต่อ แต่ **คนยังอยู่ในระบบ** เอาไปเสนอ
@@ -103,7 +115,7 @@ export function isInRmTab(r: PublicApplication, tab: RmTab): boolean {
   // "เก็บ Lead → รายชื่อไปอยู่ที่การติดต่อแทน" · เดิม Lead หายเข้าคลังสำรอง)
   // 🔴 ของใครของมัน (Journey 4 ต.ค. 2569): Lead นับเฉพาะที่ผู้ดูเก็บ — server ซ่อน Lead ของคนอื่นแล้ว
   // `lead_by_me` ไม่มากับแถว (server เก่า) = ถือตาม is_lead เหมือนเดิม
-  const kept = r.claimed_by_me === true || (r.is_lead === true && r.lead_by_me !== false);
+  const kept = everyone ? r.claimed === true || r.is_lead === true : r.claimed_by_me === true || (r.is_lead === true && r.lead_by_me !== false);
   /**
    * 🔴 ตอบไม่สนใจแล้ว = กลับคลังกลาง — **ยกเว้นเก็บมาหลังผลนั้น** (QA 5 ต.ค. 2569 · เจ้าของเจอเอง:
    * "เก็บชื่อจากหน้าผู้สมัครแล้วไม่ไปหน้าการติดต่อ") — เดิมเช็คผลก่อนเสมอ ⇒ กดเก็บคนที่ไม่สนใจ ระบบล็อกเบอร์ให้
@@ -500,10 +512,12 @@ export function filterApplications(
   tab: RmTab,
   filters: RmFilters,
   keyword: string,
+  /** แท็บการติดต่อปุ่ม "ทุกคน" — ส่งเฉพาะตอนแถวมาจากเส้น `view=contact&scope=all` */
+  everyone = false,
 ): PublicApplication[] {
   const kw = keyword.trim().toLowerCase();
   return rows.filter((r) => {
-    if (!isInRmTab(r, tab)) return false;
+    if (!isInRmTab(r, tab, everyone)) return false;
     if (filters.statuses.length > 0 && !filters.statuses.includes(r.status)) return false;
     if (filters.channels.length > 0) {
       if (!r.referral_source || !filters.channels.includes(r.referral_source)) return false;

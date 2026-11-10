@@ -89,10 +89,22 @@ describe('ปุ่ม ของฉัน / ทุกคน', () => {
     expect(lastFlag()).toBe(true);
   });
 
-  it.each(['contact', 'candidates'] as const)('แท็บ %s ไม่มีปุ่มนี้', async (tab) => {
-    renderTab(tab);
+  it('แท็บ candidates ไม่มีปุ่มนี้', async () => {
+    renderTab('candidates');
     await waitFor(() => expect(fetchAll).toHaveBeenCalled());
     expect(screen.queryByRole('radio', { name: 'ทุกคน' })).toBeNull();
+    expect(lastFlag()).toBe(false);
+  });
+
+  // 10 พ.ย. 2569 เจ้าของ "ใครเก็บไปแล้วยังไม่โทรบ้าง" · Choice "แท็บการติดต่อมีปุ่ม ทุกคน" — ค่าเริ่มยังเป็นของฉัน
+  it('แท็บ contact มีปุ่มของตัวเอง ค่าเริ่ม "ของฉัน" · กด "ทุกคน" ยิงธงการติดต่อ (ไม่ใช่ธงนัด)', async () => {
+    renderTab('contact');
+    await waitFor(() => expect(fetchAll).toHaveBeenCalled());
+    expect(screen.getByRole('radio', { name: 'ของฉัน' })).toHaveAttribute('aria-checked', 'true');
+    expect(lastFlag()).toBe(false);
+    expect(fetchAll.mock.calls.at(-1)?.[4]).toBe(false);
+    fireEvent.click(screen.getByRole('radio', { name: 'ทุกคน' }));
+    await waitFor(() => expect(fetchAll.mock.calls.at(-1)?.[4]).toBe(true));
     expect(lastFlag()).toBe(false);
   });
 });

@@ -54,7 +54,7 @@ import {
   profileFullName,
   type ProfilePatch,
 } from '../../src/lib/applicantProfileEdit.js';
-import { loadProgressByJob, saveProgress } from '../_lib/selectionProgressStore.js';
+import { loadProgressByJobs, saveProgress } from '../_lib/selectionProgressStore.js';
 import {
   cleanRmLicenseTypes,
   isRmSpecificType,
@@ -73,6 +73,7 @@ import { loadLatestScreeningByApplication } from '../_lib/applicationScreening.j
 import { loadBoardPhoneSet } from '../_lib/applicationBoardLink.js';
 import { toE164Thai } from '../_lib/thaiPhone.js';
 import { logError, logWarn } from '../_lib/logger.js';
+import { loadStaffDisplay } from '../_lib/staffDisplay.js';
 import { linkOwnerSql } from '../_lib/recruitPostings.js';
 
 const tbl = tableInAppSchema('public_job_applications');
@@ -164,13 +165,15 @@ function toIso(value: string | Date): string {
  *   claimed_by_me  = คนเก็บคือ viewer
  *   claimed_by_name = **เฉพาะของตัวเอง** — เจ้าของสั่ง "คนอื่นจะไม่เห็นชื่อคนที่เก็บไป"
  */
-function toApplication(r: Row, viewerId?: string) {
+function toApplication(r: Row, viewerId?: string, showClaimer = false) {
   const claimed = Boolean(r.claimed_by);
   const mine = claimed && !!viewerId && r.claimed_by === viewerId;
   return {
     claimed,
     claimed_by_me: mine,
-    claimed_by_name: mine ? (r.claimed_by_name ?? undefined) : undefined,
+    // `showClaimer` = แท็บการติดต่อปุ่ม "ทุกคน" (เจ้าของ 10 พ.ย. 2569 "ใครเก็บไปแล้วยังไม่โทรบ้าง" · Choice
+    // "คอลัมน์บอกว่าใครเก็บ") — คำสั่งล่าสุดทับ "คนอื่นจะไม่เห็นชื่อ" (13 ส.ค.) เฉพาะมุมนี้ · ลิสต์ปกติยังซ่อนเหมือนเดิม
+    claimed_by_name: mine || showClaimer ? (r.claimed_by_name ?? undefined) : undefined,
     // เวลาที่ฉันเก็บ (เฉพาะของตัวเอง) — ให้หน้าเว็บรู้ว่าเก็บหลังผลโทร "ไม่สนใจ" ไหม (5 ต.ค. 2569)
     claimed_at: mine && r.claimed_at ? toIso(r.claimed_at) : undefined,
     // Lead เป็นสถานะระดับระบบ (ไม่ใช่ของใครคนหนึ่ง) — ชื่อคนปัดจึงส่งให้ทุกคนเห็นได้
@@ -403,6 +406,17 @@ function isUndefinedColumn(e: unknown): boolean {
  * - ขอมาตรง ๆ ทั้งสองค่า · ไม่ปนกับมุมมองที่มีเงื่อนไขของตัวเอง (`job_id` · `lead=1` · `bucket`)
  * อ่านอย่างเดียว — ลงผลมา/ไม่มาบนนัดของคนอื่นผ่านอยู่แล้ว (application-attendance เช็คแค่ BU)
  */
+/**
+ * แท็บการติดต่อปุ่ม "ทุกคน" (เจ้าของ 10 พ.ย. 2569 "อยากดู … ใครเก็บไปแล้วยังไม่โทรบ้าง") — ทุกบัญชีที่ล็อกอิน
+ * แบบเดียวกับนัดหมายทุกคน · สิทธิ์ BU ข้างในยังอยู่ · ได้เฉพาะใบที่มีคนเก็บ (เก็บไปโทร หรือ Lead)
+ */
+export function wantsEveryoneContact(query: Record<string, unknown> | undefined, role: UserRole | undefined): boolean {
+  if (!role) return false;
+  const q = query ?? {};
+  if (getString(q.view) !== 'contact' || getString(q.scope) !== 'all') return false;
+  return !getString(q.job_id) && getString(q.lead) !== '1' && !getString(q.bucket);
+}
+
 export function wantsEveryoneAppointments(
   query: Record<string, unknown> | undefined,
   role: UserRole | undefined,
@@ -457,6 +471,8 @@ export function buildApplicationsListQuery(input: {
    * ดูเหตุผลที่ฟังก์ชันนั้น · ไม่ส่ง/false = ลิสต์เดิมทุกตัวอักษร
    */
   everyoneAppointments?: boolean;
+  /** แท็บการติดต่อ "ทุกคน" — ผ่าน `wantsEveryoneContact` มาแล้วเท่านั้น · ได้แต่ใบที่มีคนเก็บ */
+  everyoneContact?: boolean;
 }): {
   sql: string;
   params: unknown[];
@@ -486,6 +502,21 @@ export function buildApplicationsListQuery(input: {
     } else {
       conds.push(byJob);
     }
+  }
+  if (input.everyoneContact === true && !jobId && !input.leadView && !input.bucketWhere) {
+    /**
+     * การติดต่อของทุกคน — ข้าม "ของใครของมัน" เฉพาะใบที่มีคนเก็บแล้ว (เก็บไปโทร หรือ Lead) · สิทธิ์ BU ข้างบนยังอยู่ครบ
+     * 🔴 ห้ามเอาไปใช้กับแท็บอื่น — ใบที่คนอื่นเก็บจะโผล่ในแท็บผู้สมัคร (หน้าเว็บแยกชุดนี้ไว้ใช้เฉพาะแท็บการติดต่อ)
+     */
+    conds.push(`(claimed_by is not null or coalesce(is_lead, false))`);
+    return {
+      sql: `select {{cols}} from ${tbl} a ${conds.length ? `where ${conds.join(' and ')}` : ''}
+        order by created_at desc limit ${APPLICATIONS_LIST_MAX}`,
+      params,
+      claimWhere: 'true',
+      legacyClaimWhere: 'true',
+      leadWhere: 'true',
+    };
   }
   if (everyone) {
     /**
@@ -1659,7 +1690,9 @@ async function handler(req: AuthedReq, res: ApiRes) {
         : null,
       // แท็บติดตามนัดหมาย "ทุกคน" — สิทธิ์ตัดสินที่นี่ (staff ส่งมา = ลิสต์เดิม)
       everyoneAppointments: wantsEveryoneAppointments(req.query, req.user.role),
+      everyoneContact: wantsEveryoneContact(req.query, req.user.role),
     });
+    const showClaimer = wantsEveryoneContact(req.query, req.user.role);
     const rows = await queryWithLegacyFallback(
       q.sql,
       q.params,
@@ -1673,7 +1706,18 @@ async function handler(req: AuthedReq, res: ApiRes) {
     if (rows.length >= APPLICATIONS_LIST_MAX) {
       logWarn('job-applications.list ถึงราวกันตก — รายชื่อเก่าสุดไม่ได้ถูกส่ง', { max: APPLICATIONS_LIST_MAX });
     }
-    const allItems = rows.map((r) => toApplication(r, req.user.sub));
+    const allItems = rows.map((r) => toApplication(r, req.user.sub, showClaimer));
+    // "เก็บโดย …" ให้เป็นชื่อเล่น ไม่ใช่อีเมล (บางใบจดอีเมลไว้) — เฉพาะปุ่ม "ทุกคน"
+    if (showClaimer) {
+      const displayOf = await loadStaffDisplay();
+      for (const item of allItems) {
+        const rec = item as Record<string, unknown>;
+        for (const k of ['claimed_by_name', 'lead_by_name'] as const) {
+          const v = typeof rec[k] === 'string' ? (rec[k] as string).trim() : '';
+          if (v.includes('@')) rec[k] = displayOf(v.toLowerCase()) ?? v;
+        }
+      }
+    }
     const cancels = await loadCancellations(allItems.map((i) => i.id));
     const wantCancelled = getString(req.query?.cancelled) === '1';
     const items = allItems.filter((i) => cancels.has(i.id) === wantCancelled);
@@ -1778,20 +1822,13 @@ async function handler(req: AuthedReq, res: ApiRes) {
        * ขั้นในกระบวนการจ้างจาก **ตารางกลาง** (105 · Phase 6.2) — ทับค่าบนใบสมัคร
        * เพราะตารางกลางคือแหล่งใหม่ที่คนจาก match ใช้ร่วมกัน · ตารางยังไม่ migrate
        * = Map ว่าง → ค่าบนใบสมัครยังทำงานเหมือนเดิม (ถอยกลับได้)
-       * ⚠️ ยิงต่อ **ใบขอ** เพราะคีย์คือ (job_id, phone) — จัดกลุ่มก่อนแล้วยิงทีละใบขอ
+       * คีย์คือ (job_id, phone) — คิวรีเดียวทั้งลิสต์ (10 พ.ย. 2569 · เดิมยิงทีละใบขอ ~200 รอบ ≈ 2.6 วิ)
        */
-      const byJob = new Map<string, typeof items>();
-      for (const it of items) {
-        if (!it.job_id) continue;
-        const list = byJob.get(it.job_id) ?? [];
-        list.push(it);
-        byJob.set(it.job_id, list);
-      }
-      for (const [jid, group] of byJob) {
-        const progress = await loadProgressByJob(jid, group.map((g) => g.phone));
-        if (progress.size === 0) continue;
-        for (const it of group) {
-          const hit = progress.get(toE164Thai(it.phone || '') || '');
+      const progress = await loadProgressByJobs(items.filter((it) => it.job_id).map((it) => ({ jobId: String(it.job_id), phone: it.phone })));
+      if (progress.size > 0) {
+        for (const it of items) {
+          if (!it.job_id) continue;
+          const hit = progress.get(`${String(it.job_id).trim()}|${toE164Thai(it.phone || '') || ''}`);
           if (!hit) continue;
           const rec = it as Record<string, unknown>;
           if (hit.selectionStatus) rec.selection_status = hit.selectionStatus;

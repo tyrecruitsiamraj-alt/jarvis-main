@@ -317,6 +317,8 @@ export async function fetchAllJobApplications(
    * (ต่ำกว่านั้นได้ลิสต์เดิม) · ได้แต่แถวนัด ห้ามใช้เป็นข้อมูลของแท็บอื่น
    */
   everyoneAppointments = false,
+  /** true = แท็บการติดต่อของ **ทุกคน** (10 พ.ย. 2569) — ได้แต่ใบที่มีคนเก็บ พร้อมชื่อคนเก็บ · ห้ามใช้กับแท็บอื่น */
+  everyoneContact = false,
 ): Promise<PublicApplication[]> {
   const qs = new URLSearchParams();
   if (leadView) qs.set('lead', '1');
@@ -324,6 +326,9 @@ export async function fetchAllJobApplications(
   if (cancelledView) qs.set('cancelled', '1');
   if (everyoneAppointments) {
     qs.set('view', 'appointments');
+    qs.set('scope', 'all');
+  } else if (everyoneContact) {
+    qs.set('view', 'contact');
     qs.set('scope', 'all');
   }
   const r = await apiFetch(`/api/job-applications${qs.size > 0 ? `?${qs}` : ''}`);

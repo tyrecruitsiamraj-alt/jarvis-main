@@ -284,6 +284,11 @@ const RmWorkspace: React.FC<{
    */
   // 21 ต.ค. 2569 เจ้าของ "ให้เห็นไปหมดเลยว่า นัดมาทั้งหมดเท่าไหร่ ใครนัดมา" · Choice "ทุกคนเห็นหมด ค่าเริ่ม = ทุกคน"
   const [appointmentScope, setAppointmentScope] = useState<RmAppointmentScope>('all');
+  /**
+   * แท็บการติดต่อ: ของฉัน / ทุกคน (เจ้าของ 10 พ.ย. 2569 "ใครเก็บไปแล้วยังไม่โทรบ้าง" · Choice "แท็บการติดต่อมีปุ่ม ทุกคน")
+   * ค่าเริ่ม = ของฉัน (การติดต่อของใครของมัน · 4 ต.ค. 2569) · ไม่ผูก URL
+   */
+  const [contactScope, setContactScope] = useState<RmAppointmentScope>('mine');
   /** ตารางนัดของวันแยกสถานที่ (แบบ iRecruit · 21 ต.ค. 2569) — วันที่ดู + สถานที่ที่กด (null = ไม่กรองรายชื่อ) */
   const todayYmd = toYmdBangkok(new Date());
   const [placeDay, setPlaceDay] = useState<string>(todayYmd);
@@ -318,21 +323,26 @@ const RmWorkspace: React.FC<{
     !bucket &&
     !leadView &&
     !cancelledView;
+  /** การติดต่อของทุกคน — ได้แต่ใบที่มีคนเก็บ (เก็บไปโทร/Lead) พร้อมชื่อคนเก็บ ⇒ ห้ามนับให้แท็บอื่นเหมือนนัดของทุกคน */
+  const everyoneContact = tab === 'contact' && contactScope === 'all' && !bucket && !leadView && !cancelledView;
+  /** ชุดที่โหลด: ของฉัน · นัดทุกคน · การติดต่อทุกคน */
+  const rowsScope = everyoneAppointments ? 'appointments' : everyoneContact ? 'contact' : 'mine';
+  const everyoneView = rowsScope !== 'mine';
 
   /** ลำดับคำขอ — สลับของฉัน/ทุกคนเร็ว ๆ แล้วคำตอบเก่ามาทีหลัง ต้องไม่ทับรายชื่อที่เลือกอยู่ */
   const loadSeq = useRef(0);
   /** รายชื่อบนจอเป็นของชุดไหน (ของฉัน/ทุกคน) — สลับชุดแล้วเส้นล้ม ห้ามค้างรายชื่อชุดเก่าใต้ปุ่มชุดใหม่ (QA รอบ 3 ข้อ 23) */
-  const rowsScopeRef = useRef<boolean | null>(null);
+  const rowsScopeRef = useRef<string | null>(null);
   const load = () => {
     const seq = ++loadSeq.current;
     setLoading(true);
     setLoadError(null);
-    if (rowsScopeRef.current !== null && rowsScopeRef.current !== everyoneAppointments) setRows([]);
-    fetchAllJobApplications(leadView, bucket, cancelledView, everyoneAppointments)
+    if (rowsScopeRef.current !== null && rowsScopeRef.current !== rowsScope) setRows([]);
+    fetchAllJobApplications(leadView, bucket, cancelledView, everyoneAppointments, everyoneContact)
       .then((next) => {
         if (seq === loadSeq.current) {
           setRows(next);
-          rowsScopeRef.current = everyoneAppointments;
+          rowsScopeRef.current = rowsScope;
         }
       })
       .catch((e) => {
@@ -342,7 +352,7 @@ const RmWorkspace: React.FC<{
         if (seq === loadSeq.current) setLoading(false);
       });
   };
-  useEffect(load, [leadView, bucket, cancelledView, refreshKey, everyoneAppointments]);
+  useEffect(load, [leadView, bucket, cancelledView, refreshKey, rowsScope]);
 
   /**
    * `?open=<id>` — ลิงก์จากรายชื่อบนหน้าหลัก/ภาพรวม (เจ้าของ 9 พ.ย. 2569 "กดไปทำงานต่อได้") ·
@@ -539,11 +549,11 @@ const RmWorkspace: React.FC<{
     // โหมด drill-down: server กรองด้วยนิยามเดียวกับกล่องแล้ว — แสดงตามนั้นตรง ๆ
     // (หั่นต่อด้วยแท็บ/ตัวกรอง = เลขไม่ตรงกล่อง)
     if (bucket) return rows;
-    const base = filterApplications(rows, tab, rmFilters, keyword);
+    const base = filterApplications(rows, tab, rmFilters, keyword, everyoneContact);
     // มุมมองย่อยใช้เฉพาะแท็บรายชื่อผู้สมัคร — แท็บอื่นมีความหมายของตัวเองอยู่แล้ว
     if (tab !== 'candidates') return base;
     return base.filter((r) => isInRmListView(r, listView));
-  }, [rows, tab, keyword, listView, bucket, rmFilters]);
+  }, [rows, tab, keyword, listView, bucket, rmFilters, everyoneContact]);
 
   const filtered = useMemo(
     () => (bucket ? baseFiltered : applyApplicantFilters(baseFiltered, applicantFilterState, applicantFacts)),
@@ -560,8 +570,8 @@ const RmWorkspace: React.FC<{
    * นับด้วยนิยามแท็บชุดเดียวกับตาราง (`filterApplications` + ตัวกรองชุดเดียวกัน) · โผล่เฉพาะตอนว่าง
    */
   const elsewhere = useMemo(() => {
-    // มุมมองนัดของทุกคนมีแต่แถวนัด — นับให้แท็บอื่นไม่ได้
-    if (bucket || everyoneAppointments || applicantFacetCount === 0 || filtered.length > 0) return [];
+    // มุมมองทุกคน (นัด/การติดต่อ) มีแต่แถวของมุมนั้น — นับให้แท็บอื่นไม่ได้
+    if (bucket || everyoneView || applicantFacetCount === 0 || filtered.length > 0) return [];
     return RM_TABS.filter((t) => t !== tab)
       .map((t) => {
         const base = filterApplications(rows, t, rmFilters, keyword);
@@ -569,7 +579,7 @@ const RmWorkspace: React.FC<{
         return { tab: t, n };
       })
       .filter((x) => x.n > 0);
-  }, [bucket, everyoneAppointments, applicantFacetCount, filtered.length, tab, rows, rmFilters, keyword, applicantFilterState, applicantFacts]);
+  }, [bucket, everyoneView, applicantFacetCount, filtered.length, tab, rows, rmFilters, keyword, applicantFilterState, applicantFacts]);
   const goToTab = (t: RmTab) =>
     setSearchParams((prev) => {
       const p = new URLSearchParams(prev);
@@ -610,8 +620,8 @@ const RmWorkspace: React.FC<{
    */
   const awaitingChoiceRows = useMemo(
     // มุมมองนัดของทุกคนไม่ได้โหลดกองนี้มา (มีแต่แถวนัด) — กลับ "ของฉัน" แล้วแถบกลับมาเอง
-    () => (everyoneAppointments ? [] : rows.filter((r) => r.unclaimed_at && !r.call_choice && !r.claimed)),
-    [rows, everyoneAppointments],
+    () => (everyoneView ? [] : rows.filter((r) => r.unclaimed_at && !r.call_choice && !r.claimed)),
+    [rows, everyoneView],
   );
   /** หมุดเวลาเดียวต่อการ render — ทุกป้ายนับถอยหลังจึงนับจากจุดเดียวกัน
    *  (แพตเทิร์นเดียวกับ RmTable ที่จับเวลาครั้งเดียวต่อ render ไม่ต้อง memo) */
@@ -1004,7 +1014,31 @@ const RmWorkspace: React.FC<{
         </div>
       ) : null}
       {!bucket && tab === 'contact' ? (
-        <div className="mt-4">
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          {/* ของฉัน / ทุกคน (เจ้าของ 10 พ.ย. 2569 "ใครเก็บไปแล้วยังไม่โทรบ้าง") — แบบเดียวกับแท็บติดตามนัดหมาย · มุมมอง Lead/ยกเลิกไม่มีปุ่มนี้ */}
+          {canSeeEveryoneAppointments(user?.role) && !leadView && !cancelledView ? (
+            <ToggleGroup
+              type="single"
+              size="xs"
+              variant="outline"
+              value={contactScope}
+              onValueChange={(v) => {
+                if (!isRmAppointmentScope(v)) return;
+                setContactScope(v);
+                setPage(1);
+                setSelectedIds([]);
+                say(null);
+              }}
+              aria-label="การติดต่อของใคร"
+              data-testid="contact-scope"
+            >
+              {RM_APPOINTMENT_SCOPES.map((s) => (
+                <ToggleGroupItem key={s} value={s}>
+                  {RM_APPOINTMENT_SCOPE_LABEL[s]}
+                </ToggleGroupItem>
+              ))}
+            </ToggleGroup>
+          ) : null}
           <FilterChips
             ariaLabel="กรองการติดต่อ"
             value={contactChip}

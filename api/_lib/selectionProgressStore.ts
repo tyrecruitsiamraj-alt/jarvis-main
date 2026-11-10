@@ -97,6 +97,41 @@ export async function loadProgressByJob(
   return out;
 }
 
+/**
+ * อ่านขั้นของหลายใบขอในคิวรีเดียว — คีย์ผลลัพธ์ `${jobId}|${เบอร์ E.164}`
+ * (10 พ.ย. 2569 "ทุกหน้าโหลดช้า" — ลิสต์ผู้สมัครเคยยิง `loadProgressByJob` ทีละใบขอ ~200 รอบ ≈ 2.6 วิ) · ผลเท่ากับวนทีละใบ
+ */
+export async function loadProgressByJobs(
+  pairs: ReadonlyArray<{ jobId: string; phone: string | null | undefined }>,
+): Promise<Map<string, SelectionProgressRow>> {
+  const out = new Map<string, SelectionProgressRow>();
+  const seen = new Set<string>();
+  const jobs: string[] = [];
+  const phones: string[] = [];
+  for (const p of pairs) {
+    const e164 = toE164Thai(p.phone ?? '');
+    const jobId = p.jobId.trim();
+    if (!jobId || !e164) continue;
+    const k = `${jobId}|${e164}`;
+    if (seen.has(k)) continue;
+    seen.add(k);
+    jobs.push(jobId);
+    phones.push(e164);
+  }
+  if (jobs.length === 0) return out;
+  try {
+    const { rows } = await dbQuery<RawRow>(
+      `select ${COLS} from ${TABLE}
+        where (job_id, phone_e164) in (select * from unnest($1::text[], $2::text[]))`,
+      [jobs, phones],
+    );
+    for (const r of rows) out.set(`${r.job_id}|${r.phone_e164}`, mapRow(r));
+  } catch (e) {
+    if (!isMissingSchema(e)) throw e;
+  }
+  return out;
+}
+
 /** อ่านขั้นของคนเดียวในใบขอเดียว */
 export async function loadProgressOne(
   jobId: string,
