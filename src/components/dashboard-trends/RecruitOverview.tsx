@@ -17,6 +17,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useSearchParams } from 'react-router-dom';
+import { rangeFromParams } from '@/lib/jobNavigation';
 import RecruitStuckBody from './stuck/RecruitStuckBody';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -150,6 +151,7 @@ const RecruitOverview: React.FC<{
    */
   published?: BoardPublishedTotals | null;
 }> = () => {
+  const [searchParams] = useSearchParams();
   /** null = เดือนนี้ (ให้เส้นตัดสินจากวันไทยของ server) */
   const [month, setMonthState] = useState<string | null>(null);
   /**
@@ -157,7 +159,8 @@ const RecruitOverview: React.FC<{
    * มีค่า = ไม่ใช้เดือน · เลือกเดือนจากปุ่มเดือน = กลับแบบเดือน
    */
   // ค่าเริ่ม = เดือนนี้ (null) ทุกหน้าเหมือนกัน (เจ้าของ 9 พ.ย. 2569 Choice "เดือนนี้" · แทน 7 วันล่าสุดของ 21 ต.ค.) · เลือกเดือน/วัน/ช่วงได้จากปุ่มช่วงเวลา
-  const [range, setRange] = useState<(DateRangeYmd & { all?: boolean }) | null>(null);
+  // ลิงก์ที่พา `?from&to` มา (ปุ่มรายงานเดิมของโฉมต้นแบบ) = เปิดที่ช่วงนั้น ไม่ใช่เดือนนี้
+  const [range, setRange] = useState<(DateRangeYmd & { all?: boolean }) | null>(() => rangeFromParams(searchParams));
   /** ป๊อปเลือกช่วง — ปุ่มลัด (7/30 วัน · ทั้งหมด) เลือกแล้วปิดเอง */
   const [periodOpen, setPeriodOpen] = useState(false);
   const pickRange = (r: DateRangeYmd & { all?: boolean }) => {
@@ -170,13 +173,12 @@ const RecruitOverview: React.FC<{
   };
   const [rev, setRev] = useState(0);
   /** BU ที่เลือก — เฉพาะผู้ใช้ที่ดูได้หลาย BU (26 ต.ค. 2569) · null = ผลรวมทุก BU ในสิทธิ์ (เจ้าของ 29 ต.ค. 2569) */
-  const [pickedBu, setPickedBu] = useState<string | null>(null);
+  const [pickedBu, setPickedBu] = useState<string | null>(() => searchParams.get('bu') || null);
   const [state, setState] = useState<Load>({ data: null, loading: true, error: null });
 
   /**
    * โฉมใหม่ (เจ้าของ 4 พ.ย. 2569 นิยามเอง "เอาทำเลย") = ค่าเริ่ม · โฉมการ์ดเดิมยังเปิดได้ที่ `?dash=cards` (ทางถอย ห้ามลบจนกว่าเจ้าของสั่ง)
    */
-  const [searchParams] = useSearchParams();
   const legacyCards = searchParams.get('dash') === 'cards';
   /** โฉมต้นแบบ SO Recruit (เจ้าของ 10 พ.ย. 2569 ชุดส่งต่อ · `&dash=v5`) — ชั้นคู่ขนาน รอตรวจรับ */
   const v5 = searchParams.get('dash') === 'v5';

@@ -123,6 +123,7 @@ const HomeOverviewPage: React.FC<{
   const [ro, setRo] = useState<RecruitOverviewResponse | null>(null);
   const [roError, setRoError] = useState<string | null>(null);
   const [aiV5, setAiV5] = useState<AiShareResponse | null>(null);
+  const [aiV5Error, setAiV5Error] = useState<string | null>(null);
   /** เลขชุดล่าสุดของช่วง/BU ที่เลือกอยู่ — กันจอกระพริบตอนรอบสด (ล้างทันทีเมื่อเปลี่ยนช่วง/BU) */
   const lastMoney = useRef<{ key: string; m: HomeMoneyPayload } | null>(null);
   /** เปลี่ยนช่วง/BU = ล้างเลขของชุดก่อนทันที (QA 30 ต.ค. 2569: สลับ BU แล้วเลข BU เก่าค้าง 1–8 วิ) · รอบสดชุดเดิมไม่ล้าง */
@@ -134,17 +135,22 @@ const HomeOverviewPage: React.FC<{
       shownKey.current = dataKey;
       setMoney(null);
       setRo(null);
+      setAiV5(null);
     }
     setMoneyError(null);
     fetchHomeMoney({ ...range, bu })
       .then((m) => alive && setMoney(m))
       .catch((e: unknown) => alive && setMoneyError(friendlyErrorText(e, 'โหลดยอดเงินไม่ขึ้น')));
     // โฉมต้นแบบ: ดูแลหลังเริ่มงาน · จับคู่งาน (ก้อนหลัก home-ai-share) — หน้าหลักเดิมไม่ใช้ จึงยิงเฉพาะ v5
+    // รอบสดชุดเดิมไม่ล้างเลข (กันกระพริบ "—" ทุกรอบ) · ล้ม = บอกว่าอ่านไม่ได้ ไม่ใช้ 0 · รอบสดถัดไปลองใหม่เอง
     if (v5) {
-      setAiV5(null);
       fetchHomeAiShare({ ...win, bu })
-        .then((d) => alive && setAiV5(d))
-        .catch(() => alive && setAiV5(null));
+        .then((d) => {
+          if (!alive) return;
+          setAiV5(d);
+          setAiV5Error(null);
+        })
+        .catch((e: unknown) => alive && setAiV5Error(friendlyErrorText(e, 'โหลดยอดดูแลหลังเริ่มงาน/จับคู่งานไม่ขึ้น')));
     }
     fetchRecruitOverview(null, range, bu)
       .then((d) => {
@@ -519,6 +525,20 @@ const HomeOverviewPage: React.FC<{
     setPanel(null);
     setFollowNames({ title, bucket });
   };
+  /**
+   * เปลี่ยนช่วง/BU = ปิดแผง · รายใบ (ทั้งชั้นที่กดลึก) · รายชื่อ ที่เปิดค้างทันที (ชุดส่งต่อ 10 พ.ย. 2569 G04)
+   * แผงถ่ายรายการตอนกด — ห้ามค้างรายการช่วงเก่าใต้ป้ายช่วงใหม่ · รอบสดชุดเดิม (dataKey ไม่เปลี่ยน) ไม่ปิด
+   */
+  const openedKey = useRef(dataKey);
+  useEffect(() => {
+    if (openedKey.current === dataKey) return;
+    openedKey.current = dataKey;
+    setPanel(null);
+    setNames(null);
+    setFollowNames(null);
+    drill.close();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- drill.close ตั้งค่าว่างเสมอ
+  }, [dataKey]);
 
   const openStep = (s: FunnelStep) => {
     const staffRows = s.key === 'staff' || s.key === 'reached' ? (roNow?.staff ?? []).filter((x) => x.claimed + x.called > 0) : [];
@@ -938,6 +958,7 @@ const HomeOverviewPage: React.FC<{
                       </span>
                     </Button>
                   </div>
+                  {aiV5Error && !aiV5 ? <p className="text-xs text-muted-foreground">{aiV5Error}</p> : null}
                 </V5Card>
               </div>
             </>

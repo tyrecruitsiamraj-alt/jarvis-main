@@ -15,6 +15,6 @@ describe('หน้าช้า', () => {
     const page = readFileSync('src/pages/HomeOverviewPage.tsx', 'utf8');
     // ยิงได้ที่เดียว ใต้ `if (v5)` (โฉมต้นแบบใช้การ์ดดูแลหลังเริ่มงาน/จับคู่งาน) — หน้าหลักเดิมต้องไม่ยิง
     expect(page.split('fetchHomeAiShare(').length - 1).toBe(1);
-    expect(page).toMatch(/if \(v5\) \{\s*setAiV5\(null\);\s*fetchHomeAiShare\(/);
+    expect(page).toMatch(/if \(v5\) \{\s*fetchHomeAiShare\(/);
   });
 });

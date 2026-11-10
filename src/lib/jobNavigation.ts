@@ -121,3 +121,9 @@ export function rangeFromParams(p: URLSearchParams): { from: string; to: string 
   const to = p.get('to');
   return from && to && YMD_PARAM.test(from) && YMD_PARAM.test(to) && from <= to ? { from, to } : null;
 }
+
+/** รายงานเดิมของภาพรวมงานสรรหา (`dash=cards`) — พาช่วงและ BU ที่ดูอยู่ไปด้วย (ชุดส่งต่อ 10 พ.ย. 2569 G01: ทุกส่วนช่วงเดียวกัน) */
+export function legacyReportsPath(win: { from: string; to: string }, bu: string | null | undefined): string {
+  const path = withRange('/jobs/board?view=dashboard&dash=cards', win);
+  return bu ? `${path}&bu=${encodeURIComponent(bu)}` : path;
+}

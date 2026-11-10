@@ -86,7 +86,8 @@ describe('หน้าจอ', () => {
   it('ค่าเริ่มเดือนนี้ (9 พ.ย. 2569 แทน 7 วัน) · มีปุ่ม 7 วันล่าสุด · การ์ดเทียบอยู่ครบ 4 แท็บ · กดช่วงได้', () => {
     const src = read('src/components/dashboard-trends/RecruitOverview.tsx');
     // เจ้าของ 9 พ.ย. 2569 Choice "เดือนนี้" ทุกหน้าเหมือนกัน
-    expect(src).toContain('useState<(DateRangeYmd & { all?: boolean }) | null>(null)');
+    // ค่าเริ่ม = เดือนนี้ เว้นแต่ลิงก์พา ?from&to มา (ปุ่มรายงานเดิมของโฉมต้นแบบ 10 พ.ย. 2569) · ช่วงผิดรูป = เดือนนี้
+    expect(src).toContain('useState<(DateRangeYmd & { all?: boolean }) | null>(() => rangeFromParams(searchParams))');
     expect(src).toContain('data-testid="recruit-last7"');
     // 30 ต.ค. 2569: แท็บภาพรวม Online ส่งชุดที่ผ่านตัวกรองบนสุดให้การ์ด (ใบขอ = ใบรายใบ · กรอกเข้ามา = fv)
     expect(src).toContain("trend={(sc) => compareCard('requests', view, { rows: sc.rows, prevRows: sc.prevRows })}");

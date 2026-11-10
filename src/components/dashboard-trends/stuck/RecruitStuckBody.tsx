@@ -12,7 +12,7 @@ import type { RecruitOverviewResponse } from '@/lib/recruitOverviewTypes';
 import { fetchRecruitStuck, type RecruitStuckResponse } from '@/lib/recruitStuckApi';
 import { STUCK_PHASES, STUCK_REASON_LABEL, STUCK_SCOPE_LABEL, stuckInScope, stuckPhaseOf, type StuckPhaseKey, type StuckReasonKey, type StuckRequest, type StuckScope } from '@/lib/recruitStuck';
 import { friendlyErrorText } from '@/lib/friendlyError';
-import { requestPathOfJobId } from '@/lib/jobNavigation';
+import { legacyReportsPath, requestPathOfJobId } from '@/lib/jobNavigation';
 import { OverviewCard, ReasonColumns, SectionError } from '../RecruitOverviewParts';
 import ChannelFunnelTable from '../ChannelFunnelTable';
 import StuckFilterBar from './StuckFilterBar';
@@ -216,7 +216,10 @@ export default function RecruitStuckBody({
         ) : null}
         {/* รายงานเดิม (ตำแหน่งสมัคร · เทียบช่วงก่อน · งานค้างตามอายุ · กรอกแล้วโทรวันไหน · ผลงานรายคน · ช่องทางแจ้งเข้า) — หน้าเดิมยังอยู่ครบ */}
         <div className="flex justify-end">
-          <Button type="button" variant="outline" onClick={() => navigate('/jobs/board?view=dashboard&dash=cards')} data-testid="v5-legacy-reports">
+          <Button type="button" variant="outline" onClick={() => {
+              navigate(legacyReportsPath(win, data.bu));
+              window.scrollTo({ top: 0 });
+            }} data-testid="v5-legacy-reports">
             รายงานเพิ่มเติม (แบบเดิม)
           </Button>
         </div>
