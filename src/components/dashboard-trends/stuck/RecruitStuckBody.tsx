@@ -136,6 +136,22 @@ export default function RecruitStuckBody({
   const openRequest = (r: StuckRequest) => r.jobId && navigate(requestPathOfJobId(r.jobId));
   const [detailTab, setDetailTab] = React.useState<V5Tab>('overview');
 
+  // กลุ่มไหนคนเข้ามาดูงานเยอะ (เจ้าของ 10 พ.ย. 2569) — ไว้เลือกกลุ่ม Autopost · ใช้ทั้งสองโฉม
+  const fbGroupsCard = (
+    <OverviewCard
+      icon={MousePointerClick}
+      title="กลุ่ม Facebook คนคลิกแล้วกรอกเท่าไหร่"
+      sub={
+        fbGroups
+          ? `ยอดทั้งหมดตั้งแต่สร้างลิงก์ (ไม่ตามช่วงวันที่) · คลิก ${fbGroups.totalClicks.toLocaleString('th-TH')} · กรอก ${fbGroups.totalApps.toLocaleString('th-TH')}`
+          : data.linkClicks === null
+            ? 'อ่านยอดคลิกไม่ได้ชั่วคราว'
+            : 'ยอดทั้งหมดตั้งแต่สร้างลิงก์'
+      }
+    >
+      <FbGroupClicksTable rows={fbGroups?.rows ?? []} onOpen={onOpenNames} />
+    </OverviewCard>
+  );
   if (layout === 'v5') {
     const ownerTable = <StuckOwnerTable bars rows={focused} countLabel={scope === 'remaining' ? 'ใบที่ต้องหา' : `ใบ${STUCK_SCOPE_LABEL[scope]}`} onPick={pick} />;
     const bringerCard = (
@@ -204,6 +220,7 @@ export default function RecruitStuckBody({
         {detailTab === 'channel' ? (
           <div className="space-y-4">
             {channelCard}
+            {fbGroupsCard}
             {bringerCard}
           </div>
         ) : null}
@@ -272,20 +289,7 @@ export default function RecruitStuckBody({
         <ChannelFunnelTable groups={channels.groups} total={channels.total} onOpen={onOpenNames} />
       </OverviewCard>
 
-      {/* กลุ่มไหนคนเข้ามาดูงานเยอะ (เจ้าของ 10 พ.ย. 2569) — ไว้เลือกกลุ่ม Autopost */}
-      <OverviewCard
-        icon={MousePointerClick}
-        title="กลุ่ม Facebook คนคลิกแล้วกรอกเท่าไหร่"
-        sub={
-          fbGroups
-            ? `ยอดทั้งหมดตั้งแต่สร้างลิงก์ (ไม่ตามช่วงวันที่) · คลิก ${fbGroups.totalClicks.toLocaleString('th-TH')} · กรอก ${fbGroups.totalApps.toLocaleString('th-TH')}`
-            : data.linkClicks === null
-              ? 'อ่านยอดคลิกไม่ได้ชั่วคราว'
-              : 'ยอดทั้งหมดตั้งแต่สร้างลิงก์'
-        }
-      >
-        <FbGroupClicksTable rows={fbGroups?.rows ?? []} onOpen={onOpenNames} />
-      </OverviewCard>
+      {fbGroupsCard}
 
       {/* ใครหารายชื่อเข้ามา (เจ้าของ 9 พ.ย. 2569 "ใครทำก็คนนั้นได้ จะได้วัดผลว่าใครมีรายชื่อเข้ามาเยอะ") — คน → วิธี → ช่องทาง/กลุ่ม */}
       <OverviewCard icon={UserRound} title="ใครหารายชื่อเข้ามา" sub={cohortSub}>
