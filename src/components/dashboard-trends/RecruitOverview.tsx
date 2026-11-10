@@ -325,16 +325,11 @@ const RecruitOverview: React.FC<{
       style={v5 ? v5Style : undefined}
       data-testid={v5 ? 'recruit-v5' : undefined}
     >
-      {v5 ? (
-        <div className="space-y-1">
-          <h1 className="text-3xl font-medium tracking-tight">ภาพรวมงานสรรหา</h1>
-          <p className="text-sm text-muted-foreground">เห็นงานค้าง คนรับผิดชอบ และสิ่งที่ต้องทำต่อ</p>
-        </div>
-      ) : null}
+      {v5 ? <h1 className="text-3xl font-medium tracking-tight">ภาพรวมงานสรรหา</h1> : null}
       {/* ─── หัว: ชื่อ + ปุ่มช่วงเวลาปุ่มเดียว (เจ้าของ 19 ต.ค. 2569 "รวมกันเลย" · 28 ต.ค. เหลือ เดือน · วันที่ · 7/30 วันล่าสุด) ─── */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        {v5 ? <span className="text-xs text-muted-foreground">กดตัวเลขเพื่อดูรายการ แล้วกดชื่อเพื่อดูสิ่งที่ต้องทำต่อ</span> : <h2 className="text-base font-medium text-foreground">ภาพรวมงานสรรหา</h2>}
-        <div className="flex flex-wrap items-center gap-2">
+        {v5 ? null : <h2 className="text-base font-medium text-foreground">ภาพรวมงานสรรหา</h2>}
+        <div className="ml-auto flex flex-wrap items-center gap-2">
           <Popover open={periodOpen} onOpenChange={setPeriodOpen}>
             <PopoverTrigger asChild>
               <Button type="button" size="xs" variant="outline" aria-label="เลือกช่วงเวลา" data-testid="recruit-period">

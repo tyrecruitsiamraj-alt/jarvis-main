@@ -299,7 +299,7 @@ const HomeOverviewPage: React.FC<{
     setPanel({
       wide: true,
       title: 'เสียเงิน',
-      sub: `${NUM.format(costlyAll.total)} ใบ · วันละ ${BAHT.format(perDayTotal)} บาท · ตามสัญญา ${BAHT.format(contract ?? 0)} บาท`,
+      sub: `${NUM.format(costlyAll.total)} ใบ เสียวันละ ${BAHT.format(perDayTotal)} บาท รวมตามสัญญา ${BAHT.format(contract ?? 0)} บาท`,
       go: PAGE.requests,
       body: (
         <div className="space-y-4">
@@ -339,11 +339,11 @@ const HomeOverviewPage: React.FC<{
           ) : null}
           {moneyNow ? (
             <p className="text-xs tabular-nums text-muted-foreground">
-              ลูกค้าหักจริง {BAHT.format(moneyNow.customerFines.total)} บาท · {NUM.format(moneyNow.customerFines.receipts)} ใบเสร็จ · ตามวันรับเงิน ผูกกับใบขอรายใบไม่ได้
+              ลูกค้าหักจริง {BAHT.format(moneyNow.customerFines.total)} บาท จาก {NUM.format(moneyNow.customerFines.receipts)} ใบเสร็จ
             </p>
           ) : null}
           <BuTrendTable metric="money" bu={bu} />
-          <p className="text-sm font-medium text-foreground">แยก BU · {thaiDate(range.from)} – {thaiDate(range.to)}</p>
+          <p className="text-sm font-medium text-foreground">แยก BU {thaiDate(range.from)} – {thaiDate(range.to)}</p>
           <ul className="divide-y divide-border rounded-xl border border-border" data-testid="overview-money-bu">
             {[...busAmt.entries()]
               .sort((a, b) => b[1].amount - a[1].amount)
@@ -356,13 +356,13 @@ const HomeOverviewPage: React.FC<{
                       type="button"
                       variant="ghost"
                       className="h-auto w-full justify-between gap-3 whitespace-normal rounded-none px-3 py-2 text-left text-sm font-normal"
-                      onClick={() => openList(`เสียเงิน · ${k === 'ไม่ระบุ BU' ? k : trendBuLabel(k)}`, [...v.rows].sort((a, b) => amountOf(b) - amountOf(a)), `${BAHT.format(v.amount)} บาท ตามสัญญาในช่วง`)}
+                      onClick={() => openList(`เสียเงิน ${k === 'ไม่ระบุ BU' ? k : trendBuLabel(k)}`, [...v.rows].sort((a, b) => amountOf(b) - amountOf(a)), `${BAHT.format(v.amount)} บาท ตามสัญญาในช่วง`)}
                       data-testid="overview-money-bu-row"
                     >
                       <span>{k === 'ไม่ระบุ BU' ? k : trendBuLabel(k)}</span>
                       <span className="text-right tabular-nums text-muted-foreground">
-                        <span className={cn('font-medium', TONE.danger.value)}>{BAHT.format(v.amount)} บาท</span> · {NUM.format(v.rows.length)} ใบ
-                        <span className="block text-xs">{today ? `ยังโดนอยู่ ${NUM.format(today.n)} ใบ · วันละ ${BAHT.format(today.perDay)}` : 'วันนี้ไม่มีใบที่ยังโดน'}</span>
+                        <span className={cn('font-medium', TONE.danger.value)}>{BAHT.format(v.amount)} บาท</span> จาก {NUM.format(v.rows.length)} ใบ
+                        <span className="block text-xs">{today ? `ยังโดนอยู่ ${NUM.format(today.n)} ใบ วันละ ${BAHT.format(today.perDay)}` : 'วันนี้ไม่มีใบที่ยังโดน'}</span>
                       </span>
                     </Button>
                   </li>
@@ -413,19 +413,19 @@ const HomeOverviewPage: React.FC<{
     setPanel({
       wide: true,
       title: 'เหลือหา',
-      sub: flow ? `${NUM.format(flow.remainingRequests)} ใบ · ${NUM.format(flow.remaining)} อัตรา · ณ ${thaiDate(range.to)}` : undefined,
+      sub: flow ? `${NUM.format(flow.remainingRequests)} ใบ ${NUM.format(flow.remaining)} อัตรา ณ ${thaiDate(range.to)}` : undefined,
       go: PAGE.requests,
       body: (
         <div className="space-y-4">
           <BuTrendTable metric="remaining" bu={bu} />
-          <p className="text-sm font-medium text-foreground">แยก BU · ณ {thaiDate(range.to)}</p>
+          <p className="text-sm font-medium text-foreground">แยก BU ณ {thaiDate(range.to)}</p>
           <PanelRows
             unit="ใบ"
             rows={[...byBu.entries()]
               .sort((a, b) => b[1].length - a[1].length)
               .map(([k, list]) => {
                 const label = k === 'ไม่ระบุ BU' ? k : trendBuLabel(k);
-                return { label: `${label} · ${NUM.format(list.reduce((n, r) => n + (r.flow?.remaining ?? 0), 0))} อัตรา`, value: list.length, onOpen: () => openList(`เหลือหา · ${label}`, list) };
+                return { label: `${label} ${NUM.format(list.reduce((n, r) => n + (r.flow?.remaining ?? 0), 0))} อัตรา`, value: list.length, onOpen: () => openList(`เหลือหา ${label}`, list) };
               })}
           />
           <Button type="button" variant="outline" className="w-full" onClick={() => openList('เหลือหา', open)} data-testid="overview-remain-all">
@@ -455,7 +455,7 @@ const HomeOverviewPage: React.FC<{
     for (const r of list) bus.set(r.bu ?? 'ไม่ระบุ BU', (bus.get(r.bu ?? 'ไม่ระบุ BU') ?? 0) + 1);
     setPanel({
       title: 'ขอใหม่',
-      sub: flow ? `${NUM.format(flow.newRequests)} ใบ · ${NUM.format(flow.newPositions)} อัตรา` : undefined,
+      sub: flow ? `${NUM.format(flow.newRequests)} ใบ ${NUM.format(flow.newPositions)} อัตรา` : undefined,
       go: PAGE.requests,
       body: (
         <div className="space-y-4">
@@ -483,7 +483,7 @@ const HomeOverviewPage: React.FC<{
               label: REQUEST_LEAD_KIND_LABEL[k],
               value: lead.get(k) ?? 0,
               emphasis: k === 'retroactive' ? 'danger' : k === 'urgent' ? 'warn' : null,
-              onOpen: () => openList(`ขอใหม่ · ${REQUEST_LEAD_KIND_LABEL[k]}`, list.filter((r) => requestLeadKindFromYmd(r.keyYmd, r.needYmd) === k)),
+              onOpen: () => openList(`ขอใหม่ ${REQUEST_LEAD_KIND_LABEL[k]}`, list.filter((r) => requestLeadKindFromYmd(r.keyYmd, r.needYmd) === k)),
             }))}
           />
           <p className="text-sm font-medium text-foreground">งานอะไร</p>
@@ -491,7 +491,7 @@ const HomeOverviewPage: React.FC<{
           <PanelRows
             unit="ใบ"
             rows={[
-              ...topKinds.slice(0, 8).map(([label, value]) => ({ label, value, onOpen: () => openList(`ขอใหม่ · ${label}`, list.filter((r) => (r.position || 'ไม่ระบุ').trim() === label)) })),
+              ...topKinds.slice(0, 8).map(([label, value]) => ({ label, value, onOpen: () => openList(`ขอใหม่ ${label}`, list.filter((r) => (r.position || 'ไม่ระบุ').trim() === label)) })),
               ...(topKinds.length > 8
                 ? [
                     {
@@ -499,7 +499,7 @@ const HomeOverviewPage: React.FC<{
                       value: topKinds.slice(8).reduce((n, [, v]) => n + v, 0),
                       onOpen: () => {
                         const top = new Set(topKinds.slice(0, 8).map(([k]) => k));
-                        openList('ขอใหม่ · อื่น ๆ', list.filter((r) => !top.has((r.position || 'ไม่ระบุ').trim())));
+                        openList('ขอใหม่ อื่น ๆ', list.filter((r) => !top.has((r.position || 'ไม่ระบุ').trim())));
                       },
                     },
                   ]
@@ -513,7 +513,7 @@ const HomeOverviewPage: React.FC<{
               .sort((a, b) => b[1] - a[1])
               .map(([k, v]) => {
                 const label = k === 'ไม่ระบุ BU' ? k : trendBuLabel(k);
-                return { label, value: v, onOpen: () => openList(`ขอใหม่ · ${label}`, list.filter((r) => (r.bu ?? 'ไม่ระบุ BU') === k)) };
+                return { label, value: v, onOpen: () => openList(`ขอใหม่ ${label}`, list.filter((r) => (r.bu ?? 'ไม่ระบุ BU') === k)) };
               })}
           />
           <Button type="button" variant="outline" className="w-full" onClick={() => openList('ขอใหม่', list)}>
@@ -561,7 +561,7 @@ const HomeOverviewPage: React.FC<{
       // ผู้สมัคร (ขั้นแรก) มีกราฟเทียบ BU บนสุด — แผงกว้าง (10 พ.ย. 2569 "กดแล้วเป็นกราฟทุกการ์ด")
       wide: s.key === 'applied',
       title: s.label,
-      sub: `${NUM.format(s.value)} คน${s.from ? ` · ${s.from}` : ''}`,
+      sub: `${NUM.format(s.value)} คน${s.from ? ` (${s.from})` : ''}`,
       // พาช่วงวันที่สมัครไปด้วย (เจ้าของ 10 พ.ย. 2569 "1474 คือของ 1-10 พย ถ้ากดไปก็ต้องโชว์ยอดของ 1-10 พย")
       go: { label: STEP_PAGE[s.key].label, to: withRange(STEP_PAGE[s.key].to, range) },
       body: (
@@ -570,7 +570,7 @@ const HomeOverviewPage: React.FC<{
           {s.rows.length ? (
             <PanelRows
               unit="คน"
-              rows={s.rows.map((r) => ({ label: r.label, value: r.value, emphasis: toneOfRow(r.tone), onOpen: () => openNames(`${s.label} · ${r.label}`, r.ids) }))}
+              rows={s.rows.map((r) => ({ label: r.label, value: r.value, emphasis: toneOfRow(r.tone), onOpen: () => openNames(`${s.label} ${r.label}`, r.ids) }))}
             />
           ) : null}
           {staffRows.length ? (
@@ -614,7 +614,7 @@ const HomeOverviewPage: React.FC<{
     setPanel({
       wide: true,
       title: 'ติดตามคนเริ่มงาน / ติดตามส่งคนแทน',
-      sub: cells ? `${NUM.format(peopleTotal)} คน · ${NUM.format(followLive)} สาย · ยกเลิก ${NUM.format(followCancelled)} สายไม่นับ` : undefined,
+      sub: cells ? `${NUM.format(peopleTotal)} คน จาก ${NUM.format(followLive)} สาย ยกเลิกไป ${NUM.format(followCancelled)} สาย` : undefined,
       go: PAGE.follow,
       body: (
         <div className="space-y-4">
@@ -623,11 +623,11 @@ const HomeOverviewPage: React.FC<{
           <PanelRows
             unit="คน"
             rows={personRows.map((r) => ({
-              label: `${r.label} · ${NUM.format(r.calls)} สาย`,
+              label: `${r.label} ${NUM.format(r.calls)} สาย`,
               value: r.people,
               emphasis: r.key === 'went' ? 'success' : r.key === 'notWent' ? 'danger' : r.key === 'failed' || r.key === 'reschedule' ? 'warn' : null,
               // กดแถว = รายชื่อคนของผลนั้น (9 พ.ย. 2569 "ทำแผงติดตามให้กดเห็นชื่อด้วย")
-              onOpen: () => openFollowNames(`ติดตาม · ${r.label}`, r.key),
+              onOpen: () => openFollowNames(`ติดตาม ${r.label}`, r.key),
             }))}
           />
           <Button type="button" variant="outline" className="w-full" onClick={() => openFollowNames('ติดตาม', null)} disabled={peopleTotal === 0} data-testid="overview-follow-names">
@@ -646,7 +646,7 @@ const HomeOverviewPage: React.FC<{
           <PanelRows
             unit="สาย"
             rows={followResults.map((r) => ({
-              label: `${r.label} · AI ${NUM.format(r.parts.ai ?? 0)} · คน ${NUM.format(r.parts.staff ?? 0)}`,
+              label: `${r.label} AI ${NUM.format(r.parts.ai ?? 0)} คน ${NUM.format(r.parts.staff ?? 0)}`,
               value: r.total,
               emphasis: r.key === 'went' ? 'success' : r.key === 'notWent' ? 'danger' : r.key === 'failed' || r.key === 'reschedule' ? 'warn' : null,
             }))}
@@ -654,7 +654,7 @@ const HomeOverviewPage: React.FC<{
           <p className="text-sm font-medium text-foreground">แต่ละ BU ใช้เท่าไหร่</p>
           <PanelRows
             unit="สาย"
-            rows={followBus.map((r) => ({ label: `${r.label} · AI ${NUM.format(r.parts.ai ?? 0)} · คน ${NUM.format(r.parts.staff ?? 0)}`, value: r.total }))}
+            rows={followBus.map((r) => ({ label: `${r.label} AI ${NUM.format(r.parts.ai ?? 0)} คน ${NUM.format(r.parts.staff ?? 0)}`, value: r.total }))}
           />
         </div>
       ),
@@ -670,14 +670,14 @@ const HomeOverviewPage: React.FC<{
     const list = (roNow?.requestList ?? []).filter(pick);
     setPanel({
       title,
-      sub: `${NUM.format(list.length)} ใบ · ${thaiDate(range.from)} – ${thaiDate(range.to)}`,
+      sub: `${NUM.format(list.length)} ใบ ${thaiDate(range.from)} – ${thaiDate(range.to)}`,
       go: PAGE.board,
       body: (
         <RequestListPanel
           key={title}
           list={list}
           onOpenRequest={(jobId) => navigate(requestPathOfJobId(jobId))}
-          onOpenNames={(r) => openNames(`${r.requestNo} · คนกรอก`, r.appIds)}
+          onOpenNames={(r) => openNames(`คนกรอก ${r.requestNo}`, r.appIds)}
         />
       ),
     });
@@ -722,10 +722,7 @@ const HomeOverviewPage: React.FC<{
       <div className="-mx-4 -my-4 min-h-screen bg-background px-4 py-6 text-foreground sm:-mx-6 sm:px-6 sm:py-8" style={v5Style} data-testid="home-v5">
         <div className="mx-auto max-w-7xl space-y-6">
           <header className="flex flex-wrap items-start justify-between gap-4">
-            <div className="space-y-1">
-              <h1 className="text-3xl font-medium tracking-tight">หน้าหลัก</h1>
-              <p className="text-sm text-muted-foreground">ใบขอ ผลการสรรหา และการติดตามในระบบ</p>
-            </div>
+            <h1 className="text-3xl font-medium tracking-tight">หน้าหลัก</h1>
             <div className="flex items-center gap-2">
               <PeriodPicker value={win} onChange={setWin} />
               {buChoices?.length ? (
@@ -749,10 +746,10 @@ const HomeOverviewPage: React.FC<{
               )}
             </div>
           </header>
-          <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
-            <span data-testid="v5-period">{ready ? `ข้อมูล ${periodText}${roNow?.generatedAt ? ` · อ่านเมื่อ ${shortTimeOf(roNow.generatedAt)} น.` : ''}` : `กำลังโหลด ${periodText}`}</span>
-            <span>กดตัวเลขเพื่อดูรายการ แล้วกดชื่อเพื่อดูสิ่งที่ต้องทำต่อ</span>
-          </div>
+          {/* ช่วงวันที่อยู่ที่ปุ่มปฏิทินแล้ว · ประโยคสอนวิธีกดถอดออก (เจ้าของ 10 พ.ย. 2569 แก้ข้อ 1–4 "อะไรทำให้ระบบดูเป็น AI") */}
+          <p className="text-xs text-muted-foreground" data-testid="v5-period">
+            {ready ? (roNow?.generatedAt ? `อ่านเมื่อ ${shortTimeOf(roNow.generatedAt)} น.` : '') : 'กำลังโหลด'}
+          </p>
           {moneyError || roError ? <p className={cn('text-sm', TONE.danger.value)}>{moneyError ?? roError}</p> : null}
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4" data-testid="v5-kpis">
@@ -764,7 +761,7 @@ const HomeOverviewPage: React.FC<{
               unit="บาท"
               money
               left={moneyNow ? `${NUM.format(costlyAll.total)} ใบที่มีผลกระทบ` : '—'}
-              right="แยกค่าปรับ / ลดมูลค่า"
+              right={moneyNow ? `ค่าปรับ ${BAHT.format(moneyNow.totals.need.fine)}` : ''}
               onClick={moneyNow ? openMoney : undefined}
               testId="v5-kpi-money"
             />
@@ -814,7 +811,7 @@ const HomeOverviewPage: React.FC<{
           ) : (
             <>
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-                <V5Card className="lg:col-span-2" title="ใบขอเข้ามา แล้วปิดได้เท่าไหร่" sub={`ตามสมุดใบขอ · ${periodText} · รวมใบขอชั่วคราว`} testId="v5-ledger">
+                <V5Card className="lg:col-span-2" title="ใบขอเข้า-ปิด" sub="รวมใบขอชั่วคราว" testId="v5-ledger">
                   <div className="grid grid-cols-2 gap-1 sm:grid-cols-5">
                     <V5EqCell label="ยกมา" value={flow?.carryInRequests} onClick={flow ? () => openList('ยกมา', flowRows((f) => f.carry)) : undefined} testId="v5-eq-carry" />
                     <V5EqCell label="+ ขอใหม่" value={flow?.newRequests} onClick={flow ? openNew : undefined} testId="v5-eq-new" />
@@ -836,10 +833,15 @@ const HomeOverviewPage: React.FC<{
                     <V5EqCell result label="= เหลือหา" value={flow?.remainingRequests} onClick={flow ? () => openList('เหลือหา', flowRows((f) => f.open)) : undefined} testId="v5-eq-remain" />
                   </div>
                   <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3 text-xs tabular-nums text-muted-foreground">
-                    <span data-testid="overview-req-sum">
-                      {flow
-                        ? `ใบ: ${NUM.format(flow.carryInRequests)} + ${NUM.format(flow.newRequests)} − ${NUM.format(flow.closedRequests)} − ${NUM.format(flow.cancelledRequests)} = ${NUM.format(flow.remainingRequests)} · อัตรา: ${NUM.format(flow.carryIn)} + ${NUM.format(flow.newPositions)} − ${NUM.format(flow.filled)} − ${NUM.format(flow.cancelled)} = ${NUM.format(flow.remaining)}`
-                        : '—'}
+                    <span className="flex flex-wrap gap-x-4" data-testid="overview-req-sum">
+                      {flow ? (
+                        <>
+                          <span>{`ใบ: ${NUM.format(flow.carryInRequests)} + ${NUM.format(flow.newRequests)} − ${NUM.format(flow.closedRequests)} − ${NUM.format(flow.cancelledRequests)} = ${NUM.format(flow.remainingRequests)}`}</span>
+                          <span>{`อัตรา: ${NUM.format(flow.carryIn)} + ${NUM.format(flow.newPositions)} − ${NUM.format(flow.filled)} − ${NUM.format(flow.cancelled)} = ${NUM.format(flow.remaining)}`}</span>
+                        </>
+                      ) : (
+                        '—'
+                      )}
                     </span>
                     <Button
                       type="button"
@@ -849,12 +851,12 @@ const HomeOverviewPage: React.FC<{
                       onClick={flow ? () => openList('หาได้แล้ว', flowRows((f) => f.filled > 0), `หาได้ ${NUM.format(flow.filled)} อัตรา`) : undefined}
                       data-testid="v5-filled"
                     >
-                      หาได้ {v5Num(flow?.filled)} อัตรา · {v5Num(flow ? flowRows((f) => f.filled > 0).length : null)} ใบ ›
+                      หาได้ {v5Num(flow?.filled)} อัตรา จาก {v5Num(flow ? flowRows((f) => f.filled > 0).length : null)} ใบ ›
                     </Button>
                   </div>
                 </V5Card>
 
-                <V5Card title="ใบขอใหม่ ประกาศไปแค่ไหน" sub="กดสถานะเพื่อดูใบขอและผู้รับผิดชอบ" testId="v5-release">
+                <V5Card title="สถานะประกาศใบขอใหม่" testId="v5-release">
                   <div className="flex items-baseline justify-between gap-2">
                     <span className="flex items-baseline gap-2 text-sm text-muted-foreground">
                       <V5NumLink value={req?.released} label="ประกาศแล้ว" onClick={req ? () => openRequestList('ประกาศแล้ว', (r) => r.released) : undefined} testId="v5-rel-released" />/{' '}
@@ -869,10 +871,10 @@ const HomeOverviewPage: React.FC<{
                     </li>
                     {(
                       [
-                        ['ยังไม่ประกาศ · ยังเปิด', req?.notReleasedOpen, (r: RecruitRequestItem) => !r.released && r.open],
-                        ['ยังไม่ประกาศ · ปิดแล้ว', req?.notReleasedClosed, (r: RecruitRequestItem) => !r.released && !r.open],
-                        ['ประกาศแล้ว · มีคนกรอก', req?.releasedWithApps, (r: RecruitRequestItem) => r.released && r.applications > 0],
-                        ['ประกาศแล้ว · ไม่มีคนกรอก', req?.releasedNoApps, (r: RecruitRequestItem) => r.released && r.applications === 0],
+                        ['ยังไม่ประกาศ ใบยังเปิด', req?.notReleasedOpen, (r: RecruitRequestItem) => !r.released && r.open],
+                        ['ยังไม่ประกาศ ใบปิดแล้ว', req?.notReleasedClosed, (r: RecruitRequestItem) => !r.released && !r.open],
+                        ['ประกาศแล้ว มีคนกรอก', req?.releasedWithApps, (r: RecruitRequestItem) => r.released && r.applications > 0],
+                        ['ประกาศแล้ว ไม่มีคนกรอก', req?.releasedNoApps, (r: RecruitRequestItem) => r.released && r.applications === 0],
                       ] as const
                     ).map(([label, value, pick]) => (
                       <li key={label} className="flex items-center justify-between gap-2 py-2">
@@ -884,7 +886,7 @@ const HomeOverviewPage: React.FC<{
                 </V5Card>
               </div>
 
-              <V5Card title="จากผู้สมัคร ไปถึงวันนัด" sub={`รายชื่อที่กรอก ${periodText} · คนโทรต่อรวมทั้งกลุ่ม AI สนใจและกลุ่มอื่น`} testId="v5-funnel">
+              <V5Card title="ผู้สมัครถึงวันนัด" testId="v5-funnel">
                 <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-6">
                   {(funnel ?? buildApplicantFunnel([])).map((st, i) => (
                     <Button
@@ -901,9 +903,11 @@ const HomeOverviewPage: React.FC<{
                       </span>
                       <span className="text-3xl font-medium tabular-nums">{funnel ? NUM.format(st.value) : '—'}</span>
                       <V5Bar pct={funnel ? (st.value / funnelMax) * 100 : 0} />
-                      <span className="text-xs tabular-nums text-muted-foreground">
-                        {st.from && funnel ? `${st.from} · ` : ''}
-                        {st.rows.map((r) => `${r.label} ${funnel ? NUM.format(r.value) : '—'}`).join(' · ')}
+                      <span className="flex flex-wrap gap-x-2 text-xs tabular-nums text-muted-foreground">
+                        {st.from && funnel ? <span>{st.from}</span> : null}
+                        {st.rows.map((r) => (
+                          <span key={r.label}>{`${r.label} ${funnel ? NUM.format(r.value) : '—'}`}</span>
+                        ))}
                       </span>
                     </Button>
                   ))}
@@ -912,14 +916,14 @@ const HomeOverviewPage: React.FC<{
 
               <V5Divider label="หลังได้คน" />
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-                <V5Card className="lg:col-span-2" title="ติดตามก่อนเริ่มงาน / ส่งคนแทน" testId="v5-follow">
+                <V5Card className="lg:col-span-2" title="ติดตามก่อนเริ่มงาน / ส่งคนแทน (สาย)" testId="v5-follow">
                   <div className="space-y-1">
                     {followResults.map((r) => (
                       <Button
                         key={r.key}
                         type="button"
                         variant="ghost"
-                        onClick={() => openFollowNames(`ติดตาม · ${r.label}`, r.key as FollowBucketKey)}
+                        onClick={() => openFollowNames(`ติดตาม ${r.label}`, r.key as FollowBucketKey)}
                         className="grid h-auto w-full grid-cols-3 items-center gap-3 rounded-lg px-2 py-1.5 text-left text-sm font-normal sm:grid-cols-5"
                         data-testid={`v5-follow-${r.key}`}
                       >
@@ -932,13 +936,13 @@ const HomeOverviewPage: React.FC<{
                     ))}
                   </div>
                   <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3 text-xs text-muted-foreground">
-                    <span>หน่วย: สาย · คนเดียวมีได้หลายสาย</span>
+                    <span>ยกเลิก {v5Num(cells ? followCancelled : null)} สาย</span>
                     <Button type="button" variant="link" className="h-auto p-0 text-xs" onClick={cells ? openFollow : undefined} disabled={!cells}>
-                      ยกเลิก {v5Num(cells ? followCancelled : null)} สาย · ดูทั้งหมด ›
+                      ดูทั้งหมด ›
                     </Button>
                   </div>
                 </V5Card>
-                <V5Card title="AI และคน โทรไปเท่าไหร่" testId="v5-callers">
+                <V5Card title="AI และคนโทร" testId="v5-callers">
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b border-border text-xs text-muted-foreground">

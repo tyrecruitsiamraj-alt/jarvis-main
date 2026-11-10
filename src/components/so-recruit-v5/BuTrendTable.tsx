@@ -30,8 +30,8 @@ const valueOf = (c: BuTrendCell | undefined, m: BuTrendMetric) =>
 /** หัวกราฟ + หน่วย ต่อการ์ด — ผู้สมัคร/ติดตาม (10 พ.ย. 2569 "กดแล้วเป็นกราฟทุกการ์ด") */
 const TITLE: Record<BuTrendMetric, string> = {
   money: 'เสียเงินตามสัญญา แยก BU',
-  remaining: 'เหลือหา ณ สิ้นช่วง แยก BU',
-  applicants: 'ผู้สมัครที่กรอกเข้ามา แยก BU',
+  remaining: 'เหลือหา แยก BU',
+  applicants: 'ผู้สมัครที่กรอก แยก BU',
   follow: 'คนที่ติดตาม แยก BU',
 };
 const UNIT: Record<BuTrendMetric, string> = { money: 'บาท', remaining: 'ใบ', applicants: 'คน', follow: 'คน' };
@@ -101,14 +101,14 @@ export default function BuTrendTable({ metric, bu }: { metric: BuTrendMetric; bu
   const pointLabel = (k: string) => {
     if (!/^\d{4}-\d{2}$/.test(k)) return chartDayLabel(k);
     const last = data?.granularity === 'month' ? data.points[data.points.length - 1]?.key : null;
-    return k === last ? `${monthLabel(k)} (ยังไม่จบเดือน)` : monthLabel(k);
+    return k === last ? `${monthLabel(k)} ถึงวันนี้` : monthLabel(k);
   };
 
   return (
     <div className="space-y-2" data-testid={`bu-trend-${metric}`}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm font-medium text-foreground">
-          {TITLE[metric]} · {month ? `รายวัน ${monthLabel(month)}` : 'รายเดือน'} ({unit})
+          {TITLE[metric]} {month ? `รายวัน ${monthLabel(month)}` : 'รายเดือน'} ({unit})
         </p>
         {month ? (
           <Button type="button" variant="outline" size="xs" onClick={() => setMonth(null)} data-testid="bu-trend-back">
@@ -165,7 +165,6 @@ export default function BuTrendTable({ metric, bu }: { metric: BuTrendMetric; bu
               {buName(b)}
             </span>
           ))}
-          {data.granularity === 'month' ? <span>· กดเดือนเพื่อดูรายวัน</span> : null}
         </div>
         {/* มือถือเหลือแค่กราฟ (เจ้าของ 10 พ.ย. 2569 "ซ่อนตารางบนมือถือ") — จอแคบเห็นแค่ 2 เดือน · ตัวเลขรายเดือนกดจุดบนกราฟดูได้ */}
         <div ref={scroller} className="hidden max-w-full overflow-x-auto rounded-xl border border-border sm:block" data-testid={`bu-trend-table-${metric}`}>

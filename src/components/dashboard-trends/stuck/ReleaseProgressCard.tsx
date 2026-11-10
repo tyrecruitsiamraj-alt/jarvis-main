@@ -35,16 +35,21 @@ export default function ReleaseProgressCard({ rows, onPick }: { rows: readonly S
     </Button>
   );
   return (
-    <OverviewCard icon={Megaphone} title="ใบขอใหม่ ประกาศไปแค่ไหน" sub={`${fmt(fresh.length)} ใบ`}>
+    <OverviewCard icon={Megaphone} title="สถานะประกาศใบขอใหม่" sub={`${fmt(fresh.length)} ใบ`}>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3" data-testid="release-progress">
         {box('ประกาศแล้ว', released, 'info', undefined, 'release-released')}
-        {box('ยังไม่ประกาศ · ยังเปิด', openNot, openNot.length ? 'warn' : 'neutral', undefined, 'release-open')}
-        {box('ไม่ได้ประกาศ · ปิดไปแล้ว', closedNot, 'neutral', undefined, 'release-closed')}
-        {box('มีคนกรอก', withApps, 'success', withApps.length ? `${fmt(appsOnReleased)} คน · ใบละ ~${fmt(Math.round(appsOnReleased / withApps.length))} คน` : undefined, 'release-apps')}
+        {box('ยังไม่ประกาศ ใบยังเปิด', openNot, openNot.length ? 'warn' : 'neutral', undefined, 'release-open')}
+        {box('ไม่ได้ประกาศ ใบปิดไปแล้ว', closedNot, 'neutral', undefined, 'release-closed')}
+        {box('มีคนกรอก', withApps, 'success', withApps.length ? `${fmt(appsOnReleased)} คน ใบละราว ${fmt(Math.round(appsOnReleased / withApps.length))} คน` : undefined, 'release-apps')}
         {box('ไม่มีคนกรอก', noApps, noApps.length ? 'warn' : 'neutral', undefined, 'release-noapps')}
       </div>
-      <p className={cn('text-xs tabular-nums', DASH.sub)} data-testid="release-sum">
-        ประกาศแล้ว {fmt(released.length)} + ยังไม่ประกาศ {fmt(openNot.length)} + ปิดไปแล้ว {fmt(closedNot.length)} = {fmt(fresh.length)} · มีคนกรอก {fmt(withApps.length)} + ไม่มี {fmt(noApps.length)} = {fmt(released.length)}
+      <p className={cn('flex flex-wrap gap-x-4 text-xs tabular-nums', DASH.sub)} data-testid="release-sum">
+        <span>
+          ประกาศแล้ว {fmt(released.length)} + ยังไม่ประกาศ {fmt(openNot.length)} + ปิดไปแล้ว {fmt(closedNot.length)} = {fmt(fresh.length)}
+        </span>
+        <span>
+          มีคนกรอก {fmt(withApps.length)} + ไม่มี {fmt(noApps.length)} = {fmt(released.length)}
+        </span>
       </p>
     </OverviewCard>
   );

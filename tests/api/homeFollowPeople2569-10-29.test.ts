@@ -56,7 +56,7 @@ describe('ผลรายคน', () => {
     const page = read('src/pages/HomeOverviewPage.tsx');
     // 9 พ.ย. 2569 รายละเอียดติดตามย้ายออกจากหน้าหลัก (เจ้าของ "ตามร่างทั้งหมด") — เหลือการ์ดสรุป "ติดตาม" กดดูแผงคน/สาย
     expect(page).not.toContain('data-testid="overview-follow-people-sum"');
-    expect(page).toContain('NUM.format(peopleTotal)} คน · ${NUM.format(followLive)} สาย');
+    expect(page).toContain('NUM.format(peopleTotal)} คน จาก ${NUM.format(followLive)} สาย');
     expect(page).not.toContain('label="AI โทร" value={follow?.ai}');
     expect(read('api/_lib/homeLumosSummarySql.ts')).toContain('followPeople: buildFollowPersonCells(personRows)');
   });
