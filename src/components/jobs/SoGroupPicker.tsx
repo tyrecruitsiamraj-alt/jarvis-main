@@ -21,8 +21,8 @@ import {
 import type { UnitSector } from '@/lib/unitSector';
 import { fbGroupStatOf, fetchFbGroupStats, type FbGroupStats } from '@/lib/recruitPostingsApi';
 
-/** "ลิงก์เรา คลิก 766 · กรอก 167" ยอดทั้งหมดตั้งแต่สร้างลิงก์ (ต่างจากสถิติ 30 วันของ So Scraping ที่นำหน้า) */
-const ourStatsText = (st: { clicks: number; apps: number }) => `ลิงก์เรา คลิก ${NUM.format(st.clicks)} · กรอก ${NUM.format(st.apps)}`;
+/** "ลิงก์เรา ยอดทั้งหมด คลิก 766 · กรอก 167" — ตั้งแต่สร้างลิงก์ · บรรทัดของตัวเอง ไม่ปนกับสถิติ 30 วันของ So Scraping */
+const ourStatsText = (st: { clicks: number; apps: number }) => `ลิงก์เรา ยอดทั้งหมด คลิก ${NUM.format(st.clicks)} · กรอก ${NUM.format(st.apps)}`;
 
 const NUM = new Intl.NumberFormat('th-TH');
 
@@ -218,13 +218,18 @@ export function SoGroupFilterPicker({
                     {[
                       prov && !g.provinces.includes(prov) && g.nationwide ? 'ทั่วประเทศ' : null,
                       soGroupStatsText(g.stats30d),
-                      ours ? ourStatsText(fbGroupStatOf(ours, soGroupLinkKey(g), g.name)) : null,
                       bkkWhen(g.lastPostedAt) ? `โพสต์ล่าสุด ${bkkWhen(g.lastPostedAt)}` : null,
                       recent?.has(g.id) ? 'ใบนี้เพิ่งสั่งโพสต์กลุ่มนี้ใน 3 วัน' : null,
                     ]
                       .filter(Boolean)
                       .join(' · ')}
                   </p>
+                  {/* บรรทัดแยกจากสถิติ 30 วันของ So Scraping — ของเราเป็นยอดทั้งหมด (เจ้าของ 10 พ.ย. 2569 "แยกให้ชัดว่าลิงก์เราเป็นยอดทั้งหมด") */}
+                  {ours ? (
+                    <p className="text-xs tabular-nums text-foreground" data-testid={`${testPrefix}-group-clicks`}>
+                      {ourStatsText(fbGroupStatOf(ours, soGroupLinkKey(g), g.name))}
+                    </p>
+                  ) : null}
                 </div>
               </li>
             ))}

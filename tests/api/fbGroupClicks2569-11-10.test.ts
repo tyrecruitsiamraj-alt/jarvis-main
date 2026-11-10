@@ -55,7 +55,10 @@ describe('ที่มาของเลข', () => {
     const registry = readFileSync('api/_handlers/registry.ts', 'utf8');
     expect(registry).toContain("'/api/recruit/postings': recruitPostingsHandler");
     expect(readFileSync('src/lib/recruitPostingsApi.ts', 'utf8')).toContain("apiFetch('/api/recruit/postings?group_stats=1')");
-    expect(readFileSync('src/components/jobs/SoGroupPicker.tsx', 'utf8')).toContain('ours ? ourStatsText(fbGroupStatOf(ours, soGroupLinkKey(g), g.name)) : null');
+    const picker = readFileSync('src/components/jobs/SoGroupPicker.tsx', 'utf8');
+    expect(picker).toContain('{ourStatsText(fbGroupStatOf(ours, soGroupLinkKey(g), g.name))}');
+    // บรรทัดแยก + บอกว่ายอดทั้งหมด (ไม่ปนกับ "30 วัน" ของ So Scraping)
+    expect(picker).toContain('`ลิงก์เรา ยอดทั้งหมด คลิก ${NUM.format(st.clicks)} · กรอก ${NUM.format(st.apps)}`');
   });
   it('ยังเก็บคลิกรายวันต่อ (ไว้ดูตามช่วงทีหลัง) · migration เพิ่มอย่างเดียว · เจ้าหน้าที่เปิดดูไม่นับ', () => {
     const sql = readFileSync('migrations/175_posting_link_daily_hits.sql', 'utf8').split('\n').filter((l) => !l.trim().startsWith('--')).join('\n');
