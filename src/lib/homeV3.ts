@@ -7,6 +7,7 @@
  *   (25 ต.ค. 2569 รวมเข้าหน้าผู้บริหารแล้ว · เครื่องที่เคยกดปุ่ม "แบบแท็บเดิม" ต้องกลับมาหน้าเดียวกับทุกคน)
  * - `?home=classic` = หน้าเดิม (deck · บอร์ด 4 ทีม · KPI) — โค้ดยังอยู่ครบเป็นทางถอย
  * - `?home=v3` = โฉม 3 ก้อน (29 ก.ย. 2569 · แผน `docs/plan-home-v3-2569-09-29.md`)
+ * - `?home=v5` = หน้าหลักโฉมต้นแบบ SO Recruit (เจ้าของ 10 พ.ย. 2569 ชุดส่งต่อ · ชั้นคู่ขนาน รอตรวจรับ) — พิมพ์เองเท่านั้น · **ไม่จำ**
  * - `?home=online` = หน้าทีม Online ตามภาพต้นแบบของเจ้าของ (29 ก.ย. 2569 · แผน `docs/plan-team-online-2569-09-29.md`)
  * จำเลือกไว้ในเครื่อง (`jarvis.home.v3` — ค่า `1` เดิม = v3)
  *
@@ -17,10 +18,10 @@ import * as React from 'react';
 
 export const HOME_V3_KEY = 'jarvis.home.v3';
 
-export type HomeVariant = 'overview' | 'exec' | 'new' | 'classic' | 'v3' | 'online';
+export type HomeVariant = 'overview' | 'exec' | 'new' | 'classic' | 'v3' | 'online' | 'v5';
 
 const isVariant = (v: unknown): v is HomeVariant =>
-  v === 'overview' || v === 'exec' || v === 'new' || v === 'classic' || v === 'v3' || v === 'online';
+  v === 'overview' || v === 'exec' || v === 'new' || v === 'classic' || v === 'v3' || v === 'online' || v === 'v5';
 
 function paramMode(): HomeVariant | null {
   try {
@@ -36,7 +37,7 @@ export function homeVariant(): HomeVariant {
   const forced = paramMode();
   try {
     // 'overview' = ค่าตั้งต้น · exec/new = ทางถอยพิมพ์เอง ⇒ ล้างค่าจำ · โฉมอื่นเก็บชื่อไว้ (v3 เก็บ '1' เดิมเพื่อความเข้ากันได้)
-    if (forced === 'overview' || forced === 'exec' || forced === 'new') window.localStorage.removeItem(HOME_V3_KEY);
+    if (forced === 'overview' || forced === 'exec' || forced === 'new' || forced === 'v5') window.localStorage.removeItem(HOME_V3_KEY);
     else if (forced) window.localStorage.setItem(HOME_V3_KEY, forced === 'v3' ? '1' : forced);
   } catch {
     /* ปิด storage ก็ปล่อยผ่าน — URL ยังสั่งได้ต่อรอบ */

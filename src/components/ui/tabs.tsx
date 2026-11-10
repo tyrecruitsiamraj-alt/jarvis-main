@@ -12,7 +12,7 @@ const Tabs = TabsPrimitive.Root;
  * สีทุกตัวมาจากตัวแปรธีม (สลับสว่าง/มืดเอง) · ⚠️ ไม่ใส่ backdrop-blur (เหตุผลเดียวกับการ์ดกระจก — เบลอของที่เลื่อนจอทำเว็บกระตุก)
  * ค่าตั้งต้น (`default`) หน้าตาเดิมทุกแถบ
  */
-type TabsVariant = "default" | "glass";
+type TabsVariant = "default" | "glass" | "line";
 const TabsVariantContext = React.createContext<TabsVariant>("default");
 
 function TABS_LIST_CLASS_GLASS(): string {
@@ -77,6 +77,8 @@ export function GlassTabIndicator() {
 const TABS_LIST_CLASS: Record<TabsVariant, string> = {
   default: "inline-flex h-10 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground",
   glass: TABS_LIST_CLASS_GLASS(),
+  /** ขีดเส้นใต้สีหลัก — โฉมต้นแบบ SO Recruit (10 พ.ย. 2569 · หน้าหลัก ?home=v5 · ภาพรวม &dash=v5) */
+  line: "inline-flex h-11 w-full items-end justify-start gap-6 overflow-x-auto border-b border-border text-muted-foreground",
 };
 
 const TABS_TRIGGER_CLASS: Record<TabsVariant, string> = {
@@ -85,6 +87,10 @@ const TABS_TRIGGER_CLASS: Record<TabsVariant, string> = {
   glass: [
     "relative z-10 h-full gap-1.5 rounded-full transition-colors duration-300 hover:text-foreground",
     "data-[state=active]:text-white data-[state=active]:hover:text-white",
+  ].join(" "),
+  line: [
+    "-mb-px h-11 rounded-none border-b-2 border-transparent px-0 transition-colors duration-200 hover:text-foreground motion-reduce:transition-none",
+    "data-[state=active]:border-primary data-[state=active]:text-foreground",
   ].join(" "),
 };
 

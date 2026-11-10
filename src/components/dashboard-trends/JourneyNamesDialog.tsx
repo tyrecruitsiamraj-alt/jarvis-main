@@ -25,7 +25,10 @@ export default function JourneyNamesDialog({
   title,
   ids,
   notes,
+  contentStyle,
 }: {
+  /** ธีมของหน้าที่เปิด (แผงอยู่นอกกล่องของหน้า · โฉมต้นแบบ ?home=v5 ส่งตัวแปรธีมมาให้) */
+  contentStyle?: React.CSSProperties;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   title: string;
@@ -64,7 +67,7 @@ export default function JourneyNamesDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-2xl" style={contentStyle}>
         <DialogHeader>
           <DialogTitle>
             {title} · {NUM.format(ids.length)} คน

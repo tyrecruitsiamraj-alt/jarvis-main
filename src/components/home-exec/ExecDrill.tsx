@@ -48,11 +48,14 @@ export default function ExecDrill({
   drill,
   all,
   today,
+  contentStyle,
 }: {
   drill: ReturnType<typeof useDrill>;
   /** ทุกใบของช่วง — ไว้กดลึกไปใบอื่นของเจ้าหน้าที่/หน่วยงานเดียวกัน */
   all: readonly MoneyRequest[];
   today: string;
+  /** ธีมของหน้าที่เปิด (แผงอยู่นอกกล่องของหน้า · โฉมต้นแบบ ?home=v5 ส่งตัวแปรธีมมาให้) */
+  contentStyle?: React.CSSProperties;
 }) {
   const lv = drill.stack[drill.stack.length - 1] ?? null;
   const navigate = useNavigate();
@@ -72,7 +75,7 @@ export default function ExecDrill({
 
   return (
     <Sheet open={drill.stack.length > 0} onOpenChange={(o) => !o && drill.close()}>
-      <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-3xl" data-testid="exec-drill">
+      <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-3xl" style={contentStyle} data-testid="exec-drill">
         <SheetHeader className="space-y-1 text-left">
           {drill.stack.length > 1 ? (
             <Button type="button" variant="ghost" size="sm" className="w-fit gap-1 px-0" onClick={drill.back} data-testid="exec-drill-back">

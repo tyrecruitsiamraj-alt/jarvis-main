@@ -432,6 +432,9 @@ const HomePage: React.FC = () => {
         <HomeAiSharePage />
       ) : variant === 'exec' ? (
         <HomeExecPage />
+      ) : variant === 'v5' ? (
+        // โฉมต้นแบบ SO Recruit (10 พ.ย. 2569) — ข้อมูล/การกดชุดเดียวกับหน้าหลักสรุป ต่างแค่หน้าตา
+        <HomeOverviewPage layout="v5" />
       ) : (
         <HomeOverviewPage />
       )}

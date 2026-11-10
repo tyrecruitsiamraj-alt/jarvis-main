@@ -308,11 +308,11 @@ export type OverviewPanel = {
 };
 
 /** แผงข้างตัวเดียวของหน้า — กดกล่องไหนก็เปิดแผงนี้ (ไม่ซ้อนแผง) */
-export function OverviewSheet({ panel, onClose }: { panel: OverviewPanel | null; onClose: () => void }) {
+export function OverviewSheet({ panel, onClose, contentStyle }: { panel: OverviewPanel | null; onClose: () => void; contentStyle?: React.CSSProperties }) {
   const navigate = useNavigate();
   return (
     <Sheet open={panel !== null} onOpenChange={(o) => !o && onClose()}>
-      <SheetContent side="right" className="w-full space-y-4 overflow-y-auto sm:max-w-lg" data-testid="overview-sheet">
+      <SheetContent side="right" className="w-full space-y-4 overflow-y-auto sm:max-w-lg" style={contentStyle} data-testid="overview-sheet">
         {panel ? (
           <>
             <SheetHeader>

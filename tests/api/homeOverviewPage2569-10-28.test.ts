@@ -13,7 +13,9 @@ describe('หน้าหลักสรุปหน้าเดียว', () =
     expect([...at].sort((a, b) => a - b)).toEqual(at);
   });
   it('แท็บมีแค่ ภาพรวม · สัดส่วน (เจ้าของสั่งเพิ่ม 28 ต.ค. 2569) · ค่าเริ่มเดือนนี้ · แผงมีปุ่มไปหน้าเต็ม', () => {
-    expect(page.match(/<TabsTrigger value=/g)?.length).toBe(2);
+    // 2 แท็บต่อโฉม × 2 โฉม (หน้าหลักสรุป + โฉมต้นแบบ ?home=v5 · 10 พ.ย. 2569) — คำเดียวกัน ภาพรวม · สัดส่วน
+    expect(page.match(/<TabsTrigger value=/g)?.length).toBe(4);
+    expect(page.match(/<TabsTrigger value="proportion"/g)?.length).toBe(2);
     expect(page).toContain("useState<'overview' | 'proportion'>('overview')");
     expect(page).toContain('thisMonthWindow(today)');
     expect(readFileSync('src/components/home-overview/OverviewParts.tsx', 'utf8')).toContain('ไปหน้าเต็ม · {panel.go.label}');

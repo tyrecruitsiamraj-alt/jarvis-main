@@ -41,13 +41,14 @@ import { useUnitRequestsFeed } from '@/hooks/useUnitRequestsFeed';
 import { usePageTitle } from '@/hooks/usePageTitle';
 import { PREQUEST_ID_PREFIX } from '@/lib/siamrajUnitRequestsApi';
 import { fetchHomeMoney, type HomeMoneyPayload } from '@/lib/homeMoneyApi';
-import type { AiShareWindow } from '@/lib/homeAiShare';
+import { fetchHomeAiShare } from '@/lib/homeAiShareApi';
+import type { AiShareResponse, AiShareWindow } from '@/lib/homeAiShare';
 import { costliest, perDayOf, reasonsOf, thisMonthWindow } from '@/lib/homeExec';
 import type { MoneyRequest } from '@/lib/homeMoney';
 import { fetchRecruitOverview } from '@/lib/recruitOverviewApi';
 import type { RecruitOverviewResponse } from '@/lib/recruitOverviewTypes';
 import { appsInWindow, buildApplicantFunnel, type FunnelStep } from '@/lib/homeOverviewFunnel';
-import { followBuSplit, followPersonResults, followResultSplit, followTeamTotals } from '@/lib/homeSplit';
+import { followBuSplit, followCallsMade, followPersonResults, followResultSplit, followTeamTotals } from '@/lib/homeSplit';
 import { REQUEST_LEAD_KIND_LABEL, requestLeadKindFromYmd, type RequestLeadKind } from '@/lib/requestLeadKind';
 import { SITE_BU_TO_DEPT, normalizeTrendBu, trendBuFromSiteCode, trendBuLabel } from '@/lib/trends/bu';
 import { toYmdBangkok } from '@/lib/dateTh';
@@ -55,6 +56,11 @@ import { thaiDate } from '@/lib/periodPick';
 import { friendlyErrorText } from '@/lib/friendlyError';
 import { TONE } from '@/lib/designTokens';
 import { cn } from '@/lib/utils';
+import { useNavigate } from 'react-router-dom';
+import { Banknote, FileText, Phone, Users } from 'lucide-react';
+import { V5Bar, V5Card, V5Divider, V5EqCell, V5Kpi, V5NumLink, useV5ThemeStyle, v5Num } from '@/components/so-recruit-v5/V5Parts';
+import { requestPathOfJobId } from '@/lib/jobNavigation';
+import type { RecruitRequestItem } from '@/lib/recruitOverviewTypes';
 
 const BAHT = new Intl.NumberFormat('th-TH', { maximumFractionDigits: 0 });
 const BU_OPTIONS = [...new Set(Object.values(SITE_BU_TO_DEPT))];
@@ -86,8 +92,17 @@ const STEP_PAGE: Record<FunnelStep['key'], (typeof PAGE)[keyof typeof PAGE]> = {
 const toneOfRow = (t: 'success' | 'warn' | 'danger' | 'neutral') => (t === 'neutral' ? null : t);
 /** สีของผลติดตาม — ไป เขียว · ไม่ไป แดง · โทรไม่ติด/ขอเลื่อน เหลือง · ที่เหลือเทา */
 
-const HomeOverviewPage: React.FC = () => {
+/** เวลาไทย HH:MM ของคำตอบ */
+const TIME_TH = new Intl.DateTimeFormat('th-TH', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Bangkok' });
+const shortTimeOf = (iso: string) => TIME_TH.format(new Date(iso));
+
+const HomeOverviewPage: React.FC<{
+  /** `v5` = โฉมต้นแบบ SO Recruit (เจ้าของ 10 พ.ย. 2569 ชุดส่งต่อ · `?home=v5`) — ข้อมูล/การกดชุดเดียวกัน ต่างแค่หน้าตา */
+  layout?: 'overview' | 'v5';
+}> = ({ layout = 'overview' }) => {
   usePageTitle('หน้าหลัก');
+  const v5 = layout === 'v5';
+  const v5Style = useV5ThemeStyle();
   const today = toYmdBangkok(new Date());
   const [win, setWin] = useState<AiShareWindow>(() => thisMonthWindow(today));
   const [tab, setTab] = useState<'overview' | 'proportion'>('overview');
@@ -101,6 +116,7 @@ const HomeOverviewPage: React.FC = () => {
   const [moneyError, setMoneyError] = useState<string | null>(null);
   const [ro, setRo] = useState<RecruitOverviewResponse | null>(null);
   const [roError, setRoError] = useState<string | null>(null);
+  const [aiV5, setAiV5] = useState<AiShareResponse | null>(null);
   /** เลขชุดล่าสุดของช่วง/BU ที่เลือกอยู่ — กันจอกระพริบตอนรอบสด (ล้างทันทีเมื่อเปลี่ยนช่วง/BU) */
   const lastMoney = useRef<{ key: string; m: HomeMoneyPayload } | null>(null);
   /** เปลี่ยนช่วง/BU = ล้างเลขของชุดก่อนทันที (QA 30 ต.ค. 2569: สลับ BU แล้วเลข BU เก่าค้าง 1–8 วิ) · รอบสดชุดเดิมไม่ล้าง */
@@ -117,6 +133,13 @@ const HomeOverviewPage: React.FC = () => {
     fetchHomeMoney({ ...range, bu })
       .then((m) => alive && setMoney(m))
       .catch((e: unknown) => alive && setMoneyError(friendlyErrorText(e, 'โหลดยอดเงินไม่ขึ้น')));
+    // โฉมต้นแบบ: ดูแลหลังเริ่มงาน · จับคู่งาน (ก้อนหลัก home-ai-share) — หน้าหลักเดิมไม่ใช้ จึงยิงเฉพาะ v5
+    if (v5) {
+      setAiV5(null);
+      fetchHomeAiShare({ ...win, bu })
+        .then((d) => alive && setAiV5(d))
+        .catch(() => alive && setAiV5(null));
+    }
     fetchRecruitOverview(null, range, bu)
       .then((d) => {
         if (!alive) return;
@@ -212,6 +235,45 @@ const HomeOverviewPage: React.FC = () => {
       go: PAGE.requests,
       body: (
         <div className="space-y-4">
+          {/* แยกประเภทเงิน + เทียบจุดเริ่มนับ (ชุดส่งต่อต้นแบบ 10 พ.ย. 2569 H02) — ยอดจากสมุดเดียวกับการ์ด · หักจริงคิดตามวันรับเงิน ผูกใบขอไม่ได้ */}
+          {moneyNow ? (
+            <table className="w-full text-sm" data-testid="overview-money-types">
+              <thead>
+                <tr className="border-b border-border text-xs text-muted-foreground">
+                  <th className="py-2 text-left font-normal">รายการ</th>
+                  <th className="py-2 text-right font-normal">นับจากวันที่ต้องการ</th>
+                  <th className="py-2 text-right font-normal">นับจากวันที่คีย์</th>
+                </tr>
+              </thead>
+              <tbody className="tabular-nums">
+                <tr className="border-b border-border">
+                  <td className="py-2">ค่าปรับ</td>
+                  <td className="py-2 text-right">{BAHT.format(moneyNow.totals.need.fine)}</td>
+                  <td className="py-2 text-right">{BAHT.format(moneyNow.totals.key.fine)}</td>
+                </tr>
+                <tr className="border-b border-border">
+                  <td className="py-2">ลดมูลค่างาน</td>
+                  <td className="py-2 text-right">{BAHT.format(moneyNow.totals.need.deduct)}</td>
+                  <td className="py-2 text-right">{BAHT.format(moneyNow.totals.key.deduct)}</td>
+                </tr>
+                <tr className="border-b border-border font-medium">
+                  <td className="py-2">รวมตามสัญญา</td>
+                  <td className="py-2 text-right">{BAHT.format(moneyNow.totals.need.fine + moneyNow.totals.need.deduct)}</td>
+                  <td className="py-2 text-right">{BAHT.format(moneyNow.totals.key.fine + moneyNow.totals.key.deduct)}</td>
+                </tr>
+                <tr>
+                  <td className="py-2">คน-วันที่ขาด</td>
+                  <td className="py-2 text-right">{NUM.format(moneyNow.totals.need.personDays)}</td>
+                  <td className="py-2 text-right">{NUM.format(moneyNow.totals.key.personDays)}</td>
+                </tr>
+              </tbody>
+            </table>
+          ) : null}
+          {moneyNow ? (
+            <p className="text-xs tabular-nums text-muted-foreground">
+              ลูกค้าหักจริง {BAHT.format(moneyNow.customerFines.total)} บาท · {NUM.format(moneyNow.customerFines.receipts)} ใบเสร็จ · ตามวันรับเงิน ผูกกับใบขอรายใบไม่ได้
+            </p>
+          ) : null}
           <p className="text-sm font-medium text-foreground">แยก BU</p>
           <ul className="divide-y divide-border rounded-xl border border-border" data-testid="overview-money-bu">
             {[...bus.entries()]
@@ -465,6 +527,333 @@ const HomeOverviewPage: React.FC = () => {
   const applied = funnel?.[0] ?? null;
   const aiStep = funnel?.[1] ?? null;
 
+  // ═══ โฉมต้นแบบ SO Recruit (`?home=v5` · เจ้าของ 10 พ.ย. 2569) — ทุกเลข/การกดใช้ตัวแปรและตัวเปิดแผงชุดเดียวกับหน้าหลักสรุป ═══
+  const navigate = useNavigate();
+  const req = roNow?.requests ?? null;
+  /** ใบขอใหม่ของช่วงตามสถานะประกาศ — กดแถวไปหน้าใบขอ · กดจำนวนคนเปิดรายชื่อ (รายการชุดเดียวกับเลขในตาราง) */
+  const openRequestList = (title: string, pick: (r: RecruitRequestItem) => boolean) => {
+    const list = (roNow?.requestList ?? []).filter(pick);
+    setPanel({
+      title,
+      sub: `${NUM.format(list.length)} ใบ · ${thaiDate(range.from)} – ${thaiDate(range.to)}`,
+      go: PAGE.board,
+      body: (
+        <ul className="divide-y divide-border rounded-xl border border-border" data-testid="v5-request-list">
+          {list.length === 0 ? <li className="px-3 py-2 text-sm text-muted-foreground">ไม่มีใบขอ</li> : null}
+          {list.map((r) => (
+            <li key={r.jobId ?? r.requestNo} className="flex items-start justify-between gap-3 px-3 py-2 text-sm">
+              <span className="min-w-0">
+                {r.jobId ? (
+                  <Button type="button" variant="link" className="h-auto whitespace-normal p-0 text-left text-sm font-normal text-foreground" onClick={() => navigate(requestPathOfJobId(r.jobId!))}>
+                    {r.unitName ?? '—'} · {r.position ?? '—'}
+                  </Button>
+                ) : (
+                  <span className="text-foreground">
+                    {r.unitName ?? '—'} · {r.position ?? '—'}
+                  </span>
+                )}
+                <span className="block text-xs tabular-nums text-muted-foreground">
+                  {r.requestNo} · เข้ามา {thaiDate(r.day)}
+                </span>
+              </span>
+              <Button type="button" variant="link" className="h-auto shrink-0 p-0 text-sm tabular-nums" disabled={r.appIds.length === 0} onClick={() => openNames(`${r.requestNo} · คนกรอก`, r.appIds)}>
+                {NUM.format(r.applications)} คน
+              </Button>
+            </li>
+          ))}
+        </ul>
+      ),
+    });
+  };
+  const calls = liveCells ? followCallsMade(liveCells) : null;
+  const periodText = `${thaiDate(range.from)} – ${thaiDate(range.to)}`;
+  const followMax = Math.max(1, ...followResults.map((r) => r.total));
+  const funnelMax = Math.max(1, funnel?.[0]?.value ?? 0);
+  const overlays = (
+    <>
+      <OverviewSheet panel={panel} onClose={() => setPanel(null)} contentStyle={v5 ? v5Style : undefined} />
+      <ExecDrill drill={drill} all={openReqs} today={today} contentStyle={v5 ? v5Style : undefined} />
+      <FollowNamesDialog
+        open={followNames !== null}
+        onOpenChange={(o) => !o && setFollowNames(null)}
+        title={followNames?.title ?? ''}
+        q={winQ}
+        bucket={followNames?.bucket ?? null}
+        contentStyle={v5 ? v5Style : undefined}
+      />
+      <JourneyNamesDialog open={names !== null} onOpenChange={(o) => !o && setNames(null)} title={names?.title ?? ''} ids={names?.ids ?? []} contentStyle={v5 ? v5Style : undefined} />
+    </>
+  );
+
+  if (v5) {
+    const ready = Boolean(moneyNow && roNow);
+    return (
+      <div className="-mx-4 -my-4 min-h-screen bg-background px-4 py-6 text-foreground sm:-mx-6 sm:px-6 sm:py-8" style={v5Style} data-testid="home-v5">
+        <div className="mx-auto max-w-7xl space-y-6">
+          <header className="flex flex-wrap items-start justify-between gap-4">
+            <div className="space-y-1">
+              <h1 className="text-3xl font-medium tracking-tight">หน้าหลัก</h1>
+              <p className="text-sm text-muted-foreground">ใบขอ ผลการสรรหา และการติดตามในระบบ</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <PeriodPicker value={win} onChange={setWin} />
+              {buChoices?.length ? (
+                <BuChoiceSelect value={bu} choices={buChoices} onChange={setBu} allOption triggerClassName="h-10 w-32 bg-card" />
+              ) : moneyNow?.forcedBu && moneyNow.bu ? (
+                <span className="text-sm text-muted-foreground">{trendBuLabel(moneyNow.bu)}</span>
+              ) : (
+                <Select value={bu ?? 'all'} onValueChange={(v) => setBu(v === 'all' ? null : v)}>
+                  <SelectTrigger className="h-10 w-32 shrink-0 bg-card" aria-label="เลือก BU">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">ทุก BU</SelectItem>
+                    {BU_OPTIONS.map((b) => (
+                      <SelectItem key={b} value={b}>
+                        {trendBuLabel(b)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+          </header>
+          <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+            <span data-testid="v5-period">{ready ? `ข้อมูล ${periodText}${roNow?.generatedAt ? ` · อ่านเมื่อ ${shortTimeOf(roNow.generatedAt)} น.` : ''}` : `กำลังโหลด ${periodText}`}</span>
+            <span>กดตัวเลขเพื่อดูรายการ แล้วกดชื่อเพื่อดูสิ่งที่ต้องทำต่อ</span>
+          </div>
+          {moneyError || roError ? <p className={cn('text-sm', TONE.danger.value)}>{moneyError ?? roError}</p> : null}
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4" data-testid="v5-kpis">
+            <V5Kpi
+              wine
+              label="ผลกระทบตามสัญญา"
+              icon={Banknote}
+              value={contract}
+              unit="บาท"
+              money
+              left={moneyNow ? `${NUM.format(costlyAll.total)} ใบที่มีผลกระทบ` : '—'}
+              right="แยกค่าปรับ / ลดมูลค่า"
+              onClick={moneyNow ? openMoney : undefined}
+              testId="v5-kpi-money"
+            />
+            <V5Kpi
+              label="ใบขอที่เหลือหา"
+              icon={FileText}
+              value={flow?.remainingRequests}
+              unit="ใบ"
+              left={flow ? `เหลือหา ${NUM.format(flow.remaining)} อัตรา` : '—'}
+              right={flow ? `รวมใบขอชั่วคราว ${NUM.format(preCount)} ใบ` : ''}
+              onClick={flow ? () => openList('เหลือหา', flowRows((f) => f.open).sort((a, b) => perDayOf(b) - perDayOf(a))) : undefined}
+              testId="v5-kpi-remain"
+            />
+            <V5Kpi
+              label="ผู้สมัคร"
+              icon={Users}
+              value={applied?.value}
+              unit="รายชื่อ"
+              left={aiStep ? `AI โทรแล้ว ${NUM.format(aiStep.value)}` : '—'}
+              right={aiStep ? `สนใจ ${NUM.format(aiStep.rows[0].value)}` : ''}
+              onClick={applied ? () => openStep(applied) : undefined}
+              testId="v5-kpi-apps"
+            />
+            <V5Kpi
+              label="ติดตามก่อนเริ่มงาน / คนแทน"
+              icon={Phone}
+              value={people ? peopleTotal : null}
+              unit="คน"
+              left={people ? `${NUM.format(followLive)} สาย` : '—'}
+              right={people ? `ไป ${NUM.format(wentPeople)} คน` : ''}
+              onClick={cells ? openFollow : undefined}
+              testId="v5-kpi-follow"
+            />
+          </div>
+
+          <Tabs value={tab} onValueChange={(v) => setTab(v === 'proportion' ? 'proportion' : 'overview')}>
+            <TabsList variant="line" aria-label="เลือกมุมมอง">
+              <TabsTrigger value="overview">ภาพรวม</TabsTrigger>
+              <TabsTrigger value="proportion" data-testid="home-tab-proportion">
+                สัดส่วน AI และคน
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+
+          {tab === 'proportion' ? (
+            <ProportionTab win={win} bu={bu} apps={apps} appsError={roError} openJobIds={openJobIds} />
+          ) : (
+            <>
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+                <V5Card className="lg:col-span-2" title="ใบขอเข้ามา แล้วปิดได้เท่าไหร่" sub={`ตามสมุดใบขอ · ${periodText} · รวมใบขอชั่วคราว`} testId="v5-ledger">
+                  <div className="grid grid-cols-2 gap-1 sm:grid-cols-5">
+                    <V5EqCell label="ยกมา" value={flow?.carryInRequests} onClick={flow ? () => openList('ยกมา', flowRows((f) => f.carry)) : undefined} testId="v5-eq-carry" />
+                    <V5EqCell label="+ ขอใหม่" value={flow?.newRequests} onClick={flow ? openNew : undefined} testId="v5-eq-new" />
+                    <V5EqCell label="− ปิดครบ" value={flow?.closedRequests} onClick={flow ? () => openList('ปิดครบ', flowRows((f) => f.closed)) : undefined} testId="v5-eq-closed" />
+                    <V5EqCell
+                      label="− ยกเลิก"
+                      value={flow?.cancelledRequests}
+                      onClick={
+                        flow
+                          ? () => {
+                              const list = flowRows((f) => f.cancelledReq);
+                              setPanel(null);
+                              drill.open({ title: 'ยกเลิก', rows: list, expand: null, reasons: { unit: 'ใบ', items: reasonsOf(list, () => 1) } });
+                            }
+                          : undefined
+                      }
+                      testId="v5-eq-cancel"
+                    />
+                    <V5EqCell result label="= เหลือหา" value={flow?.remainingRequests} onClick={flow ? () => openList('เหลือหา', flowRows((f) => f.open)) : undefined} testId="v5-eq-remain" />
+                  </div>
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3 text-xs tabular-nums text-muted-foreground">
+                    <span data-testid="overview-req-sum">
+                      {flow
+                        ? `ใบ: ${NUM.format(flow.carryInRequests)} + ${NUM.format(flow.newRequests)} − ${NUM.format(flow.closedRequests)} − ${NUM.format(flow.cancelledRequests)} = ${NUM.format(flow.remainingRequests)} · อัตรา: ${NUM.format(flow.carryIn)} + ${NUM.format(flow.newPositions)} − ${NUM.format(flow.filled)} − ${NUM.format(flow.cancelled)} = ${NUM.format(flow.remaining)}`
+                        : '—'}
+                    </span>
+                    <Button
+                      type="button"
+                      variant="link"
+                      className="h-auto p-0 text-xs"
+                      disabled={!flow}
+                      onClick={flow ? () => openList('หาได้แล้ว', flowRows((f) => f.filled > 0), `หาได้ ${NUM.format(flow.filled)} อัตรา`) : undefined}
+                      data-testid="v5-filled"
+                    >
+                      หาได้ {v5Num(flow?.filled)} อัตรา · {v5Num(flow ? flowRows((f) => f.filled > 0).length : null)} ใบ ›
+                    </Button>
+                  </div>
+                </V5Card>
+
+                <V5Card title="ใบขอใหม่ ประกาศไปแค่ไหน" sub="กดสถานะเพื่อดูใบขอและผู้รับผิดชอบ" testId="v5-release">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span className="flex items-baseline gap-2 text-sm text-muted-foreground">
+                      <V5NumLink value={req?.released} label="ประกาศแล้ว" onClick={req ? () => openRequestList('ประกาศแล้ว', (r) => r.released) : undefined} testId="v5-rel-released" />/{' '}
+                      <V5NumLink value={req?.total} label="ขอใหม่" onClick={req ? () => openRequestList('ขอใหม่', () => true) : undefined} testId="v5-rel-total" /> ใบ
+                    </span>
+                    <span className="rounded-full bg-muted px-3 py-1 text-xs text-muted-foreground">ประกาศแล้ว</span>
+                  </div>
+                  <ul className="divide-y divide-border text-sm">
+                    <li className="flex justify-between py-2 text-xs text-muted-foreground">
+                      <span>สถานะ</span>
+                      <span>ใบ</span>
+                    </li>
+                    {(
+                      [
+                        ['ยังไม่ประกาศ · ยังเปิด', req?.notReleasedOpen, (r: RecruitRequestItem) => !r.released && r.open],
+                        ['ยังไม่ประกาศ · ปิดแล้ว', req?.notReleasedClosed, (r: RecruitRequestItem) => !r.released && !r.open],
+                        ['ประกาศแล้ว · มีคนกรอก', req?.releasedWithApps, (r: RecruitRequestItem) => r.released && r.applications > 0],
+                        ['ประกาศแล้ว · ไม่มีคนกรอก', req?.releasedNoApps, (r: RecruitRequestItem) => r.released && r.applications === 0],
+                      ] as const
+                    ).map(([label, value, pick]) => (
+                      <li key={label} className="flex items-center justify-between gap-2 py-2">
+                        <span>{label}</span>
+                        <V5NumLink value={value} label={label} onClick={req ? () => openRequestList(label, pick) : undefined} />
+                      </li>
+                    ))}
+                  </ul>
+                </V5Card>
+              </div>
+
+              <V5Card title="จากผู้สมัคร ไปถึงวันนัด" sub={`รายชื่อที่กรอก ${periodText} · คนโทรต่อรวมทั้งกลุ่ม AI สนใจและกลุ่มอื่น`} testId="v5-funnel">
+                <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-6">
+                  {(funnel ?? buildApplicantFunnel([])).map((st, i) => (
+                    <Button
+                      key={st.key}
+                      type="button"
+                      variant="ghost"
+                      disabled={!funnel}
+                      onClick={() => openStep(st)}
+                      className="h-auto min-w-0 flex-col items-stretch justify-start gap-2 whitespace-normal rounded-xl p-3 text-left font-normal disabled:opacity-100"
+                      data-testid={`overview-step-${st.key}`}
+                    >
+                      <span className="text-xs text-muted-foreground">
+                        {String(i + 1).padStart(2, '0')} {st.label}
+                      </span>
+                      <span className="text-3xl font-medium tabular-nums">{funnel ? NUM.format(st.value) : '—'}</span>
+                      <V5Bar pct={funnel ? (st.value / funnelMax) * 100 : 0} />
+                      <span className="text-xs tabular-nums text-muted-foreground">
+                        {st.from && funnel ? `${st.from} · ` : ''}
+                        {st.rows.map((r) => `${r.label} ${funnel ? NUM.format(r.value) : '—'}`).join(' · ')}
+                      </span>
+                    </Button>
+                  ))}
+                </div>
+              </V5Card>
+
+              <V5Divider label="หลังได้คน" />
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+                <V5Card className="lg:col-span-2" title="ติดตามก่อนเริ่มงาน / ส่งคนแทน" testId="v5-follow">
+                  <div className="space-y-1">
+                    {followResults.map((r) => (
+                      <Button
+                        key={r.key}
+                        type="button"
+                        variant="ghost"
+                        onClick={() => openFollowNames(`ติดตาม · ${r.label}`, r.key as FollowBucketKey)}
+                        className="grid h-auto w-full grid-cols-3 items-center gap-3 rounded-lg px-2 py-1.5 text-left text-sm font-normal sm:grid-cols-5"
+                        data-testid={`v5-follow-${r.key}`}
+                      >
+                        <span>{r.label}</span>
+                        <span className="sm:col-span-3">
+                          <V5Bar pct={(r.total / followMax) * 100} muted />
+                        </span>
+                        <span className="text-right font-medium tabular-nums">{NUM.format(r.total)}</span>
+                      </Button>
+                    ))}
+                  </div>
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3 text-xs text-muted-foreground">
+                    <span>หน่วย: สาย · คนเดียวมีได้หลายสาย</span>
+                    <Button type="button" variant="link" className="h-auto p-0 text-xs" onClick={cells ? openFollow : undefined} disabled={!cells}>
+                      ยกเลิก {v5Num(cells ? followCancelled : null)} สาย · ดูทั้งหมด ›
+                    </Button>
+                  </div>
+                </V5Card>
+                <V5Card title="AI และคน โทรไปเท่าไหร่" testId="v5-callers">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-border text-xs text-muted-foreground">
+                        <th className="py-2 text-left font-normal">ผู้โทร</th>
+                        <th className="py-2 text-right font-normal">โทรแล้ว</th>
+                        <th className="py-2 text-right font-normal">รอโทร</th>
+                      </tr>
+                    </thead>
+                    <tbody className="tabular-nums">
+                      <tr className="border-b border-border">
+                        <td className="py-2">AI</td>
+                        <td className="py-2 text-right">{v5Num(calls?.aiDone)}</td>
+                        <td className="py-2 text-right">{v5Num(calls?.aiWaiting)}</td>
+                      </tr>
+                      <tr>
+                        <td className="py-2">คน</td>
+                        <td className="py-2 text-right">{v5Num(calls?.staffDone)}</td>
+                        <td className="py-2 text-right">{v5Num(calls?.staffWaiting)}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                  <div className="grid grid-cols-2 gap-3 border-t border-border pt-3">
+                    <Button type="button" variant="ghost" className="h-auto flex-col items-start gap-1 rounded-xl p-2 text-left font-normal" onClick={() => navigate(PAGE.aftercare.to)} data-testid="v5-aftercare">
+                      <span className="text-xs text-muted-foreground">ดูแลหลังเริ่มงาน</span>
+                      <span className="text-2xl font-medium tabular-nums">
+                        {v5Num(aiV5?.aftercare?.total)} <span className="text-xs font-normal text-muted-foreground">รายการ</span>
+                      </span>
+                    </Button>
+                    <Button type="button" variant="ghost" className="h-auto flex-col items-start gap-1 rounded-xl p-2 text-left font-normal" onClick={() => navigate('/matching/match')} data-testid="v5-matching">
+                      <span className="text-xs text-muted-foreground">จับคู่งาน</span>
+                      <span className="text-2xl font-medium tabular-nums">
+                        {v5Num(aiV5?.matching?.total)} <span className="text-xs font-normal text-muted-foreground">รายการ</span>
+                      </span>
+                    </Button>
+                  </div>
+                </V5Card>
+              </div>
+            </>
+          )}
+        </div>
+        {overlays}
+      </div>
+    );
+  }
+
+
   return (
     <div className="space-y-6" data-testid="home-overview">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -606,7 +995,7 @@ const HomeOverviewPage: React.FC = () => {
             emphasis="success"
             variant="outline"
             className="shrink-0 sm:w-48"
-            onClick={flow ? () => openList('หาได้แล้ว', openReqs.filter((r) => r.filledInWindow > 0), `หาได้ ${NUM.format(flow.filled)} อัตรา`) : undefined}
+            onClick={flow ? () => openList('หาได้แล้ว', flowRows((f) => f.filled > 0), `หาได้ ${NUM.format(flow.filled)} อัตรา`) : undefined}
             testId="overview-req-filled"
           />
         </div>
@@ -647,16 +1036,7 @@ const HomeOverviewPage: React.FC = () => {
       </>
       )}
 
-      <OverviewSheet panel={panel} onClose={() => setPanel(null)} />
-      <ExecDrill drill={drill} all={openReqs} today={today} />
-      <FollowNamesDialog
-        open={followNames !== null}
-        onOpenChange={(o) => !o && setFollowNames(null)}
-        title={followNames?.title ?? ''}
-        q={winQ}
-        bucket={followNames?.bucket ?? null}
-      />
-      <JourneyNamesDialog open={names !== null} onOpenChange={(o) => !o && setNames(null)} title={names?.title ?? ''} ids={names?.ids ?? []} />
+      {overlays}
     </div>
   );
 };
