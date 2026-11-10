@@ -11,6 +11,14 @@ const files = [
   'src/components/so-recruit-v5/BuTrendTable.tsx',
   'src/components/dashboard-trends/RecruitOverview.tsx',
   'src/components/dashboard-trends/stuck/ReleaseProgressCard.tsx',
+  // หัวข้อคำถามหน้าภาพรวมงานสรรหา (เจ้าของ 10 พ.ย. 2569 "แก้หัวข้อคำถามหน้าภาพรวมงานสรรหาด้วย")
+  'src/components/dashboard-trends/stuck/RecruitStuckBody.tsx',
+  'src/components/dashboard-trends/stuck/StuckOwnerTable.tsx',
+  'src/components/dashboard-trends/stuck/StuckPhasesCard.tsx',
+  'src/components/dashboard-trends/stuck/StuckAreaTable.tsx',
+  'src/components/dashboard-trends/stuck/PersonJourneyCard.tsx',
+  'src/components/dashboard-trends/RecruitOverviewParts.tsx',
+  'src/components/dashboard-trends/RequestTab.tsx',
 ].map((f) => [f, readFileSync(f, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')] as const);
 
 const gone = [
@@ -29,6 +37,19 @@ const gone = [
   'คนเดียวมีได้หลายสาย',
   'คนโทรต่อรวมทั้งกลุ่ม',
   'ณ สิ้นช่วง',
+  'ติดตรงไหน',
+  'ไปถึงขั้นไหน',
+  'คนคลิกแล้วกรอกเท่าไหร่',
+  'ใครหารายชื่อเข้ามา',
+  'รายชื่อมาจากไหน ไปถึงไหน',
+  'ทำไมไม่สำเร็จ',
+  'ติดที่ใคร',
+  'รายชื่อหลุดตรงไหน',
+  'กรอกแล้วโทรวันไหน',
+  'ไปถึงไหนแยกช่องทาง',
+  'มาจากช่องทางไหน',
+  'พื้นที่ไหนขาดคน',
+  'ช่องทางไหนได้คนสนใจเยอะ',
 ];
 
 describe('หน้าหลักโฉม Codex ไม่มีภาษา AI', () => {

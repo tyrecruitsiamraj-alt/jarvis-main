@@ -1151,7 +1151,7 @@ const HomeOverviewPage: React.FC<{
       {/* ใบขอใหม่ ประกาศไปแค่ไหน → ย้ายไปหน้าภาพรวมงานสรรหา (เจ้าของ 9 พ.ย. 2569 "ตามร่างทั้งหมด") */}
 
       {/* ── ผู้สมัคร 6 ขั้น + แถบช่องทาง ── */}
-      <OverviewSection title="ผู้สมัคร" sub="ไปถึงขั้นไหน · คน" testId="overview-funnel">
+      <OverviewSection title="ผู้สมัคร" sub="แยกขั้น (คน)" testId="overview-funnel">
         {/* แบบร่าง B (2 พ.ย. 2569): แท่งยาวตามจำนวนไล่ลงทีละขั้น · ตัวเลขย่อยขวามือ */}
         <div className="space-y-1">
           {(funnel ?? buildApplicantFunnel([])).map((s) => (

@@ -36,7 +36,7 @@ export default function StuckPhasesCard({
   onOpenRequest,
   listOverride,
   onCloseList,
-  title = 'ใบขอที่เหลือหา ติดตรงไหน',
+  title = 'ใบขอที่เหลือหา แยกขั้นที่ติด',
   sub = 'ใบที่ยังเปิดอยู่ทั้งหมด ณ วันนี้ · กดได้ทุกตัวเลข',
   onFocus,
 }: {
@@ -154,7 +154,7 @@ export default function StuckPhasesCard({
                 <TableRow className={DASH.tableHead}>
                   <TableHead className="text-xs">ใบขอ</TableHead>
                   <TableHead className="text-xs">หน่วยงาน · ตำแหน่ง</TableHead>
-                  <TableHead className="text-xs">ติดตรงไหน</TableHead>
+                  <TableHead className="text-xs">ขั้นที่ติด</TableHead>
                   <TableHead className="text-xs">เจ้าหน้าที่</TableHead>
                   <TableHead className="text-right text-xs">ผ่านมา</TableHead>
                   <TableHead className="text-right text-xs">เหลือหา</TableHead>

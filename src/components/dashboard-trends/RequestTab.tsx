@@ -455,7 +455,7 @@ function ProvinceCard({
   const max = Math.max(1, ...areas.map((a) => a.requested));
   const shown = all ? areas : areas.slice(0, PROVINCES_SHOWN);
   return (
-    <OverviewCard icon={MapPin} title="พื้นที่ไหนขาดคน">
+    <OverviewCard icon={MapPin} title="พื้นที่ที่ขาดคน">
       <div className={cn('flex flex-wrap gap-4 text-xs', DASH.sub)}>
         <span className="inline-flex items-center gap-1.5">
           <span className={cn('h-2.5 w-2.5 rounded-sm', TONE.neutral.dot)} aria-hidden />
@@ -712,7 +712,7 @@ function ApplicantCard({
           ))}
         </div>
         <div className="space-y-2 rounded-xl bg-muted/40 p-3 text-sm" data-testid="request-tab-success">
-          <p className="font-medium">ช่องทางไหนได้คนสนใจเยอะ</p>
+          <p className="font-medium">ช่องทางที่ได้คนสนใจ</p>
           {ranking.length === 0 ? <p className={DASH.sub}>ยังไม่มีช่องทางที่โทรครบ 10 คน</p> : null}
           {ranking.map((r) => (
             <p key={r.key} className="grid grid-cols-[minmax(0,10rem)_minmax(0,1fr)_auto] items-center gap-2">

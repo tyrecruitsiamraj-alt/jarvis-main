@@ -493,7 +493,7 @@ const RecruitOverview: React.FC<{
                 {backlog ? <BacklogBody backlog={backlog} only="uncalled" /> : <SectionError message={data.errors.backlog ?? 'อ่านงานค้างไม่ได้'} />}
               </OverviewCard>
               <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
-                <OverviewCard icon={Timer} title="กรอกแล้วโทรวันไหน">
+                <OverviewCard icon={Timer} title="โทรหลังกรอก">
                   {apps ? <DelayList rows={fv.delay} /> : <EmptyNote>{`ยังไม่มีรายชื่อใน${period}`}</EmptyNote>}
                 </OverviewCard>
                 <div className="min-w-0 lg:col-span-2">
@@ -503,7 +503,7 @@ const RecruitOverview: React.FC<{
               {/* ช่องทาง → แจ้งเข้า (เจ้าของ 19 ต.ค. 2569 "facebook ad 200 สนใจ 100 … มา 10" + "จับได้ถึงแจ้งเข้า") */}
               <OverviewCard
                 icon={Megaphone}
-                title="รายชื่อที่กรอกในช่วงนี้ ไปถึงไหนแยกช่องทาง"
+                title="รายชื่อที่กรอกในช่วงนี้ แยกช่องทาง"
                 sub={data.errors.informs ? 'อ่านแจ้งเข้า ERP ไม่ได้' : undefined}
               >
                 <ChannelFunnelTable groups={fv.channels.groups} total={fv.channels.total} onOpen={(title, ids) => setNames({ title, ids })} />
@@ -531,7 +531,7 @@ const RecruitOverview: React.FC<{
                   {backlog ? <BacklogBody backlog={backlog} only="appointments" /> : <SectionError message={data.errors.backlog ?? 'อ่านงานค้างไม่ได้'} />}
                 </OverviewCard>
                 {/* ช่องทางที่ได้คนลงงาน (เจ้าของ 19 ต.ค. 2569 — ทีม Online ดูว่าเด็กมาจากไหน ลงงานจากช่องทางไหนเยอะ) */}
-                <OverviewCard icon={Megaphone} title="คนแจ้งเข้าในช่วงนี้ มาจากช่องทางไหน" sub={placementFiltered ? 'นับตามวันแจ้งเข้า' : 'นับตามวันแจ้งเข้า · ทุก BU'}>
+                <OverviewCard icon={Megaphone} title="คนแจ้งเข้าในช่วงนี้ แยกช่องทาง" sub={placementFiltered ? 'นับตามวันแจ้งเข้า' : 'นับตามวันแจ้งเข้า · ทุก BU'}>
                   {placement ? (
                     <ChannelPlacementTable data={placement} placedOnly={placementFiltered} />
                   ) : (

@@ -74,7 +74,7 @@ export default function StuckAreaTable({
               <TableHead className="text-xs">จังหวัด / อำเภอ</TableHead>
               <TableHead className="whitespace-nowrap text-right text-xs">{countLabel}</TableHead>
               <TableHead className="whitespace-nowrap text-right text-xs">เหลือหา (อัตรา)</TableHead>
-              <TableHead className="text-xs">ติดตรงไหน</TableHead>
+              <TableHead className="text-xs">ขั้นที่ติด</TableHead>
               {STUCK_PHASES.map((p) => (
                 <TableHead key={p.key} className={cn('whitespace-nowrap text-right text-xs', TONE[p.tone].value)}>
                   {p.label}

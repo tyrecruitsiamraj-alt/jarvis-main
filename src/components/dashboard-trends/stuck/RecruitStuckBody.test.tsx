@@ -55,7 +55,7 @@ describe('หน้าภาพรวมโฉมใหม่', () => {
     const phases = screen.getByTestId('stuck-phases');
     const nums = ['before', 'uncalled', 'calling', 'closing'].map((k) => Number(within(phases).getByTestId(`stuck-phase-${k}`).textContent?.match(/\d+/)?.[0]));
     expect(nums).toEqual([2, 1, 0, 0]);
-    for (const t of ['ติดที่ใคร', 'รายชื่อมาจากไหน ไปถึงไหน', 'พื้นที่ที่เหลือหา', 'เทียบเดือน', 'ทำไมไม่สำเร็จ']) expect(screen.getByText(t)).toBeTruthy();
+    for (const t of ['ใบค้าง แยกเจ้าหน้าที่', 'รายชื่อ แยกช่องทาง', 'พื้นที่ที่เหลือหา', 'เทียบเดือน', 'เหตุผลที่ไม่สำเร็จ']) expect(screen.getByText(t)).toBeTruthy();
     // กดเหตุ "ยังไม่ประกาศ" → รายการใบ 1 ใบ → กดใบ → เส้นทาง ขั้นที่ติด = ประกาศ
     fireEvent.click(screen.getByTestId('stuck-reason-not_released'));
     const list = await screen.findByTestId('stuck-list');
@@ -113,7 +113,7 @@ describe('หน้าภาพรวมโฉมใหม่', () => {
     expect(within(screen.getByTestId('follow-callers')).getAllByTestId('follow-caller-row').map((r) => r.querySelector('td')?.textContent)).toEqual(['อ้น']);
     fireEvent.click(within(eq).getByTestId('stuck-eq-cancelled'));
     await waitFor(() => expect(screen.getByTestId('stuck-total').textContent).toContain('1'));
-    expect(screen.getByText('ใบที่ยกเลิก ไปถึงขั้นไหน')).toBeTruthy();
+    expect(screen.getByText('ใบที่ยกเลิก แยกขั้นล่าสุด')).toBeTruthy();
     expect(within(screen.getByTestId('stuck-owners')).getAllByTestId('stuck-owner-row').map((r) => r.querySelector('td')?.textContent)).toEqual(['ฟอร์ด']);
     // รายชื่อเหลือเฉพาะของใบที่ยกเลิก (x2) — ไม่มีคนสนใจ
     expect(within(screen.getByTestId('person-stage-ai')).getByTestId('person-part-ai-noPickup').textContent).toContain('1');

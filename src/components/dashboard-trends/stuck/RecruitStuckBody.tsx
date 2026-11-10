@@ -38,11 +38,11 @@ const V5_TABS: ReadonlyArray<readonly [V5Tab, string]> = [
 ];
 
 const SCOPE_TITLE: Record<StuckScope, { title: string; sub: string }> = {
-  remaining: { title: 'ใบขอที่เหลือหา ติดตรงไหน', sub: 'ใบที่ยังเปิดอยู่ ณ วันนี้ · กดได้ทุกตัวเลข' },
-  carried: { title: 'ใบยกมา ติดตรงไหน', sub: 'ใบที่เปิดอยู่ก่อนเริ่มช่วง · กดได้ทุกตัวเลข' },
-  new: { title: 'ใบขอใหม่ ไปถึงขั้นไหน', sub: 'ใบที่ส่งเข้ามาในช่วง ทุกสถานะ · กดได้ทุกตัวเลข' },
-  filled: { title: 'ใบที่ปิดแล้ว ไปถึงขั้นไหน', sub: 'ใบขอใหม่ที่ได้คนแล้ว · กดได้ทุกตัวเลข' },
-  cancelled: { title: 'ใบที่ยกเลิก ไปถึงขั้นไหน', sub: 'ใบขอใหม่ที่ยกเลิกทั้งใบ · กดได้ทุกตัวเลข' },
+  remaining: { title: 'ใบขอที่เหลือหา แยกขั้นที่ติด', sub: 'ใบที่ยังเปิดอยู่ ณ วันนี้ · กดได้ทุกตัวเลข' },
+  carried: { title: 'ใบยกมา แยกขั้นที่ติด', sub: 'ใบที่เปิดอยู่ก่อนเริ่มช่วง · กดได้ทุกตัวเลข' },
+  new: { title: 'ใบขอใหม่ แยกขั้นล่าสุด', sub: 'ใบที่ส่งเข้ามาในช่วง ทุกสถานะ · กดได้ทุกตัวเลข' },
+  filled: { title: 'ใบที่ปิดแล้ว แยกขั้นล่าสุด', sub: 'ใบขอใหม่ที่ได้คนแล้ว · กดได้ทุกตัวเลข' },
+  cancelled: { title: 'ใบที่ยกเลิก แยกขั้นล่าสุด', sub: 'ใบขอใหม่ที่ยกเลิกทั้งใบ · กดได้ทุกตัวเลข' },
 };
 
 /**
@@ -152,7 +152,7 @@ export default function RecruitStuckBody({
   const fbGroupsCard = (
     <OverviewCard
       icon={MousePointerClick}
-      title="กลุ่ม Facebook คนคลิกแล้วกรอกเท่าไหร่"
+      title="คลิกและกรอก แยกกลุ่ม Facebook"
       sub={
         fbGroups
           ? `คลิก ${fbGroups.totalClicks.toLocaleString('th-TH')} · กรอก ${fbGroups.totalApps.toLocaleString('th-TH')} ยอดทั้งหมดตั้งแต่สร้างลิงก์ · กดสมัคร ${fbGroups.totalPresses.toLocaleString('th-TH')} · สมัครซ้ำโดนกัน ${fbGroups.totalBlocked.toLocaleString('th-TH')} นับตั้งแต่ 10 พ.ย. 2569`
@@ -167,12 +167,12 @@ export default function RecruitStuckBody({
   if (layout === 'v5') {
     const ownerTable = <StuckOwnerTable bars rows={focused} countLabel={scope === 'remaining' ? 'ใบที่ต้องหา' : `ใบ${STUCK_SCOPE_LABEL[scope]}`} onPick={pick} />;
     const bringerCard = (
-      <OverviewCard icon={UserRound} title="ใครหารายชื่อเข้ามา" sub={cohortSub}>
+      <OverviewCard icon={UserRound} title="รายชื่อ แยกคนหา" sub={cohortSub}>
         {appsUnknown ? appsError : <ChannelFunnelTable groups={bringers.groups} total={bringers.total} onOpen={onOpenNames} firstLabel="คน" rootLabel="ทุกคน" />}
       </OverviewCard>
     );
     const channelCard = (
-      <OverviewCard icon={Megaphone} title="รายชื่อมาจากไหน ไปถึงไหน" sub={`${cohortSub}${data.errors.informs ? ' · อ่านแจ้งเข้า ERP ไม่ได้' : ''}`}>
+      <OverviewCard icon={Megaphone} title="รายชื่อ แยกช่องทาง" sub={`${cohortSub}${data.errors.informs ? ' · อ่านแจ้งเข้า ERP ไม่ได้' : ''}`}>
         {appsUnknown ? appsError : <ChannelFunnelTable groups={channels.groups} total={channels.total} onOpen={onOpenNames} />}
       </OverviewCard>
     );
@@ -247,7 +247,7 @@ export default function RecruitStuckBody({
           </div>
         ) : null}
         {detailTab === 'reasons' ? (
-          <OverviewCard icon={AlertCircle} title="ทำไมไม่สำเร็จ" sub={`${cohortSub} · ผลล่าสุดของแต่ละคน`}>
+          <OverviewCard icon={AlertCircle} title="เหตุผลที่ไม่สำเร็จ" sub={`${cohortSub} · ผลล่าสุดของแต่ละคน`}>
             {appsUnknown ? appsError : <ReasonColumns groups={reasons} onOpen={onOpenNames} />}
           </OverviewCard>
         ) : null}
@@ -301,14 +301,14 @@ export default function RecruitStuckBody({
       {appsUnknown ? appsError : <PersonJourneyCard list={cohort} sub={cohortSub} onOpenNames={onOpenNames} />}
 
       {/* 3 รายชื่อมาจากไหน ไปถึงไหน — ตารางเดิม 4 กลุ่ม → ช่องทาง → กลุ่ม/เพจ · ถึงแจ้งเข้า */}
-      <OverviewCard icon={Megaphone} title="รายชื่อมาจากไหน ไปถึงไหน" sub={`${cohortSub}${data.errors.informs ? ' · อ่านแจ้งเข้า ERP ไม่ได้' : ''}`}>
+      <OverviewCard icon={Megaphone} title="รายชื่อ แยกช่องทาง" sub={`${cohortSub}${data.errors.informs ? ' · อ่านแจ้งเข้า ERP ไม่ได้' : ''}`}>
         {appsUnknown ? appsError : <ChannelFunnelTable groups={channels.groups} total={channels.total} onOpen={onOpenNames} />}
       </OverviewCard>
 
       {fbGroupsCard}
 
       {/* ใครหารายชื่อเข้ามา (เจ้าของ 9 พ.ย. 2569 "ใครทำก็คนนั้นได้ จะได้วัดผลว่าใครมีรายชื่อเข้ามาเยอะ") — คน → วิธี → ช่องทาง/กลุ่ม */}
-      <OverviewCard icon={UserRound} title="ใครหารายชื่อเข้ามา" sub={cohortSub}>
+      <OverviewCard icon={UserRound} title="รายชื่อ แยกคนหา" sub={cohortSub}>
         {appsUnknown ? appsError : <ChannelFunnelTable groups={bringers.groups} total={bringers.total} onOpen={onOpenNames} firstLabel="คน" rootLabel="ทุกคน" />}
       </OverviewCard>
 
@@ -323,7 +323,7 @@ export default function RecruitStuckBody({
         onOpen={() => setMonthlyOpen(true)}
       />
 
-      <OverviewCard icon={AlertCircle} title="ทำไมไม่สำเร็จ" sub={`${cohortSub} · ผลล่าสุดของแต่ละคน`}>
+      <OverviewCard icon={AlertCircle} title="เหตุผลที่ไม่สำเร็จ" sub={`${cohortSub} · ผลล่าสุดของแต่ละคน`}>
         {appsUnknown ? appsError : <ReasonColumns groups={reasons} onOpen={onOpenNames} />}
       </OverviewCard>
     </div>

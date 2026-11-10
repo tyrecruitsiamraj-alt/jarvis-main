@@ -37,7 +37,7 @@ export default function PersonJourneyCard({
     );
 
   return (
-    <OverviewCard icon={Route} title="รายชื่อหลุดตรงไหน" sub={sub}>
+    <OverviewCard icon={Route} title="จุดที่รายชื่อหลุด" sub={sub}>
       <div className="space-y-1" data-testid="person-journey">
         {stages.map((s, i) => (
           <React.Fragment key={s.key}>

@@ -39,7 +39,7 @@ export default function StuckOwnerTable({
       <span className={cn('px-2 tabular-nums', DASH.sub)}>0</span>
     );
   return (
-    <OverviewCard icon={Users} title="ติดที่ใคร" sub="เจ้าหน้าที่สรรหาของใบ · กดเลขดูใบ">
+    <OverviewCard icon={Users} title="ใบค้าง แยกเจ้าหน้าที่" sub="เจ้าหน้าที่สรรหาของใบ · กดเลขดูใบ">
       <div className="overflow-x-auto" data-testid="stuck-owners">
         <Table>
           <TableHeader>

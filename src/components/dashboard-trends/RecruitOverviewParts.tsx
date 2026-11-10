@@ -462,7 +462,7 @@ export function DailyCard({ rows, icon }: { rows: readonly DailyRow[]; icon: Luc
       title="รายวัน"
       sub={
         asTable
-          ? 'กรอกมาวันไหน โทรหลังกรอกกี่วัน (ครบ 24 ชม. = 1 วัน)'
+          ? 'แยกวันที่กรอก นับวันจนโทร (ครบ 24 ชม. = 1 วัน)'
           : `${metric === 'names' ? 'รายชื่อที่กรอกแต่ละวัน' : `${label} แยกตามวันที่กรอก`} · รวม ${fmt(s.total)}${s.peak ? ` · สูงสุด ${fmt(s.peak.value)} (${dayMonthText(s.peak.ymd)})` : ''}`
       }
       actions={
