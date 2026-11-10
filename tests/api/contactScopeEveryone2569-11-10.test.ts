@@ -67,7 +67,8 @@ describe('แท็บการติดต่อปุ่ม "ทุกคน" 
     const mine = await get('staff', {});
     expect(mine.sql).toContain('claimed_by is null or claimed_by::text');
     dbQuery.mockClear();
-    const all = await get('staff', { view: 'contact', scope: 'all' });
+    // ทุกคน = เฉพาะ role ที่มีสิทธิ์ contact_view_all (ค่าเริ่ม Admin + Supervisor · เจ้าของ 10 พ.ย. 2569)
+    const all = await get('supervisor', { view: 'contact', scope: 'all' });
     expect(all.sql).toContain('(claimed_by is not null or coalesce(is_lead, false))');
     expect(all.sql).not.toContain('claimed_by is null or claimed_by::text');
     const q = buildApplicationsListQuery({ viewerId: 'u-viewer', everyoneContact: true });
@@ -78,11 +79,22 @@ describe('แท็บการติดต่อปุ่ม "ทุกคน" 
     dbQuery.mockImplementation(async (sql: string) => ({ rows: /order by created_at desc limit 20000/.test(String(sql)) ? [row] : [] }));
     const call = async (query: Record<string, string>) => {
       const { res, json } = mockRes();
-      await handler(req('staff', query) as never, res as never);
+      await handler(req('supervisor', query) as never, res as never);
       return (json.mock.calls[0][0] as { items: Array<Record<string, unknown>> }).items[0];
     };
     expect((await call({})).claimed_by_name).toBeUndefined();
     expect((await call({ view: 'contact', scope: 'all' })).claimed_by_name).toBe('ตั้ม');
+  });
+  it('Staff ขอ "ทุกคน" = 403 (ไม่ใช่ลิสต์ของทุกคน) · เจ้าของเปิดสิทธิ์ให้ Staff ที่หน้าตั้งค่าแล้ว = ได้', async () => {
+    const denied = mockRes();
+    await handler(req('staff', { view: 'contact', scope: 'all' }) as never, denied.res as never);
+    expect(denied.status).toHaveBeenCalledWith(403);
+    expect(listCall()).toBeUndefined();
+    dbQuery.mockImplementation(async (sql: string) => ({
+      rows: /role_function_grants/.test(String(sql)) ? [{ role: 'staff', function_id: 'contact_view_all', enabled: true }] : [],
+    }));
+    const all = await get('staff', { view: 'contact', scope: 'all' });
+    expect(all.sql).toContain('(claimed_by is not null or coalesce(is_lead, false))');
   });
   it('หน้าเว็บ: ทุกคน = ใครเก็บก็อยู่แท็บการติดต่อ · ป้าย "เก็บโดย" ไม่ขึ้นกับของฉัน', () => {
     const other = { id: 'a1', full_name: 'สมชาย ใจดี', phone: '0812345678', status: 'new', created_at: '2026-11-09T03:00:00Z', claimed: true, claimed_by_me: false, claimed_by_name: 'ตั้ม' } as PublicApplication;

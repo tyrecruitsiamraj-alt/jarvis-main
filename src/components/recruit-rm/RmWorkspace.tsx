@@ -79,6 +79,7 @@ import { fetchCallHoldsByPhones, type CallHold } from '@/lib/callHoldsApi';
 import { RM_OPEN_PARAM, canHoldApplication } from '@/lib/recruitRm';
 import { choiceCountdown } from '@/lib/callChoiceGuard';
 import { useAuth } from '@/contexts/AuthContext';
+import { useRolePermissions } from '@/contexts/RolePermissionsContext';
 import {
   FilterSheetButton,
   FilterSidebar,
@@ -247,6 +248,9 @@ const RmWorkspace: React.FC<{
   /** ใบประวัติ (แท็บผู้สมัคร) — คนละป๊อปกับ `contactApp` ของแท็บการติดตาม */
   const [profileApp, setProfileApp] = useState<PublicApplication | null>(null);
   const { user } = useAuth();
+  const { isFunctionEnabled } = useRolePermissions();
+  /** การติดต่อ "ทุกคน" — เฉพาะ role ที่เจ้าของเปิดสิทธิ์ (ค่าเริ่ม Admin + Supervisor · 10 พ.ย. 2569) · ตั้งค่า › สิทธิ์ฟังก์ชัน */
+  const canSeeEveryoneContact = isFunctionEnabled('contact_view_all');
   /** ล็อกโทรของแถวในหน้า (คีย์ = application id) — โชว์ 🔒 + กันกดซ้ำ */
   const [holdByRef, setHoldByRef] = useState<Record<string, CallHold>>({});
   const [holdingSelected, setHoldingSelected] = useState(false);
@@ -328,7 +332,7 @@ const RmWorkspace: React.FC<{
     !leadView &&
     !cancelledView;
   /** การติดต่อของทุกคน — ได้แต่ใบที่มีคนเก็บ (เก็บไปโทร/Lead) พร้อมชื่อคนเก็บ ⇒ ห้ามนับให้แท็บอื่นเหมือนนัดของทุกคน */
-  const everyoneContact = tab === 'contact' && contactScope === 'all' && !bucket && !leadView && !cancelledView;
+  const everyoneContact = canSeeEveryoneContact && tab === 'contact' && contactScope === 'all' && !bucket && !leadView && !cancelledView;
   /** ชุดที่โหลด: ของฉัน · นัดทุกคน · การติดต่อทุกคน */
   const rowsScope = everyoneAppointments ? 'appointments' : everyoneContact ? 'contact' : 'mine';
   const everyoneView = rowsScope !== 'mine';
@@ -1020,7 +1024,7 @@ const RmWorkspace: React.FC<{
       {!bucket && tab === 'contact' ? (
         <div className="mt-4 flex flex-wrap items-center gap-2">
           {/* ของฉัน / ทุกคน (เจ้าของ 10 พ.ย. 2569 "ใครเก็บไปแล้วยังไม่โทรบ้าง") — แบบเดียวกับแท็บติดตามนัดหมาย · มุมมอง Lead/ยกเลิกไม่มีปุ่มนี้ */}
-          {canSeeEveryoneAppointments(user?.role) && !leadView && !cancelledView ? (
+          {canSeeEveryoneContact && !leadView && !cancelledView ? (
             <ToggleGroup
               type="single"
               size="xs"

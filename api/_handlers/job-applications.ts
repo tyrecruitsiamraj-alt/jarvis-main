@@ -1,3 +1,4 @@
+import { checkFunctionAccess } from '../_lib/roleFunctionGrants.js';
 import { cancelApplication, isUndefinedTable, loadCancellations, restoreApplication } from '../_lib/applicationCancellations.js';
 import { loadIrecruitDups, type IrecruitDup } from '../_lib/irecruitDuplicates.js';
 import { loadIrecruitImportStatus } from '../_lib/irecruitApplicantImport.js';
@@ -407,8 +408,9 @@ function isUndefinedColumn(e: unknown): boolean {
  * อ่านอย่างเดียว — ลงผลมา/ไม่มาบนนัดของคนอื่นผ่านอยู่แล้ว (application-attendance เช็คแค่ BU)
  */
 /**
- * แท็บการติดต่อปุ่ม "ทุกคน" (เจ้าของ 10 พ.ย. 2569 "อยากดู … ใครเก็บไปแล้วยังไม่โทรบ้าง") — ทุกบัญชีที่ล็อกอิน
- * แบบเดียวกับนัดหมายทุกคน · สิทธิ์ BU ข้างในยังอยู่ · ได้เฉพาะใบที่มีคนเก็บ (เก็บไปโทร หรือ Lead)
+ * แท็บการติดต่อปุ่ม "ทุกคน" (เจ้าของ 10 พ.ย. 2569 "อยากดู … ใครเก็บไปแล้วยังไม่โทรบ้าง")
+ * สิทธิ์ใคร = ฟังก์ชัน `contact_view_all` (ค่าเริ่ม Admin + Supervisor · เจ้าของ 10 พ.ย. 2569 "เฉพาะคนที่ฉันกำหนดเท่านั้น")
+ * ผู้เรียกเช็ค `checkFunctionAccess` ต่อ (ไม่มีสิทธิ์ = 403) · สิทธิ์ BU ข้างในยังอยู่ · ได้เฉพาะใบที่มีคนเก็บ (เก็บไปโทร หรือ Lead)
  */
 export function wantsEveryoneContact(query: Record<string, unknown> | undefined, role: UserRole | undefined): boolean {
   if (!role) return false;
@@ -1677,6 +1679,12 @@ async function handler(req: AuthedReq, res: ApiRes) {
     }
     // แผนกของผู้ใช้ — คู่กับ department_code บนใบสมัคร ทำให้ใบขอปิดแล้วรายชื่อยังอยู่
     const deptScope = await loadUserDepartmentScope(req.user);
+    // การติดต่อ "ทุกคน" เฉพาะ role ที่เปิดสิทธิ์ `contact_view_all` (ค่าเริ่ม Admin + Supervisor · เจ้าของ 10 พ.ย. 2569)
+    const everyoneContact = wantsEveryoneContact(req.query, req.user.role);
+    if (everyoneContact) {
+      const access = await checkFunctionAccess(req.user.role, 'contact_view_all');
+      if (!access.ok) return sendError(res, 403, 'Forbidden', 'ไม่มีสิทธิ์ดูรายชื่อการติดต่อของทุกคน');
+    }
     const q = buildApplicationsListQuery({
       jobId,
       scopedJobIds,
@@ -1690,9 +1698,9 @@ async function handler(req: AuthedReq, res: ApiRes) {
         : null,
       // แท็บติดตามนัดหมาย "ทุกคน" — สิทธิ์ตัดสินที่นี่ (staff ส่งมา = ลิสต์เดิม)
       everyoneAppointments: wantsEveryoneAppointments(req.query, req.user.role),
-      everyoneContact: wantsEveryoneContact(req.query, req.user.role),
+      everyoneContact,
     });
-    const showClaimer = wantsEveryoneContact(req.query, req.user.role);
+    const showClaimer = everyoneContact;
     const rows = await queryWithLegacyFallback(
       q.sql,
       q.params,
