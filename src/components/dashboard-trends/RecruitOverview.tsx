@@ -60,6 +60,7 @@ import {
 import { friendlyErrorText } from '@/lib/friendlyError';
 import { TrendState } from './TrendParts';
 import JourneyNamesDialog from './JourneyNamesDialog';
+import { useV5ThemeStyle } from '@/components/so-recruit-v5/V5Parts';
 import ChannelPlacementTable from './ChannelPlacementTable';
 import ChannelFunnelTable from './ChannelFunnelTable';
 import { buildChannelFunnelTree } from '@/lib/channelFunnel';
@@ -177,6 +178,9 @@ const RecruitOverview: React.FC<{
    */
   const [searchParams] = useSearchParams();
   const legacyCards = searchParams.get('dash') === 'cards';
+  /** โฉมต้นแบบ SO Recruit (เจ้าของ 10 พ.ย. 2569 ชุดส่งต่อ · `&dash=v5`) — ชั้นคู่ขนาน รอตรวจรับ */
+  const v5 = searchParams.get('dash') === 'v5';
+  const v5Style = useV5ThemeStyle();
 
   useEffect(() => {
     let cancelled = false;
@@ -311,10 +315,20 @@ const RecruitOverview: React.FC<{
     .join(' · ');
 
   return (
-    <div className={cn('space-y-3', state.loading && 'opacity-70')}>
+    <div
+      className={cn(v5 ? '-mx-4 min-h-screen space-y-6 bg-background px-4 py-6 text-foreground sm:-mx-6 sm:px-6' : 'space-y-3', state.loading && 'opacity-70')}
+      style={v5 ? v5Style : undefined}
+      data-testid={v5 ? 'recruit-v5' : undefined}
+    >
+      {v5 ? (
+        <div className="space-y-1">
+          <h1 className="text-3xl font-medium tracking-tight">ภาพรวมงานสรรหา</h1>
+          <p className="text-sm text-muted-foreground">เห็นงานค้าง คนรับผิดชอบ และสิ่งที่ต้องทำต่อ</p>
+        </div>
+      ) : null}
       {/* ─── หัว: ชื่อ + ปุ่มช่วงเวลาปุ่มเดียว (เจ้าของ 19 ต.ค. 2569 "รวมกันเลย" · 28 ต.ค. เหลือ เดือน · วันที่ · 7/30 วันล่าสุด) ─── */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-base font-medium text-foreground">ภาพรวมงานสรรหา</h2>
+        {v5 ? <span className="text-xs text-muted-foreground">กดตัวเลขเพื่อดูรายการ แล้วกดชื่อเพื่อดูสิ่งที่ต้องทำต่อ</span> : <h2 className="text-base font-medium text-foreground">ภาพรวมงานสรรหา</h2>}
         <div className="flex flex-wrap items-center gap-2">
           <Popover open={periodOpen} onOpenChange={setPeriodOpen}>
             <PopoverTrigger asChild>
@@ -422,6 +436,7 @@ const RecruitOverview: React.FC<{
        */}
       {legacyCards ? null : (
         <RecruitStuckBody
+          layout={v5 ? 'v5' : undefined}
           data={data}
           win={win}
           onOpenNames={(title, ids) => setNames({ title, ids })}
@@ -534,6 +549,7 @@ const RecruitOverview: React.FC<{
         onOpenChange={(o) => !o && setNames(null)}
         title={names?.title ?? ''}
         ids={names?.ids ?? []}
+        contentStyle={v5 ? v5Style : undefined}
       />
     </div>
   );

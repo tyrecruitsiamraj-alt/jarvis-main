@@ -2,6 +2,9 @@ import React from 'react';
 import { AlertCircle, Megaphone, UserRound } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { V5Divider } from '@/components/so-recruit-v5/V5Parts';
 import { EMPTY_REQUEST_FILTER, appsOfFilter, filterRequestRows, jobFilterOf, type RequestTabFilter } from '@/lib/recruitRequestTab';
 import { cohortOf, reasonGroups } from '@/lib/recruitOverview';
 import { buildBringerFunnelTree, buildChannelFunnelTree } from '@/lib/channelFunnel';
@@ -20,6 +23,16 @@ import MonthlyBarsCard from './MonthlyBarsCard';
 import StuckEquationCard from './StuckEquationCard';
 import PersonJourneyCard from './PersonJourneyCard';
 import ReleaseProgressCard from './ReleaseProgressCard';
+
+type V5Tab = 'overview' | 'staff' | 'channel' | 'area' | 'trend' | 'reasons';
+const V5_TABS: ReadonlyArray<readonly [V5Tab, string]> = [
+  ['overview', 'ภาพรวม'],
+  ['staff', 'เจ้าหน้าที่'],
+  ['channel', 'ช่องทาง'],
+  ['area', 'พื้นที่'],
+  ['trend', 'แนวโน้ม'],
+  ['reasons', 'เหตุผลที่ไม่สำเร็จ'],
+];
 
 const SCOPE_TITLE: Record<StuckScope, { title: string; sub: string }> = {
   remaining: { title: 'ใบขอที่เหลือหา ติดตรงไหน', sub: 'ใบที่ยังเปิดอยู่ ณ วันนี้ · กดได้ทุกตัวเลข' },
@@ -41,11 +54,14 @@ export default function RecruitStuckBody({
   win,
   onOpenNames,
   onPickMonth,
+  layout,
 }: {
   data: RecruitOverviewResponse;
   win: RecruitOverviewResponse['window'];
   onOpenNames: (title: string, ids: readonly string[]) => void;
   onPickMonth: (month: string) => void;
+  /** `v5` = โฉมต้นแบบ SO Recruit (10 พ.ย. 2569 · &dash=v5) — การ์ดชุดเดิมทั้งหมด จัดเป็นแท็บเจาะรายละเอียด */
+  layout?: 'v5';
 }) {
   const navigate = useNavigate();
   const [stuck, setStuck] = React.useState<{ data: RecruitStuckResponse | null; error: string | null }>({ data: null, error: null });
@@ -114,6 +130,99 @@ export default function RecruitStuckBody({
     requestAnimationFrame(() => phasesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
   };
   const openRequest = (r: StuckRequest) => r.jobId && navigate(requestPathOfJobId(r.jobId));
+  const [detailTab, setDetailTab] = React.useState<V5Tab>('overview');
+
+  if (layout === 'v5') {
+    const ownerTable = <StuckOwnerTable bars rows={focused} countLabel={scope === 'remaining' ? 'ใบที่ต้องหา' : `ใบ${STUCK_SCOPE_LABEL[scope]}`} onPick={pick} />;
+    const bringerCard = (
+      <OverviewCard icon={UserRound} title="ใครหารายชื่อเข้ามา" sub={cohortSub}>
+        <ChannelFunnelTable groups={bringers.groups} total={bringers.total} onOpen={onOpenNames} firstLabel="คน" rootLabel="ทุกคน" />
+      </OverviewCard>
+    );
+    const channelCard = (
+      <OverviewCard icon={Megaphone} title="รายชื่อมาจากไหน ไปถึงไหน" sub={`${cohortSub}${data.errors.informs ? ' · อ่านแจ้งเข้า ERP ไม่ได้' : ''}`}>
+        <ChannelFunnelTable groups={channels.groups} total={channels.total} onOpen={onOpenNames} />
+      </OverviewCard>
+    );
+    return (
+      <div className="space-y-6" data-testid="recruit-stuck">
+        <StuckFilterBar rows={allRows} appRecruiters={appRecruiters} value={filter} onChange={setFilter} />
+        {stuck.error || stuck.data?.errors.requests ? (
+          <SectionError message={stuck.error ?? stuck.data?.errors.requests ?? 'อ่านใบขอที่เหลือหาไม่ได้'} onRetry={() => setRev((n) => n + 1)} />
+        ) : null}
+        {stuck.data?.requests ? (
+          <>
+            <StuckEquationCard look="v5" rows={filtered} window={stuck.data.window ?? null} value={scope} onChange={setScope} />
+            <div ref={phasesRef} className="scroll-mt-20">
+              <StuckPhasesCard
+                key={scope}
+                rows={rows}
+                title={SCOPE_TITLE[scope].title}
+                sub={SCOPE_TITLE[scope].sub}
+                onFocus={setFocus}
+                onOpenRequest={openRequest}
+                listOverride={picked}
+                onCloseList={() => setPicked(null)}
+              />
+            </div>
+          </>
+        ) : stuck.error || stuck.data ? null : (
+          <div className="space-y-3" aria-busy>
+            <Skeleton className="h-32 rounded-2xl" />
+            <Skeleton className="h-64 rounded-2xl" />
+          </div>
+        )}
+
+        <V5Divider label="เจาะรายละเอียด" />
+        <Tabs value={detailTab} onValueChange={(v) => setDetailTab(v as V5Tab)}>
+          <TabsList variant="line" aria-label="เจาะรายละเอียด">
+            {V5_TABS.map(([k, label]) => (
+              <TabsTrigger key={k} value={k} data-testid={`v5-tab-${k}`}>
+                {label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
+        {/* ทุกการ์ดของหน้าเดิมอยู่ครบในแท็บ (ชุดส่งต่อ 04_NO_DATA_LOSS) — ตัวกรอง/ชุดใบ/ช่วงเดียวกันทั้งหมด */}
+        {detailTab === 'overview' ? (
+          <div className="space-y-4">
+            {stuck.data?.requests ? ownerTable : null}
+            {stuck.data?.requests ? <ReleaseProgressCard rows={filtered} onPick={pick} /> : null}
+            <PersonJourneyCard list={cohort} sub={cohortSub} onOpenNames={onOpenNames} />
+          </div>
+        ) : null}
+        {detailTab === 'staff' ? (
+          <div className="space-y-4">
+            {stuck.data?.requests ? ownerTable : null}
+            {bringerCard}
+          </div>
+        ) : null}
+        {detailTab === 'channel' ? (
+          <div className="space-y-4">
+            {channelCard}
+            {bringerCard}
+          </div>
+        ) : null}
+        {detailTab === 'area' && stuck.data?.requests ? (
+          <StuckAreaTable rows={focused} title={scope === 'remaining' ? undefined : `พื้นที่ · ใบ${STUCK_SCOPE_LABEL[scope]}`} countLabel={scope === 'remaining' ? undefined : `ใบ${STUCK_SCOPE_LABEL[scope]}`} onPick={pick} />
+        ) : null}
+        {detailTab === 'trend' ? (
+          <MonthlyBarsCard rows={monthly.data} error={monthly.error} ok={jobOk} onPickMonth={onPickMonth} open={monthlyOpen} onOpen={() => setMonthlyOpen(true)} />
+        ) : null}
+        {detailTab === 'reasons' ? (
+          <OverviewCard icon={AlertCircle} title="ทำไมไม่สำเร็จ" sub={`${cohortSub} · ผลล่าสุดของแต่ละคน`}>
+            <ReasonColumns groups={reasons} onOpen={onOpenNames} />
+          </OverviewCard>
+        ) : null}
+        {/* รายงานเดิม (ตำแหน่งสมัคร · เทียบช่วงก่อน · งานค้างตามอายุ · กรอกแล้วโทรวันไหน · ผลงานรายคน · ช่องทางแจ้งเข้า) — หน้าเดิมยังอยู่ครบ */}
+        <div className="flex justify-end">
+          <Button type="button" variant="outline" onClick={() => navigate('/jobs/board?view=dashboard&dash=cards')} data-testid="v5-legacy-reports">
+            รายงานเพิ่มเติม (แบบเดิม)
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-5" data-testid="recruit-stuck">

@@ -16,13 +16,20 @@ export default function StuckOwnerTable({
   rows,
   onPick,
   countLabel = 'ใบที่ต้องหา',
+  bars = false,
 }: {
   rows: readonly StuckRequest[];
   onPick: (title: string, list: StuckRequest[]) => void;
   /** หัวคอลัมน์จำนวนใบ — ตามใบชุดที่เลือกบนสุด */
   countLabel?: string;
+  /** แท่งต่อช่อง (ต้นแบบ SO Recruit 10 พ.ย. 2569 "งานอยู่ที่ใคร" — แต่ละคนมีงานกี่ใบในแต่ละช่วง อ่านจากแท่ง+เลข) · ยาวเทียบช่องที่มากสุดของช่วงเดียวกัน */
+  bars?: boolean;
 }) {
   const owners = React.useMemo(() => stuckByOwner(rows), [rows]);
+  const phaseMax = React.useMemo(
+    () => Object.fromEntries(STUCK_PHASES.map((p) => [p.key, Math.max(1, ...owners.map((o) => o.byPhase[p.key].length))])) as Record<string, number>,
+    [owners],
+  );
   const cell = (list: StuckRequest[], title: string) =>
     list.length ? (
       <Button type="button" variant="ghost" size="xs" className="-mr-2 h-7 px-2 tabular-nums" onClick={() => onPick(title, list)}>
@@ -61,7 +68,16 @@ export default function StuckOwnerTable({
                 <TableCell className="p-1 text-right">{cell(o.rows, `${o.name} · ${countLabel}`)}</TableCell>
                 {STUCK_PHASES.map((p) => (
                   <TableCell key={p.key} className="p-1 text-right">
-                    {cell(o.byPhase[p.key], `${o.name} · ${p.label}`)}
+                    {bars ? (
+                      <span className="flex items-center justify-end gap-2">
+                        <span className="block h-1.5 w-16 overflow-hidden rounded-full bg-muted sm:w-24" aria-hidden>
+                          <span className={cn('block h-full rounded-full', TONE[p.tone].dot)} style={{ width: `${(o.byPhase[p.key].length / phaseMax[p.key]) * 100}%` }} />
+                        </span>
+                        {cell(o.byPhase[p.key], `${o.name} · ${p.label}`)}
+                      </span>
+                    ) : (
+                      cell(o.byPhase[p.key], `${o.name} · ${p.label}`)
+                    )}
                   </TableCell>
                 ))}
                 <TableCell className="text-right text-sm tabular-nums">{o.rows.some((r) => r.ageDays !== null) ? `${fmt(o.oldest)} วัน` : '—'}</TableCell>

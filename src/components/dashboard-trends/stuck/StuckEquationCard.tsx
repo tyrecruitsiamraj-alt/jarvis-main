@@ -25,14 +25,53 @@ export default function StuckEquationCard({
   window: win,
   value,
   onChange,
+  look,
 }: {
   rows: readonly StuckRequest[];
   window: { from: string; to: string } | null;
   value: StuckScope;
   onChange: (next: StuckScope) => void;
+  /** `v5` = การ์ดขาวแบบต้นแบบ SO Recruit (10 พ.ย. 2569 · &dash=v5) — "ใบจากนอกช่วง" = ยกมา · ตัวเลข/การกดเหมือนเดิม */
+  look?: 'v5';
 }) {
   const eq = React.useMemo(() => stuckEquation(rows), [rows]);
   const need = eq.remaining.reduce((s, r) => s + r.remaining, 0);
+  if (look === 'v5') {
+    const label: Record<StuckScope, string> = { carried: 'ใบจากนอกช่วง', new: 'ขอใหม่', filled: 'ปิดแล้ว', cancelled: 'ยกเลิก', remaining: 'ยังต้องหา' };
+    return (
+      <div className="rounded-2xl border border-border bg-card p-4 sm:p-6" data-testid="stuck-equation">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-5 sm:gap-0 sm:divide-x sm:divide-border">
+          {BOXES.map((b) => {
+            const result = b.key === 'remaining';
+            return (
+              <Button
+                key={b.key}
+                type="button"
+                variant="ghost"
+                aria-pressed={value === b.key}
+                onClick={() => onChange(value === b.key ? 'remaining' : b.key)}
+                className={cn(
+                  'h-auto min-w-0 flex-col items-start justify-start gap-1 whitespace-normal rounded-xl px-4 py-2 text-left font-normal sm:rounded-none',
+                  value === b.key && 'bg-muted',
+                )}
+                data-testid={`stuck-eq-${b.key}`}
+              >
+                <span className="text-sm text-muted-foreground">
+                  {b.op ? `${b.op} ` : ''}
+                  {label[b.key]}
+                </span>
+                <span className={cn('text-4xl font-medium tabular-nums', result ? 'text-primary' : 'text-foreground')}>
+                  <span data-testid={`stuck-eq-${b.key}-n`}>{fmt(eq[b.key].length)}</span>
+                  <span className="ml-1 text-sm font-normal text-muted-foreground">{result ? `ใบ · ${fmt(need)} อัตรา` : 'ใบ'}</span>
+                </span>
+              </Button>
+            );
+          })}
+        </div>
+        {win ? <p className="mt-3 text-xs tabular-nums text-muted-foreground">ขอใหม่ {dayText(win.from)} – {dayText(win.to)} · กดกล่องเพื่อดูเฉพาะใบชุดนั้นทั้งหน้า</p> : null}
+      </div>
+    );
+  }
   return (
     <div
       className="space-y-3 rounded-2xl bg-foreground p-4 text-background shadow-xl shadow-foreground/10 dark:bg-card dark:text-foreground sm:p-6"
