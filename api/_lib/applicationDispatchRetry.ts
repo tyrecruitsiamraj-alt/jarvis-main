@@ -12,7 +12,10 @@
  * ใบที่หยิบ (ตรงกับเส้นกรอกเสร็จ):
  *   ผูกใบขอ · ไม่มีคนคีย์ (`created_by_name` ว่าง) หรือคีย์/นำเข้าตั้งแต่ `KEYED_AUTO_SINCE` (ไม่ใช่ใบดึงจาก iRecruit) · ไม่มีแถวในคิวโทร · ไม่ถูกยกเลิกข้อมูล · ไม่ติดป้ายซ้ำ iRecruit ·
  *   อายุไม่เกิน · ไม่มีคนเก็บไปโทรเอง/เก็บ Lead · ไม่อยู่กองรอเลือกวิธีโทร (`unclaimed_at` — ของ callChoiceWorker) ·
- *   วิธีโทรว่างหรือเลือก AI · กรอกมาแล้ว ≥ 3 นาที (ไม่ชนเส้นกรอกเสร็จ) และไม่เกิน 7 วัน
+ *   วิธีโทรว่างหรือเลือก AI · กรอกมาแล้ว ≥ 3 นาที (ไม่ชนเส้นกรอกเสร็จ)
+ *   ใบที่ผูกใบขอ: ไม่มีเพดานวัน (เจ้าของ 10 พ.ย. 2569 "ระบบส่งซ้ำจนกว่าจะส่งได้ ไม่ตัด 7 วัน" — เดิมเลยวันที่ 7 แล้วค้างกล่อง "ไม่ได้ส่ง AI"
+ *   ขึ้น "ส่ง AI ไม่สำเร็จ" ทั้งที่ไม่ใช่กฎ) · ใบขอปิด/ไม่มีรายได้ = ตัวส่งจดเหตุตามกฎให้ · ใบใหม่ก่อน (กันใบเก่าที่ติดกฎกินโควตารอบ)
+ *   ใบไม่ผูกใบขอ (บททักทาย) ยังตัดที่ 7 วันเหมือนเดิม — ไม่โทรเงียบหาคนเก่าที่ไม่ได้สั่ง
  * 🔴 กรอกตั้งแต่ `RETRY_SINCE` เท่านั้น — 17 ใบที่หลุดก่อนหน้านี้ เจ้าของยังไม่สั่งส่ง (ข้อ 2) ห้ามโทรเงียบ ๆ
  * 🔴 ไม่มีคีย์ push ของ Lumos หรือปิด `APPLICATION_AUTO_DISPATCH_ENABLED` = ไม่ทำอะไร
  *    (เครื่องนักพัฒนาไม่มีคีย์ ⇒ ไม่ยิงสายจริงจากเครื่อง ทั้งที่ฐานเป็นของจริง) · ปิดเฉพาะตัวนี้ด้วย APPLICATION_DISPATCH_RETRY_ENABLED=false
@@ -91,7 +94,7 @@ function unsentSql(linked: boolean): string {
       and a.phone is not null
       and a.created_at >= $1::timestamptz
       and a.created_at <= now() - interval '${MIN_AGE_MINUTES} minutes'
-      and a.created_at >= now() - interval '${MAX_AGE_DAYS} days'
+      ${linked ? '' : `and a.created_at >= now() - interval '${MAX_AGE_DAYS} days'`}
       and (a.age is null or a.age < ${OVER_AGE_MIN})
       and a.claimed_by is null
       and a.unclaimed_at is null
@@ -102,7 +105,7 @@ function unsentSql(linked: boolean): string {
       and not exists (select 1 from ${QUEUE} q where q.person_ref = 'app-' || a.id::text)
       and not exists (select 1 from ${CANCELLATIONS} c where c.application_id = a.id)
       and not exists (select 1 from ${IRECRUIT_DUPS} d where d.application_id = a.id)
-    order by a.created_at asc
+    order by a.created_at ${linked ? 'desc' : 'asc'}
     limit ${LIMIT}`;
 }
 

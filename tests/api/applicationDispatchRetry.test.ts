@@ -39,7 +39,6 @@ describe('ตัวลองส่งใบสมัครเข้า AI ซ้
       'a.created_by_name is null',
       "a.created_at >= $1::timestamptz",
       "interval '3 minutes'",
-      "interval '7 days'",
       'a.claimed_by is null',
       'a.unclaimed_at is null',
       'coalesce(a.is_lead, false) = false',
@@ -50,6 +49,16 @@ describe('ตัวลองส่งใบสมัครเข้า AI ซ้
     ]) {
       expect(sql).toContain(guard);
     }
+  });
+
+  it('ใบที่ผูกใบขอไม่ตัดที่ 7 วัน (เจ้าของ 10 พ.ย. 2569 ส่งซ้ำจนกว่าจะส่งได้) · ใบใหม่ก่อน · ใบไม่ผูกใบขอยังตัด 7 วัน', () => {
+    const linked = unsentApplicationsSql();
+    expect(linked).not.toContain("interval '7 days'");
+    expect(linked).toContain('order by a.created_at desc');
+    expect(linked).toContain('a.created_at >= $1::timestamptz');
+    const unlinked = unsentUnlinkedApplicationsSql();
+    expect(unlinked).toContain("interval '7 days'");
+    expect(unlinked).toContain('order by a.created_at asc');
   });
 
   it('ใบคีย์เอง/นำเข้า Excel ที่ผูกใบขอ = AI โทรเอง (เจ้าของ 20 ต.ค. 2569) · ใบดึงจาก iRecruit ไม่หยิบ · ใบคีย์เก่าไม่โทรเงียบ', () => {
