@@ -120,3 +120,11 @@ describe('H09 · R09 · G05', () => {
     }
   });
 });
+
+describe('รายชื่ออ่านไม่ได้ ห้ามโชว์ 0 (เจ้าของ 10 พ.ย. 2569 "ทำไมเป็น 0")', () => {
+  it('การ์ดที่นับจากรายชื่อ (เส้นทาง · ทำไมไม่สำเร็จ · ช่องทาง · ใครหารายชื่อ) ขึ้นข้อความอ่านไม่ได้แทน', () => {
+    const src = readFileSync('src/components/dashboard-trends/stuck/RecruitStuckBody.tsx', 'utf8');
+    expect(src).toContain('const appsUnknown = data.apps == null;');
+    expect(src.match(/appsUnknown \? appsError :/g)?.length).toBe(8);
+  });
+});

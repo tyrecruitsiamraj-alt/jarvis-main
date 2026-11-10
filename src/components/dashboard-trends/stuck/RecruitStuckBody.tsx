@@ -122,7 +122,15 @@ export default function RecruitStuckBody({
     return narrowIds ? byFilter.filter((f) => Boolean(f.jobId && narrowIds.has(f.jobId))) : byFilter;
   }, [data.apps, win.from, win.to, filter, allRows, recruiterOf, narrowIds]);
   const narrowText = [scope !== 'remaining' ? `ใบ${STUCK_SCOPE_LABEL[scope]}` : null, focusLabel].filter(Boolean).join(' · ');
-  const cohortSub = `รายชื่อที่กรอกในช่วงที่เลือก ${cohort.length.toLocaleString('th-TH')} คน${narrowText ? ` · เฉพาะ${narrowText}` : ''}`;
+  /**
+   * รายชื่อผู้สมัครอ่านไม่ได้ (`apps` null · เช่นช่วงเว็บรีสตาร์ต) = การ์ดที่นับจากรายชื่อบอกว่าอ่านไม่ได้ ห้ามโชว์ 0
+   * (เจ้าของ 10 พ.ย. 2569 "ทำไมเป็น 0" — รายชื่อหลุดตรงไหนขึ้น 0 ทุกช่องตอนเว็บกำลังขึ้นของใหม่)
+   */
+  const appsUnknown = data.apps == null;
+  const appsError = <SectionError message={data.errors.apps ?? 'อ่านรายชื่อผู้สมัครไม่ได้ชั่วคราว'} />;
+  const cohortSub = appsUnknown
+    ? 'อ่านรายชื่อผู้สมัครไม่ได้'
+    : `รายชื่อที่กรอกในช่วงที่เลือก ${cohort.length.toLocaleString('th-TH')} คน${narrowText ? ` · เฉพาะ${narrowText}` : ''}`;
   const channels = React.useMemo(() => buildChannelFunnelTree(cohort), [cohort]);
   // กลุ่ม Facebook คลิก → กรอก ยอดทั้งหมดตั้งแต่สร้างลิงก์ (เจ้าของ 10 พ.ย. 2569 Choice "แบบ 1") — ไม่ตามปฏิทิน/ตัวกรองย่อย
   const fbGroups = React.useMemo(() => buildFbGroupClickRows(data.linkClicks), [data.linkClicks]);
@@ -160,12 +168,12 @@ export default function RecruitStuckBody({
     const ownerTable = <StuckOwnerTable bars rows={focused} countLabel={scope === 'remaining' ? 'ใบที่ต้องหา' : `ใบ${STUCK_SCOPE_LABEL[scope]}`} onPick={pick} />;
     const bringerCard = (
       <OverviewCard icon={UserRound} title="ใครหารายชื่อเข้ามา" sub={cohortSub}>
-        <ChannelFunnelTable groups={bringers.groups} total={bringers.total} onOpen={onOpenNames} firstLabel="คน" rootLabel="ทุกคน" />
+        {appsUnknown ? appsError : <ChannelFunnelTable groups={bringers.groups} total={bringers.total} onOpen={onOpenNames} firstLabel="คน" rootLabel="ทุกคน" />}
       </OverviewCard>
     );
     const channelCard = (
       <OverviewCard icon={Megaphone} title="รายชื่อมาจากไหน ไปถึงไหน" sub={`${cohortSub}${data.errors.informs ? ' · อ่านแจ้งเข้า ERP ไม่ได้' : ''}`}>
-        <ChannelFunnelTable groups={channels.groups} total={channels.total} onOpen={onOpenNames} />
+        {appsUnknown ? appsError : <ChannelFunnelTable groups={channels.groups} total={channels.total} onOpen={onOpenNames} />}
       </OverviewCard>
     );
     return (
@@ -212,7 +220,7 @@ export default function RecruitStuckBody({
           <div className="space-y-4">
             {stuck.data?.requests ? ownerTable : null}
             {stuck.data?.requests ? <ReleaseProgressCard rows={filtered} onPick={pick} /> : null}
-            <PersonJourneyCard list={cohort} sub={cohortSub} onOpenNames={onOpenNames} />
+            {appsUnknown ? appsError : <PersonJourneyCard list={cohort} sub={cohortSub} onOpenNames={onOpenNames} />}
           </div>
         ) : null}
         {detailTab === 'staff' ? (
@@ -240,7 +248,7 @@ export default function RecruitStuckBody({
         ) : null}
         {detailTab === 'reasons' ? (
           <OverviewCard icon={AlertCircle} title="ทำไมไม่สำเร็จ" sub={`${cohortSub} · ผลล่าสุดของแต่ละคน`}>
-            <ReasonColumns groups={reasons} onOpen={onOpenNames} />
+            {appsUnknown ? appsError : <ReasonColumns groups={reasons} onOpen={onOpenNames} />}
           </OverviewCard>
         ) : null}
         {/* รายงานเดิม (ตำแหน่งสมัคร · เทียบช่วงก่อน · งานค้างตามอายุ · กรอกแล้วโทรวันไหน · ผลงานรายคน · ช่องทางแจ้งเข้า) — หน้าเดิมยังอยู่ครบ */}
@@ -290,18 +298,18 @@ export default function RecruitStuckBody({
         </div>
       )}
 
-      <PersonJourneyCard list={cohort} sub={cohortSub} onOpenNames={onOpenNames} />
+      {appsUnknown ? appsError : <PersonJourneyCard list={cohort} sub={cohortSub} onOpenNames={onOpenNames} />}
 
       {/* 3 รายชื่อมาจากไหน ไปถึงไหน — ตารางเดิม 4 กลุ่ม → ช่องทาง → กลุ่ม/เพจ · ถึงแจ้งเข้า */}
       <OverviewCard icon={Megaphone} title="รายชื่อมาจากไหน ไปถึงไหน" sub={`${cohortSub}${data.errors.informs ? ' · อ่านแจ้งเข้า ERP ไม่ได้' : ''}`}>
-        <ChannelFunnelTable groups={channels.groups} total={channels.total} onOpen={onOpenNames} />
+        {appsUnknown ? appsError : <ChannelFunnelTable groups={channels.groups} total={channels.total} onOpen={onOpenNames} />}
       </OverviewCard>
 
       {fbGroupsCard}
 
       {/* ใครหารายชื่อเข้ามา (เจ้าของ 9 พ.ย. 2569 "ใครทำก็คนนั้นได้ จะได้วัดผลว่าใครมีรายชื่อเข้ามาเยอะ") — คน → วิธี → ช่องทาง/กลุ่ม */}
       <OverviewCard icon={UserRound} title="ใครหารายชื่อเข้ามา" sub={cohortSub}>
-        <ChannelFunnelTable groups={bringers.groups} total={bringers.total} onOpen={onOpenNames} firstLabel="คน" rootLabel="ทุกคน" />
+        {appsUnknown ? appsError : <ChannelFunnelTable groups={bringers.groups} total={bringers.total} onOpen={onOpenNames} firstLabel="คน" rootLabel="ทุกคน" />}
       </OverviewCard>
 
       {stuck.data?.requests ? <StuckAreaTable rows={focused} title={scope === 'remaining' ? undefined : `พื้นที่ · ใบ${STUCK_SCOPE_LABEL[scope]}`} countLabel={scope === 'remaining' ? undefined : `ใบ${STUCK_SCOPE_LABEL[scope]}`} onPick={pick} /> : null}
@@ -316,7 +324,7 @@ export default function RecruitStuckBody({
       />
 
       <OverviewCard icon={AlertCircle} title="ทำไมไม่สำเร็จ" sub={`${cohortSub} · ผลล่าสุดของแต่ละคน`}>
-        <ReasonColumns groups={reasons} onOpen={onOpenNames} />
+        {appsUnknown ? appsError : <ReasonColumns groups={reasons} onOpen={onOpenNames} />}
       </OverviewCard>
     </div>
   );

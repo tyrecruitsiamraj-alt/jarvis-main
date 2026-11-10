@@ -412,6 +412,9 @@ function isUndefinedColumn(e: unknown): boolean {
  * สิทธิ์ใคร = ฟังก์ชัน `contact_view_all` (ค่าเริ่ม Admin + Supervisor · เจ้าของ 10 พ.ย. 2569 "เฉพาะคนที่ฉันกำหนดเท่านั้น")
  * ผู้เรียกเช็ค `checkFunctionAccess` ต่อ (ไม่มีสิทธิ์ = 403) · สิทธิ์ BU ข้างในยังอยู่ · ได้เฉพาะใบที่มีคนเก็บ (เก็บไปโทร หรือ Lead)
  */
+/** ใบจาก iRecruit ที่สมัครก่อนเวลานี้ไม่ขึ้นหน้าผู้สมัคร (เจ้าของ 10 พ.ย. 2569) */
+export const IRECRUIT_LIST_SINCE = '2026-10-01T00:00:00+07:00';
+
 export function wantsEveryoneContact(query: Record<string, unknown> | undefined, role: UserRole | undefined): boolean {
   if (!role) return false;
   const q = query ?? {};
@@ -484,7 +487,9 @@ export function buildApplicationsListQuery(input: {
 } {
   const { jobId, scopedJobIds, viewerId, viewerDepartment } = input;
   const params: unknown[] = [];
-  const conds: string[] = [];
+  // ใบที่ดึงจาก iRecruit นับตั้งแต่ ต.ค. 2569 (เจ้าของ 10 พ.ย. 2569 "เยอะเกิน เก่าๆเขาคงไม่โทร") — ก.ย. 90 ใบไม่ขึ้นหน้าผู้สมัคร
+  // ตัดที่ server ⇒ ชิป "iRecruit" กับรายชื่อนับชุดเดียวกัน · ใบที่คนคีย์/กรอกเองไม่โดน
+  const conds: string[] = [`not (created_by_name = 'iRecruit' and created_at < timestamptz '${IRECRUIT_LIST_SINCE}')`];
   const everyone =
     input.everyoneAppointments === true && !jobId && !input.leadView && !input.bucketWhere;
   if (jobId) {

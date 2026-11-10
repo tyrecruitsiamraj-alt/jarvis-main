@@ -31,3 +31,17 @@ describe('แผนกของใบ iRecruit', () => {
     expect(admin.sql).not.toContain("created_by_name = 'iRecruit' and job_id is null");
   });
 });
+
+describe('ใบ iRecruit นับตั้งแต่ ต.ค. 2569 (เจ้าของ 10 พ.ย. 2569 "เยอะเกิน เก่าๆเขาคงไม่โทร")', () => {
+  it('ทุกมุมมองของลิสต์ตัดใบ iRecruit ที่สมัครก่อน 1 ต.ค. 2569 · ใบคีย์/กรอกเองไม่โดน', async () => {
+    const { IRECRUIT_LIST_SINCE } = await import('../../api/_handlers/job-applications');
+    expect(IRECRUIT_LIST_SINCE).toBe('2026-10-01T00:00:00+07:00');
+    for (const q of [
+      buildApplicationsListQuery({ viewerId: 'u1' }),
+      buildApplicationsListQuery({ viewerId: 'u1', scopedJobIds: new Set(['x']), viewerDepartment: ['LBD'] }),
+      buildApplicationsListQuery({ viewerId: 'u1', everyoneContact: true }),
+    ]) {
+      expect(q.sql).toContain("not (created_by_name = 'iRecruit' and created_at < timestamptz '2026-10-01T00:00:00+07:00')");
+    }
+  });
+});
