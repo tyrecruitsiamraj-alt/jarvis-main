@@ -63,6 +63,10 @@ describe('เก็บคลิกรายวัน', () => {
     expect(ov).toContain("settle('คลิกลิงก์', () => loadLinkClicks({ from: window.from, to: window.to, buSet }))");
     const rp = readFileSync('api/_handlers/recruit-postings.ts', 'utf8');
     expect(rp).toContain("getQuery(req, 'group_stats') === '1'");
+    // ที่อยู่ที่หน้าเว็บเรียกต้องเป็นเส้นที่ลงทะเบียนจริง (10 พ.ย. 2569 เคยเรียก /api/recruit-postings ได้ 404 ตัวเลขไม่ขึ้น)
+    const registry = readFileSync('api/_handlers/registry.ts', 'utf8');
+    expect(registry).toContain("'/api/recruit/postings': recruitPostingsHandler");
+    expect(readFileSync('src/lib/recruitPostingsApi.ts', 'utf8')).toContain("apiFetch('/api/recruit/postings?group_stats=1')");
     const picker = readFileSync('src/components/jobs/SoGroupPicker.tsx', 'utf8');
     expect(picker).toContain('ours ? ourStatsText(ours[soGroupLinkKey(g)], !g.stats30d) : null');
   });

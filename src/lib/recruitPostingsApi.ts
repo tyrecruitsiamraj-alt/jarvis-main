@@ -246,7 +246,7 @@ export async function fetchPublicPostingByCode(code: string): Promise<PublicPost
 export type FbGroupStats = Record<string, { clicks: number; apps: number }>;
 let fbGroupStatsOnce: Promise<FbGroupStats | null> | null = null;
 export function fetchFbGroupStats(): Promise<FbGroupStats | null> {
-  fbGroupStatsOnce ??= apiFetch('/api/recruit-postings?group_stats=1')
+  fbGroupStatsOnce ??= apiFetch('/api/recruit/postings?group_stats=1')
     .then(async (r) => (r.ok ? (((await readJsonSafe(r)) as { stats?: FbGroupStats | null } | null)?.stats ?? null) : null))
     .catch(() => null);
   return fbGroupStatsOnce;
