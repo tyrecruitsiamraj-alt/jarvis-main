@@ -18,6 +18,11 @@ let role: UserRole = 'supervisor';
 vi.mock('@/contexts/AuthContext', () => ({
   useAuth: () => ({ user: { id: 'u1', email: 'u1@example.com', role } }),
 }));
+// สิทธิ์ฟังก์ชันตามค่าเริ่มของ role (การติดต่อ "ทุกคน" = Admin + Supervisor · 10 พ.ย. 2569)
+vi.mock('@/contexts/RolePermissionsContext', async () => {
+  const { isFunctionEnabledForRole } = await import('@/lib/roleFunctions');
+  return { useRolePermissions: () => ({ isFunctionEnabled: (id: never) => isFunctionEnabledForRole(role, id) }) };
+});
 vi.mock('@/lib/publicApplicationsApi', async (orig) => ({
   ...(await orig<typeof import('@/lib/publicApplicationsApi')>()),
   fetchAllJobApplications: (...a: unknown[]) => fetchAll(...a),
@@ -106,5 +111,14 @@ describe('ปุ่ม ของฉัน / ทุกคน', () => {
     fireEvent.click(screen.getByRole('radio', { name: 'ทุกคน' }));
     await waitFor(() => expect(fetchAll.mock.calls.at(-1)?.[4]).toBe(true));
     expect(lastFlag()).toBe(false);
+  });
+
+  // เจ้าของ 10 พ.ย. 2569 "ที่จะเห็นทุกคนได้เฉพาะคนที่ฉันกำหนดเท่านั้น ตอนนี้ให้เฉพาะ Admin … แล้วก็ Supervisor"
+  it.each<UserRole>(['staff', 'opl'])('%s: แท็บการติดต่อไม่มีปุ่ม ทุกคน · เห็นของตัวเอง', async (r) => {
+    role = r;
+    renderTab('contact');
+    await waitFor(() => expect(fetchAll).toHaveBeenCalled());
+    expect(screen.queryByRole('radio', { name: 'ทุกคน' })).toBeNull();
+    expect(fetchAll.mock.calls.at(-1)?.[4]).toBe(false);
   });
 });

@@ -6,6 +6,7 @@ export type AppFunctionId =
   | 'candidates_read'
   | 'candidates_create'
   | 'candidates_edit'
+  | 'contact_view_all'
   | 'jobs_read'
   | 'jobs_edit'
   | 'jobs_assign_staff'
@@ -41,6 +42,12 @@ export const APP_FUNCTIONS: AppFunctionDef[] = [
   { id: 'candidates_read', label: 'ดูผู้สมัคร', group: 'ผู้สมัคร', minimumRole: 'staff' },
   { id: 'candidates_create', label: 'เพิ่มผู้สมัคร', group: 'ผู้สมัคร', minimumRole: 'staff' },
   { id: 'candidates_edit', label: 'แก้ไข / ปิดผู้สมัคร', group: 'ผู้สมัคร', minimumRole: 'supervisor' },
+  /**
+   * แท็บการติดต่อปุ่ม "ทุกคน" (เห็นรายชื่อที่คนอื่นเก็บไป) — เจ้าของ 10 พ.ย. 2569
+   * *"หน้าการติดต่อ ที่จะเห็นทุกคนได้เฉพาะคนที่ฉันกำหนดเท่านั้น ตอนนี้ให้เฉพาะ Admin … แล้วก็ Supervisor"*
+   * เปิด/ปิดราย role ได้ที่ ตั้งค่า › สิทธิ์ฟังก์ชัน · ฝั่ง API บังคับซ้ำ (`job-applications` scope=all)
+   */
+  { id: 'contact_view_all', label: 'การติดต่อ: ดูรายชื่อของทุกคน', group: 'ผู้สมัคร', minimumRole: 'supervisor' },
   { id: 'jobs_read', label: 'ดูงาน / ใบขอ', group: 'งาน & หน่วยงาน', minimumRole: 'staff' },
   { id: 'jobs_edit', label: 'แก้ไขงาน', group: 'งาน & หน่วยงาน', minimumRole: 'supervisor' },
   { id: 'jobs_assign_staff', label: 'กำหนดสรรหา / คัดสรร', group: 'งาน & หน่วยงาน', minimumRole: 'supervisor' },

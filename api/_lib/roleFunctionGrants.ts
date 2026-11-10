@@ -11,6 +11,8 @@ export const FUNCTION_DEFAULT_MIN_ROLE: Record<string, UserRole> = {
   candidates_read: 'staff',
   candidates_create: 'staff',
   candidates_edit: 'supervisor',
+  // แท็บการติดต่อปุ่ม "ทุกคน" (เจ้าของ 10 พ.ย. 2569 "เฉพาะคนที่ฉันกำหนด" · ค่าเริ่ม Admin + Supervisor)
+  contact_view_all: 'supervisor',
   jobs_read: 'staff',
   jobs_edit: 'supervisor',
   jobs_assign_staff: 'supervisor',
