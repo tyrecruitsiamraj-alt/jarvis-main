@@ -283,12 +283,32 @@ function toResponse(r: FollowRow) {
   };
 }
 
+/** ช่วงของรอบรีเฟรช — ไม่ส่งครบสามค่า = null (ทั้งตาราง) · ส่งแต่อ่านไม่ออก = 'bad' */
+export function parseFollowBand(q: Record<string, unknown> | undefined): { from: string; to: string; since: string } | null | 'bad' {
+  const from = q?.band_from;
+  const to = q?.band_to;
+  const since = q?.created_since;
+  if (from === undefined && to === undefined && since === undefined) return null;
+  const ok = (v: unknown): v is string => typeof v === 'string' && !Number.isNaN(Date.parse(v));
+  if (!ok(from) || !ok(to) || !ok(since) || Date.parse(from) >= Date.parse(to)) return 'bad';
+  return { from: new Date(from).toISOString(), to: new Date(to).toISOString(), since: new Date(since).toISOString() };
+}
+
 async function listFollow(req: AuthedReq, res: ApiRes) {
   const rawLimit = typeof req.query?.limit === 'string' ? Number(req.query.limit) : NaN;
   // QA 17 ต.ค. 2569: เพดานต่อหน้า 500 → 2,000 (หน้าติดตามโหลดทั้งชุด 7,000+ แถว · ลดจำนวนคำขอ ไม่ชนเพดานฝั่งหน้าเว็บ)
   const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, 2000) : 200;
   const rawOffset = typeof req.query?.offset === 'string' ? Number(req.query.offset) : NaN;
   const offset = Number.isFinite(rawOffset) && rawOffset > 0 ? Math.floor(rawOffset) : 0;
+  /**
+   * `?band_from&band_to&created_since` = รอบรีเฟรช 25 วิของหน้าติดตาม (เจ้าของ 10 พ.ย. 2569 Choice "รอบ 25 วิดึงเฉพาะสายช่วงนี้")
+   * ได้เฉพาะสายที่นัดโทรในช่วง [band_from, band_to) + สายที่เพิ่งสร้างตั้งแต่ created_since — เดิมดึงทั้งตาราง 16,000 แถวทุก 25 วิ
+   * ไม่ส่ง = ทั้งตารางตามเดิม (โหลดเต็ม · ทุก 5 นาที · หลังกดทำอะไร) · ค่าอ่านไม่ออก = 400 (ไม่ถอยไปดึงทั้งตารางเงียบ ๆ)
+   */
+  const band = parseFollowBand(req.query);
+  if (band === 'bad') return sendError(res, 400, 'Bad request', 'ช่วงเวลาที่ขอไม่ถูกต้อง');
+  const bandWhere = band ? `where (f.scheduled_at >= $3::timestamptz and f.scheduled_at < $4::timestamptz) or f.created_at >= $5::timestamptz` : '';
+  const bandParams = band ? [band.from, band.to, band.since] : [];
 
   const { rows } = await dbQuery<FollowRow>(
     /**
@@ -353,9 +373,10 @@ async function listFollow(req: AuthedReq, res: ApiRes) {
        left join um umde on umde.email = lower(btrim(f.completed_by_name))
        left join um umsi on umsi.id = f.staff_called_by::text
        left join um umse on umse.email = lower(btrim(f.staff_called_by_name))
+      ${bandWhere}
       order by f.created_at desc
       limit $1 offset $2`,
-    [limit, offset],
+    [limit, offset, ...bandParams],
   );
 
   /**
@@ -366,7 +387,11 @@ async function listFollow(req: AuthedReq, res: ApiRes) {
    * ไม่ครบ **โดยไม่มีอะไรบอกใครเลย** — เจ้าของจับได้ว่าเลขไม่สอดคล้องกัน
    */
   const { rows: countRows } = await dbQuery<{ n: string }>(
-    `select count(*)::text as n from ${followTable}`,
+    // รอบรีเฟรชช่วงนี้ = ยอดของช่วงเดียวกัน (has_more ของช่วง)
+    band
+      ? `select count(*)::text as n from ${followTable} f ${bandWhere.replace(/\$3/g, '$1').replace(/\$4/g, '$2').replace(/\$5/g, '$3')}`
+      : `select count(*)::text as n from ${followTable}`,
+    bandParams,
   );
   const total = Number(countRows[0]?.n ?? rows.length);
   // ชื่อเจ้าของเบอร์ฉุกเฉิน (เจ้าของ 29 ต.ค. 2569 "เติมชื่อเจ้าของเบอร์") — หาไม่เจอ = ขึ้นแค่เบอร์

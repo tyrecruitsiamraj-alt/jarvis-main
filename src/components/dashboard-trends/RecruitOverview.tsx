@@ -27,7 +27,8 @@ import { formatTrendNumber as fmt } from '@/lib/trends/format';
 import { rangeText } from '@/lib/teamOnline';
 import { shortTime } from '@/lib/dateTh';
 import { fetchRecruitOverview } from '@/lib/recruitOverviewApi';
-import { monthLabel, monthOptions, shiftMonth, shiftRange } from '@/lib/recruitOverviewWindow';
+import { monthLabel, monthOptions, monthWindow, rangeWindow, shiftMonth, shiftRange } from '@/lib/recruitOverviewWindow';
+import { prefetchRecruitStuck } from '@/lib/recruitStuckApi';
 import { type DateRangeYmd } from '@/components/shared/DateRangeCalendarPicker';
 import { Calendar } from '@/components/ui/calendar';
 import { parseYmd, toYmdLocal } from '@/lib/dateTh';
@@ -171,9 +172,21 @@ const RecruitOverview: React.FC<{
   const [pickedBu, setPickedBu] = useState<string | null>(null);
   const [state, setState] = useState<Load>({ data: null, loading: true, error: null });
 
+  /**
+   * โฉมใหม่ (เจ้าของ 4 พ.ย. 2569 นิยามเอง "เอาทำเลย") = ค่าเริ่ม · โฉมการ์ดเดิมยังเปิดได้ที่ `?dash=cards` (ทางถอย ห้ามลบจนกว่าเจ้าของสั่ง)
+   */
+  const [searchParams] = useSearchParams();
+  const legacyCards = searchParams.get('dash') === 'cards';
+
   useEffect(() => {
     let cancelled = false;
     setState((s) => ({ ...s, loading: true, error: null }));
+    // ใบขอติดตรงไหน (โฉมใหม่) ยิงพร้อมกันเลย ไม่ต้องรอก้อนนี้เสร็จ — ช่วงคิดด้วยตัวเดียวกับ server (10 พ.ย. 2569 หน้าช้า)
+    if (!legacyCards) {
+      const today = toYmdBangkok(new Date());
+      const w = (range ? rangeWindow(range.from, range.to, today, range.all === true) : null) ?? monthWindow(month, today);
+      prefetchRecruitStuck(pickedBu, { from: w.from, to: w.to });
+    }
     fetchRecruitOverview(month, range, pickedBu)
       .then((data) => !cancelled && setState({ data, loading: false, error: null }))
       // ล้มแล้วห้ามค้างเลขรอบก่อนพร้อม "ข้อมูล ณ …" (QA 18 ต.ค. 2569) ⇒ ล้างแล้วขึ้นกล่องล้ม + ลองใหม่
@@ -181,7 +194,7 @@ const RecruitOverview: React.FC<{
     return () => {
       cancelled = true;
     };
-  }, [month, range, rev, pickedBu]);
+  }, [month, range, rev, pickedBu, legacyCards]);
 
   const data = state.data;
   const win = data?.window ?? null;
@@ -193,11 +206,6 @@ const RecruitOverview: React.FC<{
 
   /** ป๊อปรายชื่อของเลขที่กดในเส้นทาง */
   const [names, setNames] = useState<{ title: string; ids: readonly string[] } | null>(null);
-  /**
-   * โฉมใหม่ (เจ้าของ 4 พ.ย. 2569 นิยามเอง "เอาทำเลย") = ค่าเริ่ม · โฉมการ์ดเดิมยังเปิดได้ที่ `?dash=cards` (ทางถอย ห้ามลบจนกว่าเจ้าของสั่ง)
-   */
-  const [searchParams] = useSearchParams();
-  const legacyCards = searchParams.get('dash') === 'cards';
 
   const view = useMemo(() => (data && win ? overviewViewOf(apps ?? [], data, win) : null), [data, win, apps]);
 

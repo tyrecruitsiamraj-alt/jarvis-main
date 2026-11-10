@@ -40,7 +40,9 @@ describe('หน้าติดตาม — โหลด / ล้ม / ว่�
     for (const msg of ['ยกเลิกไม่สำเร็จ', 'ลบไม่สำเร็จ', 'ปิดงานไม่สำเร็จ', 'ย้อนสถานะไม่สำเร็จ', 'ลงผลโทรไม่สำเร็จ', 'ล้างผลโทรไม่สำเร็จ']) {
       expect(page).toContain(`toast.error(friendlyErrorText(err, '${msg}'))`);
     }
-    expect(page.match(/setError\(/g)?.length).toBe(2);
+    // แถบระดับหน้ามาจากการโหลดรายการเท่านั้น: reload ตั้ง/ล้าง (2) + รอบรีเฟรชช่วงนี้ล้างเมื่อสำเร็จ (1 · 10 พ.ย. 2569)
+    expect(page.match(/setError\(/g)?.length).toBe(3);
+    expect(page).toMatch(/setItems\(\(prev\) => mergeFollowBand\(prev, fresh\)\);[\s\S]{0,80}setError\(null\);/);
   });
 });
 

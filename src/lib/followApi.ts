@@ -250,8 +250,17 @@ const FOLLOW_PAGE_CONCURRENCY = 4;
  * เจ้าของ 8 ต.ค. 2569 "หน้าอื่นที่ช้าไล่แก้ให้เร็วด้วย" — วัดจริง: 4,208 แถว = 9 หน้า โหลดต่อกันทีละหน้ารวม ~2.4 วิ
  * ลำดับแถวเหมือนเดิม (ต่อหน้าตาม offset) · เส้นเก่าที่ไม่ส่ง has_more/total = หน้าเดียวจบ
  */
-async function fetchFollowPage(offset: number): Promise<{ items: FollowEntry[]; total?: number; has_more?: boolean }> {
-  const r = await apiFetch(`/api/follow?limit=${FOLLOW_PAGE_SIZE}&offset=${offset}`);
+async function fetchFollowPage(
+  offset: number,
+  band?: FollowRefreshBand,
+): Promise<{ items: FollowEntry[]; total?: number; has_more?: boolean }> {
+  const qs = new URLSearchParams({ limit: String(FOLLOW_PAGE_SIZE), offset: String(offset) });
+  if (band) {
+    qs.set('band_from', band.from);
+    qs.set('band_to', band.to);
+    qs.set('created_since', band.since);
+  }
+  const r = await apiFetch(`/api/follow?${qs}`);
   if (!r.ok) throw new Error(await readError(r));
   const data = (await r.json()) as { items?: FollowEntry[]; total?: number; has_more?: boolean };
   return { items: data.items ?? [], total: data.total, has_more: data.has_more };
@@ -293,6 +302,46 @@ export async function listFollowEntries(): Promise<FollowEntry[]> {
   }
   // เลข "วันที่ · สายที่" ต้องคิดจากทั้งชุด — ที่เดียวตอนโหลด ทุกจอที่อ่านรายการนี้เห็นเลขเดียวกัน
   return withFollowDayCalls(all);
+}
+
+/**
+ * ช่วงของรอบรีเฟรช 25 วิ (เจ้าของ 10 พ.ย. 2569 Choice "รอบ 25 วิดึงเฉพาะสายช่วงนี้")
+ * = สายที่นัดโทร 3 วันก่อนถึงสิ้นวันพรุ่งนี้ (เวลาไทย) + สายที่สร้างตั้งแต่ `since` · โหลดเต็มยังทำทุก 5 นาที/หลังกดทำอะไร
+ */
+export type FollowRefreshBand = { from: string; to: string; since: string };
+
+const DAY_MS = 86_400_000;
+const BKK_OFFSET_MS = 7 * 3_600_000;
+export const FOLLOW_BAND_DAYS_BACK = 3;
+/** สุดวันพรุ่งนี้เวลาไทย = เที่ยงคืนต้นวันมะรืน */
+export function followRefreshBand(now: Date, since: Date): FollowRefreshBand {
+  const bkkMidnight = Math.floor((now.getTime() + BKK_OFFSET_MS) / DAY_MS) * DAY_MS - BKK_OFFSET_MS;
+  return {
+    from: new Date(now.getTime() - FOLLOW_BAND_DAYS_BACK * DAY_MS).toISOString(),
+    to: new Date(bkkMidnight + 2 * DAY_MS).toISOString(),
+    since: since.toISOString(),
+  };
+}
+
+/** สายของช่วง — ไล่ทุกหน้าของช่วง (ปกติหน้าเดียว) · ยังไม่ใส่เลข "ครั้งที่ · สายที่" (ผู้เรียกรวมกับชุดเดิมแล้วคิดใหม่) */
+export async function listFollowBand(band: FollowRefreshBand): Promise<FollowEntry[]> {
+  const all: FollowEntry[] = [];
+  for (let page = 0; page < FOLLOW_MAX_PAGES; page += 1) {
+    const p = await fetchFollowPage(all.length, band);
+    all.push(...p.items);
+    if (p.items.length === 0 || p.has_more !== true) break;
+  }
+  return all;
+}
+
+/** รวมสายของช่วงทับชุดเดิมด้วย id (ใหม่ทับเก่า · สายใหม่ต่อท้าย) แล้วคิดเลข "ครั้งที่ · สายที่" ใหม่ทั้งชุด */
+export function mergeFollowBand(prev: readonly FollowEntry[], fresh: readonly FollowEntry[]): FollowEntry[] {
+  if (fresh.length === 0) return prev as FollowEntry[];
+  const byId = new Map(fresh.map((e) => [e.id, e]));
+  const merged = prev.map((e) => byId.get(e.id) ?? e);
+  const known = new Set(prev.map((e) => e.id));
+  for (const e of fresh) if (!known.has(e.id)) merged.unshift(e);
+  return withFollowDayCalls(merged);
 }
 
 export async function createFollowEntry(input: NewFollowEntry): Promise<FollowEntry> {

@@ -47,6 +47,9 @@ import { conveyorLabel } from '@/lib/soRecruitNav';
 import { ArrowLeft, Settings2, Plus, X, LoaderCircle, PhoneForwarded, Users, UserCog, Building2, ChevronLeft, ChevronRight, RefreshCw, ClipboardList } from 'lucide-react';
 import {
   listFollowEntries,
+  listFollowBand,
+  mergeFollowBand,
+  followRefreshBand,
   followListShortfall,
   createFollowRounds,
   cancelFollowEntry,
@@ -205,6 +208,8 @@ function nowForInput(): string {
  * ค่าว่าง = ไม่ระบุ (บางเคสมีแค่ชื่อเล่น/ชื่อที่คนแนะนำมา)
  */
 /** ตั้งตารางได้ยาวสุดกี่วันต่อครั้ง (7 ต.ค. 2569 · เดิม 31 ตัดเงียบ) · วันละกี่สายก็ได้ (เจ้าของ 8 ต.ค. 2569 "ไม่ต้องกำหนดว่าห้ามเกิน 5 สาย") */
+/** โหลดเต็มอย่างน้อยทุก 5 นาที — สายนอกช่วงที่คนอื่นแก้ขึ้นช้าสุดเท่านี้ (เจ้าของ 10 พ.ย. 2569 Choice) */
+const FULL_RELOAD_MS = 5 * 60_000;
 const MAX_FOLLOW_DAYS = 92;
 
 const NAME_PREFIXES = ['', 'นาย', 'นาง', 'นางสาว'] as const;
@@ -667,6 +672,9 @@ const FollowPage: React.FC = () => {
    * (ไม่งั้นทุก 25 วิ จอจะกะพริบเป็นโครงกระดูกทั้งที่คนกำลังอ่านอยู่)
    */
   const reloadingRef = useRef(false);
+  /** โหลดเต็มครั้งล่าสุด / ดึงครั้งล่าสุด (เวลาเริ่มยิง) — รอบรีเฟรชช่วงนี้ใช้ตัดสิน (10 พ.ย. 2569) */
+  const lastFullAtRef = useRef(0);
+  const lastFetchAtRef = useRef(0);
   const reload = useCallback(async (silent = false) => {
     /**
      * 🔴 รอบเงียบห้ามซ้อนรอบที่ยังโหลดไม่จบ (QA 5 ต.ค. 2569: ชุดเต็ม ~2.6 MB · เน็ตช้า = ยิงทับกันเรื่อย ๆ)
@@ -675,8 +683,11 @@ const FollowPage: React.FC = () => {
     if (silent && reloadingRef.current) return;
     reloadingRef.current = true;
     if (!silent) setLoading(true);
+    const startedAt = new Date();
     try {
       setItems(await listFollowEntries());
+      lastFullAtRef.current = startedAt.getTime();
+      lastFetchAtRef.current = startedAt.getTime();
       setListShortfall(followListShortfall());
       // จดเวลาที่ **ดึงสำเร็จ** — ท้ายตารางเอาไปบอกคนว่าหน้าไม่ได้ค้าง (12 ก.ย. 2569)
       setLastLoadedAt(new Date());
@@ -801,6 +812,34 @@ const FollowPage: React.FC = () => {
    * 3. 🔴 **กำลังพิมพ์อยู่ = ข้ามรอบนั้น** ห้ามแย่งของที่คนกำลังกรอก
    * 4. เงียบเสมอ — ไม่ขึ้นโครงกระดูก ไม่เด้ง error (ดู `silent` ข้างบน)
    */
+  /**
+   * รอบรีเฟรช 25 วิ = ดึงเฉพาะสายช่วงนี้ (เจ้าของ 10 พ.ย. 2569 Choice "รอบ 25 วิดึงเฉพาะสายช่วงนี้")
+   * วัดบนเว็บจริง: เดิมโหลดทั้ง 16,000 สาย (9 คำขอ) ทุก 25 วิต่อหน้าที่เปิดค้าง — เซิร์ฟเวอร์หนักทุกหน้า
+   * ⇒ สายนัดโทร 3 วันก่อนถึงพรุ่งนี้ + สายที่เพิ่งสร้าง (ผล AI ขึ้นเร็วเท่าเดิม) · โหลดเต็มทุก 5 นาที (สายเก่าที่คนอื่นแก้ ช้าสุด 5 นาที)
+   * กดทำอะไรเอง = `reload(true)` โหลดเต็มทันทีเหมือนเดิม
+   */
+  const refreshBand = useCallback(async () => {
+    if (Date.now() - lastFullAtRef.current >= FULL_RELOAD_MS || lastFetchAtRef.current === 0) {
+      await reload(true);
+      return;
+    }
+    if (reloadingRef.current) return;
+    reloadingRef.current = true;
+    const startedAt = new Date();
+    try {
+      // ซ้อนเวลา 2 นาทีกันสายที่สร้างคาบเส้นตอนดึงรอบก่อน
+      const fresh = await listFollowBand(followRefreshBand(startedAt, new Date(lastFetchAtRef.current - 120_000)));
+      lastFetchAtRef.current = startedAt.getTime();
+      setItems((prev) => mergeFollowBand(prev, fresh));
+      setLastLoadedAt(new Date());
+      setError(null);
+    } catch {
+      // รอบเงียบล้ม = เงียบต่อ ของบนจอยังใช้ได้ (กติกาเดียวกับ reload แบบเงียบ)
+    } finally {
+      reloadingRef.current = false;
+    }
+  }, [reload]);
+
   useEffect(() => {
     const REFRESH_MS = 25_000;
     const typing = () => {
@@ -811,7 +850,7 @@ const FollowPage: React.FC = () => {
     const tick = () => {
       if (document.visibilityState !== 'visible') return;
       if (typing()) return;
-      void reload(true);
+      void refreshBand();
     };
     const id = window.setInterval(tick, REFRESH_MS);
     const onVisible = () => {
@@ -822,7 +861,7 @@ const FollowPage: React.FC = () => {
       window.clearInterval(id);
       document.removeEventListener('visibilitychange', onVisible);
     };
-  }, [reload]);
+  }, [refreshBand]);
 
   const resetForm = () => {
     setReplaceStartVal(defaultReplaceStart());
