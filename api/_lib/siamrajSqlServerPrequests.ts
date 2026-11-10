@@ -39,6 +39,10 @@ const PREQUEST_MIN_DATE =
 
 type PrequestRow = {
   prequest_no: string;
+  /** สถานะหัวใบใน ERP — 'A' = ใช้งาน · 'C' = ยกเลิก (หน้ารายละเอียดเปิดใบเดียวไม่ผ่านตัวกรองของรายการ) */
+  head_status?: string | null;
+  /** 'Y' = ทำเป็นใบขอจริงแล้ว (ใบจริงรับช่วงต่อ) */
+  is_request?: string | null;
   prequest_date: Date | string | null;
   want_date_from: Date | string | null;
   want_date_to: Date | string | null;
@@ -98,6 +102,19 @@ const txt = (v: string | null | undefined): string | undefined => {
  *   - แจ้งเข้า/ปิดครบ = 0 เสมอ (ยังไม่เริ่มหาคน)
  *   - ไซต์ = ไม่มี (ยังไม่เปิดไซต์)
  */
+/**
+ * ใบขอชั่วคราวยังเปิดอยู่ไหม — เงื่อนไขเดียวกับรายการ (`status = 'A'` และยังไม่ทำเป็นใบจริง)
+ * 🔴 10 พ.ย. 2569: เดิมตั้ง 'open' ตายตัว ⇒ ใบที่ ERP ยกเลิกแล้ว (อีซูซุ LBM6909003 · พรีโม LAM6910008 · ฟอร์เอฟเวอร์ LBM6910007)
+ *    ยังเปิดได้ · ลิงก์สมัครยังรับคน · ตัวส่ง AI บอกเหตุผิดเป็น "ใบขอยังไม่ตั้งรายได้" ทั้งที่ตั้งแล้ว
+ *    เจ้าของ Choice "ป้ายถูก + ปิดลิงก์สมัคร" ⇒ ยกเลิก/ทำเป็นใบจริงแล้ว = ปิด เหมือนใบขอจริงที่ปิด
+ *    ไม่มีค่า (แถวเก่าที่ไม่ได้ select มา) = ถือว่าเปิด เหมือนเดิม
+ */
+export function prequestIsOpen(headStatus: string | null | undefined, isRequest: string | null | undefined): boolean {
+  const st = (headStatus ?? '').trim().toUpperCase();
+  if (st && st !== 'A') return false;
+  return (isRequest ?? '').trim().toUpperCase() !== 'Y';
+}
+
 function mapPrequestRow(r: PrequestRow) {
   const workSchedule = [txt(r.work_date), txt(r.work_time)].filter(Boolean).join(' • ');
   const roleLabel = primaryJobRoleLabel(r.job_name_1, r.staff_title_name, null);
@@ -158,7 +175,7 @@ function mapPrequestRow(r: PrequestRow) {
     position_units: qty,
     filled_positions: 0,
     cancelled_positions: 0,
-    status: 'open' as const,
+    status: prequestIsOpen(r.head_status, r.is_request) ? ('open' as const) : ('closed' as const),
     urgency: 'advance' as const,
     /**
      * 🔴 อัตราจ่ายดิบ + หน่วย — **ห้ามเอา `total_income` ไปโชว์โดยไม่ดู `rate_unit`**
@@ -185,7 +202,8 @@ export type SiamrajPrequest = ReturnType<typeof mapPrequestRow>;
 
 /** คอลัมน์ที่ select — ⚠️ ไม่มี `draw_rate` โดยตั้งใจ (อัตราเบิก ห้ามหลุด) */
 const PREQUEST_SELECT = `
-    RTRIM(h.prequest_no) AS prequest_no, h.prequest_date, h.want_date_from, h.want_date_to,
+    RTRIM(h.prequest_no) AS prequest_no, RTRIM(h.status) AS head_status, RTRIM(h.is_request) AS is_request,
+    h.prequest_date, h.want_date_from, h.want_date_to,
     h.request_qty,
     RTRIM(h.customer_name) AS customer_name,
     RTRIM(h.bu_department_code) AS bu_department_code,
