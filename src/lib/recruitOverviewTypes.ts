@@ -233,10 +233,8 @@ export type RecruitOverviewResponse = {
   backlogByJob?: Record<string, RecruitBacklog>;
   staffByJob?: Record<string, RecruitStaffRow[]>;
   aiByJob?: Record<string, RecruitAiRow>;
-  /** คลิกลิงก์สมัครของช่วงนี้ รวมตามป้ายลิงก์ (10 พ.ย. 2569 · 175) · null = นับไม่ได้ · ไม่มี = เส้นรุ่นเก่า */
-  linkClicks?: Array<{ label: string; fbGroupId: string | null; clicks: number }> | null;
-  /** วันแรกที่มีคลิกรายวัน — ช่วงที่เริ่มก่อนนี้ คลิกนับเฉพาะตั้งแต่วันนี้ */
-  clicksSince?: string;
+  /** ลิงก์กลุ่ม Facebook ยอดทั้งหมดตั้งแต่สร้างลิงก์ รวมตามป้าย: คลิก + id ใบสมัครที่มาจากลิงก์ (10 พ.ย. 2569) · null = อ่านไม่ได้ · ไม่มี = เส้นรุ่นเก่า */
+  linkClicks?: Array<{ label: string; fbGroupId: string | null; clicks: number; appIds: string[] }> | null;
   /** ก้อนที่อ่านไม่ได้ + เหตุ (ก้อนล้มแยกกัน — ห้ามโชว์ 0 แทน) */
   errors: Partial<Record<'apps' | 'backlog' | 'staff' | 'board' | 'requests' | 'channels' | 'informs' | 'appJobs', string>>;
 };

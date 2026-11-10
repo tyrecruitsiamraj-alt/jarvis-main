@@ -14,7 +14,6 @@ import { OverviewCard, ReasonColumns, SectionError } from '../RecruitOverviewPar
 import ChannelFunnelTable from '../ChannelFunnelTable';
 import FbGroupClicksTable from './FbGroupClicksTable';
 import { buildFbGroupClickRows } from '@/lib/fbGroupClicks';
-import { thaiDate } from '@/lib/periodPick';
 import StuckFilterBar from './StuckFilterBar';
 import StuckPhasesCard from './StuckPhasesCard';
 import StuckOwnerTable from './StuckOwnerTable';
@@ -105,16 +104,8 @@ export default function RecruitStuckBody({
   const narrowText = [scope !== 'remaining' ? `ใบ${STUCK_SCOPE_LABEL[scope]}` : null, focusLabel].filter(Boolean).join(' · ');
   const cohortSub = `รายชื่อที่กรอกในช่วงที่เลือก ${cohort.length.toLocaleString('th-TH')} คน${narrowText ? ` · เฉพาะ${narrowText}` : ''}`;
   const channels = React.useMemo(() => buildChannelFunnelTree(cohort), [cohort]);
-  // กลุ่ม Facebook คลิก → กรอก (เจ้าของ 10 พ.ย. 2569) — คลิกเป็นยอดรวมของช่วง ไม่ตามตัวกรองย่อย (ไม่มีรายชื่อให้กรอง)
-  const fbGroups = React.useMemo(() => buildFbGroupClickRows(cohort, data.linkClicks), [cohort, data.linkClicks]);
-  const clicksNote =
-    data.linkClicks === undefined
-      ? ''
-      : data.linkClicks === null
-        ? ' · นับคลิกไม่ได้ชั่วคราว'
-        : data.clicksSince && win.from < data.clicksSince
-          ? ` · คลิกนับตั้งแต่ ${thaiDate(data.clicksSince)}`
-          : '';
+  // กลุ่ม Facebook คลิก → กรอก ยอดทั้งหมดตั้งแต่สร้างลิงก์ (เจ้าของ 10 พ.ย. 2569 Choice "แบบ 1") — ไม่ตามปฏิทิน/ตัวกรองย่อย
+  const fbGroups = React.useMemo(() => buildFbGroupClickRows(data.linkClicks), [data.linkClicks]);
   const bringers = React.useMemo(() => buildBringerFunnelTree(cohort), [cohort]);
   const reasons = React.useMemo(() => reasonGroups(cohort), [cohort]);
   const appRecruiters = React.useMemo(() => Object.values(data.appJobs ?? {}).map((j) => j.recruiter), [data.appJobs]);
@@ -173,9 +164,15 @@ export default function RecruitStuckBody({
       <OverviewCard
         icon={MousePointerClick}
         title="กลุ่ม Facebook คนคลิกแล้วกรอกเท่าไหร่"
-        sub={`คลิกลิงก์สมัครในช่วงนี้ ${fbGroups.totalClicks === null ? '—' : fbGroups.totalClicks.toLocaleString('th-TH')} ครั้ง${clicksNote}`}
+        sub={
+          fbGroups
+            ? `ยอดทั้งหมดตั้งแต่สร้างลิงก์ (ไม่ตามช่วงวันที่) · คลิก ${fbGroups.totalClicks.toLocaleString('th-TH')} · กรอก ${fbGroups.totalApps.toLocaleString('th-TH')}`
+            : data.linkClicks === null
+              ? 'อ่านยอดคลิกไม่ได้ชั่วคราว'
+              : 'ยอดทั้งหมดตั้งแต่สร้างลิงก์'
+        }
       >
-        <FbGroupClicksTable rows={fbGroups.rows} onOpen={onOpenNames} />
+        <FbGroupClicksTable rows={fbGroups?.rows ?? []} onOpen={onOpenNames} />
       </OverviewCard>
 
       {/* ใครหารายชื่อเข้ามา (เจ้าของ 9 พ.ย. 2569 "ใครทำก็คนนั้นได้ จะได้วัดผลว่าใครมีรายชื่อเข้ามาเยอะ") — คน → วิธี → ช่องทาง/กลุ่ม */}

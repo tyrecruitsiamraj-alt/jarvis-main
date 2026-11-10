@@ -14307,6 +14307,6 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 
 ### คลิกลิงก์สมัครตามกลุ่ม Facebook (10 พ.ย. 2569)
 - `migrations/175_posting_link_daily_hits.sql` — คลิกต่อ (ลิงก์ · วันไทย) เริ่มนับ 10 พ.ย. 2569 · `hit_count` เดิมยังเป็นยอดสะสม
-- `api/_lib/postingLinkHits.ts` — `recordDailyLinkHit` (เรียกจาก `getPostingByLinkCode` เท่านั้น) · `loadLinkClicks` (ภาพรวม ตามช่วง+BU) · `loadFbGroupStats30d` (ป๊อปเลือกกลุ่ม)
-- `src/lib/fbGroupClicks.ts` — แถวกลุ่ม คลิก → กรอก → AI สนใจ → นัดได้ → มา · ชื่อกลุ่ม = `funnelSubOf` ตัวเดียวกับตารางช่องทาง
-- `src/components/dashboard-trends/stuck/FbGroupClicksTable.tsx` — การ์ดในภาพรวมงานสรรหา · ป๊อปเลือกกลุ่ม (`SoGroupPicker`) ต่อท้าย "คลิก · กรอก" 30 วัน
+- `api/_lib/postingLinkHits.ts` — `recordDailyLinkHit` (เรียกจาก `getPostingByLinkCode` เท่านั้น · รายวันเก็บไว้ใช้ทีหลัง) · `loadLinkClicks` (ภาพรวม ยอดทั้งหมด `hit_count` + id ใบสมัคร ตาม BU) · `loadFbGroupStats` (ป๊อปเลือกกลุ่ม byId/byName) · 🔴 จอใช้ยอดทั้งหมดตั้งแต่สร้างลิงก์ (เจ้าของ "คลิก 0 กรอก 8 ย้อนแย้งปะ" → Choice แบบ 1) ห้ามเอาคลิกรายวันไปเทียบกับกรอกตามช่วงที่เริ่มก่อน 10 พ.ย.
+- `src/lib/fbGroupClicks.ts` — แถวกลุ่ม คลิก · กรอก · กรอกต่อคลิก · ชื่อกลุ่ม = `funnelSubOf` ตัวเดียวกับตารางช่องทาง
+- `src/components/dashboard-trends/stuck/FbGroupClicksTable.tsx` — การ์ดในภาพรวมงานสรรหา · ป๊อปเลือกกลุ่ม (`SoGroupPicker`) ต่อท้าย "ลิงก์เรา คลิก · กรอก" ยอดทั้งหมด (`fbGroupStatOf`)

@@ -240,14 +240,22 @@ export async function fetchPublicPostingByCode(code: string): Promise<PublicPost
 }
 
 /**
- * กลุ่ม Facebook 30 วัน: คลิก · กรอก ต่อกลุ่ม (คีย์ = `soGroupLinkKey`) — ป๊อปเลือกกลุ่ม (เจ้าของ 10 พ.ย. 2569)
- * โหลดครั้งเดียวต่อหน้า · null = นับไม่ได้ (ไม่ขึ้นเลข ไม่ขึ้น 0)
+ * กลุ่ม Facebook ยอดทั้งหมด: คลิก · กรอก (เจ้าของ 10 พ.ย. 2569) — `byId` = `soGroupLinkKey` · `byName` = ชื่อกลุ่มตัวเล็ก (ลิงก์เก่าไม่มีรหัส)
+ * โหลดครั้งเดียวต่อหน้า · null = อ่านไม่ได้ (ไม่ขึ้นเลข ไม่ขึ้น 0)
  */
-export type FbGroupStats = Record<string, { clicks: number; apps: number }>;
+export type FbGroupStat = { clicks: number; apps: number };
+export type FbGroupStats = { byId: Record<string, FbGroupStat>; byName: Record<string, FbGroupStat> };
 let fbGroupStatsOnce: Promise<FbGroupStats | null> | null = null;
 export function fetchFbGroupStats(): Promise<FbGroupStats | null> {
   fbGroupStatsOnce ??= apiFetch('/api/recruit/postings?group_stats=1')
     .then(async (r) => (r.ok ? (((await readJsonSafe(r)) as { stats?: FbGroupStats | null } | null)?.stats ?? null) : null))
     .catch(() => null);
   return fbGroupStatsOnce;
+}
+
+/** สถิติของกลุ่มหนึ่ง — รหัสกลุ่มก่อน ไม่มีค่อยใช้ชื่อ (รวมกันถ้ามีทั้งสอง: ลิงก์ใหม่มีรหัส ลิงก์เก่ามีแต่ชื่อ) */
+export function fbGroupStatOf(stats: FbGroupStats, key: string, name: string | null): FbGroupStat {
+  const a = stats.byId[key];
+  const b = name ? stats.byName[name.trim().toLowerCase()] : undefined;
+  return { clicks: (a?.clicks ?? 0) + (b?.clicks ?? 0), apps: (a?.apps ?? 0) + (b?.apps ?? 0) };
 }

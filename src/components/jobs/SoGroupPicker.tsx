@@ -19,11 +19,10 @@ import {
   type SoOptGroup,
 } from '@/lib/soScraping';
 import type { UnitSector } from '@/lib/unitSector';
-import { fetchFbGroupStats, type FbGroupStats } from '@/lib/recruitPostingsApi';
+import { fbGroupStatOf, fetchFbGroupStats, type FbGroupStats } from '@/lib/recruitPostingsApi';
 
-/** "คลิก 12 · กรอก 3" · ไม่มีสถิติ So Scraping นำหน้า = เติม "30 วัน" เอง · ยังไม่เคยมีลิงก์ = คลิก 0 · กรอก 0 */
-const ourStatsText = (st: { clicks: number; apps: number } | undefined, lead: boolean) =>
-  `${lead ? '30 วัน ' : ''}คลิก ${NUM.format(st?.clicks ?? 0)} · กรอก ${NUM.format(st?.apps ?? 0)}`;
+/** "ลิงก์เรา คลิก 766 · กรอก 167" ยอดทั้งหมดตั้งแต่สร้างลิงก์ (ต่างจากสถิติ 30 วันของ So Scraping ที่นำหน้า) */
+const ourStatsText = (st: { clicks: number; apps: number }) => `ลิงก์เรา คลิก ${NUM.format(st.clicks)} · กรอก ${NUM.format(st.apps)}`;
 
 const NUM = new Intl.NumberFormat('th-TH');
 
@@ -107,7 +106,7 @@ export function SoGroupFilterPicker({
   onToggle: (ids: string[], on: boolean) => void;
 }) {
   const usable = React.useMemo(() => groups.filter((g) => soGroupUsable(g, account)), [groups, account]);
-  // คลิก · กรอก จากลิงก์ของกลุ่ม 30 วัน (เจ้าของ 10 พ.ย. 2569 "ต่อไปเวลาเลือกกลุ่ม Auto post ได้เลือกกลุ่มถูก")
+  // คลิก · กรอก จากลิงก์ของกลุ่ม ยอดทั้งหมด (เจ้าของ 10 พ.ย. 2569 "ต่อไปเวลาเลือกกลุ่ม Auto post ได้เลือกกลุ่มถูก")
   const [ours, setOurs] = React.useState<FbGroupStats | null>(null);
   React.useEffect(() => {
     let alive = true;
@@ -219,7 +218,7 @@ export function SoGroupFilterPicker({
                     {[
                       prov && !g.provinces.includes(prov) && g.nationwide ? 'ทั่วประเทศ' : null,
                       soGroupStatsText(g.stats30d),
-                      ours ? ourStatsText(ours[soGroupLinkKey(g)], !g.stats30d) : null,
+                      ours ? ourStatsText(fbGroupStatOf(ours, soGroupLinkKey(g), g.name)) : null,
                       bkkWhen(g.lastPostedAt) ? `โพสต์ล่าสุด ${bkkWhen(g.lastPostedAt)}` : null,
                       recent?.has(g.id) ? 'ใบนี้เพิ่งสั่งโพสต์กลุ่มนี้ใน 3 วัน' : null,
                     ]

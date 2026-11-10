@@ -15,7 +15,7 @@
  *    *"เปลี่ยนเป็น 7 เหมือนหัวกล่องงาน"*) · เดิมนับใบที่ประกาศในเดือนจาก `job_public_releases` — ถอดแล้ว
  */
 import { withRbac, sendError, handleApiError, type ApiRes, type AuthedReq } from '../_lib/http.js';
-import { CLICKS_SINCE, loadLinkClicks } from '../_lib/postingLinkHits.js';
+import { loadLinkClicks } from '../_lib/postingLinkHits.js';
 import { dbQuery, isPgUndefinedTable } from '../_lib/postgres.js';
 import { tableInAppSchema } from '../_lib/schema.js';
 import { loadMatchingBuScope, type DepartmentScope } from '../_lib/departmentScope.js';
@@ -857,11 +857,10 @@ export async function buildRecruitOverview(
         ).rows.map((r) => r.code).filter(Boolean),
       ),
     ),
-    // คลิกลิงก์สมัครรายวันของช่วงนี้ — ตาราง "กลุ่ม Facebook คลิก → กรอก" (เจ้าของ 10 พ.ย. 2569)
-    settle('คลิกลิงก์', () => loadLinkClicks({ from: window.from, to: window.to, buSet })),
+    // คลิก/กรอกทั้งหมดของลิงก์กลุ่ม Facebook — การ์ด "กลุ่ม Facebook" (เจ้าของ 10 พ.ย. 2569 Choice ยอดทั้งหมด)
+    settle('คลิกลิงก์', () => loadLinkClicks({ buSet })),
   ]);
   body.linkClicks = clicksR.ok ? clicksR.value : null;
-  body.clicksSince = CLICKS_SINCE;
 
   // บอร์ด ERP อ่านไม่ได้ = ไม่รู้ว่าได้ใบสมัครหรือยัง (null) — ไม่ใช่ "ยังไม่ได้"
   const boardPhones = boardR.ok ? boardR.value : null;
