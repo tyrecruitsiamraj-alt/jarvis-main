@@ -1,9 +1,13 @@
 import React, { useState } from 'react';
 import { Switch } from '@/components/ui/switch';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Card } from '@/components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import {
   APP_FUNCTIONS,
   type AppFunctionDef,
-  ROLE_LABELS,
   ROLE_ORDER,
   functionGroups,
   roleHasFunction,
@@ -14,6 +18,19 @@ import { useAuth } from '@/contexts/AuthContext';
 import { TONE } from '@/lib/designTokens';
 import type { UserRole } from '@/types';
 import { cn } from '@/lib/utils';
+
+/**
+ * หัวคอลัมน์สั้น (เจ้าของ 10 พ.ย. 2569 "จัดเรียงหน้าให้ดูหน่อย") — เดิมใช้ ROLE_LABELS เต็ม "Sale (อ่านอย่างเดียว)"
+ * หัวกินที่จนชื่อฟังก์ชันโดนบีบตัดทีละพยางค์ · "อ่านอย่างเดียว" ย้ายเป็นบรรทัดรองใต้หัว
+ */
+const ROLE_HEAD: Record<UserRole, { name: string; note?: string }> = {
+  sale: { name: 'Sale', note: 'อ่านอย่างเดียว' },
+  opl: { name: 'OPL', note: 'อ่านอย่างเดียว' },
+  staff: { name: 'Staff' },
+  supervisor: { name: 'Supervisor' },
+  admin: { name: 'Admin' },
+};
+const VIEW_AS_ROLES: UserRole[] = ['sale', 'opl', 'staff', 'supervisor'];
 
 const RolePermissionsTab: React.FC = () => {
   const { matrix, loading, updateGrant, savingKey } = useRolePermissions();
@@ -27,10 +44,15 @@ const RolePermissionsTab: React.FC = () => {
    * เดิมต้องปิดทีละ role ถ้าเผลอปิดไม่ครบ = คนอื่นยังเห็น
    */
   const adminOnly = async (fn: AppFunctionDef) => {
-    for (const role of ROLE_ORDER) {
-      if (role === 'admin') continue;
-      if (!roleHasFunction(role, fn, matrix)) continue;
-      await updateGrant(role, fn.id, false);
+    setError(null);
+    try {
+      for (const role of ROLE_ORDER) {
+        if (role === 'admin') continue;
+        if (!roleHasFunction(role, fn, matrix)) continue;
+        await updateGrant(role, fn.id, false);
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'บันทึกไม่สำเร็จ');
     }
   };
 
@@ -45,137 +67,128 @@ const RolePermissionsTab: React.FC = () => {
 
   return (
     <div className="space-y-4">
-      <div className="glass-card rounded-3xl p-4 border border-white/70 text-sm text-muted-foreground space-y-1">
-        <p>เปิด/ปิดฟังก์ชันให้แต่ละ role — บันทึกทันทีเมื่อสลับ</p>
-        <p className="text-xs">ค่าเริ่มต้นตามลำดับ Admin &gt; Supervisor &gt; Staff · เปลี่ยน role ผู้ใช้ได้ที่แท็บ Users</p>
-      </div>
-
-      {/* ═══ ลองดูหน้าจอในมุมมองของ role อื่น (เจ้าของสั่ง 2 ก.ย. 2569) ═══
-          *"ทำให้ Admin ดูมุมมองของ Role อื่นได้ จะได้ตรวจสอบว่าที่แก้ไปได้ตามนั้นไหม"*
-          🔴 เขียนไว้ตรง ๆ ว่าเป็นแค่มุมมองจอ — ไม่ได้ลดสิทธิ์จริงฝั่งเซิร์ฟเวอร์ */}
-      {realRole === 'admin' ? (
-        <div className={cn('rounded-xl border p-3', TONE.info.soft)}>
-          <p className="text-sm font-medium text-foreground">ลองดูหน้าจอในมุมมองของ role อื่น</p>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            สลับแล้วเมนูและปุ่มทั้งระบบจะเหลือเท่าที่ role นั้นเห็น — ใช้ตรวจว่าที่เพิ่งแก้สิทธิ์ไปได้ผลจริงไหม
-            · <b>เป็นการจำลองหน้าจอเท่านั้น</b> ถ้ากดปุ่ม เซิร์ฟเวอร์ยังทำงานด้วยสิทธิ์ admin ของคุณ
-          </p>
-          <div className="mt-2 flex flex-wrap items-center gap-1.5">
-            {(['sale', 'opl', 'staff', 'supervisor'] as UserRole[]).map((r) => (
-              <button
-                key={r}
-                type="button"
-                onClick={() => setViewAsRole(viewAsRole === r ? null : r)}
-                aria-pressed={viewAsRole === r}
-                className={cn(
-                  'inline-flex min-h-9 items-center rounded-full border px-3 text-xs font-medium uppercase',
-                  viewAsRole === r
-                    ? 'border-transparent bg-primary text-primary-foreground'
-                    : TONE.neutral.outline,
-                )}
-              >
-                {r}
-              </button>
-            ))}
-            {viewAsRole ? (
-              <>
-                <button
-                  type="button"
-                  onClick={() => setViewAsRole(null)}
-                  className="text-[11px] font-medium text-primary underline"
-                >
-                  กลับเป็น admin
-                </button>
-              </>
-            ) : null}
-          </div>
+      <Card className="space-y-4 p-5">
+        <div className="space-y-1">
+          <h2 className="text-lg font-medium text-foreground">สิทธิ์ตาม role</h2>
+          <p className="text-sm text-muted-foreground">สลับแล้วบันทึกทันที · เปลี่ยน role ของคนที่เมนูผู้ใช้งาน</p>
         </div>
-      ) : null}
+
+        {/* ═══ ลองดูหน้าจอในมุมมองของ role อื่น (เจ้าของสั่ง 2 ก.ย. 2569) ═══
+            *"ทำให้ Admin ดูมุมมองของ Role อื่นได้ จะได้ตรวจสอบว่าที่แก้ไปได้ตามนั้นไหม"*
+            🔴 เขียนไว้ตรง ๆ ว่าเป็นแค่มุมมองจอ — ไม่ได้ลดสิทธิ์จริงฝั่งเซิร์ฟเวอร์ */}
+        {realRole === 'admin' ? (
+          <div className="flex flex-wrap items-center gap-3 border-t border-border pt-4">
+            <span className="text-sm text-foreground">ดูจอแบบ role อื่น</span>
+            <ToggleGroup
+              type="single"
+              size="sm"
+              variant="outline"
+              className="flex-wrap justify-start"
+              value={viewAsRole ?? ''}
+              onValueChange={(v) => setViewAsRole(v ? (v as UserRole) : null)}
+              aria-label="ดูจอแบบ role อื่น"
+            >
+              {VIEW_AS_ROLES.map((r) => (
+                <ToggleGroupItem key={r} value={r}>
+                  {ROLE_HEAD[r].name}
+                </ToggleGroupItem>
+              ))}
+            </ToggleGroup>
+            {viewAsRole ? (
+              <Button type="button" variant="ghost" size="sm" onClick={() => setViewAsRole(null)}>
+                กลับเป็น Admin
+              </Button>
+            ) : null}
+            <span className="basis-full text-xs text-muted-foreground">
+              จำลองจออย่างเดียว · กดปุ่มแล้วเซิร์ฟเวอร์ยังทำด้วยสิทธิ์ Admin ของคุณ
+            </span>
+          </div>
+        ) : null}
+      </Card>
 
       {error ? (
-        <div className="text-sm text-destructive rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2">
+        <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">
           {error}
         </div>
       ) : null}
 
-      {loading ? <div className="text-sm text-muted-foreground px-1">กำลังโหลดสิทธิ์…</div> : null}
-
-      {groups.map((group) => (
-        <div key={group} className="glass-card rounded-3xl border border-white/70 overflow-hidden">
-          <div className="px-4 py-3 border-b border-border/50 bg-secondary/20">
-            <h3 className="text-sm font-medium text-foreground">{group}</h3>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[520px]">
-              <thead>
-                <tr className="border-b border-border/50">
-                  <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground">ฟังก์ชัน</th>
-                  {ROLE_ORDER.map((role) => (
-                    <th
-                      key={role}
-                      className="px-3 py-2.5 text-center text-xs font-medium text-muted-foreground w-28"
-                    >
-                      {ROLE_LABELS[role]}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {APP_FUNCTIONS.filter((f) => f.group === group).map((fn) => (
-                  <tr key={fn.id} className="border-b border-border/30 last:border-0">
-                    <td className="px-4 py-2.5">
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        <span className="text-foreground">{fn.label}</span>
-                        {ROLE_ORDER.every((r) => r === 'admin' || !roleHasFunction(r, fn, matrix)) ? (
-                          <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-medium text-amber-800 dark:bg-amber-950/60 dark:text-amber-200">
-                            ยังไม่เปิดใช้ — เห็นเฉพาะ admin
-                          </span>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => void adminOnly(fn)}
-                            disabled={loading || !!savingKey}
-                            className="rounded-full border border-border px-1.5 py-0.5 text-[9px] font-medium text-muted-foreground hover:bg-secondary disabled:opacity-50"
-                            title="ปิดฟีเจอร์นี้สำหรับทุก role ยกเว้น admin"
-                          >
-                            เปิดเฉพาะ admin
-                          </button>
-                        )}
-                      </div>
-                      <div className="text-[10px] text-muted-foreground mt-0.5">ขั้นต่ำ: {ROLE_LABELS[fn.minimumRole]}</div>
-                    </td>
-                    {ROLE_ORDER.map((role) => {
-                      const allowed = roleHasFunction(role, fn, matrix);
-                      const defaultAllowed = roleHasFunction(role, fn, null);
-                      const key = `${role}:${fn.id}`;
-                      const saving = savingKey === key;
-                      const isOverride = allowed !== defaultAllowed;
-                      return (
-                        <td key={role} className="px-3 py-2.5">
-                          <div className="flex flex-col items-center gap-1">
-                            <Switch
-                              checked={allowed}
-                              disabled={loading || saving}
-                              onCheckedChange={(checked) => void handleToggle(role, fn.id, checked)}
-                              aria-label={`${fn.label} — ${ROLE_LABELS[role]}`}
-                            />
-                            {isOverride ? (
-                              <span className={cn('text-[9px] font-medium', allowed ? 'text-primary' : 'text-muted-foreground')}>
-                                {allowed ? 'เปิด' : 'ปิด'}
-                              </span>
-                            ) : null}
-                          </div>
-                        </td>
-                      );
-                    })}
-                  </tr>
+      {/* ตารางเดียวทั้งหน้า หัวคอลัมน์ชุดเดียว · กลุ่มเป็นแถวคั่น (เดิมการ์ดละกลุ่ม หัวซ้ำทุกการ์ด) */}
+      <Card className="overflow-hidden p-0" aria-busy={loading}>
+        <div className="max-w-full overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="min-w-64">ฟังก์ชัน</TableHead>
+                {ROLE_ORDER.map((role) => (
+                  <TableHead key={role} className="w-28 whitespace-nowrap text-center">
+                    <span className="block text-foreground">{ROLE_HEAD[role].name}</span>
+                    {ROLE_HEAD[role].note ? <span className="block text-xs font-normal">{ROLE_HEAD[role].note}</span> : null}
+                  </TableHead>
                 ))}
-              </tbody>
-            </table>
-          </div>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {groups.map((group) => (
+                <React.Fragment key={group}>
+                  <TableRow className="bg-muted/50 hover:bg-muted/50">
+                    <TableCell colSpan={ROLE_ORDER.length + 1} className="py-2 text-sm font-medium text-foreground">
+                      {group}
+                    </TableCell>
+                  </TableRow>
+                  {APP_FUNCTIONS.filter((f) => f.group === group).map((fn) => {
+                    const adminOnlyNow = ROLE_ORDER.every((r) => r === 'admin' || !roleHasFunction(r, fn, matrix));
+                    return (
+                      <TableRow key={fn.id}>
+                        <TableCell className="space-y-1.5">
+                          <span className="block text-sm text-foreground">{fn.label}</span>
+                          <span className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                            <span>ขั้นต่ำ {ROLE_HEAD[fn.minimumRole].name}</span>
+                            {adminOnlyNow ? (
+                              <Badge variant="outline" className={cn('font-normal', TONE.warn.soft, TONE.warn.value)}>
+                                เห็นเฉพาะ Admin
+                              </Badge>
+                            ) : (
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="xs"
+                                onClick={() => void adminOnly(fn)}
+                                disabled={loading || !!savingKey}
+                                title="ปิดฟังก์ชันนี้ทุก role ยกเว้น Admin"
+                              >
+                                เปิดเฉพาะ Admin
+                              </Button>
+                            )}
+                          </span>
+                        </TableCell>
+                        {ROLE_ORDER.map((role) => {
+                          const allowed = roleHasFunction(role, fn, matrix);
+                          const isOverride = allowed !== roleHasFunction(role, fn, null);
+                          const saving = savingKey === `${role}:${fn.id}`;
+                          return (
+                            <TableCell key={role} className="text-center">
+                              <span className="inline-flex flex-col items-center gap-1">
+                                <Switch
+                                  checked={allowed}
+                                  disabled={loading || saving}
+                                  onCheckedChange={(checked) => void handleToggle(role, fn.id, checked)}
+                                  aria-label={`${fn.label} — ${ROLE_HEAD[role].name}`}
+                                />
+                                {/* ต่างจากค่าเริ่มของ role นี้ = มีคนแก้ไว้ (บอกด้วยคำ ไม่ใช่สีอย่างเดียว) */}
+                                {isOverride ? <span className="whitespace-nowrap text-xs text-primary">แก้จากค่าเริ่ม</span> : null}
+                              </span>
+                            </TableCell>
+                          );
+                        })}
+                      </TableRow>
+                    );
+                  })}
+                </React.Fragment>
+              ))}
+            </TableBody>
+          </Table>
         </div>
-      ))}
+      </Card>
     </div>
   );
 };
