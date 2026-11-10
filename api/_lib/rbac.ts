@@ -280,3 +280,45 @@ export function checkApiAccess(
   }
   return { ok: true };
 }
+
+/**
+ * สิทธิ์ในหน้า "บทบาทและสิทธิ์" ที่คุมเส้นนี้ (อ่าน/เขียน) — null = ไม่มีสิทธิ์ตัวไหนคุม
+ * 🔴 คุมเฉพาะที่ชื่อสิทธิ์ตรงกับสิ่งที่เส้นทำ — ใบสมัคร (`job-applications`) ผูกแค่การอ่าน
+ *    (การเขียนมีลงผลโทร/เก็บรายชื่อที่ทำทุกวัน ไม่ใช่ "แก้ไข/ปิดผู้สมัคร" — ผูกผิด = ล็อกงานประจำ)
+ */
+export function grantFunctionFor(resource: ApiResource, method: string): string | null {
+  const read = method.toUpperCase() === 'GET' || method.toUpperCase() === 'HEAD';
+  switch (resource) {
+    case 'candidates':
+      return read ? 'candidates_read' : method.toUpperCase() === 'POST' ? 'candidates_create' : 'candidates_edit';
+    case 'job-applications':
+      return read ? 'candidates_read' : null;
+    case 'jobs':
+      return read ? 'jobs_read' : 'jobs_edit';
+    case 'job-assignments':
+      return read ? 'jobs_read' : 'jobs_assign_staff';
+    case 'siamraj-unit-requests':
+    case 'siamraj-unit-history':
+    case 'siamraj-unit-work-status':
+    case 'siamraj-unit-assignments':
+      return read ? 'unit_requests_read' : null;
+    case 'employees':
+      return read ? 'employees_read' : 'employees_edit';
+    case 'clients':
+      return read ? 'clients_read' : 'clients_edit';
+    case 'work-calendar':
+      return read ? 'work_calendar_read' : 'work_calendar_manage';
+    case 'follow':
+    case 'follow-staff-contacts':
+      return read ? 'follow_read' : 'follow_manage';
+    case 'recruit-postings':
+      return 'recruit_postings';
+    case 'recruit-channels':
+      return read ? null : 'recruit_channels_manage';
+    case 'audit-logs':
+      return 'audit_logs';
+    default:
+      return null;
+  }
+}
+

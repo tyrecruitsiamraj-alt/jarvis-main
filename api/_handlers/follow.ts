@@ -55,6 +55,7 @@ import {
   validateFollowStaffCall,
 } from '../../src/lib/followStaffCall.js';
 import { followSameStopUnitSql } from '../_lib/followDayScope.js';
+import { buVisibleSql, followBuJoin, followBuSql, viewerBuSet } from '../_lib/homeBuSql.js';
 
 const followTable = tableInAppSchema('follow_entries');
 const queueTable = tableInAppSchema('lumos_dispatch_queue');
@@ -307,8 +308,13 @@ async function listFollow(req: AuthedReq, res: ApiRes) {
    */
   const band = parseFollowBand(req.query);
   if (band === 'bad') return sendError(res, 400, 'Bad request', 'ช่วงเวลาที่ขอไม่ถูกต้อง');
-  const bandWhere = band ? `where (f.scheduled_at >= $3::timestamptz and f.scheduled_at < $4::timestamptz) or f.created_at >= $5::timestamptz` : '';
+  const bandCond = (a: string, b: string, c: string) =>
+    `((f.scheduled_at >= ${a}::timestamptz and f.scheduled_at < ${b}::timestamptz) or f.created_at >= ${c}::timestamptz)`;
   const bandParams = band ? [band.from, band.to, band.since] : [];
+  // เห็นเฉพาะ BU ในสิทธิ์ (ตรวจทั้งระบบ 10 พ.ย. 2569 · เจ้าของ Choice "เห็นเฉพาะ BU ตัวเอง") — BU ของสาย = นิยามเดียวกับหน้าหลัก (`followBuSql`)
+  const buSet = await viewerBuSet(req.user);
+  const listWhere = `where ${[band ? bandCond('$3', '$4', '$5') : null, buVisibleSql(followBuSql('f'), band ? '$6' : '$3')].filter(Boolean).join(' and ')}`;
+  const countWhere = `where ${[band ? bandCond('$1', '$2', '$3') : null, buVisibleSql(followBuSql('f'), band ? '$4' : '$1')].filter(Boolean).join(' and ')}`;
 
   const { rows } = await dbQuery<FollowRow>(
     /**
@@ -361,7 +367,7 @@ async function listFollow(req: AuthedReq, res: ApiRes) {
             coalesce(umsi.name, umse.name) as staff_called_by_display
        -- 🔴 ตัดหน้าก่อนแล้วค่อย join (เจ้าของ 10 พ.ย. 2569 "หน้าติดตามเปิดครั้งแรกให้เร็วกว่านี้อีก") — เดิม join + เรียงทั้ง 16,000 แถว
        -- (เรียงลงดิสก์) แล้วคิดคอลัมน์หนักให้แถวก่อน offset ทุกหน้า ⇒ หน้าหลัง ๆ ช้าขึ้นเรื่อย ๆ · id = ตัวตัดสินลำดับ แถวไม่ซ้ำ/ไม่หล่นข้ามหน้า
-       from (select * from ${followTable} f ${bandWhere}
+       from (select f.* from ${followTable} f ${followBuJoin('f')} ${listWhere}
               order by f.created_at desc, f.id desc
               limit $1 offset $2) f
        left join ${queueTable} q
@@ -378,7 +384,7 @@ async function listFollow(req: AuthedReq, res: ApiRes) {
        left join um umsi on umsi.id = f.staff_called_by::text
        left join um umse on umse.email = lower(btrim(f.staff_called_by_name))
       order by f.created_at desc, f.id desc`,
-    [limit, offset, ...bandParams],
+    [limit, offset, ...bandParams, buSet],
   );
 
   /**
@@ -390,10 +396,8 @@ async function listFollow(req: AuthedReq, res: ApiRes) {
    */
   const { rows: countRows } = await dbQuery<{ n: string }>(
     // รอบรีเฟรชช่วงนี้ = ยอดของช่วงเดียวกัน (has_more ของช่วง)
-    band
-      ? `select count(*)::text as n from ${followTable} f ${bandWhere.replace(/\$3/g, '$1').replace(/\$4/g, '$2').replace(/\$5/g, '$3')}`
-      : `select count(*)::text as n from ${followTable}`,
-    bandParams,
+    `select count(*)::text as n from ${followTable} f ${followBuJoin('f')} ${countWhere}`,
+    [...bandParams, buSet],
   );
   const total = Number(countRows[0]?.n ?? rows.length);
   // ชื่อเจ้าของเบอร์ฉุกเฉิน (เจ้าของ 29 ต.ค. 2569 "เติมชื่อเจ้าของเบอร์") — หาไม่เจอ = ขึ้นแค่เบอร์

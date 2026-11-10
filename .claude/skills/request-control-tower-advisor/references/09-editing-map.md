@@ -14319,3 +14319,5 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 - บทโทรใบสมัคร: ชื่อจุดทำงานจากใบขอก่อน `unit_name` บนใบ (`buildApplicationInterviewPayload`)
 - คำขอ PDPA ขอลบ/หยุดติดต่อจากหน้าสาธารณะ = หยุดโทรตอนกดยืนยันตัวตน (`pdpa-requests` PATCH verify) · ลงแทน = ทันที · `pdpaCallsStopped`
 - สมุดใบขอ: `endedFull` (ERP `is_inform_all` · ไม่ใช่ Stop/ยกเลิก) = ปิดครบ แม้คนเริ่มงานหลังวันปิดใบ (`requestFlowRole`) · เทสต์ `tests/api/ledgerInformAll2569-11-10.test.ts`
+- ข้อ 4 สิทธิ์: `viewerBuSet` + `buVisibleSql` (`api/_lib/homeBuSql.ts`) — หน้าติดตาม (`follow.ts` รายการ+ยอดรวม · BU = `followBuSql` นิยามเดียวกับหน้าหลัก) · ดูแลหลังเริ่มงาน (`aftercare.ts` · `aftercareBuSql`) เห็นเฉพาะ BU ในสิทธิ์ · ไม่รู้ BU = เห็นทุกคน · admin ทุก BU · ประวัติติดต่อ (`matching-contact-history`) ไม่กรอง (ค้นด้วยเบอร์ · ใช้กันโทรซ้ำข้าม BU)
+- ปิดสิทธิ์ในหน้า "บทบาทและสิทธิ์" = API ปฏิเสธ: `grantFunctionFor(resource, method)` (`rbac.ts`) + `grantSwitchedOff` (`roleFunctionGrants.ts` · จำ 30 วิ) ใน `withRbac` · 🔴 ล็อกเฉพาะแถวที่ปิดไว้ชัด ๆ ค่าเริ่มไม่ล็อกเพิ่ม · ใบสมัครคุมแค่การอ่าน · เทสต์ `tests/api/buScopeGrants2569-11-10.test.ts`

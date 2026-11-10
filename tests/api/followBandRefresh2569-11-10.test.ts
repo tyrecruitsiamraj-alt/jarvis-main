@@ -57,7 +57,8 @@ describe('ภาพรวม: ใบขอติดตรงไหนยิง�
 describe('เปิดหน้าติดตามครั้งแรก (10 พ.ย. 2569 "ให้เร็วกว่านี้อีก")', () => {
   it('ตัดหน้าจากตารางติดตามก่อนแล้วค่อย join · ลำดับมีตัวตัดสิน (id) แถวไม่ซ้ำ/ไม่หล่นข้ามหน้า', () => {
     const h = readFileSync('api/_handlers/follow.ts', 'utf8');
-    expect(h).toMatch(/from \(select \* from \$\{followTable\} f \$\{bandWhere\}\s+order by f\.created_at desc, f\.id desc\s+limit \$1 offset \$2\) f/);
-    expect(h).not.toMatch(/\$\{bandWhere\}\s+order by f\.created_at desc\s+limit \$1 offset \$2/);
+    // 10 พ.ย. 2569 กรอง BU ในซับคิวรีเดียวกัน (followBuJoin · listWhere) — ยังตัดหน้าก่อน join
+    expect(h).toMatch(/from \(select f\.\* from \$\{followTable\} f \$\{followBuJoin\('f'\)\} \$\{listWhere\}\s+order by f\.created_at desc, f\.id desc\s+limit \$1 offset \$2\) f/);
+    expect(h).not.toMatch(/\$\{listWhere\}\s+order by f\.created_at desc\s+limit \$1 offset \$2/);
   });
 });

@@ -29,6 +29,8 @@ import {
   isAftercareResult,
   isAftercareScore,
 } from '../../src/lib/aftercareContact.js';
+import { aftercareBuSql, buVisibleSql, viewerBuSet } from '../_lib/homeBuSql.js';
+import { grantSwitchedOff } from '../_lib/roleFunctionGrants.js';
 
 const TABLE = tableInAppSchema('aftercare_people');
 /** แผนติดตามเดิมของคนที่ย้ายมา — เจ้าของงาน = คนเพิ่มแผนนั้น (ตัวกรอง 19 ต.ค. 2569) · ย้อนกลับเปิดสายของชุดนั้นคืน */
@@ -154,6 +156,11 @@ async function handleGet(req: AuthedReq, res: ApiRes) {
     }
   }
   const includeClosed = getString(req.query?.closed) === '1';
+  // หน้าดูแลหลังเริ่มงานมีสิทธิ์ของตัวเอง (`aftercare_read`) — ปิดในหน้าสิทธิ์ = ล็อกด้วย (10 พ.ย. 2569)
+  if (await grantSwitchedOff(req.user.role, 'aftercare_read')) return sendError(res, 403, 'Forbidden', 'ฟังก์ชันนี้ถูกปิดสำหรับบทบาทของคุณ');
+  // เห็นเฉพาะ BU ในสิทธิ์ (ตรวจทั้งระบบ 10 พ.ย. 2569 · เจ้าของ Choice "เห็นเฉพาะ BU ตัวเอง") · ไม่รู้ BU = เห็นทุกคน
+  const buSet = await viewerBuSet(req.user);
+  const where = [includeClosed ? null : 'a.closed_at is null', buVisibleSql(aftercareBuSql('a'), '$1')].filter(Boolean).join(' and ');
   try {
     const { rows } = await dbQuery<Row>(
       `select ${COLS_A},
@@ -168,8 +175,9 @@ async function handleGet(req: AuthedReq, res: ApiRes) {
             order by (x.id = f.created_by) desc
             limit 1
          ) u on true
-        ${includeClosed ? '' : 'where a.closed_at is null'}
+        where ${where}
         order by a.created_at desc limit 500`,
+      [buSet],
     );
     const contacts = await lastContactsOf(rows.map((r) => r.phone_e164));
     res.setHeader?.('Cache-Control', 'no-store');

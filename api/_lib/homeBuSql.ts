@@ -19,7 +19,8 @@
 import { tableInAppSchema } from './schema.js';
 import { siteBuSql, trendBuOfSiteSql, trendBuSql } from './siteBuSql.js';
 import { normalizeTrendBu } from '../../src/lib/trends/bu.js';
-import type { DepartmentScope } from './departmentScope.js';
+import { loadUserDepartmentScope, type DepartmentScope } from './departmentScope.js';
+import type { UserRole } from './auth.js';
 
 const MAP = tableInAppSchema('job_site_map');
 const APPS = tableInAppSchema('public_job_applications');
@@ -84,6 +85,21 @@ export function pickDashboardBuSet(scope: DepartmentScope, raw: unknown): { bu: 
 
 /** BU ของแถวอยู่ในชุด — `param` = ตำแหน่งพารามิเตอร์ `text[]` (null = ไม่กรอง) */
 export const buMatchSql = (expr: string, param: string) => `(${param}::text[] is null or ${expr} = any(${param}::text[]))`;
+
+/**
+ * รายการที่มีชื่อ/เบอร์คน (ติดตาม · ดูแลหลังเริ่มงาน · ประวัติติดต่อ) — เห็นเฉพาะ BU ในสิทธิ์
+ * (ตรวจทั้งระบบ 10 พ.ย. 2569 · เจ้าของ Choice "เห็นเฉพาะ BU ตัวเอง") · แถวที่ไม่รู้ BU ยังเห็นทุกคน (ไม่รู้ ≠ BU อื่น)
+ */
+export const buVisibleSql = (expr: string, param: string) =>
+  `(${param}::text[] is null or ${expr} is null or ${expr} = any(${param}::text[]))`;
+
+/** ชุด BU ที่ผู้ใช้เห็นได้ — admin = null (ทุก BU) · BU หลัก + BU ที่ตั้ง "ดูเพิ่ม" · ไม่มี BU = [] (ไม่เห็นของที่รู้ BU) */
+export async function viewerBuSet(user: { sub: string; role: UserRole }): Promise<BuSet> {
+  const scope = await loadUserDepartmentScope(user);
+  if (scope.mode === 'all') return null;
+  if (scope.mode === 'none') return [];
+  return [...new Set(scope.codes.map((c) => normalizeTrendBu(c) ?? c))];
+}
 
 /** BU ของแถวอยู่ในชุด (ฝั่ง Node) */
 export const inBuSet = (bu: string | null | undefined, set: BuSet) => set === null || (bu != null && set.includes(bu));

@@ -7,7 +7,8 @@ import {
   type UserRole,
   type JwtUserPayload,
 } from './auth.js';
-import { checkApiAccess, meetsMinimumRole, type ApiResource } from './rbac.js';
+import { checkApiAccess, grantFunctionFor, meetsMinimumRole, type ApiResource } from './rbac.js';
+import { grantSwitchedOff } from './roleFunctionGrants.js';
 import { liveUserOf } from './liveUser.js';
 
 export type ApiRes = {
@@ -135,6 +136,11 @@ export function withRbac(
     const access = checkApiAccess(req.user.role, resource, method, hint);
     if (!access.ok) {
       return sendError(res, 403, 'Forbidden', access.message);
+    }
+    // ปิดสิทธิ์ไว้ในหน้า "บทบาทและสิทธิ์" = ล็อกที่นี่ด้วย (ตรวจทั้งระบบ 10 พ.ย. 2569 · `grantSwitchedOff`)
+    const fn = grantFunctionFor(resource, method);
+    if (fn && (await grantSwitchedOff(req.user.role, fn))) {
+      return sendError(res, 403, 'Forbidden', 'ฟังก์ชันนี้ถูกปิดสำหรับบทบาทของคุณ');
     }
     await handler(req, res);
   });

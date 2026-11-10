@@ -122,6 +122,28 @@ export async function upsertGrant(
     `,
     [role, functionId, enabled, updatedBy],
   );
+  switchedOffCache = null;
+}
+
+/**
+ * ═══ ปิดสิทธิ์ในหน้า "บทบาทและสิทธิ์" = ล็อกที่เซิร์ฟเวอร์ด้วย (ตรวจทั้งระบบ 10 พ.ย. 2569 · เจ้าของ Choice "ล็อกที่เซิร์ฟเวอร์ด้วย") ═══
+ * เดิมเซิร์ฟเวอร์เช็กจริงแค่ `contact_view_all` · `unit_notes_edit` — ปิดสิทธิ์ที่เหลือ = ซ่อนเมนู แต่ API ยังตอบ
+ * 🔴 ล็อกเฉพาะที่ **ปิดไว้ชัด ๆ ในหน้าสิทธิ์** (แถว enabled = false) — ค่าเริ่มไม่ล็อกเพิ่ม (role ขั้นต่ำของ rbac.ts ยังคุมอยู่)
+ *    ⇒ วันที่ขึ้นไม่มีใครเสียสิทธิ์ (ไม่มีแถวปิดเลย) · gate ผิด = ล็อกคนออกจากงานจริง (บทเรียน 16 ส.ค. 2569)
+ * จำไว้ 30 วิ · กดเปลี่ยนสิทธิ์บนเครื่องเดียวกัน = ล้างทันที
+ */
+let switchedOffCache: { at: number; map: Map<string, boolean> } | null = null;
+const SWITCHED_OFF_TTL_MS = 30_000;
+
+export async function grantSwitchedOff(role: UserRole, functionId: string, now = Date.now()): Promise<boolean> {
+  if (!switchedOffCache || now - switchedOffCache.at > SWITCHED_OFF_TTL_MS) {
+    try {
+      switchedOffCache = { at: now, map: await loadGrantOverrides() };
+    } catch {
+      return false; // อ่านตารางสิทธิ์ไม่ได้ = ใช้ role ขั้นต่ำตามเดิม (ไม่ล็อกทุกคนออกเพราะตารางนี้)
+    }
+  }
+  return switchedOffCache.map.get(grantKey(role, functionId)) === false;
 }
 
 /** Prevent admin from locking everyone out of Settings */
