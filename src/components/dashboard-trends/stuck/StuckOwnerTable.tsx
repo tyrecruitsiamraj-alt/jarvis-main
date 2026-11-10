@@ -22,7 +22,7 @@ export default function StuckOwnerTable({
   onPick: (title: string, list: StuckRequest[]) => void;
   /** หัวคอลัมน์จำนวนใบ — ตามใบชุดที่เลือกบนสุด */
   countLabel?: string;
-  /** แท่งต่อช่อง (ต้นแบบ SO Recruit 10 พ.ย. 2569 "งานอยู่ที่ใคร" — แต่ละคนมีงานกี่ใบในแต่ละช่วง อ่านจากแท่ง+เลข) · ยาวเทียบช่องที่มากสุดของช่วงเดียวกัน */
+  /** แท่งต่อช่อง (ต้นแบบ SO Recruit 10 พ.ย. 2569 "งานอยู่ที่ใคร" — แต่ละคนมีงานกี่ใบในแต่ละช่วง อ่านจากแท่ง+เลข) · ยาวเทียบช่องที่มากสุดของช่วงเดียวกัน · สีเทาสีเดียว (เจ้าของ 10 พ.ย. 2569 "ใช้หลอดสีเทาสีเดียวแบบต้นแบบ") หัวคอลัมน์บอกช่วง */
   bars?: boolean;
 }) {
   const owners = React.useMemo(() => stuckByOwner(rows), [rows]);
@@ -71,7 +71,7 @@ export default function StuckOwnerTable({
                     {bars ? (
                       <span className="flex items-center justify-end gap-2">
                         <span className="block h-1.5 w-16 overflow-hidden rounded-full bg-muted sm:w-24" aria-hidden>
-                          <span className={cn('block h-full rounded-full', TONE[p.tone].dot)} style={{ width: `${(o.byPhase[p.key].length / phaseMax[p.key]) * 100}%` }} />
+                          <span className="block h-full rounded-full bg-foreground/40" style={{ width: `${(o.byPhase[p.key].length / phaseMax[p.key]) * 100}%` }} />
                         </span>
                         {cell(o.byPhase[p.key], `${o.name} · ${p.label}`)}
                       </span>
