@@ -13320,7 +13320,7 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 - เจ้าของ: "Pre check ย้ายมาไว้แทนหน้าภาพรวม" · แท็บ = โพสต์ประกาศ ผู้สมัคร การติดต่อ ติดตามนัดหมาย Pre-Check
 - `BOARD_VIEW_TABS` (JobBoardView) แท็บ `precheck` · `StaffJobBoardPage` lazy `PreCheckPage embedded` (ไม่มีหัว/ขอบซ้อน) · `/matching/pre-check` ยังเปิดเต็มหน้า
   🔴 ภาพรวมเดิม (`RecruitOverview` · `?dash=classic` = BoardDashboard) ไม่มีแท็บแล้วแต่ยังเปิดได้ที่ `?view=dashboard` (ทางถอย ห้ามลบ)
-- ตัวเลขรายวัน: `RecruitDailyPanel` (พับได้ เหนือชิปมุมมองแท็บผู้สมัคร) · ตัวคิด `src/lib/recruitDaily.ts`
+- ~~ตัวเลขรายวัน `RecruitDailyPanel` · `src/lib/recruitDaily.ts`~~ ถอดแล้ว 10 พ.ย. 2569 (เจ้าของ "เอาออก") — ห้ามกลับมา
   ข้อมูล `/api/recruit-overview?from&to` ย้อน 30 วัน · นับตามวันที่กรอก (cohort) · AI โทรแล้ว = `calledByAi` · สนใจ/ไม่สนใจ/ไม่รับสาย = `aiAnswer`
   เฉลี่ยเลือก 7 วัน / 30 วัน / เดือนนี้ ไม่นับวันนี้ และไม่นับวันก่อน `firstDay` · กดแท่งดูวันนั้น
 - เทสต์ `tests/api/recruitDailyPrecheck.test.ts`
