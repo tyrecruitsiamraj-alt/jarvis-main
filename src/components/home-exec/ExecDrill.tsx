@@ -239,6 +239,12 @@ export default function ExecDrill({
                                   อัตราต่อคน {BAHT.format(r.finePerDay)} / {BAHT.format(r.deductPerDay)} บาท
                                 </span>
                                 <span>โดนในช่วง {NUM.format(a.days)} วัน · {NUM.format(a.personDays)} คน-วัน</span>
+                                {/* คนแทน + เงื่อนไขสัญญา (ชุดส่งต่อ 10 พ.ย. 2569 H03) — ไม่รู้ = บอกว่าไม่รู้ ไม่เดา */}
+                                <span>คนแทนหักแล้ว {NUM.format(a.coveredPersonDays)} คน-วัน</span>
+                                <span>
+                                  สัญญาส่งคนแทน{' '}
+                                  {r.replaceAccepted == null ? 'ไม่รู้' : r.replaceAccepted ? `ได้${r.replaceWindow ? ` · ${r.replaceWindow}` : ''}` : 'ไม่ได้'}
+                                </span>
                                 <span>
                                   ค่าปรับ {BAHT.format(a.fine)} · ลดมูลค่า {BAHT.format(a.deduct)} บาท
                                 </span>

@@ -39,9 +39,26 @@ export default function BuTrendTable({ metric, bu }: { metric: BuTrendMetric; bu
   const data = state?.key === key ? state.data : null;
   /** เปิดมาเห็นเดือน/วันล่าสุด + แนวโน้ม (ขวาสุด) ก่อน — ย้อนดูเก่าเลื่อนซ้าย */
   const scroller = useRef<HTMLDivElement>(null);
+  // แผงเลื่อนเข้ามาอยู่ (ขนาดยังไม่นิ่ง) — เลื่อนหลังจอวางเสร็จ และซ้ำเมื่อกล่องเปลี่ยนขนาด
   useEffect(() => {
     const el = scroller.current;
-    if (el && data) el.scrollLeft = el.scrollWidth;
+    if (!el || !data) return;
+    const toEnd = () => {
+      el.scrollLeft = el.scrollWidth;
+    };
+    const raf = requestAnimationFrame(toEnd);
+    const ro = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(toEnd);
+    ro?.observe(el);
+    const stop = () => ro?.disconnect();
+    // คนเลื่อนเองแล้ว = หยุดดึงกลับขวา
+    el.addEventListener('pointerdown', stop, { once: true });
+    el.addEventListener('wheel', stop, { once: true });
+    return () => {
+      cancelAnimationFrame(raf);
+      ro?.disconnect();
+      el.removeEventListener('pointerdown', stop);
+      el.removeEventListener('wheel', stop);
+    };
   }, [data]);
   const max = useMemo(() => Math.max(1, ...(data?.points ?? []).flatMap((p) => Object.values(p.byBu).map((c) => valueOf(c, metric)))), [data, metric]);
   /** แนวโน้มรายเดือน: เดือนที่จบแล้วล่าสุดเทียบเดือนก่อนหน้า (ห้ามเอาเดือนนี้ที่ยังไม่จบมาเทียบ) */
