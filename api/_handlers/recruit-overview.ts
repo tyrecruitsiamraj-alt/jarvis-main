@@ -19,7 +19,7 @@ import { loadLinkClicks } from '../_lib/postingLinkHits.js';
 import { dbQuery, isPgUndefinedTable } from '../_lib/postgres.js';
 import { tableInAppSchema } from '../_lib/schema.js';
 import { loadMatchingBuScope, type DepartmentScope } from '../_lib/departmentScope.js';
-import { appBuJoin, appBuSql, pickDashboardBu, pickDashboardBuSet } from '../_lib/homeBuSql.js';
+import { appBuJoin, appBuSql, pickDashboardBu, pickDashboardBuSet, type BuSet } from '../_lib/homeBuSql.js';
 import {
   AI_RESULT_AT_SQL,
   AI_RESULT_BY_PHONE_SQL,
@@ -118,6 +118,35 @@ const JOB_POSTING_REQUESTS = tableInAppSchema('job_posting_requests');
 const POSTINGS_TABLE = tableInAppSchema('recruit_postings');
 const scopeWhere = (bu: string) =>
   `not coalesce(a.is_lead, false) and not exists (select 1 from ${CANCELLATIONS} cx where cx.application_id = a.id) and ${buInSql(bu)}`;
+
+/**
+ * ใบที่กรอกเข้ามาต่อช่วง แยก BU — กราฟเทียบ BU ของแผงผู้สมัครบนหน้าหลัก (เจ้าของ 10 พ.ย. 2569 Choice "กดแล้วเป็นกราฟทุกการ์ด")
+ * ประชากรเดียวกับการ์ดผู้สมัคร (`scopeWhere` + วันกรอกไทย) · อ่านครั้งเดียวทั้งช่วงแล้วแบ่งตามวัน
+ */
+export async function loadApplicantsByBucket(
+  buckets: ReadonlyArray<{ from: string; to: string }>,
+  buSet: BuSet,
+): Promise<Array<Record<string, number>>> {
+  if (buckets.length === 0) return [];
+  const { rows } = await dbQuery<{ d: string; bu: string | null; n: number }>(
+    `select to_char(a.created_at at time zone 'Asia/Bangkok', 'YYYY-MM-DD') as d, ${appBuSql('a')} as bu, count(*)::int as n
+       from ${APPS} a
+       ${appBuJoin('a')}
+      where a.created_at >= $1::timestamptz and a.created_at < $2::timestamptz
+        and ${scopeWhere('$3')}
+      group by 1, 2`,
+    [startOfBkk(buckets[0].from), startOfBkk(addDays(buckets[buckets.length - 1].to, 1)), buSet],
+  );
+  return buckets.map((b) => {
+    const out: Record<string, number> = {};
+    for (const r of rows) {
+      if (r.d < b.from || r.d > b.to) continue;
+      const k = r.bu || 'ไม่ระบุ BU';
+      out[k] = (out[k] ?? 0) + Number(r.n);
+    }
+    return out;
+  });
+}
 
 /** ข้อเท็จจริงต่อใบของช่วง [$1, $2) · $3 = BU · `attendance` = นิพจน์ผลนัด (ตารางยังไม่มี = null) */
 export function factsSql(

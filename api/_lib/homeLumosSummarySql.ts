@@ -26,6 +26,7 @@ import {
 import { FOLLOW_TEAM_REPLACEMENT } from '../../src/lib/followReplacement.js';
 import { categorizeFollowRows, FOLLOW_ENTRY_CATEGORY_COLS, FOLLOW_QUEUE_CALL_COLS } from './followCategory.js';
 import { journeyResultOf } from '../../src/lib/followJourney.js';
+import { addDays } from '../../src/lib/trends/timeBuckets.js';
 
 const QUEUE = tableInAppSchema('lumos_dispatch_queue');
 const FOLLOW = tableInAppSchema('follow_entries');
@@ -222,4 +223,40 @@ export async function loadHomeLumosSummary(
     applicants: bucket(apps.rows[0]),
     backlog: Number(backlog.rows[0]?.n ?? 0),
   };
+}
+
+/**
+ * คนที่ติดตามต่อช่วง แยก BU — กราฟเทียบ BU ของแผงติดตาม (เจ้าของ 10 พ.ย. 2569 Choice "กดแล้วเป็นกราฟทุกการ์ด")
+ * นิยามเดียวกับ `followPeople` ของการ์ด: สายตามวันนัดโทรในช่วง · ไม่นับสายยกเลิก · 1 เบอร์ = 1 คนต่อช่วง · หมวดคิดใหม่ทีละช่วง
+ * อ่านฐานครั้งเดียวทั้งช่วงแล้วแบ่งฝั่ง Node · `buckets` = วัน (YYYY-MM-DD ไทย) เรียงจากเก่า
+ */
+export async function loadFollowPeopleByBucket(
+  buckets: ReadonlyArray<{ from: string; to: string }>,
+  bu: BuSet,
+): Promise<Array<Record<string, number>>> {
+  if (buckets.length === 0) return [];
+  const startOf = (ymd: string) => new Date(`${ymd}T00:00:00+07:00`);
+  const rows = await loadFollowLedgerRows(startOf(buckets[0].from), startOf(addDays(buckets[buckets.length - 1].to, 1)), bu);
+  return buckets.map((b) => {
+    const s = startOf(b.from).getTime();
+    const e = startOf(addDays(b.to, 1)).getTime();
+    const mine = rows.filter((r) => {
+      const t = new Date(r.scheduled_at as string | Date).getTime();
+      return t >= s && t < e;
+    });
+    const derived = categorizeFollowRows(mine);
+    const personRows: FollowPersonCallRow[] = [];
+    for (const r of mine) {
+      const key = followLedgerBucket(r, derived);
+      if (key === 'cancelled') continue;
+      const rowBu = typeof r.summary_bu === 'string' && r.summary_bu ? r.summary_bu : null;
+      personRows.push(personCallRow(r, rowBu, r.follow_team === FOLLOW_TEAM_REPLACEMENT ? 'replacement' : 'main', key));
+    }
+    const out: Record<string, number> = {};
+    for (const person of groupFollowPeople(personRows)) {
+      const k = person.bu ?? 'ไม่ระบุ BU';
+      out[k] = (out[k] ?? 0) + 1;
+    }
+    return out;
+  });
 }

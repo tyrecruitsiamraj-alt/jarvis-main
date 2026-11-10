@@ -558,12 +558,15 @@ const HomeOverviewPage: React.FC<{
   const openStep = (s: FunnelStep) => {
     const staffRows = s.key === 'staff' || s.key === 'reached' ? (roNow?.staff ?? []).filter((x) => x.claimed + x.called > 0) : [];
     setPanel({
+      // ผู้สมัคร (ขั้นแรก) มีกราฟเทียบ BU บนสุด — แผงกว้าง (10 พ.ย. 2569 "กดแล้วเป็นกราฟทุกการ์ด")
+      wide: s.key === 'applied',
       title: s.label,
       sub: `${NUM.format(s.value)} คน${s.from ? ` · ${s.from}` : ''}`,
       // พาช่วงวันที่สมัครไปด้วย (เจ้าของ 10 พ.ย. 2569 "1474 คือของ 1-10 พย ถ้ากดไปก็ต้องโชว์ยอดของ 1-10 พย")
       go: { label: STEP_PAGE[s.key].label, to: withRange(STEP_PAGE[s.key].to, range) },
       body: (
         <div className="space-y-4">
+          {s.key === 'applied' ? <BuTrendTable metric="applicants" bu={bu} /> : null}
           {s.rows.length ? (
             <PanelRows
               unit="คน"
@@ -609,11 +612,13 @@ const HomeOverviewPage: React.FC<{
 
   const openFollow = () =>
     setPanel({
+      wide: true,
       title: 'ติดตามคนเริ่มงาน / ติดตามส่งคนแทน',
       sub: cells ? `${NUM.format(peopleTotal)} คน · ${NUM.format(followLive)} สาย · ยกเลิก ${NUM.format(followCancelled)} สายไม่นับ` : undefined,
       go: PAGE.follow,
       body: (
         <div className="space-y-4">
+          <BuTrendTable metric="follow" bu={bu} />
           <p className="text-sm font-medium text-foreground">ผลรายคน</p>
           <PanelRows
             unit="คน"

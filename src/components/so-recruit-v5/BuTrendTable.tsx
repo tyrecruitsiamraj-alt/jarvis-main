@@ -22,26 +22,35 @@ const NUM = new Intl.NumberFormat('th-TH', { maximumFractionDigits: 0 });
 const MONTH = new Intl.DateTimeFormat('th-TH', { month: 'short', year: '2-digit', timeZone: 'UTC' });
 const monthLabel = (ym: string) => MONTH.format(new Date(`${ym}-01T00:00:00Z`));
 
-export type BuTrendMetric = 'money' | 'remaining';
+export type BuTrendMetric = 'money' | 'remaining' | 'applicants' | 'follow';
 /** สีเส้นตามลำดับ BU — จากโทเค็นที่เดียว (เหมือนกราฟเส้นแท็บภาพรวม) */
 const LINE_TONES: ToneKey[] = ['info', 'success', 'warn', 'violet', 'danger', 'teal'];
-const valueOf = (c: BuTrendCell | undefined, m: BuTrendMetric) => (c ? (m === 'money' ? c.money : c.remainingRequests) : 0);
+const valueOf = (c: BuTrendCell | undefined, m: BuTrendMetric) =>
+  !c ? 0 : m === 'money' ? c.money : m === 'remaining' ? c.remainingRequests : m === 'applicants' ? (c.applicants ?? 0) : (c.followPeople ?? 0);
+/** หัวกราฟ + หน่วย ต่อการ์ด — ผู้สมัคร/ติดตาม (10 พ.ย. 2569 "กดแล้วเป็นกราฟทุกการ์ด") */
+const TITLE: Record<BuTrendMetric, string> = {
+  money: 'เสียเงินตามสัญญา แยก BU',
+  remaining: 'เหลือหา ณ สิ้นช่วง แยก BU',
+  applicants: 'ผู้สมัครที่กรอกเข้ามา แยก BU',
+  follow: 'คนที่ติดตาม แยก BU',
+};
+const UNIT: Record<BuTrendMetric, string> = { money: 'บาท', remaining: 'ใบ', applicants: 'คน', follow: 'คน' };
 
 export default function BuTrendTable({ metric, bu }: { metric: BuTrendMetric; bu: string | null }) {
   const [month, setMonth] = useState<string | null>(null);
   const [state, setState] = useState<{ key: string; data: BuTrendResponse | null; error: string | null } | null>(null);
   const [rev, setRev] = useState(0);
-  const key = `${bu ?? ''}|${month ?? ''}`;
+  const key = `${metric}|${bu ?? ''}|${month ?? ''}`;
   useEffect(() => {
     let alive = true;
     setState({ key, data: null, error: null });
-    fetchHomeBuTrend({ bu, month })
+    fetchHomeBuTrend({ bu, month, metric: metric === 'applicants' || metric === 'follow' ? metric : undefined })
       .then((d) => alive && setState({ key, data: d, error: null }))
       .catch((e: unknown) => alive && setState({ key, data: null, error: friendlyErrorText(e, 'โหลดกราฟเทียบ BU ไม่ขึ้น') }));
     return () => {
       alive = false;
     };
-  }, [key, bu, month, rev]);
+  }, [key, bu, month, metric, rev]);
   const data = state?.key === key ? state.data : null;
   /** เปิดมาเห็นเดือน/วันล่าสุด + แนวโน้ม (ขวาสุด) ก่อน — ย้อนดูเก่าเลื่อนซ้าย */
   const scroller = useRef<HTMLDivElement>(null);
@@ -76,7 +85,7 @@ export default function BuTrendTable({ metric, bu }: { metric: BuTrendMetric; bu
     if (a === z) return 'เท่าเดิม';
     return z > a ? `เพิ่มขึ้น ${NUM.format(z - a)}` : `ลดลง ${NUM.format(a - z)}`;
   };
-  const unit = metric === 'money' ? 'บาท' : 'ใบ';
+  const unit = UNIT[metric];
   const buName = (b: string) => (b === 'ไม่ระบุ BU' ? b : trendBuLabel(b));
   const lineData = useMemo(
     () =>
@@ -99,7 +108,7 @@ export default function BuTrendTable({ metric, bu }: { metric: BuTrendMetric; bu
     <div className="space-y-2" data-testid={`bu-trend-${metric}`}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm font-medium text-foreground">
-          {metric === 'money' ? 'เสียเงินตามสัญญา แยก BU' : 'เหลือหา ณ สิ้นช่วง แยก BU'} · {month ? `รายวัน ${monthLabel(month)}` : 'รายเดือน'} ({unit})
+          {TITLE[metric]} · {month ? `รายวัน ${monthLabel(month)}` : 'รายเดือน'} ({unit})
         </p>
         {month ? (
           <Button type="button" variant="outline" size="xs" onClick={() => setMonth(null)} data-testid="bu-trend-back">

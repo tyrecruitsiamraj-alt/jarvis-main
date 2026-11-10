@@ -14,7 +14,8 @@ import {
   type PenaltyRequestRow,
 } from './requestPenaltyLedger';
 
-export type BuTrendCell = { money: number; remainingRequests: number; remainingPositions: number };
+/** `applicants` / `followPeople` มีเฉพาะคำตอบของ `metric=applicants|follow` (กราฟแผงผู้สมัคร/ติดตาม · 10 พ.ย. 2569) */
+export type BuTrendCell = { money: number; remainingRequests: number; remainingPositions: number; applicants?: number; followPeople?: number };
 export type BuTrendPoint = { key: string; from: string; to: string; byBu: Record<string, BuTrendCell> };
 export type BuTrendBucket = { key: string; from: string; to: string };
 export type BuTrendResponse = { granularity: 'month' | 'day'; month: string | null; bus: string[]; points: BuTrendPoint[] };
@@ -75,6 +76,25 @@ export function buildBuTrend(
       seen.add(bu);
     }
     for (const c of Object.values(byBu)) c.money = Math.round(c.money * 100) / 100;
+    return { key: b.key, from: b.from, to: b.to, byBu };
+  });
+  return { bus: [...seen].sort(), points };
+}
+
+/** ยอดนับต่อช่วง (`counts[i]` = BU → จำนวน ของ `buckets[i]`) → รูปเดียวกับกราฟเงิน/เหลือหา · BU ที่ 0 ทั้งเส้นไม่ขึ้น */
+export function countsToBuTrend(
+  buckets: readonly BuTrendBucket[],
+  counts: ReadonlyArray<Record<string, number>>,
+  field: 'applicants' | 'followPeople',
+): { bus: string[]; points: BuTrendPoint[] } {
+  const seen = new Set<string>();
+  const points = buckets.map((b, i) => {
+    const byBu: Record<string, BuTrendCell> = {};
+    for (const [bu, n] of Object.entries(counts[i] ?? {})) {
+      if (!n) continue;
+      byBu[bu] = { money: 0, remainingRequests: 0, remainingPositions: 0, [field]: n };
+      seen.add(bu);
+    }
     return { key: b.key, from: b.from, to: b.to, byBu };
   });
   return { bus: [...seen].sort(), points };

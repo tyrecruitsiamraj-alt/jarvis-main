@@ -15,7 +15,9 @@ import { loadMatchingBuScope, loadUserDepartmentScope } from '../_lib/department
 import { loadPenaltyLedgerRaw, LEDGER_SINCE } from '../_lib/siamrajPenaltyLedgerSql.js';
 import { buildPenaltyLedger } from '../../src/lib/requestPenaltyLedger.js';
 import { buildHomeMoney } from '../../src/lib/homeMoney.js';
-import { buildBuTrend, dayBuckets, monthBuckets, type BuTrendResponse } from '../../src/lib/homeBuTrend.js';
+import { buildBuTrend, countsToBuTrend, dayBuckets, monthBuckets, type BuTrendResponse } from '../../src/lib/homeBuTrend.js';
+import { loadApplicantsByBucket } from './recruit-overview.js';
+import { loadFollowPeopleByBucket } from '../_lib/homeLumosSummarySql.js';
 import { toBangkokYmd } from '../_lib/businessDate.js';
 import { dbQuery } from '../_lib/postgres.js';
 import { tableInAppSchema } from '../_lib/schema.js';
@@ -121,6 +123,22 @@ async function handler(req: AuthedReq, res: ApiRes) {
     const forcedBu = picked.forcedBu;
     const bu = picked.bu;
     const buSet = picked.buSet;
+
+    /**
+     * `?trend=bu&metric=applicants|follow` = กราฟเทียบ BU ของแผงผู้สมัคร/ติดตาม (เจ้าของ 10 พ.ย. 2569 Choice "กดแล้วเป็นกราฟทุกการ์ด")
+     * ไม่ต้องอ่านสมุดค่าปรับ · BU/สิทธิ์ชุดเดียวกับการ์ด (`pickDashboardBuSet`)
+     */
+    if (q.trend === 'bu' && (q.metric === 'applicants' || q.metric === 'follow')) {
+      const month = typeof q.month === 'string' && /^\d{4}-\d{2}$/.test(q.month) ? q.month : null;
+      const buckets = month ? dayBuckets(month, today) : monthBuckets(today, 12);
+      const trend =
+        q.metric === 'applicants'
+          ? countsToBuTrend(buckets, await loadApplicantsByBucket(buckets, buSet), 'applicants')
+          : countsToBuTrend(buckets, await loadFollowPeopleByBucket(buckets, buSet), 'followPeople');
+      const out: BuTrendResponse = { granularity: month ? 'day' : 'month', month, ...trend };
+      res.setHeader?.('Cache-Control', 'no-store');
+      return res.status(200).json(out);
+    }
 
     const raw = await loadPenaltyLedgerRaw(departmentScope);
     // 🔴 BU ของสมุดเป็นรหัสยาวจากไซต์ (LML · DSL · SNJ) แต่ตัวเลือกเป็นรหัสสั้น (LM · DS · SN) — แปลงก่อนเทียบ

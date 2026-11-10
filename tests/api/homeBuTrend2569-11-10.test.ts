@@ -8,7 +8,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { buildPenaltyLedger, requestFlow, type PenaltyRequestRow } from '@/lib/requestPenaltyLedger';
-import { buildBuTrend, dayBuckets, monthBuckets } from '@/lib/homeBuTrend';
+import { buildBuTrend, countsToBuTrend, dayBuckets, monthBuckets } from '@/lib/homeBuTrend';
 import { rangeFromParams, withRange } from '@/lib/jobNavigation';
 
 const base = (p: Partial<PenaltyRequestRow>): PenaltyRequestRow => ({
@@ -132,5 +132,32 @@ describe('กดเหลือหา = กราฟ (เจ้าของ 10 �
     expect(chart).toContain('if (data.granularity === \'month\' && k) setMonth(k);');
     // กล่องตัวเลขค้างจากรายวันตอนกลับรายเดือน = เคยล่ม (Invalid time value)
     expect(chart).toContain("if (!/^\\d{4}-\\d{2}$/.test(k)) return chartDayLabel(k);");
+  });
+});
+
+describe('กราฟแผงผู้สมัคร/ติดตาม (เจ้าของ 10 พ.ย. 2569 Choice "กดแล้วเป็นกราฟทุกการ์ด")', () => {
+  it('ยอดต่อช่วง → จุดของกราฟ · BU ที่ 0 ทั้งเส้นไม่ขึ้น · ช่วงว่าง = จุดว่าง (ไม่หาย)', () => {
+    const b = monthBuckets('2026-11-10', 3);
+    const t = countsToBuTrend(b, [{}, { LBD: 1787, LBA: 276, LM: 0 }, { LBD: 1159, LBA: 424 }], 'applicants');
+    expect(t.bus).toEqual(['LBA', 'LBD']);
+    expect(t.points.map((p) => p.key)).toEqual(['2026-09', '2026-10', '2026-11']);
+    expect(t.points[0].byBu).toEqual({});
+    expect(t.points[2].byBu.LBD.applicants).toBe(1159);
+    expect(countsToBuTrend(b, [{}, {}, { LBD: 249 }], 'followPeople').points[2].byBu.LBD.followPeople).toBe(249);
+  });
+  it('ที่มาเดียวกับการ์ด · แผงผู้สมัคร/ติดตามมีกราฟบนสุด', () => {
+    const ov = readFileSync('api/_handlers/recruit-overview.ts', 'utf8');
+    const fn = ov.slice(ov.indexOf('export async function loadApplicantsByBucket'), ov.indexOf('export function factsSql'));
+    expect(fn).toContain("and ${scopeWhere('$3')}");
+    const fl = readFileSync('api/_lib/homeLumosSummarySql.ts', 'utf8');
+    const ff = fl.slice(fl.indexOf('export async function loadFollowPeopleByBucket'));
+    expect(ff).toContain('loadFollowLedgerRows(');
+    expect(ff).toContain("if (key === 'cancelled') continue;");
+    expect(ff).toContain('groupFollowPeople(personRows)');
+    const money = readFileSync('api/_handlers/home-money.ts', 'utf8');
+    expect(money.indexOf("q.metric === 'applicants' || q.metric === 'follow'")).toBeLessThan(money.indexOf('await loadPenaltyLedgerRaw('));
+    const page = readFileSync('src/pages/HomeOverviewPage.tsx', 'utf8');
+    expect(page).toContain("{s.key === 'applied' ? <BuTrendTable metric=\"applicants\" bu={bu} /> : null}");
+    expect(page).toContain('<BuTrendTable metric="follow" bu={bu} />');
   });
 });
