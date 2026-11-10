@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import LoadErrorNotice from '@/components/shared/LoadErrorNotice';
+import NamesSearchInput, { NAMES_PAGE, matchesNameQuery } from '@/components/shared/NamesSearchInput';
 import { fetchHomeFollowPeople } from '@/lib/homeAiShareApi';
 import type { AiShareWindow } from '@/lib/homeAiShare';
 import { followPersonLink, type FollowBucketKey, type FollowPersonName } from '@/lib/homeLumosSummary';
@@ -65,6 +66,17 @@ export default function FollowNamesDialog({
     if (!all || all.key !== qKey) return null;
     return all.people.filter((p) => (bucket ? p.bucket === bucket : true)).sort((a, b) => (a.name ?? '').localeCompare(b.name ?? '', 'th'));
   }, [all, qKey, bucket]);
+  // ค้นหา + ดูทีละ 50 (ชุดส่งต่อ G04) — เปิดชุดใหม่ (ช่วง/BU/ผลที่กด) = ล้าง
+  const [term, setTerm] = useState('');
+  const [limit, setLimit] = useState(NAMES_PAGE);
+  const setKey = `${qKey}|${bucket ?? ''}|${title}`;
+  const [seenSet, setSeenSet] = useState(setKey);
+  if (seenSet !== setKey) {
+    setSeenSet(setKey);
+    setTerm('');
+    setLimit(NAMES_PAGE);
+  }
+  const shown = useMemo(() => (rows ? rows.filter((p) => matchesNameQuery([p.name, p.phone], term)) : null), [rows, term]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -85,25 +97,28 @@ export default function FollowNamesDialog({
             <Skeleton className="h-8 w-full rounded-lg" />
           </div>
         ) : (
-          <div className="max-h-[60vh] overflow-y-auto">
+          <div className="max-h-[60vh] space-y-2 overflow-y-auto">
+            {rows.length > 5 ? (
+              <NamesSearchInput value={term} onChange={(v) => { setTerm(v); setLimit(NAMES_PAGE); }} found={term.trim() ? (shown?.length ?? 0) : null} />
+            ) : null}
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>ชื่อ</TableHead>
-                  <TableHead>เบอร์</TableHead>
-                  <TableHead>ทีม</TableHead>
+                  <TableHead className="hidden sm:table-cell">เบอร์</TableHead>
+                  <TableHead className="hidden sm:table-cell">ทีม</TableHead>
                   <TableHead className="text-right">สาย</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {rows.length === 0 ? (
+                {!shown || shown.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={4} className="text-center text-muted-foreground">
-                      ไม่มีรายชื่อ
+                      {rows.length === 0 ? 'ไม่มีรายชื่อ' : 'ไม่เจอชื่อที่ค้นหา'}
                     </TableCell>
                   </TableRow>
                 ) : (
-                  rows.map((p) => (
+                  shown.slice(0, limit).map((p) => (
                     <TableRow key={p.entryId}>
                       <TableCell className="min-w-32 font-medium">
                         {/* กดชื่อ = ไปทำงานกับคนนั้นต่อที่หน้าติดตาม */}
@@ -120,9 +135,13 @@ export default function FollowNamesDialog({
                         >
                           {p.name || 'ไม่มีชื่อ'}
                         </Button>
+                        {/* มือถือ: เบอร์/ทีมย้ายมาใต้ชื่อ (คอลัมน์ซ่อน) — ตรวจจอ 375 · 10 พ.ย. 2569 */}
+                        <span className="block text-xs font-normal tabular-nums text-muted-foreground sm:hidden">
+                          {[p.phone ? localThaiPhone(p.phone) : null, TEAM_LABEL[p.team], p.bu ? trendBuLabel(p.bu) : null].filter(Boolean).join(' · ')}
+                        </span>
                       </TableCell>
-                      <TableCell className="whitespace-nowrap tabular-nums">{p.phone ? localThaiPhone(p.phone) : '—'}</TableCell>
-                      <TableCell className="whitespace-nowrap">
+                      <TableCell className="hidden whitespace-nowrap tabular-nums sm:table-cell">{p.phone ? localThaiPhone(p.phone) : '—'}</TableCell>
+                      <TableCell className="hidden whitespace-nowrap sm:table-cell">
                         {TEAM_LABEL[p.team]}
                         {p.bu ? <span className="block text-xs text-muted-foreground">{trendBuLabel(p.bu)}</span> : null}
                       </TableCell>
@@ -132,6 +151,11 @@ export default function FollowNamesDialog({
                 )}
               </TableBody>
             </Table>
+            {shown && shown.length > limit ? (
+              <Button type="button" variant="outline" size="sm" onClick={() => setLimit((n) => n + NAMES_PAGE)}>
+                ดูเพิ่ม ({NUM.format(shown.length - limit)} คน)
+              </Button>
+            ) : null}
           </div>
         )}
       </DialogContent>

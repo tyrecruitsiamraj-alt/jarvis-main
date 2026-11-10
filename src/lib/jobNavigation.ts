@@ -123,7 +123,37 @@ export function rangeFromParams(p: URLSearchParams): { from: string; to: string 
 }
 
 /** รายงานเดิมของภาพรวมงานสรรหา (`dash=cards`) — พาช่วงและ BU ที่ดูอยู่ไปด้วย (ชุดส่งต่อ 10 พ.ย. 2569 G01: ทุกส่วนช่วงเดียวกัน) */
-export function legacyReportsPath(win: { from: string; to: string }, bu: string | null | undefined): string {
+export function legacyReportsPath(win: { from: string; to: string }, bu: string | null | undefined, filterQuery = ''): string {
   const path = withRange('/jobs/board?view=dashboard&dash=cards', win);
-  return bu ? `${path}&bu=${encodeURIComponent(bu)}` : path;
+  // ตัวกรองบนสุด (เจ้าหน้าที่ · ประเภท · งานย่อย · ไซต์ · พื้นที่) ไปด้วย (R12) — `requestFilterToParams`
+  return `${bu ? `${path}&bu=${encodeURIComponent(bu)}` : path}${filterQuery ? `&${filterQuery}` : ''}`;
+}
+
+/** ช่วงของหน้าหลักโฉมต้นแบบจากลิงก์ (G01) — `from=all` = ทั้งหมด · `unit` = แท็บของปฏิทิน · ผิดรูป/กลับหัว/เลยวันนี้ = null */
+export function homeWindowFromParams(
+  p: URLSearchParams,
+  today: string,
+): { from: string | null; to: string | null; unit?: 'day' | 'week' | 'month' | 'year' } | null {
+  if (p.get('from') === 'all') return { from: null, to: null };
+  const r = rangeFromParams(p);
+  if (!r || r.to > today) return null;
+  const u = p.get('unit');
+  return u === 'day' || u === 'week' || u === 'month' || u === 'year' ? { ...r, unit: u } : r;
+}
+
+/** เขียนช่วง/BU ลงลิงก์ — พารามิเตอร์อื่นของหน้า (เช่น `home=v5`) คงไว้ */
+export function homeWindowToParams(
+  prev: URLSearchParams,
+  win: { from: string | null; to: string | null; unit?: string },
+  bu: string | null,
+): URLSearchParams {
+  const p = new URLSearchParams(prev);
+  for (const k of ['from', 'to', 'unit', 'bu']) p.delete(k);
+  if (win.from && win.to) {
+    p.set('from', win.from);
+    p.set('to', win.to);
+    if (win.unit) p.set('unit', win.unit);
+  } else p.set('from', 'all');
+  if (bu) p.set('bu', bu);
+  return p;
 }

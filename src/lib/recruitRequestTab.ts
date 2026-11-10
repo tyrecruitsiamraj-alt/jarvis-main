@@ -91,6 +91,41 @@ export type RequestTabFilter = {
 export const EMPTY_REQUEST_FILTER: RequestTabFilter = { sector: null, subtype: null, siteCode: null, province: null, district: null, subdistrict: null, recruiter: null };
 export const NO_RECRUITER_KEY = '__none__';
 
+/**
+ * ตัวกรองใบขอ ↔ query ของลิงก์ (ชุดส่งต่อ 10 พ.ย. 2569 R12) — ปุ่ม "รายงานเพิ่มเติม (แบบเดิม)" ของโฉมต้นแบบพาตัวกรองบนสุดไปหน้าเดิม
+ * ชื่อพารามิเตอร์ขึ้นต้น `rf_` ไม่ชนกับพารามิเตอร์อื่นของหน้า · ค่าที่ไม่รู้จัก (ประเภท) = ไม่กรอง · ไม่มีอะไรเลย = null
+ */
+const RF_KEYS = [
+  ['sector', 'rf_sector'],
+  ['subtype', 'rf_subtype'],
+  ['siteCode', 'rf_site'],
+  ['province', 'rf_province'],
+  ['district', 'rf_district'],
+  ['subdistrict', 'rf_subdistrict'],
+  ['recruiter', 'rf_recruiter'],
+] as const;
+const SECTOR_VALUES: ReadonlySet<string> = new Set(['bank', 'government', 'private', 'unset']);
+export function requestFilterToParams(f: RequestTabFilter): string {
+  const p = new URLSearchParams();
+  for (const [k, q] of RF_KEYS) {
+    const v = f[k];
+    if (typeof v === 'string' && v) p.set(q, v);
+  }
+  return p.toString();
+}
+export function requestFilterFromParams(p: URLSearchParams): RequestTabFilter | null {
+  const out: RequestTabFilter = { ...EMPTY_REQUEST_FILTER };
+  let any = false;
+  for (const [k, q] of RF_KEYS) {
+    const v = p.get(q)?.trim();
+    if (!v) continue;
+    if (k === 'sector' && !SECTOR_VALUES.has(v)) continue;
+    (out as Record<string, string | null>)[k] = v.slice(0, 120);
+    any = true;
+  }
+  return any ? out : null;
+}
+
 export const isRequestFilterActive = (f: RequestTabFilter) =>
   Boolean(f.sector || f.subtype || f.siteCode || f.province || f.district || f.subdistrict || f.recruiter);
 /** ตัวกรองที่ผูกกับใบขอที่เข้ามาในช่วง (ทุกตัวยกเว้นเจ้าหน้าที่) */

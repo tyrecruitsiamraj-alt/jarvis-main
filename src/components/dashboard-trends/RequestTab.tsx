@@ -1,6 +1,6 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { ChevronDown, FileText, MapPin, Users, X } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import SearchableSelect from '@/components/shared/SearchableSelect';
 import { Label } from '@/components/ui/label';
@@ -16,6 +16,7 @@ import {
   APPLICANT_BUCKET_LABEL,
   APPLICANT_NOT_CALLED,
   EMPTY_REQUEST_FILTER,
+  requestFilterFromParams,
   REQUEST_FUNNEL_LABEL,
   districtOf,
   provinceOf,
@@ -237,7 +238,9 @@ export default function RequestTab({
    */
   scoped?: (apps: readonly RecruitAppFact[], channel: string | null) => React.ReactNode;
 }) {
-  const [f, setF] = useState<RequestTabFilter>(EMPTY_REQUEST_FILTER);
+  // ลิงก์ที่พาตัวกรองมา (ปุ่มรายงานเดิมของโฉมต้นแบบ · R12) = เปิดที่ตัวกรองนั้น
+  const [searchParams] = useSearchParams();
+  const [f, setF] = useState<RequestTabFilter>(() => requestFilterFromParams(searchParams) ?? EMPTY_REQUEST_FILTER);
   const active = isRequestFilterActive(f);
   const picked = useMemo(() => (rows ? filterRequestRows(rows, f) : []), [rows, f]);
   const options = useMemo(() => requestAreaOptions(rows ?? [], f), [rows, f]);

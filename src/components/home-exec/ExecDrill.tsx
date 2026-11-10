@@ -7,9 +7,11 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { NO_REASON, chargesToday, perDayOf } from '@/lib/homeExec';
+import { DRILL_SORTS, NO_REASON, chargesToday, drillRowsOf, perDayOf, type DrillSort } from '@/lib/homeExec';
 import type { MoneyRequest } from '@/lib/homeMoney';
 import { PREQUEST_LEDGER_PREFIX, ledgerJobIdOf } from '@/lib/requestPenaltyLedger';
 import { requestPathOfJobId } from '@/lib/jobNavigation';
@@ -64,14 +66,20 @@ export default function ExecDrill({
   const navigate = useNavigate();
   const [openRow, setOpenRow] = useState<string | null>(null);
   const [limit, setLimit] = useState(50);
+  // ค้นหา + เรียง (ชุดส่งต่อ G04) — เปลี่ยนชั้น = ล้างทั้งคู่ (ไม่ค้างคำค้นของรายการก่อน)
+  const [q, setQ] = useState('');
+  const [sort, setSort] = useState<DrillSort>('default');
   const levelKey = `${drill.stack.length}|${lv?.title ?? ''}`;
   const [seenKey, setSeenKey] = useState(levelKey);
   if (seenKey !== levelKey) {
     setSeenKey(levelKey);
     setOpenRow(lv?.expand ?? null);
     setLimit(50);
+    setQ('');
+    setSort('default');
   }
   const rows = lv?.rows ?? [];
+  const shown = drillRowsOf(rows, q, sort, today);
   const sumPerDay = rows.reduce((a, r) => a + (chargesToday(r, today) ? perDayOf(r) : 0), 0);
   const sameUnit = rows.length > 1 && rows.every((r) => r.unit === rows[0].unit);
   const sumMoney = rows.reduce((a, r) => a + r.amount.need.fine + r.amount.need.deduct, 0);
@@ -161,6 +169,34 @@ export default function ExecDrill({
           </Table>
         ) : (
           <div className="mt-4 overflow-x-auto">
+            {rows.length > 1 ? (
+              <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center">
+                <Input
+                  value={q}
+                  onChange={(e) => {
+                    setQ(e.target.value);
+                    setLimit(50);
+                  }}
+                  placeholder="ค้นหา หน่วยงาน ตำแหน่ง เลขใบ เจ้าหน้าที่"
+                  aria-label="ค้นหาใบในรายการ"
+                  className="h-9 min-w-0 flex-1"
+                  data-testid="exec-drill-search"
+                />
+                <Select value={sort} onValueChange={(v) => setSort(v as DrillSort)}>
+                  <SelectTrigger className="h-9 w-full sm:w-56 sm:shrink-0" aria-label="เรียงใบ" data-testid="exec-drill-sort">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {DRILL_SORTS.map(([k, label]) => (
+                      <SelectItem key={k} value={k}>
+                        {label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {q.trim() ? <span className="text-xs tabular-nums text-muted-foreground">เจอ {NUM.format(shown.length)} ใบ</span> : null}
+              </div>
+            ) : null}
             <Table>
               <TableHeader>
                 <TableRow>
@@ -171,14 +207,14 @@ export default function ExecDrill({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {rows.length === 0 ? (
+                {shown.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={4} className="text-center text-sm text-muted-foreground">
-                      ไม่มีใบ
+                      {rows.length === 0 ? 'ไม่มีใบ' : 'ไม่เจอใบที่ค้นหา'}
                     </TableCell>
                   </TableRow>
                 ) : (
-                  rows.slice(0, limit).flatMap((r) => {
+                  shown.slice(0, limit).flatMap((r) => {
                     const isOpen = openRow === r.requestNo;
                     const missing = Math.max(0, r.qty - r.filled);
                     const late = chargesToday(r, today);
@@ -297,9 +333,9 @@ export default function ExecDrill({
                 )}
               </TableBody>
             </Table>
-            {rows.length > limit ? (
+            {shown.length > limit ? (
               <Button type="button" variant="outline" size="sm" className="mt-3" onClick={() => setLimit((n) => n + 50)}>
-                ดูเพิ่ม ({NUM.format(rows.length - limit)} ใบ)
+                ดูเพิ่ม ({NUM.format(shown.length - limit)} ใบ)
               </Button>
             ) : null}
           </div>

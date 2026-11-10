@@ -48,7 +48,9 @@ const AiShareListDialog: React.FC<{
   win: AiShareWindow & { bu?: string | null };
   /** เลขในกล่องที่กด — ขึ้นบนหัวระหว่างรอรายชื่อ */
   count: number | null;
-}> = ({ open, onOpenChange, block, blockTitle, listKey, unit, win, count }) => {
+  /** ธีมของหน้าที่เปิด (โฉมต้นแบบ ?home=v5 ส่งตัวแปรธีมมา · ป๊อปอยู่นอกกล่องของหน้า) */
+  contentStyle?: React.CSSProperties;
+}> = ({ open, onOpenChange, block, blockTitle, listKey, unit, win, count, contentStyle }) => {
   const [page, setPage] = useState(0);
   const [data, setData] = useState<AiShareListResponse | null>(null);
   const [loading, setLoading] = useState(false);
@@ -86,7 +88,7 @@ const AiShareListDialog: React.FC<{
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className={cn('flex max-h-[85vh] max-w-2xl flex-col overflow-hidden', EVEN_TYPE)}>
+      <DialogContent className={cn('flex max-h-[85vh] max-w-2xl flex-col overflow-hidden', EVEN_TYPE)} style={contentStyle}>
         <DialogHeader className="pr-6">
           <DialogTitle className="space-y-1">
             <span className="block text-sm font-normal text-muted-foreground">

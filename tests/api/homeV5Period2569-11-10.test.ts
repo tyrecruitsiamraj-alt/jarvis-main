@@ -24,7 +24,7 @@ describe('รายงานเดิมพาช่วงไปด้วย', (
     expect(ov).toContain('useState<(DateRangeYmd & { all?: boolean }) | null>(() => rangeFromParams(searchParams))');
     expect(ov).toContain("useState<string | null>(() => searchParams.get('bu') || null)");
     const body = readFileSync('src/components/dashboard-trends/stuck/RecruitStuckBody.tsx', 'utf8');
-    expect(body).toContain('navigate(legacyReportsPath(win, data.bu))');
+    expect(body).toContain('navigate(legacyReportsPath(win, data.bu, requestFilterToParams(filter)))');
     expect(body).not.toContain("navigate('/jobs/board?view=dashboard&dash=cards')");
   });
 });

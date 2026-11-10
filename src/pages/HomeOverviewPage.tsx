@@ -42,7 +42,9 @@ import { usePageTitle } from '@/hooks/usePageTitle';
 import { PREQUEST_ID_PREFIX } from '@/lib/siamrajUnitRequestsApi';
 import { fetchHomeMoney, type HomeMoneyPayload } from '@/lib/homeMoneyApi';
 import { fetchHomeAiShare } from '@/lib/homeAiShareApi';
-import type { AiShareResponse, AiShareWindow } from '@/lib/homeAiShare';
+import AiShareListDialog from '@/components/home-ai-share/AiShareListDialog';
+import RequestListPanel from '@/components/home-overview/RequestListPanel';
+import { AI_SHARE_UNIT, type AiShareResponse, type AiShareWindow } from '@/lib/homeAiShare';
 import { costliest, perDayOf, reasonsOf, thisMonthWindow } from '@/lib/homeExec';
 import type { MoneyRequest } from '@/lib/homeMoney';
 import { fetchRecruitOverview } from '@/lib/recruitOverviewApi';
@@ -56,10 +58,10 @@ import { thaiDate } from '@/lib/periodPick';
 import { friendlyErrorText } from '@/lib/friendlyError';
 import { TONE } from '@/lib/designTokens';
 import { cn } from '@/lib/utils';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Banknote, FileText, Phone, Users } from 'lucide-react';
 import { V5Bar, V5Card, V5Divider, V5EqCell, V5Kpi, V5NumLink, useV5ThemeStyle, v5Num } from '@/components/so-recruit-v5/V5Parts';
-import { requestPathOfJobId, withRange } from '@/lib/jobNavigation';
+import { homeWindowFromParams, homeWindowToParams, requestPathOfJobId, withRange } from '@/lib/jobNavigation';
 import BuTrendTable from '@/components/so-recruit-v5/BuTrendTable';
 import { fetchRecruitStuck } from '@/lib/recruitStuckApi';
 import { STUCK_REASON_LABEL } from '@/lib/recruitStuck';
@@ -110,9 +112,19 @@ const HomeOverviewPage: React.FC<{
   const v5Style = useV5ThemeStyle();
   const navigate = useNavigate();
   const today = toYmdBangkok(new Date());
-  const [win, setWin] = useState<AiShareWindow>(() => thisMonthWindow(today));
+  /**
+   * ช่วง/BU อยู่ในลิงก์ (ชุดส่งต่อ G01 · เฉพาะโฉมต้นแบบ) — ส่งลิงก์ให้คนอื่น/กดย้อนกลับ ได้ช่วงเดิม
+   * `from=all` = ทั้งหมด · ไม่ครบ/ผิดรูป = เดือนนี้ (ไม่เดา) · BU จากลิงก์ฝั่ง server ยังบังคับสิทธิ์ตามเดิม
+   */
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [win, setWin] = useState<AiShareWindow>(() => (v5 ? homeWindowFromParams(searchParams, today) : null) ?? thisMonthWindow(today));
   const [tab, setTab] = useState<'overview' | 'proportion'>('overview');
-  const [bu, setBu] = useState<string | null>(null);
+  const [bu, setBu] = useState<string | null>(() => (v5 ? searchParams.get('bu')?.trim() || null : null));
+  useEffect(() => {
+    if (!v5) return;
+    setSearchParams((prev) => homeWindowToParams(prev, win, bu), { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- เขียนตามช่วง/BU ที่เลือกเท่านั้น
+  }, [v5, win, bu]);
   const tick = useLiveTick(true, LIVE_MS);
   const range = useMemo(() => ({ from: win.from ?? ALL_FROM, to: win.to ?? today }), [win, today]);
   const winQ = useMemo(() => ({ ...win, bu }), [win, bu]);
@@ -521,6 +533,8 @@ const HomeOverviewPage: React.FC<{
 
   /** รายชื่อคนติดตาม — ผลรายคนที่กด (null = ทุกคน) · ปิดแผงก่อน ไม่ซ้อนป๊อป */
   const [followNames, setFollowNames] = useState<{ title: string; bucket: FollowBucketKey | null } | null>(null);
+  /** รายชื่อหลังเลข ดูแลหลังเริ่มงาน / จับคู่งาน (ชุดส่งต่อ H09 · ป๊อปเดียวกับหน้าหลักรุ่นก่อน แบ่งหน้า ช่วง/BU เดียวกับเลข) */
+  const [blockNames, setBlockNames] = useState<{ block: 'aftercare' | 'matching'; title: string; count: number | null } | null>(null);
   const openFollowNames = (title: string, bucket: FollowBucketKey | null) => {
     setPanel(null);
     setFollowNames({ title, bucket });
@@ -536,6 +550,7 @@ const HomeOverviewPage: React.FC<{
     setPanel(null);
     setNames(null);
     setFollowNames(null);
+    setBlockNames(null);
     drill.close();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- drill.close ตั้งค่าว่างเสมอ
   }, [dataKey]);
@@ -653,30 +668,12 @@ const HomeOverviewPage: React.FC<{
       sub: `${NUM.format(list.length)} ใบ · ${thaiDate(range.from)} – ${thaiDate(range.to)}`,
       go: PAGE.board,
       body: (
-        <ul className="divide-y divide-border rounded-xl border border-border" data-testid="v5-request-list">
-          {list.length === 0 ? <li className="px-3 py-2 text-sm text-muted-foreground">ไม่มีใบขอ</li> : null}
-          {list.map((r) => (
-            <li key={r.jobId ?? r.requestNo} className="flex items-start justify-between gap-3 px-3 py-2 text-sm">
-              <span className="min-w-0">
-                {r.jobId ? (
-                  <Button type="button" variant="link" className="h-auto whitespace-normal p-0 text-left text-sm font-normal text-foreground" onClick={() => navigate(requestPathOfJobId(r.jobId!))}>
-                    {r.unitName ?? '—'} · {r.position ?? '—'}
-                  </Button>
-                ) : (
-                  <span className="text-foreground">
-                    {r.unitName ?? '—'} · {r.position ?? '—'}
-                  </span>
-                )}
-                <span className="block text-xs tabular-nums text-muted-foreground">
-                  {r.requestNo} · เข้ามา {thaiDate(r.day)}
-                </span>
-              </span>
-              <Button type="button" variant="link" className="h-auto shrink-0 p-0 text-sm tabular-nums" disabled={r.appIds.length === 0} onClick={() => openNames(`${r.requestNo} · คนกรอก`, r.appIds)}>
-                {NUM.format(r.applications)} คน
-              </Button>
-            </li>
-          ))}
-        </ul>
+        <RequestListPanel
+          key={title}
+          list={list}
+          onOpenRequest={(jobId) => navigate(requestPathOfJobId(jobId))}
+          onOpenNames={(r) => openNames(`${r.requestNo} · คนกรอก`, r.appIds)}
+        />
       ),
     });
   };
@@ -686,6 +683,20 @@ const HomeOverviewPage: React.FC<{
   const funnelMax = Math.max(1, funnel?.[0]?.value ?? 0);
   const overlays = (
     <>
+      {blockNames ? (
+        <AiShareListDialog
+          key={`${blockNames.block}|${dataKey}`}
+          open
+          onOpenChange={(o) => !o && setBlockNames(null)}
+          block={blockNames.block}
+          blockTitle={blockNames.title}
+          listKey="total"
+          unit={AI_SHARE_UNIT}
+          win={winQ}
+          count={blockNames.count}
+          contentStyle={v5 ? v5Style : undefined}
+        />
+      ) : null}
       <OverviewSheet panel={panel} onClose={() => setPanel(null)} contentStyle={v5 ? v5Style : undefined} />
       <ExecDrill drill={drill} all={openReqs} today={today} contentStyle={v5 ? v5Style : undefined} stageOf={stageOf} />
       <FollowNamesDialog
@@ -944,19 +955,29 @@ const HomeOverviewPage: React.FC<{
                       </tr>
                     </tbody>
                   </table>
+                  {/* กดเลข = รายชื่อจริง (H09) · ลิงก์ล่าง = ไปทำงานที่หน้าเต็ม */}
                   <div className="grid grid-cols-2 gap-3 border-t border-border pt-3">
-                    <Button type="button" variant="ghost" className="h-auto flex-col items-start gap-1 rounded-xl p-2 text-left font-normal" onClick={() => navigate(PAGE.aftercare.to)} data-testid="v5-aftercare">
-                      <span className="text-xs text-muted-foreground">ดูแลหลังเริ่มงาน</span>
-                      <span className="text-2xl font-medium tabular-nums">
-                        {v5Num(aiV5?.aftercare?.total)} <span className="text-xs font-normal text-muted-foreground">รายการ</span>
-                      </span>
-                    </Button>
-                    <Button type="button" variant="ghost" className="h-auto flex-col items-start gap-1 rounded-xl p-2 text-left font-normal" onClick={() => navigate('/matching/match')} data-testid="v5-matching">
-                      <span className="text-xs text-muted-foreground">จับคู่งาน</span>
-                      <span className="text-2xl font-medium tabular-nums">
-                        {v5Num(aiV5?.matching?.total)} <span className="text-xs font-normal text-muted-foreground">รายการ</span>
-                      </span>
-                    </Button>
+                    {([
+                      { block: 'aftercare', label: 'ดูแลหลังเริ่มงาน', value: aiV5?.aftercare?.total, to: PAGE.aftercare.to },
+                      { block: 'matching', label: 'จับคู่งาน', value: aiV5?.matching?.total, to: '/matching/match' },
+                    ] as const).map((b) => (
+                      <div key={b.block} className="space-y-1 p-2">
+                        <span className="block text-xs text-muted-foreground">{b.label}</span>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          className="h-auto gap-1 rounded-lg px-1 py-0 text-2xl font-medium tabular-nums"
+                          disabled={b.value == null}
+                          onClick={() => setBlockNames({ block: b.block, title: b.label, count: b.value ?? null })}
+                          data-testid={`v5-${b.block}`}
+                        >
+                          {v5Num(b.value)} <span className="text-xs font-normal text-muted-foreground">รายชื่อ</span>
+                        </Button>
+                        <Button type="button" variant="link" size="xs" className="h-auto p-0 text-xs" onClick={() => navigate(b.to)} data-testid={`v5-${b.block}-page`}>
+                          ไปหน้า{b.label} ›
+                        </Button>
+                      </div>
+                    ))}
                   </div>
                   {aiV5Error && !aiV5 ? <p className="text-xs text-muted-foreground">{aiV5Error}</p> : null}
                 </V5Card>

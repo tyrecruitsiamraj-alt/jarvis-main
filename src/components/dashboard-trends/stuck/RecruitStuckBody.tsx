@@ -5,10 +5,11 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { V5Divider } from '@/components/so-recruit-v5/V5Parts';
-import { EMPTY_REQUEST_FILTER, appsOfFilter, filterRequestRows, jobFilterOf, type RequestTabFilter } from '@/lib/recruitRequestTab';
+import { EMPTY_REQUEST_FILTER, appsOfFilter, filterRequestRows, jobFilterOf, requestFilterToParams, type RequestTabFilter } from '@/lib/recruitRequestTab';
 import { cohortOf, reasonGroups } from '@/lib/recruitOverview';
 import { buildBringerFunnelTree, buildChannelFunnelTree } from '@/lib/channelFunnel';
 import type { RecruitOverviewResponse } from '@/lib/recruitOverviewTypes';
+import type { RecruitRequestRow } from '@/lib/recruitRequestTab';
 import { fetchRecruitStuck, type RecruitStuckResponse } from '@/lib/recruitStuckApi';
 import { STUCK_PHASES, STUCK_REASON_LABEL, STUCK_SCOPE_LABEL, stuckInScope, stuckPhaseOf, type StuckPhaseKey, type StuckReasonKey, type StuckRequest, type StuckScope } from '@/lib/recruitStuck';
 import { friendlyErrorText } from '@/lib/friendlyError';
@@ -57,9 +58,12 @@ export default function RecruitStuckBody({
   onOpenNames,
   onPickMonth,
   layout,
+  requestTrend,
 }: {
   data: RecruitOverviewResponse;
   win: RecruitOverviewResponse['window'];
+  /** การ์ดแนวโน้มใบขอรายวัน (ใบเข้า/ประกาศ/มีผู้สมัคร/ไม่มี) ของรายงานเดิม — โฉมต้นแบบวางในแท็บแนวโน้ม · ใบตามตัวกรองบนสุด */
+  requestTrend?: (rows: RecruitRequestRow[] | null, prevRows: RecruitRequestRow[] | null) => React.ReactNode;
   onOpenNames: (title: string, ids: readonly string[]) => void;
   onPickMonth: (month: string) => void;
   /** `v5` = โฉมต้นแบบ SO Recruit (10 พ.ย. 2569 · &dash=v5) — การ์ดชุดเดิมทั้งหมด จัดเป็นแท็บเจาะรายละเอียด */
@@ -228,7 +232,11 @@ export default function RecruitStuckBody({
           <StuckAreaTable rows={focused} title={scope === 'remaining' ? undefined : `พื้นที่ · ใบ${STUCK_SCOPE_LABEL[scope]}`} countLabel={scope === 'remaining' ? undefined : `ใบ${STUCK_SCOPE_LABEL[scope]}`} onPick={pick} />
         ) : null}
         {detailTab === 'trend' ? (
-          <MonthlyBarsCard rows={monthly.data} error={monthly.error} ok={jobOk} onPickMonth={onPickMonth} open={monthlyOpen} onOpen={() => setMonthlyOpen(true)} />
+          <div className="space-y-4">
+            {/* ใบขอรายวันตามช่วงที่เลือก (R09) — ใบตามตัวกรองบนสุด · ช่วงก่อนสำหรับเทียบ */}
+            {requestTrend?.(data.requestRows ? (filterRequestRows(data.requestRows, filter) as RecruitRequestRow[]) : null, data.requestRowsPrev ? (filterRequestRows(data.requestRowsPrev, filter) as RecruitRequestRow[]) : null)}
+            <MonthlyBarsCard rows={monthly.data} error={monthly.error} ok={jobOk} onPickMonth={onPickMonth} open={monthlyOpen} onOpen={() => setMonthlyOpen(true)} />
+          </div>
         ) : null}
         {detailTab === 'reasons' ? (
           <OverviewCard icon={AlertCircle} title="ทำไมไม่สำเร็จ" sub={`${cohortSub} · ผลล่าสุดของแต่ละคน`}>
@@ -238,7 +246,7 @@ export default function RecruitStuckBody({
         {/* รายงานเดิม (ตำแหน่งสมัคร · เทียบช่วงก่อน · งานค้างตามอายุ · กรอกแล้วโทรวันไหน · ผลงานรายคน · ช่องทางแจ้งเข้า) — หน้าเดิมยังอยู่ครบ */}
         <div className="flex justify-end">
           <Button type="button" variant="outline" onClick={() => {
-              navigate(legacyReportsPath(win, data.bu));
+              navigate(legacyReportsPath(win, data.bu, requestFilterToParams(filter)));
               window.scrollTo({ top: 0 });
             }} data-testid="v5-legacy-reports">
             รายงานเพิ่มเติม (แบบเดิม)

@@ -135,3 +135,44 @@ export function byOwner(requests: readonly MoneyRequest[], today: string): Owner
 export function thisMonthWindow(today: string): { from: string; to: string } {
   return { from: `${today.slice(0, 7)}-01`, to: today };
 }
+
+/**
+ * ค้นหา + เรียงรายใบในแผง (ชุดส่งต่อ 10 พ.ย. 2569 G04) — pure · ค่าเริ่ม = ลำดับที่ส่งมา (ไม่เปลี่ยนสิ่งที่เคยเห็น)
+ * ค้นหา: หน่วยงาน · ตำแหน่ง · สถานที่ · เลขใบ · เจ้าหน้าที่ (ไม่สนตัวพิมพ์ใหญ่เล็ก/ช่องว่างหัวท้าย)
+ */
+export type DrillSort = 'default' | 'perDay' | 'money' | 'missing' | 'oldest';
+export const DRILL_SORTS: ReadonlyArray<readonly [DrillSort, string]> = [
+  ['default', 'เรียงตามเดิม'],
+  ['perDay', 'เสียวันละมากก่อน'],
+  ['money', 'ยอดในช่วงมากก่อน'],
+  ['missing', 'ขาดคนมากก่อน'],
+  ['oldest', 'ใบเก่าก่อน'],
+];
+type DrillRow = {
+  requestNo: string;
+  unit: string;
+  position: string;
+  place?: string | null;
+  owner?: string | null;
+  qty: number;
+  filled: number;
+  open?: boolean;
+  keyYmd: string;
+  amount: { need: { fine: number; deduct: number } };
+};
+export function drillRowsOf<T extends DrillRow>(rows: readonly T[], q: string, sort: DrillSort, today: string): T[] {
+  const k = q.trim().toLowerCase();
+  const hit = (r: T) =>
+    !k || [r.unit, r.position, r.place, r.requestNo, r.owner].some((v) => (v ?? '').toLowerCase().includes(k));
+  const list = rows.filter(hit);
+  const missing = (r: T) => (r.open === false ? 0 : Math.max(0, r.qty - r.filled));
+  const money = (r: T) => r.amount.need.fine + r.amount.need.deduct;
+  const perDay = (r: T) => (chargesToday(r as never, today) ? perDayOf(r as never) : 0);
+  const by: Record<Exclude<DrillSort, 'default'>, (a: T, b: T) => number> = {
+    perDay: (a, b) => perDay(b) - perDay(a),
+    money: (a, b) => money(b) - money(a),
+    missing: (a, b) => missing(b) - missing(a),
+    oldest: (a, b) => a.keyYmd.localeCompare(b.keyYmd),
+  };
+  return sort === 'default' ? list : [...list].sort(by[sort]);
+}

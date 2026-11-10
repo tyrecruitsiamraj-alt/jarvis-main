@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import LoadErrorNotice from '@/components/shared/LoadErrorNotice';
+import NamesSearchInput, { NAMES_PAGE, matchesNameQuery } from '@/components/shared/NamesSearchInput';
 import type { PublicApplication } from '@/lib/publicApplicationsApi';
 import { fetchApplicantNames, type ApplicantNameRow } from '@/lib/recruitOverviewApi';
 import { applicantWorkLink, applicationUnitLabel } from '@/lib/recruitRm';
@@ -64,6 +65,19 @@ export default function JourneyNamesDialog({
     const want = new Set(ids);
     return all.filter((a) => want.has(a.id)).sort((x, y) => (y.created_at ?? '').localeCompare(x.created_at ?? ''));
   }, [all, ids]);
+  // ค้นหา + ดูทีละ 50 (ชุดส่งต่อ G04) — เปิดชุดใหม่ = ล้าง (key ของป๊อปเปลี่ยนตามชุด ids)
+  const [q, setQ] = useState('');
+  const [limit, setLimit] = useState(NAMES_PAGE);
+  const [seen, setSeen] = useState(ids);
+  if (seen !== ids) {
+    setSeen(ids);
+    setQ('');
+    setLimit(NAMES_PAGE);
+  }
+  const shown = useMemo(
+    () => rows.filter((a) => matchesNameQuery([a.full_name, a.phone, applicationUnitLabel(a as PublicApplication)], q)),
+    [rows, q],
+  );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -83,26 +97,29 @@ export default function JourneyNamesDialog({
             <Skeleton className="h-8 w-full rounded-lg" />
           </div>
         ) : (
-          <div className="max-h-[60vh] overflow-y-auto">
+          <div className="max-h-[60vh] space-y-2 overflow-y-auto">
+            {rows.length > 5 ? (
+              <NamesSearchInput value={q} onChange={(v) => { setQ(v); setLimit(NAMES_PAGE); }} found={q.trim() ? shown.length : null} />
+            ) : null}
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>ชื่อ</TableHead>
-                  <TableHead>เบอร์</TableHead>
-                  <TableHead>หน่วยงาน</TableHead>
+                  <TableHead className="hidden sm:table-cell">เบอร์</TableHead>
+                  <TableHead className="hidden sm:table-cell">หน่วยงาน</TableHead>
                   {notes ? <TableHead>ค้างที่</TableHead> : null}
-                  <TableHead className="text-right">วันที่กรอก</TableHead>
+                  <TableHead className="hidden text-right sm:table-cell">วันที่กรอก</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {rows.length === 0 ? (
+                {shown.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={cols} className="text-center text-muted-foreground">
-                      ไม่มีรายชื่อ
+                      {rows.length === 0 ? 'ไม่มีรายชื่อ' : 'ไม่เจอชื่อที่ค้นหา'}
                     </TableCell>
                   </TableRow>
                 ) : (
-                  rows.map((a) => (
+                  shown.slice(0, limit).map((a) => (
                     <TableRow key={a.id}>
                       {/* กดชื่อ = ไปทำงานกับคนนั้นต่อ (เจ้าของ 9 พ.ย. 2569 "บอกชื่อกดไปต้องเห็นชื่อแล้วกดไปทำงานต่อได้") */}
                       <TableCell className="min-w-32 font-medium">
@@ -118,11 +135,21 @@ export default function JourneyNamesDialog({
                         >
                           {a.full_name || 'ไม่มีชื่อ'}
                         </Button>
+                        {/* มือถือ: เบอร์/หน่วยงาน/วันที่ย้ายมาใต้ชื่อ (คอลัมน์ซ่อน) — ตรวจจอ 375 · 10 พ.ย. 2569 */}
+                        <span className="block text-xs font-normal tabular-nums text-muted-foreground sm:hidden">
+                          {[
+                            a.phone ? localThaiPhone(a.phone) : null,
+                            applicationUnitLabel(a as PublicApplication) || null,
+                            a.created_at ? formatYmdTh(toYmdBangkok(new Date(a.created_at))) : null,
+                          ]
+                            .filter(Boolean)
+                            .join(' · ')}
+                        </span>
                       </TableCell>
-                      <TableCell className="whitespace-nowrap tabular-nums">{a.phone ? localThaiPhone(a.phone) : '—'}</TableCell>
-                      <TableCell className="max-w-56 truncate">{applicationUnitLabel(a as PublicApplication) || '—'}</TableCell>
+                      <TableCell className="hidden whitespace-nowrap tabular-nums sm:table-cell">{a.phone ? localThaiPhone(a.phone) : '—'}</TableCell>
+                      <TableCell className="hidden max-w-56 truncate sm:table-cell">{applicationUnitLabel(a as PublicApplication) || '—'}</TableCell>
                       {notes ? <TableCell className="min-w-32">{notes.get(a.id) ?? '—'}</TableCell> : null}
-                      <TableCell className="whitespace-nowrap text-right tabular-nums">
+                      <TableCell className="hidden whitespace-nowrap text-right tabular-nums sm:table-cell">
                         {a.created_at ? formatYmdTh(toYmdBangkok(new Date(a.created_at))) : '—'}
                       </TableCell>
                     </TableRow>
@@ -130,6 +157,11 @@ export default function JourneyNamesDialog({
                 )}
               </TableBody>
             </Table>
+            {shown.length > limit ? (
+              <Button type="button" variant="outline" size="sm" onClick={() => setLimit((n) => n + NAMES_PAGE)}>
+                ดูเพิ่ม ({NUM.format(shown.length - limit)} คน)
+              </Button>
+            ) : null}
             {rows.length < ids.length ? (
               <p className="mt-2 text-xs text-muted-foreground">
                 เปิดชื่อไม่ได้ {NUM.format(ids.length - rows.length)} คน
