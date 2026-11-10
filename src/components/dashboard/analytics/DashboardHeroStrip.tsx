@@ -1,7 +1,6 @@
 import React, { useMemo, useRef } from 'react';
 import { cn } from '@/lib/utils';
-import { useSurfaceKit } from '@/components/shared/ui-v2/surface';
-import { DASH } from '@/lib/designTokens';
+import { Button } from '@/components/ui/button';
 import type { DashboardActivityTrendPoint, DashboardAgeDaysBreakdown } from '@/lib/dashboard/types';
 
 type Props = {
@@ -31,21 +30,19 @@ type Props = {
  * ฝั่งขวาเป็นแท่ง "เข้ามารายเดือน" ย่อจาก activityTrend — ดูแนวโน้มได้โดยไม่ต้องกางกราฟใหญ่
  */
 
-/** สีตัวเลขบนพื้น hero เข้ม — โทนอ่อนของภาษาความด่วนเดิม (พื้นเข้มตลอดจึงไม่มีคู่ dark) */
 /**
- * สีของตัวเลขตามความเร่งด่วน — **ความหมายเดิมทั้งหมด** (แดง=ด่วนมาก ฯลฯ)
- * `num` = ชุดสำหรับพื้นเข้ม (โฉมเดิม) · `numLight` = ชุดเดียวกันที่อ่านออกบนพื้นขาว (โฉมใหม่)
+ * สีของตัวเลขตามความค้าง — **ความหมายเดิมทั้งหมด** (แดง = ค้างนานสุด ฯลฯ) · ชุดสำหรับพื้นเข้ม (แถบกรมท่า/การ์ดเข้มธีมมืด)
  */
 const HERO_BUCKET: Record<
   DashboardAgeDaysBreakdown['bucket'],
-  { urgency: string; num: string; numLight: string }
+  { urgency: string; num: string }
 > = {
   // 31 ต.ค. 2569 เจ้าของ Choice "อายุใบใช้ ค้าง" — "ด่วน" สงวนไว้กับป้ายเตือน (ชนิดใบ ฉุกเฉิน/ล่วงหน้า เป็นอีกเรื่อง)
-  '30+': { urgency: 'ค้าง 30 วันขึ้นไป', num: 'text-red-400', numLight: 'text-red-700' },
-  '16-30': { urgency: 'ค้าง 16–30 วัน', num: 'text-orange-300', numLight: 'text-orange-700' },
-  '8-15': { urgency: 'ค้าง 8–15 วัน', num: 'text-amber-300', numLight: 'text-amber-700' },
-  '1-7': { urgency: 'ค้าง 1–7 วัน', num: 'text-emerald-300', numLight: 'text-emerald-700' },
-  advance: { urgency: 'ยังไม่ถึงวันต้องการ', num: 'text-sky-300', numLight: 'text-sky-700' },
+  '30+': { urgency: 'ค้าง 30 วันขึ้นไป', num: 'text-red-400' },
+  '16-30': { urgency: 'ค้าง 16–30 วัน', num: 'text-orange-300' },
+  '8-15': { urgency: 'ค้าง 8–15 วัน', num: 'text-amber-300' },
+  '1-7': { urgency: 'ค้าง 1–7 วัน', num: 'text-emerald-300' },
+  advance: { urgency: 'ยังไม่ถึงวันต้องการ', num: 'text-sky-300' },
 };
 
 /** ลำดับโชว์: ด่วนสุดซ้ายสุด (สลับจากถังข้อมูลที่เรียงเบา→หนัก) */
@@ -95,73 +92,48 @@ const DashboardHeroStrip: React.FC<Props> = ({
     !!selectedMonth && bars.pts.some((p) => p.date.slice(0, 7) === selectedMonth.slice(0, 7));
 
   /**
-   * 🔴 โฉมใหม่ (5 ก.ย. 2569): แถบหัวแดชบอร์ดเลิกเป็น "ผืนกรมท่าทึบ" เป็นผืนขาวคั่นเส้น
-   * ⚠️ **ตัวเลข/นิยาม/ปุ่มกดทุกตัวเหมือนเดิม** — Control Tower ห้ามแตะตรรกะ
+   * 🔴 แถบกรมท่าแบบหน้าหลัก (เจ้าของ 9 พ.ย. 2569 "ทำ Dashboard ให้สวยแบบเดียวกันด้วย") — ธีมมืดเป็นการ์ดเข้ม
+   * ⚠️ **ตัวเลข/นิยาม/ปุ่มกดทุกตัวเหมือนเดิม** — Control Tower ห้ามแตะตรรกะ · สีตัวเลขตามความค้างเดิม (ชุดพื้นเข้ม)
    */
-  const S = useSurfaceKit();
+  const dim = 'text-background/70 dark:text-foreground/70';
 
   return (
-    <div
-      className={cn(
-        'px-4 py-4 md:px-5',
-        S.v2 ? 'rounded-2xl border border-border/70 bg-card shadow-sm' : DASH.hero,
-      )}
-    >
-      <div className="flex flex-wrap items-stretch gap-x-8 gap-y-4">
-        <div className="min-w-[260px] flex-[1.2]">
-          <p className={S.v2 ? 'text-[12.5px] font-medium text-primary' : DASH.heroLabel}>
-            ค้างมานานแค่ไหน
-          </p>
-          {/* 🔴 ผู้ทดสอบมือถือทัก "ตัวเลขชิดกัน" (5 ก.ย. 2569) — จอ 375px แถวเดิม
-              (flex-wrap + gap-y-2 แค่ 8px) ดันให้แถวถัดไปมาติดป้ายแถวบนแทบไม่มีช่องหายใจ
-              ⇒ จอเล็กใช้ grid 2 คอลัมน์ + แถวห่างขึ้น (gap-y-5) · sm: คืนค่า flex เดิมเป๊ะ
-              (ตัวเลข/ป้าย/สีความหมายเดิมทุกตัว ไม่แตะ) */}
-          <div className="mt-1.5 grid grid-cols-2 items-end gap-x-5 gap-y-5 sm:flex sm:flex-wrap sm:gap-y-2">
+    <div className="rounded-2xl bg-foreground p-4 text-background shadow-xl shadow-foreground/10 dark:bg-card dark:text-foreground sm:p-6" data-testid="dashboard-hero">
+      {/* จอใหญ่มากถึงวางแท่งรายเดือนข้างกัน — จอทั่วไปวางใต้ ไม่ให้ป้ายถังบีบจนตัดบรรทัด */}
+      <div className="grid gap-x-10 gap-y-6 2xl:grid-cols-5">
+        <div className="min-w-0 2xl:col-span-3">
+          <p className="text-lg font-medium">ค้างมานานแค่ไหน</p>
+          <div className="mt-3 grid grid-cols-2 items-end gap-2 sm:grid-cols-5">
             {ordered.map((item, idx) => {
               const meta = HERO_BUCKET[item.bucket];
               const clickable = !!onBucketClick && item.count > 0;
               return (
-                <button
+                <Button
                   key={item.bucket}
                   type="button"
+                  variant="ghost"
                   disabled={!clickable}
                   onClick={clickable ? () => onBucketClick(item.bucket, item.label) : undefined}
                   title={`${item.label} · ${item.count.toLocaleString('th-TH')} อัตรา`}
                   className={cn(
-                    'text-left',
-                    clickable ? 'cursor-pointer hover:opacity-80' : 'cursor-default',
-                    item.count === 0 && 'opacity-50',
+                    'h-auto min-w-0 flex-col items-start gap-1 whitespace-normal rounded-xl p-3 text-left font-normal text-inherit hover:bg-background/10 hover:text-inherit disabled:opacity-100 dark:hover:bg-foreground/10',
+                    item.count === 0 && 'opacity-50 disabled:opacity-50',
                   )}
                 >
-                  <span
-                    className={cn(
-                      'block font-medium leading-none tracking-tight tabular-nums',
-                      idx === 0 ? 'text-4xl' : 'text-[22px]',
-                      S.v2 ? meta.numLight : meta.num,
-                    )}
-                  >
+                  <span className={cn('block font-medium leading-none tabular-nums', idx === 0 ? 'text-6xl' : 'text-4xl', meta.num)}>
                     {item.count.toLocaleString('th-TH')}
                   </span>
-                  <span className={cn('mt-1 block text-[10px]', S.muted)}>
-                    {meta.urgency}
-                  </span>
-                </button>
+                  <span className={cn('block text-sm', dim)}>{meta.urgency}</span>
+                </Button>
               );
             })}
           </div>
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <span
-              className={cn(
-                'inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-medium',
-                S.v2
-                  ? 'border border-border bg-background/60 text-emerald-700'
-                  : 'border border-white/20 bg-white/10 text-emerald-200',
-              )}
-            >
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <span className="inline-flex items-center rounded-full bg-primary px-3 py-1 text-sm font-medium tabular-nums text-primary-foreground">
               {inRange ? 'เหลือหา (ใบที่ต้องการคนในช่วง)' : 'เหลือหาทั้งระบบ'} {remainingPositions.toLocaleString('th-TH')} อัตรา ·{' '}
               {siteCount.toLocaleString('th-TH')} ไซต์
             </span>
-            <span className={cn('text-[10px]', S.muted)}>
+            <span className={cn('text-sm tabular-nums', dim)}>
               {/* 31 ต.ค. 2569 เลขอัตราซ้ำกับชิปเหลือหาข้าง ๆ — ขึ้นเฉพาะตอนไม่เท่ากัน */}
               {bucketTotal !== remainingPositions ? `รวม ${bucketTotal.toLocaleString('th-TH')} อัตรา · ` : ''}
               {requestTotal.toLocaleString('th-TH')} ใบขอ
@@ -172,24 +144,26 @@ const DashboardHeroStrip: React.FC<Props> = ({
 
         {/* จุดเดียว (เลือกเดือนเดียว) ไม่วาดแท่ง — แท่งเดี่ยวสูง 100% อ่านเป็นกราฟพัง ตัวเลขไปอยู่บรรทัดล่างแทน */}
         {bars.max > 0 && bars.pts.length >= 2 ? (
-          <div className="min-w-[200px] flex-1">
+          <div className="min-w-0 2xl:col-span-2">
             {/* ช่วงยาวกว่า 12 เดือนโชว์แค่ท้ายสุด — ป้ายต้องบอกตามที่เห็นจริง ไม่ใช่ช่วงเต็มของตัวกรอง */}
-            <p className={S.v2 ? 'text-[12.5px] font-medium text-primary' : DASH.heroLabel}>
-              เข้ามารายเดือน ·{' '}
-              {bars.frozen ? 'กดเลือกเดือน' : bars.truncated ? '12 เดือนล่าสุด' : trendLabel}
+            <p className="text-lg font-medium">
+              เข้ามารายเดือน{' '}
+              <span className={cn('text-sm font-normal', dim)}>
+                · {bars.frozen ? 'กดเลือกเดือน' : bars.truncated ? '12 เดือนล่าสุด' : trendLabel}
+              </span>
             </p>
             {/* กดแท่ง = กรองทั้งแดชบอร์ดเป็นเดือนนั้น (เจ้าของสั่ง 10 ส.ค. 2569: "กดแล้วข้อมูล
                 เปลี่ยนตามเหมือนเป็น calendar") · กดแท่งเดิมซ้ำ = ปลดตัวกรองกลับช่วงเดิม
-                แท่งที่เลือกอยู่เป็นสีสว่างและมีขอบ ให้รู้ว่ากำลังดูเดือนไหน */}
-            <div className="mt-2 flex h-14 items-end gap-1.5">
+                เดือนที่เลือก = เบอร์กันดี + วงแหวน · เดือนอื่นหรี่ลง (เจ้าของสั่ง 10 ส.ค. 2569) */}
+            <div className="mt-3 flex h-20 items-end gap-1.5">
               {bars.pts.map((p, i) => {
-                // มีเดือนที่เลือกอยู่ไหม — ใช้ตัดสินว่าจะหรี่เดือนอื่นหรือไม่
                 const active = !!selectedMonth && p.date.slice(0, 7) === selectedMonth.slice(0, 7);
                 const clickable = !!onMonthClick;
                 return (
-                  <button
+                  <Button
                     key={`${p.label}-${i}`}
                     type="button"
+                    variant="ghost"
                     disabled={!clickable}
                     onClick={clickable ? () => onMonthClick(p.date, p.label) : undefined}
                     title={`${p.label} · ${p.value.toLocaleString('th-TH')} อัตรา${
@@ -197,27 +171,23 @@ const DashboardHeroStrip: React.FC<Props> = ({
                     }`}
                     aria-pressed={active}
                     className={cn(
-                      'block flex-1 self-end rounded-t-[5px] rounded-b-sm transition-all',
-                      // เจ้าของสั่ง 10 ส.ค. 2569: "กดเดือนไหนเดือนนั้นเข้มกว่า เดือนอื่นจางกว่า"
-                      // เลือกอยู่ = สว่างเต็ม + วงแหวน · เดือนที่เหลือหรี่ลงให้ตาไปหยุดที่เดือนที่เลือก
+                      'block h-auto min-w-0 flex-1 self-end rounded-md p-0 transition-all disabled:opacity-100',
                       active
-                        ? 'bg-hero-strong opacity-100 ring-1 ring-white/60'
+                        ? 'bg-primary ring-2 ring-background hover:bg-primary dark:ring-foreground'
                         : p === peak
-                          ? 'bg-hero'
-                          : 'bg-hero-dim',
-                      hasSelection && !active && 'opacity-30',
-                      clickable && !active && 'hover:bg-hero hover:opacity-70',
-                      clickable ? 'cursor-pointer' : 'cursor-default',
+                          ? 'bg-background/60 hover:bg-background/80 dark:bg-foreground/60 dark:hover:bg-foreground/80'
+                          : 'bg-background/25 hover:bg-background/40 dark:bg-foreground/25 dark:hover:bg-foreground/40',
+                      hasSelection && !active && 'opacity-40',
                     )}
                     style={{ height: `${Math.max(6, Math.round((p.value / bars.max) * 100))}%` }}
                   />
                 );
               })}
             </div>
-            <div className={cn('mt-1 flex justify-between text-[10px]', S.muted)}>
+            <div className={cn('mt-2 flex justify-between gap-2 text-sm tabular-nums', dim)}>
               <span>{bars.pts[0]?.label}</span>
               {peak ? (
-                <span className={S.strong}>
+                <span className="font-medium text-background dark:text-foreground">
                   {peak.label} {peak.value.toLocaleString('th-TH')} อัตรา
                 </span>
               ) : null}

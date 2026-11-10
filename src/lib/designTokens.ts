@@ -269,6 +269,11 @@ export const TONE_DARK_REQUIRED_VARIANTS = [
 export const DASH = {
   /** การ์ดมาตรฐาน — ใส่ padding ที่จุดเรียกใช้ (แต่ละการ์ดใช้ไม่เท่ากัน) */
   card: 'rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900',
+  /**
+   * การ์ดหน้า Dashboard โฉมเดียวกับหน้าหลัก/ภาพรวม (เจ้าของ 9 พ.ย. 2569 "ทำ Dashboard ให้สวยแบบเดียวกันด้วย")
+   * = `Card variant="solid"` ขาวทึบ เงานุ่ม มุม 2xl — ใส่ padding ที่จุดเรียกใช้
+   */
+  panel: 'rounded-2xl bg-card text-card-foreground shadow-xl shadow-foreground/10 ring-1 ring-foreground/5 dark:shadow-background/50',
   /** การ์ดใหญ่มุมโค้งกว่า — แถว KPI / ถังอายุ */
   cardLg: 'rounded-2xl bg-white shadow-sm dark:bg-slate-900',
   /** การ์ดดำสำหรับสรุปผู้บริหาร (ตามรูป reference ที่เจ้าของส่งมา) */

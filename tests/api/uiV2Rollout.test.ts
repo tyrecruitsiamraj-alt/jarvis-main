@@ -28,7 +28,7 @@ const SKINNED = [
   'src/components/follow/CallFunnelPanel.tsx',
   'src/components/follow/FollowCallRoundsPanel.tsx',
   'src/pages/aftercare/AftercarePage.tsx',
-  'src/components/dashboard/analytics/DashboardHeroStrip.tsx',
+  // DashboardHeroStrip ออกจากรายการ 9 พ.ย. 2569 — เจ้าของสั่งรื้อ Dashboard ตรง ๆ ให้เหมือนหน้าหลัก ("ทำ Dashboard ให้สวยแบบเดียวกันด้วย") ไม่อยู่หลังสวิตช์แล้ว
   'src/components/jobs/RecruitBoardTools.tsx',
 ];
 

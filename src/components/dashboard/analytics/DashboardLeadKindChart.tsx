@@ -39,10 +39,10 @@ const DashboardLeadKindChart: React.FC<DashboardLeadKindChartProps> = ({
   const maxPositions = slices.reduce((m, s) => Math.max(m, s.positions), 0);
 
   return (
-    <div className={cn('rounded-2xl border p-4', DASH.card)}>
+    <div className={cn(DASH.panel, 'p-4 sm:p-6')}>
       <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
         <div>
-          <p className={cn('text-sm font-medium', DASH.cellStrong)}>ชนิดใบขอ</p>
+          <p className={cn('text-lg font-medium', DASH.cellStrong)}>ชนิดใบขอ</p>
           <p className={cn('text-[11px]', DASH.muted)}>
             แบ่งตามระยะเวลาที่ให้หา — ตามช่วง {scopeLabel} · เปลี่ยนตามตัวกรองทุกตัว
           </p>

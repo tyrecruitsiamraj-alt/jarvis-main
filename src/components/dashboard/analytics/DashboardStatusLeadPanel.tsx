@@ -50,10 +50,10 @@ export default function DashboardStatusLeadPanel({
   const max = Math.max(1, ...STATUS_LEAD_ORDER.map((k) => panel.kinds[k].positions));
 
   return (
-    <div ref={rootRef} className={cn('scroll-mt-20 space-y-3 rounded-2xl border p-4', DASH.card)} data-testid="dashboard-status-lead">
+    <div ref={rootRef} className={cn('scroll-mt-20 space-y-3 p-4 sm:p-6', DASH.panel)} data-testid="dashboard-status-lead">
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
         <div>
-          <p className={cn('text-sm font-medium', DASH.cellStrong)}>ชนิดใบขอ</p>
+          <p className={cn('text-lg font-medium', DASH.cellStrong)}>ชนิดใบขอ</p>
           <p className={cn('text-[11px]', DASH.muted)}>{label}</p>
           {note ? <p className={cn('text-[11px]', DASH.muted)}>{note}</p> : null}
         </div>

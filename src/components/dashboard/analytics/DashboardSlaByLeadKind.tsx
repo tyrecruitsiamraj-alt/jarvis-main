@@ -60,8 +60,8 @@ const DashboardSlaByLeadKind: React.FC<Props> = ({
 
   if (table.totalRow.total === 0) {
     return (
-      <div className={cn(DASH.card, 'px-4 py-3')}>
-        <p className={DASH.label}>ปิดทัน / ไม่ทัน ตามชนิดใบขอ</p>
+      <div className={cn(DASH.panel, 'p-4 sm:p-6')}>
+        <p className={cn('text-lg font-medium', DASH.cellStrong)}>ปิดทัน / ไม่ทัน ตามชนิดใบขอ</p>
         <p className={cn('mt-1', DASH.sub)}>ไม่มีใบขอในช่วงที่กรองอยู่</p>
       </div>
     );
@@ -156,9 +156,9 @@ const DashboardSlaByLeadKind: React.FC<Props> = ({
   );
 
   return (
-    <div className={cn(DASH.card, 'px-4 py-3')}>
+    <div className={cn(DASH.panel, 'p-4 sm:p-6')}>
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <p className={DASH.label}>ปิดทัน / ไม่ทัน ตามชนิดใบขอ</p>
+        <p className={cn('text-lg font-medium', DASH.cellStrong)}>ปิดทัน / ไม่ทัน ตามชนิดใบขอ</p>
         <p className={DASH.sub}>นับเป็น “ใบขอ” · เปลี่ยนตามตัวกรองด้านบน</p>
       </div>
 

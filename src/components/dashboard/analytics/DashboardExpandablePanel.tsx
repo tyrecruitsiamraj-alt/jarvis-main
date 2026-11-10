@@ -2,6 +2,8 @@ import React from 'react';
 import { ChevronDown } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import { DASH } from '@/lib/designTokens';
 
 type Props = {
   title: string;
@@ -15,18 +17,18 @@ const DashboardExpandablePanel: React.FC<Props> = ({ title, subtitle, open, onOp
   return (
     <Collapsible open={open} onOpenChange={onOpenChange}>
       <CollapsibleTrigger asChild>
-        <button
+        {/* โฉมการ์ดเดียวกับหน้าหลัก (9 พ.ย. 2569) · ปุ่มของ shadcn */}
+        <Button
           type="button"
-          className="flex w-full items-center justify-between gap-3 rounded-2xl bg-white dark:bg-slate-900 px-5 py-3.5 text-left shadow-sm hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+          variant="ghost"
+          className={cn(DASH.panel, 'h-auto w-full justify-between gap-3 whitespace-normal px-5 py-4 text-left font-normal hover:bg-muted/50 sm:px-6')}
         >
-          <div className="min-w-0">
-            <h3 className="text-sm font-medium text-slate-900 dark:text-slate-100">{title}</h3>
-            {subtitle ? <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">{subtitle}</p> : null}
-          </div>
-          <ChevronDown
-            className={cn('h-4 w-4 shrink-0 text-slate-500 transition-transform', open && 'rotate-180')}
-          />
-        </button>
+          <span className="min-w-0">
+            <span className="block text-lg font-medium text-foreground">{title}</span>
+            {subtitle ? <span className="mt-0.5 block text-xs text-muted-foreground">{subtitle}</span> : null}
+          </span>
+          <ChevronDown className={cn('shrink-0 text-muted-foreground transition-transform', open && 'rotate-180')} aria-hidden />
+        </Button>
       </CollapsibleTrigger>
       <CollapsibleContent className="pt-3">{children}</CollapsibleContent>
     </Collapsible>

@@ -298,25 +298,26 @@ const DashboardShell: React.FC<Props> = ({
             {isMobile ? (
               <Collapsible open={mobileFiltersOpen} onOpenChange={setMobileFiltersOpen}>
                 <CollapsibleTrigger asChild>
-                  <button
+                  <Button
                     type="button"
+                    variant="ghost"
                     className={cn(
-                      DASH.card,
-                      'flex w-full items-center justify-between gap-2 px-4 py-3 text-sm font-medium text-slate-900 dark:text-slate-100',
+                      DASH.panel,
+                      'h-auto w-full justify-between gap-2 px-4 py-3 text-sm font-medium text-foreground hover:bg-muted/50',
                     )}
                   >
                     <span className="flex items-center gap-2">
-                      <SlidersHorizontal className="h-4 w-4" aria-hidden />
+                      <SlidersHorizontal aria-hidden />
                       ตัวกรอง
                     </span>
                     <span className="flex items-center gap-1 text-xs font-normal text-slate-500 dark:text-slate-400">
                       {mobileFiltersOpen ? 'ซ่อน' : 'กดเพื่อกรอง'}
                       <ChevronDown
-                        className={cn('h-4 w-4 transition-transform', mobileFiltersOpen && 'rotate-180')}
+                        className={cn('transition-transform', mobileFiltersOpen && 'rotate-180')}
                         aria-hidden
                       />
                     </span>
-                  </button>
+                  </Button>
                 </CollapsibleTrigger>
                 <CollapsibleContent className="pt-3">{filterBar}</CollapsibleContent>
               </Collapsible>
@@ -345,8 +346,12 @@ const DashboardShell: React.FC<Props> = ({
                  * 9 พ.ย. 2569 ถอด "สรุปอัตราในช่วงที่เลือก" (เข้ามา − หาได้ − ยกเลิก = เหลือหา) — เจ้าของ "ตามร่างทั้งหมด":
                  * Dashboard = ไล่ SLA · สมการใบขออยู่หน้าหลักที่เดียว (นับต่างแบบกันแล้วงง · ได้บางส่วนแล้วยกเลิกเคยนับซ้ำทั้งสองกล่อง)
                  */}
-                <div>
-                  <p className={cn(DASH.eyebrow, 'mb-2')}>สถานะทำงาน (นับอัตรา)</p>
+                {/* การ์ดขาว + กล่องเทาตัวเลขใหญ่ แบบกล่องสมการหน้าหลัก (เจ้าของ 9 พ.ย. 2569 "ทำ Dashboard ให้สวยแบบเดียวกันด้วย") */}
+                <div className={cn(DASH.panel, 'p-4 sm:p-6')} data-testid="dashboard-work-status">
+                  <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
+                    <p className="text-lg font-medium text-foreground">สถานะทำงาน</p>
+                    <p className="text-sm text-muted-foreground">นับอัตรา</p>
+                  </div>
                   {/* ใช้การ์ดทรงเดียวกับ "สรุปอัตราในช่วงที่เลือก" ตามที่เจ้าของสั่ง — กวาดตาอ่านง่ายกว่าชิป
                       ครบทุกสถานะเท่าเดิม (ตัวเลข 0 ก็ยังอยู่ ไม่ซ่อน) · กดแล้วเปิดลิสต์ใบขอสถานะนั้นเหมือนเดิม */}
                   {/* เจ้าของสั่ง 10 ส.ค. 2569: "แถวละ 5 จะได้พอดีกัน" และ "ไม่เป็น visual control เลย"
@@ -363,6 +368,7 @@ const DashboardShell: React.FC<Props> = ({
                       return list.map((kpi) => (
                         <DashboardKpiCard
                           key={kpi.id}
+                          surface="tile"
                           kpi={kpi}
                           progressPercent={total > 0 ? Math.round((kpi.value / total) * 100) : 0}
                           selected={statusPick?.kpiId === kpi.id}
@@ -378,6 +384,7 @@ const DashboardShell: React.FC<Props> = ({
                     return (
                       <div className="mt-3 grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
                         <DashboardKpiCard
+                          surface="tile"
                           kpi={pre}
                           selected={statusPick?.kpiId === pre.id}
                           onClick={onKpiClick ? () => onKpiClick(pre.id, pre.label, pre.secondaryCount ?? null) : undefined}

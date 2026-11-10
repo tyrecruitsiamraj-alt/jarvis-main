@@ -13,6 +13,11 @@ type Props = {
   progressPercent?: number | null;
   /** กล่องที่กดอยู่ (29 ต.ค. 2569 กดแล้วรายการขึ้นในการ์ดเร่งด่วน) */
   selected?: boolean;
+  /**
+   * `tile` = กล่องเทาตัวเลขใหญ่ วางในการ์ดขาว แบบกล่องสมการหน้าหลัก (Dashboard · เจ้าของ 9 พ.ย. 2569 "สวยแบบเดียวกัน")
+   * ไม่ส่ง = การ์ดขาวเดิม (หน้าอื่นที่ใช้กล่องนี้ไม่เปลี่ยน)
+   */
+  surface?: 'card' | 'tile';
 };
 
 /**
@@ -45,7 +50,9 @@ const DashboardKpiCard: React.FC<Props> = ({
   onClick,
   progressPercent = null,
   selected = false,
+  surface = 'card',
 }) => {
+  const tile = surface === 'tile';
   const trend = kpi.trendPercent;
   /** เจ้าของ 1 พ.ย. 2569 "เอา % ออก" — เหลือลูกศร + คำ (เพิ่มขึ้น/ลดลง/ทรงตัว) */
   const trendWord = trend == null ? null : kpiTrendWord(trend);
@@ -68,18 +75,20 @@ const DashboardKpiCard: React.FC<Props> = ({
       disabled={!onClick}
       aria-pressed={onClick ? selected : undefined}
       className={cn(
-        'w-full rounded-2xl p-4 text-left shadow-sm transition-colors',
+        'w-full p-4 text-left transition-colors',
+        tile ? 'rounded-xl' : 'rounded-2xl shadow-sm',
         selected && 'ring-2 ring-ring',
-        solid && tone ? tone.solid : (tone?.tile ?? NEUTRAL_TILE),
+        solid && tone ? tone.solid : (tone?.tile ?? (tile ? 'bg-muted/50 hover:bg-muted' : NEUTRAL_TILE)),
         onClick ? 'cursor-pointer' : 'cursor-default',
       )}
     >
-      <p className={cn('text-xs font-medium', solid ? 'text-white/80' : 'text-slate-600 dark:text-slate-400')}>
+      <p className={cn(tile ? 'text-sm' : 'text-xs font-medium', solid ? 'text-white/80' : 'text-slate-600 dark:text-slate-400')}>
         {kpi.label}
       </p>
       <p
         className={cn(
-          'mt-1.5 text-2xl font-medium tracking-tight tabular-nums',
+          'mt-1.5 font-medium tracking-tight tabular-nums',
+          tile ? 'text-4xl' : 'text-2xl',
           solid ? 'text-white' : (tone?.num ?? NEUTRAL_NUM),
         )}
       >

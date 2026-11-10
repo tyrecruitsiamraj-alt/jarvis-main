@@ -160,7 +160,7 @@ const DashboardFilterBar: React.FC<Props> = ({
   return (
     <aside
       className={cn(
-        DASH.card,
+        DASH.panel,
         'p-4 space-y-4 lg:sticky lg:top-20 lg:max-h-[calc(100dvh-6rem)] lg:overflow-y-auto',
         className,
       )}
