@@ -11,6 +11,7 @@ import { dbQuery } from './postgres.js';
 import { tableInAppSchema } from './schema.js';
 import { siteBuSql, trendBuSql } from './siteBuSql.js';
 import { buMatchSql, type BuSet } from './homeBuSql.js';
+import { SO_SCHEMA } from './soScrapingGroups.js';
 
 const HITS = tableInAppSchema('recruit_posting_link_hits');
 const LINKS = tableInAppSchema('recruit_posting_links');
@@ -37,7 +38,21 @@ export async function recordDailyLinkHit(linkId: string): Promise<void> {
 /** BU ของลิงก์ = BU ของใบขอที่ประกาศ (ไซต์) ไม่มีค่อยใช้แผนกของประกาศลอย */
 const linkBuSql = `${trendBuSql(`coalesce(${siteBuSql('bm.site_code')}, nullif(btrim(p.department_code), ''))`)}`;
 
-export type LinkClickRow = { label: string; fbGroupId: string | null; clicks: number; appIds: string[] };
+/**
+ * กลุ่มที่ So Scraping ลบไปแล้วไม่ขึ้นในการ์ด (เจ้าของ 10 พ.ย. 2569 *"กลุ่มที่ลบไปแล้วจาก So Scraping อันนี้ก็ลบด้วย"*)
+ * ลิงก์มีรหัสกลุ่ม = เทียบรหัส · ลิงก์เก่าไม่มีรหัส = เทียบชื่อท้ายป้าย · ป้ายไม่มีชื่อกลุ่ม ("ไม่ระบุชื่อ") ยังนับ
+ * อ่านตาราง So Scraping ไม่ได้ = การ์ดขึ้น "อ่านไม่ได้" (ไม่ถอยไปโชว์ทุกกลุ่ม)
+ */
+const stillInSoSql = `(
+  l.channel_label !~* 'facebook group\\s*·\\s*\\S'
+  or (nullif(btrim(l.fb_group_id), '') is not null
+      and exists (select 1 from ${SO_SCHEMA}.groups g where lower(btrim(g.fb_group_id::text)) = lower(btrim(l.fb_group_id))))
+  or (nullif(btrim(l.fb_group_id), '') is null
+      and exists (select 1 from ${SO_SCHEMA}.groups g
+                   where lower(btrim(g.name::text)) = lower(btrim(regexp_replace(l.channel_label, '^.*facebook group\\s*·\\s*', '', 'i')))))
+)`;
+
+export type LinkClickRow ={ label: string; fbGroupId: string | null; clicks: number; appIds: string[] };
 
 /**
  * ยอดทั้งหมดตั้งแต่สร้างลิงก์ ต่อป้ายลิงก์ (เจ้าของ 10 พ.ย. 2569 Choice "แบบ 1 ยอดทั้งหมด ใช้ได้เลย")
@@ -53,6 +68,7 @@ export async function loadLinkClicks(opts: { buSet: BuSet }): Promise<LinkClickR
        left join ${MAP} bm on bm.job_id = p.job_id
       where nullif(btrim(l.channel_label), '') is not null
         and l.channel_label ilike '%facebook group%'
+        and ${stillInSoSql}
         and ${buMatchSql(linkBuSql, '$1')}
       group by btrim(l.channel_label)`,
     [opts.buSet],

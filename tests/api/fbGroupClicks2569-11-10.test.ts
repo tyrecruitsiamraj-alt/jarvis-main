@@ -50,7 +50,10 @@ describe('ที่มาของเลข', () => {
   it('คลิก = hit_count สะสม (ไม่ตามปฏิทิน) · ภาพรวมกรองตาม BU ในสิทธิ์ · ป๊อปเรียกเส้นที่ลงทะเบียนจริง', () => {
     const hits = readFileSync('api/_lib/postingLinkHits.ts', 'utf8');
     expect(hits).toContain('sum(l.hit_count)::text as clicks');
-    const ov = readFileSync('api/_handlers/recruit-overview.ts', 'utf8');
+    // กลุ่มที่ So Scraping ลบแล้วไม่ขึ้นการ์ด (เจ้าของ 10 พ.ย. 2569) — เทียบรหัสก่อน ไม่มีรหัสเทียบชื่อ · ไม่ถอยไปโชว์ทุกกลุ่มเมื่ออ่านไม่ได้
+    const load = hits.slice(hits.indexOf('export async function loadLinkClicks'), hits.indexOf('export type FbGroupStat'));
+    expect(load).toContain('and ${stillInSoSql}');
+    expect(hits).toContain('from ${SO_SCHEMA}.groups g where lower(btrim(g.fb_group_id::text)) = lower(btrim(l.fb_group_id))');    const ov = readFileSync('api/_handlers/recruit-overview.ts', 'utf8');
     expect(ov).toContain("settle('คลิกลิงก์', () => loadLinkClicks({ buSet }))");
     const registry = readFileSync('api/_handlers/registry.ts', 'utf8');
     expect(registry).toContain("'/api/recruit/postings': recruitPostingsHandler");

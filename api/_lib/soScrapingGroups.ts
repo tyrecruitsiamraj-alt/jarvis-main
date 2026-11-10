@@ -13,7 +13,8 @@ import { dbQuery } from './postgres.js';
 import { logWarn, errorSummaryText } from './logger.js';
 import { SO_GROUP_SECTOR_BEFORE_TAG, soGroupSectorOf, type SoGroup } from '../../src/lib/soScraping.js';
 
-const SCHEMA = 'so_autopost_apiscraper';
+export const SO_SCHEMA = 'so_autopost_apiscraper';
+const SCHEMA = SO_SCHEMA;
 
 /** ช่องที่ So Scraping ยังไม่ได้เพิ่ม (42703) */
 const isUndefinedColumn = (e: unknown) => typeof e === 'object' && e !== null && (e as { code?: string }).code === '42703';
