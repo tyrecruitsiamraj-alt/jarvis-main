@@ -273,7 +273,7 @@ function boardJobsOf(
   applicantCounts: Readonly<Record<string, number>>,
   today: string,
 ): RawBoardJob[] {
-  const released = buildReleaseIndex(releases);
+  const released = buildReleaseIndex(releases, feed.map((j) => String(j.id)));
   const linked = buildJobKeyIndex(postings.map((p) => [p.jobId, true] as const));
   const counts = buildCountIndex(applicantCounts);
   const facts: ReleaseFacts = {
@@ -434,7 +434,7 @@ export function decisionRequestsOf(
   const linked = new Set(src.postings.map((p) => p.jobId));
   const skipIdx = buildSkipIndex(src.skips);
   const skipExact = new Map(src.skips.map((x) => [x.job_id, x]));
-  const releasedIdx = buildReleaseIndex(src.releases);
+  const releasedIdx = buildReleaseIndex(src.releases, src.boardJobs.map((j) => String(j.id)));
   const releasedExact = new Set(src.releases.map((r) => r.job_id));
   const jobs = new Map(src.boardJobs.map((j) => [j.id, j]));
   return requests.map((r): RawDecisionRequest => {

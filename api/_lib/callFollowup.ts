@@ -732,6 +732,8 @@ const NEEDS_HUMAN_SOURCE_WHERE = {
   follow: `and person_ref like 'follow-%'`,
   board: `and person_ref like 'card-%'`,
   irecruit: `and person_ref like 'ir-%'`,
+  // ใบสมัคร (`app-<id>`) — เดิมไม่มีคีย์นี้ ⇒ ?source=applicant ได้ SQL "undefined" ตาย 500 (ตรวจทั้งระบบ 10 พ.ย. 2569)
+  applicant: `and person_ref like 'app-%'`,
 } as const;
 
 export async function listNeedsHumanQueueItems(

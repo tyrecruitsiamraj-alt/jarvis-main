@@ -15,6 +15,7 @@ import { toYmdBangkok } from '@/lib/dateTh';
 import { bucketOfCall, CALL_BUCKET_LABEL, type CallBucket } from '@/lib/callOutcomeBuckets';
 import { followRoundSlot } from '@/lib/followRoundBuckets';
 import { ChevronRight, Phone, PhoneOutgoing, RefreshCw } from 'lucide-react';
+import { LoadErrorNotice } from '@/components/shared/LoadErrorNotice';
 
 /**
  * แผง "งาน Follow วันนี้" บนหน้าหลัก (เจ้าของสั่ง 14 ส.ค. 2569 · ปรับ 17 ส.ค. 2569)
@@ -36,6 +37,7 @@ export default function FollowTodayPanel() {
   const [funnel, setFunnel] = useState<CallFunnel>(EMPTY_FUNNEL);
   const [sentToday, setSentToday] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [funnelFailed, setFunnelFailed] = useState(false);
   const [entries, setEntries] = useState<FollowEntry[]>([]);
   /** รอบที่กดดูรายชื่ออยู่ — null = ไม่ได้เปิดกล่อง */
   const [openRound, setOpenRound] = useState<number | null>(null);
@@ -51,6 +53,7 @@ export default function FollowTodayPanel() {
       .then(([todayData, allData]) => {
         setSentToday(todayData.funnel.queuedActive);
         setFunnel(allData.funnel);
+        setFunnelFailed(todayData.failed === true || allData.failed === true);
       })
       .finally(() => setLoading(false));
     // รายชื่อสำหรับ popup — ล้มก็ไม่ทำให้ยอดบนแผงหาย (กดดูรายชื่อค่อยบอกว่าโหลดไม่ได้)
@@ -92,6 +95,7 @@ export default function FollowTodayPanel() {
 
   return (
     <div className={cn('rounded-2xl border p-4 md:p-5', DASH.card)}>
+      {funnelFailed ? <LoadErrorNotice className="mb-3" message="โหลดยอดการโทรไม่สำเร็จ" onRetry={load} /> : null}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <PhoneOutgoing className={cn('h-4 w-4', TONE.primary.value)} aria-hidden />

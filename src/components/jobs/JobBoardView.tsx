@@ -356,7 +356,8 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
    * ⚠️ ใบที่ไม่อยู่ในทะเบียนนี้ = คนนอกไม่เห็น และ AI (Lumos) ก็ไม่เห็น
    */
   const [releases, setReleases] = useState<JobRelease[] | null>(null);
-  const releaseIdx = useMemo(() => buildReleaseIndex(releases ?? []), [releases]);
+  // เลขที่ซ้ำกันบนกระดาน (ใบจริง/ใบชั่วคราว) เทียบ id เต็ม (10 พ.ย. 2569)
+  const releaseIdx = useMemo(() => buildReleaseIndex(releases ?? [], jobs.map((j) => String(j.id))), [releases, jobs]);
   /** ประกาศล่าสุดวันไหน ใครกด (เจ้าของ 1 พ.ย. 2569) — ทะเบียนเขียน released_at ใหม่ทุกครั้งที่กดประกาศซ้ำ */
   const releaseByJob = useMemo(
     () => buildJobKeyIndex((releases ?? []).map((r) => [r.job_id, r] as const)),

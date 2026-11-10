@@ -17,8 +17,12 @@ export type ChannelRegistration = { phone9: string; at: string; channel: string 
 /** `erpNews` = ช่อง "ทราบข่าวจาก" ใน ERP (รหัส + ชื่อ) — ใช้เมื่อหาการลงทะเบียนไม่เจอ (19 ต.ค. 2569) */
 export type ChannelInform = { phone9: string; at: string; erpNews?: { code: string | null; name: string | null } | null; /** เลขที่ใบขอของใบแจ้งเข้า — กรองตามตัวกรองหน้าภาพรวม (4 พ.ย. 2569) */ requestNo?: string | null };
 
-export type ChannelSubRow = { name: string; registered: number; placed: number };
-export type ChannelRow = { channel: string; registered: number; placed: number; subs: ChannelSubRow[] };
+/**
+ * `placedInCohort` = คนที่แจ้งเข้า **และ** ลงทะเบียนในช่วงเดียวกัน — ตัวตั้งของ % (ตรวจทั้งระบบ 10 พ.ย. 2569 · รวมผล Codex)
+ * เดิม % = แจ้งเข้าในช่วง (ลงทะเบียนย้อนได้ 365 วัน) ÷ ลงทะเบียนในช่วง ⇒ คนเก่ามาลงงานแล้วเกิน 100%
+ */
+export type ChannelSubRow = { name: string; registered: number; placed: number; placedInCohort?: number };
+export type ChannelRow = { channel: string; registered: number; placed: number; placedInCohort?: number; subs: ChannelSubRow[] };
 export type ChannelPlacement = {
   /** แจ้งเข้าในช่วง (คน) */
   informed: number;
@@ -107,11 +111,11 @@ export function buildChannelPlacement(
     byPhone.set(r.phone9, list);
   }
 
-  const rows = new Map<string, { registered: Set<string>; placed: number; subs: Map<string, { registered: Set<string>; placed: number }> }>();
+  const rows = new Map<string, { registered: Set<string>; placed: number; inCohort: number; subs: Map<string, { registered: Set<string>; placed: number; inCohort: number }> }>();
   const rowOf = (channel: string) => {
     let r = rows.get(channel);
     if (!r) {
-      r = { registered: new Set(), placed: 0, subs: new Map() };
+      r = { registered: new Set(), placed: 0, inCohort: 0, subs: new Map() };
       rows.set(channel, r);
     }
     return r;
@@ -119,7 +123,7 @@ export function buildChannelPlacement(
   const subOf = (row: ReturnType<typeof rowOf>, name: string) => {
     let s = row.subs.get(name);
     if (!s) {
-      s = { registered: new Set(), placed: 0 };
+      s = { registered: new Set(), placed: 0, inCohort: 0 };
       row.subs.set(name, s);
     }
     return s;
@@ -179,7 +183,10 @@ export function buildChannelPlacement(
     const ch = mainChannelOf(last.channel, last.sub);
     const row = rowOf(ch);
     row.placed += 1;
-    subOf(row, subName(last.sub, ch)).placed += 1;
+    const sub = subOf(row, subName(last.sub, ch));
+    sub.placed += 1;
+    if (row.registered.has(phone)) row.inCohort += 1;
+    if (sub.registered.has(phone)) sub.inCohort += 1;
     note(phone, ch, subName(last.sub, ch));
     matched += 1;
   }
@@ -188,8 +195,9 @@ export function buildChannelPlacement(
     channel,
     registered: r.registered.size,
     placed: r.placed,
+    placedInCohort: r.inCohort,
     subs: [...r.subs.entries()]
-      .map(([name, s]) => ({ name, registered: s.registered.size, placed: s.placed }))
+      .map(([name, s]) => ({ name, registered: s.registered.size, placed: s.placed, placedInCohort: s.inCohort }))
       .sort((a, b) => b.placed - a.placed || b.registered - a.registered),
   }));
   // ลงงานมากก่อน · "ไม่รู้ช่องทาง" ท้ายสุดเสมอ

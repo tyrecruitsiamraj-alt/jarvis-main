@@ -27,6 +27,7 @@ import {
 } from '../../../src/lib/publicJobVisibility.js';
 import { publicJobDetails, publicWorkSiteName } from '../../../src/lib/publicJobSafety.js';
 import { publicPostText } from '../../../src/lib/postText.js';
+import { ambiguousRequestNos } from '../../../src/lib/jobReleaseIndex.js';
 
 type JobRow = {
   id: string;
@@ -360,7 +361,8 @@ function prequestPublicEnabled(): boolean {
  */
 async function onlyReleasedJobs<T extends Record<string, unknown>>(jobs: T[]): Promise<T[]> {
   const keys = await loadReleasedJobKeys();
-  return jobs.filter((j) => isReleased(keys, String(j.id ?? '')));
+  const ambiguous = ambiguousRequestNos(jobs.map((j) => String(j.id ?? '')));
+  return jobs.filter((j) => isReleased(keys, String(j.id ?? ''), ambiguous));
 }
 
 async function listPublicSiamrajJobs(limit: number, bu: string | null = null): Promise<PublicJob[]> {

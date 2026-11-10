@@ -39,8 +39,9 @@ const ChannelPlacementTable: React.FC<{ data: ChannelPlacement; placedOnly?: boo
               const expandable = r.subs.length > 1 || (r.subs.length === 1 && r.subs[0].name !== r.channel);
               const isOpen = open === r.channel;
               const unknown = r.channel === UNKNOWN_CHANNEL;
-              // % แจ้งเข้า = เฉพาะคนที่มาจากการลงทะเบียน (คนที่ได้ช่องทางจาก ERP ไม่ได้ลงทะเบียน · เคยขึ้น 167%)
-              const fromReg = r.placed - (r.subs.find((s) => s.name === ERP_SUB)?.placed ?? 0);
+              // % แจ้งเข้า = คนที่ลงทะเบียนในช่วงนี้แล้วแจ้งเข้า ÷ ลงทะเบียนในช่วงนี้ (กลุ่มเดียวกัน ไม่เกิน 100% · 10 พ.ย. 2569)
+              // เดิมตัวตั้งรวมคนลงทะเบียนก่อนช่วงด้วย (เคยขึ้น 167% · 200%) · ไม่มีค่า (ข้อมูลเก่า) = ถอยไปแบบเดิม
+              const fromReg = r.placedInCohort ?? r.placed - (r.subs.find((s) => s.name === ERP_SUB)?.placed ?? 0);
               return (
                 <React.Fragment key={r.channel}>
                   <TableRow data-testid={`channel-row-${r.channel}`}>
@@ -73,7 +74,7 @@ const ChannelPlacementTable: React.FC<{ data: ChannelPlacement; placedOnly?: boo
                           <TableCell className="sticky left-0 z-10 bg-muted pl-8 text-xs text-muted-foreground">{s.name}</TableCell>
                           <TableCell className="text-right text-xs tabular-nums">{placedOnly ? '—' : fmt(s.registered)}</TableCell>
                           <TableCell className="text-right text-xs tabular-nums">{fmt(s.placed)}</TableCell>
-                          <TableCell className="text-right text-xs tabular-nums text-muted-foreground">{placedOnly ? '—' : pct(s.placed, s.registered)}</TableCell>
+                          <TableCell className="text-right text-xs tabular-nums text-muted-foreground">{placedOnly ? '—' : pct(s.placedInCohort ?? s.placed, s.registered)}</TableCell>
                         </TableRow>
                       ))
                     : null}

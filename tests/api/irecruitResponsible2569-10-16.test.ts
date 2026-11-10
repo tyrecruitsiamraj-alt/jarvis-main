@@ -49,7 +49,8 @@ describe('ชื่อผู้รับผิดชอบ', () => {
 describe('เติมใบเก่า', () => {
   const src = readFileSync('api/_lib/irecruitApplicantImport.ts', 'utf8');
   it('🔴 เขียนเฉพาะช่องผู้รับผิดชอบที่ยังว่าง ตาม id · ทุกรอบดึง · error ไม่ทำให้รอบล้ม', () => {
-    expect(src).toContain("`update ${APPS} set responsible_name = $2 where id = $1::uuid and nullif(btrim(responsible_name), '') is null`");
+    // 10 พ.ย. 2569 นับจาก returning (dbQuery ไม่มี rowCount)
+    expect(src).toContain("`update ${APPS} set responsible_name = $2 where id = $1::uuid and nullif(btrim(responsible_name), '') is null returning id`");
     expect(src).toMatch(/try \{\s*out\.responsibleFilled = await backfillIrecruitResponsible\(\);\s*\} catch/);
     expect(src).toContain('responsible_name)\n         values');
   });

@@ -366,12 +366,31 @@ const RmWorkspace: React.FC<{
    * เจอ = ค้นชื่อให้แถวขึ้นในรายชื่อ + เปิดป๊อปของคนนั้น · ไม่เจอ = บอกเหตุ · ใช้แล้วล้างออกจาก URL
    */
   const openParam = searchParams.get(RM_OPEN_PARAM);
+  /**
+   * ไม่เจอในรายชื่อของฉัน = อาจอยู่ในการติดต่อของคนอื่น (เก็บไปโทร/Lead ของคนอื่นซ่อนจากรายชื่อเรา · 4 ต.ค. 2569)
+   * คนที่มีสิทธิ์ "การติดต่อ: ดูรายชื่อของทุกคน" → พาไปแท็บการติดต่อ "ทุกคน" แล้วหาอีกรอบ (ตรวจทั้งระบบ 10 พ.ย. 2569:
+   * หัวหน้ากดชื่อในขั้นเก็บ/ติดต่อได้/นัดได้แล้วเจอ "ไม่เจอคนนี้" เกือบทุกครั้ง)
+   */
+  const openTriedEveryone = useRef(false);
   useEffect(() => {
     if (!openParam || loading) return;
+    // สลับไปทุกคนแล้ว รอจนรายชื่อชุดทุกคนโหลดเสร็จจริง (รอบแรกหลังสลับยังเป็นรายชื่อเดิม)
+    if (openTriedEveryone.current && rowsScopeRef.current !== 'contact') return;
+    const found = rows.find((r) => r.id === openParam);
+    if (!found && canSeeEveryoneContact && !everyoneContact) {
+      if (openTriedEveryone.current) return; // รอรายชื่อทุกคนโหลด
+      openTriedEveryone.current = true;
+      const to = new URLSearchParams(searchParams);
+      to.set('view', 'contact');
+      setSearchParams(to, { replace: true });
+      setContactScope('all');
+      return;
+    }
+    openTriedEveryone.current = false;
     const next = new URLSearchParams(searchParams);
     next.delete(RM_OPEN_PARAM);
     setSearchParams(next, { replace: true });
-    const row = rows.find((r) => r.id === openParam);
+    const row = found;
     if (!row) {
       say('ไม่เจอคนนี้ในรายชื่อ อาจเป็น Lead หรือถูกยกเลิกข้อมูลแล้ว');
       return;
@@ -379,8 +398,8 @@ const RmWorkspace: React.FC<{
     setKeyword(row.full_name ?? '');
     setPage(1);
     setProfileApp(row);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- ทำครั้งเดียวต่อลิงก์ หลังรายชื่อโหลดเสร็จ
-  }, [openParam, loading]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- ทำครั้งเดียวต่อลิงก์ หลังรายชื่อโหลดเสร็จ (รอบสองหลังสลับไปการติดต่อทุกคน)
+  }, [openParam, loading, everyoneContact]);
 
   const setCancelledView = (on: boolean) => {
     const next = new URLSearchParams(searchParams);

@@ -116,18 +116,18 @@ export async function fetchCallRateSeries(
 export async function fetchCallFunnel(
   sinceYmd?: string,
   source: CallFunnelSource = 'all',
-): Promise<{ funnel: CallFunnel; needsHuman: NeedsHumanItem[] }> {
+): Promise<{ funnel: CallFunnel; needsHuman: NeedsHumanItem[]; /** โหลดไม่สำเร็จ — ยอดเป็นค่าว่าง ห้ามอ่านว่าเป็น 0 จริง (10 พ.ย. 2569) */ failed?: boolean }> {
   try {
     const params = new URLSearchParams();
     if (sinceYmd) params.set('since', sinceYmd);
     if (source !== 'all') params.set('source', source);
     const qs = params.toString() ? `?${params.toString()}` : '';
     const r = await apiFetch(`/api/lumos/call-funnel${qs}`);
-    if (!r.ok) return { funnel: EMPTY_FUNNEL, needsHuman: [] };
+    if (!r.ok) return { funnel: EMPTY_FUNNEL, needsHuman: [], failed: true };
     const data = await readJsonSafe<{ funnel?: CallFunnel; needsHuman?: NeedsHumanItem[] }>(r);
     return { funnel: data?.funnel ?? EMPTY_FUNNEL, needsHuman: data?.needsHuman ?? [] };
   } catch {
-    return { funnel: EMPTY_FUNNEL, needsHuman: [] };
+    return { funnel: EMPTY_FUNNEL, needsHuman: [], failed: true };
   }
 }
 

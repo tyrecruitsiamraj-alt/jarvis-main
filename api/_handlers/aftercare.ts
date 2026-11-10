@@ -176,9 +176,11 @@ async function handleGet(req: AuthedReq, res: ApiRes) {
             limit 1
          ) u on true
         where ${where}
-        order by a.created_at desc limit 500`,
+        order by a.created_at desc limit ${AFTERCARE_LIST_MAX}`,
       [buSet],
     );
+    // ยอดจริงในสิทธิ์ (ตรวจทั้งระบบ 10 พ.ย. 2569 · รวมผล Codex) — เดิม total = แถวที่ส่ง (ตัดที่ 500 แล้วบอกว่าครบ)
+    const { rows: countRows } = await dbQuery<{ n: string }>(`select count(*)::text as n from ${TABLE} a where ${where}`, [buSet]);
     const contacts = await lastContactsOf(rows.map((r) => r.phone_e164));
     res.setHeader?.('Cache-Control', 'no-store');
     return res.status(200).json({
@@ -187,7 +189,8 @@ async function handleGet(req: AuthedReq, res: ApiRes) {
         last_contact: contacts.get(r.phone_e164)?.last ?? null,
         contact_count: contacts.get(r.phone_e164)?.count ?? 0,
       })),
-      total: rows.length,
+      total: Number(countRows[0]?.n ?? rows.length),
+      returned: rows.length,
     });
   } catch (e) {
     // ตารางยังไม่ migrate → หน้าใหม่ต้องเปิดได้และบอกตรง ๆ ว่ายังว่าง (ไม่ใช่จอพัง)
@@ -198,6 +201,8 @@ async function handleGet(req: AuthedReq, res: ApiRes) {
 
 /** ย้ายคนเข้ามาดูแล — กดซ้ำได้ (upsert ต่อเบอร์ · ไม่สร้างซ้ำ) */
 /** ลงผลการโทรดูแล (10 ต.ค. 2569) — ทุกครั้งเป็นแถวใหม่ (เก็บประวัติ) · ไม่ปิดการดูแลเอง */
+const AFTERCARE_LIST_MAX = 2000;
+
 async function handleContact(req: AuthedReq, res: ApiRes, raw: Record<string, unknown> | null) {
   const phone = toE164Thai(getString(raw?.phone) ?? '');
   if (!phone) return sendError(res, 400, 'Bad request', 'ต้องระบุเบอร์ที่ใช้กับระบบได้');

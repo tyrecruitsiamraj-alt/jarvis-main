@@ -1152,6 +1152,19 @@ async function purgeFollow(req: AuthedReq, res: ApiRes) {
   const target = rows[0];
   if (!target) return sendError(res, 404, 'Not found', 'ไม่พบรายการ');
 
+  // 🔴 สายที่ส่งให้ Lumos แล้วต้องกด "ยกเลิก" ก่อน (ตรวจทั้งระบบ 10 พ.ย. 2569) — เดิมลบแถวฝั่งเราอย่างเดียว
+  // แผนที่ส่งไปแล้วยังโทรหาคนจริง และบนจอไม่มีอะไรให้กดหยุด · ยกเลิกปกติส่งยกเลิกถึง Lumos + ตัวส่งซ้ำตามให้ถ้าล้ม
+  if (!target.cancelled_at && !(target as { completed_at?: unknown }).completed_at) {
+    const { rows: pushed } = await dbQuery<{ n: string }>(
+      `select count(*)::text as n from ${queueTable}
+        where person_ref = $1 and (push_state = 'pushed' or pushed_at is not null) and result is null`,
+      [`follow-${id}`],
+    );
+    if (Number(pushed[0]?.n ?? 0) > 0) {
+      return sendError(res, 409, 'Conflict', 'สายนี้ส่งให้ AI แล้ว กด "ยกเลิก" ก่อน แล้วค่อยลบ');
+    }
+  }
+
   const { rows: removed } = await dbQuery<{ id: string }>(
     `delete from ${queueTable} where person_ref = $1 returning id`,
     [`follow-${id}`],

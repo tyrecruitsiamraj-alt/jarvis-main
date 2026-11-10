@@ -45,7 +45,7 @@ describe('buildChannelPlacement', () => {
     expect(row('Tiktok').placed).toBe(1);
     expect(row('Tiktok').registered).toBe(2);
     expect(row('Line AI LBD').placed).toBe(1);
-    expect(row('Tiktok').subs[0]).toEqual({ name: 'SOWORK Driver', registered: 2, placed: 1 });
+    expect(row('Tiktok').subs[0]).toEqual({ name: 'SOWORK Driver', registered: 2, placed: 1, placedInCohort: 1 });
   });
 });
 

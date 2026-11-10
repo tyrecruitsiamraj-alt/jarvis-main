@@ -89,7 +89,9 @@ async function handler(req: AuthedReq, res: ApiRes) {
     return sendError(res, 405, 'Method not allowed', 'Read-only');
   }
   try {
-    const scope: DepartmentScope = await loadMatchingBuScope(req.user);
+    // admin = ทุก BU (ตรวจทั้งระบบ 10 พ.ย. 2569 · รวมผล Codex) — เดิมล็อก BU ของแอดมินเอง (SN) ⇒ หน้าผู้ใช้งาน
+    // "ทั้งหมด 68" แต่ Online + Offline + ยังไม่เข้า รวมได้ 2 · คนอื่นยังใช้ BU หลักแบบเดิม
+    const scope: DepartmentScope = req.user.role === 'admin' ? { mode: 'all' } : await loadMatchingBuScope(req.user);
     const canSeePeople = req.user.role === 'admin' || req.user.role === 'supervisor';
     const cacheKey = JSON.stringify([scope, canSeePeople]);
     const hit = cache.get(cacheKey);

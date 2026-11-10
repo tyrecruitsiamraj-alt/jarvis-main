@@ -7,6 +7,7 @@
  *    เทสต์ `tests/api/homeOverviewFunnel.test.ts`
  */
 import { appliedYmd } from './recruitOverview';
+import { aiBranchOf } from './recruitPersonJourney';
 import type { RecruitAppFact } from './recruitOverviewTypes';
 import { FOUR_MAIN_OTHER, fourMainOf } from './channelFourMain';
 
@@ -63,7 +64,7 @@ function channelsOf(list: readonly RecruitAppFact[]): Record<FunnelChannel, numb
 export function appsInWindow(apps: readonly RecruitAppFact[], from: string, to: string): RecruitAppFact[] {
   return apps.filter((f) => {
     const d = appliedYmd(f);
-    return Boolean(d) && d >= from && d <= to;
+    return d != null && d >= from && d <= to;
   });
 }
 
@@ -80,10 +81,14 @@ export function buildApplicantFunnel(apps: readonly RecruitAppFact[]): FunnelSte
   const aiCalled = apps.filter((f) => f.calledByAi);
   const aiQueued = apps.filter((f) => !f.calledByAi && f.aiQueued === true);
   const notCalled = apps.filter((f) => !f.calledByAi && f.aiQueued !== true);
-  const interested = aiCalled.filter((f) => f.aiAnswer === 'said_yes');
-  const no = aiCalled.filter((f) => f.aiAnswer === 'said_no');
-  const noPickup = aiCalled.filter((f) => f.aiAnswer === 'no_pickup');
-  const aiOther = aiCalled.filter((f) => f.aiAnswer !== 'said_yes' && f.aiAnswer !== 'said_no' && f.aiAnswer !== 'no_pickup');
+  // 🔴 ผล AI ตัวตัดสินเดียวกับหน้าภาพรวมงานสรรหา (`aiBranchOf`) — เดิมหน้าหลักแบ่งเอง "ไม่สนใจ 209 · อื่น ๆ 104"
+  // แต่ภาพรวมได้ "ไม่สนใจ 301 · คนละพื้นที่ 11 · ยังสรุปไม่ได้ 1" จากคนกลุ่มเดียวกัน (ตรวจทั้งระบบ 10 พ.ย. 2569 · รวมผล Codex)
+  const aiOf = (k: ReturnType<typeof aiBranchOf>) => aiCalled.filter((f) => aiBranchOf(f) === k);
+  const interested = aiOf('yes');
+  const no = aiOf('no');
+  const noPickup = aiOf('noPickup');
+  const outOfArea = aiOf('outOfArea');
+  const aiOther = aiOf('other');
   const staffCalled = apps.filter((f) => f.calledByStaff);
   const staffOfInterested = interested.filter((f) => f.calledByStaff);
   const staffNotYet = interested.filter((f) => !f.calledByStaff);
@@ -113,9 +118,10 @@ export function buildApplicantFunnel(apps: readonly RecruitAppFact[]): FunnelSte
       value: aiCalled.length,
       rows: [
         row('yes', 'สนใจ', interested, 'success'),
-        row('no', 'ไม่สนใจ', no, 'neutral'),
         row('noPickup', 'ไม่รับสาย', noPickup, 'neutral'),
-        row('other', 'อื่น ๆ', aiOther, 'neutral'),
+        row('no', 'ไม่สนใจ', no, 'neutral'),
+        row('outOfArea', 'คนละพื้นที่', outOfArea, 'neutral'),
+        row('other', 'ยังสรุปไม่ได้', aiOther, 'neutral'),
       ],
       channels: channelsOf(aiCalled),
       ids: idsOf(aiCalled),

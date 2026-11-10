@@ -328,7 +328,9 @@ export async function syncIrecruitImportStatus(): Promise<number> {
       `select i.register_uuid, i.irecruit_status from ${IMPORTS} i
          join ${APPS} a on a.id = i.application_id
         where a.created_at > now() - interval '14 days'
-        order by a.created_at desc limit 2000`,
+           -- ยังค้าง W/ยังไม่รู้สถานะ = ตามต่อถึง 120 วัน (ตรวจทั้งระบบ 10 พ.ย. 2569 · รวมผล Codex: เดิมเกิน 14 วันหยุดตามแม้ยังไม่จบ)
+           or (coalesce(i.irecruit_status, 'W') = 'W' and a.created_at > now() - interval '120 days')
+        order by a.created_at desc limit 4000`,
     ));
   } catch (e) {
     if (/irecruit_status/.test(String((e as Error)?.message ?? e))) return 0;
@@ -400,11 +402,12 @@ export async function backfillIrecruitResponsible(): Promise<number> {
   for (const t of safe) {
     const name = nameByUuid.get(t.register_uuid.toLowerCase());
     if (!name) continue;
-    const { rowCount } = await dbQuery(
-      `update ${APPS} set responsible_name = $2 where id = $1::uuid and nullif(btrim(responsible_name), '') is null`,
+    // dbQuery คืนแค่ rows — นับจาก returning (เดิมอ่าน rowCount ที่ไม่มี ⇒ รายงานเติมได้ 0 ตลอด · 10 พ.ย. 2569)
+    const { rows: done } = await dbQuery(
+      `update ${APPS} set responsible_name = $2 where id = $1::uuid and nullif(btrim(responsible_name), '') is null returning id`,
       [t.id, name],
     );
-    filled += rowCount ?? 0;
+    filled += done.length;
   }
   if (filled > 0) logInfo('irecruitImport.responsibleFilled', { filled, checked: safe.length });
   return filled;

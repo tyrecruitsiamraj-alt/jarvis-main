@@ -401,12 +401,17 @@ export function applicationAppointmentYmd(row: PublicApplication): string | null
   return Number.isFinite(t) ? toYmdBangkok(new Date(t)) : null;
 }
 
-/** วันที่สมัครในรูป YYYY-MM-DD (ตัดเวลาออก) — null = ไม่รู้วัน */
+/**
+ * วันที่สมัคร (วันไทย) YYYY-MM-DD — null = ไม่รู้วัน
+ * 🔴 created_at มาเป็นเวลา UTC ("…T17:30:00Z" = 00:30 ไทยวันถัดไป) — เดิมตัด 10 ตัวแรก ⇒ ใบที่กรอกเที่ยงคืนถึงก่อน 7 โมงไปอยู่วันก่อน
+ * (ตรวจทั้งระบบ 10 พ.ย. 2569 · รวมผล Codex) · ไม่มีเวลา (YYYY-MM-DD เปล่า) = ใช้ตามนั้น
+ */
 export function applicationAppliedYmd(row: PublicApplication): string | null {
   const raw = row.created_at;
   if (!raw || typeof raw !== 'string') return null;
-  const ymd = raw.slice(0, 10);
-  return /^\d{4}-\d{2}-\d{2}$/.test(ymd) ? ymd : null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+  const t = Date.parse(raw);
+  return Number.isFinite(t) ? toYmdBangkok(new Date(t)) : null;
 }
 
 /** ไม่ได้ติ๊กอะไรเลย = ไม่กรอง (ไม่ใช่ "กรองจนไม่เหลืออะไร") */

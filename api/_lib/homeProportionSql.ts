@@ -97,7 +97,7 @@ export function proportionAppReasonsSql(): string {
 }
 
 /**
- * ทางเข้า: ใบสมัคร (ไม่นับที่ยกเลิกข้อมูล) ตามวันกรอก · ใบส่งคนแทนตามวันที่สร้างแถว (นับใบ ไม่ใช่สาย) · คำขอโพสต์
+ * ทางเข้า: ใบสมัคร (ไม่นับที่ยกเลิกข้อมูล · ไม่นับ Lead ชุดเดียวกับการ์ดผู้สมัคร — ตรวจทั้งระบบ 10 พ.ย. 2569: 1,595 vs 1,633) ตามวันกรอก · ใบส่งคนแทนตามวันที่สร้างแถว (นับใบ ไม่ใช่สาย) · คำขอโพสต์
  * ใบสมัคร: `source = 'irecruit'` = ดึง iRecruit · คนสร้าง = So Scraping = ระบบ · มีชื่อคนสร้างอื่น = คนคีย์/นำเข้า · ไม่มี = กรอกเอง
  */
 export function proportionEntrySql(): string {
@@ -107,22 +107,26 @@ export function proportionEntrySql(): string {
        from ${APPS} a ${appBuJoin('a')}
       where ($1::timestamptz is null or a.created_at >= $1::timestamptz) and a.created_at < $2::timestamptz
         and ($3::text[] is null or ${appBuSql('a')} = any($3::text[]))
+        and not coalesce(a.is_lead, false)
         and not exists (select 1 from ${CANCELLATIONS} x where x.application_id = a.id)) as self_apply,
     (select count(*) filter (where a.source = 'irecruit')::int
        from ${APPS} a ${appBuJoin('a')}
       where ($1::timestamptz is null or a.created_at >= $1::timestamptz) and a.created_at < $2::timestamptz
         and ($3::text[] is null or ${appBuSql('a')} = any($3::text[]))
+        and not coalesce(a.is_lead, false)
         and not exists (select 1 from ${CANCELLATIONS} x where x.application_id = a.id)) as irecruit,
     (select count(*) filter (where a.source is distinct from 'irecruit' and a.created_by_name = '${SO_SCRAPING_CREATED_BY}')::int
        from ${APPS} a ${appBuJoin('a')}
       where ($1::timestamptz is null or a.created_at >= $1::timestamptz) and a.created_at < $2::timestamptz
         and ($3::text[] is null or ${appBuSql('a')} = any($3::text[]))
+        and not coalesce(a.is_lead, false)
         and not exists (select 1 from ${CANCELLATIONS} x where x.application_id = a.id)) as so_scraping,
     (select count(*) filter (where a.source is distinct from 'irecruit' and a.created_by_name is not null
                                and a.created_by_name <> '${SO_SCRAPING_CREATED_BY}')::int
        from ${APPS} a ${appBuJoin('a')}
       where ($1::timestamptz is null or a.created_at >= $1::timestamptz) and a.created_at < $2::timestamptz
         and ($3::text[] is null or ${appBuSql('a')} = any($3::text[]))
+        and not coalesce(a.is_lead, false)
         and not exists (select 1 from ${CANCELLATIONS} x where x.application_id = a.id)) as staff_keyed`;
 }
 

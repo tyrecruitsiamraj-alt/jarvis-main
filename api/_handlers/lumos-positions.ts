@@ -18,6 +18,7 @@ import { isReleased, loadReleasedJobKeys } from '../_lib/jobPublicReleases.js';
 import { dbQuery } from '../_lib/postgres.js';
 import { sendError, handleApiError, type ApiReq, type ApiRes } from '../_lib/http.js';
 import { withLumosAuth } from '../_lib/lumos-auth.js';
+import { ambiguousRequestNos } from '../../src/lib/jobReleaseIndex.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -201,9 +202,10 @@ async function listSiamrajPositions(limit: number): Promise<LumosPosition[]> {
    * fail-closed เหมือนกัน: อ่านทะเบียนไม่ได้ = ไม่ส่งอะไรออกไป
    */
   const keys = await loadReleasedJobKeys();
+  const ambiguous = ambiguousRequestNos(items.map((j) => String((j as { id?: unknown }).id ?? '')));
   return items
     .filter(isActiveStatus)
-    .filter((j) => isReleased(keys, String((j as { id?: unknown }).id ?? '')))
+    .filter((j) => isReleased(keys, String((j as { id?: unknown }).id ?? ''), ambiguous))
     .map((j) => toLumosPosition(j as unknown as Record<string, unknown>));
 }
 

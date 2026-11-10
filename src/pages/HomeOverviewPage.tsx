@@ -67,6 +67,8 @@ import { fetchRecruitStuck } from '@/lib/recruitStuckApi';
 import { STUCK_REASON_LABEL } from '@/lib/recruitStuck';
 import { PREQUEST_LEDGER_PREFIX, ledgerJobIdOf } from '@/lib/requestPenaltyLedger';
 import type { RecruitRequestItem } from '@/lib/recruitOverviewTypes';
+import { RANGE_MAX_DAYS, rangeWindow } from '@/lib/recruitOverviewWindow';
+const dayNumberOf = (ymd: string) => Math.round(Date.parse(`${ymd}T00:00:00Z`) / 86_400_000);
 
 const BAHT = new Intl.NumberFormat('th-TH', { maximumFractionDigits: 0 });
 const BU_OPTIONS = [...new Set(Object.values(SITE_BU_TO_DEPT))];
@@ -127,6 +129,8 @@ const HomeOverviewPage: React.FC<{
   }, [v5, win, bu]);
   const tick = useLiveTick(true, LIVE_MS);
   const range = useMemo(() => ({ from: win.from ?? ALL_FROM, to: win.to ?? today }), [win, today]);
+  /** ช่วงที่ส่งไปภาพรวมงานสรรหา — ยาวเกิน 62 วันขอแบบ all (เพดาน 731 วัน) */
+  const roRange = useMemo(() => ({ ...range, all: dayNumberOf(range.to) - dayNumberOf(range.from) + 1 > RANGE_MAX_DAYS }), [range]);
   const winQ = useMemo(() => ({ ...win, bu }), [win, bu]);
 
   // ── เงิน · สมการใบขอ ──
@@ -164,7 +168,7 @@ const HomeOverviewPage: React.FC<{
         })
         .catch((e: unknown) => alive && setAiV5Error(friendlyErrorText(e, 'โหลดยอดดูแลหลังเริ่มงาน/จับคู่งานไม่ขึ้น')));
     }
-    fetchRecruitOverview(null, range, bu)
+    fetchRecruitOverview(null, roRange, bu)
       .then((d) => {
         if (!alive) return;
         setRo(d);
@@ -207,11 +211,22 @@ const HomeOverviewPage: React.FC<{
   const rowsOf = (list: ReadonlyArray<{ requestNo: string }>): MoneyRequest[] =>
     list.map((x) => byNo.get(x.requestNo)).filter((r): r is MoneyRequest => Boolean(r));
   const flowRows = (pick: (f: NonNullable<MoneyRequest['flow']>) => boolean) => openReqs.filter((r) => r.flow && pick(r.flow));
+  /** BU ของใบ — ใบจริงได้รหัสไซต์ (LML) ใบชั่วคราวได้รหัสแผนก (LM) · แปลงชุดเดียวกับกราฟก่อนจัดกลุ่ม (ตรวจทั้งระบบ 10 พ.ย. 2569: LM ขึ้นสองแถว) */
+  const buKeyOf = (r: MoneyRequest) => normalizeTrendBu(r.bu) ?? 'ไม่ระบุ BU';
+  /**
+   * ใบที่มีเงินตามสัญญาในช่วง = ชุดเดียวกับยอดบนการ์ด (ตรวจทั้งระบบ 10 พ.ย. 2569 · รวมผล Codex)
+   * เดิมการ์ดบอก "55 ใบ" และ "ดูทุกใบ" เปิดเฉพาะใบที่ยังโดนอยู่วันนี้ ⇒ กดดูรวมได้ 327,886 จากยอด 403,165 · แยก BU ได้ 69 ใบ
+   */
+  const moneyAmountOf = (r: MoneyRequest) => r.amount.need.fine + r.amount.need.deduct;
+  const chargedRows = useMemo(() => openReqs.filter((r) => moneyAmountOf(r) > 0).sort((a, b) => moneyAmountOf(b) - moneyAmountOf(a)), [openReqs]);
 
   // ── ผู้สมัคร ──
+  // ช่วงยาว/ทั้งหมด/ปลายช่วงเลยวันนี้: เซิร์ฟเวอร์ตัดช่วง (62 วัน · all = 731 วัน · ไม่เกินวันนี้) — เทียบกับช่วงที่ตัดแล้ว
+  // เดิมเทียบช่วงดิบ ⇒ ผู้สมัครค้าง "กำลังโหลด" ตลอดเมื่อเลือกทั้งหมด/เกิน 2 เดือน/สัปดาห์-เดือนนี้ (ตรวจทั้งระบบ 10 พ.ย. 2569)
+  const roWin = useMemo(() => rangeWindow(roRange.from, roRange.to, today, roRange.all), [roRange, today]);
   // ผู้ใช้ BU เดียว: หน้าส่ง bu=null แต่เซิร์ฟเวอร์ตอบ BU ที่ล็อกไว้ (ไม่มีตัวเลือก) — เดิมเทียบ bu ตรง ๆ แล้วผู้สมัครค้าง "กำลังโหลด" ตลอด (ตรวจ 10 พ.ย. 2569)
   const roBuOk = (r: NonNullable<typeof ro>) => r.bu === bu || (bu === null && r.bu != null && !r.buChoices?.length);
-  const roNow = ro && ro.window.from === range.from && ro.window.to === range.to && roBuOk(ro) ? ro : null;
+  const roNow = ro && roWin && ro.window.from === roWin.from && ro.window.to === roWin.to && roBuOk(ro) ? ro : null;
   const apps = useMemo(() => (roNow?.apps ? appsInWindow(roNow.apps, range.from, range.to) : null), [roNow, range]);
   const funnel = useMemo(() => (apps ? buildApplicantFunnel(apps) : null), [apps]);
   const backlog = roNow?.backlog ?? null;
@@ -273,10 +288,10 @@ const HomeOverviewPage: React.FC<{
   };
 
   const openMoney = () => {
-    const rows = rowsOf(costlyAll.rows);
     const bus = new Map<string, { n: number; missing: number; perDay: number }>();
     for (const r of costlyAll.rows) {
-      const k = byNo.get(r.requestNo)?.bu ?? 'ไม่ระบุ BU';
+      const m = byNo.get(r.requestNo);
+      const k = m ? buKeyOf(m) : 'ไม่ระบุ BU';
       const cur = bus.get(k) ?? { n: 0, missing: 0, perDay: 0 };
       cur.n += 1;
       cur.missing += r.missing;
@@ -292,7 +307,7 @@ const HomeOverviewPage: React.FC<{
     for (const r of openReqs) {
       const a = amountOf(r);
       if (a <= 0) continue;
-      const k = r.bu ?? 'ไม่ระบุ BU';
+      const k = buKeyOf(r);
       const cur = busAmt.get(k) ?? { amount: 0, rows: [] };
       cur.amount += a;
       cur.rows.push(r);
@@ -301,7 +316,7 @@ const HomeOverviewPage: React.FC<{
     setPanel({
       wide: true,
       title: 'เสียเงิน',
-      sub: `${NUM.format(costlyAll.total)} ใบ เสียวันละ ${BAHT.format(perDayTotal)} บาท รวมตามสัญญา ${BAHT.format(contract ?? 0)} บาท`,
+      sub: `${NUM.format(chargedRows.length)} ใบ รวมตามสัญญา ${BAHT.format(contract ?? 0)} บาท ยังโดนอยู่ ${NUM.format(costlyAll.total)} ใบ วันละ ${BAHT.format(perDayTotal)} บาท`,
       go: PAGE.requests,
       body: (
         <div className="space-y-4">
@@ -399,8 +414,8 @@ const HomeOverviewPage: React.FC<{
               </li>
             ))}
           </ul>
-          <Button type="button" variant="outline" className="w-full" onClick={() => openList('ใบที่เสียเงิน', rows)} data-testid="overview-money-all">
-            ดูทุกใบ {NUM.format(costlyAll.total)} ใบ
+          <Button type="button" variant="outline" className="w-full" onClick={() => openList('ใบที่เสียเงิน', chargedRows, `${BAHT.format(contract ?? 0)} บาท ตามสัญญาในช่วง`)} data-testid="overview-money-all">
+            ดูทุกใบ {NUM.format(chargedRows.length)} ใบ
           </Button>
         </div>
       ),
@@ -411,7 +426,7 @@ const HomeOverviewPage: React.FC<{
   const openRemaining = () => {
     const open = flowRows((f) => f.open).sort((a, b) => perDayOf(b) - perDayOf(a));
     const byBu = new Map<string, MoneyRequest[]>();
-    for (const r of open) byBu.set(r.bu ?? 'ไม่ระบุ BU', [...(byBu.get(r.bu ?? 'ไม่ระบุ BU') ?? []), r]);
+    for (const r of open) byBu.set(buKeyOf(r), [...(byBu.get(buKeyOf(r)) ?? []), r]);
     setPanel({
       wide: true,
       title: 'เหลือหา',
@@ -454,7 +469,7 @@ const HomeOverviewPage: React.FC<{
     }
     const topKinds = [...kinds.entries()].sort((a, b) => b[1] - a[1]);
     const bus = new Map<string, number>();
-    for (const r of list) bus.set(r.bu ?? 'ไม่ระบุ BU', (bus.get(r.bu ?? 'ไม่ระบุ BU') ?? 0) + 1);
+    for (const r of list) bus.set(buKeyOf(r), (bus.get(buKeyOf(r)) ?? 0) + 1);
     setPanel({
       title: 'ขอใหม่',
       sub: flow ? `${NUM.format(flow.newRequests)} ใบ ${NUM.format(flow.newPositions)} อัตรา` : undefined,
@@ -515,7 +530,7 @@ const HomeOverviewPage: React.FC<{
               .sort((a, b) => b[1] - a[1])
               .map(([k, v]) => {
                 const label = k === 'ไม่ระบุ BU' ? k : trendBuLabel(k);
-                return { label, value: v, onOpen: () => openList(`ขอใหม่ ${label}`, list.filter((r) => (r.bu ?? 'ไม่ระบุ BU') === k)) };
+                return { label, value: v, onOpen: () => openList(`ขอใหม่ ${label}`, list.filter((r) => buKeyOf(r) === k)) };
               })}
           />
           <Button type="button" variant="outline" className="w-full" onClick={() => openList('ขอใหม่', list)}>
@@ -762,7 +777,7 @@ const HomeOverviewPage: React.FC<{
               value={contract}
               unit="บาท"
               money
-              left={moneyNow ? `${NUM.format(costlyAll.total)} ใบที่มีผลกระทบ` : '—'}
+              left={moneyNow ? `${NUM.format(chargedRows.length)} ใบที่มีผลกระทบ` : '—'}
               right={moneyNow ? `ค่าปรับ ${BAHT.format(moneyNow.totals.need.fine)}` : ''}
               onClick={moneyNow ? openMoney : undefined}
               testId="v5-kpi-money"

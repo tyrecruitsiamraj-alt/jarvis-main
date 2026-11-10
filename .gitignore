@@ -43,3 +43,4 @@ wipe-backup-*.json
 .claude/skills/shadcn
 .claude/skills/migrate-radix-to-base
 .backups/
+scrub-locations-backup-*.json

@@ -17,6 +17,7 @@ import { RefreshCw, ChevronDown, ArrowRight, ArrowDown } from 'lucide-react';
 import PageHeroStrip from '@/components/shared/PageHeroStrip';
 import { useSurfaceKit } from '@/components/shared/ui-v2/surface';
 import { resolvedCallBase } from '@/lib/callFunnelMath';
+import { LoadErrorNotice } from '@/components/shared/LoadErrorNotice';
 
 /**
  * funnel การโทร + ถัง "ต้องคนตาม" — ตอบคำถามที่เจ้าของถามหน้า Follow:
@@ -212,11 +213,13 @@ const CallFunnelPanel: React.FC<CallFunnelPanelProps> = ({
   /** ชุดสีพื้นผิว — โฉมเดิม = แผงพื้นเข้ม · โฉมใหม่ = ผืนขาว (ข้อมูลเหมือนกันทุกตัว) */
   const S = useSurfaceKit();
 
+  const [funnelFailed, setFunnelFailed] = useState(false);
   const load = useCallback(() => {
     setLoading(true);
     void fetchCallFunnel(undefined, source).then((d) => {
       setFunnel(d.funnel);
       setNeedsHuman(d.needsHuman);
+      setFunnelFailed(d.failed === true);
       setLoading(false);
     });
   }, [source]);
@@ -285,6 +288,7 @@ const CallFunnelPanel: React.FC<CallFunnelPanelProps> = ({
 
   return (
     <div className="space-y-3">
+      {funnelFailed ? <LoadErrorNotice message="โหลดยอดการโทรไม่สำเร็จ" onRetry={load} /> : null}
       <PageHeroStrip
         eyebrow={`${title} · ${SOURCE_TABS.find((t) => t.id === source)?.label ?? ''}`}
         actions={

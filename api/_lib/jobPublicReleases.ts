@@ -57,9 +57,13 @@ export function requestNoOf(jobId: string): string {
 export function isReleased(
   keys: { ids: Set<string>; requestNos: Set<string> },
   jobId: string,
+  /** เลขที่ที่ชุดใบนี้มีมากกว่า 1 ใบ (`ambiguousRequestNos`) — เทียบด้วย id เต็มเท่านั้น (10 พ.ย. 2569) */
+  ambiguous?: ReadonlySet<string>,
 ): boolean {
   if (keys.ids.has(jobId)) return true;
-  return keys.requestNos.has(requestNoOf(jobId));
+  const no = requestNoOf(jobId);
+  if (ambiguous?.has(no)) return false;
+  return keys.requestNos.has(no);
 }
 
 /** ปล่อยใบขอ (กดซ้ำได้ — อัปเดตเวลา/คนกดล่าสุด) */

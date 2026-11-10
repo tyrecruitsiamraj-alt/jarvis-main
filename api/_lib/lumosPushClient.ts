@@ -32,6 +32,9 @@ import {
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
+/** เพดานเวลาต่อการยิงหนึ่งครั้ง — เกิน = ล้ม แล้วลองใหม่ตามรอบเดิม */
+export const LUMOS_FETCH_TIMEOUT_MS = 20_000;
+
 export type LumosPushConfig = {
   baseUrl: string;
   connectionId: string;
@@ -238,7 +241,16 @@ async function lumosFetch(
     }
 
     try {
-      const res = await fetch(url, { ...init, headers });
+      // เพดานเวลาต่อครั้ง (ตรวจทั้งระบบ 10 พ.ย. 2569 · รวมผล Codex) — เดิมไม่มี ปลายทางรับสายแต่ตอบช้า = คิวทั้งแถวรอตาม
+      // ส่งซ้ำหลังหมดเวลาใช้ idempotency key เดิม (ไม่เกิดแผนซ้ำ)
+      const ac = init.signal ? null : new AbortController();
+      const timer = ac ? setTimeout(() => ac.abort(new Error(`Lumos ไม่ตอบใน ${LUMOS_FETCH_TIMEOUT_MS / 1000} วิ`)), LUMOS_FETCH_TIMEOUT_MS) : null;
+      let res: Response;
+      try {
+        res = await fetch(url, { ...init, headers, ...(ac ? { signal: ac.signal } : {}) });
+      } finally {
+        if (timer) clearTimeout(timer);
+      }
       if (logCfg.level !== 'off') {
         try {
           // clone ก่อนอ่าน — ตัวจริงต้องเหลือให้ผู้เรียก .json() ต่อได้

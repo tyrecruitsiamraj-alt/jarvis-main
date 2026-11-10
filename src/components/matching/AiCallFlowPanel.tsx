@@ -21,6 +21,7 @@ import {
 import { aiCallFlowCells, type CallFlowCell } from '@/lib/aiCallFlowCells';
 import { RefreshCw, Bot, UserRound } from 'lucide-react';
 import { useUiV2 } from '@/lib/uiV2';
+import { LoadErrorNotice } from '@/components/shared/LoadErrorNotice';
 
 /**
  * แผง "AI โทร" หน้า Matching — 2 แถวสถานะเดียวกัน (AI · คนเก็บไปโทร) ในกรอบเดียว
@@ -151,10 +152,14 @@ export default function AiCallFlowPanel({
     [source],
   );
 
+  const [funnelFailed, setFunnelFailed] = useState(false);
   const load = useCallback(() => {
     setLoading(true);
     void fetchCallFunnel(undefined, source)
-      .then((d) => setFunnel(d.funnel))
+      .then((d) => {
+        setFunnel(d.funnel);
+        setFunnelFailed(d.failed === true);
+      })
       .finally(() => setLoading(false));
   }, [source]);
 
@@ -173,6 +178,7 @@ export default function AiCallFlowPanel({
 
   return (
     <div className="space-y-1.5" data-testid="ai-call-flow">
+      {funnelFailed ? <LoadErrorNotice message="โหลดยอดการโทรไม่สำเร็จ" onRetry={load} /> : null}
       <ChipRow cells={cells} side="ai" onOpenCell={openPeople} />
       {/* แถวคนเก็บไปโทร — ช่องเดียวกันเป๊ะ (template เดียวกัน) · ปุ่มต้นทางชิดขวาแถวนี้ (แถวสั้นกว่า) */}
       <div className="flex flex-wrap items-center justify-between gap-2">
