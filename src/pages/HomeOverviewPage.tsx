@@ -1049,7 +1049,8 @@ const HomeOverviewPage: React.FC<{
             tag="ต้องหา"
             // 9 พ.ย. 2569 ใบขอชั่วคราวอยู่ในเลขนี้แล้ว (สมุดใบขอ) — บอกว่ารวมกี่ใบ ไม่ใช่ "อีก"
             sub={flow ? `${NUM.format(flow.remaining)} อัตรา · รวมใบขอชั่วคราว ${NUM.format(preCount)} ใบ` : undefined}
-            onClick={flow ? () => openList('เหลือหา', flowRows((f) => f.open).sort((a, b) => perDayOf(b) - perDayOf(a))) : undefined}
+            // กด = กราฟเทียบ BU + แยก BU → รายใบ (เจ้าของ 10 พ.ย. 2569 "พอกดเข้าให้มันโชว์กราฟไง") — เดิมเปิดรายใบเลย
+            onClick={flow ? openRemaining : undefined}
             className="justify-center sm:col-span-2 lg:row-span-2"
             testId="overview-kpi-remain"
           />

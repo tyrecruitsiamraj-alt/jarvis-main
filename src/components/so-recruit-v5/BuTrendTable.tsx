@@ -4,10 +4,14 @@
  * Choice "ถ้าฉันกดดูแบบเดือน ก็จะเห็นทุกเดือนเลย พอกดเดือนไหนก็ค่อยให้เห็นเป็นวัน"
  * แท่งเทาสีเดียว ยาวเทียบช่องที่มากสุดทั้งตาราง (เทียบข้าม BU ได้) · เลขอยู่ทุกช่อง · แนวโน้ม = เดือนก่อนเทียบเดือนก่อนหน้า (เดือนที่จบแล้ว)
  * โหลดตอนเปิดแผงเท่านั้น · เปลี่ยนเดือน/BU = คำตอบเก่าที่มาช้าห้ามทับ
+ * กราฟเส้นบนสุด เส้นละ BU (เจ้าของ 10 พ.ย. 2569 "พอกดเข้าให้มันโชว์กราฟไง") — ชุดข้อมูลเดียวกับตาราง · กดจุดเดือน = รายวันของเดือนนั้น
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { CHART, chartDayLabel, DASH, TONE, type ToneKey } from '@/lib/designTokens';
+import { cn } from '@/lib/utils';
 import LoadErrorNotice from '@/components/shared/LoadErrorNotice';
 import { fetchHomeBuTrend } from '@/lib/homeMoneyApi';
 import type { BuTrendCell, BuTrendResponse } from '@/lib/homeBuTrend';
@@ -19,6 +23,8 @@ const MONTH = new Intl.DateTimeFormat('th-TH', { month: 'short', year: '2-digit'
 const monthLabel = (ym: string) => MONTH.format(new Date(`${ym}-01T00:00:00Z`));
 
 export type BuTrendMetric = 'money' | 'remaining';
+/** สีเส้นตามลำดับ BU — จากโทเค็นที่เดียว (เหมือนกราฟเส้นแท็บภาพรวม) */
+const LINE_TONES: ToneKey[] = ['info', 'success', 'warn', 'violet', 'danger', 'teal'];
 const valueOf = (c: BuTrendCell | undefined, m: BuTrendMetric) => (c ? (m === 'money' ? c.money : c.remainingRequests) : 0);
 
 export default function BuTrendTable({ metric, bu }: { metric: BuTrendMetric; bu: string | null }) {
@@ -71,6 +77,23 @@ export default function BuTrendTable({ metric, bu }: { metric: BuTrendMetric; bu
     return z > a ? `เพิ่มขึ้น ${NUM.format(z - a)}` : `ลดลง ${NUM.format(a - z)}`;
   };
   const unit = metric === 'money' ? 'บาท' : 'ใบ';
+  const buName = (b: string) => (b === 'ไม่ระบุ BU' ? b : trendBuLabel(b));
+  const lineData = useMemo(
+    () =>
+      (data?.points ?? []).map((p) => ({
+        key: p.key,
+        label: data?.granularity === 'month' ? monthLabel(p.key) : String(Number(p.key.slice(8))),
+        ...Object.fromEntries((data?.bus ?? []).map((b) => [b, valueOf(p.byBu[b], metric)])),
+      })),
+    [data, metric],
+  );
+  /** เดือนสุดท้าย = เดือนนี้ยังไม่จบ — กล่องตัวเลขบอก (เลขเงินเดือนนี้ยังน้อยกว่าเดือนเต็ม) */
+  // ตัดสินจากรูปคีย์ ไม่ใช่โหมดตอนนี้ — กล่องตัวเลขค้างจากโหมดรายวันตอนกดกลับรายเดือนเคยทำหน้าล่ม (Invalid time value)
+  const pointLabel = (k: string) => {
+    if (!/^\d{4}-\d{2}$/.test(k)) return chartDayLabel(k);
+    const last = data?.granularity === 'month' ? data.points[data.points.length - 1]?.key : null;
+    return k === last ? `${monthLabel(k)} (ยังไม่จบเดือน)` : monthLabel(k);
+  };
 
   return (
     <div className="space-y-2" data-testid={`bu-trend-${metric}`}>
@@ -89,6 +112,52 @@ export default function BuTrendTable({ metric, bu }: { metric: BuTrendMetric; bu
       ) : !data ? (
         <Skeleton className="h-40 w-full rounded-xl" />
       ) : (
+        <>
+        <div className={cn('h-56', DASH.sub)} data-testid={`bu-trend-chart-${metric}`}>
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart
+              data={lineData}
+              margin={{ top: 8, right: 12, bottom: 0, left: metric === 'money' ? 8 : -12 }}
+              className={data.granularity === 'month' ? 'cursor-pointer' : undefined}
+              onClick={(e: { activePayload?: Array<{ payload?: { key?: string } }> } | null) => {
+                const k = e?.activePayload?.[0]?.payload?.key;
+                if (data.granularity === 'month' && k) setMonth(k);
+              }}
+            >
+              <CartesianGrid strokeDasharray="3 3" stroke={CHART.gridStroke} strokeOpacity={CHART.gridOpacity} />
+              <XAxis dataKey="label" tick={{ fontSize: 11, fill: CHART.axisFill }} />
+              <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: CHART.axisFill }} tickFormatter={(v: number) => NUM.format(v)} />
+              <Tooltip
+                {...CHART.tooltip}
+                cursor={CHART.cursorLine}
+                labelFormatter={(_l, p) => pointLabel(String((p?.[0]?.payload as { key?: string } | undefined)?.key ?? ''))}
+                formatter={(value: number, name: string) => [`${NUM.format(Number(value))} ${unit}`, buName(name)]}
+              />
+              {data.bus.map((b, i) => (
+                <Line
+                  key={b}
+                  type="monotone"
+                  dataKey={b}
+                  name={b}
+                  stroke={TONE[LINE_TONES[i % LINE_TONES.length]].hex}
+                  strokeWidth={2}
+                  dot={{ r: 3 }}
+                  activeDot={CHART.activeDot}
+                  animationDuration={CHART.animationDuration}
+                />
+              ))}
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+        <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+          {data.bus.map((b, i) => (
+            <span key={b} className="inline-flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full" style={{ background: TONE[LINE_TONES[i % LINE_TONES.length]].hex }} aria-hidden />
+              {buName(b)}
+            </span>
+          ))}
+          {data.granularity === 'month' ? <span>· กดเดือนเพื่อดูรายวัน</span> : null}
+        </div>
         <div ref={scroller} className="max-w-full overflow-x-auto rounded-xl border border-border">
           <table className="w-full text-xs tabular-nums">
             <thead>
@@ -118,7 +187,7 @@ export default function BuTrendTable({ metric, bu }: { metric: BuTrendMetric; bu
               ) : null}
               {data.bus.map((b) => (
                 <tr key={b} className="border-b border-border last:border-b-0">
-                  <td className="sticky left-0 whitespace-nowrap bg-card px-2 py-2 text-foreground">{b === 'ไม่ระบุ BU' ? b : trendBuLabel(b)}</td>
+                  <td className="sticky left-0 whitespace-nowrap bg-card px-2 py-2 text-foreground">{buName(b)}</td>
                   {data.points.map((p) => {
                     const v = valueOf(p.byBu[b], metric);
                     return (
@@ -136,6 +205,7 @@ export default function BuTrendTable({ metric, bu }: { metric: BuTrendMetric; bu
             </tbody>
           </table>
         </div>
+        </>
       )}
     </div>
   );

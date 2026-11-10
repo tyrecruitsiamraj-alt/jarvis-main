@@ -121,3 +121,16 @@ describe('ลิงก์พกช่วงวันที่ไปหน้า�
     expect(drill).toContain('stageOf');
   });
 });
+
+describe('กดเหลือหา = กราฟ (เจ้าของ 10 พ.ย. 2569 "พอกดเข้าให้มันโชว์กราฟไง")', () => {
+  it('การ์ดใหญ่เหลือหาเปิดแผงกราฟ ไม่ใช่รายใบเลย · แผงมีกราฟเส้นเส้นละ BU กดเดือนดูรายวัน', () => {
+    const page = readFileSync('src/pages/HomeOverviewPage.tsx', 'utf8');
+    const hero = page.slice(page.indexOf('label="เหลือหา"'), page.indexOf('testId="overview-kpi-remain"'));
+    expect(hero).toContain('onClick={flow ? openRemaining : undefined}');
+    const chart = readFileSync('src/components/so-recruit-v5/BuTrendTable.tsx', 'utf8');
+    expect(chart).toContain('<LineChart');
+    expect(chart).toContain('if (data.granularity === \'month\' && k) setMonth(k);');
+    // กล่องตัวเลขค้างจากรายวันตอนกลับรายเดือน = เคยล่ม (Invalid time value)
+    expect(chart).toContain("if (!/^\\d{4}-\\d{2}$/.test(k)) return chartDayLabel(k);");
+  });
+});
