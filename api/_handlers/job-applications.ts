@@ -500,7 +500,10 @@ export function buildApplicationsListQuery(input: {
     const byJob = `job_id = any($${params.length}::text[])`;
     if (viewerDepartment) {
       params.push(viewerDepartment);
-      conds.push(`(${byJob} or department_code = any($${params.length}::text[]))`);
+      // ใบที่ดึงจาก iRecruit ที่หาเจ้าหน้าที่ดูแลไม่เจอ (ไม่มีแผนก · ไม่ผูกใบขอ) = คลังกลาง ทุกแผนกเห็น (เจ้าของ 10 พ.ย. 2569)
+      conds.push(
+        `(${byJob} or department_code = any($${params.length}::text[]) or (created_by_name = 'iRecruit' and job_id is null and nullif(btrim(department_code), '') is null))`,
+      );
     } else {
       conds.push(byJob);
     }

@@ -1,4 +1,5 @@
 import { randomBytes } from 'node:crypto';
+import { recordDailyLinkHit } from './postingLinkHits.js';
 
 import { dbQuery, isPgUniqueViolation } from './postgres.js';
 import { tableInAppSchema } from './schema.js';
@@ -568,6 +569,8 @@ export async function getPostingByLinkCode(
   if (opts.countHit !== false) void dbQuery(`UPDATE ${linksTable} SET hit_count = hit_count + 1 WHERE id = $1`, [link.id]).catch(
     () => undefined,
   );
+  // รายวันด้วย — ตาราง "กลุ่มไหนคนคลิกเยอะ" เลือกช่วงวันที่ได้ (เจ้าของ 10 พ.ย. 2569 · 175)
+  if (opts.countHit !== false) void recordDailyLinkHit(link.id);
   return { posting, link: mapLink(link) };
 }
 

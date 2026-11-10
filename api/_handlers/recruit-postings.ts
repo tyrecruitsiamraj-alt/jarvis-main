@@ -6,6 +6,7 @@ import {
   type AuthedReq,
 } from '../_lib/http.js';
 import { readJsonBody } from '../_lib/body.js';
+import { loadFbGroupStats } from '../_lib/postingLinkHits.js';
 import { loadUserDepartmentScope } from '../_lib/departmentScope.js';
 import { isSiamrajRequestInScope } from '../_lib/siamrajUnitRequests.js';
 import {
@@ -44,6 +45,10 @@ async function handler(req: AuthedReq, res: ApiRes) {
     const scopedCodes = scope.mode === 'code' ? scope.codes : null;
 
     if (method === 'GET') {
+      // กลุ่ม Facebook ยอดทั้งหมด: คลิก · กรอก — ป๊อปเลือกกลุ่ม Autopost/Gen link (เจ้าของ 10 พ.ย. 2569) · ยอดรวม ไม่มีชื่อคน
+      if (getQuery(req, 'group_stats') === '1') {
+        return res.status(200).json({ stats: await loadFbGroupStats() });
+      }
       const id = getQuery(req, 'id');
       if (id) {
         const posting = await getRecruitPosting(id);

@@ -1,5 +1,5 @@
 import React from 'react';
-import { AlertCircle, Megaphone, UserRound } from 'lucide-react';
+import { AlertCircle, Megaphone, MousePointerClick, UserRound } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
@@ -15,6 +15,8 @@ import { friendlyErrorText } from '@/lib/friendlyError';
 import { legacyReportsPath, requestPathOfJobId } from '@/lib/jobNavigation';
 import { OverviewCard, ReasonColumns, SectionError } from '../RecruitOverviewParts';
 import ChannelFunnelTable from '../ChannelFunnelTable';
+import FbGroupClicksTable from './FbGroupClicksTable';
+import { buildFbGroupClickRows } from '@/lib/fbGroupClicks';
 import StuckFilterBar from './StuckFilterBar';
 import StuckPhasesCard from './StuckPhasesCard';
 import StuckOwnerTable from './StuckOwnerTable';
@@ -118,6 +120,8 @@ export default function RecruitStuckBody({
   const narrowText = [scope !== 'remaining' ? `ใบ${STUCK_SCOPE_LABEL[scope]}` : null, focusLabel].filter(Boolean).join(' · ');
   const cohortSub = `รายชื่อที่กรอกในช่วงที่เลือก ${cohort.length.toLocaleString('th-TH')} คน${narrowText ? ` · เฉพาะ${narrowText}` : ''}`;
   const channels = React.useMemo(() => buildChannelFunnelTree(cohort), [cohort]);
+  // กลุ่ม Facebook คลิก → กรอก ยอดทั้งหมดตั้งแต่สร้างลิงก์ (เจ้าของ 10 พ.ย. 2569 Choice "แบบ 1") — ไม่ตามปฏิทิน/ตัวกรองย่อย
+  const fbGroups = React.useMemo(() => buildFbGroupClickRows(data.linkClicks), [data.linkClicks]);
   const bringers = React.useMemo(() => buildBringerFunnelTree(cohort), [cohort]);
   const reasons = React.useMemo(() => reasonGroups(cohort), [cohort]);
   const appRecruiters = React.useMemo(() => Object.values(data.appJobs ?? {}).map((j) => j.recruiter), [data.appJobs]);
@@ -266,6 +270,21 @@ export default function RecruitStuckBody({
       {/* 3 รายชื่อมาจากไหน ไปถึงไหน — ตารางเดิม 4 กลุ่ม → ช่องทาง → กลุ่ม/เพจ · ถึงแจ้งเข้า */}
       <OverviewCard icon={Megaphone} title="รายชื่อมาจากไหน ไปถึงไหน" sub={`${cohortSub}${data.errors.informs ? ' · อ่านแจ้งเข้า ERP ไม่ได้' : ''}`}>
         <ChannelFunnelTable groups={channels.groups} total={channels.total} onOpen={onOpenNames} />
+      </OverviewCard>
+
+      {/* กลุ่มไหนคนเข้ามาดูงานเยอะ (เจ้าของ 10 พ.ย. 2569) — ไว้เลือกกลุ่ม Autopost */}
+      <OverviewCard
+        icon={MousePointerClick}
+        title="กลุ่ม Facebook คนคลิกแล้วกรอกเท่าไหร่"
+        sub={
+          fbGroups
+            ? `ยอดทั้งหมดตั้งแต่สร้างลิงก์ (ไม่ตามช่วงวันที่) · คลิก ${fbGroups.totalClicks.toLocaleString('th-TH')} · กรอก ${fbGroups.totalApps.toLocaleString('th-TH')}`
+            : data.linkClicks === null
+              ? 'อ่านยอดคลิกไม่ได้ชั่วคราว'
+              : 'ยอดทั้งหมดตั้งแต่สร้างลิงก์'
+        }
+      >
+        <FbGroupClicksTable rows={fbGroups?.rows ?? []} onOpen={onOpenNames} />
       </OverviewCard>
 
       {/* ใครหารายชื่อเข้ามา (เจ้าของ 9 พ.ย. 2569 "ใครทำก็คนนั้นได้ จะได้วัดผลว่าใครมีรายชื่อเข้ามาเยอะ") — คน → วิธี → ช่องทาง/กลุ่ม */}

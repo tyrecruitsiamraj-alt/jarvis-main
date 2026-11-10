@@ -13,11 +13,16 @@ import {
   soGroupLabel,
   soGroupStatsText,
   soGroupUsable,
+  soGroupLinkKey,
   soGroupView,
   type SoOptAccount,
   type SoOptGroup,
 } from '@/lib/soScraping';
 import type { UnitSector } from '@/lib/unitSector';
+import { fbGroupStatOf, fetchFbGroupStats, type FbGroupStats } from '@/lib/recruitPostingsApi';
+
+/** "ลิงก์เรา ยอดทั้งหมด คลิก 766 · กรอก 167" — ตั้งแต่สร้างลิงก์ · บรรทัดของตัวเอง ไม่ปนกับสถิติ 30 วันของ So Scraping */
+const ourStatsText = (st: { clicks: number; apps: number }) => `ลิงก์เรา ยอดทั้งหมด คลิก ${NUM.format(st.clicks)} · กรอก ${NUM.format(st.apps)}`;
 
 const NUM = new Intl.NumberFormat('th-TH');
 
@@ -101,6 +106,15 @@ export function SoGroupFilterPicker({
   onToggle: (ids: string[], on: boolean) => void;
 }) {
   const usable = React.useMemo(() => groups.filter((g) => soGroupUsable(g, account)), [groups, account]);
+  // คลิก · กรอก จากลิงก์ของกลุ่ม ยอดทั้งหมด (เจ้าของ 10 พ.ย. 2569 "ต่อไปเวลาเลือกกลุ่ม Auto post ได้เลือกกลุ่มถูก")
+  const [ours, setOurs] = React.useState<FbGroupStats | null>(null);
+  React.useEffect(() => {
+    let alive = true;
+    void fetchFbGroupStats().then((s) => alive && setOurs(s));
+    return () => {
+      alive = false;
+    };
+  }, []);
   const [buPick, setBuPick] = React.useState<string | null | undefined>(undefined);
   const [sectorPick, setSectorPick] = React.useState<UnitSector | null | undefined>(undefined);
   const [province, setProvince] = React.useState('');
@@ -210,6 +224,12 @@ export function SoGroupFilterPicker({
                       .filter(Boolean)
                       .join(' · ')}
                   </p>
+                  {/* บรรทัดแยกจากสถิติ 30 วันของ So Scraping — ของเราเป็นยอดทั้งหมด (เจ้าของ 10 พ.ย. 2569 "แยกให้ชัดว่าลิงก์เราเป็นยอดทั้งหมด") */}
+                  {ours ? (
+                    <p className="text-xs tabular-nums text-foreground" data-testid={`${testPrefix}-group-clicks`}>
+                      {ourStatsText(fbGroupStatOf(ours, soGroupLinkKey(g), g.name))}
+                    </p>
+                  ) : null}
                 </div>
               </li>
             ))}

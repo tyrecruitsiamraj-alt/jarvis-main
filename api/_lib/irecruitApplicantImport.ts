@@ -174,6 +174,8 @@ export type IrecruitImportRun = {
   already: number;
   /** ใบเก่าที่เติมผู้รับผิดชอบรอบนี้ */
   responsibleFilled?: number;
+  /** ใบที่ติดแผนกตามเจ้าหน้าที่ที่ดูแลรอบนี้ (10 พ.ย. 2569) */
+  departmentFilled?: number;
   /** สถานะ iRecruit ที่อ่านกลับรอบนี้ (158) */
   statusSynced?: number;
 };
@@ -185,6 +187,12 @@ export async function runIrecruitImportOnce(): Promise<IrecruitImportRun> {
     out.responsibleFilled = await backfillIrecruitResponsible();
   } catch (e) {
     logError('irecruitImport.backfillResponsible failed', e);
+  }
+  // แผนกตามเจ้าหน้าที่ที่ดูแล (10 พ.ย. 2569) — ใบเก่า + ใบที่ดึงรอบก่อน · กลืน error
+  try {
+    out.departmentFilled = await fillIrecruitDepartments();
+  } catch (e) {
+    logError('irecruitImport.fillDepartments failed', e);
   }
   // สถานะใน iRecruit ของรายชื่อที่ดึงมาแล้ว 14 วันล่าสุด (21 ต.ค. 2569) — กลืน error ห้ามทำให้รอบดึงล้ม
   try {
@@ -255,8 +263,40 @@ export async function runIrecruitImportOnce(): Promise<IrecruitImportRun> {
       out.imported += 1;
     }
   });
+  // ใบที่เพิ่งดึงรอบนี้ ติดแผนกเลย ไม่ต้องรอรอบหน้า
+  try {
+    out.departmentFilled = (out.departmentFilled ?? 0) + (await fillIrecruitDepartments());
+  } catch (e) {
+    logError('irecruitImport.fillDepartments failed', e);
+  }
   logInfo('irecruitImport.run', out);
   return out;
+}
+
+/**
+ * ═══ ใบที่ดึงจาก iRecruit ติดแผนกตามเจ้าหน้าที่ที่ดูแล (เจ้าของ 10 พ.ย. 2569) ═══
+ * เจอจริง: คุณวรวิทย์ (Supervisor LBD) เห็นชิป iRecruit = 0 — ใบที่ดึงมาไม่มีแผนกและไม่ผูกใบขอ ⇒ คนที่ล็อกแผนกมองไม่เห็นเลย (625 ใบ / 30 วัน)
+ * Choice "ตามแผนกของเจ้าหน้าที่ที่ดูแล": `responsible_name` (ชื่อเล่น/ชื่อจริงของผู้ใช้ jarvis) → แผนกของผู้ใช้คนนั้น
+ * - จับได้เฉพาะชื่อที่ตรงผู้ใช้ที่ใช้งานอยู่และได้แผนกเดียว (ชื่อซ้ำคนละแผนก = ไม่เดา) · 'Administrator' ไม่นับ
+ * - เติมเฉพาะใบที่ยังไม่มีแผนก (ไม่ทับของเดิม) · หาไม่เจอ = ว่างไว้ → ทุกแผนกเห็น (`job-applications` ด่าน BU)
+ * วัด 10 พ.ย. 2569 (อ่านอย่างเดียว): จับได้ 785/799 ใบ — เจมส์·ว่าน = LBD · ใหม่·Kanyanat·ฟอร์ด·น้ำฝน = LBA
+ */
+export async function fillIrecruitDepartments(): Promise<number> {
+  const { rows } = await dbQuery<{ id: string }>(
+    `with staff as (
+       select lower(btrim(x.name)) as k, min(btrim(u.department_code)) as dept, count(distinct btrim(u.department_code)) as nd
+         from ${tableInAppSchema('users')} u cross join lateral (values (u.nickname), (u.full_name)) as x(name)
+        where coalesce(u.is_active, true) and nullif(btrim(x.name), '') is not null and nullif(btrim(u.department_code), '') is not null
+        group by 1)
+     update ${APPS} a set department_code = s.dept
+       from staff s
+      where a.created_by_name = '${IRECRUIT_IMPORT_CREATED_BY}' and a.job_id is null
+        and nullif(btrim(a.department_code), '') is null
+        and lower(btrim(a.responsible_name)) = s.k and s.nd = 1 and s.k <> 'administrator'
+      returning a.id::text as id`,
+  );
+  if (rows.length > 0) logInfo('irecruitImport.departmentFilled', { filled: rows.length });
+  return rows.length;
 }
 
 /** อีเมล (ตัวเล็ก) → ชื่อที่โชว์ของผู้ใช้ jarvis (ชื่อเล่น → ชื่อจริง) — กติกาเดียวกับ created_by_display */

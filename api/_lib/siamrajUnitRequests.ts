@@ -421,6 +421,8 @@ export async function getSiamrajUnitRequestById(
   }
 
   if (!item) return null;
+  // ใบขอชั่วคราวที่ ERP ยกเลิก/ทำเป็นใบจริงแล้ว = ปิด — กติกาเดียวกับใบจริง (`includeClosed` เท่านั้นที่เปิดเห็น · 10 พ.ย. 2569)
+  if ((item as { status?: string }).status === 'closed' && isPrequestId(String((item as { id?: string }).id ?? '')) && !options?.includeClosed) return null;
   if (departmentScope && !jobAllowedByDepartmentScope(item, departmentScope)) return null;
   return item;
 }
