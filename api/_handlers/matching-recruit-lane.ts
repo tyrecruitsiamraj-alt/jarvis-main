@@ -33,8 +33,14 @@ async function handler(req: AuthedReq, res: ApiRes) {
   const method = (req.method || 'GET').toUpperCase();
 
   try {
-    if (method !== 'GET') {
+    // 🔴 สั่ง AI โทร (send=1) ต้องเป็น POST เท่านั้น (ตรวจทั้งระบบ 10 พ.ย. 2569) — เดิม GET ก็สั่งได้
+    // แค่เปิดลิงก์ที่มีคนส่งมาก็โทรหาผู้สมัครจริง · บทบาทอ่านอย่างเดียวผ่านด่าน (ด่านกันแค่การเขียน)
+    if (method !== 'GET' && method !== 'POST') {
       return sendError(res, 405, 'Method not allowed', 'Read-only recruit-lane matching');
+    }
+    const wantsSend = getQuery(req, 'send') === '1';
+    if (wantsSend && method !== 'POST') {
+      return sendError(res, 405, 'Method not allowed', 'สั่งให้ AI โทรต้องกดปุ่มส่ง (POST)');
     }
     // ⚠️ ไม่บังคับ iRecruit config เหมือนเลนคัดสรร — เลนนี้มี 3 แหล่ง
     // iRecruit ล่ม/ไม่ได้ตั้งค่า ต้องยังค้นจากฐานใหม่ + Checklist ได้ (ธงบอกอยู่ใน sources[])
@@ -59,7 +65,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
     });
 
     const dispatch =
-      getQuery(req, 'send') === '1'
+      wantsSend
         ? await enqueueLumosInterviewForRecruitLane(job as Record<string, unknown>, result)
         : null;
 

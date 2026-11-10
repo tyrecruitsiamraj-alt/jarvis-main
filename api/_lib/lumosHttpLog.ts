@@ -67,6 +67,46 @@ export function redactSecrets(text: string, secrets: ReadonlyArray<string | unde
   return out;
 }
 
+/**
+ * 🔴 ปิดข้อมูลคนก่อนลง log (ตรวจทั้งระบบ 10 พ.ย. 2569 — เดิม log เต็มเก็บชื่อ/เบอร์/บทสนทนาของผู้สมัครไว้นอกระบบ)
+ * ยังเห็นโครงข้อความครบไว้ไล่ปัญหา: เบอร์เหลือ 4 ตัวท้าย · ชื่อเหลืออักษรแรก · บทสนทนา/สรุป/ที่อยู่ = บอกแค่ความยาว
+ */
+const NAME_KEYS = /^(name|full_?name|first_?name|last_?name|nick_?name|candidate_?name|recipient_?name|customer_?name|employee_?name|staff_?name|applicant_?name)$/i;
+// ⚠️ ไม่ปิด detail/message/error — เป็นข้อความผิดพลาดของ Lumos ที่ต้องใช้ไล่ปัญหา
+const TEXT_KEYS = /^(transcript|conversation|messages|summary|address|line_?id|id_?card|citizen_?id|answers?)$/i;
+
+const maskName = (v: string) => (v.trim() ? `${Array.from(v.trim())[0]}***` : v);
+/** เบอร์ไทย 9–10 หลัก (มี/ไม่มี +66 · มีขีด/เว้นวรรค) → เหลือ 4 ตัวท้าย */
+export function maskPhones(text: string): string {
+  return text.replace(/(?:\+?66|0)(?:[\s-]?\d){8,9}(?!\d)/g, (m) => {
+    const d = m.replace(/\D/g, '');
+    return `***${d.slice(-4)}`;
+  });
+}
+
+function maskValue(key: string, v: unknown): unknown {
+  if (typeof v === 'string') {
+    if (NAME_KEYS.test(key)) return maskName(v);
+    if (TEXT_KEYS.test(key)) return v ? `[ปิดไว้ ${v.length} ตัวอักษร]` : v;
+    return maskPhones(v);
+  }
+  if (Array.isArray(v)) return TEXT_KEYS.test(key) ? `[ปิดไว้ ${v.length} รายการ]` : v.map((x) => maskValue('', x));
+  if (v && typeof v === 'object') {
+    const out: Record<string, unknown> = {};
+    for (const [k, x] of Object.entries(v as Record<string, unknown>)) out[k] = maskValue(k, x);
+    return out;
+  }
+  return v;
+}
+
+export function maskPersonalData(text: string): string {
+  try {
+    return JSON.stringify(maskValue('', JSON.parse(text)));
+  } catch {
+    return maskPhones(text);
+  }
+}
+
 /** ตัดความยาวแล้วบอกตรง ๆ ว่าตัดไปเท่าไหร่ — ห้ามตัดเงียบจนคนอ่านเข้าใจว่านี่คือทั้งหมด */
 export function truncateForLog(text: string, maxChars: number): string {
   if (text.length <= maxChars) return text;

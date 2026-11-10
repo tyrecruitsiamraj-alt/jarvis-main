@@ -8,6 +8,7 @@ import {
   type JwtUserPayload,
 } from './auth.js';
 import { checkApiAccess, meetsMinimumRole, type ApiResource } from './rbac.js';
+import { liveUserOf } from './liveUser.js';
 
 export type ApiRes = {
   setHeader?: (name: string, value: string | string[]) => void;
@@ -96,6 +97,15 @@ export function withAuth<T extends ApiReq>(
     }
     try {
       const user = verifyAuthToken(token);
+      // บัญชีถูกปิด/ลบ = ออก · role เปลี่ยน = ใช้ role ใหม่ (ตรวจทั้งระบบ 10 พ.ย. 2569 · `liveUser.ts`)
+      // เทสต์ที่จำลองฐานเป็นลำดับไม่ต้องเจอคำถามนี้ — เปิดเองด้วย JARVIS_LIVE_USER_CHECK=1
+      if (!process.env.VITEST || process.env.JARVIS_LIVE_USER_CHECK === '1') {
+        const live = await liveUserOf(user.sub);
+        if (live === null || (live !== 'unknown' && !live.active)) {
+          return sendError(res, 401, 'Unauthorized', 'บัญชีนี้ถูกปิดแล้ว');
+        }
+        if (live !== 'unknown') user.role = live.role;
+      }
       if (allowed && allowed.length > 0 && !meetsRole(user.role, allowed)) {
         return sendError(res, 403, 'Forbidden', 'Insufficient role');
       }

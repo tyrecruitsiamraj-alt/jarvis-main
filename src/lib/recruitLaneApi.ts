@@ -70,7 +70,8 @@ export async function fetchRecruitLaneCandidates(
   const params = new URLSearchParams({ jobId });
   if (options?.send) params.set('send', '1');
   if (options?.refresh) params.set('refresh', '1');
-  const r = await apiFetch(`/api/matching/recruit-lane?${params.toString()}`);
+  // สั่ง AI โทร = POST (เซิร์ฟเวอร์ไม่รับ send ผ่าน GET แล้ว · 10 พ.ย. 2569)
+  const r = await apiFetch(`/api/matching/recruit-lane?${params.toString()}`, options?.send ? { method: 'POST' } : undefined);
   if (!r.ok) {
     const data = (await r.json().catch(() => ({}))) as {
       message?: string;
@@ -156,7 +157,7 @@ export async function fetchSelectionRecall(
   if (options?.send) params.set('send', '1');
   if (options?.refresh) params.set('refresh', '1');
   if (options?.refs && options.refs.length > 0) params.set('refs', options.refs.join(','));
-  const r = await apiFetch(`/api/matching/selection-recall?${params.toString()}`);
+  const r = await apiFetch(`/api/matching/selection-recall?${params.toString()}`, options?.send ? { method: 'POST' } : undefined);
   if (!r.ok) {
     const data = (await r.json().catch(() => ({}))) as {
       message?: string;

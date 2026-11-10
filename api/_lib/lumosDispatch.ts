@@ -275,8 +275,9 @@ export function buildApplicationInterviewPayload(
   const position =
     speechText(jobFacts?.positionTitle || applyFacts?.positionTitle || app.job_title || app.position_interest || '') ||
     'งานที่เปิดรับ';
-  // ใบสมัครไม่มีชื่อหน่วยงาน = ใช้ชื่อจุดทำงานจากใบขอ (เดิมพูดว่า "หน่วยงานของเรา")
-  const unit = (app.unit_name || '').trim() || (jobFacts?.unitName ?? '').trim() || 'หน่วยงานของเรา';
+  // 🔴 ชื่อจุดทำงานจากใบขอก่อน (ตรวจทั้งระบบ 10 พ.ย. 2569) — unit_name บนใบมาจากหน้าสาธารณะ ใครยิงตรงก็ใส่ข้อความเองได้
+  // แล้ว AI อ่านให้คนที่ถูกโทรฟัง · ใบขออ่านไม่ได้ค่อยใช้ของบนใบ · ไม่มีทั้งคู่ = "หน่วยงานของเรา"
+  const unit = speechText((jobFacts?.unitName ?? '').trim() || (app.unit_name || '').trim()) || 'หน่วยงานของเรา';
   return {
     client_candidate_id: `${app.job_id}::app-${app.id}`,
     client_interview_id: `${app.job_id}::app-${app.id}::interview`,

@@ -14310,3 +14310,12 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 - `api/_lib/postingLinkHits.ts` — `recordDailyLinkHit` (เรียกจาก `getPostingByLinkCode` เท่านั้น · รายวันเก็บไว้ใช้ทีหลัง) · `loadLinkClicks` (ภาพรวม ยอดทั้งหมด `hit_count` + id ใบสมัคร ตาม BU) · `loadFbGroupStats` (ป๊อปเลือกกลุ่ม byId/byName) · 🔴 จอใช้ยอดทั้งหมดตั้งแต่สร้างลิงก์ (เจ้าของ "คลิก 0 กรอก 8 ย้อนแย้งปะ" → Choice แบบ 1) ห้ามเอาคลิกรายวันไปเทียบกับกรอกตามช่วงที่เริ่มก่อน 10 พ.ย.
 - `src/lib/fbGroupClicks.ts` — แถวกลุ่ม คลิก · กรอก · กรอกต่อคลิก · ชื่อกลุ่ม = `funnelSubOf` ตัวเดียวกับตารางช่องทาง
 - `src/components/dashboard-trends/stuck/FbGroupClicksTable.tsx` — การ์ดในภาพรวมงานสรรหา · ป๊อปเลือกกลุ่ม (`SoGroupPicker`) ต่อท้าย "ลิงก์เรา คลิก · กรอก" ยอดทั้งหมด (`fbGroupStatOf`)
+
+### ตรวจทั้งระบบ 10 พ.ย. 2569 (Red Team · เจ้าของสั่งแก้)
+- `api/_lib/liveUser.ts` — ทุกคำขอเช็กบัญชีในฐาน (จำไว้ 1 นาที) จาก `withAuth` (`api/_lib/http.ts`): ปิด/ลบบัญชี = 401 · role ในฐานชนะ role ใน token · ฐานอ่านไม่ได้ = ใช้ token ต่อ · 🔴 ใต้ vitest ข้ามคำถามนี้ (เทสต์ที่จำลองฐานเป็นลำดับ) เปิดเองด้วย `JARVIS_LIVE_USER_CHECK=1` · เทสต์ `tests/api/security2569-11-10.test.ts`
+- `api/_lib/lumos-auth.ts` — รับ `LUMOS_API_KEY` + `LUMOS_API_KEY_NEXT` ช่วงสลับรหัส (deploy ส่งทั้งคู่ลง .env) · เทียบแบบเวลาคงที่ `sameSecret` · log `lumos.auth.key` บอกว่า Lumos ใช้ชุดไหน (เฉพาะตอนตั้ง NEXT)
+- `api/_lib/lumosHttpLog.ts` `maskPersonalData` — log ขาไป/กลับ Lumos: เบอร์เหลือ 4 ตัวท้าย · ชื่อเหลืออักษรแรก · บทสนทนา/สรุป/ที่อยู่ = ความยาว · ไม่ปิด detail/message/error (ใช้ไล่ปัญหา)
+- สั่ง AI โทรจากเลนสรรหา/คัดสรร (`send=1`) = POST เท่านั้น (`matching-recruit-lane.ts` · `matching-selection-recall.ts` · หน้าเว็บ `recruitLaneApi.ts`)
+- บทโทรใบสมัคร: ชื่อจุดทำงานจากใบขอก่อน `unit_name` บนใบ (`buildApplicationInterviewPayload`)
+- คำขอ PDPA ขอลบ/หยุดติดต่อจากหน้าสาธารณะ = หยุดโทรตอนกดยืนยันตัวตน (`pdpa-requests` PATCH verify) · ลงแทน = ทันที · `pdpaCallsStopped`
+- สมุดใบขอ: `endedFull` (ERP `is_inform_all` · ไม่ใช่ Stop/ยกเลิก) = ปิดครบ แม้คนเริ่มงานหลังวันปิดใบ (`requestFlowRole`) · เทสต์ `tests/api/ledgerInformAll2569-11-10.test.ts`

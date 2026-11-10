@@ -232,3 +232,33 @@ describe('lumosFetch — log ของจริง', () => {
     expect(find('lumos.http.response')[0].status).toBe(200);
   });
 });
+
+describe('ปิดข้อมูลคนใน log (ตรวจทั้งระบบ 10 พ.ย. 2569)', () => {
+  it('ชื่อเหลืออักษรแรก · เบอร์เหลือ 4 ตัวท้าย · บทสนทนา/สรุปบอกแค่ความยาว · โครงข้อความยังอยู่', async () => {
+    const { maskPersonalData } = await import('../../api/_lib/lumosHttpLog');
+    const out = JSON.parse(
+      maskPersonalData(
+        JSON.stringify({
+          plan_ref: 'follow-abc',
+          recipient_name: 'สมชาย ใจดี',
+          recipient_phone: '+66812345678',
+          contacts: [{ full_name: 'มานี', phone: '081-234-5678' }],
+          summary: 'ผู้สมัครบอกว่าจะไปวันจันทร์',
+          transcript: ['สวัสดีค่ะ', 'ครับ'],
+        }),
+      ),
+    );
+    expect(out).toEqual({
+      plan_ref: 'follow-abc',
+      recipient_name: 'ส***',
+      recipient_phone: '***5678',
+      contacts: [{ full_name: 'ม***', phone: '***5678' }],
+      summary: '[ปิดไว้ 27 ตัวอักษร]',
+      transcript: '[ปิดไว้ 2 รายการ]',
+    });
+  });
+  it('ไม่ใช่ JSON = ปิดเฉพาะเบอร์ · ตัวเลขอื่นไม่โดน', async () => {
+    const { maskPersonalData } = await import('../../api/_lib/lumosHttpLog');
+    expect(maskPersonalData('error for 0812345678 at row 12345')).toBe('error for ***5678 at row 12345');
+  });
+});

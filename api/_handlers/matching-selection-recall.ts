@@ -32,8 +32,14 @@ async function handler(req: AuthedReq, res: ApiRes) {
   const method = (req.method || 'GET').toUpperCase();
 
   try {
-    if (method !== 'GET') {
+    // 🔴 สั่ง AI โทร (send=1) ต้องเป็น POST เท่านั้น (ตรวจทั้งระบบ 10 พ.ย. 2569) — เดิม GET ก็สั่งได้
+    // แค่เปิดลิงก์ที่มีคนส่งมาก็โทรหาผู้สมัครจริง · บทบาทอ่านอย่างเดียวผ่านด่าน (ด่านกันแค่การเขียน)
+    if (method !== 'GET' && method !== 'POST') {
       return sendError(res, 405, 'Method not allowed', 'Read-only selection recall');
+    }
+    const wantsSend = getQuery(req, 'send') === '1';
+    if (wantsSend && method !== 'POST') {
+      return sendError(res, 405, 'Method not allowed', 'สั่งให้ AI โทรต้องกดปุ่มส่ง (POST)');
     }
     if (!(await isAiConfigured('selection_recall'))) {
       return sendError(res, 503, 'Service unavailable', AI_NOT_CONFIGURED_MESSAGE);
@@ -65,7 +71,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
       wanted.size > 0 ? { ...result, matches: result.matches.filter((m) => wanted.has(m.ref)) } : result;
 
     const dispatch =
-      getQuery(req, 'send') === '1'
+      wantsSend
         ? await enqueueLumosInterviewForRecall(job as Record<string, unknown>, toSend)
         : null;
 

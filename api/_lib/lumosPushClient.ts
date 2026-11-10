@@ -24,6 +24,7 @@ import {
   newRequestId,
   pickResponseHeaders,
   readLumosHttpLogConfig,
+  maskPersonalData,
   redactSecrets,
   safeHeadersForLog,
   truncateForLog,
@@ -209,9 +210,9 @@ async function lumosFetch(
   };
   const logCfg = readLumosHttpLogConfig(process.env);
   const method = (init.method ?? 'GET').toUpperCase();
-  /** ปิดบังคีย์ + connection id ทุกบรรทัดก่อนลง log */
+  /** ปิดบังคีย์ + connection id + ข้อมูลคน (ชื่อ/เบอร์/บทสนทนา) ทุกบรรทัดก่อนลง log */
   const clean = (text: string): string =>
-    truncateForLog(redactSecrets(text, [config.apiKey]), logCfg.maxChars);
+    truncateForLog(maskPersonalData(redactSecrets(text, [config.apiKey])), logCfg.maxChars);
 
   let lastErr: unknown;
   for (let attempt = 1; attempt <= FETCH_MAX_ATTEMPTS; attempt++) {
