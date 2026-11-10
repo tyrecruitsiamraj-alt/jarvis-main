@@ -167,7 +167,8 @@ export default function BuTrendTable({ metric, bu }: { metric: BuTrendMetric; bu
           ))}
           {data.granularity === 'month' ? <span>· กดเดือนเพื่อดูรายวัน</span> : null}
         </div>
-        <div ref={scroller} className="max-w-full overflow-x-auto rounded-xl border border-border">
+        {/* มือถือเหลือแค่กราฟ (เจ้าของ 10 พ.ย. 2569 "ซ่อนตารางบนมือถือ") — จอแคบเห็นแค่ 2 เดือน · ตัวเลขรายเดือนกดจุดบนกราฟดูได้ */}
+        <div ref={scroller} className="hidden max-w-full overflow-x-auto rounded-xl border border-border sm:block" data-testid={`bu-trend-table-${metric}`}>
           <table className="w-full text-xs tabular-nums">
             <thead>
               <tr className="border-b border-border text-muted-foreground">

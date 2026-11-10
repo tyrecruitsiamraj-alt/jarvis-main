@@ -133,6 +133,10 @@ describe('กดเหลือหา = กราฟ (เจ้าของ 10 �
     // กล่องตัวเลขค้างจากรายวันตอนกลับรายเดือน = เคยล่ม (Invalid time value)
     expect(chart).toContain("if (!/^\\d{4}-\\d{2}$/.test(k)) return chartDayLabel(k);");
   });
+  it('มือถือซ่อนตารางใต้กราฟ เหลือแค่กราฟ · จอ sm ขึ้นไปยังมีตาราง (เจ้าของ 10 พ.ย. 2569 "ซ่อนตารางบนมือถือ")', () => {
+    const chart = readFileSync('src/components/so-recruit-v5/BuTrendTable.tsx', 'utf8');
+    expect(chart).toContain('className="hidden max-w-full overflow-x-auto rounded-xl border border-border sm:block"');
+  });
 });
 
 describe('กราฟแผงผู้สมัคร/ติดตาม (เจ้าของ 10 พ.ย. 2569 Choice "กดแล้วเป็นกราฟทุกการ์ด")', () => {
