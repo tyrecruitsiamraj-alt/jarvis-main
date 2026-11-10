@@ -119,7 +119,8 @@ export async function createPdpaRequest(
     [input.kind, input.fullName, e164, input.detail, meta.source, meta.byName, meta.clientIp],
   );
   const row = rows[0];
-  const stopped = pdpaStopsCalls(input.kind) ? await stopCallsForPhone(e164, row.id, meta.byName ?? 'คำขอ PDPA') : null;
+  // ยื่นเองจากหน้าสาธารณะไม่หยุดโทรทันที — ใครก็ใส่เบอร์คนอื่นได้ · หยุดตอนเจ้าหน้าที่ยืนยันตัวตน (pdpa-requests PATCH verify)
+  const stopped = pdpaStopsCalls(input.kind) && meta.source !== 'public' ? await stopCallsForPhone(e164, row.id, meta.byName ?? 'คำขอ PDPA') : null;
   return { row, stopped };
 }
 

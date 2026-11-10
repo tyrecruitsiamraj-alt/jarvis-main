@@ -59,6 +59,11 @@ export type PenaltyRequestRow = {
   /** ติ๊ก "ต้องส่งคนแทน" ที่หน้าใบขอ — true = ไม่คิดค่าปรับ/ลดมูลค่าทั้งใบ (`penaltyWaivedByReplacement` · 28 ต.ค. 2569) */
   sendReplacement?: boolean | null;
   /**
+   * ERP ติ๊ก "แจ้งเข้าครบ" (`is_inform_all`) แล้วใบจบด้วยเหตุนั้น — นับเป็นปิดครบ ทุกอัตราที่หายไปเป็นหาได้
+   * แม้คนสุดท้ายเริ่มงานหลังวันปิดใบ (ตรวจ 10 พ.ย. 2569: 63/185 ใบตั้งแต่ 1 ก.ย. เคยถูกนับเป็นยกเลิก)
+   */
+  endedFull?: boolean;
+  /**
    * ใบขอชั่วคราว (ใบขอล่วงหน้า `st_prequest_*`) — เจ้าของ 9 พ.ย. 2569 "ทุกหน้านับใบขอชั่วคราวหมด" · "ปิดแล้วก็นับไปที่ปิดแล้ว"
    * จบ (ERP ปิดใบ) = **ปิดแล้ว** ในหน่วยใบ · ไม่มีประวัติแจ้งเข้า ⇒ หน่วยคนเป็นยกเลิก (ห้ามนับเป็นหาได้)
    * `requestNo` = `PREQUEST_LEDGER_PREFIX` + เลขที่ใบ (เลขซ้ำใบจริงได้ — ห้ามใช้เลขเปล่า)
@@ -316,7 +321,8 @@ export function requestFlowRole(r: LedgerRequest, from: string, to: string): Req
   if (!keyedIn && b === 0 && !endedIn) return none;
   const newQ = keyedIn ? r.qty : 0;
   const startFill = keyedIn ? 0 : filledBy(r.starts, before);
-  const endFill = endedIn ? filledBy(r.starts, r.endYmd as string) : filledBy(r.starts, to);
+  // ใบที่ ERP ปิดเพราะแจ้งเข้าครบ = ได้ครบทุกอัตรา ณ วันปิด แม้วันเริ่มงานยังไม่ถึง (ไม่ใช่ยกเลิก)
+  const endFill = endedIn ? (r.endedFull ? r.qty : filledBy(r.starts, r.endYmd as string)) : filledBy(r.starts, to);
   // ส่วนที่หายไปจากใบนี้ในช่วง = หาได้ + ยกเลิก — แบ่งด้วยคนที่เริ่มงานจริง ที่เหลือคือยกเลิก (ข้อมูลเพี้ยนก็ยังลงตัว)
   const gone = Math.max(0, b + newQ - a);
   const fill = Math.min(gone, Math.max(0, Math.min(r.qty, endFill) - startFill));
@@ -326,7 +332,7 @@ export function requestFlowRole(r: LedgerRequest, from: string, to: string): Req
   if ((b > 0 || keyedIn) && a === 0) {
     const full = r.starts.find(([, cum]) => cum >= r.qty);
     // ใบขอชั่วคราวที่ ERP ปิด = ปิดแล้ว (เจ้าของ 9 พ.ย. 2569) · ใบจริง = ครบคนถึงเป็นปิดแล้ว ไม่ครบ = ยกเลิก
-    if (r.prequest || (full && full[0] <= to && (r.endYmd == null || full[0] <= r.endYmd))) closed = true;
+    if (r.prequest || (r.endedFull && endedIn) || (full && full[0] <= to && (r.endYmd == null || full[0] <= r.endYmd))) closed = true;
     else cancelledReq = true;
   }
   return {

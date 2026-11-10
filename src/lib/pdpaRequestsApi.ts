@@ -73,14 +73,14 @@ export async function patchPdpaRequest(
   id: string,
   action: 'verify' | 'close' | 'reject' | 'erase',
   note: string | null = null,
-): Promise<{ item: PdpaRequestItem; erased: Record<string, number> | null }> {
+): Promise<{ item: PdpaRequestItem; erased: Record<string, number> | null; stopped?: { queue: number; follow: number } | null }> {
   const r = await apiFetch('/api/pdpa-requests', {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ id, action, note }),
   });
   if (!r.ok) throw new Error(await readError(r));
-  return (await r.json()) as { item: PdpaRequestItem; erased: Record<string, number> | null };
+  return (await r.json()) as { item: PdpaRequestItem; erased: Record<string, number> | null; stopped?: { queue: number; follow: number } | null };
 }
 
 /** ผู้สมัครยื่นเอง — ไม่ต้องล็อกอิน */

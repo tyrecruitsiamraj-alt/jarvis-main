@@ -75,6 +75,7 @@ type ReqSqlRow = {
   eff_informed: number | null;
   is_replace: string | null;
   replace_window: string | null;
+  ended_full: number | null;
 };
 type InformSqlRow = { request_no: string; start_ymd: string | null; record_ymd: string | null; qty: number | null };
 type FineSqlRow = { ymd: string; site_code: string; amount: number; receipts: number };
@@ -121,6 +122,12 @@ export async function loadPenaltyLedgerRaw(scope: DepartmentScope): Promise<Pena
                 WHEN ISNULL(A.is_inform_all, 'N') = 'Y' THEN CONVERT(varchar(10), A.update_date, 120)
                 ELSE NULL
               END AS end_ymd,
+              -- ใบจบเพราะแจ้งเข้าครบ (ไม่ใช่ Stop/ยกเลิก) — นับปิดครบ แม้คนเริ่มงานหลังวันปิดใบ (ตรวจ 10 พ.ย. 2569)
+              CASE
+                WHEN A.status <> 'A' OR ISNULL(A.is_stop, 'N') = 'Y' OR ISNULL(RTRIM(A.stop_no), '') <> '' THEN 0
+                WHEN ISNULL(A.is_inform_all, 'N') = 'Y' THEN 1
+                ELSE 0
+              END AS ended_full,
               -- เหตุผลที่หยุดใบ (st_ms_stop_by) — กดกล่องยกเลิกแล้วแยกเหตุผล (เจ้าของ 25 ต.ค. 2569)
               (SELECT TOP 1 RTRIM(z.stop_by_name) FROM st_ms_stop_by z WHERE z.stop_by_code = A.stop_code) AS stop_reason,
               B.work_date,
@@ -205,6 +212,7 @@ export async function loadPenaltyLedgerRaw(scope: DepartmentScope): Promise<Pena
       replaceAccepted: r.is_replace === 'Y' ? true : r.is_replace === 'N' ? false : null,
       replaceWindow: r.replace_window,
       informedCap: r.eff_informed == null ? null : Number(r.eff_informed) || 0,
+      endedFull: Number(r.ended_full) === 1,
     });
   }
   for (const r of preRows) {

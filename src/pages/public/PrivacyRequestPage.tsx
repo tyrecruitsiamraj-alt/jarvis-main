@@ -11,7 +11,7 @@ const PDPA_CONTACT_PHONE = '082-7530-062';
 /**
  * ═══ /privacy-request — ผู้สมัครขอดู / แก้ / ลบข้อมูลของตัวเอง (เจ้าของเลือกทำ 18 ต.ค. 2569) ═══
  * ลิงก์อยู่ในข้อตกลง PDPA บนฟอร์มสมัคร · ส่งแล้วเจ้าหน้าที่โทรกลับยืนยันตัวตน (Choice 17 ต.ค. 2569)
- * ขอลบ / ขอให้หยุดติดต่อ = ระบบหยุดโทรทันที
+ * ขอลบ / ขอให้หยุดติดต่อ = ระบบหยุดโทรเมื่อเจ้าหน้าที่ยืนยันตัวตน (10 พ.ย. 2569 · เดิมหยุดทันที ใครก็ใส่เบอร์คนอื่นได้)
  */
 export default function PrivacyRequestPage() {
   const [busy, setBusy] = useState(false);
@@ -42,7 +42,7 @@ export default function PrivacyRequestPage() {
           <div className="space-y-2 text-sm text-foreground" data-testid="privacy-request-sent">
             <p className="text-base font-medium">ได้รับคำขอแล้ว</p>
             <p>เจ้าหน้าที่จะโทรกลับเบอร์ {sent.phone} เพื่อยืนยันว่าเป็นเจ้าของข้อมูล ภายใน 30 วัน</p>
-            {pdpaStopsCalls(sent.kind) ? <p>ระบบหยุดโทรหาเบอร์นี้แล้ว</p> : null}
+            {pdpaStopsCalls(sent.kind) ? <p>ยืนยันตัวตนแล้ว ระบบจะหยุดโทรหาเบอร์นี้</p> : null}
             <p className="text-muted-foreground">สอบถามเพิ่มเติม โทร {PDPA_CONTACT_PHONE}</p>
           </div>
         ) : (

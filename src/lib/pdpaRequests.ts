@@ -2,7 +2,8 @@
  * ═══ คำขอใช้สิทธิ์ข้อมูลส่วนบุคคล (PDPA) — ตรรกะล้วน ที่เดียวของทั้งระบบ (เจ้าของเลือกทำ 18 ต.ค. 2569) ═══
  * สิทธิ์ 4 ข้อตามข้อตกลงของบริษัท (`PDPA_POLICY` หัวข้อ 4) · ตาราง `app_pdpa_requests` (migration 152)
  * ขั้นตอนตาม Choice 17 ต.ค. 2569:
- *   1. ยื่นคำขอ (ฟอร์มสาธารณะ /privacy-request หรือเจ้าหน้าที่ลงแทน) — ขอลบ/คัดค้าน = หยุดโทรทันที
+ *   1. ยื่นคำขอ (ฟอร์มสาธารณะ /privacy-request หรือเจ้าหน้าที่ลงแทน) — ขอลบ/คัดค้าน: เจ้าหน้าที่ลงแทน = หยุดโทรทันที ·
+ *      ยื่นเองจากหน้าสาธารณะ = หยุดโทรเมื่อกดยืนยันตัวตน (ตรวจทั้งระบบ 10 พ.ย. 2569: เดิมใครก็ใส่เบอร์คนอื่นให้หยุดโทรได้ไม่ต้องล็อกอิน)
  *   2. เจ้าหน้าที่โทรกลับเบอร์ที่สมัคร คุยกับเจ้าตัวแล้วกด "ยืนยันตัวตนแล้ว"
  *   3. ทำตามคำขอ: ขอดู = เปิดดู/คัดลอกข้อมูลส่งให้ · ขอลบ = ล้างชื่อ/เบอร์/ที่อยู่ · ขอแก้/คัดค้าน = ปิดคำขอพร้อมบันทึก
  * ทุกคำขอมีกำหนด 30 วันนับจากวันยื่น
@@ -30,9 +31,16 @@ export const PDPA_REQUEST_STATUS_LABEL: Record<PdpaRequestStatus, string> = {
 
 export type PdpaRequestSource = 'public' | 'staff';
 
-/** คำขอแบบนี้ต้องหยุดโทรทันทีที่ได้รับ (ก่อนยืนยันตัวตน) */
+/** คำขอแบบนี้ต้องหยุดโทร — เจ้าหน้าที่ลงแทน = ทันที · ยื่นเองจากหน้าสาธารณะ = ตอนยืนยันตัวตน (`pdpaCallsStopped`) */
 export function pdpaStopsCalls(kind: PdpaRequestKind): boolean {
   return kind === 'delete' || kind === 'object';
+}
+
+/** คำขอนี้หยุดโทรไปแล้วหรือยัง — ยื่นเองที่ยังไม่ยืนยันตัวตน/ไม่ดำเนินการ = ยังโทรตามปกติ */
+export function pdpaCallsStopped(r: { kind: PdpaRequestKind; source: PdpaRequestSource; status: PdpaRequestStatus }): boolean {
+  if (!pdpaStopsCalls(r.kind)) return false;
+  if (r.source !== 'public') return true;
+  return r.status === 'verified' || r.status === 'done';
 }
 
 export function isPdpaRequestKind(v: unknown): v is PdpaRequestKind {

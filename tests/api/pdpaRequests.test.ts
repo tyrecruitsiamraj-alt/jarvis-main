@@ -7,6 +7,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   pdpaActions,
+  pdpaCallsStopped,
   pdpaDaysLeft,
   pdpaDueText,
   pdpaStopsCalls,
@@ -35,7 +36,12 @@ describe('validatePdpaRequest — ตัวเดียวทั้งหน้�
 });
 
 describe('ขั้นตอนตามสถานะ', () => {
-  it('ขอลบ/คัดค้าน หยุดโทรทันที · ขอดู/ขอแก้ ไม่หยุด', () => {
+  it('ขอลบ/คัดค้าน = หยุดโทร · ขอดู/ขอแก้ ไม่หยุด · ยื่นเองหยุดเมื่อยืนยันตัวตน', () => {
+    expect(pdpaCallsStopped({ kind: 'delete', source: 'staff', status: 'received' })).toBe(true);
+    expect(pdpaCallsStopped({ kind: 'delete', source: 'public', status: 'received' })).toBe(false);
+    expect(pdpaCallsStopped({ kind: 'object', source: 'public', status: 'verified' })).toBe(true);
+    expect(pdpaCallsStopped({ kind: 'object', source: 'public', status: 'rejected' })).toBe(false);
+    expect(pdpaCallsStopped({ kind: 'access', source: 'staff', status: 'verified' })).toBe(false);
     expect(pdpaStopsCalls('delete')).toBe(true);
     expect(pdpaStopsCalls('object')).toBe(true);
     expect(pdpaStopsCalls('access')).toBe(false);
@@ -70,6 +76,13 @@ describe('เซิร์ฟเวอร์', () => {
   });
   it('ไม่แตะคอลัมน์ที่ฐานคำนวณเอง (phone_e164 ของใบสมัคร)', () => {
     expect(lib).not.toMatch(/phone_e164 = null/);
+  });
+  it('🔴 ยื่นเองจากหน้าสาธารณะไม่หยุดโทรทันที (ใครก็ใส่เบอร์คนอื่นได้) — หยุดตอนเจ้าหน้าที่กดยืนยันตัวตน · ลงแทนยังหยุดทันที (ตรวจ 10 พ.ย. 2569)', () => {
+    expect(lib).toContain("pdpaStopsCalls(input.kind) && meta.source !== 'public' ? await stopCallsForPhone(");
+    const h = read('api/_handlers/pdpa-requests.ts');
+    expect(h).toContain("if (action === 'verify' && updated && row.source === 'public' && pdpaStopsCalls(row.kind)) {");
+    expect(h).toContain('stopped = await stopCallsForPhone(row.phone_e164, id, byName);');
+    expect(read('src/pages/public/PrivacyRequestPage.tsx')).not.toContain('ระบบหยุดโทรหาเบอร์นี้แล้ว');
   });
   it('หน้าสาธารณะไม่บอกว่าเบอร์นี้มีข้อมูลในระบบไหม · จำกัด 3 ครั้ง/10 นาที', () => {
     const pub = read('api/_handlers/public/privacy-request.ts');

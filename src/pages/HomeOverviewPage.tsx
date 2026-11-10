@@ -209,7 +209,9 @@ const HomeOverviewPage: React.FC<{
   const flowRows = (pick: (f: NonNullable<MoneyRequest['flow']>) => boolean) => openReqs.filter((r) => r.flow && pick(r.flow));
 
   // ── ผู้สมัคร ──
-  const roNow = ro && ro.window.from === range.from && ro.window.to === range.to && ro.bu === bu ? ro : null;
+  // ผู้ใช้ BU เดียว: หน้าส่ง bu=null แต่เซิร์ฟเวอร์ตอบ BU ที่ล็อกไว้ (ไม่มีตัวเลือก) — เดิมเทียบ bu ตรง ๆ แล้วผู้สมัครค้าง "กำลังโหลด" ตลอด (ตรวจ 10 พ.ย. 2569)
+  const roBuOk = (r: NonNullable<typeof ro>) => r.bu === bu || (bu === null && r.bu != null && !r.buChoices?.length);
+  const roNow = ro && ro.window.from === range.from && ro.window.to === range.to && roBuOk(ro) ? ro : null;
   const apps = useMemo(() => (roNow?.apps ? appsInWindow(roNow.apps, range.from, range.to) : null), [roNow, range]);
   const funnel = useMemo(() => (apps ? buildApplicantFunnel(apps) : null), [apps]);
   const backlog = roNow?.backlog ?? null;

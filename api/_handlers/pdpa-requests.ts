@@ -5,6 +5,7 @@
  * GET ?id=&data=1  → ข้อมูลทั้งหมดของเบอร์นี้ (คำขอต้องยืนยันตัวตนแล้วเท่านั้น)
  * POST             → เจ้าหน้าที่ลงคำขอแทน `{ kind, fullName, phone, detail }` (ขอลบ/คัดค้าน = หยุดโทรทันที)
  * PATCH            → `{ id, action: 'verify' | 'close' | 'reject' | 'erase', note }`
+ *                    verify คำขอลบ/คัดค้านที่ยื่นเอง = หยุดโทรตอนนี้ (หน้าสาธารณะไม่หยุดทันที · 10 พ.ย. 2569)
  * สิทธิ์: admin (หน้าตั้งค่า) — ลบข้อมูลย้อนไม่ได้
  */
 import { withRbac, sendError, handleApiError, type ApiRes, type AuthedReq } from '../_lib/http.js';
@@ -17,8 +18,10 @@ import {
   getPdpaRequest,
   listPdpaRequests,
   setPdpaRequestStatus,
+  stopCallsForPhone,
+  type PdpaRequestRow,
 } from '../_lib/pdpaRequests.js';
-import { pdpaActions, validatePdpaRequest } from '../../src/lib/pdpaRequests.js';
+import { pdpaActions, pdpaStopsCalls, validatePdpaRequest } from '../../src/lib/pdpaRequests.js';
 
 const UUID_RE = /^[0-9a-f-]{36}$/i;
 
@@ -69,9 +72,13 @@ async function handler(req: AuthedReq, res: ApiRes) {
       if (!allowed.includes(action)) return sendError(res, 409, 'Conflict', 'คำขอนี้ทำแบบนี้ไม่ได้แล้ว โหลดใหม่แล้วลองอีกครั้ง');
       if (action === 'reject' && !note) return sendError(res, 400, 'Bad request', 'บอกเหตุผลที่ไม่ดำเนินการ');
 
-      let updated = null;
+      let updated: PdpaRequestRow | null = null;
       let erased: Record<string, number> | null = null;
+      let stopped: { queue: number; follow: number } | null = null;
       if (action === 'verify') updated = await setPdpaRequestStatus(id, ['received'], 'verified', byName, null);
+      if (action === 'verify' && updated && row.source === 'public' && pdpaStopsCalls(row.kind)) {
+        stopped = await stopCallsForPhone(row.phone_e164, id, byName);
+      }
       if (action === 'close') updated = await setPdpaRequestStatus(id, ['verified'], 'done', byName, note);
       if (action === 'reject') updated = await setPdpaRequestStatus(id, ['received', 'verified'], 'rejected', byName, note);
       if (action === 'erase') {
@@ -84,9 +91,9 @@ async function handler(req: AuthedReq, res: ApiRes) {
         entityType: 'pdpa_request',
         entityId: id,
         before: { status: row.status },
-        after: { status: updated.status, erased },
+        after: { status: updated.status, erased, stopped },
       });
-      return res.status(200).json({ item: updated, erased });
+      return res.status(200).json({ item: updated, erased, stopped });
     }
 
     return sendError(res, 405, 'Method not allowed', 'GET / POST / PATCH เท่านั้น');

@@ -33,7 +33,8 @@ describe('หน้าหลัก', () => {
     expect(page).not.toContain('ใบขอชั่วคราวอีก');
     expect(page).not.toContain('ล่วงหน้าอีก');
     expect(page).toContain('(trendBuFromSiteCode(j.site_code) ?? normalizeTrendBu(j.department_code)) === bu');
-    expect(page).toContain('ro.bu === bu');
+    // ผู้ใช้ BU เดียวรับ BU ที่ล็อกไว้ด้วย (10 พ.ย. 2569) — เปลี่ยน BU แล้วเลขเก่ายังไม่โผล่
+    expect(page).toContain('r.bu === bu || (bu === null && r.bu != null && !r.buChoices?.length)');
   });
   it('เส้นข้อมูลหน้าหลักทั้ง 3 ใช้ตัวเลือก BU ตัวเดียวกัน', () => {
     for (const f of ['api/_handlers/home-money.ts', 'api/_handlers/home-ai-share.ts', 'api/_handlers/recruit-overview.ts']) {

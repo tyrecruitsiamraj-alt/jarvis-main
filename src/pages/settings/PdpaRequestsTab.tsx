@@ -33,6 +33,7 @@ import {
   PDPA_REQUEST_KIND_LABEL,
   PDPA_REQUEST_STATUS_LABEL,
   pdpaActions,
+  pdpaCallsStopped,
   pdpaDaysLeft,
   pdpaDueText,
   pdpaStopsCalls,
@@ -154,7 +155,15 @@ const PdpaRequestsTab: React.FC = () => {
       if (action === 'erase' && res.erased) {
         toast.success(`ลบแล้ว · ใบสมัคร ${res.erased.applications ?? 0} · สายติดตาม ${res.erased.follows ?? 0} · สาย AI ${res.erased.calls ?? 0}`);
       } else {
-        toast.success(action === 'verify' ? 'ยืนยันตัวตนแล้ว' : action === 'close' ? 'ปิดคำขอแล้ว' : 'บันทึกแล้ว');
+        toast.success(
+          action === 'verify' && res.stopped
+            ? `ยืนยันตัวตนแล้ว หยุดโทรเบอร์นี้แล้ว (ยกเลิกสาย AI ${res.stopped.queue} สายติดตาม ${res.stopped.follow})`
+            : action === 'verify'
+              ? 'ยืนยันตัวตนแล้ว'
+              : action === 'close'
+                ? 'ปิดคำขอแล้ว'
+                : 'บันทึกแล้ว',
+        );
       }
       setPending(null);
       load();
@@ -237,7 +246,9 @@ const PdpaRequestsTab: React.FC = () => {
                     </TableCell>
                     <TableCell className="min-w-36 text-sm">
                       <span className="whitespace-nowrap">{PDPA_REQUEST_KIND_LABEL[r.kind]}</span>
-                      {pdpaStopsCalls(r.kind) ? <span className="block text-xs text-muted-foreground">หยุดโทรแล้ว</span> : null}
+                      {pdpaStopsCalls(r.kind) ? (
+                        <span className="block text-xs text-muted-foreground">{pdpaCallsStopped(r) ? 'หยุดโทรแล้ว' : 'ยังโทรอยู่ หยุดเมื่อยืนยันตัวตน'}</span>
+                      ) : null}
                       {r.detail ? <span className="block max-w-56 whitespace-pre-wrap break-words text-xs text-muted-foreground">{r.detail}</span> : null}
                     </TableCell>
                     <TableCell className="min-w-32 text-xs tabular-nums">
