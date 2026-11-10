@@ -48,6 +48,11 @@ export const FUNNEL_COLUMNS: ReadonlyArray<{ key: FunnelCellKey; label: string }
 
 const idsOf = (list: readonly RecruitAppFact[]) => list.map((f) => f.id).filter((v): v is string => Boolean(v));
 
+/** แถวเส้นทางของรายชื่อชุดหนึ่ง — ตัวเดียวกับตารางช่องทาง (ส่งออกให้ตารางกลุ่ม Facebook ใช้ · 10 พ.ย. 2569) */
+export function funnelRowOf(channel: string, list: readonly RecruitAppFact[]): ChannelFunnelRow {
+  return rowOf(channel, list);
+}
+
 function rowOf(channel: string, list: readonly RecruitAppFact[]): ChannelFunnelRow {
   const steps = buildRecruitJourney(list);
   const partOf = (step: string, key: string): FunnelCell => {

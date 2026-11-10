@@ -238,3 +238,16 @@ export async function fetchPublicPostingByCode(code: string): Promise<PublicPost
   if (!r.ok) throw new Error(await readErrorMessage(r, 'เปิดลิงก์ไม่สำเร็จ'));
   return (await readJsonSafe<PublicPostingInfo>(r)) as PublicPostingInfo;
 }
+
+/**
+ * กลุ่ม Facebook 30 วัน: คลิก · กรอก ต่อกลุ่ม (คีย์ = `soGroupLinkKey`) — ป๊อปเลือกกลุ่ม (เจ้าของ 10 พ.ย. 2569)
+ * โหลดครั้งเดียวต่อหน้า · null = นับไม่ได้ (ไม่ขึ้นเลข ไม่ขึ้น 0)
+ */
+export type FbGroupStats = Record<string, { clicks: number; apps: number }>;
+let fbGroupStatsOnce: Promise<FbGroupStats | null> | null = null;
+export function fetchFbGroupStats(): Promise<FbGroupStats | null> {
+  fbGroupStatsOnce ??= apiFetch('/api/recruit-postings?group_stats=1')
+    .then(async (r) => (r.ok ? (((await readJsonSafe(r)) as { stats?: FbGroupStats | null } | null)?.stats ?? null) : null))
+    .catch(() => null);
+  return fbGroupStatsOnce;
+}

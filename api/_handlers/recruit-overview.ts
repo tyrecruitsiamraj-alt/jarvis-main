@@ -15,6 +15,7 @@
  *    *"เปลี่ยนเป็น 7 เหมือนหัวกล่องงาน"*) · เดิมนับใบที่ประกาศในเดือนจาก `job_public_releases` — ถอดแล้ว
  */
 import { withRbac, sendError, handleApiError, type ApiRes, type AuthedReq } from '../_lib/http.js';
+import { CLICKS_SINCE, loadLinkClicks } from '../_lib/postingLinkHits.js';
 import { dbQuery, isPgUndefinedTable } from '../_lib/postgres.js';
 import { tableInAppSchema } from '../_lib/schema.js';
 import { loadMatchingBuScope, type DepartmentScope } from '../_lib/departmentScope.js';
@@ -802,7 +803,7 @@ export async function buildRecruitOverview(
 
   // จังหวัดของงาน (การ์ดงานค้าง) — วิ่งพร้อมก้อนอื่น ครั้งแรกหลังสำเนาใบขอหมดอายุใช้ ~4 วิ (28 ต.ค. 2569)
   const jobIndexP = loadJobIndex();
-  const [boardR, factsR, backlogR, apptR, staffR, showedR, aiR, firstR, everR, chR, reqR, informR, irecR, irAppR, apCodesR] = await Promise.all([
+  const [boardR, factsR, backlogR, apptR, staffR, showedR, aiR, firstR, everR, chR, reqR, informR, irecR, irAppR, apCodesR, clicksR] = await Promise.all([
     settle('รายชื่อบนบอร์ด', loadBoardPhoneSet),
     settle('ใบสมัคร', () => loadFacts(bothRange)),
     settle('งานค้าง', async () => (await dbQuery<Row>(backlogSql(), [buSet])).rows),
@@ -856,7 +857,11 @@ export async function buildRecruitOverview(
         ).rows.map((r) => r.code).filter(Boolean),
       ),
     ),
+    // คลิกลิงก์สมัครรายวันของช่วงนี้ — ตาราง "กลุ่ม Facebook คลิก → กรอก" (เจ้าของ 10 พ.ย. 2569)
+    settle('คลิกลิงก์', () => loadLinkClicks({ from: window.from, to: window.to, buSet })),
   ]);
+  body.linkClicks = clicksR.ok ? clicksR.value : null;
+  body.clicksSince = CLICKS_SINCE;
 
   // บอร์ด ERP อ่านไม่ได้ = ไม่รู้ว่าได้ใบสมัครหรือยัง (null) — ไม่ใช่ "ยังไม่ได้"
   const boardPhones = boardR.ok ? boardR.value : null;

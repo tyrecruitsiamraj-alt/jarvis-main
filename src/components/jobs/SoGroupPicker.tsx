@@ -13,11 +13,17 @@ import {
   soGroupLabel,
   soGroupStatsText,
   soGroupUsable,
+  soGroupLinkKey,
   soGroupView,
   type SoOptAccount,
   type SoOptGroup,
 } from '@/lib/soScraping';
 import type { UnitSector } from '@/lib/unitSector';
+import { fetchFbGroupStats, type FbGroupStats } from '@/lib/recruitPostingsApi';
+
+/** "คลิก 12 · กรอก 3" · ไม่มีสถิติ So Scraping นำหน้า = เติม "30 วัน" เอง · ยังไม่เคยมีลิงก์ = คลิก 0 · กรอก 0 */
+const ourStatsText = (st: { clicks: number; apps: number } | undefined, lead: boolean) =>
+  `${lead ? '30 วัน ' : ''}คลิก ${NUM.format(st?.clicks ?? 0)} · กรอก ${NUM.format(st?.apps ?? 0)}`;
 
 const NUM = new Intl.NumberFormat('th-TH');
 
@@ -101,6 +107,15 @@ export function SoGroupFilterPicker({
   onToggle: (ids: string[], on: boolean) => void;
 }) {
   const usable = React.useMemo(() => groups.filter((g) => soGroupUsable(g, account)), [groups, account]);
+  // คลิก · กรอก จากลิงก์ของกลุ่ม 30 วัน (เจ้าของ 10 พ.ย. 2569 "ต่อไปเวลาเลือกกลุ่ม Auto post ได้เลือกกลุ่มถูก")
+  const [ours, setOurs] = React.useState<FbGroupStats | null>(null);
+  React.useEffect(() => {
+    let alive = true;
+    void fetchFbGroupStats().then((s) => alive && setOurs(s));
+    return () => {
+      alive = false;
+    };
+  }, []);
   const [buPick, setBuPick] = React.useState<string | null | undefined>(undefined);
   const [sectorPick, setSectorPick] = React.useState<UnitSector | null | undefined>(undefined);
   const [province, setProvince] = React.useState('');
@@ -204,6 +219,7 @@ export function SoGroupFilterPicker({
                     {[
                       prov && !g.provinces.includes(prov) && g.nationwide ? 'ทั่วประเทศ' : null,
                       soGroupStatsText(g.stats30d),
+                      ours ? ourStatsText(ours[soGroupLinkKey(g)], !g.stats30d) : null,
                       bkkWhen(g.lastPostedAt) ? `โพสต์ล่าสุด ${bkkWhen(g.lastPostedAt)}` : null,
                       recent?.has(g.id) ? 'ใบนี้เพิ่งสั่งโพสต์กลุ่มนี้ใน 3 วัน' : null,
                     ]
