@@ -8,6 +8,7 @@ import ImportApplicantsDialog from '@/components/recruit-rm/ImportApplicantsDial
 import { jobBoardCardTitle, publicJobPositionLabel } from '@/lib/unitRequestDisplay';
 import type { JobRequest } from '@/types';
 import DateRangeCalendarPicker, { type DateRangeYmd } from '@/components/shared/DateRangeCalendarPicker';
+import { rangeFromParams } from '@/lib/jobNavigation';
 import { useUnitRequestsFeed } from '@/hooks/useUnitRequestsFeed';
 import { useClosedRequestsFeed } from '@/hooks/useClosedRequestsFeed';
 import type { JobBoxKey } from '@/lib/jobBoxGroups';
@@ -116,7 +117,8 @@ const StaffJobBoardPage: React.FC = () => {
    * วันที่สมัคร ของแท็บผู้สมัคร/การติดต่อ/ติดตามนัดหมาย — ปุ่มปฏิทินอยู่ข้างรีเฟรช (เจ้าของสั่ง 5 ต.ค. 2569:
    * *"Filter วันที่ย้ายไปข้างๆปุ่ม Refresh"*) · ค่าเดียวใช้ร่วมสามแท็บ (สลับแท็บแล้วช่วงวันไม่หาย)
    */
-  const [applicantDates, setApplicantDates] = useState<DateRangeYmd | null>(null);
+  // ลิงก์จากหน้าหลัก/ภาพรวมพาช่วงวันที่มาด้วย `?from=&to=` (เจ้าของ 10 พ.ย. 2569 "ตอนนี้บอก 1474 คือของ 1-10 พย ถ้ากดไปก็ต้องโชว์ยอดของ 1-10 พย")
+  const [applicantDates, setApplicantDates] = useState<DateRangeYmd | null>(() => rangeFromParams(searchParams));
   /** ช่องข้างปุ่มวันที่ — แท็บผู้สมัครวาง "นำเข้า Excel" + "รายงาน" ที่นี่ (เจ้าของสั่ง 14 ต.ค. 2569) */
   const [headerSlot, setHeaderSlot] = useState<HTMLSpanElement | null>(null);
   const rmView = (RM_VIEWS as readonly string[]).includes(view);

@@ -15,6 +15,7 @@ import { loadMatchingBuScope, loadUserDepartmentScope } from '../_lib/department
 import { loadPenaltyLedgerRaw, LEDGER_SINCE } from '../_lib/siamrajPenaltyLedgerSql.js';
 import { buildPenaltyLedger } from '../../src/lib/requestPenaltyLedger.js';
 import { buildHomeMoney } from '../../src/lib/homeMoney.js';
+import { buildBuTrend, dayBuckets, monthBuckets, type BuTrendResponse } from '../../src/lib/homeBuTrend.js';
 import { toBangkokYmd } from '../_lib/businessDate.js';
 import { dbQuery } from '../_lib/postgres.js';
 import { tableInAppSchema } from '../_lib/schema.js';
@@ -132,6 +133,18 @@ async function handler(req: AuthedReq, res: ApiRes) {
       loadSendReplacement([...new Set(scoped.map((r) => r.requestNo))]),
     ]);
     const rows = sendReplacement ? scoped.map((r) => ({ ...r, sendReplacement: sendReplacement.has(r.requestNo.trim().toUpperCase()) })) : scoped;
+    /**
+     * `?trend=bu` = เทียบ BU ตามเวลา (เจ้าของ 10 พ.ย. 2569) — ไม่ส่ง `month` = 12 เดือนล่าสุด · `month=YYYY-MM` = รายวันของเดือนนั้น
+     * สมุด/BU/สิทธิ์ชุดเดียวกับยอดหลักของเส้นนี้ (`buildBuTrend` · นิยามเดียวกับการ์ด)
+     */
+    if (q.trend === 'bu') {
+      const month = typeof q.month === 'string' && /^\d{4}-\d{2}$/.test(q.month) ? q.month : null;
+      const buckets = month ? dayBuckets(month, today) : monthBuckets(today, 12);
+      const trend = buildBuTrend(rows, raw.informs, today, buckets, (r) => normalizeTrendBu(r.bu) ?? 'ไม่ระบุ BU', replacements ?? {});
+      const out: BuTrendResponse = { granularity: month ? 'day' : 'month', month, ...trend };
+      res.setHeader?.('Cache-Control', 'no-store');
+      return res.status(200).json(out);
+    }
     const ledger = buildPenaltyLedger(rows, raw.informs, today, { from, to: to > today ? today : to }, replacements ?? {});
     // เสียวันละ = สมุดของวันนี้วันเดียว (หักคนแทนแล้ว) — นิยามเดียวกับ "ตามสัญญา" (27 ต.ค. 2569)
     const todayCost = new Map(

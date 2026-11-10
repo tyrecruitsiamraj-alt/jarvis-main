@@ -49,6 +49,7 @@ export default function ExecDrill({
   all,
   today,
   contentStyle,
+  stageOf,
 }: {
   drill: ReturnType<typeof useDrill>;
   /** ทุกใบของช่วง — ไว้กดลึกไปใบอื่นของเจ้าหน้าที่/หน่วยงานเดียวกัน */
@@ -56,6 +57,8 @@ export default function ExecDrill({
   today: string;
   /** ธีมของหน้าที่เปิด (แผงอยู่นอกกล่องของหน้า · โฉมต้นแบบ ?home=v5 ส่งตัวแปรธีมมาให้) */
   contentStyle?: React.CSSProperties;
+  /** ใบถึงขั้นไหน (หน้าหลัก 10 พ.ย. 2569) — undefined = กำลังอ่าน · null = ไม่มีขั้น (จบแล้ว/ไม่อยู่ในชุด) · ไม่ส่ง = ไม่มีบรรทัดนี้ */
+  stageOf?: (r: MoneyRequest) => string | null | undefined;
 }) {
   const lv = drill.stack[drill.stack.length - 1] ?? null;
   const navigate = useNavigate();
@@ -193,6 +196,14 @@ export default function ExecDrill({
                               <span className="block text-sm text-foreground">{(sameUnit ? [r.position] : [r.unit, r.position]).filter(Boolean).join(' · ')}</span>
                               {r.place ? <span className="block text-xs text-muted-foreground">{r.place}</span> : null}
                               <span className="block text-xs tabular-nums text-muted-foreground">{r.requestNo}</span>
+                              {stageOf ? (
+                                <span className="block text-xs text-foreground" data-testid="exec-drill-stage">
+                                  {(() => {
+                                    const st = stageOf(r);
+                                    return st === undefined ? 'กำลังดูว่าถึงขั้นไหน…' : st === null ? null : `ขั้น: ${st}`;
+                                  })()}
+                                </span>
+                              ) : null}
                               {/* มือถือ: 3 ช่องขวาซ่อน ⇒ บอกในบรรทัดนี้แทน (ตรวจจอ 375 · 25 ต.ค. 2569) */}
                               <span className="block text-xs tabular-nums text-muted-foreground sm:hidden">
                                 {r.owner ?? '—'} · ขาด {r.open ? NUM.format(missing) : '0'} คน ·{' '}

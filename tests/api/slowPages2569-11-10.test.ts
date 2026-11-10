@@ -13,6 +13,8 @@ describe('หน้าช้า', () => {
   });
   it('หน้าหลักไม่ดึง /api/home-ai-share ก้อนหลักที่ไม่มีการ์ดใช้', () => {
     const page = readFileSync('src/pages/HomeOverviewPage.tsx', 'utf8');
-    expect(page).not.toContain('fetchHomeAiShare(');
+    // ยิงได้ที่เดียว ใต้ `if (v5)` (โฉมต้นแบบใช้การ์ดดูแลหลังเริ่มงาน/จับคู่งาน) — หน้าหลักเดิมต้องไม่ยิง
+    expect(page.split('fetchHomeAiShare(').length - 1).toBe(1);
+    expect(page).toMatch(/if \(v5\) \{\s*setAiV5\(null\);\s*fetchHomeAiShare\(/);
   });
 });

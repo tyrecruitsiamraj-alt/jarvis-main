@@ -106,3 +106,18 @@ export function navigateToUnitRequest(
 
   navigate(path, returnTo ? { state: { returnTo } } : undefined);
 }
+
+const YMD_PARAM = /^\d{4}-\d{2}-\d{2}$/;
+
+/** ต่อช่วงวันที่ไปกับลิงก์ — หน้าปลายทาง (แท็บผู้สมัคร/การติดต่อ/นัดหมาย) อ่าน `?from=&to=` ด้วย `rangeFromParams`
+ *  (เจ้าของ 10 พ.ย. 2569: กด 1,475 ของ 1–10 พ.ย. ไปแล้วต้องเห็นยอด 1–10 พ.ย.) */
+export function withRange(path: string, r: { from: string; to: string }): string {
+  return `${path}${path.includes('?') ? '&' : '?'}from=${r.from}&to=${r.to}`;
+}
+
+/** `?from=YYYY-MM-DD&to=YYYY-MM-DD` → ช่วงวันที่ · ไม่ครบ/ผิดรูป/กลับหัว = ไม่กรอง (ไม่เดา) */
+export function rangeFromParams(p: URLSearchParams): { from: string; to: string } | null {
+  const from = p.get('from');
+  const to = p.get('to');
+  return from && to && YMD_PARAM.test(from) && YMD_PARAM.test(to) && from <= to ? { from, to } : null;
+}

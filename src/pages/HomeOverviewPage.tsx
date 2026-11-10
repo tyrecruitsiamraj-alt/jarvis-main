@@ -59,7 +59,11 @@ import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
 import { Banknote, FileText, Phone, Users } from 'lucide-react';
 import { V5Bar, V5Card, V5Divider, V5EqCell, V5Kpi, V5NumLink, useV5ThemeStyle, v5Num } from '@/components/so-recruit-v5/V5Parts';
-import { requestPathOfJobId } from '@/lib/jobNavigation';
+import { requestPathOfJobId, withRange } from '@/lib/jobNavigation';
+import BuTrendTable from '@/components/so-recruit-v5/BuTrendTable';
+import { fetchRecruitStuck } from '@/lib/recruitStuckApi';
+import { STUCK_REASON_LABEL } from '@/lib/recruitStuck';
+import { PREQUEST_LEDGER_PREFIX, ledgerJobIdOf } from '@/lib/requestPenaltyLedger';
 import type { RecruitRequestItem } from '@/lib/recruitOverviewTypes';
 
 const BAHT = new Intl.NumberFormat('th-TH', { maximumFractionDigits: 0 });
@@ -92,6 +96,7 @@ const STEP_PAGE: Record<FunnelStep['key'], (typeof PAGE)[keyof typeof PAGE]> = {
 const toneOfRow = (t: 'success' | 'warn' | 'danger' | 'neutral') => (t === 'neutral' ? null : t);
 /** สีของผลติดตาม — ไป เขียว · ไม่ไป แดง · โทรไม่ติด/ขอเลื่อน เหลือง · ที่เหลือเทา */
 
+
 /** เวลาไทย HH:MM ของคำตอบ */
 const TIME_TH = new Intl.DateTimeFormat('th-TH', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Bangkok' });
 const shortTimeOf = (iso: string) => TIME_TH.format(new Date(iso));
@@ -103,6 +108,7 @@ const HomeOverviewPage: React.FC<{
   usePageTitle('หน้าหลัก');
   const v5 = layout === 'v5';
   const v5Style = useV5ThemeStyle();
+  const navigate = useNavigate();
   const today = toYmdBangkok(new Date());
   const [win, setWin] = useState<AiShareWindow>(() => thisMonthWindow(today));
   const [tab, setTab] = useState<'overview' | 'proportion'>('overview');
@@ -212,6 +218,34 @@ const HomeOverviewPage: React.FC<{
 
   // ── แผง ──
   const drill = useDrill();
+  /**
+   * ใบนี้ถึงขั้นไหน (เจ้าของ 10 พ.ย. 2569 "กดที่ใบนั้นๆก็พาไปดูว่าตอนนี้ถึงขั้นตอนไหน เช่น มีคนแล้วรอคนโทรนะ")
+   * ตัวตัดสินเดียวกับภาพรวม "ติดตรงไหน" (`/api/recruit-stuck` · `stuckReasonOf`) · โหลดตอนเปิดรายใบครั้งแรกของช่วง/BU
+   * จับคู่ด้วย jobId เต็ม (siamraj-sql / siamraj-pre) ไม่ใช้เลขใบอย่างเดียว · ใบที่จบแล้ว = ไม่มีขั้น
+   */
+  const [stages, setStages] = useState<{ key: string; map: Map<string, string> } | null>(null);
+  useEffect(() => {
+    if (drill.stack.length === 0 || stages?.key === dataKey) return;
+    let alive = true;
+    fetchRecruitStuck(bu, range)
+      .then((d) => {
+        if (!alive) return;
+        const map = new Map<string, string>();
+        for (const x of d.requests ?? []) if (x.jobId && x.state !== 'filled' && x.state !== 'cancelled') map.set(x.jobId.toUpperCase(), STUCK_REASON_LABEL[x.reason]);
+        setStages({ key: dataKey, map });
+      })
+      .catch(() => {
+        /* อ่านขั้นไม่ได้ = ไม่โชว์บรรทัดขั้น (รายใบยังใช้ได้) */
+      });
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- dataKey มาจาก range/bu ชุดเดียวกัน
+  }, [drill.stack.length, dataKey]);
+  const stageOf = (r: MoneyRequest): string | null | undefined =>
+    stages?.key === dataKey
+      ? (stages.map.get(ledgerJobIdOf({ requestNo: r.requestNo, prequest: r.requestNo.startsWith(PREQUEST_LEDGER_PREFIX) }).toUpperCase()) ?? null)
+      : undefined;
   const [panel, setPanel] = useState<OverviewPanel | null>(null);
   const openList = (title: string, rows: MoneyRequest[], sub?: string) => {
     setPanel(null);
@@ -229,7 +263,23 @@ const HomeOverviewPage: React.FC<{
       cur.perDay += r.perDay;
       bus.set(k, cur);
     }
+    /**
+     * ยอดตามสัญญาในช่วงแยก BU (เจ้าของ 10 พ.ย. 2569 "กดไปก็เห็นว่าเป็นของ Bu ไหนเท่าไหร่ เช่น Lbd 20000") — ทุกใบในสมุดของช่วง
+     * (รวมใบที่ปิดไปแล้ว) ⇒ ทุก BU รวมกัน = ตัวเลขบนการ์ดพอดี · เงินต่อวันยังคิดจากใบที่ยังโดนอยู่วันนี้ (ชุดเดิม)
+     */
+    const amountOf = (r: MoneyRequest) => r.amount.need.fine + r.amount.need.deduct;
+    const busAmt = new Map<string, { amount: number; rows: MoneyRequest[] }>();
+    for (const r of openReqs) {
+      const a = amountOf(r);
+      if (a <= 0) continue;
+      const k = r.bu ?? 'ไม่ระบุ BU';
+      const cur = busAmt.get(k) ?? { amount: 0, rows: [] };
+      cur.amount += a;
+      cur.rows.push(r);
+      busAmt.set(k, cur);
+    }
     setPanel({
+      wide: true,
       title: 'เสียเงิน',
       sub: `${NUM.format(costlyAll.total)} ใบ · วันละ ${BAHT.format(perDayTotal)} บาท · ตามสัญญา ${BAHT.format(contract ?? 0)} บาท`,
       go: PAGE.requests,
@@ -274,27 +324,32 @@ const HomeOverviewPage: React.FC<{
               ลูกค้าหักจริง {BAHT.format(moneyNow.customerFines.total)} บาท · {NUM.format(moneyNow.customerFines.receipts)} ใบเสร็จ · ตามวันรับเงิน ผูกกับใบขอรายใบไม่ได้
             </p>
           ) : null}
-          <p className="text-sm font-medium text-foreground">แยก BU</p>
+          <BuTrendTable metric="money" bu={bu} />
+          <p className="text-sm font-medium text-foreground">แยก BU · {thaiDate(range.from)} – {thaiDate(range.to)}</p>
           <ul className="divide-y divide-border rounded-xl border border-border" data-testid="overview-money-bu">
-            {[...bus.entries()]
-              .sort((a, b) => b[1].perDay - a[1].perDay)
-              .map(([k, v]) => (
-                <li key={k}>
-                  {/* กดแถว = รายใบของ BU นั้น (9 พ.ย. 2569 "ถ้าใบก็ต้องใบ") */}
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    className="h-auto w-full justify-between gap-3 whitespace-normal rounded-none px-3 py-2 text-left text-sm font-normal"
-                    onClick={() => openList(`เสียเงิน · ${k === 'ไม่ระบุ BU' ? k : trendBuLabel(k)}`, rows.filter((x) => (x.bu ?? 'ไม่ระบุ BU') === k))}
-                  >
-                    <span>{k === 'ไม่ระบุ BU' ? k : trendBuLabel(k)}</span>
-                    <span className="text-right tabular-nums text-muted-foreground">
-                      {NUM.format(v.n)} ใบ · ขาด {NUM.format(v.missing)} คน ·{' '}
-                      <span className={cn('font-medium', TONE.danger.value)}>{BAHT.format(v.perDay)} บาท/วัน</span>
-                    </span>
-                  </Button>
-                </li>
-              ))}
+            {[...busAmt.entries()]
+              .sort((a, b) => b[1].amount - a[1].amount)
+              .map(([k, v]) => {
+                const today = bus.get(k);
+                return (
+                  <li key={k}>
+                    {/* กดแถว = รายใบของ BU นั้น เรียงเงินมากสุดก่อน (9 พ.ย. 2569 "ถ้าใบก็ต้องใบ") */}
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      className="h-auto w-full justify-between gap-3 whitespace-normal rounded-none px-3 py-2 text-left text-sm font-normal"
+                      onClick={() => openList(`เสียเงิน · ${k === 'ไม่ระบุ BU' ? k : trendBuLabel(k)}`, [...v.rows].sort((a, b) => amountOf(b) - amountOf(a)), `${BAHT.format(v.amount)} บาท ตามสัญญาในช่วง`)}
+                      data-testid="overview-money-bu-row"
+                    >
+                      <span>{k === 'ไม่ระบุ BU' ? k : trendBuLabel(k)}</span>
+                      <span className="text-right tabular-nums text-muted-foreground">
+                        <span className={cn('font-medium', TONE.danger.value)}>{BAHT.format(v.amount)} บาท</span> · {NUM.format(v.rows.length)} ใบ
+                        <span className="block text-xs">{today ? `ยังโดนอยู่ ${NUM.format(today.n)} ใบ · วันละ ${BAHT.format(today.perDay)}` : 'วันนี้ไม่มีใบที่ยังโดน'}</span>
+                      </span>
+                    </Button>
+                  </li>
+                );
+              })}
           </ul>
           <p className="text-sm font-medium text-foreground">ใบที่เสียมากสุด</p>
           <ul className="divide-y divide-border rounded-xl border border-border">
@@ -326,6 +381,37 @@ const HomeOverviewPage: React.FC<{
           </ul>
           <Button type="button" variant="outline" className="w-full" onClick={() => openList('ใบที่เสียเงิน', rows)} data-testid="overview-money-all">
             ดูทุกใบ {NUM.format(costlyAll.total)} ใบ
+          </Button>
+        </div>
+      ),
+    });
+  };
+
+  /** เหลือหา (เจ้าของ 10 พ.ย. 2569 "เหลือหาก็เหมือนกัน") — แยก BU + เทียบรายเดือน/รายวัน → รายใบ · ชุดใบเดียวกับการ์ด */
+  const openRemaining = () => {
+    const open = flowRows((f) => f.open).sort((a, b) => perDayOf(b) - perDayOf(a));
+    const byBu = new Map<string, MoneyRequest[]>();
+    for (const r of open) byBu.set(r.bu ?? 'ไม่ระบุ BU', [...(byBu.get(r.bu ?? 'ไม่ระบุ BU') ?? []), r]);
+    setPanel({
+      wide: true,
+      title: 'เหลือหา',
+      sub: flow ? `${NUM.format(flow.remainingRequests)} ใบ · ${NUM.format(flow.remaining)} อัตรา · ณ ${thaiDate(range.to)}` : undefined,
+      go: PAGE.requests,
+      body: (
+        <div className="space-y-4">
+          <BuTrendTable metric="remaining" bu={bu} />
+          <p className="text-sm font-medium text-foreground">แยก BU · ณ {thaiDate(range.to)}</p>
+          <PanelRows
+            unit="ใบ"
+            rows={[...byBu.entries()]
+              .sort((a, b) => b[1].length - a[1].length)
+              .map(([k, list]) => {
+                const label = k === 'ไม่ระบุ BU' ? k : trendBuLabel(k);
+                return { label: `${label} · ${NUM.format(list.reduce((n, r) => n + (r.flow?.remaining ?? 0), 0))} อัตรา`, value: list.length, onOpen: () => openList(`เหลือหา · ${label}`, list) };
+              })}
+          />
+          <Button type="button" variant="outline" className="w-full" onClick={() => openList('เหลือหา', open)} data-testid="overview-remain-all">
+            ดูทุกใบ {NUM.format(open.length)} ใบ
           </Button>
         </div>
       ),
@@ -439,7 +525,8 @@ const HomeOverviewPage: React.FC<{
     setPanel({
       title: s.label,
       sub: `${NUM.format(s.value)} คน${s.from ? ` · ${s.from}` : ''}`,
-      go: STEP_PAGE[s.key],
+      // พาช่วงวันที่สมัครไปด้วย (เจ้าของ 10 พ.ย. 2569 "1474 คือของ 1-10 พย ถ้ากดไปก็ต้องโชว์ยอดของ 1-10 พย")
+      go: { label: STEP_PAGE[s.key].label, to: withRange(STEP_PAGE[s.key].to, range) },
       body: (
         <div className="space-y-4">
           {s.rows.length ? (
@@ -471,6 +558,15 @@ const HomeOverviewPage: React.FC<{
           <Button type="button" variant="outline" className="w-full" onClick={() => openNames(s.label, s.ids)} disabled={s.value === 0} data-testid="overview-step-names">
             ดูรายชื่อ {NUM.format(s.value)} คน
           </Button>
+          {/* ทางลัดไปทำงาน (เจ้าของ 10 พ.ย. 2569 "กดไปเพื่อดูว่าชื่อฉันอย่างเดียวเหลือเท่าไหร่" · "ดูว่าวันนี้นัดมาเท่านี้นะกดไปแล้วเห็นเลย") */}
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <Button type="button" variant="outline" onClick={() => navigate(withRange('/jobs/board?view=contact&scope=mine&chip=uncalled', range))} data-testid="overview-my-uncalled">
+              ชื่อที่ฉันเก็บไว้ ยังไม่โทร ›
+            </Button>
+            <Button type="button" variant="outline" onClick={() => navigate(withRange('/jobs/board?view=appointments', { from: today, to: today }))} data-testid="overview-appt-today">
+              นัดวันนี้ ›
+            </Button>
+          </div>
         </div>
       ),
     });
@@ -528,7 +624,6 @@ const HomeOverviewPage: React.FC<{
   const aiStep = funnel?.[1] ?? null;
 
   // ═══ โฉมต้นแบบ SO Recruit (`?home=v5` · เจ้าของ 10 พ.ย. 2569) — ทุกเลข/การกดใช้ตัวแปรและตัวเปิดแผงชุดเดียวกับหน้าหลักสรุป ═══
-  const navigate = useNavigate();
   const req = roNow?.requests ?? null;
   /** ใบขอใหม่ของช่วงตามสถานะประกาศ — กดแถวไปหน้าใบขอ · กดจำนวนคนเปิดรายชื่อ (รายการชุดเดียวกับเลขในตาราง) */
   const openRequestList = (title: string, pick: (r: RecruitRequestItem) => boolean) => {
@@ -572,7 +667,7 @@ const HomeOverviewPage: React.FC<{
   const overlays = (
     <>
       <OverviewSheet panel={panel} onClose={() => setPanel(null)} contentStyle={v5 ? v5Style : undefined} />
-      <ExecDrill drill={drill} all={openReqs} today={today} contentStyle={v5 ? v5Style : undefined} />
+      <ExecDrill drill={drill} all={openReqs} today={today} contentStyle={v5 ? v5Style : undefined} stageOf={stageOf} />
       <FollowNamesDialog
         open={followNames !== null}
         onOpenChange={(o) => !o && setFollowNames(null)}
@@ -644,7 +739,7 @@ const HomeOverviewPage: React.FC<{
               unit="ใบ"
               left={flow ? `เหลือหา ${NUM.format(flow.remaining)} อัตรา` : '—'}
               right={flow ? `รวมใบขอชั่วคราว ${NUM.format(preCount)} ใบ` : ''}
-              onClick={flow ? () => openList('เหลือหา', flowRows((f) => f.open).sort((a, b) => perDayOf(b) - perDayOf(a))) : undefined}
+              onClick={flow ? openRemaining : undefined}
               testId="v5-kpi-remain"
             />
             <V5Kpi

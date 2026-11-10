@@ -94,7 +94,7 @@ describe('แท็บการติดต่อปุ่ม "ทุกคน" 
     expect(claimerOf(mine)).toBeNull();
     const ws = readFileSync('src/components/recruit-rm/RmWorkspace.tsx', 'utf8');
     expect(ws).toContain('aria-label="การติดต่อของใคร"');
-    expect(ws).toContain("useState<RmAppointmentScope>('mine')");
+    expect(ws).toContain("useState<RmAppointmentScope>(() => (searchParams.get('scope') === 'all' ? 'all' : 'mine'))");
   });
 });
 

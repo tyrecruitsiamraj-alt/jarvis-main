@@ -305,6 +305,8 @@ export type OverviewPanel = {
   body: React.ReactNode;
   /** ปุ่มไปหน้าเต็มของเรื่องนั้น */
   go?: { label: string; to: string };
+  /** แผงกว้าง — มีตารางเทียบหลายคอลัมน์ (เทียบ BU รายเดือน) */
+  wide?: boolean;
 };
 
 /** แผงข้างตัวเดียวของหน้า — กดกล่องไหนก็เปิดแผงนี้ (ไม่ซ้อนแผง) */
@@ -312,7 +314,7 @@ export function OverviewSheet({ panel, onClose, contentStyle }: { panel: Overvie
   const navigate = useNavigate();
   return (
     <Sheet open={panel !== null} onOpenChange={(o) => !o && onClose()}>
-      <SheetContent side="right" className="w-full space-y-4 overflow-y-auto sm:max-w-lg" style={contentStyle} data-testid="overview-sheet">
+      <SheetContent side="right" className={cn('w-full space-y-4 overflow-y-auto', panel?.wide ? 'sm:max-w-3xl' : 'sm:max-w-lg')} style={contentStyle} data-testid="overview-sheet">
         {panel ? (
           <>
             <SheetHeader>

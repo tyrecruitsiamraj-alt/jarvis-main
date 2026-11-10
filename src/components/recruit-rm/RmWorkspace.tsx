@@ -264,7 +264,11 @@ const RmWorkspace: React.FC<{
    * ชิปกรองแบบ C (เจ้าของเคาะ 5 ต.ค. 2569 "การ์ดเดิมแต่กระชับ" ทุกแท็บ) — การติดต่อ: ทั้งหมด/ยังไม่โทร/โทรแล้ว ·
    * ติดตามนัดหมาย: นัดทั้งหมด/มา/ไม่มา/รอผล (แทนกล่องตัวเลข 4 ใบ) · ไม่ผูก URL (ของคนที่นั่งดู)
    */
-  const [contactChip, setContactChip] = useState<ContactChip>('all');
+  // `?chip=` = ลิงก์จากหน้าหลักเปิดชิปนั้นเลย (เจ้าของ 10 พ.ย. 2569 "กดไปเพื่อดูว่าชื่อฉันอย่างเดียวเหลือเท่าไหร่")
+  const [contactChip, setContactChip] = useState<ContactChip>(() => {
+    const c = searchParams.get('chip');
+    return CONTACT_CHIPS.some((x) => x.id === c) ? (c as ContactChip) : 'all';
+  });
   // ?appt=overdue = เปิดชิปเลยวันนัดเลย (ลิงก์ตรง · แถบแดงที่เคยส่งมาถอดแล้ว 22 ต.ค. 2569)
   const [appointmentChip, setAppointmentChip] = useState<AppointmentChip>(() =>
     searchParams.get('appt') === 'overdue' ? 'overdue' : 'all',
@@ -288,7 +292,7 @@ const RmWorkspace: React.FC<{
    * แท็บการติดต่อ: ของฉัน / ทุกคน (เจ้าของ 10 พ.ย. 2569 "ใครเก็บไปแล้วยังไม่โทรบ้าง" · Choice "แท็บการติดต่อมีปุ่ม ทุกคน")
    * ค่าเริ่ม = ของฉัน (การติดต่อของใครของมัน · 4 ต.ค. 2569) · ไม่ผูก URL
    */
-  const [contactScope, setContactScope] = useState<RmAppointmentScope>('mine');
+  const [contactScope, setContactScope] = useState<RmAppointmentScope>(() => (searchParams.get('scope') === 'all' ? 'all' : 'mine'));
   /** ตารางนัดของวันแยกสถานที่ (แบบ iRecruit · 21 ต.ค. 2569) — วันที่ดู + สถานที่ที่กด (null = ไม่กรองรายชื่อ) */
   const todayYmd = toYmdBangkok(new Date());
   const [placeDay, setPlaceDay] = useState<string>(todayYmd);
