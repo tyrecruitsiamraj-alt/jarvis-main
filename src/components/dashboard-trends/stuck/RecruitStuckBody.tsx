@@ -155,7 +155,7 @@ export default function RecruitStuckBody({
       title="กลุ่ม Facebook คนคลิกแล้วกรอกเท่าไหร่"
       sub={
         fbGroups
-          ? `ยอดทั้งหมดตั้งแต่สร้างลิงก์ (ไม่ตามช่วงวันที่) · คลิก ${fbGroups.totalClicks.toLocaleString('th-TH')} · กรอก ${fbGroups.totalApps.toLocaleString('th-TH')}`
+          ? `คลิก ${fbGroups.totalClicks.toLocaleString('th-TH')} · กรอก ${fbGroups.totalApps.toLocaleString('th-TH')} ยอดทั้งหมดตั้งแต่สร้างลิงก์ · กดสมัคร ${fbGroups.totalPresses.toLocaleString('th-TH')} · สมัครซ้ำโดนกัน ${fbGroups.totalBlocked.toLocaleString('th-TH')} นับตั้งแต่ 10 พ.ย. 2569`
           : data.linkClicks === null
             ? 'อ่านยอดคลิกไม่ได้ชั่วคราว'
             : 'ยอดทั้งหมดตั้งแต่สร้างลิงก์'

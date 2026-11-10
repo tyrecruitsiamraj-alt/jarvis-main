@@ -12,26 +12,42 @@ import { funnelChannelOf, funnelSubOf, NO_SUB } from '@/lib/channelFunnel';
 
 export const FB_GROUP_CHANNEL = 'Facebook Group';
 
-export type FbGroupClickRow = { group: string; clicks: number; appIds: string[]; ratePct: number | null };
+/** `applyPresses` / `repeatBlocked` นับตั้งแต่ 10 พ.ย. 2569 (`FUNNEL_SINCE` ฝั่ง API) — คนละฐานกับคลิก/กรอกที่เป็นยอดทั้งหมด */
+export type FbGroupClickRow = { group: string; clicks: number; appIds: string[]; ratePct: number | null; applyPresses: number; repeatBlocked: number };
 
 const labelFact = (label: string) => ({ channelLabel: label, referralSource: null, sourceChannel: null, sourceSub: null }) as unknown as RecruitAppFact;
 
 export function buildFbGroupClickRows(
-  links: ReadonlyArray<{ label: string; clicks: number; appIds: readonly string[] }> | null | undefined,
-): { rows: FbGroupClickRow[]; totalClicks: number; totalApps: number } | null {
+  links: ReadonlyArray<{ label: string; clicks: number; appIds: readonly string[]; applyPresses?: number; repeatBlocked?: number }> | null | undefined,
+): { rows: FbGroupClickRow[]; totalClicks: number; totalApps: number; totalPresses: number; totalBlocked: number } | null {
   if (!links) return null;
-  const by = new Map<string, { clicks: number; ids: Set<string> }>();
+  const by = new Map<string, { clicks: number; ids: Set<string>; presses: number; blocked: number }>();
   for (const l of links) {
     const f = labelFact(l.label);
     if (funnelChannelOf(f) !== FB_GROUP_CHANNEL) continue;
     const g = funnelSubOf(f);
-    const cur = by.get(g) ?? { clicks: 0, ids: new Set<string>() };
+    const cur = by.get(g) ?? { clicks: 0, ids: new Set<string>(), presses: 0, blocked: 0 };
     cur.clicks += l.clicks;
+    cur.presses += l.applyPresses ?? 0;
+    cur.blocked += l.repeatBlocked ?? 0;
     for (const id of l.appIds) cur.ids.add(id);
     by.set(g, cur);
   }
   const rows = [...by.entries()]
-    .map(([group, v]) => ({ group, clicks: v.clicks, appIds: [...v.ids], ratePct: v.clicks > 0 ? Math.round((v.ids.size / v.clicks) * 100) : null }))
+    .map(([group, v]) => ({
+      group,
+      clicks: v.clicks,
+      appIds: [...v.ids],
+      ratePct: v.clicks > 0 ? Math.round((v.ids.size / v.clicks) * 100) : null,
+      applyPresses: v.presses,
+      repeatBlocked: v.blocked,
+    }))
     .sort((a, b) => Number(a.group === NO_SUB) - Number(b.group === NO_SUB) || b.clicks - a.clicks || b.appIds.length - a.appIds.length);
-  return { rows, totalClicks: rows.reduce((s, r) => s + r.clicks, 0), totalApps: rows.reduce((s, r) => s + r.appIds.length, 0) };
+  return {
+    rows,
+    totalClicks: rows.reduce((s, r) => s + r.clicks, 0),
+    totalApps: rows.reduce((s, r) => s + r.appIds.length, 0),
+    totalPresses: rows.reduce((s, r) => s + r.applyPresses, 0),
+    totalBlocked: rows.reduce((s, r) => s + r.repeatBlocked, 0),
+  };
 }

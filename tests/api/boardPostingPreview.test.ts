@@ -52,7 +52,8 @@ describe('หน้าลิงก์ /apply/p = การ์ดเดียว�
 
   it('หน้าใช้ PublicJobCardPreview ตัวเดียวกับตัวอย่างในป๊อปประกาศ + ปุ่มสมัครจริง · ส่งใบงานเข้าฟอร์ม', () => {
     expect(PAGE).toContain('<PublicJobCardPreview');
-    expect(PAGE).toContain('onApply={() => setApplyOpen(true)}');
+    expect(PAGE).toContain('onApply={openApply}'); // เปิดฟอร์ม + นับ "กดสมัคร" (10 พ.ย. 2569)
+    expect(PAGE).toContain('setApplyOpen(true);');
     expect(PAGE).toContain('job={job}');
     // ไม่มีใบงาน = การ์ดประกาศเดิม
     expect(PAGE).toContain('<PublicPostingPreview');

@@ -70,3 +70,30 @@ describe('ที่มาของเลข', () => {
     expect(readFileSync('api/_lib/recruitPostings.ts', 'utf8')).toContain('if (opts.countHit !== false) void recordDailyLinkHit(link.id);');
   });
 });
+
+describe('กดสมัคร · สมัครซ้ำโดนกัน (เจ้าของ Choice "เพิ่มช่องในตาราง" 10 พ.ย. 2569)', () => {
+  it('รวมต่อกลุ่ม + รวมทั้งการ์ด · ไม่มีค่า = 0', () => {
+    const r = buildFbGroupClickRows([
+      { label: G1, clicks: 10, appIds: ['a1'], applyPresses: 4, repeatBlocked: 2 },
+      { label: G1_OLD, clicks: 5, appIds: [], applyPresses: 1 },
+      { label: G2, clicks: 3, appIds: [] },
+    ])!;
+    expect(r.rows.map((x) => [x.group, x.applyPresses, x.repeatBlocked])).toEqual([
+      ['กลุ่มคนขับรถผู้บริหาร', 5, 2],
+      ['หางานขับรถ (553130514463865)', 0, 0],
+    ]);
+    expect([r.totalPresses, r.totalBlocked]).toEqual([5, 2]);
+  });
+  it('ที่มา: ปุ่มสมัครหน้าลิงก์นับ open_apply · โดนกันจด link_id · เจ้าหน้าที่ไม่นับ · จอบอกวันเริ่มนับ', () => {
+    const page = readFileSync('src/pages/public/PublicPostingApplyPage.tsx', 'utf8');
+    expect(page).toContain("trackPublicClick('open_apply', { jobRef: info.jobId ?? null, postingId: info.postingId })");
+    expect(page).not.toContain('setApplyOpen(true)}');
+    expect(readFileSync('api/_handlers/public/apply.ts', 'utf8')).toContain('{ kind: outcome.hit.kind, link_id: v.linkId ?? null }');
+    expect(readFileSync('api/_handlers/public/click.ts', 'utf8')).toContain('if (isSignedInViewer(req)) return');
+    const hits = readFileSync('api/_lib/postingLinkHits.ts', 'utf8');
+    expect(hits).toContain("c.action = 'open_apply' and c.day >= date '${FUNNEL_SINCE}'");
+    expect(hits).toContain("(au.new_value::jsonb)->>'link_id' = any(array_agg(l.id::text))");
+    const body = readFileSync('src/components/dashboard-trends/stuck/RecruitStuckBody.tsx', 'utf8');
+    expect(body).toContain('นับตั้งแต่ 10 พ.ย. 2569');
+  });
+});

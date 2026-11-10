@@ -8,6 +8,7 @@ import PublicPostingPreview from '@/components/jobs/PublicPostingPreview';
 import PublicJobCardPreview from '@/components/jobs/PublicJobCardPreview';
 import { enrichJobsWithUrgency } from '@/lib/jobUrgency';
 import { boardCardPlace } from '@/lib/boardCardFacts';
+import { trackPublicClick } from '@/lib/publicClickApi';
 
 /**
  * หน้าเปิดจากลิงก์ที่เจ้าหน้าที่สร้าง — /apply/p/<code>
@@ -86,6 +87,11 @@ const PublicPostingApplyPage: React.FC = () => {
    * ไม่มี (ประกาศลอย/ใบไม่ผ่านด่าน/ปิดรับแล้ว) = การ์ดประกาศเดิม
    */
   const job = !closed && info.job ? enrichJobsWithUrgency([info.job])[0] ?? null : null;
+  /** กดสมัคร = นับ "กดสมัคร" ของลิงก์นี้ (รหัสลิงก์มาจาก URL เอง) — การ์ดกลุ่ม Facebook แยกคนกดแล้วไม่ส่ง (10 พ.ย. 2569) */
+  const openApply = () => {
+    trackPublicClick('open_apply', { jobRef: info.jobId ?? null, postingId: info.postingId });
+    setApplyOpen(true);
+  };
 
   return (
     // หน้าที่คนนอกเห็น = หน้าตาแบรนด์ที่หรูสุดในระบบ (mockup rev.3 ข้อ 10)
@@ -93,7 +99,7 @@ const PublicPostingApplyPage: React.FC = () => {
       {job ? (
         <PublicJobCardPreview
           job={job}
-          onApply={() => setApplyOpen(true)}
+          onApply={openApply}
           // ใบขอไม่มีที่อยู่ = ใช้สถานที่ที่เจ้าหน้าที่พิมพ์ตอน Gen link (ห้ามขึ้น "ยังไม่ระบุสถานที่" ทั้งที่พิมพ์ไว้แล้ว)
           placeText={boardCardPlace(job) === 'ยังไม่ระบุสถานที่' ? info.locationText : null}
           /* 🔴 ไม่แสดงรายละเอียดที่พิมพ์ตอน Gen link ต่อท้าย (6 ต.ค. 2569 — เจ้าของ "เห็นภาพเดียวกันยัง"):
@@ -112,7 +118,7 @@ const PublicPostingApplyPage: React.FC = () => {
             <>
               <button
                 type="button"
-                onClick={() => setApplyOpen(true)}
+                onClick={openApply}
                 className="mt-6 w-full rounded-full bg-night py-3 text-sm font-medium text-white transition-colors hover:bg-night-hover dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
               >
                 สมัครงาน

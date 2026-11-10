@@ -2,6 +2,7 @@ import { sendError, handleApiError, type ApiReq, type ApiRes } from '../../_lib/
 import { rateLimitOrReject } from '../../_lib/rateLimit.js';
 import { readJsonBody, getString } from '../../_lib/body.js';
 import { recordPublicClick } from '../../_lib/publicClicks.js';
+import { isSignedInViewer } from '../../_lib/auth.js';
 
 /**
  * `POST /api/public/click` — นับคลิกบนหน้าสาธารณะ (ไม่ต้องล็อกอิน)
@@ -17,6 +18,9 @@ export default async function handler(req: ApiReq, res: ApiRes) {
   if (method !== 'POST') return sendError(res, 405, 'Method not allowed');
   // เพดานกันยิงถล่ม — คนจริงกดไม่กี่ครั้งต่อรอบเข้าเว็บ
   if (!rateLimitOrReject(req, res, 'public-click', 120, 10 * 60 * 1000)) return;
+
+  // เจ้าหน้าที่ที่ล็อกอินอยู่เปิดหน้าลิงก์ไม่นับ (เหมือนยอดเปิดลิงก์ · 10 พ.ย. 2569)
+  if (isSignedInViewer(req)) return res.status(204).end?.() ?? res.status(204).json({});
 
   try {
     const body = ((await readJsonBody(req)) ?? {}) as Record<string, unknown>;

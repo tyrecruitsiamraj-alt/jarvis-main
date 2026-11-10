@@ -228,7 +228,8 @@ export default async function handler(req: ApiReq, res: ApiRes) {
       return { id: null };
     });
     if ('hit' in outcome && outcome.hit) {
-      logPublicApply(req, 'public_application.repeat_rejected', 'repeat', v, { kind: outcome.hit.kind });
+      // link_id = แยกได้ว่าคนจากกลุ่ม FB ไหนโดนกัน (การ์ดกลุ่ม Facebook · 10 พ.ย. 2569)
+      logPublicApply(req, 'public_application.repeat_rejected', 'repeat', v, { kind: outcome.hit.kind, link_id: v.linkId ?? null });
       return sendError(res, 409, 'Conflict', repeatPublicMessage(outcome.hit.kind, outcome.hit.lastAt));
     }
     const id = 'id' in outcome ? outcome.id : null;

@@ -18,9 +18,17 @@ const LINKS = tableInAppSchema('recruit_posting_links');
 const POSTINGS = tableInAppSchema('recruit_postings');
 const MAP = tableInAppSchema('job_site_map');
 const APPS = tableInAppSchema('public_job_applications');
+const CLICKS = tableInAppSchema('public_page_clicks');
+const AUDIT = tableInAppSchema('audit_logs');
 
 /** วันแรกที่มีคลิกรายวัน (ไทย) — ช่วงที่เริ่มก่อนวันนี้ต้องบอกว่าคลิกนับเฉพาะตั้งแต่วันนี้ */
 export const CLICKS_SINCE = '2026-11-10';
+
+/**
+ * "กดสมัคร" กับ "สมัครซ้ำโดนกัน" ต่อลิงก์ เริ่มนับวันนี้ (10 พ.ย. 2569) — ก่อนนี้หน้าลิงก์ไม่ได้นับปุ่มสมัคร
+ * และบันทึกโดนกันจดแค่ประกาศ (ประกาศเดียวมีหลายลิงก์ 427/612 ครั้ง แยกกลุ่มไม่ได้) ⇒ จอต้องบอกวันเริ่มนับ
+ */
+export const FUNNEL_SINCE = '2026-11-10';
 
 /** +1 คลิกของวันนี้ (วันไทย) — พลาดไม่เป็นไร ไม่ให้ล้มการเปิดหน้า */
 export async function recordDailyLinkHit(linkId: string): Promise<void> {
@@ -52,7 +60,16 @@ const stillInSoSql = `(
                    where lower(btrim(g.name::text)) = lower(btrim(regexp_replace(l.channel_label, '^.*facebook group\\s*·\\s*', '', 'i')))))
 )`;
 
-export type LinkClickRow ={ label: string; fbGroupId: string | null; clicks: number; appIds: string[] };
+export type LinkClickRow = {
+  label: string;
+  fbGroupId: string | null;
+  clicks: number;
+  appIds: string[];
+  /** กดปุ่มสมัครบนหน้าลิงก์ ตั้งแต่ `FUNNEL_SINCE` */
+  applyPresses: number;
+  /** กรอกแล้วโดนกันเพราะสมัครซ้ำใน 14 วัน ตั้งแต่ `FUNNEL_SINCE` */
+  repeatBlocked: number;
+};
 
 /**
  * ยอดทั้งหมดตั้งแต่สร้างลิงก์ ต่อป้ายลิงก์ (เจ้าของ 10 พ.ย. 2569 Choice "แบบ 1 ยอดทั้งหมด ใช้ได้เลย")
@@ -60,9 +77,14 @@ export type LinkClickRow ={ label: string; fbGroupId: string | null; clicks: num
  * `buSet` = ชุด BU ในสิทธิ์ (null = ไม่กรอง) · ป้ายว่าง = ไม่นับ
  */
 export async function loadLinkClicks(opts: { buSet: BuSet }): Promise<LinkClickRow[]> {
-  const { rows } = await dbQuery<{ label: string; fb_group_id: string | null; clicks: string; app_ids: string[] | null }>(
+  const { rows } = await dbQuery<{ label: string; fb_group_id: string | null; clicks: string; app_ids: string[] | null; apply_presses: string; repeat_blocked: string }>(
     `select btrim(l.channel_label) as label, max(lower(nullif(btrim(l.fb_group_id), ''))) as fb_group_id, sum(l.hit_count)::text as clicks,
-            (select array_agg(a.id::text) from ${APPS} a where a.link_id = any(array_agg(l.id))) as app_ids
+            (select array_agg(a.id::text) from ${APPS} a where a.link_id = any(array_agg(l.id))) as app_ids,
+            (select coalesce(sum(c.hits), 0) from ${CLICKS} c
+              where c.action = 'open_apply' and c.day >= date '${FUNNEL_SINCE}' and c.link_code = any(array_agg(l.code)))::text as apply_presses,
+            (select count(*) from ${AUDIT} au
+              where au.action = 'public_application.repeat_rejected' and au.created_at >= timestamptz '${FUNNEL_SINCE}T00:00:00+07:00'
+                and (au.new_value::jsonb)->>'link_id' = any(array_agg(l.id::text)))::text as repeat_blocked
        from ${LINKS} l
        left join ${POSTINGS} p on p.id = l.posting_id
        left join ${MAP} bm on bm.job_id = p.job_id
@@ -73,7 +95,14 @@ export async function loadLinkClicks(opts: { buSet: BuSet }): Promise<LinkClickR
       group by btrim(l.channel_label)`,
     [opts.buSet],
   );
-  return rows.map((r) => ({ label: r.label, fbGroupId: r.fb_group_id, clicks: Number(r.clicks) || 0, appIds: r.app_ids ?? [] }));
+  return rows.map((r) => ({
+    label: r.label,
+    fbGroupId: r.fb_group_id,
+    clicks: Number(r.clicks) || 0,
+    appIds: r.app_ids ?? [],
+    applyPresses: Number(r.apply_presses) || 0,
+    repeatBlocked: Number(r.repeat_blocked) || 0,
+  }));
 }
 
 export type FbGroupStat = { clicks: number; apps: number };
