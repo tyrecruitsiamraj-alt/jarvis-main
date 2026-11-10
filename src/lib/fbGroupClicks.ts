@@ -5,7 +5,7 @@
  *
  * - กลุ่ม = ชื่อกลุ่มในป้ายลิงก์ (`funnelSubOf`) ตัวแยกเดียวกับตาราง "รายชื่อมาจากไหน ไปถึงไหน"
  * - คลิก = `hit_count` สะสม · กรอก = ใบสมัครที่มาจากลิงก์ (id ไว้กดดูชื่อ) · กรอกต่อคลิก = กรอก ÷ คลิก
- * - เรียงคลิกมากก่อน · "ไม่ระบุชื่อ" ท้าย · pure — เทสต์ `tests/api/fbGroupClicks2569-11-10.test.ts`
+ * - เรียงกรอกมากก่อน (เจ้าของ 10 พ.ย. 2569 "คนที่กรอกเยอะสุด ขึ้นได้ไหม") กรอกเท่ากันคลิกมากก่อน · "ไม่ระบุชื่อ" ท้าย · pure — เทสต์ `tests/api/fbGroupClicks2569-11-10.test.ts`
  */
 import type { RecruitAppFact } from '@/lib/recruitOverviewTypes';
 import { funnelChannelOf, funnelSubOf, NO_SUB } from '@/lib/channelFunnel';
@@ -42,7 +42,7 @@ export function buildFbGroupClickRows(
       applyPresses: v.presses,
       repeatBlocked: v.blocked,
     }))
-    .sort((a, b) => Number(a.group === NO_SUB) - Number(b.group === NO_SUB) || b.clicks - a.clicks || b.appIds.length - a.appIds.length);
+    .sort((a, b) => Number(a.group === NO_SUB) - Number(b.group === NO_SUB) || b.appIds.length - a.appIds.length || b.clicks - a.clicks);
   return {
     rows,
     totalClicks: rows.reduce((s, r) => s + r.clicks, 0),

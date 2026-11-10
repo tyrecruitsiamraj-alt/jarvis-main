@@ -14,7 +14,7 @@ const G1_OLD = 'Facebook Group · กลุ่มคนขับรถผู้�
 const G2 = 'Facebook · Facebook Group · หางานขับรถ (553130514463865)';
 
 describe('การ์ดกลุ่ม Facebook', () => {
-  it('รวมตามชื่อกลุ่ม (ป้ายเก่า/ใหม่ชื่อเดียวกัน = กลุ่มเดียว) · กรอกนับคนไม่ซ้ำ · กรอกต่อคลิก · คลิกมากก่อน · ไม่ใช่ Facebook Group ไม่นับ', () => {
+  it('รวมตามชื่อกลุ่ม (ป้ายเก่า/ใหม่ชื่อเดียวกัน = กลุ่มเดียว) · กรอกนับคนไม่ซ้ำ · กรอกต่อคลิก · กรอกมากก่อน (กรอกเท่ากันคลิกมากก่อน) · ไม่ใช่ Facebook Group ไม่นับ', () => {
     const r = buildFbGroupClickRows([
       { label: G1, clicks: 100, appIds: ['a1', 'a2'] },
       { label: G1_OLD, clicks: 12, appIds: ['a2', 'a3'] },
@@ -22,8 +22,8 @@ describe('การ์ดกลุ่ม Facebook', () => {
       { label: 'Tiktok · Live', clicks: 999, appIds: ['x'] },
     ])!;
     expect(r.rows.map((x) => [x.group, x.clicks, x.appIds.length, x.ratePct])).toEqual([
-      ['หางานขับรถ (553130514463865)', 150, 0, 0],
       ['กลุ่มคนขับรถผู้บริหาร', 112, 3, 3],
+      ['หางานขับรถ (553130514463865)', 150, 0, 0],
     ]);
     expect([r.totalClicks, r.totalApps]).toEqual([262, 3]);
   });
