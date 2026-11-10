@@ -69,9 +69,10 @@ describe('ช่องทาง: สนใจ / นัดได้', () => {
 });
 
 describe('หน้า + เส้น', () => {
-  it('หน้าผู้บริหารแบบแท็บ = ทางถอย ?home=exec · ค่าตั้งต้นของ / = หน้าสรุปหน้าเดียว (28 ต.ค. 2569)', () => {
+  it('หน้าผู้บริหารแบบแท็บ = ทางถอย ?home=exec · ค่าตั้งต้นของ / = โฉม Codex (10 พ.ย. 2569 · หน้าสรุปเดิมที่ ?home=overview)', () => {
     const v = read('src/lib/homeV3.ts');
-    expect(v).toContain("return 'overview';");
+    expect(v).toContain("return 'v5';");
+    expect(v).not.toContain("return 'overview';");
     expect(read('src/pages/HomePage.tsx')).toContain("variant === 'exec' ? (\n        <HomeExecPage />");
     expect(read('src/pages/HomePage.tsx')).toContain('<HomeOverviewPage />');
     const exec = read('src/pages/HomeExecPage.tsx');

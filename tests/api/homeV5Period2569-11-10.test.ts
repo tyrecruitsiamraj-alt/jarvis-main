@@ -43,3 +43,13 @@ describe('หน้าหลักโฉมต้นแบบ: เปลี่�
     expect(load).toContain('setAiV5Error(friendlyErrorText(');
   });
 });
+
+describe('โฉม Codex = ค่าเริ่ม (เจ้าของ 10 พ.ย. 2569 Choice "ใช้โฉม Codex เป็นค่าเริ่ม" · คงแถบบนเดิม)', () => {
+  it('หน้าหลักไม่ส่ง ?home = v5 · โฉมก่อนหน้า ?home=overview · ภาพรวมงานสรรหาไม่ส่ง dash = v5 · โฉมก่อนหน้า &dash=prev', () => {
+    const v = readFileSync('src/lib/homeV3.ts', 'utf8');
+    expect(v).toContain("if (typeof window === 'undefined') return 'v5';");
+    expect(v).toContain(": v === 'classic' ? 'classic' : 'v5';");
+    const ov = readFileSync('src/components/dashboard-trends/RecruitOverview.tsx', 'utf8');
+    expect(ov).toContain("const v5 = !legacyCards && searchParams.get('dash') !== 'prev';");
+  });
+});

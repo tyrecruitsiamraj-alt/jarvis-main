@@ -180,8 +180,11 @@ const RecruitOverview: React.FC<{
    * โฉมใหม่ (เจ้าของ 4 พ.ย. 2569 นิยามเอง "เอาทำเลย") = ค่าเริ่ม · โฉมการ์ดเดิมยังเปิดได้ที่ `?dash=cards` (ทางถอย ห้ามลบจนกว่าเจ้าของสั่ง)
    */
   const legacyCards = searchParams.get('dash') === 'cards';
-  /** โฉมต้นแบบ SO Recruit (เจ้าของ 10 พ.ย. 2569 ชุดส่งต่อ · `&dash=v5`) — ชั้นคู่ขนาน รอตรวจรับ */
-  const v5 = searchParams.get('dash') === 'v5';
+  /**
+   * โฉม Codex / SO Recruit = ค่าเริ่ม (เจ้าของ 10 พ.ย. 2569 Choice "ใช้โฉม Codex เป็นค่าเริ่ม") · `&dash=v5` เดิมยังใช้ได้
+   * โฉมก่อนหน้า (4 พ.ย. 2569) เปิดได้ที่ `&dash=prev` · การ์ดเดิม `&dash=cards` — ทางถอย ห้ามลบจนกว่าเจ้าของสั่ง
+   */
+  const v5 = !legacyCards && searchParams.get('dash') !== 'prev';
   const v5Style = useV5ThemeStyle();
 
   useEffect(() => {

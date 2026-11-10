@@ -1,13 +1,14 @@
 /**
  * ═══ สวิตช์โฉมหน้าหลัก — ชั้นคู่ขนานตามกติกาโปรเจกต์ ═══
  *
- * - (ไม่ส่ง) / `?home=overview` = **หน้าหลักสรุปหน้าเดียว** (เจ้าของ 28 ต.ค. 2569 · `src/pages/HomeOverviewPage.tsx`) — **ค่าตั้งต้นตอนนี้**
+ * - (ไม่ส่ง) = **โฉม Codex / SO Recruit** (`HomeOverviewPage layout="v5"`) — **ค่าตั้งต้นตั้งแต่ 10 พ.ย. 2569** (เจ้าของ Choice "ใช้โฉม Codex เป็นค่าเริ่ม")
+ * - `?home=overview` = หน้าหลักสรุปหน้าเดียวโฉมก่อนหน้า (28 ต.ค. 2569) — ทางถอย พิมพ์เองเท่านั้น · **ไม่จำ**
  * - `?home=exec` = หน้าหลักผู้บริหารแบบแท็บ (24–25 ต.ค. 2569 · `src/pages/HomeExecPage.tsx`) — ทางถอย พิมพ์เองเท่านั้น · **ไม่จำ**
  * - `?home=new` = หน้าแท็บ "ระบบไปกี่ %" (30 ก.ย. 2569 · `src/pages/HomeAiSharePage.tsx`) — ทางถอย พิมพ์เองเท่านั้น · **ไม่จำ**
  *   (25 ต.ค. 2569 รวมเข้าหน้าผู้บริหารแล้ว · เครื่องที่เคยกดปุ่ม "แบบแท็บเดิม" ต้องกลับมาหน้าเดียวกับทุกคน)
  * - `?home=classic` = หน้าเดิม (deck · บอร์ด 4 ทีม · KPI) — โค้ดยังอยู่ครบเป็นทางถอย
  * - `?home=v3` = โฉม 3 ก้อน (29 ก.ย. 2569 · แผน `docs/plan-home-v3-2569-09-29.md`)
- * - `?home=v5` = หน้าหลักโฉมต้นแบบ SO Recruit (เจ้าของ 10 พ.ย. 2569 ชุดส่งต่อ · ชั้นคู่ขนาน รอตรวจรับ) — พิมพ์เองเท่านั้น · **ไม่จำ**
+ * - `?home=v5` = โฉม Codex (ลิงก์เดิมที่ส่งกันไว้ยังใช้ได้ · เท่ากับค่าตั้งต้น)
  * - `?home=online` = หน้าทีม Online ตามภาพต้นแบบของเจ้าของ (29 ก.ย. 2569 · แผน `docs/plan-team-online-2569-09-29.md`)
  * จำเลือกไว้ในเครื่อง (`jarvis.home.v3` — ค่า `1` เดิม = v3)
  *
@@ -33,7 +34,7 @@ function paramMode(): HomeVariant | null {
 }
 
 export function homeVariant(): HomeVariant {
-  if (typeof window === 'undefined') return 'overview';
+  if (typeof window === 'undefined') return 'v5';
   const forced = paramMode();
   try {
     // 'overview' = ค่าตั้งต้น · exec/new = ทางถอยพิมพ์เอง ⇒ ล้างค่าจำ · โฉมอื่นเก็บชื่อไว้ (v3 เก็บ '1' เดิมเพื่อความเข้ากันได้)
@@ -46,10 +47,10 @@ export function homeVariant(): HomeVariant {
   try {
     const v = window.localStorage.getItem(HOME_V3_KEY);
     // 'new' ที่จำไว้จากปุ่มเดิม = ไม่ใช้แล้ว (หน้าแท็บรวมเข้าหน้าผู้บริหาร 25 ต.ค. 2569)
-    return v === '1' || v === 'v3' ? 'v3' : v === 'online' ? 'online' : v === 'classic' ? 'classic' : 'overview';
+    return v === '1' || v === 'v3' ? 'v3' : v === 'online' ? 'online' : v === 'classic' ? 'classic' : 'v5';
   } catch {
-    // อ่าน storage ไม่ได้ = หน้าหลักสรุปหน้าเดียว (ค่าตั้งต้น)
-    return 'overview';
+    // อ่าน storage ไม่ได้ = ค่าตั้งต้น (โฉม Codex)
+    return 'v5';
   }
 }
 
