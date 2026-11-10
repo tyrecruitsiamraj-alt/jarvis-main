@@ -7,7 +7,8 @@
  * ภาพตัวอย่างที่เจ้าของดูก่อนสร้าง: https://claude.ai/artifact/PsMLRYXb9T3rKxruRnSxZf
  * ลำดับ: ตอนนี้ (4 กล่อง) → ใบขอ → ใบขอใหม่ประกาศแค่ไหน → ผู้สมัคร 6 ขั้น → ติดตาม · ดูแลหลังเริ่มงาน
  * ข้อมูล: `/api/home-money` (เงิน · สมการใบขอ) · `/api/recruit-overview` (ประกาศ · ผู้สมัคร · งานค้าง) ·
- *        `/api/home-ai-share` (+ `summary=lumos`) (ติดตาม · ดูแล) — ทุกเลขชุดเดียวกับหน้าที่ปุ่ม "ไปหน้าเต็ม" พาไป
+ *        `/api/home-ai-share?summary=lumos` (ติดตาม) — ทุกเลขชุดเดียวกับหน้าที่ปุ่ม "ไปหน้าเต็ม" พาไป
+ *        (10 พ.ย. 2569 เลิกดึง `/api/home-ai-share` ก้อนหลัก — ไม่มีการ์ดไหนใช้แล้ว แต่กินเวลา ~3 วิทุกครั้งที่เปิดหน้า)
  * 🔴 ชั้นคู่ขนาน: หน้าหลักผู้บริหารแบบแท็บเดิมยังเปิดได้ที่ `?home=exec` (ทางถอย · `HomeExecPage.tsx`)
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
@@ -40,8 +41,7 @@ import { useUnitRequestsFeed } from '@/hooks/useUnitRequestsFeed';
 import { usePageTitle } from '@/hooks/usePageTitle';
 import { PREQUEST_ID_PREFIX } from '@/lib/siamrajUnitRequestsApi';
 import { fetchHomeMoney, type HomeMoneyPayload } from '@/lib/homeMoneyApi';
-import { fetchHomeAiShare } from '@/lib/homeAiShareApi';
-import type { AiShareResponse, AiShareWindow } from '@/lib/homeAiShare';
+import type { AiShareWindow } from '@/lib/homeAiShare';
 import { costliest, perDayOf, reasonsOf, thisMonthWindow } from '@/lib/homeExec';
 import type { MoneyRequest } from '@/lib/homeMoney';
 import { fetchRecruitOverview } from '@/lib/recruitOverviewApi';
@@ -99,7 +99,6 @@ const HomeOverviewPage: React.FC = () => {
   // ── เงิน · สมการใบขอ ──
   const [money, setMoney] = useState<HomeMoneyPayload | null>(null);
   const [moneyError, setMoneyError] = useState<string | null>(null);
-  const [ai, setAi] = useState<AiShareResponse | null>(null);
   const [ro, setRo] = useState<RecruitOverviewResponse | null>(null);
   const [roError, setRoError] = useState<string | null>(null);
   /** เลขชุดล่าสุดของช่วง/BU ที่เลือกอยู่ — กันจอกระพริบตอนรอบสด (ล้างทันทีเมื่อเปลี่ยนช่วง/BU) */
@@ -112,16 +111,12 @@ const HomeOverviewPage: React.FC = () => {
     if (shownKey.current !== dataKey) {
       shownKey.current = dataKey;
       setMoney(null);
-      setAi(null);
       setRo(null);
     }
     setMoneyError(null);
     fetchHomeMoney({ ...range, bu })
       .then((m) => alive && setMoney(m))
       .catch((e: unknown) => alive && setMoneyError(friendlyErrorText(e, 'โหลดยอดเงินไม่ขึ้น')));
-    fetchHomeAiShare({ ...win, bu })
-      .then((d) => alive && setAi(d))
-      .catch(() => alive && setAi(null));
     fetchRecruitOverview(null, range, bu)
       .then((d) => {
         if (!alive) return;
