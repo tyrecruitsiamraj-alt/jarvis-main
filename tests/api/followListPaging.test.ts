@@ -86,7 +86,7 @@ describe('listFollowEntries', () => {
    * 🔴 QA 17 ต.ค. 2569: ฐาน 7,438 แถว +394/วัน · เพดานเดิม 10,000 จะชนราว 23 ต.ค. แล้วรายการขาดเงียบ ๆ
    * เซิร์ฟเวอร์รุ่นเก่าตัดหน้าละ 500 ⇒ ก้าว offset ต้องใช้ขนาดหน้าที่ได้จริง ไม่ใช่ขนาดที่ขอ
    */
-  it('12,000 แถว (เกินเพดานเดิม 10,000) โหลดครบ · ก้าวตามขนาดหน้าที่เซิร์ฟเวอร์ให้จริง · ยิงพร้อมกันไม่เกิน 4', async () => {
+  it('12,000 แถว (เกินเพดานเดิม 10,000) โหลดครบ · ก้าวตามขนาดหน้าที่เซิร์ฟเวอร์ให้จริง · ยิงพร้อมกันไม่เกิน 8 (10 พ.ย. 2569 เส้นตัดหน้าก่อน join แล้ว)', async () => {
     const TOTAL = 12_000;
     let inFlight = 0;
     let maxInFlight = 0;
@@ -105,6 +105,7 @@ describe('listFollowEntries', () => {
     const items = await listFollowEntries();
     expect(items).toHaveLength(TOTAL);
     expect(new Set(items.map((x) => (x as { id: string }).id)).size).toBe(TOTAL);
-    expect(maxInFlight).toBeLessThanOrEqual(4);
+    expect(maxInFlight).toBeLessThanOrEqual(8);
+    expect(maxInFlight).toBeGreaterThan(4);
   });
 });

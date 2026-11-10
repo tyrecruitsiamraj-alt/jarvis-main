@@ -359,7 +359,11 @@ async function listFollow(req: AuthedReq, res: ApiRes) {
             coalesce(umui.name, umue.name) as updated_by_display,
             coalesce(umdi.name, umde.name) as completed_by_display,
             coalesce(umsi.name, umse.name) as staff_called_by_display
-       from ${followTable} f
+       -- 🔴 ตัดหน้าก่อนแล้วค่อย join (เจ้าของ 10 พ.ย. 2569 "หน้าติดตามเปิดครั้งแรกให้เร็วกว่านี้อีก") — เดิม join + เรียงทั้ง 16,000 แถว
+       -- (เรียงลงดิสก์) แล้วคิดคอลัมน์หนักให้แถวก่อน offset ทุกหน้า ⇒ หน้าหลัง ๆ ช้าขึ้นเรื่อย ๆ · id = ตัวตัดสินลำดับ แถวไม่ซ้ำ/ไม่หล่นข้ามหน้า
+       from (select * from ${followTable} f ${bandWhere}
+              order by f.created_at desc, f.id desc
+              limit $1 offset $2) f
        left join ${queueTable} q
               on q.channel = 'reminder'
              and q.job_ref = 'follow'
@@ -373,9 +377,7 @@ async function listFollow(req: AuthedReq, res: ApiRes) {
        left join um umde on umde.email = lower(btrim(f.completed_by_name))
        left join um umsi on umsi.id = f.staff_called_by::text
        left join um umse on umse.email = lower(btrim(f.staff_called_by_name))
-      ${bandWhere}
-      order by f.created_at desc
-      limit $1 offset $2`,
+      order by f.created_at desc, f.id desc`,
     [limit, offset, ...bandParams],
   );
 
