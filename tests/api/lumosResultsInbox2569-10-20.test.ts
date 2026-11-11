@@ -3,7 +3,7 @@
  * เจ้าของ 20 ต.ค. 2569: "Lumos บอกไม่รับสาย ทำไมระบบเราบอกว่าส่ง AI แล้ว ยังไม่มีผล … จะเชื่อถือระบบเราได้ไง"
  * ช่องใบสมัครไม่เคยจดผลขาเข้า + ใบเดียวผิดรูป = ปฏิเสธทั้งชุด ⇒ ผลหายแล้วพิสูจน์ไม่ได้ว่าใครพลาด
  */
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { splitLumosResults } from '../../api/_lib/lumosResultInbox';
 
@@ -91,7 +91,9 @@ describe('หน้าต่างจับคู่งาน: shadcn + ขน�
 
 describe('หน้าจับคู่: เก็บไปโทรเองแล้วมีที่ไปโทรบนจอ (เจ้าของ 20 ต.ค. 2569)', () => {
   it('การติดต่อของจับคู่งาน → ตารางเดียวในแท็บการติดต่อ (11 พ.ย. 2569) · ว่างแล้วไม่หาย · ข้อความบอกที่ไปตามชนิดคน', () => {
-    expect(read('src/components/jobs/UnitSectionTabs.tsx')).toContain("{ id: 'contact', label: 'การติดต่อ', to: '/jobs/board?view=contact' }");
+    // แถบแท็บบนหน้าใบขอถอดแล้ว (เจ้าของ 11 พ.ย. 2569) — การติดต่ออยู่แท็บของหน้างานสรรหา
+    expect(existsSync('src/components/jobs/UnitSectionTabs.tsx')).toBe(false);
+    expect(read('src/pages/jobs/JobListPage.tsx')).not.toContain('UnitSectionTabs');
     expect(read('src/components/recruit-rm/RmWorkspace.tsx')).toContain('<SelectionContactRows rows={matchShown}');
     expect(read('api/_lib/selectionContacts.ts')).toContain("h.release_reason in ('result', 'expired')");
     const page = read('src/pages/matching/MatchingPage.tsx');

@@ -11,7 +11,6 @@ import Term from '@/components/shared/Term';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
 import { useUrlDialogHistory } from '@/hooks/useUrlDialogHistory';
-import UnitSectionTabs from '@/components/jobs/UnitSectionTabs';
 import AiCallFlowPanel from '@/components/matching/AiCallFlowPanel';
 import SelectionRecallButton from '@/components/matching/SelectionRecallButton';
 import SearchField from '@/components/shared/SearchField';
@@ -2327,12 +2326,6 @@ const MatchingPage: React.FC<{ embedded?: boolean }> = ({ embedded = false }) =>
           )
         }
       />
-      )}
-      {embedded ? null : (
-        <div className="px-4 md:px-6">
-          {/* ทางเข้าคู่กับหน้าหน่วยงาน (16 ส.ค. 2569 เย็น) — สองหน้าเป็นที่เดียวกันในสายตาคนใช้ */}
-          <UnitSectionTabs active="matching" />
-        </div>
       )}
       <div className={cn('space-y-4', !embedded && 'px-4 md:px-6')}>
         {/* การไหลของการโทร — เจ้าของสั่งให้มี "เฉพาะหน้านี้" (10 ส.ค. 2569)

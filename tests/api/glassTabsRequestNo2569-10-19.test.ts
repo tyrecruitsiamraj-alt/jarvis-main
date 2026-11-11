@@ -52,7 +52,6 @@ describe('รอบ 2: กระจกทั้งระบบ + หน้าไ
     ]) expect(read(f), f).toContain('<TabsList variant="glass"');
     for (const f of [
       'src/components/jobs/UnitRequestTabs.tsx',
-      'src/components/jobs/UnitSectionTabs.tsx',
       'src/components/jobs/JobBoardView.tsx',
       'src/components/recruit-rm/RmWorkspace.tsx',
     ]) expect(read(f), f).toContain('glassTabClass(');
@@ -68,7 +67,7 @@ describe('รอบ 4 (เจ้าของ 19 ต.ค. 2569)', () => {
     const tabs = read('src/components/ui/tabs.tsx');
     expect(tabs).toContain('export function GlassTabIndicator()');
     expect(tabs).toContain('{variant === "glass" ? <GlassTabIndicator /> : null}');
-    for (const f of ['src/components/jobs/UnitRequestTabs.tsx', 'src/components/jobs/UnitSectionTabs.tsx', 'src/components/jobs/JobBoardView.tsx', 'src/components/recruit-rm/RmWorkspace.tsx']) {
+    for (const f of ['src/components/jobs/UnitRequestTabs.tsx', 'src/components/jobs/JobBoardView.tsx', 'src/components/recruit-rm/RmWorkspace.tsx']) {
       expect(read(f), f).toContain('<GlassTabIndicator />');
     }
   });

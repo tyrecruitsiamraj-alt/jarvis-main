@@ -1671,7 +1671,7 @@ cooldown 30 วัน ซึ่งพ้นเดือนแล้วจะป�
 
 | ไฟล์ | หน้าที่ |
 |---|---|
-| `src/components/jobs/UnitSectionTabs.tsx` | 2 มุมมองบนสุด — หน่วยงาน (`/jobs/list`) · จับคู่กับงาน (`/matching/match`) |
+| ~~`src/components/jobs/UnitSectionTabs.tsx`~~ | **ลบแล้ว 11 พ.ย. 2569** — แถบ หน่วยงาน · จับคู่กับงาน · การติดต่อ บนหน้าใบขอ (เจ้าของ "เอาออกจากหน้า ใบขอ") · จับคู่/การติดต่ออยู่หน้างานสรรหา |
 | `src/components/jobs/UnitRequestTabs.tsx` | 4 แท็บของใบขอ — รายละเอียดงาน / ผู้สมัคร / AI Match / การติดต่อ |
 | `src/pages/jobs/UnitRequestTabPage.tsx` | เนื้อของ 3 แท็บหลัง (`/jobs/siamraj/:id/{applicants,ai-match,contact}`) |
 | `src/lib/unitMatchingView.ts` | pure — แบ่งกลุ่มตามที่มา / ยอด / สถานะท้ายแถว (กู้กลับจาก ba2f31d) |
@@ -14329,3 +14329,4 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 - 11 พ.ย. 2569 สั่งงานเหลือ 3 อย่าง Autopost · Scrap · โพสต์เอง (เจ้าของ "เอามันมารวมกันจะง่ายกว่าไหม" → Choice "เลือกช่องทางก่อน" · ประกาศลอยเก็บไว้): `OrderPostButton` โพสต์เอง ข้อ 1 ช่องทาง — กลุ่ม Facebook = `ManualPostPanel` · ช่องทางอื่น = `JobApplyLinks` (Gen link เดิม) · ถอด `withGenLink` · ป๊อปประกาศ (`BoardPublishSheet`) ถอดช่องติ๊ก Gen link · ปุ่มหัว "โพสต์เอง (ประกาศลอย)" (`RM_TOOLBAR_LABEL.link`) · `ui/dialog` ยึดขอบบน 5vh (สลับตัวเลือกแล้วป๊อปไม่เลื่อน)
 - 11 พ.ย. 2569 ภาพรวมงานสรรหาหน้าเดียว 4 ข้อ ไม่มีแท็บ (เจ้าของ "ทำไมต้องแยกกัน เอามันรวมกันเลย" → แบบร่างรอบ 2): `RecruitStuckBody` v5 = การ์ดบนเดิม → 1 ใครต้องทำอะไร (`StuckTodoTable` · `stuckTodoByOwner`/`stuckTodoPeople` ใน `recruitStuck.ts` · ใบ + คน) → สถานะประกาศ → 2 ทำแล้วเป็นไง (`CallerResultsTable` · `lib/callerResults.ts` ทุกขั้นทำแล้ว/ยังไม่ทำ บวกลงตัว + แถว AI) → จุดที่รายชื่อหลุด → เหตุผล → 3 ที่มามาจากใคร (`buildBringerFunnelTree` = คน → ต้นไม้ช่องทาง) → 4 ช่องทาง → พื้นที่ → แนวโน้ม · เทสต์ `tests/api/recruitOverviewFourQuestions2569-11-11.test.ts`
 - 11 พ.ย. 2569 ป๊อปรายชื่อ (`JourneyNamesDialog`) บอกว่าอยู่ที่ใคร ค้างกี่วัน (เจ้าของ "เก็บไปแล้วยังไม่โทรอยู่ใคร ค้างมากี่วันแล้ว"): เส้น `?names=` ส่ง claimed_by/claimed_at/ผลล่าสุด · `holderStateOf`/`holderSummary` (`recruitOverviewApi.ts`) · บรรทัดสรุปบนป๊อป + คอลัมน์ "อยู่ที่ใคร" · ยังไม่โทรขึ้นก่อน ค้างนานสุดก่อน
+- 11 พ.ย. 2569: ถอดแถบแท็บบนหน้าใบขอ (`UnitSectionTabs` ลบไฟล์) — เจ้าของเลือกแท็บ "จับคู่กับงาน" และ "การติดต่อ" แล้วสั่ง "เอาออกจากหน้า ใบขอ" · เหลือแท็บเดียวจึงถอดทั้งแถบ · หน้าจับคู่แบบเต็มหน้า (ไม่ embedded) ไม่มีแถบนี้แล้วด้วย · เทสต์ `lumosResultsInbox2569-10-20` คุมว่าไฟล์ไม่กลับมา

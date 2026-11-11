@@ -6,7 +6,6 @@ import { conveyorLabel } from '@/lib/soRecruitNav';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import PageHeader from '@/components/shared/PageHeader';
-import UnitSectionTabs from '@/components/jobs/UnitSectionTabs';
 import type { JobRequest } from '@/types';
 import { JOB_TYPE_LABELS } from '@/types';
 import { jobSectorLabel, requestActionOrTypeLabel } from '@/lib/unitRequestDisplay';
@@ -563,10 +562,7 @@ const JobListPage: React.FC = () => {
         }
       />
 
-      <div className="px-4 md:px-6">
-        <UnitSectionTabs active="units" />
-      </div>
-
+      {/* แถบ หน่วยงาน · จับคู่กับงาน · การติดต่อ ถอดแล้ว (เจ้าของ 11 พ.ย. 2569 "เอาออกจากหน้า ใบขอ") — จับคู่/การติดต่ออยู่หน้างานสรรหา */}
       <div className="px-4 md:px-6 space-y-4">
         {wantClosed && closedLoading ? <p className="text-sm text-muted-foreground">กำลังโหลดใบที่ปิดแล้ว…</p> : null}
         {wantClosed && closedError ? <LoadErrorNotice message={closedError} onRetry={() => setClosedRev((n) => n + 1)} /> : null}
