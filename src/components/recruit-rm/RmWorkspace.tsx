@@ -108,8 +108,14 @@ import {
   type ApplicantFilterState,
 } from '@/lib/applicantFilters';
 import { friendlyErrorText } from '@/lib/friendlyError';
-import SelectionContactBoard from '@/components/matching/SelectionContactBoard';
-import { fetchSelectionContacts } from '@/lib/selectionContacts';
+import {
+  SelectionContactDialogs,
+  SelectionContactRows,
+  selectionRowMatchesKeyword,
+  useSelectionContacts,
+} from '@/components/matching/SelectionContactRows';
+import { isInSelectionChip, type SelectionContactRow } from '@/lib/selectionContacts';
+import LoadErrorNotice from '@/components/shared/LoadErrorNotice';
 
 /** แท็บของพื้นที่นี้ → `?view=` ของบอร์ดรับสมัคร · ชื่อแท็บใช้ `RM_TAB_LABEL` ชุดเดียวกับแถบแท็บของบอร์ด */
 const RM_TAB_BOARD_VIEW: Record<RmTab, string> = { candidates: 'list', contact: 'contact', appointments: 'appointments' };
@@ -679,12 +685,29 @@ const RmWorkspace: React.FC<{
     setPage(1);
   };
 
-  /** เลขบนชิปการติดต่อ — นับจากชุดเดียวกับตาราง (ก่อนกดชิป) */
+  /**
+   * การติดต่อตารางเดียว (เจ้าของ 11 พ.ย. 2569 "ไม่ต้องมีหน้าการติดต่อ 2 ที่" → "ทำเลย") — คนที่ฉันเก็บจากจับคู่งาน
+   * อยู่บนสุดของตาราง ป้าย "จับคู่งาน" · ชิปชุดเดียวกันนับรวมสองทาง · มุมมองทุกคน/Lead/ยกเลิก ไม่มีแถวนี้
+   * (เส้นจับคู่งานคืนเฉพาะของฉัน)
+   */
+  const matchVisible = !bucket && tab === 'contact' && !leadView && !cancelledView && !everyoneContact;
+  const matchContacts = useSelectionContacts(matchVisible, refreshKey);
+  const matchKeyed = useMemo(
+    () => (matchVisible ? (matchContacts.rows ?? []).filter((r) => selectionRowMatchesKeyword(r, keyword)) : []),
+    [matchVisible, matchContacts.rows, keyword],
+  );
+  const matchShown = useMemo(() => matchKeyed.filter((r) => isInSelectionChip(r, contactChip)), [matchKeyed, contactChip]);
+  const [matchResultFor, setMatchResultFor] = useState<SelectionContactRow | null>(null);
+  const [matchAiFor, setMatchAiFor] = useState<SelectionContactRow | null>(null);
+
+  /** เลขบนชิปการติดต่อ — นับจากชุดเดียวกับตาราง (ก่อนกดชิป) · รวมคนจากจับคู่งาน */
   const contactChipCounts = useMemo(() => {
     const out = {} as Record<ContactChip, number>;
-    for (const c of CONTACT_CHIPS) out[c.id] = filtered.filter((r) => isInContactChip(r, c.id)).length;
+    for (const c of CONTACT_CHIPS) {
+      out[c.id] = filtered.filter((r) => isInContactChip(r, c.id)).length + matchKeyed.filter((r) => isInSelectionChip(r, c.id)).length;
+    }
     return out;
-  }, [filtered]);
+  }, [filtered, matchKeyed]);
 
   /** ชุดที่ตารางโชว์ = `filtered` + ชิปของแท็บ (ถัง drill-down ไม่กรองต่อ — เลขต้องเท่ากล่องที่กดมา) */
   const shown = useMemo(() => {
@@ -969,53 +992,6 @@ const RmWorkspace: React.FC<{
   const toggleRow = (id: string) =>
     setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
 
-  /**
-   * การติดต่อที่เดียว (เจ้าของ 11 พ.ย. 2569 "พอเก็บแล้วก็ย้ายไปหน้าการติดต่อ … ไม่ต้องมีหน้าการติดต่อ 2 ที่" · ทำตามแบบร่าง)
-   * มาจาก: กรอกเอง = รายชื่อที่กรอก/เก็บจากแท็บผู้สมัคร (ตารางเดิม) · จับคู่งาน = คนบนบอร์ด ERP ที่กดเก็บไปโทรจากจับคู่งาน
-   * (`SelectionContactBoard` ตัวเดิมของ /matching/contact · ลงผลแบบเดียวกัน) · เลือกแล้วจำใน `?source=match`
-   */
-  const contactSource: 'self' | 'match' = searchParams.get('source') === 'match' ? 'match' : 'self';
-  const setContactSource = (next: 'self' | 'match') => {
-    const p = new URLSearchParams(searchParams);
-    if (next === 'match') p.set('source', 'match');
-    else p.delete('source');
-    setSearchParams(p, { replace: true });
-    setPage(1);
-    setSelectedIds([]);
-  };
-  const [matchContactCount, setMatchContactCount] = useState<number | null | 'unknown'>(null);
-  useEffect(() => {
-    if (tab !== 'contact') return;
-    let alive = true;
-    fetchSelectionContacts()
-      .then((rows) => alive && setMatchContactCount(rows.length))
-      .catch(() => alive && setMatchContactCount('unknown'));
-    return () => {
-      alive = false;
-    };
-  }, [tab, contactSource, refreshKey]);
-  const contactSourceToggle =
-    !bucket && tab === 'contact' && !leadView && !cancelledView ? (
-      <FilterChips
-        ariaLabel="มาจาก"
-        value={contactSource}
-        onChange={(v) => setContactSource(v === 'match' ? 'match' : 'self')}
-        chips={[
-          { id: 'self' as const, label: 'มาจาก: กรอกเอง', count: loading ? null : loadError ? 'unknown' : contactChipCounts.all },
-          { id: 'match' as const, label: 'มาจาก: จับคู่งาน', count: matchContactCount },
-        ]}
-      />
-    ) : null;
-
-  if (contactSourceToggle && contactSource === 'match') {
-    return (
-      <div className="mt-4 space-y-4" data-testid="contact-source-match">
-        {contactSourceToggle}
-        <SelectionContactBoard />
-      </div>
-    );
-  }
-
   const toggleAll = () =>
     setSelectedIds((prev) =>
       pageRows.every((r) => prev.includes(r.id))
@@ -1081,7 +1057,6 @@ const RmWorkspace: React.FC<{
       ) : null}
       {!bucket && tab === 'contact' ? (
         <div className="mt-4 flex flex-wrap items-center gap-2">
-          {contactSourceToggle}
           {/* ของฉัน / ทุกคน (เจ้าของ 10 พ.ย. 2569 "ใครเก็บไปแล้วยังไม่โทรบ้าง") — แบบเดียวกับแท็บติดตามนัดหมาย · มุมมอง Lead/ยกเลิกไม่มีปุ่มนี้ */}
           {canSeeEveryoneContact && !leadView && !cancelledView ? (
             <ToggleGroup
@@ -1426,10 +1401,13 @@ const RmWorkspace: React.FC<{
             <>
               {/* ป้าย "2 ส่วนที่ทำงานคนละแบบ…" ถอดออก (เจ้าของสั่ง 4 ต.ค. 2569 — ห้ามประโยคอธิบายบนจอ) */}
               {/* บอร์ดรับสมัคร = พื้นที่ของทีมสรรหา → เห็นเฉพาะงานโทรเลนสรรหา
-                  (คนยังไม่สมัคร) · งานเลนคัดสรรมีหน้าของตัวเองที่ /matching/contact
-                  (เจ้าของสั่ง 16 ส.ค. 2569: "ไม่ปนกัน") */}
+                  (คนยังไม่สมัคร) · คนที่เก็บจากจับคู่งาน (เลนคัดสรร) อยู่ในตารางเดียวกันข้างล่าง ป้าย "จับคู่งาน"
+                  (เจ้าของ 11 พ.ย. 2569 "ไม่ต้องมีหน้าการติดต่อ 2 ที่" · แทนข้อ "ไม่ปนกัน" 16 ส.ค. 2569) */}
               {/* ใบสมัครที่เก็บไปโทรเองอยู่ในตารางแล้ว — ไม่แยกกล่องซ้ำ (เจ้าของ 8 ต.ค. 2569) */}
               <MyCallsSection lane="recruit" skipApplications />
+              {matchVisible && matchContacts.error ? (
+                <LoadErrorNotice message={matchContacts.error} onRetry={matchContacts.reload} />
+              ) : null}
             </>
           ) : null}
 
@@ -1578,6 +1556,12 @@ const RmWorkspace: React.FC<{
                 unitOf={unitOf}
                 recruiterOf={recruiterOf}
                 actionsOverride={cancelledView ? ['view', 'restore'] : undefined}
+                extraRows={
+                  currentPage === 1 && matchShown.length > 0 ? (
+                    <SelectionContactRows rows={matchShown} onResult={setMatchResultFor} onSendAi={setMatchAiFor} />
+                  ) : null
+                }
+                extraRowCount={currentPage === 1 ? matchShown.length : 0}
               />
               </div>
               </div>
@@ -1587,7 +1571,9 @@ const RmWorkspace: React.FC<{
                 page={currentPage}
                 pageCount={totalPages}
                 onPageChange={setPage}
-                summary={`แสดง ${shown.length === 0 ? 0 : (currentPage - 1) * pageSize + 1}–${Math.min(currentPage * pageSize, shown.length)} จาก ${shown.length}`}
+                summary={`แสดง ${
+                  shown.length + matchShown.length === 0 ? 0 : currentPage === 1 ? 1 : matchShown.length + (currentPage - 1) * pageSize + 1
+                }–${matchShown.length + Math.min(currentPage * pageSize, shown.length)} จาก ${shown.length + matchShown.length}`}
                 size={{
                   value: pageSize,
                   options: PAGE_SIZE_OPTIONS,
@@ -1601,6 +1587,21 @@ const RmWorkspace: React.FC<{
           )}
         </div>
       </div>
+
+      <SelectionContactDialogs
+        resultFor={matchResultFor}
+        aiFor={matchAiFor}
+        onClose={() => {
+          setMatchResultFor(null);
+          setMatchAiFor(null);
+        }}
+        onDone={(message) => {
+          setMatchResultFor(null);
+          setMatchAiFor(null);
+          if (message) say(message);
+          matchContacts.reload();
+        }}
+      />
 
       <AddApplicantDialog
         open={addOpen}

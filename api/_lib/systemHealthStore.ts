@@ -162,7 +162,7 @@ export async function readStaleItems(now = new Date()): Promise<StaleItem[]> {
         title: r.name?.trim() || 'ไม่ทราบชื่อ',
         subtitle: `AI บอกว่าสนใจ · ${r.job_ref.split(':').pop() || r.job_ref}`,
         ageMinutes: Number.isNaN(at) ? 0 : Math.max(0, Math.floor((now.getTime() - at) / 60_000)),
-        link: '/jobs/board?view=contact&source=match',
+        link: '/jobs/board?view=contact',
       });
     }
   } catch (e) {

@@ -55,14 +55,13 @@ const BoardPostingPage = lazyPage(() => import("@/pages/jobs/BoardPostingPage"))
  *  27 ส.ค. 2569 — ลิงก์ที่ใครบันทึกไว้ต้องไม่ 404)
  */
 /**
- * จับคู่งานย้ายไปอยู่ใต้ "โพสต์ประกาศ ▾" ของหน้างานสรรหา · การติดต่อของจับคู่งานรวมเข้าแท็บการติดต่อ (เจ้าของ 11 พ.ย. 2569 ·
+ * จับคู่งานย้ายไปอยู่ใต้ "โพสต์ประกาศ ▾" ของหน้างานสรรหา · การติดต่อของจับคู่งานรวมเข้าตารางแท็บการติดต่อ (เจ้าของ 11 พ.ย. 2569 ·
  * ทำตามแบบร่าง) — ลิงก์เก่า `/matching/match?jobId=…` · `/matching/contact` ยังเปิดได้ (พก query เดิมไปด้วย)
  */
-function MatchingMovedRedirect({ view, extra }: { view: 'match' | 'contact'; extra?: Record<string, string> }) {
+function MatchingMovedRedirect({ view }: { view: 'match' | 'contact' }) {
   const location = useLocation();
   const p = new URLSearchParams(location.search);
   p.set('view', view);
-  for (const [k, v] of Object.entries(extra ?? {})) p.set(k, v);
   return <Navigate to={`/jobs/board?${p.toString()}`} replace />;
 }
 
@@ -151,7 +150,7 @@ const ProtectedRoutes = () => {
                 กัน bookmark เก่าพัง · call-team ไม่มีบอร์ดทีมแล้ว (เอาออก 14 ส.ค.) */}
             <Route path="/matching/my-calls" element={<MatchingMovedRedirect view="match" />} />
             {/* การติดต่อของเลนคัดสรร (16 ส.ค. 2569) — เลนสรรหาอยู่บนบอร์ดรับสมัคร ไม่ปนกัน */}
-            <Route path="/matching/contact" element={<MatchingMovedRedirect view="contact" extra={{ source: 'match' }} />} />
+            <Route path="/matching/contact" element={<MatchingMovedRedirect view="contact" />} />
             <Route path="/matching/call-team" element={<MatchingMovedRedirect view="match" />} />
             <Route path="/matching/our-people" element={<OurPeoplePage />} />
             <Route path="/follow" element={<FollowPage />} />

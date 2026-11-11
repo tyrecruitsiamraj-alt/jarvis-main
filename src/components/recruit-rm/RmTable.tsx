@@ -162,7 +162,13 @@ const RmTable: React.FC<{
   recruiterOf?: (r: PublicApplication) => string | null;
   /** ปุ่มต่อแถวแทนชุดของแท็บ — มุมมอง "ดูที่ยกเลิก" ใช้ ดูรายละเอียด + กู้คืน (4 ต.ค. 2569) */
   actionsOverride?: RmRowAction[];
-}> = ({ tab, rows, selectedIds, onToggleRow, onToggleAll, onAction, holdByRef = {}, onAttendance, recruiterOf, actionsOverride, unitOf }) => {
+  /**
+   * แถวที่ไม่ใช่ใบสมัคร วางบนสุดของตาราง — แท็บการติดต่อใช้กับคนที่เก็บจากจับคู่งาน (เจ้าของ 11 พ.ย. 2569 รวมตารางเดียว)
+   * คอลัมน์ต้องตรงกับหัวของแท็บนั้น · `extraRowCount` > 0 = ไม่ขึ้นแถว "ไม่พบใบสมัคร"
+   */
+  extraRows?: React.ReactNode;
+  extraRowCount?: number;
+}> = ({ tab, rows, selectedIds, onToggleRow, onToggleAll, onAction, holdByRef = {}, onAttendance, recruiterOf, actionsOverride, unitOf, extraRows, extraRowCount = 0 }) => {
   const actions = actionsOverride ?? RM_ROW_ACTIONS[tab];
   /**
    * 🔴 แท็บผู้สมัครใช้ชุดคอลัมน์ที่เจ้าของสั่งเอง (30 ก.ย. 2569 · Choice "เอาตามที่ฉันสั่ง"):
@@ -295,7 +301,8 @@ const RmTable: React.FC<{
             </tr>
           </thead>
           <tbody>
-            {rows.length === 0 ? (
+            {extraRows}
+            {rows.length === 0 && extraRowCount === 0 ? (
               <tr>
                 <td colSpan={colCount} className={cn('px-3 py-6 text-center text-sm', DASH.muted)} data-testid="rm-empty-row">
                   ไม่พบใบสมัครตามเงื่อนไขที่เลือก
