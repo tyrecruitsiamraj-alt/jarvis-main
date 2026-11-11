@@ -40,7 +40,7 @@ export default function CallerResultsTable({
 
   const line = (row: CallerResultRow, strong: boolean) => (
     <TableRow key={row.who}>
-      <TableCell className={cn('text-sm', strong && 'font-medium')}>{row.who}</TableCell>
+      <TableCell className={cn('whitespace-nowrap text-sm', strong && 'font-medium')}>{row.who}</TableCell>
       {num(`${row.who} · เก็บไป`, row.kept, { strong })}
       {CALLER_GROUPS.flatMap((g) =>
         g.cells.map((c, ci) =>

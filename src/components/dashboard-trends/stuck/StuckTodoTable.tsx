@@ -59,7 +59,7 @@ export default function StuckTodoTable({ rows, onPick }: { rows: readonly StuckR
         <TableBody>
           {owners.map((o) => (
             <TableRow key={o.owner}>
-              <TableCell className="text-sm">{o.owner}</TableCell>
+              <TableCell className="whitespace-nowrap text-sm">{o.owner}</TableCell>
               {STUCK_TODO_COLUMNS.map((c) => (
                 <TableCell key={c.key} className="text-right text-sm tabular-nums">
                   {cell(o.owner, c.label, c.peopleLabel, o.cells[c.key], false)}
