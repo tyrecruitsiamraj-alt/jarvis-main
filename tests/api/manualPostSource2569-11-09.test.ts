@@ -51,7 +51,9 @@ describe('ตารางช่องทางชั้นที่ 4', () => {
     expect(grp.children!.map((r) => [r.channel, r.names.value])).toEqual([['Autopost', 1], ['โพสต์เอง', 2]]);
   });
   it('ปุ่มโพสต์เองอยู่ในช่อง "สั่งอะไร" · ลิงก์จด note โพสต์เอง', () => {
-    expect(readFileSync('src/components/jobs/OrderPostButton.tsx', 'utf8')).toContain("{ value: 'manual', label: 'โพสต์เอง — คัดลอกข้อความไปโพสต์ในกลุ่ม Facebook' }");
+    const order = readFileSync('src/components/jobs/OrderPostButton.tsx', 'utf8');
+    expect(order).toContain("{ value: 'manual', label: 'โพสต์เอง — เอาลิงก์ไปโพสต์เอง' }");
+    expect(order).toContain("{ value: 'fbGroup', label: 'กลุ่ม Facebook' }");
     expect(readFileSync('src/components/jobs/ManualPostPanel.tsx', 'utf8')).toContain("ensureSoGroupLinks(posting, groups.filter((g) => picked.includes(g.id)), groups, 'manual')");
     expect(readFileSync('src/components/jobs/AutopostDialog.tsx', 'utf8')).toContain("opts.groups, 'autopost')");
     // เตรียมซ้ำในป๊อปเดิมต้องได้ลิงก์เดิม (ทดสอบผ่านหน้าจอ 9 พ.ย. 2569 — เดิมป๊อปไม่จำลิงก์ที่เพิ่งสร้าง)

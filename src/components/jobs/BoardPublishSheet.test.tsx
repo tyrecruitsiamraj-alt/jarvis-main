@@ -159,15 +159,14 @@ describe('BoardPublishSheet — ป๊อปประกาศหน้าเด
     fireEvent.click(await screen.findByRole('button', { name: /หาคนทุกกอง/ }));
     expect(onSearch).toHaveBeenCalled();
   });
-  it('🔴 อ่านทะเบียนลิงก์ไม่ได้ ≠ ยังไม่มีลิงก์ — บอกว่าอ่านไม่ได้ · ปิด Gen link · ลองใหม่แล้วกลับมาปกติ (QA 10 ต.ค. 2569)', async () => {
+  it('🔴 อ่านทะเบียนลิงก์ไม่ได้ ≠ ยังไม่มีลิงก์ — บอกว่าอ่านไม่ได้ · ลองใหม่แล้วกลับมาปกติ (QA 10 ต.ค. 2569) · ช่องติ๊ก Gen link ย้ายไปโพสต์เอง (11 พ.ย. 2569)', async () => {
     fetchJobReleases.mockResolvedValue([]);
     fetchRecruitPostings.mockRejectedValueOnce(new Error('HTTP 500'));
     renderSheet();
     expect(await screen.findByText('อ่านลิงก์ไม่ได้')).toBeTruthy();
     expect(screen.queryByText('ยังไม่มีลิงก์')).toBeNull();
-    expect((document.getElementById('publish-want-link') as HTMLButtonElement).disabled).toBe(true);
+    expect(document.getElementById('publish-want-link')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'ลองใหม่' }));
     expect(await screen.findByText('ยังไม่มีลิงก์')).toBeTruthy();
-    expect((document.getElementById('publish-want-link') as HTMLButtonElement).disabled).toBe(false);
   });
 });

@@ -253,7 +253,7 @@ const BoardJobCard: React.FC<BoardJobCardProps> = ({ job, readiness, applicants,
                 className="rounded-lg"
               >
                 <Megaphone aria-hidden />
-                Autopost / Scrap
+                Autopost / Scrap / โพสต์เอง
               </Button>
             ) : null}
             {onImport ? (

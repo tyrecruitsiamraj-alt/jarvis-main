@@ -49,22 +49,28 @@ import ManualPostPanel from '@/components/jobs/ManualPostPanel';
  */
 const AUTO_WORKER = '__auto__';
 const NUM = new Intl.NumberFormat('th-TH');
-type OrderKind = 'autopost' | 'manual' | 'scrap' | 'genlink';
+type OrderKind = 'autopost' | 'scrap' | 'manual';
+/**
+ * 🔴 เหลือ 3 อย่าง (เจ้าของ 11 พ.ย. 2569 "เอามันมารวมกันจะง่ายกว่าไหมจะได้เหลือแค่ 1. Autopost 2. Scrap 3. โพสต์เอง"
+ * → Choice "เลือกช่องทางก่อน") — Gen link เดิมย้ายมาอยู่ในโพสต์เอง › ช่องทางอื่น
+ */
 const KIND_OPTIONS: Array<{ value: OrderKind; label: string }> = [
   { value: 'autopost', label: 'Autopost — โพสต์ลงกลุ่ม Facebook' },
-  // เจ้าของ 9 พ.ย. 2569 "ฉันจะให้คนสามารถโพสต์เองได้" — คัดลอกข้อความกลุ่มละแถว (`ManualPostPanel`)
-  { value: 'manual', label: 'โพสต์เอง — คัดลอกข้อความไปโพสต์ในกลุ่ม Facebook' },
   { value: 'scrap', label: 'Scrap — ดึงผู้สมัครจาก JobThai / JobBKK' },
+  // เจ้าของ 9 พ.ย. 2569 "ฉันจะให้คนสามารถโพสต์เองได้"
+  { value: 'manual', label: 'โพสต์เอง — เอาลิงก์ไปโพสต์เอง' },
 ];
-/** ตัวเลือกที่ 3 — หน้ารายละเอียดใบขอ (เจ้าของ 4 พ.ย. 2569 "เอารวมกันสิ่" · ลิงก์สมัครเดิมเป็นกล่องแยก) */
-const GEN_LINK_OPTION = { value: 'genlink' as const, label: 'Gen link — ลิงก์สมัครเอาไปโพสต์เอง' };
+type ManualChannel = 'fbGroup' | 'other';
+const MANUAL_CHANNEL_OPTIONS: Array<{ value: ManualChannel; label: string }> = [
+  { value: 'fbGroup', label: 'กลุ่ม Facebook' },
+  { value: 'other', label: 'ช่องทางอื่น (Tiktok · Facebook Page · LINE · Webjob …)' },
+];
 
 export default function OrderPostButton({
   job,
   onCaptionSaved,
   defaultKind = 'autopost',
   onSent,
-  withGenLink = false,
   onLinksChanged,
 }: {
   job: JobRequest;
@@ -75,12 +81,11 @@ export default function OrderPostButton({
   defaultKind?: OrderKind;
   /** ส่งใบสั่งแล้ว (โพสต์หรือ Scrap) — หน้าแม่โหลดป้ายสถานะใหม่ */
   onSent?: (item: JobPostingRequest) => void;
-  /** มีตัวเลือก Gen link ในช่อง "สั่งอะไร" (หน้ารายละเอียดใบขอ + ป๊อปประกาศ) */
-  withGenLink?: boolean;
   /** Gen link / แก้ลิงก์แล้ว — หน้าแม่โหลดลิงก์ใหม่ (ป๊อปประกาศเอาลิงก์ไปต่อท้ายข้อความโพสต์) */
   onLinksChanged?: () => void;
 }) {
   const [kind, setKind] = React.useState<OrderKind>(defaultKind);
+  const [manualChannel, setManualChannel] = React.useState<ManualChannel>('fbGroup');
   const [latest, setLatest] = React.useState<JobPostingRequest[] | null>(null);
   const [loadError, setLoadError] = React.useState<string | null>(null);
   const [busy, setBusy] = React.useState(false);
@@ -244,7 +249,7 @@ export default function OrderPostButton({
           }}
           ariaLabel="สั่งอะไร"
           testId="so-order-kind"
-          options={withGenLink ? [...KIND_OPTIONS, GEN_LINK_OPTION] : KIND_OPTIONS}
+          options={KIND_OPTIONS}
         />
       </div>
 
@@ -263,13 +268,26 @@ export default function OrderPostButton({
           />
         </div>
       ) : kind === 'manual' ? (
-        <div className="rounded-xl border border-border/70 p-3" data-testid="so-order-manual">
-          <ManualPostPanel job={job} />
-        </div>
-      ) : kind === 'genlink' ? (
-        <div className="space-y-2 rounded-xl border border-border/70 p-3" data-testid="so-order-genlink">
-          {/* ฟอร์ม Gen link พับไว้ กดกางค่อยใช้ (เจ้าของ 4 พ.ย. 2569 "ย่อไว้กดกางออกค่อยให้ทำงานได้") */}
-          <JobApplyLinks job={job} onChanged={onLinksChanged} />
+        <div className="space-y-3 rounded-xl border border-border/70 p-3" data-testid="so-order-manual">
+          <div className="space-y-1">
+            <p className="text-sm font-medium text-foreground">1 · ช่องทาง</p>
+            <FieldSelect
+              id={`so-manual-channel-${job.id}`}
+              value={manualChannel}
+              onChange={(v) => setManualChannel(v === 'other' ? 'other' : 'fbGroup')}
+              ariaLabel="โพสต์ที่ช่องทางไหน"
+              testId="so-manual-channel"
+              options={MANUAL_CHANNEL_OPTIONS}
+            />
+          </div>
+          {/* กลุ่ม Facebook = เลือกกลุ่ม คัดลอกข้อความกลุ่มละแถว · ช่องทางอื่น = ฟอร์มลิงก์สมัคร (Gen link เดิม) */}
+          {manualChannel === 'fbGroup' ? (
+            <ManualPostPanel job={job} />
+          ) : (
+            <div data-testid="so-order-genlink">
+              <JobApplyLinks job={job} onChanged={onLinksChanged} />
+            </div>
+          )}
         </div>
       ) : (
         <div className="space-y-3 rounded-xl border border-border/70 p-3" data-testid="so-order-scrap-form">
@@ -416,7 +434,7 @@ export function OrderPostFold({ className, ...props }: React.ComponentProps<type
         data-testid="order-post-toggle"
       >
         <Megaphone className={cn('h-4 w-4', TONE.primary.value)} aria-hidden />
-        {props.withGenLink ? 'Autopost / Scrap / Gen link' : 'Autopost / Scrap'}
+        Autopost / Scrap / โพสต์เอง
         <ChevronDown className={cn('ml-auto h-4 w-4 shrink-0 text-muted-foreground transition-transform', open && 'rotate-180')} aria-hidden />
       </Button>
       {open ? <OrderPostButton {...props} /> : null}

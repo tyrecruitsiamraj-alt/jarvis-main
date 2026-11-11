@@ -294,7 +294,7 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
             {/* พับไว้ตอนเปิดหน้า กดหัวกล่องแล้วค่อยกางเลือกว่าจะทำอะไร (เจ้าของ 4 พ.ย. 2569 "ย่อไว้ พอกดค่อยกางออกมาแล้วค่อยเลือก")
                 แบบเดียวกับกล่อง "ข้อมูลใบขอ" — ทั้งแถวกดได้ · พับอยู่ = ยังไม่โหลดบัญชี/กลุ่มของ So Scraping (`OrderPostFold` ตัวเดียวกับป๊อปประกาศ) */}
             <section className="glass-card rounded-3xl p-4 border border-white/70 space-y-3" data-testid="detail-order-post">
-              <OrderPostFold job={data} withGenLink />
+              <OrderPostFold job={data} />
             </section>
 
             <section className="glass-card rounded-3xl p-4 border border-white/70 space-y-2">

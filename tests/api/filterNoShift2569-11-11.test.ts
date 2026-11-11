@@ -63,3 +63,11 @@ describe('ทั้งระบบ: กดแล้วปุ่มอยู่�
     expect(read('src/pages/matching/ErpBoardPage.tsx')).toContain('if (selectedMonthKey) setOpenMonths((x) => (selectedMonthKey in x ? x : { ...x, [selectedMonthKey]: true }));');
   });
 });
+
+describe('ป๊อปยึดขอบบน — สลับตัวเลือกแล้วป๊อปไม่เลื่อน (11 พ.ย. 2569)', () => {
+  it('Dialog ไม่อยู่กลางจอ (กลางจอ + เนื้อหาเปลี่ยนสูง = ทั้งป๊อปเลื่อน)', () => {
+    const d = read('src/components/ui/dialog.tsx');
+    expect(d).toContain('fixed left-[50%] top-[5vh] z-50 grid max-h-[90vh] w-full max-w-lg translate-x-[-50%] gap-4 overflow-y-auto');
+    expect(d).not.toContain('translate-y-[-50%]');
+  });
+});

@@ -24,7 +24,6 @@ import { ChevronDown, ClipboardCheck, Send, UserMinus, Users } from 'lucide-reac
 
 import EditPostingDialog from '@/components/jobs/EditPostingDialog';
 import EditPublicJobFieldsDialog from '@/components/jobs/EditPublicJobFieldsDialog';
-import GenApplyLinkDialog from '@/components/jobs/GenApplyLinkDialog';
 import GenderPicker from '@/components/jobs/GenderPicker';
 import JobApplicantsDialog from '@/components/jobs/JobApplicantsDialog';
 import PublicJobCardPreview from '@/components/jobs/PublicJobCardPreview';
@@ -36,7 +35,6 @@ import { RequestRateLinesBlock, ResignedEmployeeBlock } from '@/components/jobs/
 import { StepCard } from '@/components/jobs/postingStepParts';
 import { useJobPublishRegistry } from '@/components/jobs/useJobPublishRegistry';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { releaseJobsToPublic, unreleaseJobsFromPublic } from '@/lib/jobPublicReleaseApi';
@@ -142,7 +140,6 @@ export const BoardPublishSheet: React.FC<BoardPublishSheetProps> = ({ id, onDone
   const [autoOpened, setAutoOpened] = React.useState(false);
   const [infoOpen, setInfoOpen] = React.useState(false);
   const [resignedOpen, setResignedOpen] = React.useState(false);
-  const [wantLink, setWantLink] = React.useState(false);
   const [editPostingOpen, setEditPostingOpen] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
   const [sendError, setSendError] = React.useState<string | null>(null);
@@ -397,26 +394,8 @@ export const BoardPublishSheet: React.FC<BoardPublishSheetProps> = ({ id, onDone
                     {linkCount === null ? 'กำลังโหลด…' : linkCount > 0 ? `มีแล้ว ${NUM.format(linkCount)} ลิงก์` : 'ยังไม่มีลิงก์'}
                   </p>
                 )}
-                <label htmlFor="publish-want-link" className="flex w-fit cursor-pointer items-center gap-3">
-                  <Checkbox
-                    id="publish-want-link"
-                    checked={wantLink}
-                    disabled={postingsFailed}
-                    onCheckedChange={(v) => setWantLink(v === true)}
-                  />
-                  <span className="text-sm text-foreground">{linkCount ? 'Gen link เพิ่ม' : 'Gen link'}</span>
-                </label>
               </div>
-              {wantLink && job ? (
-                <GenApplyLinkDialog
-                  embedded
-                  open
-                  previewFirst
-                  job={job}
-                  onClose={() => setWantLink(false)}
-                  onCreated={() => void reg.loadPostings()}
-                />
-              ) : null}
+              {/* Gen link ย้ายไปอยู่ "Autopost / Scrap / โพสต์เอง" › โพสต์เอง › ช่องทางอื่น (เจ้าของ 11 พ.ย. 2569 รวมเหลือ 3 อย่าง) */}
               {latestPosting ? (
                 <Collapsible open={editPostingOpen} onOpenChange={setEditPostingOpen}>
                   <CollapsibleTrigger asChild>

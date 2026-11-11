@@ -96,7 +96,7 @@ export default function AutopostDialog({
         {job ? (
           <>
             <DialogHeader>
-              <DialogTitle>Autopost / Scrap · {jobBoardCardTitle(job)}</DialogTitle>
+              <DialogTitle>Autopost / Scrap / โพสต์เอง · {jobBoardCardTitle(job)}</DialogTitle>
               <DialogDescription>{publicJobTitle(job)}</DialogDescription>
             </DialogHeader>
             {/* ฟอร์มเดียวกับหน้าใบขอ/ป๊อปประกาศ (เจ้าของ 3 พ.ย. 2569 "ไม่ใช่แค่หน้านี้ หมายถึงหน้างานสรรหาด้วย") · ปุ่มบนการ์ดเปิดมาที่ Autopost */}

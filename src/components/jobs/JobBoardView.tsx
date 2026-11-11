@@ -2219,7 +2219,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                           )}
                         >
                           <Link2 className="h-3.5 w-3.5" />
-                          Gen link
+                          โพสต์เอง
                         </span>
                       </div>
                     </CardFooter>

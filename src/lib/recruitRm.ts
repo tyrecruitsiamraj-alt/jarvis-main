@@ -560,7 +560,8 @@ export type RmToolbarKey = (typeof RM_TOOLBAR_KEYS)[number];
 
 export const RM_TOOLBAR_LABEL: Record<RmToolbarKey, string> = {
   channels: 'ช่องทาง',
-  link: 'Gen link', // เจ้าของยืนยัน 5 ต.ค. 2569 ใช้คำว่า Gen link ทั้งระบบ
+  // 11 พ.ย. 2569 Gen link รวมเข้า "โพสต์เอง" (เจ้าของ "เหลือแค่ Autopost · Scrap · โพสต์เอง") — แทนคำยืนยัน 5 ต.ค. 2569
+  link: 'โพสต์เอง',
   reasons: 'เหตุผล',
 };
 

@@ -341,7 +341,7 @@ describe('ป๊อปประกาศหน้าเดียว 9 กล่�
     // 4 พ.ย. 2569 "ทำไมไม่รวมกันแบบหน้าใบขอ" — ลิงก์สมัครอยู่ในกล่อง Autopost / Scrap / Gen link (พับไว้) ไม่มีการ์ดแยก
     expect(screen.queryByRole('heading', { name: 'ลิงก์สมัคร' })).toBeNull();
     expect(screen.queryByTestId('gen-link-toggle')).toBeNull();
-    expect((await screen.findByTestId('order-post-toggle')).textContent).toContain('Autopost / Scrap / Gen link');
+    expect((await screen.findByTestId('order-post-toggle')).textContent).toContain('Autopost / Scrap / โพสต์เอง'); // 11 พ.ย. 2569 รวมเหลือ 3 อย่าง
     // เจ้าของ 7 ต.ค.: "ข้อความโพสต์ เปลี่ยนเป็นหน้าตาที่จะเห็นเลย"
     expect(screen.queryByRole('heading', { name: 'ข้อความโพสต์' })).toBeNull();
     expect(screen.getByRole('heading', { name: 'ผู้สมัครจะเห็นแบบนี้' })).toBeTruthy();
