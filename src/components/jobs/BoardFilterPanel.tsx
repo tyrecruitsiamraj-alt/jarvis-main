@@ -75,6 +75,9 @@ function FacetBody<K extends string>({
   onToggle: (key: K, value: string) => void;
 }) {
   const [query, setQuery] = useState('');
+  // หัวข้อมีไว้รอเสมอ (เจ้าของ 11 พ.ย. 2569) — ยังโหลด/ไม่มีค่า = บอกในหัวข้อ ไม่ซ่อนหัวข้อ
+  if (facet.pending) return <p className="px-2 text-xs text-muted-foreground">กำลังโหลด…</p>;
+  if (facet.options.length === 0) return <p className="px-2 text-xs text-muted-foreground">ไม่มีข้อมูล</p>;
   const { shown, hiddenCount } = facet.searchable
     ? visibleFacetOptions(facet.options, query)
     : { shown: facet.options, hiddenCount: 0 };
@@ -241,9 +244,12 @@ export function FilterAccordion<K extends string>({
           </AccordionTrigger>
           <AccordionContent className="space-y-4 pb-3">
             <FacetBody facet={g.head} onToggle={onToggle} />
-            {g.children.map((c) => (
-              <FacetSection key={c.key} facet={c} onToggle={onToggle} showTitle />
-            ))}
+            {/* หัวข้อลูกยังว่าง (ยังไม่เลือกแม่) = ไม่ขึ้นหัวลูก */}
+            {g.children
+              .filter((c) => c.options.length > 0 || c.selectedCount > 0)
+              .map((c) => (
+                <FacetSection key={c.key} facet={c} onToggle={onToggle} showTitle />
+              ))}
           </AccordionContent>
         </AccordionItem>
       ))}

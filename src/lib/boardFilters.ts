@@ -250,7 +250,7 @@ const FACETS: readonly FacetDef[] = [
     ui: 'check',
     order: [...READINESS_FACET_ORDER],
     labelOf: (v) => READINESS_FACET_LABEL[v as ReadinessFacetValue] ?? v,
-    available: (facts) => Boolean(facts.readinessOf),
+    pending: (facts) => !facts.readinessOf,
     values: (job, facts) => {
       const r = facts.readinessOf?.(job);
       return r ? readinessFacetValues(r) : [];
@@ -263,7 +263,7 @@ const FACETS: readonly FacetDef[] = [
     ui: 'check',
     order: ['none', 'open', 'done', 'rejected'],
     labelOf: (v) => SO_FACET_LABEL[v as SoFacetValue] ?? v,
-    available: (facts) => Boolean(facts.soOf),
+    pending: (facts) => !facts.soOf,
     values: (job, facts) => soFacetValues(facts.soOf?.(job) ?? []),
   },
   {
@@ -272,7 +272,7 @@ const FACETS: readonly FacetDef[] = [
     ui: 'chip',
     order: ['none', 'few', 'many', 'lead'],
     labelOf: (v) => APPLICANT_LABEL[v] ?? v,
-    available: (facts) => facts.countsReady,
+    pending: (facts) => !facts.countsReady,
     values: (job, facts) => {
       const n = facts.applicants(job);
       const out = [n <= 0 ? 'none' : n < 5 ? 'few' : 'many'];
@@ -286,7 +286,7 @@ const FACETS: readonly FacetDef[] = [
     ui: 'check',
     order: ['released', 'unreleased'],
     labelOf: (v) => (v === 'released' ? 'ประกาศ' : 'ยังไม่ประกาศ'),
-    available: (facts) => facts.isReleased !== null,
+    pending: (facts) => facts.isReleased === null,
     values: (job, facts) => [facts.isReleased?.(job) ? 'released' : 'unreleased'],
   },
   {
@@ -305,7 +305,7 @@ const FACETS: readonly FacetDef[] = [
     ui: 'check',
     order: ['sent', 'not_sent'],
     labelOf: (v) => (v === 'sent' ? 'ส่ง AI แล้ว' : 'ยังไม่ส่ง'),
-    available: (facts) => facts.aiSent !== null,
+    pending: (facts) => facts.aiSent === null,
     values: (job, facts) => [(facts.aiSent?.(job) ?? 0) > 0 ? 'sent' : 'not_sent'],
   },
   {

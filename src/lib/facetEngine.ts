@@ -8,7 +8,10 @@
  * หลักการ (แผน `docs/plan-board-irecruit-filter-2569-09-26.md`):
  * - OR ในหัวข้อเดียวกัน · AND ข้ามหัวข้อ
  * - เลขต่อท้ายแต่ละค่า = นับจากชุดที่ผ่าน **หัวข้ออื่น** (เลือกจังหวัดแล้วจังหวัดอื่นไม่กลายเป็น 0)
- * - ห้ามปุ่มหลอก: ซ่อนเฉพาะหัวข้อที่ข้อมูลจริงว่างทั้งหมด · หัวข้อแบบตายตัว (`order`) โชว์ครบ เลข 0 จาง
+ * - 🔴 หัวข้อมีไว้รอเสมอ ไม่รอข้อมูลค่อยโผล่ (เจ้าของ 11 พ.ย. 2569 "filter ให้มันมีไว้รอเลย … มันงง") — ไม่มีค่า = หัวข้อว่าง
+ *   (เดิมซ่อนหัวข้อที่ข้อมูลว่าง = หัวข้อโผล่/หายตอนโหลดเสร็จหรือกดกรอง) · หัวข้อแบบตายตัว (`order`) โชว์ครบ เลข 0 จาง
+ * - 🔴 ตัวเลือกอยู่ที่เดิมตอนติ๊ก (เจ้าของ "เวลาเลือกก็ไม่ต้องเด้งสิ่งที่เลือกมาข้างบน … ตอนนี้กดอะไรเด้งสลับไปสลับมา")
+ *   ลำดับคิดจากทั้งชุด ไม่ขึ้นกับสิ่งที่ติ๊ก · ค่าที่ติ๊กไม่ลอยขึ้นบน
  * - หัวข้อที่เส้นข้อมูลยังไม่พร้อม (`available` = false) ต้องไม่โชว์ **และห้ามตัดแถวทิ้ง**
  * - เก็บใน URL ต่อยอด params เดิม (แต่ละหน้าใช้ prefix ของตัวเอง ไม่ชนกัน)
  */
@@ -33,8 +36,10 @@ export type FacetDef<T, K extends string, F, S extends FacetState<K> = FacetStat
   order?: readonly string[];
   /** คำบนจอของค่า — ไม่มี = ใช้ค่านั้นเป็นคำ */
   labelOf?: (value: string) => string;
-  /** หัวข้อนี้พร้อมโชว์ไหม (ขึ้นกับเส้นข้อมูล) */
+  /** หัวข้อนี้มีในหน้านี้ไหม (เช่น เฉพาะแท็บนัดหมาย) — false = ไม่มีหัวข้อนี้เลย */
   available?: (facts: F) => boolean;
+  /** เส้นข้อมูลของหัวข้อนี้ยังโหลดไม่เสร็จ — หัวข้อยังอยู่ (ขึ้นกำลังโหลด) แต่ยังไม่กรอง (ห้ามตัดแถวทิ้งเพราะยังไม่รู้) */
+  pending?: (facts: F) => boolean;
   /** แถวนี้มีค่าอะไรบ้าง — คืนได้หลายค่า · คืน [] = แถวนี้ไม่อยู่ในหัวข้อนี้ (หัวข้อลูกก่อนเลือกแม่) */
   values: (row: T, facts: F, state: S) => string[];
 };
@@ -47,6 +52,8 @@ export type FacetView<K extends string = string> = {
   searchable: boolean;
   options: FacetOption[];
   selectedCount: number;
+  /** เส้นข้อมูลยังโหลดไม่เสร็จ */
+  pending?: boolean;
 };
 
 /** ค่าที่ติ๊กจริงของหัวข้อนั้น (กรองของว่างออก) */
@@ -59,7 +66,7 @@ function activeDefs<T, K extends string, F, S extends FacetState<K>>(
   defs: readonly FacetDef<T, K, F, S>[],
   facts: F,
 ): FacetDef<T, K, F, S>[] {
-  return defs.filter((d) => !d.available || d.available(facts));
+  return defs.filter((d) => (!d.available || d.available(facts)) && !d.pending?.(facts));
 }
 
 type ValueTable<K extends string> = Map<K, string[][]>;
@@ -154,13 +161,22 @@ export function buildFacetViews<T, K extends string, F, S extends FacetState<K>>
   const table = buildValueTable(rows, active, facts, state);
   const out: FacetView<K>[] = [];
 
-  for (const d of active) {
+  for (const d of defs) {
+    if (d.available && !d.available(facts)) continue;
     const selected = selectedOf(state, d.key);
+    if (!active.includes(d)) {
+      out.push({ key: d.key, label: d.label, ui: d.ui, searchable: Boolean(d.searchable), options: [], selectedCount: selected.length, pending: true });
+      continue;
+    }
     const universe = new Set<string>();
-    for (const vals of table.get(d.key) ?? []) for (const v of vals) universe.add(v);
-    // 🔴 ห้ามปุ่มหลอก: ข้อมูลจริงว่างทั้งหมด (มีแต่ "ไม่ระบุ" หรือไม่มีเลย) และไม่ได้ติ๊กอะไร = ซ่อน
-    const hasRealValue = [...universe].some((v) => v !== UNSPECIFIED);
-    if (!hasRealValue && selected.length === 0) continue;
+    // ลำดับของค่าเยอะ = จำนวนในทั้งชุด (ไม่ขึ้นกับสิ่งที่ติ๊ก) — ติ๊กแล้วตัวเลือกไม่สลับที่
+    const baseCounts = new Map<string, number>();
+    for (const vals of table.get(d.key) ?? []) {
+      for (const v of new Set(vals)) {
+        universe.add(v);
+        baseCounts.set(v, (baseCounts.get(v) ?? 0) + 1);
+      }
+    }
     if (d.order) for (const v of d.order) universe.add(v);
     for (const v of selected) universe.add(v);
 
@@ -189,7 +205,7 @@ export function buildFacetViews<T, K extends string, F, S extends FacetState<K>>
       options.sort((a, b) => {
         if (a.value === UNSPECIFIED) return 1;
         if (b.value === UNSPECIFIED) return -1;
-        return b.count - a.count || a.label.localeCompare(b.label, 'th');
+        return (baseCounts.get(b.value) ?? 0) - (baseCounts.get(a.value) ?? 0) || a.label.localeCompare(b.label, 'th');
       });
     }
 
@@ -207,7 +223,7 @@ export function buildFacetViews<T, K extends string, F, S extends FacetState<K>>
 
 /**
  * ตัวเลือกที่จะโชว์ในหัวข้อค่าเยอะ (กติกาในแผน ข้อ 4)
- * ค่าที่ติ๊กแล้วลอยขึ้นบนสุด · ยังไม่พิมพ์ค้นหา = โชว์ 10 ค่าแรก · พิมพ์แล้ว = ทุกค่าที่ตรง
+ * ยังไม่พิมพ์ค้นหา = 10 ค่าแรก · พิมพ์แล้ว = ทุกค่าที่ตรง · ค่าที่ติ๊กไว้โชว์เสมอ **ที่ตำแหน่งเดิม** (ไม่ลอยขึ้นบน · เจ้าของ 11 พ.ย. 2569)
  */
 export function visibleFacetOptions(
   options: readonly FacetOption[],
@@ -215,14 +231,9 @@ export function visibleFacetOptions(
   limit = 10,
 ): { shown: FacetOption[]; hiddenCount: number } {
   const q = query.trim().toLowerCase();
-  const selected = options.filter((o) => o.selected);
-  const rest = options.filter((o) => !o.selected);
-  if (q) {
-    const hits = rest.filter((o) => o.label.toLowerCase().includes(q));
-    return { shown: [...selected, ...hits], hiddenCount: 0 };
-  }
-  const head = rest.slice(0, Math.max(limit - selected.length, 0));
-  return { shown: [...selected, ...head], hiddenCount: rest.length - head.length };
+  if (q) return { shown: options.filter((o) => o.selected || o.label.toLowerCase().includes(q)), hiddenCount: 0 };
+  const shown = options.filter((o, i) => i < limit || o.selected);
+  return { shown, hiddenCount: options.length - shown.length };
 }
 
 /** นับค่าที่ติ๊กอยู่ทั้งแถบ (ปุ่ม "ตัวกรอง (N)" บนมือถือ) */

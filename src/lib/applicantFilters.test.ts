@@ -119,9 +119,9 @@ describe('จังหวัด → อำเภอ', () => {
   const bkk = app({ province: 'กรุงเทพมหานคร', district: 'บางรัก' });
 
   // อำเภอเหลือแค่แท็บติดตามนัดหมาย (15 ต.ค. 2569 ถอดจากแท็บผู้สมัคร/การติดต่อ)
-  it('ยังไม่เลือกจังหวัด = ไม่มีหัวข้ออำเภอ · เลือกแล้วโผล่เฉพาะอำเภอของจังหวัดนั้น', () => {
+  it('ยังไม่เลือกจังหวัด = อำเภอยังว่าง (แถบไม่ขึ้นหัวลูก) · เลือกแล้วโผล่เฉพาะอำเภอของจังหวัดนั้น', () => {
     const appt = facts({ tab: 'appointments' });
-    expect(buildApplicantFacets([lop, bkk], EMPTY_APPLICANT_FILTER_STATE, appt).some((f) => f.key === 'district')).toBe(false);
+    expect(buildApplicantFacets([lop, bkk], EMPTY_APPLICANT_FILTER_STATE, appt).find((f) => f.key === 'district')?.options).toEqual([]);
     const d = buildApplicantFacets([lop, bkk], state({ province: ['ลพบุรี'] }), appt).find((f) => f.key === 'district')!;
     expect(d.options.map((o) => o.value)).toEqual(['ชัยบาดาล']);
   });

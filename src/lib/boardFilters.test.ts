@@ -179,9 +179,10 @@ describe('🔴 ห้ามปุ่มหลอก · หัวข้อตา�
     ]);
   });
 
-  it('หัวข้อค่าเยอะที่ข้อมูลว่างทั้งหมด = ไม่โชว์ (ไม่มีอะไรให้กด)', () => {
+  it('🔴 หัวข้อมีไว้รอเสมอ แม้ข้อมูลว่างทั้งหมด (เจ้าของ 11 พ.ย. 2569 "ไม่ใช่ว่าต้องรอมีข้อมูลแล้วค่อยขึ้น")', () => {
     const rows = [job({ recruiter_name: '' }), job({ recruiter_name: '' })];
-    expect(buildBoardFacets(rows, EMPTY_BOARD_FILTER_STATE, facts()).some((v) => v.key === 'recruiter')).toBe(false);
+    expect(buildBoardFacets(rows, EMPTY_BOARD_FILTER_STATE, facts()).some((v) => v.key === 'recruiter')).toBe(true);
+    expect(buildBoardFacets([], EMPTY_BOARD_FILTER_STATE, facts()).some((v) => v.key === 'recruiter')).toBe(true);
   });
 
   it('หัวข้อค่าเยอะที่มีค่าเดียวก็ยังโชว์ (ไม่ใช่ปุ่มหลอก — บอกว่าทั้งกองเป็นของใคร)', () => {
@@ -252,12 +253,15 @@ describe('ตำแหน่งงาน → งานย่อย (เฉพา
   const garden = job({ job_description_code_1: 'คนสวน', job_description_code_2: '1' });
   const rows = [central, boss, valet, other, garden];
 
-  it('ยังไม่เลือกตำแหน่ง = ไม่มีหัวข้องานย่อย', () => {
-    expect(buildBoardFacets(rows, EMPTY_BOARD_FILTER_STATE, facts()).some((v) => v.key === 'subtype')).toBe(false);
+  const subtypeOptions = (s: Parameters<typeof buildBoardFacets>[1]) =>
+    buildBoardFacets(rows, s, facts()).find((v) => v.key === 'subtype')?.options.filter((o) => o.count > 0 || o.selected);
+
+  it('ยังไม่เลือกตำแหน่ง = งานย่อยไม่มีค่าให้กด', () => {
+    expect(subtypeOptions(EMPTY_BOARD_FILTER_STATE)).toEqual([]);
   });
 
   it('เลือกตำแหน่งที่ไม่ใช่งานขับรถ = ไม่มีงานย่อย', () => {
-    expect(buildBoardFacets(rows, state({ position: ['คนสวน'] }), facts()).some((v) => v.key === 'subtype')).toBe(false);
+    expect(subtypeOptions(state({ position: ['คนสวน'] }))).toEqual([]);
   });
 
   it('เลือก "ขับรถ" แล้ว งานย่อยโผล่: ส่วนกลาง · นายไทย · นายต่างชาติ · Valet · อื่น ๆ (4 ต.ค. 2569)', () => {
@@ -293,9 +297,11 @@ describe('เส้นข้อมูลที่ยังไม่พร้อ�
   const a = job();
   const b = job();
 
-  it('ทะเบียนปล่อยยังไม่มา = ไม่มีหัวข้อสถานะประกาศ และติ๊กค้างก็ไม่ตัดใบทิ้ง', () => {
+  const pendingOf = (f: BoardFacetFacts, key: string) => buildBoardFacets([a, b], EMPTY_BOARD_FILTER_STATE, f).find((v) => v.key === key)?.pending;
+
+  it('ทะเบียนปล่อยยังไม่มา = หัวข้อสถานะประกาศขึ้น "กำลังโหลด" และติ๊กค้างก็ไม่ตัดใบทิ้ง', () => {
     const f = facts({ released: null });
-    expect(buildBoardFacets([a, b], EMPTY_BOARD_FILTER_STATE, f).some((v) => v.key === 'release')).toBe(false);
+    expect(pendingOf(f, 'release')).toBe(true);
     expect(applyBoardFilters([a, b], state({ release: ['released'] }), f)).toEqual([a, b]);
   });
 
@@ -304,14 +310,15 @@ describe('เส้นข้อมูลที่ยังไม่พร้อ�
     expect(applyBoardFilters([a, b], state({ release: ['unreleased'] }), f)).toEqual([b]);
   });
 
-  it('🔴 ยอดผู้สมัครยังไม่มา = ไม่มีหัวข้อจำนวนผู้สมัคร (ไม่งั้นขึ้น "ยังไม่มีคนสมัคร" ทั้งกอง)', () => {
+  it('🔴 ยอดผู้สมัครยังไม่มา = หัวข้อจำนวนผู้สมัครยังไม่มีตัวเลือก (ไม่งั้นขึ้น "ยังไม่มีคนสมัคร" ทั้งกอง)', () => {
     const f = facts({ countsReady: false });
-    expect(buildBoardFacets([a, b], EMPTY_BOARD_FILTER_STATE, f).some((v) => v.key === 'applicants')).toBe(false);
+    expect(pendingOf(f, 'applicants')).toBe(true);
+    expect(buildBoardFacets([a, b], EMPTY_BOARD_FILTER_STATE, f).find((v) => v.key === 'applicants')?.options).toEqual([]);
     expect(applyBoardFilters([a, b], state({ applicants: ['many'] }), f)).toEqual([a, b]);
   });
 
-  it('ยอด AI ยังไม่มา = ไม่มีหัวข้อ AI โทร', () => {
-    expect(buildBoardFacets([a, b], EMPTY_BOARD_FILTER_STATE, facts({ ai: null })).some((v) => v.key === 'ai')).toBe(false);
+  it('ยอด AI ยังไม่มา = หัวข้อ AI โทรขึ้น "กำลังโหลด"', () => {
+    expect(pendingOf(facts({ ai: null }), 'ai')).toBe(true);
     const f = facts({ ai: { [a.id]: 2 } });
     expect(applyBoardFilters([a, b], state({ ai: ['sent'] }), f)).toEqual([a]);
   });
@@ -333,9 +340,9 @@ describe('ช่วงอายุ — ใบที่ช่วงทับก�
 });
 
 describe('จังหวัด → อำเภอ', () => {
-  it('ยังไม่เลือกจังหวัด = ไม่มีหัวข้ออำเภอ', () => {
+  it('ยังไม่เลือกจังหวัด = อำเภอยังว่าง (แถบไม่ขึ้นหัวลูก)', () => {
     const rows = [job(), job({ location_address: addrBkk })];
-    expect(buildBoardFacets(rows, EMPTY_BOARD_FILTER_STATE, facts()).some((v) => v.key === 'district')).toBe(false);
+    expect(buildBoardFacets(rows, EMPTY_BOARD_FILTER_STATE, facts()).find((v) => v.key === 'district')?.options).toEqual([]);
   });
 
   it('เลือกจังหวัดแล้ว อำเภอของใบขอโผล่ให้กรอง', () => {
@@ -390,16 +397,15 @@ describe('visibleFacetOptions — ช่องค้นหาในหัวข�
     selected: i === 12,
   }));
 
-  it('ยังไม่พิมพ์ = 10 ค่า โดยค่าที่ติ๊กลอยขึ้นบนสุด', () => {
+  it('🔴 ยังไม่พิมพ์ = 10 ค่าแรก + ค่าที่ติ๊กไว้ **ที่ตำแหน่งเดิม** ไม่ลอยขึ้นบน (เจ้าของ 11 พ.ย. 2569)', () => {
     const { shown, hiddenCount } = visibleFacetOptions(opts, '');
-    expect(shown).toHaveLength(10);
-    expect(shown[0].value).toBe('u12');
-    expect(hiddenCount).toBe(5);
+    expect(shown.map((o) => o.value)).toEqual(['u0', 'u1', 'u2', 'u3', 'u4', 'u5', 'u6', 'u7', 'u8', 'u9', 'u12']);
+    expect(hiddenCount).toBe(4);
   });
 
-  it('พิมพ์แล้ว = ทุกค่าที่ตรง (ค่าที่ติ๊กยังอยู่บนสุด)', () => {
+  it('พิมพ์แล้ว = ทุกค่าที่ตรง เรียงตามเดิม', () => {
     const { shown } = visibleFacetOptions(opts, 'หน่วย 1');
-    expect(shown.map((o) => o.value)).toEqual(['u12', 'u1', 'u10', 'u11', 'u13', 'u14']);
+    expect(shown.map((o) => o.value)).toEqual(['u1', 'u10', 'u11', 'u12', 'u13', 'u14']);
   });
 });
 
@@ -513,8 +519,8 @@ describe('🔴 พร้อมประกาศไหม — แทนหัว
     expect(applyBoardFilters(rows, st, withReadiness()).map((j) => j.id)).toEqual([a.id]);
   });
 
-  it('ทะเบียนการประกาศยังไม่พร้อม = ไม่มีหัวข้อนี้ และค่าที่ค้างใน URL ต้องไม่ตัดใบทิ้ง', () => {
-    expect(buildBoardFacets(rows, EMPTY_BOARD_FILTER_STATE, facts()).some((f) => f.key === 'ready')).toBe(false);
+  it('ทะเบียนการประกาศยังไม่พร้อม = หัวข้อขึ้น "กำลังโหลด" และค่าที่ค้างใน URL ต้องไม่ตัดใบทิ้ง', () => {
+    expect(buildBoardFacets(rows, EMPTY_BOARD_FILTER_STATE, facts()).find((f) => f.key === 'ready')?.pending).toBe(true);
     const st = toggleBoardFacetValue(EMPTY_BOARD_FILTER_STATE, 'ready', 'ready');
     expect(applyBoardFilters(rows, st, { ...facts(), readinessOf: null })).toHaveLength(rows.length);
   });
@@ -527,5 +533,21 @@ describe('🔴 พร้อมประกาศไหม — แทนหัว
     expect(p.getAll('f.ready')).toEqual(['ready']);
     expect(p.get('lane')).toBe('unreleased');
     expect(readBoardFilterState(p).selection.ready).toEqual(['ready']);
+  });
+});
+
+describe('🔴 ติ๊กแล้วตัวเลือกไม่สลับที่ (เจ้าของ 11 พ.ย. 2569 "กดอะไรเด้งสลับไปสลับมา")', () => {
+  it('ลำดับหน่วยงานคิดจากทั้งชุด — ติ๊กหัวข้ออื่นแล้วเลขเปลี่ยนแต่ลำดับเท่าเดิม', () => {
+    const rows = [
+      job({ unit_name: 'A', recruiter_name: 'คิว' }),
+      job({ unit_name: 'A', recruiter_name: 'คิว' }),
+      job({ unit_name: 'A', recruiter_name: 'คิว' }),
+      job({ unit_name: 'B', recruiter_name: 'แบงค์' }),
+      job({ unit_name: 'B', recruiter_name: 'แบงค์' }),
+      job({ unit_name: 'C', recruiter_name: 'แบงค์' }),
+    ];
+    const order = (s: Parameters<typeof buildBoardFacets>[1]) =>
+      buildBoardFacets(rows, s, facts()).find((v) => v.key === 'unit')!.options.map((o) => o.value);
+    expect(order(state({ recruiter: ['แบงค์'] }))).toEqual(order(EMPTY_BOARD_FILTER_STATE));
   });
 });
