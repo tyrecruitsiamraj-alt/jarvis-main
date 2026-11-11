@@ -180,6 +180,7 @@ describe('QA 30 ต.ค. 2569 ก้อน 3 Dashboard', () => {
     expect(src).toContain('buildAgeDaysBreakdown(period ? stockJobs : openRemainingJobs, today)');
     expect(src).toContain('buildUnitOverview(openRemainingJobs, today)');
     // ชิปเหลือหาโหมดมีงวดบวกใบขอชั่วคราวให้ชุดเดียวกัน
-    expect(readFileSync('src/components/dashboard/analytics/DashboardShell.tsx', 'utf8')).toContain("(dateRange != null ? data.prequestKpi?.value ?? 0 : 0)");
+    // 11 พ.ย. 2569 ใบชั่วคราวอยู่ในข้อมูลแนวโน้มแล้ว (เจ้าของ "นับรวมเหมือนหน้าหลัก") — เลิกบวกแยก
+    expect(readFileSync('src/components/dashboard/analytics/DashboardShell.tsx', 'utf8')).not.toContain("(dateRange != null ? data.prequestKpi?.value ?? 0 : 0)");
   });
 });

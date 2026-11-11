@@ -179,8 +179,8 @@ const DashboardShell: React.FC<Props> = ({
       remaining: rows.reduce((sum, r) => sum + r.remaining, 0),
     };
   });
-  // โหมดเลือกช่วง: เหลือหาของ ERP ไม่มีใบขอชั่วคราว → บวกใบชั่วคราวที่ต้องการคนในช่วง (เจ้าของ 9 พ.ย. 2569 "นับใบขอชั่วคราวด้วย")
-  const remainingKpiValue = (data.kpis.find((k) => k.id === 'remaining')?.value ?? 0) + (dateRange != null ? data.prequestKpi?.value ?? 0 : 0);
+  // ใบขอชั่วคราวอยู่ในข้อมูลแนวโน้มแล้ว (เจ้าของ 11 พ.ย. 2569 "นับรวมเหมือนหน้าหลัก") — เลิกบวกแยก (บวกซ้ำ)
+  const remainingKpiValue = data.kpis.find((k) => k.id === 'remaining')?.value ?? 0;
 
 
   /** แผงตัวกรองชุดเดียว — มือถือเอาไปใส่ Collapsible · เดสก์ท็อปวางตรง ๆ เหมือนเดิม */

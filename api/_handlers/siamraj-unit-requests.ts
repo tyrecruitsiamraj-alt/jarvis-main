@@ -30,6 +30,7 @@ import { enqueuePrecomputeJobs } from '../_lib/matchPrecomputeWorker.js';
 import { logInfo, logWarn } from '../_lib/logger.js';
 import { enrichJobsWithUrgency } from '@/lib/jobUrgency';
 import { canSeeDrawRate, hideDrawRateOnLines, hideDrawRateOnRequests } from '../_lib/drawRateVisibility.js';
+import { listPrequestThroughput } from '../_lib/siamrajPrequestThroughput.js';
 
 function getQuery(req: AuthedReq, key: string): string {
   const v = req.query?.[key];
@@ -461,8 +462,12 @@ async function handler(req: AuthedReq, res: ApiRes) {
       if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
         return sendError(res, 400, 'Bad request', 'ต้องระบุ from และ to เป็น YYYY-MM-DD');
       }
-      const items = await listSiamrajThroughput({ from, to, departmentScope });
-      return res.status(200).json(items);
+      // ใบขอชั่วคราวนับรวมเหมือนหน้าหลัก (เจ้าของ 11 พ.ย. 2569) — อ่านไม่ได้ = ล้มทั้งเส้น (ห้ามโชว์เลขขาดเงียบ ๆ)
+      const [erp, pre] = await Promise.all([
+        listSiamrajThroughput({ from, to, departmentScope }),
+        getSiamrajDbSource() === 'sqlserver' ? listPrequestThroughput({ from, to, departmentScope }) : Promise.resolve([]),
+      ]);
+      return res.status(200).json([...erp, ...pre]);
     }
 
     if (getQuery(req, 'closed') === '1') {
