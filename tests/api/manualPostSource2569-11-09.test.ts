@@ -65,7 +65,8 @@ describe('ตารางช่องทางชั้นที่ 4', () => {
 
 describe('ใครหารายชื่อเข้ามา (เจ้าของ 9 พ.ย. 2569 "คิวโพสต์เอง ก็บอกว่าคนเข้ามาเป็นของคิว")', () => {
   const f = (id: string, p: Partial<RecruitAppFact>) => ({ ...fact(id, null), ...p }) as RecruitAppFact;
-  it('นับให้คนที่ทำ · แยกวิธี → กลุ่ม · ทุกชั้นบวกกันเท่ารวม', () => {
+  // 11 พ.ย. 2569 เจ้าของ: คน → ช่องทาง → ช่องทางย่อย → กลุ่ม → โพสต์เอง/Autopost (ต้นไม้ชุดเดียวกับตารางช่องทาง)
+  it('นับให้คนที่ทำ · คน → ช่องทาง → … · ทุกชั้นบวกกันเท่ารวม', () => {
     const apps = [
       f('a', { bringer: 'คิว', postSource: 'manual' }),
       f('b', { bringer: 'คิว', postSource: 'manual' }),
@@ -77,8 +78,10 @@ describe('ใครหารายชื่อเข้ามา (เจ้า�
     const t = buildBringerFunnelTree(apps);
     expect(t.groups.map((g) => [g.channel, g.names.value])).toEqual([['คิว', 3], ['เจมส์', 1], ['ดึงจาก iRecruit', 1], [NO_BRINGER_WEB, 1]]);
     const q = t.groups[0];
-    expect(q.children!.map((c) => [c.channel, c.names.value])).toEqual([['โพสต์เอง', 2], ['Autopost', 1]]);
-    expect(t.groups.find((g) => g.channel === 'เจมส์')!.children![0].channel).toBe('เพิ่มเอง / นำเข้า');
+    // ชั้นที่ 2 = กลุ่มช่องทาง (Facebook/Tiktok/…) ที่คนนั้นมีรายชื่อเท่านั้น · รวมกันเท่ายอดคน
+    expect(q.children!.every((c) => (c.names.value ?? 0) > 0)).toBe(true);
+    expect(q.children!.reduce((n, c) => n + (c.names.value ?? 0), 0)).toBe(3);
+    expect(t.groups.find((g) => g.channel === NO_BRINGER_WEB)!.children!.map((c) => c.channel)).toEqual(['Tiktok']);
     expect(t.groups.reduce((n, g) => n + (g.names.value ?? 0), 0)).toBe(t.total.names.value);
   });
   it('เซิร์ฟเวอร์: ลิงก์ = คนสร้างลิงก์ › ผู้รับผิดชอบประกาศ (ลิงก์เก่า) · ไม่มีลิงก์ = คนเพิ่ม · อีเมลเป็นชื่อเล่น', () => {

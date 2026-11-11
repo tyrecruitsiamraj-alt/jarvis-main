@@ -261,3 +261,48 @@ export function monthlySeries(rows: readonly StuckMonthlyRow[], key: StuckTrendK
   }
   return [...by.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([month, value]) => ({ month, value }));
 }
+
+/* ═══ ข้อ 1 "ใครต้องทำอะไร" (เจ้าของ 11 พ.ย. 2569 รวมหน้าภาพรวมเป็นหน้าเดียว 4 ข้อ · Choice "ตารางต่อคน งานที่ค้าง") ═══
+ * แถว = เจ้าหน้าที่สรรหาของใบ (งานประกาศ/โพสต์ และรายชื่อที่ยังไม่มีคนเก็บ ลงที่เจ้าของใบ — Choice) · ช่อง = เหตุที่ใบค้าง 6 กลุ่ม
+ * ช่องที่มีคนบอกทั้งใบและคน (Choice "ใบ + คน"): มีชื่อยังไม่โทร = คนที่รอโทร · โทรแล้วยังไม่ได้คน = คนที่เหลือโทร · รอปิดใบ = คนที่นัดได้
+ * ทุกใบอยู่ช่องเดียว (`reason` ตัวเดียวกับการ์ดขั้นที่ติด) ⇒ ทุกช่องรวมกันเท่าใบทั้งหมด (มีเทสต์) */
+export type StuckTodoKey = 'not_released' | 'not_posted' | 'no_apps' | 'uncalled' | 'calling' | 'closing';
+export const STUCK_TODO_COLUMNS: ReadonlyArray<{ key: StuckTodoKey; label: string; reasons: readonly StuckReasonKey[]; peopleLabel: string | null }> = [
+  { key: 'not_released', label: 'ยังไม่ประกาศ', reasons: ['not_released'], peopleLabel: null },
+  { key: 'not_posted', label: 'ยังไม่โพสต์', reasons: ['not_posted'], peopleLabel: null },
+  { key: 'no_apps', label: 'ไม่มีคนกรอก', reasons: ['no_apps'], peopleLabel: null },
+  { key: 'uncalled', label: 'มีชื่อ ยังไม่โทร', reasons: ['queued_not_called', 'names_not_called', 'staff_not_calling'], peopleLabel: 'รอโทร' },
+  { key: 'calling', label: 'โทรแล้ว ยังไม่ได้คน', reasons: ['calling_no_interest', 'names_exhausted', 'cannot_reach', 'not_interested'], peopleLabel: 'เหลือโทร' },
+  { key: 'closing', label: 'ได้คนแล้ว รอปิดใบ', reasons: ['no_appointment', 'appointed_not_show', 'showed_not_passed', 'waiting_start'], peopleLabel: 'นัดได้' },
+];
+const TODO_OF: Record<StuckReasonKey, StuckTodoKey> = Object.fromEntries(
+  STUCK_TODO_COLUMNS.flatMap((c) => c.reasons.map((r) => [r, c.key])),
+) as Record<StuckReasonKey, StuckTodoKey>;
+
+/** คนของใบในช่องนั้น — ช่องที่ไม่มีคน = 0 */
+export function stuckTodoPeople(r: StuckRequest): number {
+  const c = r.signals.counts;
+  switch (TODO_OF[r.reason]) {
+    case 'uncalled':
+      return r.reason === 'staff_not_calling' ? c.aiYesNoStaff : r.signals.uncalled;
+    case 'calling':
+      return r.signals.uncalled;
+    case 'closing':
+      return c.appointed;
+    default:
+      return 0;
+  }
+}
+
+export type StuckTodoRow = { owner: string; cells: Record<StuckTodoKey, StuckRequest[]>; total: number };
+export function stuckTodoByOwner(rows: readonly StuckRequest[]): StuckTodoRow[] {
+  const by = new Map<string, StuckTodoRow>();
+  for (const r of rows) {
+    const owner = recruiterLabelOf(r);
+    const row = by.get(owner) ?? { owner, cells: Object.fromEntries(STUCK_TODO_COLUMNS.map((c) => [c.key, []])) as unknown as Record<StuckTodoKey, StuckRequest[]>, total: 0 };
+    row.cells[TODO_OF[r.reason]].push(r);
+    row.total += 1;
+    by.set(owner, row);
+  }
+  return [...by.values()].sort((a, b) => b.total - a.total || a.owner.localeCompare(b.owner, 'th'));
+}

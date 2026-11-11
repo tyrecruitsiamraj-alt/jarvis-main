@@ -217,40 +217,21 @@ export function bringerOf(f: Pick<RecruitAppFact, 'bringer' | 'postSource'>): st
   if (b) return IRECRUIT_BRINGER.test(b) ? 'ดึงจาก iRecruit' : b;
   return f.postSource ? NO_BRINGER_LINK : NO_BRINGER_WEB;
 }
-export function bringMethodOf(f: Pick<RecruitAppFact, 'bringer' | 'postSource'>): string {
-  if (f.postSource === 'autopost') return POST_SOURCE_LABEL.autopost;
-  if (f.postSource === 'manual') return POST_SOURCE_LABEL.manual;
-  if (IRECRUIT_BRINGER.test((f.bringer ?? '').trim())) return 'ดึงจาก iRecruit';
-  return f.bringer ? 'เพิ่มเอง / นำเข้า' : NO_BRINGER_WEB;
-}
-/** ชั้นสุดท้าย: ชื่อกลุ่ม/เพจถ้ามี ไม่งั้นช่องทาง */
-const placeNameOf = (f: RecruitAppFact): string => {
-  const sub = funnelSubOf(f);
-  return sub !== NO_SUB ? sub : funnelPlaceOf(f).channel;
-};
 export function buildBringerFunnelTree(cohort: readonly RecruitAppFact[]): { groups: FunnelNode[]; total: ChannelFunnelRow } {
-  const by = new Map<string, Map<string, Map<string, RecruitAppFact[]>>>();
+  // 🔴 11 พ.ย. 2569 เจ้าของ "ว่าน ชื่อเท่านี้ พอกดลูกศรก็เห็นว่ามาจากไหนบ้าง facebook tiktok พอกด facebook ก็เห็นว่ามาจาก ad หรือ group"
+  // ⇒ คน → ช่องทาง → ช่องทางย่อย → กลุ่ม → โพสต์เอง/Autopost = ต้นไม้ชุดเดียวกับตารางช่องทาง (`buildChannelFunnelTree`) ใต้ชื่อคน
+  //    (เดิม คน → วิธี → ที่) · กลุ่มช่องทางที่คนนั้นไม่มีรายชื่อไม่ขึ้น
+  const by = new Map<string, RecruitAppFact[]>();
   for (const f of cohort) {
     const who = bringerOf(f);
-    const how = bringMethodOf(f);
-    const where = placeNameOf(f);
-    const hows = by.get(who) ?? new Map<string, Map<string, RecruitAppFact[]>>();
-    const wheres = hows.get(how) ?? new Map<string, RecruitAppFact[]>();
-    wheres.set(where, [...(wheres.get(where) ?? []), f]);
-    hows.set(how, wheres);
-    by.set(who, hows);
+    by.set(who, [...(by.get(who) ?? []), f]);
   }
   const groups: FunnelNode[] = [...by.entries()]
-    .map(([who, hows]) => {
-      const howNodes: FunnelNode[] = [...hows.entries()]
-        .map(([how, wheres]) => ({
-          ...rowOf(how, [...wheres.values()].flat()),
-          key: `${who}|${how}`,
-          children: [...wheres.entries()].map(([where, l]) => ({ ...rowOf(where, l), key: `${who}|${how}|${where}` })).sort(byNames),
-        }))
-        .sort(byNames);
-      return { ...rowOf(who, [...hows.values()].flatMap((w) => [...w.values()].flat())), key: who, children: howNodes };
-    })
+    .map(([who, list]) => ({
+      ...rowOf(who, list),
+      key: `bringer:${who}`,
+      children: buildChannelFunnelTree(list).groups.filter((g) => (g.names.value ?? 0) > 0),
+    }))
     .sort(byNames);
   return { groups, total: rowOf('รวม', cohort) };
 }

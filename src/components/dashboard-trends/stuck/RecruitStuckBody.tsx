@@ -1,9 +1,8 @@
 import React from 'react';
-import { AlertCircle, Megaphone, UserRound } from 'lucide-react';
+import { AlertCircle, ListChecks, Megaphone, PhoneCall, UserRound } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { V5Divider } from '@/components/so-recruit-v5/V5Parts';
 import { EMPTY_REQUEST_FILTER, appsOfFilter, filterRequestRows, jobFilterOf, requestFilterToParams, type RequestTabFilter } from '@/lib/recruitRequestTab';
 import { cohortOf, reasonGroups } from '@/lib/recruitOverview';
@@ -23,18 +22,11 @@ import StuckOwnerTable from './StuckOwnerTable';
 import StuckAreaTable from './StuckAreaTable';
 import MonthlyBarsCard from './MonthlyBarsCard';
 import StuckEquationCard from './StuckEquationCard';
+import StuckTodoTable from './StuckTodoTable';
+import CallerResultsTable from './CallerResultsTable';
 import PersonJourneyCard from './PersonJourneyCard';
 import ReleaseProgressCard from './ReleaseProgressCard';
 
-type V5Tab = 'overview' | 'staff' | 'channel' | 'area' | 'trend' | 'reasons';
-const V5_TABS: ReadonlyArray<readonly [V5Tab, string]> = [
-  ['overview', 'ภาพรวม'],
-  ['staff', 'เจ้าหน้าที่'],
-  ['channel', 'ช่องทาง'],
-  ['area', 'พื้นที่'],
-  ['trend', 'แนวโน้ม'],
-  ['reasons', 'เหตุผลที่ไม่สำเร็จ'],
-];
 
 const SCOPE_TITLE: Record<StuckScope, { title: string; sub: string }> = {
   remaining: { title: 'ใบขอที่เหลือหา แยกขั้นที่ติด', sub: 'ใบที่ยังเปิดอยู่ ณ วันนี้ · กดได้ทุกตัวเลข' },
@@ -65,7 +57,7 @@ export default function RecruitStuckBody({
   requestTrend?: (rows: RecruitRequestRow[] | null, prevRows: RecruitRequestRow[] | null) => React.ReactNode;
   onOpenNames: (title: string, ids: readonly string[]) => void;
   onPickMonth: (month: string) => void;
-  /** `v5` = โฉมต้นแบบ SO Recruit (10 พ.ย. 2569 · &dash=v5) — การ์ดชุดเดิมทั้งหมด จัดเป็นแท็บเจาะรายละเอียด */
+  /** `v5` = โฉมต้นแบบ SO Recruit (10 พ.ย. 2569 · &dash=v5) — 11 พ.ย. 2569 หน้าเดียว 4 ข้อ ไม่มีแท็บ */
   layout?: 'v5';
 }) {
   const navigate = useNavigate();
@@ -149,17 +141,15 @@ export default function RecruitStuckBody({
     requestAnimationFrame(() => phasesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
   };
   const openRequest = (r: StuckRequest) => r.jobId && navigate(requestPathOfJobId(r.jobId));
-  const [detailTab, setDetailTab] = React.useState<V5Tab>('overview');
 
   if (layout === 'v5') {
-    const ownerTable = <StuckOwnerTable bars rows={focused} countLabel={scope === 'remaining' ? 'ใบที่ต้องหา' : `ใบ${STUCK_SCOPE_LABEL[scope]}`} onPick={pick} />;
     const bringerCard = (
-      <OverviewCard icon={UserRound} title="รายชื่อ แยกคนหา" sub={cohortSub}>
-        {appsUnknown ? appsError : <ChannelFunnelTable groups={bringers.groups} total={bringers.total} onOpen={onOpenNames} firstLabel="คน" />}
+      <OverviewCard icon={UserRound} title="3. ที่มามาจากใคร" sub={cohortSub}>
+        {appsUnknown ? appsError : <ChannelFunnelTable groups={bringers.groups} total={bringers.total} onOpen={onOpenNames} firstLabel="คนหา" />}
       </OverviewCard>
     );
     const channelCard = (
-      <OverviewCard icon={Megaphone} title="รายชื่อ แยกช่องทาง" sub={channelSub}>
+      <OverviewCard icon={Megaphone} title="4. ช่องทางไหนทำได้ดี" sub={channelSub}>
         {appsUnknown ? appsError : <ChannelFunnelTable groups={channels.groups} total={channels.total} onOpen={onOpenNames} clicks={channels.clicks} />}
       </OverviewCard>
     );
@@ -192,51 +182,33 @@ export default function RecruitStuckBody({
           </div>
         )}
 
-        <V5Divider label="เจาะรายละเอียด" />
-        <Tabs value={detailTab} onValueChange={(v) => setDetailTab(v as V5Tab)}>
-          <TabsList variant="line" aria-label="เจาะรายละเอียด">
-            {V5_TABS.map(([k, label]) => (
-              <TabsTrigger key={k} value={k} data-testid={`v5-tab-${k}`}>
-                {label}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-        </Tabs>
-        {/* ทุกการ์ดของหน้าเดิมอยู่ครบในแท็บ (ชุดส่งต่อ 04_NO_DATA_LOSS) — ตัวกรอง/ชุดใบ/ช่วงเดียวกันทั้งหมด */}
-        {detailTab === 'overview' ? (
-          <div className="space-y-4">
-            {stuck.data?.requests ? ownerTable : null}
-            {stuck.data?.requests ? <ReleaseProgressCard rows={filtered} onPick={pick} /> : null}
-            {appsUnknown ? appsError : <PersonJourneyCard list={cohort} sub={cohortSub} onOpenNames={onOpenNames} />}
-          </div>
-        ) : null}
-        {detailTab === 'staff' ? (
-          <div className="space-y-4">
-            {stuck.data?.requests ? ownerTable : null}
-            {bringerCard}
-          </div>
-        ) : null}
-        {detailTab === 'channel' ? (
-          <div className="space-y-4">
-            {channelCard}
-            {bringerCard}
-          </div>
-        ) : null}
-        {detailTab === 'area' && stuck.data?.requests ? (
-          <StuckAreaTable rows={focused} title={scope === 'remaining' ? undefined : `พื้นที่ · ใบ${STUCK_SCOPE_LABEL[scope]}`} countLabel={scope === 'remaining' ? undefined : `ใบ${STUCK_SCOPE_LABEL[scope]}`} onPick={pick} />
-        ) : null}
-        {detailTab === 'trend' ? (
-          <div className="space-y-4">
-            {/* ใบขอรายวันตามช่วงที่เลือก (R09) — ใบตามตัวกรองบนสุด · ช่วงก่อนสำหรับเทียบ */}
-            {requestTrend?.(data.requestRows ? (filterRequestRows(data.requestRows, filter) as RecruitRequestRow[]) : null, data.requestRowsPrev ? (filterRequestRows(data.requestRowsPrev, filter) as RecruitRequestRow[]) : null)}
-            <MonthlyBarsCard rows={monthly.data} error={monthly.error} ok={jobOk} onPickMonth={onPickMonth} open={monthlyOpen} onOpen={() => setMonthlyOpen(true)} />
-          </div>
-        ) : null}
-        {detailTab === 'reasons' ? (
-          <OverviewCard icon={AlertCircle} title="เหตุผลที่ไม่สำเร็จ" sub={`${cohortSub} · ผลล่าสุดของแต่ละคน`}>
-            {appsUnknown ? appsError : <ReasonColumns groups={reasons} onOpen={onOpenNames} />}
+        {/*
+         * 🔴 หน้าเดียว ไม่มีแท็บ (เจ้าของ 11 พ.ย. 2569 "ทำไมต้องแยกกัน เอามันรวมกันเลย" → แบบร่างรอบ 2 "ทำตามแบบร่างนี้")
+         * 1 ใครต้องทำอะไร · 2 ทำแล้วเป็นไง · 3 ที่มามาจากใคร · 4 ช่องทางไหนทำได้ดี · ต่อท้ายพื้นที่ · แนวโน้ม
+         * การ์ดเดิมของแท็บอยู่ครบ: ใบขอใหม่ประกาศไปแค่ไหน (ข้อ 1) · คนที่กรอกมาไปถึงไหน + เหตุผลที่ไม่สำเร็จ (ข้อ 2)
+         */}
+        <V5Divider label="รายงาน" />
+        {stuck.data?.requests ? (
+          <OverviewCard icon={ListChecks} title="1. ใครต้องทำอะไร" sub={`${rows.length.toLocaleString('th-TH')} ใบ${scope === 'remaining' ? 'ที่ยังเปิด' : STUCK_SCOPE_LABEL[scope]} แยกตามเจ้าหน้าที่สรรหาของใบ · กดเลขดูใบ`}>
+            <StuckTodoTable rows={rows} onPick={pick} />
           </OverviewCard>
         ) : null}
+        {stuck.data?.requests ? <ReleaseProgressCard rows={filtered} onPick={pick} /> : null}
+        <OverviewCard icon={PhoneCall} title="2. ทำแล้วเป็นไง" sub={`${cohortSub} · ตัวแดง = ยังไม่ทำ กดดูชื่อไปทำต่อ`}>
+          {appsUnknown ? appsError : <CallerResultsTable cohort={cohort} onOpen={onOpenNames} />}
+        </OverviewCard>
+        {appsUnknown ? null : <PersonJourneyCard list={cohort} sub={cohortSub} onOpenNames={onOpenNames} />}
+        <OverviewCard icon={AlertCircle} title="เหตุผลที่ไม่สำเร็จ" sub={`${cohortSub} · ผลล่าสุดของแต่ละคน`}>
+          {appsUnknown ? appsError : <ReasonColumns groups={reasons} onOpen={onOpenNames} />}
+        </OverviewCard>
+        {bringerCard}
+        {channelCard}
+        {stuck.data?.requests ? (
+          <StuckAreaTable rows={focused} title={scope === 'remaining' ? undefined : `พื้นที่ · ใบ${STUCK_SCOPE_LABEL[scope]}`} countLabel={scope === 'remaining' ? undefined : `ใบ${STUCK_SCOPE_LABEL[scope]}`} onPick={pick} />
+        ) : null}
+        {/* ใบขอรายวันตามช่วงที่เลือก (R09) — ใบตามตัวกรองบนสุด · ช่วงก่อนสำหรับเทียบ */}
+        {requestTrend?.(data.requestRows ? (filterRequestRows(data.requestRows, filter) as RecruitRequestRow[]) : null, data.requestRowsPrev ? (filterRequestRows(data.requestRowsPrev, filter) as RecruitRequestRow[]) : null)}
+        <MonthlyBarsCard rows={monthly.data} error={monthly.error} ok={jobOk} onPickMonth={onPickMonth} open={monthlyOpen} onOpen={() => setMonthlyOpen(true)} />
         {/* รายงานเดิม (ตำแหน่งสมัคร · เทียบช่วงก่อน · งานค้างตามอายุ · กรอกแล้วโทรวันไหน · ผลงานรายคน · ช่องทางแจ้งเข้า) — หน้าเดิมยังอยู่ครบ */}
         <div className="flex justify-end">
           <Button type="button" variant="outline" onClick={() => {
