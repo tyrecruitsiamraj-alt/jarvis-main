@@ -19,6 +19,8 @@ import type { ContactLog } from './applicationContactsApi';
 import { CALL_OUTCOME_LABEL } from './callOutcomeTone';
 import { CALL_RESULT_LABEL } from './callHoldsApi';
 import { ATTENDANCE_LABEL, type AttendanceResult } from './appointmentAttendance';
+import { CONNECTED_CALL_OUTCOMES } from './callOutcomeBuckets';
+import { formatDateTimeTh } from './dateTh';
 
 export type ContactChoice = 'ok' | 'fail';
 /** ขั้น 3 — สำเร็จ = มาตามนัด · ไม่สำเร็จ = ไม่มา หรือ เลื่อนนัด (ค่าที่เก็บจริงยังเป็น 3 คำเดิม) */
@@ -111,15 +113,57 @@ const AI_STATUS_LABEL: Record<string, string> = {
   cancelled: 'ยกเลิก',
 };
 
+/**
+ * คอลัมน์ "ผล" ขึ้นต้นด้วย ติดต่อได้ / ติดต่อไม่ได้ เสมอ แล้วตามด้วยเหตุผล (เจ้าของ 11 พ.ย. 2569
+ * "ผล ให้มันบอกว่าโทรสำเร็จหรือไม่ และบอกเหตุผลตามที่เลือก") · นิยาม "ติดต่อได้" = `CONNECTED_CALL_OUTCOMES` ตัวกลาง
+ */
+function reachedText(outcome: string, label: string): string {
+  return `${(CONNECTED_CALL_OUTCOMES as readonly string[]).includes(outcome) ? 'ติดต่อได้' : 'ติดต่อไม่ได้'} · ${label}`;
+}
+
+/** ผลที่เจ้าหน้าที่ลงในขั้นการติดต่อ/นัดหมาย (บันทึกผลติดต่อ) เป็นคำเดียวกับปุ่มที่กด */
+export function contactLogResultText(l: Pick<ContactLog, 'ok' | 'reasonLabel' | 'appointmentAt'>): string {
+  if (!l.ok) return `ติดต่อไม่ได้ · ${l.reasonLabel || 'ไม่ระบุเหตุผล'}`;
+  if (l.appointmentAt) return `ติดต่อได้ · นัดหมาย ${formatDateTimeTh(l.appointmentAt)}`;
+  if (l.reasonLabel) return `ติดต่อได้ · นัดหมายไม่สำเร็จ · ${l.reasonLabel}`;
+  return 'ติดต่อได้';
+}
+
+/** กดโทรแล้วลงผลภายในวันเดียวกัน = ผลของสายนั้น */
+const DIAL_RESULT_WINDOW_MS = 24 * 3_600_000;
+
 export function detailCallRows(
   aiCalls: readonly ApplicantAiCall[],
   staffCalls: readonly ApplicantStaffCall[],
   dialCalls: readonly ApplicantDialCall[] = [],
+  contactLogs: readonly ContactLog[] = [],
 ): DetailCallRow[] {
   const rows: DetailCallRow[] = [];
-  // กดปุ่มโทรทุกครั้ง (21 ต.ค. 2569 · แบบ iRecruit "โทรหาผู้สมัครโดย …")
-  for (const d of dialCalls) {
-    rows.push({ key: `dial-${d.id}`, at: d.at, who: d.by_name || 'เจ้าหน้าที่', result: 'โทรหาผู้สมัคร', note: null });
+  /**
+   * กดปุ่มโทรทุกครั้ง (21 ต.ค. 2569 · แบบ iRecruit "โทรหาผู้สมัครโดย …") — ผลที่ลงทีหลังมาเติมในแถวเดียวกัน (11 พ.ย. 2569)
+   * บันทึกผลแต่ละครั้งจับกับการกดโทรครั้งล่าสุดก่อนหน้า (ไม่เกิน 24 ชม.) · กดโทรแล้วยังไม่ลงผล = บอกตรง ๆ
+   * บันทึกผลที่ไม่มีการกดโทรในระบบ (โทรจากมือถือเอง) = แถวของตัวเอง
+   */
+  const dials = [...dialCalls].sort((x, y) => x.at.localeCompare(y.at));
+  const resultOfDial = new Map<string, ContactLog>();
+  for (const l of [...contactLogs].sort((x, y) => x.createdAt.localeCompare(y.createdAt))) {
+    const t = Date.parse(l.createdAt);
+    const dial = [...dials].reverse().find((d) => {
+      const dt = Date.parse(d.at);
+      return dt <= t && t - dt <= DIAL_RESULT_WINDOW_MS && !resultOfDial.has(String(d.id));
+    });
+    if (dial) resultOfDial.set(String(dial.id), l);
+    else rows.push({ key: `log-${l.id}`, at: l.createdAt, who: l.createdByName || 'เจ้าหน้าที่', result: contactLogResultText(l), note: l.note });
+  }
+  for (const d of dials) {
+    const l = resultOfDial.get(String(d.id));
+    rows.push({
+      key: `dial-${d.id}`,
+      at: d.at,
+      who: d.by_name || 'เจ้าหน้าที่',
+      result: l ? contactLogResultText(l) : 'โทรหาผู้สมัคร · ยังไม่ลงผล',
+      note: l?.note ?? null,
+    });
   }
   for (const c of aiCalls) {
     const label = c.outcome ? (CALL_OUTCOME_LABEL as Record<string, string>)[c.outcome] ?? c.outcome : null;
@@ -127,7 +171,7 @@ export function detailCallRows(
       key: `ai-${c.id}`,
       at: c.result_at ?? c.created_at,
       who: 'AI',
-      result: label ?? AI_STATUS_LABEL[c.status] ?? c.status,
+      result: c.outcome && label ? reachedText(c.outcome, label) : AI_STATUS_LABEL[c.status] ?? c.status,
       note: c.attempts > 1 ? `โทรครั้งที่ ${c.attempts}` : null,
     });
   }
@@ -137,7 +181,12 @@ export function detailCallRows(
       key: `staff-${c.id}`,
       at: c.held_at,
       who: c.held_by_name || 'เจ้าหน้าที่',
-      result: label ?? (c.released_at ? (RELEASE_REASON_LABEL[c.release_reason ?? ''] ?? 'คืนงานโดยไม่บันทึกผล') : 'ถือไว้โทรอยู่'),
+      result:
+        c.outcome && label
+          ? reachedText(c.outcome, label)
+          : c.released_at
+            ? (RELEASE_REASON_LABEL[c.release_reason ?? ''] ?? 'คืนงานโดยไม่บันทึกผล')
+            : 'ถือไว้โทรอยู่',
       note: c.note,
     });
   }

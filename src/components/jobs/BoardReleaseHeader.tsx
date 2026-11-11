@@ -20,12 +20,12 @@
  * `src/lib/boardRelease.ts` (มีเทสต์คุมว่าบวกกันลงตัว) ไฟล์นี้แค่วาด · ป้ายทุกคำมาจาก `RELEASE_LANE_TEXT`
  */
 import * as React from 'react';
-import { ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { DASH, TONE } from '@/lib/designTokens';
 import { RELEASE_LANE_TEXT, type ReleaseLaneKey, type ReleaseLedger } from '@/lib/boardRelease';
 import { cn } from '@/lib/utils';
-import { ledgerStateText, UNKNOWN_NUMBER, type LedgerState } from '@/lib/boardDataState';
+import { OverviewNode, type Emphasis } from '@/components/home-overview/OverviewParts';
+import { ledgerStateText, type LedgerState } from '@/lib/boardDataState';
 
 export type BoardReleaseHeaderProps = {
   /**
@@ -50,44 +50,46 @@ export type BoardReleaseHeaderProps = {
 
 const th = (n: number) => n.toLocaleString('th-TH');
 
+/** ช่องของกล่อง 3 ก้อน — ใช้ทั้งตอนโหลดและตอนมีเลข ⇒ หน้าไม่กระโดด */
+const LANE_GRID = 'grid gap-2 sm:grid-cols-[minmax(0,0.8fr)_minmax(0,2fr)_minmax(0,2fr)]';
+
 /** ลำดับเลนหลัก 3 อัน — ใช้ตอนโชว์ขีด/โครงเปล่า */
 const LANE_ORDER = ['all', 'released', 'unreleased'] as const;
 
 /**
- * ชิปเลน — แบบ C "การ์ดเดิมแต่กระชับ" (เจ้าของเคาะ 5 ต.ค. 2569 · ทุกแท็บของหน้างานสรรหา)
- * การ์ดตัวเลขใหญ่ 3 ใบ + บรรทัดท้าย ยุบเป็นแถวชิปเดียว · 🔴 ทุกเลนยังกดกรองได้ครบเหมือนเดิม
- * เลนหลัก (ทั้งหมด/ประกาศ/ยังไม่ประกาศ) = ชิปทึบเมื่อเลือก · เลนย่อย = ชิปเบาต่อท้าย
+ * กล่องเลน — Visual Control (เจ้าของ 11 พ.ย. 2569 "อยากได้มันเป็น Visual Control ที่กดเพื่อพาไปลิสต์นั้นๆ")
+ * กล่องตัวเลขชุดเดียวกับหน้าภาพรวม (`OverviewNode`) · กดแล้วการ์ดข้างล่างเหลือใบชุดนั้น · กดซ้ำ = ทุกใบ
+ * กล่องที่เลือก = กรอบหนา (ไม่เปลี่ยนขนาด ของรอบข้างไม่ขยับ)
  */
-function LaneChip({
+function LaneBox({
   laneKey,
   count,
   active,
   onClick,
-  sub = false,
-  extra,
+  sub,
+  emphasis = null,
+  className,
 }: {
   laneKey: ReleaseLaneKey;
   count: number;
   active: boolean;
   onClick: () => void;
-  sub?: boolean;
-  /** ต่อท้ายเลขใบ เช่น จำนวนคนที่กรอก (28 ต.ค. 2569) */
-  extra?: string;
+  sub?: string;
+  emphasis?: Emphasis;
+  className?: string;
 }) {
   return (
-    <Button
-      type="button"
-      size="xs"
-      variant={active ? 'default' : sub ? 'ghost' : 'outline'}
+    <OverviewNode
+      label={RELEASE_LANE_TEXT[laneKey].label}
+      value={count}
+      unit="ใบ"
+      sub={sub}
+      emphasis={emphasis}
+      variant={emphasis ? 'fill' : 'outline'}
       onClick={onClick}
-      aria-pressed={active}
-      title={RELEASE_LANE_TEXT[laneKey].hint}
-      className={cn('shrink-0', sub && !active && 'text-muted-foreground')}
-    >
-      {RELEASE_LANE_TEXT[laneKey].label}
-      <span className="tabular-nums">{th(count)} ใบ</span>
-      {extra ? <span className="tabular-nums">· {extra}</span> : null}
-    </Button>
+      testId={`board-lane-${laneKey}`}
+      className={cn('ring-inset', active ? 'ring-2 ring-primary' : 'ring-0', className)}
+    />
   );
 }
 
@@ -119,15 +121,13 @@ const BoardReleaseHeader: React.FC<BoardReleaseHeaderProps> = ({
             </Button>
           ) : null}
         </div>
-        <div className="flex flex-wrap items-center gap-1.5">
+        {/* โครงเดียวกับกล่องตอนโหลดเสร็จ (ทั้งหมด | ประกาศแล้ว | ยังไม่ประกาศ) — โหลดเสร็จแล้วหน้าไม่กระโดด */}
+        <div className={LANE_GRID}>
           {LANE_ORDER.map((laneKey) =>
             broken ? (
-              <Button key={laneKey} type="button" size="xs" variant="outline" disabled>
-                {RELEASE_LANE_TEXT[laneKey].label}
-                <span className={DASH.muted}>{UNKNOWN_NUMBER}</span>
-              </Button>
+              <OverviewNode key={laneKey} label={RELEASE_LANE_TEXT[laneKey].label} value={null} variant="outline" className="sm:min-h-56" />
             ) : (
-              <div key={laneKey} className="h-7 w-28 animate-pulse rounded-full bg-muted/70" />
+              <div key={laneKey} className="h-24 animate-pulse rounded-2xl bg-muted/70 sm:h-56" />
             ),
           )}
         </div>
@@ -143,28 +143,26 @@ const BoardReleaseHeader: React.FC<BoardReleaseHeaderProps> = ({
       {ageLabel ? <p className={cn('text-xs', DASH.muted)}>{ageLabel}</p> : null}
 
       {/* 🔴 เลขชุดนี้ **ตรงกับหน้าหลัก** · ประกาศแล้ว + ยังไม่ประกาศ = ใบขอทั้งหมดเป๊ะ
-          28 ต.ค. 2569 เจ้าของ "ทำให้มันเห็นภาพ" — ใบขอทั้งหมด แตกเป็นสองสาย แต่ละสายแตกต่อ · ทุกชิปยังกดกรองได้เหมือนเดิม */}
-      <div className="space-y-1.5" data-testid="board-release-tree">
-        <LaneChip laneKey="all" count={ledger.all} active={lane === null || lane === 'all'} onClick={() => onLaneChange(null)} />
-        <div className="flex flex-wrap items-center gap-1.5 pl-4" data-testid="board-release-released">
-          <LaneChip laneKey="released" count={ledger.released} active={lane === 'released'} onClick={() => toggle('released')} />
-          <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
-          <LaneChip
-            sub
+          11 พ.ย. 2569 กล่องตัวเลข (Visual Control): ทั้งหมด | ประกาศแล้ว (มีคนกรอก · ยังไม่มีคนกรอก) | ยังไม่ประกาศ (ยังต้องหาคน · เริ่มงานแล้ว)
+          ทุกกล่องกดกรองการ์ดข้างล่าง · สองกล่องย่อยบวกกัน = กล่องหัวของกลุ่ม */}
+      <div className={LANE_GRID} data-testid="board-release-tree">
+        <LaneBox laneKey="all" count={ledger.all} active={lane === null || lane === 'all'} onClick={() => onLaneChange(null)} className="sm:h-full" />
+        <div className="grid grid-cols-2 gap-2 rounded-2xl border border-border/70 p-2" data-testid="board-release-released">
+          <LaneBox laneKey="released" count={ledger.released} active={lane === 'released'} onClick={() => toggle('released')} className="col-span-2" />
+          <LaneBox
             laneKey="applied"
             count={ledger.releasedWithApplicants}
-            extra={`${th(ledger.applicantHeads)} คน`}
+            sub={`${th(ledger.applicantHeads)} คน`}
             active={lane === 'applied'}
             onClick={() => toggle('applied')}
           />
-          <LaneChip sub laneKey="silent" count={ledger.releasedSilent} active={lane === 'silent'} onClick={() => toggle('silent')} />
+          <LaneBox laneKey="silent" count={ledger.releasedSilent} emphasis="warn" active={lane === 'silent'} onClick={() => toggle('silent')} />
         </div>
-        <div className="flex flex-wrap items-center gap-1.5 pl-4" data-testid="board-release-unreleased">
-          <LaneChip laneKey="unreleased" count={ledger.unreleased} active={lane === 'unreleased'} onClick={() => toggle('unreleased')} />
-          <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
-          {/* 🔴 ก้อนย่อยของ "ยังไม่ปล่อย" (เจ้าของเคาะ 21 ก.ย. 2569) — ยังต้องหาคน + เริ่มงานแล้ว = ยังไม่ประกาศ */}
-          <LaneChip sub laneKey="sourcing" count={ledger.releasable} active={lane === 'sourcing'} onClick={() => toggle('sourcing')} />
-          <LaneChip sub laneKey="started" count={ledger.startedAlready} active={lane === 'started'} onClick={() => toggle('started')} />
+        <div className="grid grid-cols-2 gap-2 rounded-2xl border border-border/70 p-2" data-testid="board-release-unreleased">
+          <LaneBox laneKey="unreleased" count={ledger.unreleased} active={lane === 'unreleased'} onClick={() => toggle('unreleased')} className="col-span-2" />
+          {/* ก้อนย่อยของ "ยังไม่ปล่อย" (เจ้าของเคาะ 21 ก.ย. 2569) — ยังต้องหาคน + เริ่มงานแล้ว = ยังไม่ประกาศ */}
+          <LaneBox laneKey="sourcing" count={ledger.releasable} emphasis="danger" active={lane === 'sourcing'} onClick={() => toggle('sourcing')} />
+          <LaneBox laneKey="started" count={ledger.startedAlready} active={lane === 'started'} onClick={() => toggle('started')} />
         </div>
       </div>
     </div>

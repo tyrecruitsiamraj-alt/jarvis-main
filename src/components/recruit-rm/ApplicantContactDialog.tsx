@@ -253,7 +253,7 @@ export default function ApplicantContactDialog({
   }, [application, loadRecords]);
 
   const baseDraft = useMemo(() => (a ? profileDraftOf(a) : null), [a]);
-  const callRows = useMemo(() => detailCallRows(extras.aiCalls, extras.staffCalls, extras.dialCalls), [extras]);
+  const callRows = useMemo(() => detailCallRows(extras.aiCalls, extras.staffCalls, extras.dialCalls, logs), [extras, logs]);
 
   if (!a || !baseDraft) return null;
 
@@ -368,6 +368,8 @@ export default function ApplicantContactDialog({
     if (profile.error) return setError(profile.error);
     if (contactFailPicked && !selectedReason) return setError('เลือกเหตุผลที่ติดต่อไม่สำเร็จ');
     if (apptPick && contactFailPicked) return setError('ติดต่อไม่สำเร็จ นัดหมายไม่ได้');
+    // 🔴 ติดต่อสำเร็จแล้วต้องบอกผลนัดเสมอ (เจ้าของ 11 พ.ย. 2569 "บังคับเลือก ถึงจะไม่หลุดการบันทึก")
+    if (contactPicked === 'ok' && apptPick === null) return setError('ติดต่อสำเร็จแล้ว เลือก "นัดหมาย" หรือ "นัดหมายไม่สำเร็จ"');
     if (apptPick === 'ok' && !apptDate) return setError('นัดหมายต้องใส่วันนัด');
     if (apptPick === 'ok' && !apptTime) return setError('นัดหมายต้องใส่เวลา');
     if (apptPick === 'ok' && !placeValue) {

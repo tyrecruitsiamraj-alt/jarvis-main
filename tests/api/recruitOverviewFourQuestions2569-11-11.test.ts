@@ -93,3 +93,12 @@ describe('ป๊อปรายชื่อบอกว่าอยู่ที�
     expect(holderSummary([free, wait, wait, done])).toEqual({ waiting: [{ who: 'อ้น', n: 2, maxDays: 3 }], free: 1, called: 1 });
   });
 });
+
+describe('ตัวกรองบนสุดคุมรายชื่อทั้งหน้า (เจ้าของ 11 พ.ย. 2569 "เลือกแล้วดูในหน้านี้ได้ครบยัง")', () => {
+  it('รายชื่อ/เทียบเดือน กรองด้วยใบที่ผ่านตัวกรอง (filtered) ไม่ใช่ใบทั้งหมด — ประเภทงาน/Site/พื้นที่ ต้องกรองข้อ 2–4 ด้วย', () => {
+    const src = readFileSync('src/components/dashboard-trends/stuck/RecruitStuckBody.tsx', 'utf8');
+    expect(src).toContain('jobFilterOf(filter, filtered, recruiterOf)');
+    expect(src).toContain('appsOfFilter(all, filter, filtered, recruiterOf)');
+    expect(src).not.toContain('appsOfFilter(all, filter, allRows');
+  });
+});

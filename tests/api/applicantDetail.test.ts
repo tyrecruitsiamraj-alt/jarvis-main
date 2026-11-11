@@ -68,9 +68,9 @@ describe('แท็บการโทร', () => {
     expect(rows.map((r) => [r.key, r.who, r.result, r.note])).toEqual([
       ['staff-h2', 'เจ้าหน้าที่', 'ถือไว้โทรอยู่', null],
       ['ai-3', 'AI', 'รอ AI โทร', null],
-      ['ai-2', 'AI', CALL_OUTCOME_LABEL.confirmed, 'โทรครั้งที่ 2'],
-      ['staff-h1', 'staff@example.com', CALL_RESULT_LABEL.declined, 'ไม่สะดวก'],
-      ['ai-1', 'AI', CALL_OUTCOME_LABEL.no_answer, null],
+      ['ai-2', 'AI', `ติดต่อได้ · ${CALL_OUTCOME_LABEL.confirmed}`, 'โทรครั้งที่ 2'],
+      ['staff-h1', 'staff@example.com', `ติดต่อได้ · ${CALL_RESULT_LABEL.declined}`, 'ไม่สะดวก'],
+      ['ai-1', 'AI', `ติดต่อไม่ได้ · ${CALL_OUTCOME_LABEL.no_answer}`, null],
     ]);
   });
 

@@ -19,13 +19,14 @@ const ledger: ReleaseLedger = {
   startedAlready: 11,
 };
 
+// 11 พ.ย. 2569 เป็นกล่องตัวเลข (Visual Control) — เจ้าของ "อยากได้มันเป็น Visual Control ที่กดเพื่อพาไปลิสต์นั้นๆ"
 describe('หัวกล่องงานแบบสองสาย', () => {
   it('ใบขอทั้งหมด → ประกาศแล้ว (มีคนกรอก ใบ·คน / ยังไม่มีคนกรอก) · ยังไม่ประกาศ (ยังต้องหาคน / เริ่มงานแล้ว)', () => {
     render(<BoardReleaseHeader state={{ status: 'ready' } as never} ledger={ledger} lane={null} onLaneChange={() => {}} />);
     expect(screen.getByRole('button', { name: /ใบขอทั้งหมด\s*314 ใบ/ })).toBeTruthy();
     const rel = screen.getByTestId('board-release-released');
     expect(within(rel).getByRole('button', { name: /ประกาศแล้ว\s*23 ใบ/ })).toBeTruthy();
-    expect(within(rel).getByRole('button', { name: /มีคนกรอก\s*10 ใบ\s*·\s*35 คน/ })).toBeTruthy();
+    expect(within(rel).getByRole('button', { name: /มีคนกรอก\s*10\s*ใบ\s*35 คน/ })).toBeTruthy();
     expect(within(rel).getByRole('button', { name: /ยังไม่มีคนกรอก\s*13 ใบ/ })).toBeTruthy();
     const unrel = screen.getByTestId('board-release-unreleased');
     expect(within(unrel).getByRole('button', { name: /ยังไม่ประกาศ\s*291 ใบ/ })).toBeTruthy();

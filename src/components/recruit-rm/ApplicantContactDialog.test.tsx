@@ -114,16 +114,13 @@ describe('ApplicantContactDialog (โฉม iRecruit)', () => {
     expect(within(dialog).getByRole('button', { name: /ติดต่อไม่สำเร็จ/ }).getAttribute('aria-pressed')).toBe('false');
   });
 
-  it('🔴 กดติดต่อสำเร็จ → บันทึก ⇒ ผลติดต่อสำเร็จไม่มีนัด แล้วปิดป๊อป', async () => {
-    saveContactLog.mockResolvedValue({});
-    const { dialog, onSaved, onClose } = renderDialog(app());
+  it('🔴 กดติดต่อสำเร็จอย่างเดียว → บันทึกไม่ได้ ต้องเลือกนัดหมาย/นัดหมายไม่สำเร็จก่อน (เจ้าของ 11 พ.ย. 2569 "บังคับเลือก")', () => {
+    const { dialog, onClose } = renderDialog(app());
     fireEvent.click(within(dialog).getByRole('button', { name: /ติดต่อสำเร็จ/ }));
     fireEvent.click(within(dialog).getByRole('button', { name: 'บันทึก' }));
-    await waitFor(() => expect(onClose).toHaveBeenCalled());
-    expect(saveContactLog).toHaveBeenCalledWith(
-      expect.objectContaining({ ok: true, appointmentAt: null, reasonId: null, jobId: null, jobLabel: null }),
-    );
-    expect(onSaved).toHaveBeenCalled();
+    expect(within(dialog).getByRole('alert').textContent).toBe('ติดต่อสำเร็จแล้ว เลือก "นัดหมาย" หรือ "นัดหมายไม่สำเร็จ"');
+    expect(saveContactLog).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
   });
 
   it('ติดต่อไม่สำเร็จ ⇒ ต้องเลือกเหตุผลก่อน + ไม่มีปุ่มนัดหมาย (Journey ข้อ 6)', () => {

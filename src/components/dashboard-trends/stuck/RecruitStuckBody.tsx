@@ -105,13 +105,18 @@ export default function RecruitStuckBody({
   const narrow = scope !== 'remaining' || focusLabel !== null;
   const narrowIds = React.useMemo(() => (narrow ? new Set(focused.map((r) => r.jobId).filter((v): v is string => Boolean(v))) : null), [narrow, focused]);
   const recruiterOf = React.useCallback((jobId: string) => data.appJobs?.[jobId]?.recruiter ?? null, [data.appJobs]);
-  const jobOkBase = React.useMemo(() => jobFilterOf(filter, allRows, recruiterOf), [filter, allRows, recruiterOf]);
+  /**
+   * 🔴 ใบที่ผ่านตัวกรอง (`filtered`) ไม่ใช่ใบทั้งหมด — เดิมส่ง `allRows` ทำให้ ประเภทงาน/งานย่อย/Code Site/จังหวัด/อำเภอ/ตำบล
+   * ไม่กรองรายชื่อ (ข้อ 2–4 · เหตุผล · เทียบเดือน) กรองได้แค่เจ้าหน้าที่ (เจ้าของ 11 พ.ย. 2569 "เลือกแล้วดูในหน้านี้ได้ครบยัง")
+   * ชุดเดียวกับแท็บใบขอเดิม (`RequestTab` ส่งใบที่ผ่านตัวกรอง)
+   */
+  const jobOkBase = React.useMemo(() => jobFilterOf(filter, filtered, recruiterOf), [filter, filtered, recruiterOf]);
   const jobOk = React.useCallback((jobId: string | null) => (narrowIds ? Boolean(jobId && narrowIds.has(jobId)) : jobOkBase(jobId)), [narrowIds, jobOkBase]);
   const cohort = React.useMemo(() => {
     const all = cohortOf(data.apps ?? [], win.from, win.to);
-    const byFilter = appsOfFilter(all, filter, allRows, recruiterOf);
+    const byFilter = appsOfFilter(all, filter, filtered, recruiterOf);
     return narrowIds ? byFilter.filter((f) => Boolean(f.jobId && narrowIds.has(f.jobId))) : byFilter;
-  }, [data.apps, win.from, win.to, filter, allRows, recruiterOf, narrowIds]);
+  }, [data.apps, win.from, win.to, filter, filtered, recruiterOf, narrowIds]);
   const narrowText = [scope !== 'remaining' ? `ใบ${STUCK_SCOPE_LABEL[scope]}` : null, focusLabel].filter(Boolean).join(' · ');
   /**
    * รายชื่อผู้สมัครอ่านไม่ได้ (`apps` null · เช่นช่วงเว็บรีสตาร์ต) = การ์ดที่นับจากรายชื่อบอกว่าอ่านไม่ได้ ห้ามโชว์ 0
