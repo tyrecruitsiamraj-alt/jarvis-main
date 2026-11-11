@@ -18,9 +18,9 @@ export type UnitSectionId = 'units' | 'matching' | 'contact';
 
 const TABS: Array<{ id: UnitSectionId; label: string; to: string }> = [
   { id: 'units', label: 'หน่วยงาน', to: '/jobs/list' },
-  { id: 'matching', label: 'จับคู่กับงาน', to: '/matching/match' },
+  { id: 'matching', label: 'จับคู่กับงาน', to: '/jobs/board?view=match' },
   // คนของเราที่กด "เก็บไปโทรเอง" บนหน้าจับคู่ ไปโทร+ลงผลที่นี่ (20 ต.ค. 2569 — เดิมไม่มีทางเข้าบนจอ)
-  { id: 'contact', label: 'การติดต่อ', to: '/matching/contact' },
+  { id: 'contact', label: 'การติดต่อ', to: '/jobs/board?view=contact&source=match' },
 ];
 
 const UnitSectionTabs: React.FC<{ active: UnitSectionId }> = ({ active }) => {

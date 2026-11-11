@@ -33,7 +33,9 @@ const PANEL_UI = code('src/components/jobs/BoardFilterPanel.tsx');
 
 describe('แท็บ: กล่องงาน > ผู้สมัคร > การติดตาม > ติดตามนัดหมาย > ภาพรวม', () => {
   it('🔴 ลำดับและชื่อตามที่เจ้าของเรียงเอง', () => {
-    const tabs = [...BOARD.matchAll(/\{ id: '(\w+)', label: '([^']+)' \}/g)].map((m) => `${m[1]}:${m[2]}`);
+    // 11 พ.ย. 2569 ลูกศรที่แท็บแรกเลือก โพสต์ประกาศ / จับคู่งาน (POSTING_PICKS) — นับเฉพาะแถบแท็บ
+    const bar = BOARD.slice(BOARD.indexOf('export const BOARD_VIEW_TABS'));
+    const tabs = [...bar.matchAll(/\{ id: '(\w+)', label: '([^']+)' \}/g)].map((m) => `${m[1]}:${m[2]}`);
     // 15 ต.ค. 2569 แท็บภาพรวม → Pre-Check (เจ้าของสั่ง) · ภาพรวมเดิมยังเปิดได้ที่ ?view=dashboard
     // 18 ต.ค. 2569 เจ้าของสั่งเพิ่ม "ภาพรวม" ต่อจาก Pre-Check
     expect(tabs).toEqual(['board:โพสต์ประกาศ', 'list:ผู้สมัคร', 'contact:การติดต่อ', 'appointments:ติดตามนัดหมาย', 'precheck:Pre-Check', 'dashboard:ภาพรวม']);

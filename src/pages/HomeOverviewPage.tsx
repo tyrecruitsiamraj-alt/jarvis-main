@@ -985,7 +985,7 @@ const HomeOverviewPage: React.FC<{
                   <div className="grid grid-cols-2 gap-3 border-t border-border pt-3">
                     {([
                       { block: 'aftercare', label: 'ดูแลหลังเริ่มงาน', value: aiV5?.aftercare?.total, to: PAGE.aftercare.to },
-                      { block: 'matching', label: 'จับคู่งาน', value: aiV5?.matching?.total, to: '/matching/match' },
+                      { block: 'matching', label: 'จับคู่งาน', value: aiV5?.matching?.total, to: '/jobs/board?view=match' },
                     ] as const).map((b) => (
                       <div key={b.block} className="space-y-1 p-2">
                         <span className="block text-xs text-muted-foreground">{b.label}</span>

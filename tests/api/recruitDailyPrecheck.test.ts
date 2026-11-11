@@ -10,7 +10,7 @@ describe('แท็บงานสรรหา', () => {
   });
   it('🔴 ภาพรวมเดิมยังเปิดได้ที่ ?view=dashboard (ทางถอย) · Pre-Check ฝังแบบไม่มีหัวซ้อน', () => {
     const page = readFileSync('src/pages/jobs/StaffJobBoardPage.tsx', 'utf8');
-    expect(page).toContain("const EXTRA_VIEWS = ['dashboard', 'precheck'] as const;");
+    expect(page).toContain("const EXTRA_VIEWS = ['dashboard', 'precheck', 'match'] as const;");
     expect(page).toContain('<PreCheckPage embedded />');
     expect(page).toContain('<RecruitOverview published={boardPublished} />');
     expect(readFileSync('src/pages/matching/PreCheckPage.tsx', 'utf8')).toContain('{embedded ? null : (');

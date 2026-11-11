@@ -64,7 +64,8 @@ describe('แถวเครื่องมือรายแท็บ', () => {
 
 describe('ชิปกรองหัวแท็บ (แทนกล่องตัวเลข)', () => {
   it('ทุกแท็บของ RmWorkspace ใช้ FilterChips ตัวเดียวกัน · ถัง drill-down ไม่มีชิป', () => {
-    expect(WS.match(/<FilterChips/g)?.length).toBe(3);
+    // + ปุ่ม "มาจาก: กรอกเอง | จับคู่งาน" ของแท็บการติดต่อ (11 พ.ย. 2569)
+    expect(WS.match(/<FilterChips/g)?.length).toBe(4);
     expect(WS).toContain("!bucket && tab === 'candidates'");
     expect(WS).toContain("!bucket && tab === 'contact'");
     expect(WS).toContain("!bucket && tab === 'appointments'");

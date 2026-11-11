@@ -27,7 +27,7 @@ import type { DeskId } from '@/lib/officeFloor';
 const DESK_HREF: Record<DeskId, string> = {
   intake: '/recruit/rm',
   aiCalls: '/recruit/rm?tab=calls',
-  selection: '/matching/match',
+  selection: '/jobs/board?view=match',
   follow: '/follow',
   // โต๊ะ "คอนเทนต์ / Scraping" ถอด 27 ก.ย. 2569 — เจ้าของเลือก "เอาแค่ปุ่ม" (ตัวเลขคำขอทุกจุดถอด)
   aftercare: '/aftercare',

@@ -495,7 +495,11 @@ function jobTitleText(j: JobRequest): string {
     .join(' ');
 }
 
-const MatchingPage: React.FC = () => {
+/**
+ * `embedded` = ฝังเป็นมุมมอง "จับคู่งาน" ใต้แท็บ "โพสต์ประกาศ ▾" ของหน้างานสรรหา (เจ้าของ 11 พ.ย. 2569
+ * "จับคู่งานย้ายไปไว้กับ โพสต์ประกาศ แบบกดแล้วมีลูกศรให้เลือก" · ทำตามแบบร่าง) — หัวหน้า/แท็บของหน้านี้ไม่ขึ้น (หน้าแม่มีแล้ว)
+ */
+const MatchingPage: React.FC<{ embedded?: boolean }> = ({ embedded = false }) => {
   const navigate = useNavigate();
   const { user, hasPermission } = useAuth();
   /** หน้า "งานโทร" ยังซ่อนไว้ให้แอดมิน — ลิงก์ที่ชี้ไปหน้านั้นต้องซ่อนตามกัน */
@@ -1318,7 +1322,7 @@ const MatchingPage: React.FC = () => {
       });
       // คนของเรา (บอร์ด) = แท็บการติดต่อของหน้านี้ · คนที่ยังไม่สมัคร (iRecruit) = แท็บการติดต่อของกล่องงาน (แยกเลนตามกติกา 16 ส.ค.)
       const where = [
-        ready.some((t) => t.source === 'board') ? 'คนของเราอยู่แท็บ "การติดต่อ" ข้างจับคู่กับงาน' : null,
+        ready.some((t) => t.source === 'board') ? 'คนของเราอยู่แท็บ "การติดต่อ" › มาจาก: จับคู่งาน' : null,
         ready.some((t) => t.source === 'irecruit') ? 'คนที่ยังไม่สมัครอยู่แท็บ "การติดต่อ" ของกล่องงาน' : null,
       ].filter(Boolean);
       setLumosNotice(where.length ? `${summary} — ${where.join(' · ')}` : summary);
@@ -1806,7 +1810,7 @@ const MatchingPage: React.FC = () => {
       .filter(Boolean)
       .join('\n');
     if (reason) params.set('reason', reason);
-    params.set('returnTo', `/matching/match?jobId=${encodeURIComponent(job.id)}`);
+    params.set('returnTo', `/jobs/board?view=match&jobId=${encodeURIComponent(job.id)}`);
     navigate(`/matching/candidates/add?${params.toString()}`);
   };
 
@@ -2305,6 +2309,7 @@ const MatchingPage: React.FC = () => {
     <div>
       {/* ช่องค้นหาอยู่แถวเดียวกับหัวเรื่องแบบหน้า Dashboard (เจ้าของสั่ง 10 ส.ค. 2569)
           เดิมอยู่ในกล่องตัวกรองใต้แผง funnel ซึ่งต้องเลื่อนลงไปหา */}
+      {embedded ? null : (
       <PageHeader
         /* 🔴 ชื่อหัวหน้าต้อง = ชื่อเมนู เสมอ — เดิมเป็น "Matching — คนของเรา" */
         title={conveyorLabel('matching')}
@@ -2322,11 +2327,14 @@ const MatchingPage: React.FC = () => {
           )
         }
       />
-      <div className="px-4 md:px-6">
-        {/* ทางเข้าคู่กับหน้าหน่วยงาน (16 ส.ค. 2569 เย็น) — สองหน้าเป็นที่เดียวกันในสายตาคนใช้ */}
-        <UnitSectionTabs active="matching" />
-      </div>
-      <div className="px-4 md:px-6 space-y-4">
+      )}
+      {embedded ? null : (
+        <div className="px-4 md:px-6">
+          {/* ทางเข้าคู่กับหน้าหน่วยงาน (16 ส.ค. 2569 เย็น) — สองหน้าเป็นที่เดียวกันในสายตาคนใช้ */}
+          <UnitSectionTabs active="matching" />
+        </div>
+      )}
+      <div className={cn('space-y-4', !embedded && 'px-4 md:px-6')}>
         {/* การไหลของการโทร — เจ้าของสั่งให้มี "เฉพาะหน้านี้" (10 ส.ค. 2569)
             ใช้คอมโพเนนต์ตัวเดียวกับหน้า Follow ตัวเลข/นิยาม/โทนสีจึงมาจากที่เดียวกัน
             เริ่มที่ "ทั้งระบบ" เพราะงานโทรเกือบทั้งหมดออกจากหน้านี้อยู่แล้ว
@@ -2672,7 +2680,7 @@ const MatchingPage: React.FC = () => {
                       <MapPin aria-hidden /> แก้เงื่อนไข/สาขา
                     </Button>
                     <Button asChild variant="outline" size="sm">
-                      <Link to={unitRequestPath(jobDetail)} state={{ returnTo: '/matching/match' }} onClick={() => setJobDetail(null)}>
+                      <Link to={unitRequestPath(jobDetail)} state={{ returnTo: '/jobs/board?view=match' }} onClick={() => setJobDetail(null)}>
                         ดูใบขอ <ExternalLink aria-hidden />
                       </Link>
                     </Button>

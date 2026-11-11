@@ -100,7 +100,7 @@ describe('ส่วน รายชื่อ → Lumos → ผลโทร — �
 describe('แท็บ Dashboard อยู่ในสองหน้า และไม่พาออกไปหน้าอื่น', () => {
   it('ภาพรวมของกล่องงานยังเปิดได้ที่ ?view=dashboard (15 ต.ค. 2569 แท็บเปลี่ยนเป็น Pre-Check) และโหลดแบบ lazy (ไม่ถ่วงหน้าสมัครสาธารณะ)', () => {
     expect(code('src/components/jobs/JobBoardView.tsx')).toContain("{ id: 'precheck', label: 'Pre-Check' }");
-    expect(code('src/pages/jobs/StaffJobBoardPage.tsx')).toContain("const EXTRA_VIEWS = ['dashboard', 'precheck'] as const;");
+    expect(code('src/pages/jobs/StaffJobBoardPage.tsx')).toContain("const EXTRA_VIEWS = ['dashboard', 'precheck', 'match'] as const;");
     const page = code('src/pages/jobs/StaffJobBoardPage.tsx');
     expect(page).toContain("lazyPage(() => import('@/components/dashboard-trends/BoardDashboard'))"); // 19 ต.ค. 2569 lazy → lazyPage (โหลดใหม่เองเมื่อไฟล์เก่าหาย)
     expect(code('src/components/jobs/JobBoardView.tsx')).not.toContain('dashboard-trends');

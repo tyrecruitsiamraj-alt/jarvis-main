@@ -273,7 +273,7 @@ function buildAiCalls(r: OfficeFloorRaw['aiCalls']): Desk {
       { key: 'resultToday', label: 'ได้ผลกลับวันนี้', value: nz(r.resultToday), unit: 'สาย', tone: 'success' },
       { key: 'pending', label: 'รอส่งออก', value: nz(r.pending), unit: 'สาย', tone: 'info' },
     ],
-    href: '/matching/match',
+    href: '/jobs/board?view=match',
   };
 }
 
@@ -329,7 +329,7 @@ function buildSelection(r: OfficeFloorRaw['selection']): Desk {
         alert: nz(r.holdsNoResult) > 0,
       },
     ],
-    href: '/matching/match',
+    href: '/jobs/board?view=match',
   };
 }
 

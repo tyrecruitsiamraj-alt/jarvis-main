@@ -46,7 +46,7 @@ describe('ชื่อหัวหน้าจอ = ชื่อเมนู', (
     // 🔴 หัวของแท็บฝั่งผู้สมัครเคยว่างเปล่า เพราะเรียกชื่อขั้น "ผู้สมัคร" ที่ถอดจากสายพานไปแล้ว
     //    (เจอ 27 ก.ย. 2569) ⇒ หัวต้องมาจากชุดแท็บเดียวกับแถบแท็บ
     expect(src).not.toContain("conveyorLabel('applicants')");
-    expect(src).toContain('BOARD_VIEW_TABS.find((t) => t.id === view)');
+    expect(src).toContain('[...POSTING_PICKS, ...BOARD_VIEW_TABS].find((t) => t.id === view)');
     expect(src).toContain('BOARD_VIEW_TABS.map(');
     // ชื่อ + ลำดับที่เจ้าของเรียงเอง 30 ก.ย. 2569 (แบบ iRecruit)
     // แท็บแรกเปลี่ยนเป็น "โพสต์ประกาศ" 4 ต.ค. 2569 (เจ้าของสั่ง)

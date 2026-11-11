@@ -32,7 +32,7 @@ describe('หน้าจับคู่งาน', () => {
   });
   it('/matching พาไปหน้าจับคู่งาน · หน้าการ์ด 2 ใบถอดแล้ว', () => {
     const app = readFileSync('src/App.tsx', 'utf8');
-    expect(app).toContain('<Route path="/matching" element={<Navigate to="/matching/match" replace />} />');
+    expect(app).toContain('<Route path="/matching" element={<MatchingMovedRedirect view="match" />} />');
     expect(app).not.toContain('MatchingDashboard');
   });
   it('ตัวกรองโพสต์ประกาศ "ชนิดใบขอ"', () => {

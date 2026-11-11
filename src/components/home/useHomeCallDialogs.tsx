@@ -292,7 +292,7 @@ export function useHomeCallDialogs(opts: { flow: FlowSummary | null; reloadFlow:
                     onClick={() => {
                       const jobRef = personDetail.item.job_ref;
                       setPersonDetail(null);
-                      navigate(`/matching/match?jobId=${encodeURIComponent(jobRef)}`);
+                      navigate(`/jobs/board?view=match&jobId=${encodeURIComponent(jobRef)}`);
                     }}
                   >
                     เปิดใบขอนี้ →

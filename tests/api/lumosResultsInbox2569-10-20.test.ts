@@ -90,12 +90,12 @@ describe('หน้าต่างจับคู่งาน: shadcn + ขน�
 });
 
 describe('หน้าจับคู่: เก็บไปโทรเองแล้วมีที่ไปโทรบนจอ (เจ้าของ 20 ต.ค. 2569)', () => {
-  it('แท็บ "การติดต่อ" ข้างจับคู่กับงาน → /matching/contact · ว่างแล้วไม่หาย · ข้อความบอกที่ไปตามชนิดคน', () => {
-    expect(read('src/components/jobs/UnitSectionTabs.tsx')).toContain("{ id: 'contact', label: 'การติดต่อ', to: '/matching/contact' }");
+  it('การติดต่อของจับคู่งาน → แท็บการติดต่อ "มาจาก: จับคู่งาน" (ย้าย 11 พ.ย. 2569) · ว่างแล้วไม่หาย · ข้อความบอกที่ไปตามชนิดคน', () => {
+    expect(read('src/components/jobs/UnitSectionTabs.tsx')).toContain("{ id: 'contact', label: 'การติดต่อ', to: '/jobs/board?view=contact&source=match' }");
     expect(read('src/pages/matching/SelectionContactPage.tsx')).toContain('<SelectionContactBoard />');
     expect(read('api/_lib/selectionContacts.ts')).toContain("h.release_reason in ('result', 'expired')");
     const page = read('src/pages/matching/MatchingPage.tsx');
-    expect(page).toContain('คนของเราอยู่แท็บ "การติดต่อ" ข้างจับคู่กับงาน');
+    expect(page).toContain('คนของเราอยู่แท็บ "การติดต่อ" › มาจาก: จับคู่งาน');
     expect(page).not.toContain('ของกล่องงาน`);');
   });
 });

@@ -195,7 +195,7 @@ const ReservationsPage: React.FC = () => {
                   <div className="text-[11px] text-muted-foreground flex flex-wrap gap-x-3 gap-y-1">
                     <span>จองไว้กับใบขอ: {it.request_no || it.job_id}</span>
                     <a
-                      href={`/matching/match?jobId=${encodeURIComponent(it.job_id)}`}
+                      href={`/jobs/board?view=match&jobId=${encodeURIComponent(it.job_id)}`}
                       className={cn('inline-flex items-center gap-0.5 hover:underline', TONE.primary.value)}
                     >
                       เปิดใบขอ <ExternalLink className="h-2.5 w-2.5" />

@@ -35,8 +35,6 @@ const EmployeeProfile = lazyPage(() => import("@/pages/wl/EmployeeProfile"));
 const AddEmployeePage = lazyPage(() => import("@/pages/wl/AddEmployeePage"));
 const CandidateProfile = lazyPage(() => import("@/pages/matching/CandidateProfile"));
 const AddCandidatePage = lazyPage(() => import("@/pages/matching/AddCandidatePage"));
-const MatchingPage = lazyPage(() => import("@/pages/matching/MatchingPage"));
-const SelectionContactPage = lazyPage(() => import("@/pages/matching/SelectionContactPage"));
 const PreCheckPage = lazyPage(() => import("@/pages/matching/PreCheckPage"));
 const RecruitRmPage = lazyPage(() => import("@/pages/recruit/RecruitRmPage"));
 const RecruitChannelsPage = lazyPage(() => import("@/pages/recruit/RecruitChannelsPage"));
@@ -56,6 +54,18 @@ const BoardPostingPage = lazyPage(() => import("@/pages/jobs/BoardPostingPage"))
  * (แท็บ "ประกาศ / ลิงก์สมัคร" เคยอยู่ในหน้าใบขอหนึ่งรอบ · เจ้าของสั่งย้ายไปกล่องงาน
  *  27 ส.ค. 2569 — ลิงก์ที่ใครบันทึกไว้ต้องไม่ 404)
  */
+/**
+ * จับคู่งานย้ายไปอยู่ใต้ "โพสต์ประกาศ ▾" ของหน้างานสรรหา · การติดต่อของจับคู่งานรวมเข้าแท็บการติดต่อ (เจ้าของ 11 พ.ย. 2569 ·
+ * ทำตามแบบร่าง) — ลิงก์เก่า `/matching/match?jobId=…` · `/matching/contact` ยังเปิดได้ (พก query เดิมไปด้วย)
+ */
+function MatchingMovedRedirect({ view, extra }: { view: 'match' | 'contact'; extra?: Record<string, string> }) {
+  const location = useLocation();
+  const p = new URLSearchParams(location.search);
+  p.set('view', view);
+  for (const [k, v] of Object.entries(extra ?? {})) p.set(k, v);
+  return <Navigate to={`/jobs/board?${p.toString()}`} replace />;
+}
+
 function LegacyPostingRedirect() {
   const { id = '' } = useParams();
   return <Navigate to={`/jobs/board/${encodeURIComponent(id)}/posting`} replace />;
@@ -122,12 +132,12 @@ const ProtectedRoutes = () => {
             <Route path="/wl/employees/add" element={<AddEmployeePage />} />
             <Route path="/wl/employees/:id" element={<EmployeeProfile />} />
             {/* 1 พ.ย. 2569 เจ้าของ Choice "หน้า /matching พาไปจับคู่งานเลย" — หน้าการ์ด 2 ใบเดิมถอดแล้ว */}
-            <Route path="/matching" element={<Navigate to="/matching/match" replace />} />
+            <Route path="/matching" element={<MatchingMovedRedirect view="match" />} />
             {/* ผู้สมัคร = คนของเราแยกถังบนบอร์ด (หน้า CandidatesPage เดิมพักไว้ — ตาราง candidates ภายในแทบไม่ถูกใช้) */}
             <Route path="/matching/candidates" element={<OurPeoplePage />} />
             <Route path="/matching/candidates/add" element={<AddCandidatePage />} />
             <Route path="/matching/candidates/:id" element={<CandidateProfile />} />
-            <Route path="/matching/match" element={<MatchingPage />} />
+            <Route path="/matching/match" element={<MatchingMovedRedirect view="match" />} />
             <Route path="/matching/pre-check" element={<PreCheckPage />} />
             {/* 🔴 หน้า "คำขอโพสหางานใหม่" ถอด 27 ก.ย. 2569 — เจ้าของเลือก "เอาแค่ปุ่ม" (ปุ่มส่ง
                 Content/Scraping ในจับคู่งานยังอยู่) · ลิงก์/บุ๊กมาร์กเก่าพาไปกล่องงาน ที่ทีม Online ทำงานจริง */}
@@ -139,10 +149,10 @@ const ProtectedRoutes = () => {
             {/* "โทรของฉัน" ย้ายเป็น section บนหน้าหลักแล้ว (เจ้าของสั่ง 13 ส.ค. 2569:
                 14 ส.ค. ย้ายไปหน้า Matching) — สอง path เดิม redirect เข้าหน้า Matching
                 กัน bookmark เก่าพัง · call-team ไม่มีบอร์ดทีมแล้ว (เอาออก 14 ส.ค.) */}
-            <Route path="/matching/my-calls" element={<Navigate to="/matching/match" replace />} />
+            <Route path="/matching/my-calls" element={<MatchingMovedRedirect view="match" />} />
             {/* การติดต่อของเลนคัดสรร (16 ส.ค. 2569) — เลนสรรหาอยู่บนบอร์ดรับสมัคร ไม่ปนกัน */}
-            <Route path="/matching/contact" element={<SelectionContactPage />} />
-            <Route path="/matching/call-team" element={<Navigate to="/matching/match" replace />} />
+            <Route path="/matching/contact" element={<MatchingMovedRedirect view="contact" extra={{ source: 'match' }} />} />
+            <Route path="/matching/call-team" element={<MatchingMovedRedirect view="match" />} />
             <Route path="/matching/our-people" element={<OurPeoplePage />} />
             <Route path="/follow" element={<FollowPage />} />
             {/* "ดูแลหลังเริ่มงาน" (Phase 7.3) — คนเข้ามาจากกล่อง "โทรครบแล้ว" บนหน้า Follow */}

@@ -162,7 +162,7 @@ const SelectionContactBoard: React.FC = () => {
                   <TableRow>
                     <TableCell colSpan={7} className="py-6 text-center text-sm text-muted-foreground">
                       ไม่มีรายชื่อ · เก็บได้จาก{' '}
-                      <Link to="/matching/match" className={cn('font-medium underline', TONE.primary.value)}>
+                      <Link to="/jobs/board?view=match" className={cn('font-medium underline', TONE.primary.value)}>
                         จับคู่กับงาน
                       </Link>
                     </TableCell>

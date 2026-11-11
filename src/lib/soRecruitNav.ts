@@ -127,7 +127,8 @@ export const CONVEYOR_STEPS: ConveyorStep[] = [
     key: 'matching',
     label: 'จับคู่งาน',
     blurb: 'AI แนะนำคนให้แต่ละใบ แล้วส่งเข้าคิวโทรหรือรับไปโทรเอง',
-    path: '/matching/match',
+    // 11 พ.ย. 2569 ย้ายไปอยู่ใต้ "โพสต์ประกาศ ▾" ของหน้างานสรรหา (เจ้าของ · ทำตามแบบร่าง)
+    path: '/jobs/board?view=match',
     icon: PhoneCall,
     match: ['/matching/match', '/matching/pre-check', '/matching/contact', '/matching/reservations'],
   },
@@ -376,7 +377,7 @@ export const HOME_TEAM_NAV: Array<{
    */
   { key: 'online', label: 'ทีม Online', blurb: 'ประกาศรับ · Content · Scraping', path: '/jobs/board' },
   { key: 'recruit', label: 'ทีมสรรหา', blurb: 'ผู้สมัคร · คัดกรอง · นัดสัมภาษณ์', path: '/jobs/board?view=list' },
-  { key: 'closing', label: 'ทีมปิดใบขอ', blurb: 'จับคู่ · ผลโทร · ปิดใบขอ', path: '/matching/match' },
+  { key: 'closing', label: 'ทีมปิดใบขอ', blurb: 'จับคู่ · ผลโทร · ปิดใบขอ', path: '/jobs/board?view=match' },
   /**
    * 🔴 `path: null` โดยตั้งใจ — ระบบ**ไม่มีหน้าของทีม Lumos** (ผลโทรอยู่ใน dialog
    * บนหน้าแรก + ปนอยู่ในหน้าจับคู่) · เจ้าของเคาะ 26 ส.ค. 2569 ว่า "กดแล้วเปิด dialog

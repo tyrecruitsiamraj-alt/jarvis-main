@@ -144,7 +144,8 @@ import { BoardFilterBar, BoardResetButton } from '@/components/jobs/BoardFilterP
 import { compareJobsByAgeDaysDesc, getJobAgeChipInfo, JOB_AGE_CHIP_META } from '@/lib/jobUrgency';
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { MapPin, Briefcase, Send, Users, Link2, Pencil, Search, EyeOff, LoaderCircle } from 'lucide-react';
+import { MapPin, Briefcase, Send, Users, Link2, Pencil, Search, EyeOff, LoaderCircle, ChevronDown } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 const RecruitLaneDialog = lazyPage(() => import('@/components/jobs/RecruitLaneDialog'));
 import {
   isUnitRequestWorkStatus,
@@ -237,7 +238,16 @@ export type JobBoardViewProps = {
  * **กล่องบนหน้ากล่องงาน** ที่กดแล้วกรองในหน้าเดิม เหมือนกล่องอื่นทุกกล่อง
  * ลิงก์เก่า `?view=closed` / `?view=cancelled` ถูกแปลงเป็นกล่องที่ `StaffJobBoardPage`
  */
-export type BoardViewId = 'board' | 'list' | 'contact' | 'appointments' | 'dashboard' | 'precheck';
+export type BoardViewId = 'board' | 'match' | 'list' | 'contact' | 'appointments' | 'dashboard' | 'precheck';
+
+/**
+ * แท็บแรก "โพสต์ประกาศ ▾" เลือกได้สองงาน (เจ้าของ 11 พ.ย. 2569 "จับคู่งานย้ายไปไว้กับ โพสต์ประกาศ แบบกดแล้วมีลูกศรให้เลือก"
+ * · ทำตามแบบร่าง) — จับคู่งาน = หน้า Matching เดิมฝังเป็นมุมมอง `?view=match` · เมนู/ลิงก์ `/matching/match` พามาที่นี่
+ */
+export const POSTING_PICKS: ReadonlyArray<{ id: BoardViewId; label: string }> = [
+  { id: 'board', label: 'โพสต์ประกาศ' },
+  { id: 'match', label: 'จับคู่งาน' },
+];
 
 /**
  * แท็บระดับบอร์ด + ชื่อหัวหน้าจอ — **ชุดเดียวใช้ทั้งแถบแท็บและหัวหน้าจอ**
@@ -1282,7 +1292,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
    * ⇒ ถอดการ์ดกรมท่าทึบ (PageHeroStrip) · ถอดพื้นไล่สี + กรอบกว้าง max-w-6xl ของฝั่งเจ้าหน้าที่
    * (หน้าสมัครสาธารณะยังเป็นหัวแบบหน้าปกนิตยสารเหมือนเดิม — คนละกลุ่มคนดู)
    */
-  const staffTitle = BOARD_VIEW_TABS.find((t) => t.id === view)?.label ?? 'งานสรรหา';
+  const staffTitle = [...POSTING_PICKS, ...BOARD_VIEW_TABS].find((t) => t.id === view)?.label ?? 'งานสรรหา';
   /** แถบแท็บล้นบนมือถือ — เลื่อนให้เห็นแท็บที่เปิดอยู่ (QA รอบ 2 ข้อ 32) */
   const staffTabsRef = React.useRef<HTMLDivElement | null>(null);
   useEffect(() => {
@@ -1324,6 +1334,27 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
       <div ref={staffTabsRef} className={cn(glassTabsListClass, 'max-w-full justify-start overflow-x-auto')} role="tablist" aria-label="มุมมองหน้างานสรรหา">
         <GlassTabIndicator />
         {BOARD_VIEW_TABS.map((v) => {
+          // แท็บแรก = ลูกศรเลือก โพสต์ประกาศ / จับคู่งาน (11 พ.ย. 2569)
+          if (v.id === 'board') {
+            const picked = POSTING_PICKS.find((p) => p.id === view) ?? null;
+            return (
+              <DropdownMenu key="posting-pick">
+                <DropdownMenuTrigger asChild>
+                  <button type="button" aria-current={picked ? 'page' : undefined} className={cn(glassTabClass(Boolean(picked)), 'gap-1')} data-testid="posting-pick">
+                    {picked?.label ?? POSTING_PICKS[0].label}
+                    <ChevronDown className="h-3.5 w-3.5 opacity-70" aria-hidden />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start">
+                  {POSTING_PICKS.map((p) => (
+                    <DropdownMenuItem key={p.id} onSelect={() => onViewChange(p.id)} data-testid={`posting-pick-${p.id}`}>
+                      {p.label}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            );
+          }
           const active = view === v.id;
           return (
             <button

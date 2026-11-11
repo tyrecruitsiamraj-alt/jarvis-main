@@ -1,7 +1,7 @@
 import React, { Suspense, useEffect, useMemo, useState } from 'react';
 import { lazyPage } from '@/lib/staleChunkReload';
 import { useSearchParams } from 'react-router-dom';
-import JobBoardView, { BOARD_VIEW_TABS, type BoardViewId } from '@/components/jobs/JobBoardView';
+import JobBoardView, { BOARD_VIEW_TABS, POSTING_PICKS, type BoardViewId } from '@/components/jobs/JobBoardView';
 import { usePageTitle } from '@/hooks/usePageTitle';
 import RmWorkspace from '@/components/recruit-rm/RmWorkspace';
 import ImportApplicantsDialog from '@/components/recruit-rm/ImportApplicantsDialog';
@@ -25,6 +25,7 @@ const BoardDashboard = lazyPage(() => import('@/components/dashboard-trends/Boar
 const RecruitOverview = lazyPage(() => import('@/components/dashboard-trends/RecruitOverview'));
 /** แท็บ Pre-Check (15 ต.ค. 2569 แทนแท็บภาพรวม) — หน้าเดิมแบบฝัง */
 const PreCheckPage = lazyPage(() => import('@/pages/matching/PreCheckPage'));
+const MatchingPage = lazyPage(() => import('@/pages/matching/MatchingPage'));
 
 /**
  * บอร์ดรับสมัครฝั่งเจ้าหน้าที่ — สี่มุมมองในหน้าเดียว
@@ -46,7 +47,7 @@ const PreCheckPage = lazyPage(() => import('@/pages/matching/PreCheckPage'));
 
 const RM_VIEWS = ['list', 'contact', 'appointments'] as const;
 /** มุมที่ไม่ใช่กล่องงานและไม่ใช่ RM — แท็บ Dashboard */
-const EXTRA_VIEWS = ['dashboard', 'precheck'] as const;
+const EXTRA_VIEWS = ['dashboard', 'precheck', 'match'] as const;
 
 /**
  * แท็บที่ถูกถอดออกแล้ว — ลิงก์เก่ามาถึงให้เปิดกล่องงานแทน แล้วล้าง `?view=` ทิ้ง
@@ -93,7 +94,7 @@ const StaffJobBoardPage: React.FC = () => {
     : 'board';
   const retiredView = (RETIRED_VIEWS as readonly string[]).includes(raw ?? '');
   // ชื่อแท็บเบราว์เซอร์ตามแท็บที่เปิด (QA 5 ต.ค. 2569)
-  usePageTitle(BOARD_VIEW_TABS.find((t) => t.id === view)?.label ?? 'งานสรรหา');
+  usePageTitle([...POSTING_PICKS, ...BOARD_VIEW_TABS].find((t) => t.id === view)?.label ?? 'งานสรรหา');
   /** ทางถอยของแท็บภาพรวม — แผง Dashboard เดิม (28 ก.ย.) ยังเปิดได้ที่ `?view=dashboard&dash=classic` */
   const classicDashboard = searchParams.get('dash') === 'classic';
   /**
@@ -174,7 +175,11 @@ const StaffJobBoardPage: React.FC = () => {
           ) : null
         }
         listContent={
-          view === 'board' ? null : view === 'precheck' ? (
+          view === 'board' ? null : view === 'match' ? (
+            <Suspense fallback={<p className="py-6 text-sm text-muted-foreground">กำลังเปิดจับคู่งาน…</p>}>
+              <MatchingPage embedded />
+            </Suspense>
+          ) : view === 'precheck' ? (
             <Suspense key={listRev} fallback={<p className="py-6 text-sm text-muted-foreground">กำลังเปิด Pre-Check…</p>}>
               <PreCheckPage embedded />
             </Suspense>

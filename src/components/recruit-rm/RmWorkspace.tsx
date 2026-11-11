@@ -108,6 +108,8 @@ import {
   type ApplicantFilterState,
 } from '@/lib/applicantFilters';
 import { friendlyErrorText } from '@/lib/friendlyError';
+import SelectionContactBoard from '@/components/matching/SelectionContactBoard';
+import { fetchSelectionContacts } from '@/lib/selectionContacts';
 
 /** แท็บของพื้นที่นี้ → `?view=` ของบอร์ดรับสมัคร · ชื่อแท็บใช้ `RM_TAB_LABEL` ชุดเดียวกับแถบแท็บของบอร์ด */
 const RM_TAB_BOARD_VIEW: Record<RmTab, string> = { candidates: 'list', contact: 'contact', appointments: 'appointments' };
@@ -967,6 +969,53 @@ const RmWorkspace: React.FC<{
   const toggleRow = (id: string) =>
     setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
 
+  /**
+   * การติดต่อที่เดียว (เจ้าของ 11 พ.ย. 2569 "พอเก็บแล้วก็ย้ายไปหน้าการติดต่อ … ไม่ต้องมีหน้าการติดต่อ 2 ที่" · ทำตามแบบร่าง)
+   * มาจาก: กรอกเอง = รายชื่อที่กรอก/เก็บจากแท็บผู้สมัคร (ตารางเดิม) · จับคู่งาน = คนบนบอร์ด ERP ที่กดเก็บไปโทรจากจับคู่งาน
+   * (`SelectionContactBoard` ตัวเดิมของ /matching/contact · ลงผลแบบเดียวกัน) · เลือกแล้วจำใน `?source=match`
+   */
+  const contactSource: 'self' | 'match' = searchParams.get('source') === 'match' ? 'match' : 'self';
+  const setContactSource = (next: 'self' | 'match') => {
+    const p = new URLSearchParams(searchParams);
+    if (next === 'match') p.set('source', 'match');
+    else p.delete('source');
+    setSearchParams(p, { replace: true });
+    setPage(1);
+    setSelectedIds([]);
+  };
+  const [matchContactCount, setMatchContactCount] = useState<number | null | 'unknown'>(null);
+  useEffect(() => {
+    if (tab !== 'contact') return;
+    let alive = true;
+    fetchSelectionContacts()
+      .then((rows) => alive && setMatchContactCount(rows.length))
+      .catch(() => alive && setMatchContactCount('unknown'));
+    return () => {
+      alive = false;
+    };
+  }, [tab, contactSource, refreshKey]);
+  const contactSourceToggle =
+    !bucket && tab === 'contact' && !leadView && !cancelledView ? (
+      <FilterChips
+        ariaLabel="มาจาก"
+        value={contactSource}
+        onChange={(v) => setContactSource(v === 'match' ? 'match' : 'self')}
+        chips={[
+          { id: 'self' as const, label: 'มาจาก: กรอกเอง', count: loading ? null : loadError ? 'unknown' : contactChipCounts.all },
+          { id: 'match' as const, label: 'มาจาก: จับคู่งาน', count: matchContactCount },
+        ]}
+      />
+    ) : null;
+
+  if (contactSourceToggle && contactSource === 'match') {
+    return (
+      <div className="mt-4 space-y-4" data-testid="contact-source-match">
+        {contactSourceToggle}
+        <SelectionContactBoard />
+      </div>
+    );
+  }
+
   const toggleAll = () =>
     setSelectedIds((prev) =>
       pageRows.every((r) => prev.includes(r.id))
@@ -1032,6 +1081,7 @@ const RmWorkspace: React.FC<{
       ) : null}
       {!bucket && tab === 'contact' ? (
         <div className="mt-4 flex flex-wrap items-center gap-2">
+          {contactSourceToggle}
           {/* ของฉัน / ทุกคน (เจ้าของ 10 พ.ย. 2569 "ใครเก็บไปแล้วยังไม่โทรบ้าง") — แบบเดียวกับแท็บติดตามนัดหมาย · มุมมอง Lead/ยกเลิกไม่มีปุ่มนี้ */}
           {canSeeEveryoneContact && !leadView && !cancelledView ? (
             <ToggleGroup

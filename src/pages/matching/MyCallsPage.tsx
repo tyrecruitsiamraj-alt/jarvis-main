@@ -327,7 +327,7 @@ export const MyCallsSection: React.FC<{
           <p className={cn('text-sm font-medium', DASH.cellStrong)}>ยังไม่มีคนที่เก็บไปโทรเอง</p>
           <p className={cn('mt-1 text-xs', DASH.muted)}>
             เก็บได้จาก{' '}
-            <Link to="/matching/match" className={cn('font-medium underline', TONE.primary.value)}>
+            <Link to="/jobs/board?view=match" className={cn('font-medium underline', TONE.primary.value)}>
               จับคู่กับงาน
             </Link>
           </p>
