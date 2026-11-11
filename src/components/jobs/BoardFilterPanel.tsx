@@ -237,7 +237,8 @@ export function FilterAccordion<K extends string>({
       {ordered.map((g) => (
         <AccordionItem key={g.head.key} value={g.head.key} className="border-border">
           <AccordionTrigger className="py-2 text-xs font-medium hover:no-underline">
-            <span className="flex items-center gap-2">
+            {/* min-h-6 = สูงเท่าป้ายเลขที่ติ๊ก — ติ๊กแล้วหัวข้อไม่สูงขึ้น ตัวเลือกข้างล่างไม่เลื่อน (เจ้าของ 11 พ.ย. 2569) */}
+            <span className="flex min-h-6 items-center gap-2">
               {g.head.label}
               <TriggerCount n={groupSelected(g)} />
             </span>
@@ -256,7 +257,8 @@ export function FilterAccordion<K extends string>({
       {sections.map((x) => (
         <AccordionItem key={`extra-${x.key}`} value={`extra-${x.key}`} className="border-border">
           <AccordionTrigger className="py-2 text-xs font-medium hover:no-underline">
-            <span className="flex items-center gap-2">
+            {/* min-h-6 = สูงเท่าป้ายเลขที่ติ๊ก — ติ๊กแล้วหัวข้อไม่สูงขึ้น ตัวเลือกข้างล่างไม่เลื่อน (เจ้าของ 11 พ.ย. 2569) */}
+            <span className="flex min-h-6 items-center gap-2">
               {x.label}
               <TriggerCount n={x.selected} />
             </span>
@@ -332,7 +334,13 @@ function FilterPanelHeader({
           ) : null}
         </span>
       </div>
-      {selected > 0 && resultText ? <p className="text-xs text-muted-foreground">{resultText}</p> : null}
+      {/* 🔴 จองบรรทัดไว้เสมอ (เจ้าของ 11 พ.ย. 2569 "ปุ่มมันขยับ … เม้าต้องขยับตามเพื่อกดอีกรอบ") — เดิมบรรทัดนี้โผล่ตอนติ๊กแรก
+          ดันทุกตัวเลือกลงหนึ่งบรรทัด · ยังไม่ติ๊ก = ซ่อนตัวหนังสือแต่กินที่เท่าเดิม */}
+      {resultText ? (
+        <p className={cn('text-xs text-muted-foreground', selected === 0 && 'invisible')} aria-hidden={selected === 0}>
+          {resultText}
+        </p>
+      ) : null}
     </div>
   );
 }
