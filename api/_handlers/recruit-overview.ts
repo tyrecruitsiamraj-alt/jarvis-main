@@ -1010,7 +1010,13 @@ export async function loadApplicantNames(ids: readonly string[], scope: Departme
   const picked = pickDashboardBu(scope, null);
   const allowed = scope.mode === 'all' ? null : (picked.choices ?? (picked.bu ? [picked.bu] : []));
   const { rows } = await dbQuery<Row>(
-    `select a.id::text as id, a.full_name, a.phone, a.unit_name, a.job_title, a.position_interest, a.created_at
+    // ใครถืออยู่ · เก็บเมื่อไหร่ · ลงผลล่าสุดเมื่อไหร่ (เจ้าของ 11 พ.ย. 2569 "กดเข้าไปปุ้บโชว์ชื่อ แล้วบอกเลยว่าเก็บไปแล้วนะอยู่ที่ใคร
+    // … เก็บไปแล้วยังไม่โทรอยู่ใคร ค้างมากี่วันแล้ว") — อีเมลแปลงเป็นชื่อเล่นที่ handler
+    `select a.id::text as id, a.full_name, a.phone, a.unit_name, a.job_title, a.position_interest, a.created_at,
+            case when a.claimed_by is not null then coalesce(nullif(btrim(a.claimed_by_name), ''), 'ไม่ระบุชื่อ') end as claimed_by,
+            case when a.claimed_by is not null then a.claimed_at end as claimed_at,
+            (select c.created_at from ${CONTACTS} c where c.application_id = a.id order by c.created_at desc limit 1) as last_log_at,
+            (select c.ok from ${CONTACTS} c where c.application_id = a.id order by c.created_at desc limit 1) as last_log_ok
        from ${APPS} a ${appBuJoin('a')}
       where a.id = any($1::uuid[])
         and ($2::text[] is null or ${appBuSql('a')} = any($2::text[]))`,
@@ -1028,6 +1034,13 @@ async function handler(req: AuthedReq, res: ApiRes) {
     const scope = await loadMatchingBuScope(req.user);
     if (typeof req.query?.names === 'string') {
       const rows = await loadApplicantNames(req.query.names.split(','), scope);
+      if (rows.some((r) => String(r.claimed_by ?? '').includes('@'))) {
+        const displayOf = await loadStaffDisplay();
+        for (const r of rows) {
+          const v = String(r.claimed_by ?? '');
+          if (v.includes('@')) r.claimed_by = displayOf(v.toLowerCase()) ?? v;
+        }
+      }
       res.setHeader?.('Cache-Control', 'no-store');
       return res.status(200).json({ rows });
     }

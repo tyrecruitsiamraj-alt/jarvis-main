@@ -78,3 +78,18 @@ describe('หน้าเดียว ไม่มีแท็บ', () => {
     for (const c of ['<ReleaseProgressCard', '<PersonJourneyCard', '<ReasonColumns', '<StuckAreaTable', '<MonthlyBarsCard']) expect(body).toContain(c);
   });
 });
+
+describe('ป๊อปรายชื่อบอกว่าอยู่ที่ใคร ค้างกี่วัน (เจ้าของ 11 พ.ย. 2569 "เก็บไปแล้วยังไม่โทรอยู่ใคร ค้างมากี่วันแล้ว")', () => {
+  it('ไม่มีคนเก็บ · เก็บแล้วยังไม่ลงผลหลังเก็บ = ค้าง N วัน (วันไทย) · ลงผลหลังเก็บ = โทรแล้ว · สรุปต่อคน', async () => {
+    const { holderStateOf, holderSummary } = await import('@/lib/recruitOverviewApi');
+    const now = new Date('2026-11-11T05:00:00Z');
+    const free = holderStateOf({ claimed_by: null, claimed_at: null, last_log_at: null, last_log_ok: null }, now);
+    const wait = holderStateOf({ claimed_by: 'อ้น', claimed_at: '2026-11-07T18:00:00Z', last_log_at: '2026-11-05T03:00:00Z', last_log_ok: false }, now);
+    const done = holderStateOf({ claimed_by: 'อ้น', claimed_at: '2026-11-07T18:00:00Z', last_log_at: '2026-11-09T03:00:00Z', last_log_ok: true }, now);
+    expect(free).toEqual({ kind: 'free' });
+    // เก็บ 8 พ.ย. ตีหนึ่งเวลาไทย → 11 พ.ย. = 3 วัน · ลงผลก่อนเก็บไม่นับ
+    expect(wait).toEqual({ kind: 'waiting', who: 'อ้น', days: 3 });
+    expect(done).toMatchObject({ kind: 'called', who: 'อ้น', ok: true });
+    expect(holderSummary([free, wait, wait, done])).toEqual({ waiting: [{ who: 'อ้น', n: 2, maxDays: 3 }], free: 1, called: 1 });
+  });
+});

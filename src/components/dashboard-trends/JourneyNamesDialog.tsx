@@ -12,11 +12,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import LoadErrorNotice from '@/components/shared/LoadErrorNotice';
 import NamesSearchInput, { NAMES_PAGE, matchesNameQuery } from '@/components/shared/NamesSearchInput';
 import type { PublicApplication } from '@/lib/publicApplicationsApi';
-import { fetchApplicantNames, type ApplicantNameRow } from '@/lib/recruitOverviewApi';
+import { fetchApplicantNames, holderStateOf, holderSummary, type ApplicantNameRow, type HolderState } from '@/lib/recruitOverviewApi';
 import { applicantWorkLink, applicationUnitLabel } from '@/lib/recruitRm';
 import { localThaiPhone } from '@/lib/followDayReport';
 import { formatYmdTh, toYmdBangkok } from '@/lib/dateTh';
 import { friendlyErrorText } from '@/lib/friendlyError';
+import { cn } from '@/lib/utils';
+import { TONE } from '@/lib/designTokens';
 
 const NUM = new Intl.NumberFormat('th-TH');
 
@@ -37,7 +39,7 @@ export default function JourneyNamesDialog({
   /** คอลัมน์ "ค้างที่" ต่อราย (หน้าความคุ้มค่า · ค้างอยู่ที่ใคร) */
   notes?: ReadonlyMap<string, string>;
 }) {
-  const cols = notes ? 5 : 4;
+  const cols = notes ? 6 : 5;
   const navigate = useNavigate();
   /** ชื่อตาม id ที่กด (29 ต.ค. 2569) — เดิมดึงลิสต์ผู้สมัครของผู้ใช้ทั้งก้อน คนที่เจ้าหน้าที่คนอื่นเก็บไปแล้วเลย "เปิดชื่อไม่ได้" */
   const [all, setAll] = useState<ApplicantNameRow[] | null>(null);
@@ -60,11 +62,23 @@ export default function JourneyNamesDialog({
     };
   }, [open, all, rev, ids]);
 
+  /** ใครถือ · ทำถึงไหน · ค้างกี่วัน (11 พ.ย. 2569) — ยังไม่โทรขึ้นก่อน ค้างนานสุดก่อน */
+  const [now] = useState(() => new Date());
+  const stateOf = useMemo(() => new Map((all ?? []).map((a) => [a.id, holderStateOf(a, now)] as const)), [all, now]);
+  const rank = (s: HolderState | undefined) => (s?.kind === 'waiting' ? 0 : s?.kind === 'free' ? 1 : 2);
   const rows = useMemo(() => {
     if (!all) return [];
     const want = new Set(ids);
-    return all.filter((a) => want.has(a.id)).sort((x, y) => (y.created_at ?? '').localeCompare(x.created_at ?? ''));
-  }, [all, ids]);
+    return all
+      .filter((a) => want.has(a.id))
+      .sort((x, y) => {
+        const sx = stateOf.get(x.id);
+        const sy = stateOf.get(y.id);
+        const wait = (s: HolderState | undefined) => (s?.kind === 'waiting' ? (s.days ?? 0) : 0);
+        return rank(sx) - rank(sy) || wait(sy) - wait(sx) || (y.created_at ?? '').localeCompare(x.created_at ?? '');
+      });
+  }, [all, ids, stateOf]);
+  const summary = useMemo(() => holderSummary(rows.map((a) => stateOf.get(a.id) ?? { kind: 'free' as const })), [rows, stateOf]);
   // ค้นหา + ดูทีละ 50 (ชุดส่งต่อ G04) — เปิดชุดใหม่ = ล้าง (key ของป๊อปเปลี่ยนตามชุด ids)
   const [q, setQ] = useState('');
   const [limit, setLimit] = useState(NAMES_PAGE);
@@ -81,7 +95,7 @@ export default function JourneyNamesDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl" style={contentStyle}>
+      <DialogContent className="max-w-3xl" style={contentStyle}>
         <DialogHeader>
           <DialogTitle>
             {title} · {NUM.format(ids.length)} คน
@@ -98,6 +112,16 @@ export default function JourneyNamesDialog({
           </div>
         ) : (
           <div className="max-h-[60vh] space-y-2 overflow-y-auto">
+            {/* สรุป: เก็บไปแล้วยังไม่โทร อยู่ที่ใคร ค้างนานสุดกี่วัน · ยังไม่มีคนเก็บ · โทรแล้ว */}
+            <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm" data-testid="names-holder-summary">
+              {summary.waiting.map((w) => (
+                <span key={w.who} className={TONE.danger.value}>
+                  {w.who} ยังไม่โทร {NUM.format(w.n)} คน{w.maxDays !== null ? ` ค้างนานสุด ${NUM.format(w.maxDays)} วัน` : ''}
+                </span>
+              ))}
+              <span className="text-muted-foreground">ยังไม่มีคนเก็บ {NUM.format(summary.free)} คน</span>
+              <span className="text-muted-foreground">โทรแล้ว {NUM.format(summary.called)} คน</span>
+            </div>
             {rows.length > 5 ? (
               <NamesSearchInput value={q} onChange={(v) => { setQ(v); setLimit(NAMES_PAGE); }} found={q.trim() ? shown.length : null} />
             ) : null}
@@ -107,6 +131,7 @@ export default function JourneyNamesDialog({
                   <TableHead>ชื่อ</TableHead>
                   <TableHead className="hidden sm:table-cell">เบอร์</TableHead>
                   <TableHead className="hidden sm:table-cell">หน่วยงาน</TableHead>
+                  <TableHead>อยู่ที่ใคร</TableHead>
                   {notes ? <TableHead>ค้างที่</TableHead> : null}
                   <TableHead className="hidden text-right sm:table-cell">วันที่กรอก</TableHead>
                 </TableRow>
@@ -148,6 +173,9 @@ export default function JourneyNamesDialog({
                       </TableCell>
                       <TableCell className="hidden whitespace-nowrap tabular-nums sm:table-cell">{a.phone ? localThaiPhone(a.phone) : '—'}</TableCell>
                       <TableCell className="hidden max-w-56 truncate sm:table-cell">{applicationUnitLabel(a as PublicApplication) || '—'}</TableCell>
+                      <TableCell className="min-w-32 text-sm">
+                        <HolderCell state={stateOf.get(a.id)} />
+                      </TableCell>
                       {notes ? <TableCell className="min-w-32">{notes.get(a.id) ?? '—'}</TableCell> : null}
                       <TableCell className="hidden whitespace-nowrap text-right tabular-nums sm:table-cell">
                         {a.created_at ? formatYmdTh(toYmdBangkok(new Date(a.created_at))) : '—'}
@@ -171,5 +199,25 @@ export default function JourneyNamesDialog({
         )}
       </DialogContent>
     </Dialog>
+  );
+}
+
+function HolderCell({ state }: { state: HolderState | undefined }) {
+  if (!state || state.kind === 'free') return <span className="text-muted-foreground">ยังไม่มีคนเก็บ</span>;
+  if (state.kind === 'waiting') {
+    return (
+      <span className={cn('block', TONE.danger.value)}>
+        {state.who}
+        <span className="block text-xs">ยังไม่โทร{state.days !== null ? ` ค้าง ${NUM.format(state.days)} วัน` : ''}</span>
+      </span>
+    );
+  }
+  return (
+    <span className="block">
+      {state.who}
+      <span className="block text-xs text-muted-foreground">
+        {state.ok === true ? 'ติดต่อได้' : state.ok === false ? 'ติดต่อไม่ได้' : 'ลงผลแล้ว'} {formatYmdTh(toYmdBangkok(new Date(state.at)))}
+      </span>
+    </span>
   );
 }
