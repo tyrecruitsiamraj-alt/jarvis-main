@@ -55,7 +55,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { ChoiceDropdown } from '@/components/shared/ChoiceDropdown';
 import { Rule2 } from '@/components/shared/ui-v2/Sheet2';
 import { useUiV2 } from '@/lib/uiV2';
-import { GitBranch, HelpCircle, Phone, RefreshCw } from 'lucide-react';
+import { GitBranch, HelpCircle, Phone } from 'lucide-react';
 
 /**
  * คำอธิบายนิยาม "สายที่" (ลำดับในวัน · 1 ต.ค. 2569) — **ข้อความเดียว ใช้สองที่** (เดสก์ท็อปโชว์เต็ม ·
@@ -580,16 +580,6 @@ export default function FollowCallRoundsPanel({
             (กดไม่ได้เลย) — ปล่อยให้ยืดหยุ่นแล้วขึ้นบรรทัดใหม่แทน */}
         <div className="flex min-w-0 flex-wrap items-center gap-2">
           {headerExtras}
-          <button
-            type="button"
-            onClick={onReload}
-            disabled={loading}
-            aria-label="รีเฟรช"
-            title="รีเฟรช"
-            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border hover:bg-secondary disabled:opacity-50"
-          >
-            <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} aria-hidden />
-          </button>
         </div>
       </div>
 

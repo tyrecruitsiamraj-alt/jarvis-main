@@ -16,9 +16,8 @@
 import React from 'react';
 import { Card } from '@/components/ui/card';
 import { Link } from 'react-router-dom';
-import { ArrowRight, RefreshCw } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
 import type { OfficeTeamResponse } from '@/lib/officeTeamApi';
 import { LUMOS_ROUTE_LABEL, type LaneCounts } from '@/lib/officeTeam';
 import type { OfficeFloorCounts } from '@/lib/officeFloor';
@@ -535,19 +534,6 @@ const TeamBoardPanel: React.FC<{
                 : 'กำลังเชื่อมข้อมูล…'
               : 'โหลดไม่สำเร็จ'}
         </span>
-        {onRefresh ? (
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={onRefresh}
-            disabled={loading}
-            className={cn('h-8 rounded-lg px-2.5', T.mut, 'hover:bg-slate-900/5 dark:hover:bg-white/10')}
-          >
-            <RefreshCw className={cn(loading && 'animate-spin')} aria-hidden />
-            รีเฟรช
-          </Button>
-        ) : null}
       </div>
 
       <div

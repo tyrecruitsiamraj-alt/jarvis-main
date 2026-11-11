@@ -52,7 +52,7 @@ import {
   aftercareRoundsSummary,
   buildAftercareRounds,
 } from '@/lib/aftercareRounds';
-import { LoaderCircle, RefreshCw, UserCheck, Users } from 'lucide-react';
+import { LoaderCircle, UserCheck, Users } from 'lucide-react';
 import { erpInformDateOf, fetchErpInformDates } from '@/lib/erpInformDatesApi';
 import { formatYmdTh } from '@/lib/dateTh';
 
@@ -317,9 +317,6 @@ const AftercarePage: React.FC = () => {
           >
             <Users aria-hidden />
             {adding ? 'กำลังเพิ่ม…' : 'เพิ่มคนจากบอร์ด ERP'}
-          </Button>
-          <Button variant="secondary" size="sm" type="button" onClick={load} disabled={loading} >
-            <RefreshCw className={cn(loading && 'animate-spin')} aria-hidden /> รีเฟรช
           </Button>
           <ChoiceDropdown
             value={owner}

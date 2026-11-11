@@ -144,7 +144,7 @@ import { BoardFilterBar, BoardResetButton } from '@/components/jobs/BoardFilterP
 import { compareJobsByAgeDaysDesc, getJobAgeChipInfo, JOB_AGE_CHIP_META } from '@/lib/jobUrgency';
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { MapPin, Briefcase, RefreshCw, Send, Users, Link2, Pencil, Search, EyeOff, LoaderCircle } from 'lucide-react';
+import { MapPin, Briefcase, Send, Users, Link2, Pencil, Search, EyeOff, LoaderCircle } from 'lucide-react';
 const RecruitLaneDialog = lazyPage(() => import('@/components/jobs/RecruitLaneDialog'));
 import {
   isUnitRequestWorkStatus,
@@ -222,7 +222,6 @@ export type JobBoardViewProps = {
   closedError?: string | null;
   closedDays?: number;
   onClosedDaysChange?: (days: number) => void;
-  onReloadClosed?: () => void;
   /** กล่องที่ให้เลือกไว้ตั้งแต่เปิดหน้า — รองรับลิงก์เก่า `?view=closed` / `?view=cancelled` */
   initialBox?: JobBoxKey | null;
   /**
@@ -290,7 +289,6 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
   closedError = null,
   closedDays = 30,
   onClosedDaysChange,
-  onReloadClosed,
   initialBox = null,
   onPublishedTotals,
 }) => {
@@ -1364,22 +1362,9 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                     wrapperClassName="w-full min-w-0 sm:w-72"
                   />
                 ) : null}
-                {/* เหลือ "สร้างลิงก์" + "ตั้งค่าบอร์ด" + รีเฟรชแบบไอคอน (เจ้าของสั่ง 27 ก.ย. 2569) ·
+                {/* เหลือ "สร้างลิงก์" + "ตั้งค่าบอร์ด" (เจ้าของสั่ง 27 ก.ย. 2569) · ปุ่มรีเฟรชถอดทุกหน้า (เจ้าของ 11 พ.ย. 2569 "เกะกะ")
                     Pre-Check ถูกถอดจากเมนูนี้ (ห้ามพาไปหมวดจับคู่งาน) */}
                 <RecruitBoardTools />
-                {onRefresh ? (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="iconXs"
-                    onClick={() => void onRefresh()}
-                    disabled={loading || refreshing}
-                    aria-label="รีเฟรชข้อมูล"
-                    title="รีเฟรชข้อมูล"
-                  >
-                    <RefreshCw className={cn(refreshing && 'animate-spin')} />
-                  </Button>
-                ) : null}
               </>
             ) : onRefresh ? (
               /* 🔴 สร้างลิงก์ (ประกาศลอย) + ตั้งค่าบอร์ด อยู่แค่แท็บโพสต์ประกาศ — แท็บอื่นเหลือรีเฟรช (ย้ายขึ้นมาจากแถวใต้แท็บ)
@@ -1387,10 +1372,6 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                  · `listHeaderActions` = ของแท็บนั้นที่วางข้างรีเฟรช (ปฏิทินวันที่สมัคร · 5 ต.ค. 2569) */
               <>
                 {listHeaderActions}
-                {/* ปุ่มมีคำ (QA 18 ต.ค. 2569 — กฎปุ่มต้องมีคำ 15 ต.ค.) */}
-                <Button type="button" variant="outline" size="xs" onClick={() => void onRefresh()}>
-                  <RefreshCw aria-hidden /> รีเฟรช
-                </Button>
               </>
             ) : undefined
           }
@@ -1569,21 +1550,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                     </Button>
                   ))}
                 </div>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  disabled={closedLoading}
-                  onClick={() => onReloadClosed?.()}
-                  className={cn('min-h-9 sm:min-h-0 h-7 rounded-lg px-2.5 text-xs', TONE.neutral.outline)}
-                >
-                  {closedLoading ? (
-                    <LoaderCircle className="animate-spin" />
-                  ) : (
-                    <RefreshCw aria-hidden />
-                  )}
-                  รีเฟรช
-                </Button>
+                {closedLoading ? <LoaderCircle className="animate-spin" aria-label="กำลังโหลด" /> : null}
                 {closedError ? (
                   <span className="text-destructive">{closedError}</span>
                 ) : null}

@@ -228,17 +228,6 @@ const DashboardShell: React.FC<Props> = ({
               </div>
               )}
               <div className="flex gap-2">
-                {onRefresh ? (
-                  <button
-                    type="button"
-                    onClick={onRefresh}
-                    disabled={refreshing}
-                    className="inline-flex items-center gap-1.5 rounded-full bg-white dark:bg-slate-900 px-3.5 py-2.5 text-sm text-slate-700 dark:text-slate-300 shadow-sm hover:bg-slate-50 dark:hover:bg-slate-800/40 dark:hover:bg-slate-800 disabled:opacity-50"
-                  >
-                    <RefreshCw className={cn('h-4 w-4', refreshing && 'animate-spin')} />
-                    รีเฟรช
-                  </button>
-                ) : null}
                 {onExport ? (
                   <button
                     type="button"

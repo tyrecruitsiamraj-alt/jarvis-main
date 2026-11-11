@@ -37,7 +37,8 @@ describe('ล้มต้องบอก + ลองใหม่ได้ · ร
     expect(read('src/components/dashboard/analytics/DashboardShell.tsx')).toContain('<LoadErrorNotice message={partialError}');
   });
   it('Dashboard ติดตาม: รีเฟรชไม่ remount (ช่วงไม่เด้ง) · ล้มล้างเลขเก่า', () => {
-    expect(read('src/pages/follow/FollowPage.tsx')).toContain('<FollowDashboard refreshKey={dashRev} />');
+    // ปุ่มรีเฟรชถอดทุกหน้า (11 พ.ย. 2569) — แผงไม่ต้องรับ refreshKey จากหน้าแล้ว
+    expect(read('src/pages/follow/FollowPage.tsx')).toContain('<FollowDashboard />');
     const src = read('src/components/dashboard-trends/FollowDashboard.tsx');
     expect(src).toContain('setRows(null);');
     expect(src).toContain('rev, refreshKey]');

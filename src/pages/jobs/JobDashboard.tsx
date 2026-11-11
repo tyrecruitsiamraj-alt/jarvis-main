@@ -10,7 +10,7 @@ import JobUrgencyBadge from '@/components/jobs/JobUrgencyBadge';
 import UnitRequestFilterFields from '@/components/jobs/UnitRequestFilterFields';
 import { JOB_TYPE_LABELS, type JobRequest } from '@/types';
 import { requestActionLabel } from '@/lib/unitRequestDisplay';
-import { Briefcase, AlertTriangle, CheckCircle, ListTodo, RefreshCw } from 'lucide-react';
+import { Briefcase, AlertTriangle, CheckCircle, ListTodo } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useUnitRequestsFeed } from '@/hooks/useUnitRequestsFeed';
 import { useSiamrajUnitRequestFilters } from '@/hooks/useSiamrajUnitRequestFilters';
@@ -131,18 +131,6 @@ const JobDashboard: React.FC = () => {
                     : 'อ่านใบขอจาก Siamraj (so-operation) — อัปเดตอัตโนมัติเมื่อมีการคีย์'
                 }`
               : 'จัดการหน่วยงานและใบขอ'
-        }
-        actions={
-          <button
-            type="button"
-            onClick={() => void refetch()}
-            disabled={refreshing}
-            className="flex items-center gap-1 px-3 py-2 rounded-full border border-white/70 bg-white/50 text-sm disabled:opacity-50"
-            title="โหลดข้อมูลใหม่"
-          >
-            <RefreshCw className={cn('w-4 h-4', refreshing && 'animate-spin')} />
-            รีเฟรช
-          </button>
         }
       />
       <div className="px-4 md:px-6 space-y-6">

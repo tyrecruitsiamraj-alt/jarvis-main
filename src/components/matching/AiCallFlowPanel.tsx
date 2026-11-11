@@ -19,7 +19,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { aiCallFlowCells, type CallFlowCell } from '@/lib/aiCallFlowCells';
-import { RefreshCw, Bot, UserRound } from 'lucide-react';
+import { Bot, UserRound } from 'lucide-react';
 import { useUiV2 } from '@/lib/uiV2';
 import { LoadErrorNotice } from '@/components/shared/LoadErrorNotice';
 
@@ -199,9 +199,6 @@ export default function AiCallFlowPanel({
               {t.label}
             </Button>
           ))}
-          <Button type="button" variant="ghost" size="iconXs" onClick={load} disabled={loading} aria-label="รีเฟรช" title="รีเฟรช">
-            <RefreshCw className={cn(loading && 'animate-spin')} />
-          </Button>
         </div>
       </div>
       <Dialog open={Boolean(peopleCell)} onOpenChange={(o) => (o ? undefined : setPeopleCell(null))}>

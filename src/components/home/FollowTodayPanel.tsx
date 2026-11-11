@@ -7,14 +7,13 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
 import { DASH, TONE } from '@/lib/designTokens';
 import { EMPTY_FUNNEL, fetchCallFunnel, type CallFunnel } from '@/lib/callFunnelApi';
 import { listFollowEntries, type FollowEntry } from '@/lib/followApi';
 import { toYmdBangkok } from '@/lib/dateTh';
 import { bucketOfCall, CALL_BUCKET_LABEL, type CallBucket } from '@/lib/callOutcomeBuckets';
 import { followRoundSlot } from '@/lib/followRoundBuckets';
-import { ChevronRight, Phone, PhoneOutgoing, RefreshCw } from 'lucide-react';
+import { ChevronRight, Phone, PhoneOutgoing } from 'lucide-react';
 import { LoadErrorNotice } from '@/components/shared/LoadErrorNotice';
 
 /**
@@ -36,14 +35,12 @@ import { LoadErrorNotice } from '@/components/shared/LoadErrorNotice';
 export default function FollowTodayPanel() {
   const [funnel, setFunnel] = useState<CallFunnel>(EMPTY_FUNNEL);
   const [sentToday, setSentToday] = useState(0);
-  const [loading, setLoading] = useState(false);
   const [funnelFailed, setFunnelFailed] = useState(false);
   const [entries, setEntries] = useState<FollowEntry[]>([]);
   /** รอบที่กดดูรายชื่ออยู่ — null = ไม่ได้เปิดกล่อง */
   const [openRound, setOpenRound] = useState<number | null>(null);
 
   const load = () => {
-    setLoading(true);
     const today = toYmdBangkok(new Date());
     // ยิง 2 ครั้ง: วันนี้ (เอา queued = ส่งวันนี้กี่คน) · ทั้งหมด (เอา byAttempt = รอบปัจจุบัน)
     void Promise.all([
@@ -55,7 +52,7 @@ export default function FollowTodayPanel() {
         setFunnel(allData.funnel);
         setFunnelFailed(todayData.failed === true || allData.failed === true);
       })
-      .finally(() => setLoading(false));
+      .catch(() => {});
     // รายชื่อสำหรับ popup — ล้มก็ไม่ทำให้ยอดบนแผงหาย (กดดูรายชื่อค่อยบอกว่าโหลดไม่ได้)
     void listFollowEntries()
       .then(setEntries)
@@ -108,17 +105,6 @@ export default function FollowTodayPanel() {
             คน
           </span>
         </div>
-        {/* 🔴 Button ของ shadcn — เลิกใช้ `jarvis-btn-*` ที่ปั้นปุ่มเองใน CSS */}
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={load}
-          disabled={loading}
-          className="shrink-0"
-        >
-          <RefreshCw className={cn(loading && 'animate-spin')} /> รีเฟรช
-        </Button>
       </div>
 
       {/* 3 รอบ format เดียวกัน — ส่ง · โทรติด · ไม่ติด · ยกเลิก + แถบสัดส่วน
@@ -273,7 +259,7 @@ export default function FollowTodayPanel() {
                 (k) => openRoundPeople[k].length === 0,
               ) ? (
                 <p className={cn('py-6 text-center text-xs', DASH.muted)}>
-                  ดึงรายชื่อไม่ได้ — ลองกดรีเฟรชที่หัวแผง
+                  ดึงรายชื่อไม่ได้ ลองเปิดหน้าใหม่
                 </p>
               ) : null}
             </div>

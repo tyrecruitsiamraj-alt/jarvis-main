@@ -106,7 +106,8 @@ describe('QA หน้าภาพรวม 18 ต.ค. 2569 (แก้ทั้
   it('ล้มไม่ค้างเลขเก่า · โหลดใหม่มีคำ · ผลงานรายคนใช้ชื่อเล่น · ตัดใบยกเลิกข้อมูล · % พุ่งบอกเลขช่วงก่อน', () => {
     const ov = readFileSync('src/components/dashboard-trends/RecruitOverview.tsx', 'utf8');
     expect(ov).toContain("setState({ data: null, loading: false, error: friendlyErrorText(e, 'โหลดภาพรวมไม่ได้') })");
-    expect(ov).toContain('<RefreshCw className={cn(state.loading && \'animate-spin\')} aria-hidden /> โหลดใหม่');
+    // ปุ่มโหลดใหม่ถอดทุกหน้า (เจ้าของ 11 พ.ย. 2569)
+    expect(ov).not.toContain('aria-hidden /> โหลดใหม่');
     const api = readFileSync('api/_handlers/recruit-overview.ts', 'utf8');
     // 4 พ.ย. 2569 ชื่อเล่นตัวเดียวกันใช้กับยอดแยกต่อใบขอด้วย (การ์ดตามตัวกรอง)
     expect(api).toContain('const displayOf = await loadStaffDisplay();');

@@ -11,7 +11,7 @@
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { RefreshCw } from 'lucide-react';
+
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import HomeBuFilter from '@/components/home/HomeBuFilter';
@@ -240,10 +240,6 @@ const HomeV3Page: React.FC = () => {
               ไม่รู้ BU {NUM.format(overview.unknown_bu_jobs)} ใบ
             </span>
           ) : null}
-          <Button type="button" size="xs" variant="outline" onClick={() => setRev((n) => n + 1)} disabled={ovLoading}>
-            <RefreshCw className={cn(ovLoading && 'animate-spin')} aria-hidden />
-            รีเฟรช
-          </Button>
         </div>
       </div>
 

@@ -13,7 +13,7 @@ import {
 import { acquireCallHold } from '@/lib/callHoldsApi';
 import { type CallOutcome } from '@/lib/callFollowupPolicy';
 import { CALL_OUTCOME_LABEL, CALL_OUTCOME_TONE } from '@/lib/callOutcomeTone';
-import { RefreshCw, ChevronDown, ArrowRight, ArrowDown } from 'lucide-react';
+import { ChevronDown, ArrowRight, ArrowDown } from 'lucide-react';
 import PageHeroStrip from '@/components/shared/PageHeroStrip';
 import { useSurfaceKit } from '@/components/shared/ui-v2/surface';
 import { resolvedCallBase } from '@/lib/callFunnelMath';
@@ -204,7 +204,6 @@ const CallFunnelPanel: React.FC<CallFunnelPanelProps> = ({
   const [source, setSource] = useState<CallFunnelSource>(defaultSource);
   const [funnel, setFunnel] = useState<CallFunnel>(EMPTY_FUNNEL);
   const [needsHuman, setNeedsHuman] = useState<NeedsHumanItem[]>([]);
-  const [loading, setLoading] = useState(true);
   const [openBucket, setOpenBucket] = useState(false);
   const [takingId, setTakingId] = useState<number | null>(null);
   const [takeError, setTakeError] = useState<string | null>(null);
@@ -215,12 +214,10 @@ const CallFunnelPanel: React.FC<CallFunnelPanelProps> = ({
 
   const [funnelFailed, setFunnelFailed] = useState(false);
   const load = useCallback(() => {
-    setLoading(true);
     void fetchCallFunnel(undefined, source).then((d) => {
       setFunnel(d.funnel);
       setNeedsHuman(d.needsHuman);
       setFunnelFailed(d.failed === true);
-      setLoading(false);
     });
   }, [source]);
 
@@ -308,9 +305,6 @@ const CallFunnelPanel: React.FC<CallFunnelPanelProps> = ({
                     {t.label}
                   </Button>
                 ))}
-            <Button type="button" variant="hero" size="sm" onClick={load}>
-              <RefreshCw className={cn(loading && 'animate-spin')} /> รีเฟรช
-            </Button>
           </div>
         }
       >

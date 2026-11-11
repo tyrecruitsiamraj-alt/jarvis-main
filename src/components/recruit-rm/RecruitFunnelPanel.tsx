@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Loader2, RefreshCw } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 
 import { TONE, type ToneKey } from '@/lib/designTokens';
 import { cn } from '@/lib/utils';
@@ -85,15 +85,6 @@ const RecruitFunnelPanel: React.FC = () => {
             ยอดจากฐานของเรา (เริ่มเก็บใหม่) · นัดหมาย/ติดตามนัดจะขึ้นเมื่อเริ่มบันทึกผลติดต่อ · กดขั้นตอนเพื่อดูรายละเอียด
           </p>
         </div>
-        <button
-          type="button"
-          onClick={load}
-          disabled={loading}
-          className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-secondary disabled:opacity-50"
-        >
-          <RefreshCw className={cn('h-3.5 w-3.5', loading && 'animate-spin')} />
-          รีเฟรช
-        </button>
       </div>
 
       {loading && !data ? (

@@ -63,7 +63,8 @@ describe('ปุ่มบนหน้าหลัก', () => {
   });
 
   it('ไฟล์ที่มีปุ่มต้อง import Button จาก shadcn', () => {
-    for (const f of ['src/components/home/useHomeCallDialogs.tsx', 'src/components/home/FollowTodayPanel.tsx']) {
+    // FollowTodayPanel ไม่มีปุ่มแล้ว (ปุ่มรีเฟรชถอดทุกหน้า 11 พ.ย. 2569)
+    for (const f of ['src/components/home/useHomeCallDialogs.tsx']) {
       expect(read(f), f).toContain("from '@/components/ui/button'");
     }
   });

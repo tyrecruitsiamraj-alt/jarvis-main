@@ -162,7 +162,6 @@ const StaffJobBoardPage: React.FC = () => {
         closedError={closed.error}
         closedDays={closed.days}
         onClosedDaysChange={closed.setDays}
-        onReloadClosed={closed.reload}
         initialBox={legacyBox}
         onPublishedTotals={setBoardPublished}
         onImportJob={setImportJob}

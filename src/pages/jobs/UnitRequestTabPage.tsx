@@ -324,16 +324,6 @@ const UnitRequestTabPage: React.FC<{ tab: UnitRequestSubTab }> = ({ tab }) => {
               ) : null}
               <span className="text-muted-foreground">· สนใจแล้ว {summary.interested}</span>
               <span className="text-muted-foreground">· ยังไม่โทร {summary.waiting}</span>
-              <button
-                type="button"
-                onClick={() => void reload()}
-                className={cn(
-                  'ml-auto inline-flex items-center gap-1 rounded-lg border px-2.5 py-1 text-xs font-medium',
-                  TONE.neutral.outline,
-                )}
-              >
-                <RefreshCw className="h-3.5 w-3.5" /> รีเฟรช
-              </button>
             </div>
 
             {!items && !error ? (

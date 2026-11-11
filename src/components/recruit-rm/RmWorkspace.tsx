@@ -4,7 +4,7 @@ import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { useSearchParams } from 'react-router-dom';
-import { CalendarDays, ChevronDown, ChevronRight, Download, FileSpreadsheet, RefreshCw, RotateCcw, X } from 'lucide-react';
+import { CalendarDays, ChevronDown, ChevronRight, Download, FileSpreadsheet, RotateCcw, X } from 'lucide-react';
 import FilterChips from '@/components/shared/FilterChips';
 import FilterChipsDropdown from '@/components/shared/FilterChipsDropdown';
 import { cn } from '@/lib/utils';
@@ -1004,14 +1004,6 @@ const RmWorkspace: React.FC<{
             );
           })}
           </div>
-          <Button variant="secondary" size="sm"
-            type="button"
-            onClick={load}
-            disabled={loading}
-            className="ml-auto"
-          >
-            <RefreshCw className={cn(loading && 'animate-spin')} aria-hidden /> รีเฟรช
-          </Button>
         </div>
       )}
 

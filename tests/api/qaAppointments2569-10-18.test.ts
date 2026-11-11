@@ -49,7 +49,8 @@ describe('สถานะจอ + มือถือ + ปุ่ม', () => {
   });
   it('ปุ่มบันทึกผล/รีเฟรชมีคำ · ของฉัน/ทุกคน ตัวที่เลือกทึบ', () => {
     expect(read('src/components/recruit-rm/RmTable.tsx')).toContain("const worded = (tab === 'appointments' && a === 'rule') || resend;");
-    expect(read('src/components/jobs/JobBoardView.tsx')).toContain('<RefreshCw aria-hidden /> รีเฟรช');
+    // ปุ่มรีเฟรชถอดทุกหน้า (เจ้าของ 11 พ.ย. 2569 "เกะกะ" · "ทุกหน้าเลยนะ")
+    expect(read('src/components/jobs/JobBoardView.tsx')).not.toContain('รีเฟรช</Button>');
     expect(read('src/components/ui/toggle.tsx')).toContain('data-[state=on]:bg-primary');
   });
   it('ป๊อปช่องทางถอยไปที่ผู้สมัครเลือกเอง · หน่วยงานจากใบขอ · "ลงงาน …"', () => {

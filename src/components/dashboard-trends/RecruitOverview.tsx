@@ -1,19 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import BuChoiceSelect from '@/components/shared/BuChoiceSelect';
-import {
-  AlertCircle,
-  BarChart3,
-  Briefcase,
-  CalendarDays,
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  ClipboardList,
-  Megaphone,
-  RefreshCw,
-  Timer,
-  Users,
-} from 'lucide-react';
+import { AlertCircle, BarChart3, Briefcase, CalendarDays, ChevronDown, ChevronLeft, ChevronRight, ClipboardList, Megaphone, Timer, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useSearchParams } from 'react-router-dom';
@@ -409,9 +396,6 @@ const RecruitOverview: React.FC<{
               </div>
             </PopoverContent>
           </Popover>
-          <Button type="button" size="xs" variant="outline" onClick={() => setRev((n) => n + 1)}>
-            <RefreshCw className={cn(state.loading && 'animate-spin')} aria-hidden /> โหลดใหม่
-          </Button>
         </div>
       </div>
 

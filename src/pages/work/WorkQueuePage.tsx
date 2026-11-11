@@ -22,7 +22,7 @@
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
-import { ArrowRight, ExternalLink, Phone, RefreshCw } from 'lucide-react';
+import { ArrowRight, ExternalLink, Phone } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Sheet2, StatRow2, Stat2 } from '@/components/shared/ui-v2/Sheet2';
@@ -383,19 +383,6 @@ const WorkQueuePage: React.FC = () => {
   const waitingAi = office?.counts.aiCalls.waitingResult ?? null;
   const th = (n: number) => n.toLocaleString('th-TH');
 
-  const refreshButton = (
-    <Button
-      type="button"
-      variant="ghost"
-      size="sm"
-      onClick={() => void load()}
-      disabled={loading}
-      className="h-8 px-2.5 text-muted-foreground"
-    >
-      <RefreshCw className={cn(loading && 'animate-spin')} aria-hidden />
-      รีเฟรช
-    </Button>
-  );
 
   return (
     <div className="mx-auto w-full max-w-[1180px] px-4 py-6 sm:px-6 md:py-9">
@@ -456,7 +443,6 @@ const WorkQueuePage: React.FC = () => {
             <Sheet2 className="animate-in fade-in slide-in-from-bottom-2 duration-500">
               <div className="flex items-center justify-between px-6 pb-2 pt-5 lg:px-8">
                 <span className="text-[12.5px] font-medium text-foreground">คิวงาน</span>
-                {refreshButton}
               </div>
               <p className="px-6 py-10 text-center text-[13px] text-muted-foreground lg:px-8">
                 ถังที่ระบบเฝ้าอยู่ว่างหมด — เปิดหน้าแรกเพื่อดูตัวเลขวันนี้
@@ -479,7 +465,6 @@ const WorkQueuePage: React.FC = () => {
                 rows={queue.buckets}
                 selectedId={selected?.id}
                 onSelect={setSelectedId}
-                action={refreshButton}
               />
 
               {/* ── ก้อนที่ 2: รายคน (หน่วย "คน" · เลขลำดับ **เริ่มใหม่** ที่ 01) ── */}

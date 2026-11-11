@@ -23,7 +23,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { toast } from '@/hooks/use-toast';
 import { useUnitRequestsFeed } from '@/hooks/useUnitRequestsFeed';
 import { navigateToUnitRequest, shouldOpenInNewTabFromEvent } from '@/lib/jobNavigation';
-import { ChevronRight, RefreshCw, SlidersHorizontal } from 'lucide-react';
+import { ChevronRight, SlidersHorizontal } from 'lucide-react';
 import Term from '@/components/shared/Term';
 import JobUrgencyBadge from '@/components/jobs/JobUrgencyBadge';
 import UnitRequestReplacementBadge from '@/components/jobs/UnitRequestReplacementBadge';
@@ -557,15 +557,6 @@ const JobListPage: React.FC = () => {
                 />
               </div>
             )}
-            <button
-              type="button"
-              onClick={() => void refetch()}
-              disabled={refreshing}
-              className="flex shrink-0 items-center gap-1 px-3 py-2 rounded-full border border-white/70 bg-white/50 text-sm disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800/60"
-            >
-              <RefreshCw className={cn('w-4 h-4', refreshing && 'animate-spin')} />
-              รีเฟรช
-            </button>
           </div>
         }
       />

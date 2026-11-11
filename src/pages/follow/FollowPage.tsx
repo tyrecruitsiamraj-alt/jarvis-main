@@ -479,8 +479,6 @@ const FollowPage: React.FC = () => {
    * โหลดลิสต์ใหม่ทันที ไม่ต้องรีเฟรชหน้า (เรื่อง กับ เจ้าหน้าที่ แยกตัวนับกัน)
    */
   const [topicsRev, setTopicsRev] = useState(0);
-  /** รีเฟรชแท็บ Dashboard = เปิดแผงใหม่ (ปุ่มรีเฟรชอยู่แถวแท็บ · 4 ต.ค. 2569) */
-  const [dashRev, setDashRev] = useState(0);
   const [contactsRev, setContactsRev] = useState(0);
   /** dialog จัดการเรื่อง / เจ้าหน้าที่ — เปิดจากปุ่มข้างปฏิทิน (supervisor+ เท่านั้น) */
   const [topicManagerOpen, setTopicManagerOpen] = useState(false);
@@ -2517,21 +2515,7 @@ const FollowPage: React.FC = () => {
                 </Button>
               </div>
             ) : null
-          ) : (
-            /* รีเฟรช — ขึ้นมาแถวแท็บชิดขวาแบบหน้าผู้สมัคร (เดิมอยู่ท้ายแถวปุ่ม) · Dashboard = โหลดแผงใหม่ */
-            <Button
-              type="button"
-              variant="outline"
-              size="iconXs"
-              onClick={() => (followView === 'dashboard' ? setDashRev((n) => n + 1) : void reload())}
-              disabled={loading}
-              aria-label="รีเฟรชข้อมูล"
-              title="รีเฟรชข้อมูล"
-              className="order-2 shrink-0 md:order-3"
-            >
-              <RefreshCw className={cn(loading && 'animate-spin')} aria-hidden />
-            </Button>
-          )}
+          ) : null /* ปุ่มรีเฟรชถอดทุกหน้า (เจ้าของ 11 พ.ย. 2569 "เกะกะ") */}
         </div>
         {followView !== 'dashboard' ? (
           <div className="flex min-w-0 flex-wrap items-center gap-1.5 sm:gap-2">{headerButtons}</div>
@@ -2542,7 +2526,7 @@ const FollowPage: React.FC = () => {
         <div className="px-4 md:px-6 py-4">
           {/* รีเฟรชส่งเป็น prop ไม่ใช่ key — key ทำให้ช่วงที่เลือกเด้งกลับเป็น "วัน" (QA 17 ต.ค. 2569) */}
           <Suspense fallback={<p className="py-6 text-sm text-muted-foreground">กำลังเปิด Dashboard…</p>}>
-            <FollowDashboard refreshKey={dashRev} />
+            <FollowDashboard />
           </Suspense>
         </div>
       ) : (

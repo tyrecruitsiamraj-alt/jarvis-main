@@ -19,7 +19,7 @@
 import BuChoiceSelect from '@/components/shared/BuChoiceSelect';
 import React, { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { ClipboardList, Link2, PhoneCall, RefreshCw, Target, UserPlus, Users } from 'lucide-react';
+import { ClipboardList, Link2, PhoneCall, Target, UserPlus, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -334,10 +334,6 @@ const TeamOnlinePage: React.FC = () => {
             </div>
           )}
         </div>
-        <Button type="button" size="xs" variant="outline" onClick={() => setRev((x) => x + 1)} disabled={loading}>
-          <RefreshCw className={cn(loading && 'animate-spin')} aria-hidden />
-          รีเฟรช
-        </Button>
       </div>
       {w ? (
         <p className={cn('text-xs tabular-nums', DASH.muted)}>

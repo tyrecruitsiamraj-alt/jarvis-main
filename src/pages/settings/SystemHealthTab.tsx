@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { AlertTriangle, CheckCircle2, LoaderCircle, RefreshCw, XCircle } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, LoaderCircle, XCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 import { cn } from '@/lib/utils';
@@ -103,14 +103,6 @@ const SystemHealthTab: React.FC = () => {
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          <button
-            type="button"
-            onClick={() => void reload()}
-            disabled={loading}
-            className="inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-secondary disabled:opacity-60"
-          >
-            <RefreshCw className={cn('h-3.5 w-3.5', loading && 'animate-spin')} /> รีเฟรช
-          </button>
           <button
             type="button"
             onClick={() => void onCheckNow()}
