@@ -126,16 +126,10 @@ const WorkStatusMasterTab: React.FC = () => {
           </p>
         </div>
 
-        {error ? (
-          <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-            {error}
-          </div>
-        ) : null}
-        {okMsg ? (
-          <div className="rounded-lg border border-success/40 bg-success/10 px-3 py-2 text-sm text-success">
-            {okMsg}
-          </div>
-        ) : null}
+        {/* บรรทัดข้อความจองที่ไว้เสมอ — กดปิด/เปิดใช้งานแล้วรายการไม่ถูกดันลง (เจ้าของ 11 พ.ย. 2569 "กดแล้วเลื่อน เม้าต้องขยับตาม") */}
+        <p className={cn('min-h-5 text-sm', error ? 'text-destructive' : 'text-success')} role="status">
+          {error || okMsg || ''}
+        </p>
 
         {/* เพิ่มสถานะใหม่ */}
         <div className="rounded-xl border border-border p-3 space-y-2">

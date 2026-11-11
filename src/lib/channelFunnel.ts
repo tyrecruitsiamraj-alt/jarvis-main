@@ -48,6 +48,9 @@ export const FUNNEL_COLUMNS: ReadonlyArray<{ key: FunnelCellKey; label: string }
 
 const idsOf = (list: readonly RecruitAppFact[]) => list.map((f) => f.id).filter((v): v is string => Boolean(v));
 
+/** แถวเลข 0 ทุกช่อง — กลุ่มที่มีคนคลิกแต่ไม่มีคนกรอกในช่วง (ตารางช่องทาง · 11 พ.ย. 2569) */
+export const emptyFunnelRow = (channel: string): ChannelFunnelRow => rowOf(channel, []);
+
 function rowOf(channel: string, list: readonly RecruitAppFact[]): ChannelFunnelRow {
   const steps = buildRecruitJourney(list);
   const partOf = (step: string, key: string): FunnelCell => {

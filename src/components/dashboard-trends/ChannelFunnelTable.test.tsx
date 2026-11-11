@@ -43,3 +43,37 @@ describe('ตารางช่องทางกางในที่', () => {
     expect(screen.queryByTestId('channel-funnel-path')).toBeNull();
   });
 });
+
+describe('คลิกกลุ่ม Facebook เป็นไส้ในของตารางช่องทาง (เจ้าของ 11 พ.ย. 2569)', () => {
+  it('ช่องคลิกเฉพาะแถวที่มีลิงก์ · กลุ่มคลิกแต่ไม่มีคนกรอกยังอยู่ (0) · เรียงกรอกก่อน คลิกรอง', async () => {
+    const { mergeFbGroupClicks } = await import('@/lib/fbGroupClicks');
+    const tree = {
+      groups: [
+        { ...node('facebook', 10, [node('Facebook Group', 10, [{ ...row('กลุ่มก', 10), key: 'Facebook Group|กลุ่มก' }])]), channel: 'Facebook' },
+        node('Tiktok', 4),
+      ] as FunnelNode[],
+      total: row('รวม', 14),
+    };
+    tree.groups[0].children![0] = { ...tree.groups[0].children![0], key: 'Facebook Group' };
+    const merged = mergeFbGroupClicks(tree, {
+      rows: [
+        { group: 'กลุ่มก', clicks: 50, appIds: [], ratePct: 20, applyPresses: 3, repeatBlocked: 1 },
+        { group: 'กลุ่มข', clicks: 80, appIds: [], ratePct: 0, applyPresses: 0, repeatBlocked: 0 },
+      ],
+      totalClicks: 130,
+      totalApps: 10,
+      totalPresses: 3,
+      totalBlocked: 1,
+    });
+    render(<ChannelFunnelTable groups={merged.groups} total={merged.total} clicks={merged.clicks} />);
+    expect(screen.getByRole('columnheader', { name: 'คลิก' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Facebook' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Facebook Group' }));
+    expect(firstCells()).toEqual(['Facebook', 'Facebook Group', 'กลุ่มก', 'กลุ่มข', 'Tiktok', 'รวม']);
+    const cellsOf = (name: string) => [...screen.getAllByRole('row').find((r) => r.querySelector('td')?.textContent?.trim() === name)!.querySelectorAll('td')].map((td) => td.textContent?.trim());
+    expect(cellsOf('Facebook Group')[1]).toBe('130กดสมัคร 3สมัครซ้ำโดนกัน 1');
+    expect(cellsOf('กลุ่มข')[1]).toBe('80');
+    expect(cellsOf('กลุ่มข')[2]?.startsWith('0')).toBe(true);
+    expect(cellsOf('Tiktok')[1]).toBe('—');
+  });
+});

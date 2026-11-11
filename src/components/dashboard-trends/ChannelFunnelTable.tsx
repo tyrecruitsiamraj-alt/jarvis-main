@@ -5,6 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { cn } from '@/lib/utils';
 import { formatTrendNumber as fmt } from '@/lib/trends/format';
 import { FUNNEL_COLUMNS, type ChannelFunnelRow, type FunnelNode } from '@/lib/channelFunnel';
+import type { FunnelClickCell } from '@/lib/fbGroupClicks';
 
 /**
  * ═══ ตาราง "ช่องทาง → แจ้งเข้า" (เจ้าของ 19 ต.ค. 2569 · ทีม Online) ═══
@@ -21,13 +22,29 @@ const pct = (n: number | null, of: number | null) => (n === null || !of ? null :
 
 const INDENT = ['', 'pl-6', 'pl-10', 'pl-14'] as const;
 
+/** ช่องคลิก — แถวที่ไม่มีลิงก์นับคลิก = "—" · กดสมัคร / สมัครซ้ำโดนกัน ขึ้นใต้เลขเมื่อมี */
+function ClickCell({ cell, strong }: { cell: FunnelClickCell | undefined; strong: boolean }) {
+  return (
+    <TableCell className={cn('text-right text-sm tabular-nums', strong && 'font-medium')}>
+      <span className={cn('inline-flex h-7 items-center', (!cell || cell.clicks === 0) && 'text-muted-foreground')}>{cell ? fmt(cell.clicks) : '—'}</span>
+      {cell && cell.presses > 0 ? <span className="block whitespace-nowrap text-xs font-normal text-muted-foreground">กดสมัคร {fmt(cell.presses)}</span> : null}
+      {cell && cell.blocked > 0 ? <span className="block whitespace-nowrap text-xs font-normal text-muted-foreground">สมัครซ้ำโดนกัน {fmt(cell.blocked)}</span> : null}
+    </TableCell>
+  );
+}
+
 const ChannelFunnelTable: React.FC<{
   groups: readonly FunnelNode[];
   total: ChannelFunnelRow;
   onOpen?: (title: string, ids: readonly string[]) => void;
   /** หัวคอลัมน์แรก + ชั้นบนสุด — ตาราง "ใครหารายชื่อเข้ามา" ใช้ "คน" (9 พ.ย. 2569) */
   firstLabel?: string;
-}> = ({ groups, total, onOpen, firstLabel = 'ช่องทาง' }) => {
+  /**
+   * คลิกลิงก์ต่อแถว (คีย์แถว) — มี = เพิ่มช่อง "คลิก" หน้า "รายชื่อ" (กลุ่ม Facebook · 11 พ.ย. 2569 "คลิกและกรอก แยกกลุ่ม Facebook คือไส้ใน")
+   * แถวที่ไม่มีลิงก์นับคลิก = "—" · ใต้เลขบอกกดสมัคร / สมัครซ้ำโดนกัน เมื่อมี
+   */
+  clicks?: ReadonlyMap<string, FunnelClickCell>;
+}> = ({ groups, total, onOpen, firstLabel = 'ช่องทาง', clicks }) => {
   /** แถวที่กางอยู่ (คีย์เต็มตามชั้น) — เก็บเป็นคีย์ เลขเปลี่ยนตามช่วงแล้วแถวที่กางไว้ยังกางอยู่ */
   const [open, setOpen] = useState<ReadonlySet<string>>(() => new Set());
   const toggle = (id: string) =>
@@ -61,6 +78,7 @@ const ChannelFunnelTable: React.FC<{
             r.channel
           )}
         </TableCell>
+        {clicks ? <ClickCell cell={node ? clicks.get(node.key) : undefined} strong={strong} /> : null}
         {FUNNEL_COLUMNS.map((c) => {
           const cell = r[c.key];
           const canOpen = !!onOpen && cell.value !== null && cell.value > 0 && cell.ids.length > 0;
@@ -96,7 +114,10 @@ const ChannelFunnelTable: React.FC<{
       const id = `${prefix}/${n.key}`;
       const out: React.ReactNode[] = [line(n, { node: n, id, depth, parentNames })];
       if (n.children && open.has(id)) {
-        const kids = [...n.children].sort((a, b) => (b.names.value ?? 0) - (a.names.value ?? 0));
+        // กรอกมากไปน้อย · กรอกเท่ากันคลิกมากก่อน
+        const kids = [...n.children].sort(
+          (a, b) => (b.names.value ?? 0) - (a.names.value ?? 0) || (clicks?.get(b.key)?.clicks ?? 0) - (clicks?.get(a.key)?.clicks ?? 0),
+        );
         out.push(...rows(kids, depth + 1, id, n.names.value));
       }
       return out;
@@ -108,6 +129,7 @@ const ChannelFunnelTable: React.FC<{
         <TableHeader>
           <TableRow>
             <TableHead className="text-xs">{firstLabel}</TableHead>
+            {clicks ? <TableHead className="whitespace-nowrap text-right text-xs">คลิก</TableHead> : null}
             {FUNNEL_COLUMNS.map((c) => (
               <TableHead key={c.key} className="whitespace-nowrap text-right text-xs">
                 {c.label}

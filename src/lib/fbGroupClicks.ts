@@ -8,7 +8,7 @@
  * - เรียงกรอกมากก่อน (เจ้าของ 10 พ.ย. 2569 "คนที่กรอกเยอะสุด ขึ้นได้ไหม") กรอกเท่ากันคลิกมากก่อน · "ไม่ระบุชื่อ" ท้าย · pure — เทสต์ `tests/api/fbGroupClicks2569-11-10.test.ts`
  */
 import type { RecruitAppFact } from '@/lib/recruitOverviewTypes';
-import { funnelChannelOf, funnelSubOf, NO_SUB } from '@/lib/channelFunnel';
+import { emptyFunnelRow, funnelChannelOf, funnelSubOf, NO_SUB, type ChannelFunnelRow, type FunnelNode } from '@/lib/channelFunnel';
 
 export const FB_GROUP_CHANNEL = 'Facebook Group';
 
@@ -50,4 +50,41 @@ export function buildFbGroupClickRows(
     totalPresses: rows.reduce((s, r) => s + r.applyPresses, 0),
     totalBlocked: rows.reduce((s, r) => s + r.repeatBlocked, 0),
   };
+}
+
+/**
+ * ═══ คลิกเป็นไส้ในของตาราง "รายชื่อ แยกช่องทาง" (เจ้าของ 11 พ.ย. 2569 "รายชื่อ แยกช่องทาง มันต้องรวมกับ คลิกและกรอก แยกกลุ่ม
+ * Facebook โดย คลิกและกรอก แยกกลุ่ม Facebook คือไส้ใน") ═══
+ * - คีย์คลิก = คีย์แถวของต้นไม้ (`Facebook Group` · `Facebook Group|ชื่อกลุ่ม`) ตัวแยกกลุ่มเดียวกัน (`funnelSubOf`)
+ * - กลุ่มที่มีคนคลิกแต่ไม่มีคนกรอกในช่วง = เติมแถว 0 ใต้ Facebook Group (ไม่งั้นกลุ่มคลิกเยอะแต่ไม่มีคนกรอกหายจากตาราง)
+ * - คลิก/กดสมัคร/สมัครซ้ำ = ยอดทั้งหมดตั้งแต่สร้างลิงก์ (ฐานเดิมของการ์ดกลุ่ม) · รายชื่อ = ช่วงที่เลือก (ฐานเดิมของตาราง)
+ */
+export type FunnelClickCell = { clicks: number; presses: number; blocked: number };
+
+export function mergeFbGroupClicks(
+  tree: { groups: FunnelNode[]; total: ChannelFunnelRow },
+  fb: ReturnType<typeof buildFbGroupClickRows>,
+): { groups: FunnelNode[]; total: ChannelFunnelRow; clicks: Map<string, FunnelClickCell> } {
+  const clicks = new Map<string, FunnelClickCell>();
+  if (!fb) return { ...tree, clicks };
+  clicks.set(FB_GROUP_CHANNEL, { clicks: fb.totalClicks, presses: fb.totalPresses, blocked: fb.totalBlocked });
+  for (const r of fb.rows) clicks.set(`${FB_GROUP_CHANNEL}|${r.group}`, { clicks: r.clicks, presses: r.applyPresses, blocked: r.repeatBlocked });
+  const groups = tree.groups.map((g) => {
+    if (g.key !== 'facebook') return g;
+    const chans = [...(g.children ?? [])];
+    let at = chans.findIndex((c) => c.key === FB_GROUP_CHANNEL);
+    if (at === -1) {
+      chans.push({ ...emptyFunnelRow(FB_GROUP_CHANNEL), key: FB_GROUP_CHANNEL });
+      at = chans.length - 1;
+    }
+    const node = chans[at];
+    const kids = [...(node.children ?? [])];
+    for (const r of fb.rows) {
+      const key = `${FB_GROUP_CHANNEL}|${r.group}`;
+      if (!kids.some((k) => k.key === key)) kids.push({ ...emptyFunnelRow(r.group), key });
+    }
+    chans[at] = { ...node, children: kids };
+    return { ...g, children: chans };
+  });
+  return { groups, total: tree.total, clicks };
 }
