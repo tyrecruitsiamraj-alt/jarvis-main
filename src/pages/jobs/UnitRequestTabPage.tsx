@@ -1,12 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useParams } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
+import { Button } from '@/components/ui/button';
 import { resolveUnitDetailBackPath } from '@/lib/jobUnitSessionState';
 import { backLabelFor } from '@/lib/stageOrigin';
 import UnitRequestTabs, { type UnitRequestTabId } from '@/components/jobs/UnitRequestTabs';
-import { MyCallsSection } from '@/pages/matching/MyCallsPage';
-import { applicationsJobKey, fetchAllUnitOptions, fetchSiamrajUnitRequest } from '@/lib/siamrajUnitRequestsApi';
-import type { BoardUnitOption } from '@/lib/boardUnitPicker';
+import { applicationsJobKey, fetchSiamrajUnitRequest } from '@/lib/siamrajUnitRequestsApi';
 import { fetchJobApplications, type PublicApplication } from '@/lib/publicApplicationsApi';
 import { fetchRecruitLaneCandidates, tierChipClass, type RecruitLaneMatch } from '@/lib/recruitLaneApi';
 import { fetchBoardMatchForJob } from '@/lib/boardMatchApi';
@@ -17,14 +16,14 @@ import type { BoardMatchResponse } from '@/lib/boardCandidateTypes';
 import {
   groupApplicationsByOrigin,
   summarizeUnitMatches,
+  UNIT_MATCH_CALLER_LABEL,
   unitMatchFactLine,
+  unitMatchLastCaller,
   unitMatchOriginLabel,
   unitMatchStatus,
+  unitMatchStatusCounts,
 } from '@/lib/unitMatchingView';
 import { jobBoardCardTitle } from '@/lib/unitRequestDisplay';
-import SelectionProgressControls from '@/components/recruit-rm/SelectionProgressControls';
-import { isInterestedApplicant, isInterestedOutcome } from '@/lib/applicantCallOutcome';
-import { jobPositionUnits } from '@/lib/jobPositionUnits';
 import { EM_DASH } from '@/lib/displayFallback';
 import {
   AlertDialog,
@@ -55,7 +54,6 @@ export type UnitRequestSubTab = Exclude<UnitRequestTabId, 'detail' | 'posting'>;
 const TAB_TITLE: Record<UnitRequestSubTab, string> = {
   applicants: 'ผู้สมัคร',
   'ai-match': 'AI Match',
-  contact: 'การติดต่อ',
 };
 
 /**
@@ -98,25 +96,6 @@ const UnitRequestTabPage: React.FC<{ tab: UnitRequestSubTab }> = ({ tab }) => {
   const [rematchConfirm, setRematchConfirm] = useState(false);
   const [boardWaiting, setBoardWaiting] = useState(false);
 
-  /**
-   * หน่วยงานให้เลือกในขั้น "รอหน่วยงานพิจารณา/รอสัมภาษณ์" (Phase 6.6)
-   * ⚠️ โหลดพัง = `[]` → ปุ่มเลือกหน่วยงานไม่โผล่ (ห้ามบล็อกงานอื่นในแท็บ)
-   * ใช้ชุดเดียวกับหน้า Follow (`?units=1`) เพื่อให้ชื่อ/รหัสไซต์ตรงกันทั้งระบบ
-   */
-  const [units, setUnits] = useState<BoardUnitOption[]>([]);
-  useEffect(() => {
-    let cancelled = false;
-    void fetchAllUnitOptions()
-      .then((v) => {
-        if (!cancelled) setUnits(v);
-      })
-      .catch(() => {
-        if (!cancelled) setUnits([]);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   /**
    * ติ๊กคนจากผล AI Match แล้วลงมือได้จากแท็บนี้เลย (Phase 6.7 · เจ้าของเคาะ 22 ส.ค. 2569)
@@ -267,11 +246,12 @@ const UnitRequestTabPage: React.FC<{ tab: UnitRequestSubTab }> = ({ tab }) => {
   }, [boardWaiting, tab, loadBoardMatch]);
 
   const summary = useMemo(() => summarizeUnitMatches(items ?? []), [items]);
-  const groups = useMemo(() => groupApplicationsByOrigin(items ?? []), [items]);
-  /** คนที่ "สนใจ" ของใบขอนี้ (Phase 6.10) — กติกาเดียวกับแท็บ/กล่องอื่นทั้งระบบ */
-  const interestedItems = useMemo(
-    () => (items ?? []).filter((a) => isInterestedApplicant(a)),
-    [items],
+  /** ชิปที่กดอยู่ (ข้อความสถานะเดียวกับป้ายท้ายการ์ด) · null = ทุกคน */
+  const [statusPick, setStatusPick] = useState<string | null>(null);
+  const statusCounts = useMemo(() => unitMatchStatusCounts(items ?? []), [items]);
+  const groups = useMemo(
+    () => groupApplicationsByOrigin((items ?? []).filter((a) => !statusPick || unitMatchStatus(a).text === statusPick)),
+    [items, statusPick],
   );
 
   /**
@@ -314,16 +294,32 @@ const UnitRequestTabPage: React.FC<{ tab: UnitRequestSubTab }> = ({ tab }) => {
         {/* ── ผู้สมัคร ───────────────────────────────────── */}
         {tab === 'applicants' ? (
           <>
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-border/70 bg-secondary/40 px-3.5 py-2.5 text-sm">
-              <span className="inline-flex items-center gap-1.5 font-medium">
-                <Users className={cn('h-4 w-4', TONE.info.value)} />
-                ผู้สมัคร {summary.total} คน
-              </span>
-              {job ? (
-                <span className="text-muted-foreground">· ต้องการ {jobPositionUnits(job)} อัตรา</span>
-              ) : null}
-              <span className="text-muted-foreground">· สนใจแล้ว {summary.interested}</span>
-              <span className="text-muted-foreground">· ยังไม่โทร {summary.waiting}</span>
+            {/* ชิปนับตามป้ายท้ายการ์ด กดแล้วเหลือเฉพาะคนกลุ่มนั้น กดซ้ำ = ทุกคน (เจ้าของ 11 พ.ย. 2569) · ชิปรวมกัน = ผู้สมัครทั้งหมด */}
+            <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border/70 bg-secondary/40 px-3.5 py-2.5 text-sm">
+              <Button
+                type="button"
+                size="xs"
+                variant={statusPick === null ? 'default' : 'outline'}
+                className="rounded-full"
+                aria-pressed={statusPick === null}
+                onClick={() => setStatusPick(null)}
+              >
+                <Users aria-hidden />
+                ผู้สมัคร <span className="tabular-nums">{summary.total}</span> คน
+              </Button>
+              {statusCounts.map((s) => (
+                <Button
+                  key={s.text}
+                  type="button"
+                  size="xs"
+                  variant={statusPick === s.text ? 'default' : 'outline'}
+                  className="rounded-full"
+                  aria-pressed={statusPick === s.text}
+                  onClick={() => setStatusPick((cur) => (cur === s.text ? null : s.text))}
+                >
+                  {s.text} <span className="tabular-nums">{s.count}</span>
+                </Button>
+              ))}
             </div>
 
             {!items && !error ? (
@@ -354,6 +350,7 @@ const UnitRequestTabPage: React.FC<{ tab: UnitRequestSubTab }> = ({ tab }) => {
                   {g.items.map((a) => {
                     const st = unitMatchStatus(a);
                     const originLabel = unitMatchOriginLabel(a);
+                    const caller = unitMatchLastCaller(a);
                     return (
                       <li
                         key={a.id}
@@ -368,24 +365,12 @@ const UnitRequestTabPage: React.FC<{ tab: UnitRequestSubTab }> = ({ tab }) => {
                         <span className="text-xs text-muted-foreground">
                           {unitMatchFactLine(a) || EM_DASH}
                         </span>
-                        <span className="sm:text-right">
+                        {/* ทุกการ์ดหน้าตาเดียวกัน: สถานะ + ใครโทรล่าสุดอยู่ท้ายแถว (เจ้าของ 11 พ.ย. 2569
+                            "ไม่เอาหน้าตาแบบนี้ เอาหน้าตาแบบ ณัฎฐกานต์ แต่บอกสถานะด้านหลัง") — แผงขั้นตอน/เตรียมเข้างานถอดจากการ์ดนี้ */}
+                        <span className="flex flex-col items-start gap-0.5 sm:items-end">
                           <span className={STATUS_CLASS[st.tone]}>{st.text}</span>
+                          {caller ? <span className="whitespace-nowrap text-xs text-muted-foreground">{UNIT_MATCH_CALLER_LABEL[caller]}</span> : null}
                         </span>
-                        {/* ขั้นในกระบวนการจ้าง + เช็คลิสต์ (ข้อ 5–7) — โผล่เฉพาะคนที่
-                            คุยแล้วสนใจหรือมีนัดแล้ว · คนที่ยังไม่ได้โทรไม่ต้องรก */}
-                        {a.appointment_at || isInterestedOutcome(a.last_call_outcome) || a.selection_status ? (
-                          <div className="sm:col-span-3">
-                            <SelectionProgressControls
-                              subject={{ kind: 'application', application: a }}
-                              units={units}
-                              onSaved={(next) =>
-                                setItems((cur) =>
-                                  (cur ?? []).map((x) => (x.id === next.id ? next : x)),
-                                )
-                              }
-                            />
-                          </div>
-                        ) : null}
                       </li>
                     );
                   })}
@@ -575,54 +560,7 @@ const UnitRequestTabPage: React.FC<{ tab: UnitRequestSubTab }> = ({ tab }) => {
           </>
         ) : null}
 
-        {/* ── การติดต่อ ─────────────────────────────────── */}
-        {tab === 'contact' ? (
-          <>
-            {/* คนที่ตอบว่าสนใจจากการโทร — ของทั้งใบขอ (Phase 6.10 · เจ้าของเคาะ 22 ส.ค. 2569)
-                🔴 เดิมแท็บนี้มีแต่ "ถังโทรของฉัน" ซึ่งเป็นของคนที่เปิดดูคนเดียว → คนสนใจ
-                ที่คนอื่นโทรได้มาไม่โผล่ที่ไหนในใบขอเลย · กติกา "ใครสนใจ" มาจาก
-                `applicantCallOutcome` ที่เดียว (เทียบผลโทรกับผลติดต่อ อันใหม่กว่าชนะ) */}
-            {interestedItems.length > 0 ? (
-              <section className={cn('space-y-2 rounded-xl border px-3 py-2.5', TONE.success.soft)}>
-                <p className={cn('text-xs font-medium', TONE.success.value)}>
-                  คนที่ตอบว่าสนใจจากการโทร {interestedItems.length} คน — ของทั้งใบขอ (ทุกคนเห็น)
-                </p>
-                <ul className="space-y-1.5">
-                  {interestedItems.map((a) => (
-                    <li key={a.id} className="rounded-xl border border-border/70 bg-card px-3 py-2 text-sm">
-                      <span className="flex flex-wrap items-center gap-1.5">
-                        <b className="font-medium text-foreground">{a.full_name}</b>
-                        <span className="font-mono text-[11px] text-muted-foreground">{a.phone}</span>
-                        {unitMatchOriginLabel(a) ? (
-                          <span className="jarvis-chip jarvis-chip-violet">{unitMatchOriginLabel(a)}</span>
-                        ) : null}
-                      </span>
-                      <span className="mt-0.5 block text-xs text-muted-foreground">
-                        {unitMatchFactLine(a) || EM_DASH}
-                      </span>
-                      {/* ตั้งขั้น/เช็คลิสต์ได้จากที่นี่เลย ไม่ต้องเด้งไปแท็บผู้สมัคร */}
-                      <div className="mt-2">
-                        <SelectionProgressControls
-                          subject={{ kind: 'application', application: a }}
-                          units={units}
-                          onSaved={(next) =>
-                            setItems((cur) => (cur ?? []).map((x) => (x.id === next.id ? next : x)))
-                          }
-                        />
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            ) : null}
-
-            <p className="rounded-xl border border-border/70 bg-card px-3 py-2 text-[11px] text-muted-foreground">
-              งานโทรที่คุณเก็บไว้เอง — เก็บแล้ว AI จะไม่โทรทับเบอร์นั้น ·
-              รายการนี้เป็นของคุณคนเดียว ไม่ใช่ของทั้งใบขอ
-            </p>
-            <MyCallsSection />
-          </>
-        ) : null}
+        {/* แท็บ "การติดต่อ" ถอดแล้ว (เจ้าของ 11 พ.ย. 2569 "เอาออกจากหน้านี้") — การติดต่ออยู่แท็บของหน้างานสรรหา */}
       </div>
 
       {/* 🔴 ยืนยันก่อนให้ AI โทรจริง — โชว์รายชื่อ (กติกา: ปุ่มที่ยิงสายต้องมีป๊อปทุกตัว) */}

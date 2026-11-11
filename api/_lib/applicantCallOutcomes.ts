@@ -18,7 +18,8 @@ import { GREETING_JOB_REF, parseGreetingAnswers, type GreetingHeard } from '../.
  * (ผลที่คนบันทึกเขียนแค่ last_outcome · ตอนตั้งโทรซ้ำระบบล้าง result ทิ้ง)
  */
 
-export type ApplicantCallOutcome = { outcome: string | null; at: string | null };
+/** `by` = ผลนี้มาจาก AI (คิว Lumos) หรือคน (บันทึกผลหลังโทรเอง) — การ์ดใบขอบอก "ล่าสุด AI/คนโทร" (เจ้าของ 11 พ.ย. 2569) */
+export type ApplicantCallOutcome = { outcome: string | null; at: string | null; by: 'ai' | 'staff' };
 
 /** ชื่อคีย์เบอร์ใน payload ต่างกันตามช่อง — ชุดเดียวกับ PAYLOAD_PHONE_KEYS ใน lumosDispatch */
 const QUEUE_PHONE_EXPR = `coalesce(payload->>'recipient_phone', payload->>'phone')`;
@@ -30,11 +31,11 @@ export async function loadLatestCallOutcomeByPhone(
   const out = new Map<string, ApplicantCallOutcome>();
   if (keys.length === 0) return out;
 
-  const take = (phone: string, outcome: string | null, at: string | null) => {
+  const take = (phone: string, outcome: string | null, at: string | null, by: 'ai' | 'staff') => {
     if (!outcome || !at) return;
     const prev = out.get(phone);
     // ผลล่าสุดชนะ — เทียบเวลาเสมอ ไม่ใช่ "แหล่งไหนมาก่อน" (คนกับ AI ส่งไม้ต่อกันได้)
-    if (!prev || !prev.at || at > prev.at) out.set(phone, { outcome, at });
+    if (!prev || !prev.at || at > prev.at) out.set(phone, { outcome, at, by });
   };
 
   // ฝั่ง AI — คิว Lumos
@@ -48,7 +49,7 @@ export async function loadLatestCallOutcomeByPhone(
           and coalesce(last_outcome, result->>'outcome') is not null`,
       [keys],
     );
-    for (const r of rows) take(r.phone, r.outcome, r.at);
+    for (const r of rows) take(r.phone, r.outcome, r.at, 'ai');
   } catch (e) {
     // ตารางยังไม่ migrate = ไม่มีผลจาก AI ให้แสดง ไม่ใช่เหตุให้ทั้งลิสต์พัง
     if (!isPgUndefinedTable(e)) throw e;
@@ -65,7 +66,7 @@ export async function loadLatestCallOutcomeByPhone(
         where phone_e164 = any($1::text[]) and result_outcome is not null`,
       [keys],
     );
-    for (const r of rows) take(r.phone, r.outcome, r.at);
+    for (const r of rows) take(r.phone, r.outcome, r.at, 'staff');
   } catch (e) {
     if (!isPgUndefinedTable(e)) throw e;
   }

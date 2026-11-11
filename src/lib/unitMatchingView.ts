@@ -121,6 +121,45 @@ export function unitMatchStatus(a: PublicApplication): UnitMatchStatus {
   return { text: 'รอโทร', tone: 'neutral' };
 }
 
+/**
+ * ใครโทรล่าสุด (เจ้าของ 11 พ.ย. 2569 "บอกด้วยว่าล่าสุดคนหรือ Ai โทร") — เทียบเวลาสามทาง อันใหม่สุดชนะ:
+ * ผลโทรล่าสุด (`last_call_by` บอกว่า AI/คน) · บันทึกผลติดต่อของเจ้าหน้าที่ · เจ้าหน้าที่กดโทร (ยังไม่ลงผลก็นับ)
+ * ไม่มีร่องรอยเลย = null (ยังไม่มีใครโทร)
+ */
+export function unitMatchLastCaller(a: PublicApplication): 'ai' | 'staff' | null {
+  const events: Array<{ at: string; by: 'ai' | 'staff' }> = [];
+  if (a.last_call_at && a.last_call_by) events.push({ at: a.last_call_at, by: a.last_call_by });
+  if (a.last_contact_at) events.push({ at: a.last_contact_at, by: 'staff' });
+  if (a.dialed_last_at) events.push({ at: a.dialed_last_at, by: 'staff' });
+  let best: { t: number; by: 'ai' | 'staff' } | null = null;
+  for (const e of events) {
+    const t = Date.parse(e.at);
+    if (Number.isFinite(t) && (!best || t > best.t)) best = { t, by: e.by };
+  }
+  return best?.by ?? null;
+}
+
+export const UNIT_MATCH_CALLER_LABEL: Record<'ai' | 'staff', string> = { ai: 'ล่าสุด AI โทร', staff: 'ล่าสุดคนโทร' };
+
+/**
+ * แถบนับบนแท็บผู้สมัคร (เจ้าของ 11 พ.ย. 2569 "ทำให้กดแล้วดูได้ · ทำไมไม่แยก โทรแล้ว ไม่ตอบ ด้วยว่ามีเท่าไหร่")
+ * นับด้วย `unitMatchStatus` ตัวเดียวกับป้ายท้ายการ์ด ⇒ ชิปรวมกัน = ผู้สมัครทั้งหมด ไม่ทับกัน
+ * นัดแล้ว · สนใจ · รอโทร อยู่เสมอ (ว่าง = 0) · ผลโทรอื่น/เบอร์เสีย/มีคนเก็บไป ขึ้นเมื่อมีคน
+ */
+export function unitMatchStatusCounts(items: PublicApplication[]): Array<UnitMatchStatus & { count: number }> {
+  const by = new Map<string, UnitMatchStatus & { count: number }>();
+  for (const a of items) {
+    const st = unitMatchStatus(a);
+    const cur = by.get(st.text);
+    if (cur) cur.count += 1;
+    else by.set(st.text, { ...st, count: 1 });
+  }
+  const fixed = (text: string, tone: UnitMatchStatus['tone']) => by.get(text) ?? { text, tone, count: 0 };
+  const called = [...by.values()].filter((s) => s.text.startsWith('โทรแล้ว · ')).sort((x, y) => y.count - x.count);
+  const tail = ['เบอร์ใช้โทรไม่ได้', 'มีคนเก็บไปโทร'].flatMap((t) => (by.get(t) ? [by.get(t)!] : []));
+  return [fixed('นัดแล้ว', 'success'), fixed('สนใจ', 'success'), ...called, ...tail, fixed('รอโทร', 'neutral')];
+}
+
 /** บรรทัดอธิบายใต้ชื่อ — ตำแหน่งที่สนใจ · พื้นที่ · อายุ (ตัดช่องว่างทิ้ง) */
 export function unitMatchFactLine(a: PublicApplication): string {
   return [

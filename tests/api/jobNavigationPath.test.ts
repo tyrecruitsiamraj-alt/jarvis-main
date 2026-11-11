@@ -62,7 +62,6 @@ describe('unitRequestTabPath', () => {
     const j = job({ id: 'siamraj-sql:LBM6908001', externalId: 'LBM6908001' });
     expect(unitRequestTabPath(j, 'applicants')).toBe('/jobs/siamraj/LBM6908001/applicants');
     expect(unitRequestTabPath(j, 'ai-match')).toBe('/jobs/siamraj/LBM6908001/ai-match');
-    expect(unitRequestTabPath(j, 'contact')).toBe('/jobs/siamraj/LBM6908001/contact');
   });
 
   it('ใบขอล่วงหน้าต้องพก prefix ไปในทุกแท็บ (กันเปิดผิดบริษัท)', () => {

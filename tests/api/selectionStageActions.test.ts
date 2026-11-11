@@ -105,16 +105,12 @@ describe('แท็บ AI Match ลงมือได้ (6.7)', () => {
   });
 });
 
-describe('คนสนใจของใบขอในแท็บการติดต่อ (6.10)', () => {
+describe('คนสนใจของใบขอในแท็บการติดต่อ (6.10) — ถอดพร้อมแท็บแล้ว (เจ้าของ 11 พ.ย. 2569 "เอาออกจากหน้านี้")', () => {
   const tab = stripComments(read('src/pages/jobs/UnitRequestTabPage.tsx'));
 
-  it('ใช้กติกากลาง ไม่เทียบผลโทรเอง', () => {
-    expect(tab).toContain('isInterestedApplicant');
+  it('ไม่มีส่วนคนสนใจ/ถังโทรส่วนตัวในหน้าใบขอแล้ว · ไม่เทียบผลโทรเอง', () => {
+    expect(tab).not.toContain("tab === 'contact'");
+    expect(tab).not.toContain('รายการนี้เป็นของคุณคนเดียว');
     expect(tab).not.toMatch(/last_call_outcome === 'confirmed'/);
-  });
-
-  it('บอกชัดว่าเป็นของทั้งใบขอ (ต่างจากถังโทรส่วนตัวที่อยู่ด้านล่าง)', () => {
-    expect(tab).toContain('ของทั้งใบขอ');
-    expect(tab).toContain('รายการนี้เป็นของคุณคนเดียว');
   });
 });

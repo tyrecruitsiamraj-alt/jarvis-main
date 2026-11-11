@@ -22,14 +22,14 @@ import { cn } from '@/lib/utils';
  *
  * ⚠️ navigate จริง ไม่ใช่ซ่อน/โชว์ — คนต้องส่งลิงก์แท็บที่ตัวเองดูอยู่ให้กันได้
  */
-export const UNIT_TAB_IDS = ['detail', 'applicants', 'ai-match', 'contact'] as const;
+// 🔴 แท็บ "การติดต่อ" ถอดแล้ว (เจ้าของ 11 พ.ย. 2569 "เอาออกจากหน้านี้") — ลิงก์เก่า /contact พาไปแท็บผู้สมัคร (App.tsx)
+export const UNIT_TAB_IDS = ['detail', 'applicants', 'ai-match'] as const;
 export type UnitRequestTabId = (typeof UNIT_TAB_IDS)[number];
 
 const TAB_LABEL: Record<UnitRequestTabId, string> = {
   detail: 'รายละเอียดงาน',
   applicants: 'ผู้สมัคร',
   'ai-match': 'AI Match',
-  contact: 'การติดต่อ',
 };
 
 /** path ต่อท้าย base ของแต่ละแท็บ — `detail` คือหน้าเปล่า (ไม่มี suffix) */

@@ -55,7 +55,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { ChoiceDropdown } from '@/components/shared/ChoiceDropdown';
 import { Rule2 } from '@/components/shared/ui-v2/Sheet2';
 import { useUiV2 } from '@/lib/uiV2';
-import { GitBranch, HelpCircle, Phone } from 'lucide-react';
+import { HelpCircle, Phone } from 'lucide-react';
 
 /**
  * คำอธิบายนิยาม "สายที่" (ลำดับในวัน · 1 ต.ค. 2569) — **ข้อความเดียว ใช้สองที่** (เดสก์ท็อปโชว์เต็ม ·
@@ -404,7 +404,6 @@ export default function FollowCallRoundsPanel({
       <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
         {/* หัวการ์ด: ไอคอน + ชื่อเรื่อง ซ้าย · ตัวกรองขวา */}
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-5 pt-5">
-          <GitBranch className={cn('h-5 w-5', TONE.primary.value)} aria-hidden />
           <h2 className="text-base font-medium text-foreground">ขั้นตอนของสาย</h2>
           {/* แถวตัวกรอง (สายที่ · ใครโทร · เจ้าของงาน · ใครเพิ่ม) ย้ายไปแถวแท็บรายวัน/รายเดือนแล้ว
               (เจ้าของสั่ง 5 ต.ค. 2569) — `FollowFilterGroup` · แผงนี้ยังเดินตามสายที่เลือกผ่าน prop `round` */}
@@ -437,66 +436,79 @@ export default function FollowCallRoundsPanel({
                * เรียง โทรทั้งหมด → โทรไปแล้ว (ผล 4 แบบ) → รอโทร → ยกเลิก · แต่ละช่อง "N คน · M สาย" (เจ้าของ "25 คน แต่ 400 สาย")
                * สายบวกกันลงตัว · คน = คนไม่ซ้ำในช่องนั้น (คนเดียวมีหลายสายคนละผลได้) · กดช่องรวม = กรองตารางข้างล่าง (แบบเดิม) · ช่อง AI/คน = ป๊อปรายชื่อ
                */}
-              <table className="w-full min-w-[30rem] border-collapse text-xs" data-testid="call-panel">
+              {/* แบบ A (เจ้าของ Choice 11 พ.ย. 2569 "ทำให้ดูสวย สะอาดตา"): AI | คน | รวม แยกคอลัมน์ย่อย คน · สาย
+                  ตัวเลขเปล่าไม่ต้องมีคำว่า "คน" "สาย" ทุกช่อง · ชื่อแถวสีเดียว มีจุดสีบอกผลแทน · กดได้เหมือนเดิม */}
+              <table className="w-full min-w-[30rem] border-collapse text-xs tabular-nums" data-testid="call-panel">
                 <thead>
                   <tr className="text-xs text-muted-foreground">
-                    <th className="py-2 text-left font-normal" />
+                    <th className="pt-1 text-left font-normal" rowSpan={2} />
                     {callerCols.map((c) => (
-                      <th key={c.key} className="py-2 text-right font-normal">
+                      <th key={c.key} colSpan={2} className="pt-1 text-center font-medium text-foreground">
                         {c.label}
                       </th>
                     ))}
+                  </tr>
+                  <tr className="text-xs text-muted-foreground">
+                    {callerCols.flatMap((c) => [
+                      <th key={`${c.key}-p`} className="pb-1.5 text-right font-normal">คน</th>,
+                      <th key={`${c.key}-c`} className="pb-1.5 text-right font-normal">สาย</th>,
+                    ])}
                   </tr>
                 </thead>
                 <tbody>
                   {FOLLOW_PANEL_LINES.map((line) => {
                     const lists = panel[line.key];
-                    const tone = line.box && line.box !== 'total' ? TONE[FOLLOW_MATRIX_COL_TONE[line.box]].value : 'text-foreground';
+                    const dot = line.indent === 2 && line.box && line.box !== 'total' ? TONE[FOLLOW_MATRIX_COL_TONE[line.box]].dot : null;
                     return (
-                      <tr key={line.key} className={cn(line.indent < 2 && "border-t border-border/60")} data-testid={`panel-${line.key}`}>
+                      <tr key={line.key} className={cn(line.indent < 2 && 'border-t border-border/60')} data-testid={`panel-${line.key}`}>
                         <td className={cn('py-0.5 text-xs', line.indent === 1 && 'pl-3', line.indent === 2 && 'pl-7')}>
-                          <span className={cn(line.indent === 0 ? 'font-medium' : '', line.indent === 2 ? tone : 'text-foreground')}>
+                          <span className={cn('inline-flex items-center gap-2 text-foreground', line.indent === 0 && 'font-medium')}>
+                            {dot ? <span className={cn('h-2 w-2 shrink-0 rounded-full', dot)} aria-hidden /> : null}
                             {line.label}
                           </span>
                         </td>
                         {callerCols.map((c) => {
                           const list = c.pick(lists);
                           const n = list.length;
+                          const people = followPeopleCount(list);
                           const isSum = c.key === 'all';
                           const selected = isSum && onResultBoxChange && line.box
                             ? line.box === 'total' ? resultBox === null : resultBox === line.box
                             : false;
-                          return (
-                            <td key={c.key} className="py-0.5 text-right">
+                          const open = () => {
+                            if (isSum && line.box && onResultBoxChange) {
+                              return onResultBoxChange(line.box === 'total' || resultBox === line.box ? null : line.box);
+                            }
+                            setPeopleLife('all');
+                            setPeopleDialog({
+                              title: `${FOLLOW_MATRIX_ROW_LABEL[activeRound]} · ${line.label} · ${c.label} (${people.toLocaleString('th-TH')} คน · ${n.toLocaleString('th-TH')} สาย)`,
+                              hint: '',
+                              people: list,
+                              splitByLife: line.key === 'total',
+                            });
+                          };
+                          const cell = (value: number, part: 'p' | 'c') => (
+                            <td key={`${c.key}-${part}`} className="py-0.5 text-right">
                               <Button
                                 type="button"
                                 variant="ghost"
                                 size="xs"
                                 disabled={n === 0 && !selected}
                                 aria-pressed={isSum && onResultBoxChange && line.box ? selected : undefined}
-                                data-testid={`panel-${line.key}-${c.key}`}
-                                className={cn('gap-1 tabular-nums', selected && 'bg-muted ring-1 ring-border')}
-                                onClick={() => {
-                                  if (isSum && line.box && onResultBoxChange) {
-                                    return onResultBoxChange(line.box === 'total' || resultBox === line.box ? null : line.box);
-                                  }
-                                  setPeopleLife('all');
-                                  setPeopleDialog({
-                                    title: `${FOLLOW_MATRIX_ROW_LABEL[activeRound]} · ${line.label} · ${c.label} (${followPeopleCount(list).toLocaleString('th-TH')} คน · ${n.toLocaleString('th-TH')} สาย)`,
-                                    hint: '',
-                                    people: list,
-                                    splitByLife: line.key === 'total',
-                                  });
-                                }}
+                                aria-label={`${line.label} · ${c.label} ${people.toLocaleString('th-TH')} คน · ${n.toLocaleString('th-TH')} สาย`}
+                                data-testid={part === 'p' ? `panel-${line.key}-${c.key}` : `panel-${line.key}-${c.key}-calls`}
+                                className={cn(
+                                  'tabular-nums',
+                                  n === 0 ? 'text-muted-foreground' : part === 'p' ? 'font-medium text-foreground' : 'font-normal text-muted-foreground',
+                                  selected && 'bg-muted',
+                                )}
+                                onClick={open}
                               >
-                                {/* บรรทัดเดียว "38 คน · 78 สาย" (เจ้าของ 12 ต.ค. 2569 "รูปแรกยาวไป" — เดิมคนกับสายคนละบรรทัด) */}
-                                <span className={cn('font-medium', n === 0 ? 'text-muted-foreground' : 'text-foreground')}>
-                                  {followPeopleCount(list).toLocaleString('th-TH')} คน
-                                </span>
-                                <span className="font-normal text-muted-foreground">· {n.toLocaleString('th-TH')} สาย</span>
+                                {value.toLocaleString('th-TH')}
                               </Button>
                             </td>
                           );
+                          return [cell(people, 'p'), cell(n, 'c')];
                         })}
                       </tr>
                     );

@@ -13,6 +13,8 @@ export type PublicApplication = {
    */
   last_call_outcome?: string | null;
   last_call_at?: string | null;
+  /** ผลโทรล่าสุดข้างบนมาจาก AI หรือคน (11 พ.ย. 2569 · การ์ดใบขอบอก "ล่าสุด AI/คนโทร") */
+  last_call_by?: 'ai' | 'staff' | null;
   /**
    * สถานะสายล่าสุดในคิว (21 ก.ย. 2569) — `pending` `delivered` `completed` `failed` `cancelled`
    * บอกได้ตั้งแต่ยังไม่มีผล (รออยู่ในคิว / AI รับไปโทรแล้ว) ต่างจาก `last_call_outcome`

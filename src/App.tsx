@@ -65,6 +65,12 @@ function MatchingMovedRedirect({ view }: { view: 'match' | 'contact' }) {
   return <Navigate to={`/jobs/board?${p.toString()}`} replace />;
 }
 
+/** แท็บ "การติดต่อ" ของใบขอถอดแล้ว (เจ้าของ 11 พ.ย. 2569) — ลิงก์เก่าไปแท็บผู้สมัครของใบเดิม */
+function UnitContactMovedRedirect() {
+  const { id = '' } = useParams();
+  return <Navigate to={`/jobs/siamraj/${encodeURIComponent(id)}/applicants`} replace />;
+}
+
 function LegacyPostingRedirect() {
   const { id = '' } = useParams();
   return <Navigate to={`/jobs/board/${encodeURIComponent(id)}/posting`} replace />;
@@ -172,7 +178,7 @@ const ProtectedRoutes = () => {
             <Route path="/jobs/siamraj/:id" element={<SiamrajUnitRequestDetailPage />} />
             <Route path="/jobs/siamraj/:id/applicants" element={<UnitRequestTabPage tab="applicants" />} />
             <Route path="/jobs/siamraj/:id/ai-match" element={<UnitRequestTabPage tab="ai-match" />} />
-            <Route path="/jobs/siamraj/:id/contact" element={<UnitRequestTabPage tab="contact" />} />
+            <Route path="/jobs/siamraj/:id/contact" element={<UnitContactMovedRedirect />} />
             <Route path="/jobs/:id" element={<JobDetailPage />} />
             <Route path="/dashboard" element={<SupervisorDashboard />} />
             <Route path="/settings" element={<AdminSettings />} />

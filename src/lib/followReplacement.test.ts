@@ -111,11 +111,13 @@ describe('หน้าการติดตาม: หัวการ์ด Call
     expect(summary.length).toBeGreaterThan(100);
     expect(summary).not.toContain('bg-secondary');
     expect(summary).not.toContain('width: `');
-    // AI / คน / รวม ของสายที่เลือก — 12 ต.ค. 2569 เป็นตาราง (เจ้าของ Choice "แบบ A") · ทุกช่อง "N คน · M สาย"
+    // AI / คน / รวม ของสายที่เลือก — 12 ต.ค. 2569 เป็นตาราง · 11 พ.ย. 2569 แยกคอลัมน์ย่อย คน | สาย (เจ้าของ Choice "แบบ A")
     expect(panel).toContain('data-testid="call-panel"');
     expect(panel).toContain("{ key: 'ai', label: 'AI', pick:");
     expect(panel).toContain("{ key: 'manual', label: 'คน', pick:");
-    expect(panel).toMatch(/followPeopleCount\(list\)\.toLocaleString\('th-TH'\)\} คน/);
+    expect(panel).toContain('const people = followPeopleCount(list);');
+    expect(panel).toContain("return [cell(people, 'p'), cell(n, 'c')];");
+    expect(panel).not.toContain('<GitBranch');
   });
 
   it('🔴 แถวบนสุด = ย้อนกลับ + แท็บ + ปุ่มของหน้า · ชื่อหน้าไม่โชว์บนจอ (3 ต.ค. 2569)', () => {

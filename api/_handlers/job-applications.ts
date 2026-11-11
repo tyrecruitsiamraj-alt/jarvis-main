@@ -1764,6 +1764,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
           if (hit) {
             (item as Record<string, unknown>).last_call_outcome = hit.outcome;
             (item as Record<string, unknown>).last_call_at = hit.at;
+            (item as Record<string, unknown>).last_call_by = hit.by;
           }
         }
       }

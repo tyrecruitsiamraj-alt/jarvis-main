@@ -52,7 +52,7 @@ export function unitRequestTabPath(job: JobRequest, tab: UnitRequestTabName): st
 }
 
 /** ชื่อแท็บของใบขอที่ลิงก์จากหน้าอื่นได้ (ตรงกับ route ใน App.tsx) */
-export type UnitRequestTabName = 'detail' | 'applicants' | 'ai-match' | 'contact';
+export type UnitRequestTabName = 'detail' | 'applicants' | 'ai-match';
 
 /**
  * path ของ **หน้างานประกาศ/ลิงก์สมัคร — ฝั่งกล่องงาน**
