@@ -46,6 +46,11 @@ export const FOLLOW_STAFF_QUICK_RESULTS: ReadonlyArray<{ outcome: FollowStaffCal
    * + ป๊อปจัดการ ตัวเดียวกัน · กดแล้วถามต่อว่าจบเรื่องเลยไหม (`STAFF_FINISH_OUTCOME`)
    */
   { outcome: 'confirmed', label: 'ไป' },
+  /**
+   * เตรียมตัว (เจ้าของ 11 พ.ย. 2569 Choice "ติดต่อได้ ยังไม่ใช่ไป") — เดิมไม่มีให้เลือกเลยต้องกด "ไป" แล้วแถวเด้งไปกองจบ
+   * ใช้รหัส `acknowledged` (คุยได้ ไม่ใช่คำตอบไป/ไม่ไป) ที่ทุกจุดอ่านเป็น "ติดต่อได้ ยังไม่ชัด" อยู่แล้ว ⇒ ไม่นับไป · สายถัดไปโทรต่อ · ไม่ถามจบเรื่อง
+   */
+  { outcome: 'acknowledged', label: 'เตรียมตัว' },
   { outcome: 'declined', label: 'ไม่ไป' },
   { outcome: 'reschedule_requested', label: 'ขอเลื่อน' },
   { outcome: 'no_answer', label: 'ติดต่อไม่ได้' },
@@ -80,8 +85,8 @@ const STAFF_WORDS: Partial<Record<FollowStaffCallOutcome, string>> = {
   no_answer: 'ติดต่อไม่ได้',
   day_off: 'วันหยุด',
   on_leave: 'ลางาน',
-  // ชุดเก่า (1–5 ต.ค. 2569) — ยังอ่านออก
-  acknowledged: 'ติดต่อสำเร็จ',
+  // 11 พ.ย. 2569 ปุ่ม "เตรียมตัว" · ชุดเก่า 1–5 ต.ค. ("ติดต่อสำเร็จ" 24 สาย = คุยได้ไม่บอกไปไหม) อ่านเป็นคำนี้ด้วย
+  acknowledged: 'เตรียมตัว',
 };
 
 export const FOLLOW_STAFF_CALL_NOTE_MAX = 300;

@@ -81,12 +81,14 @@ describe('ศัพท์ผลชุดเดียวกับผลที่�
     expect(followStaffCallText('declined')).toBe('ไม่ไป');
     expect(followStaffCallText('reschedule_requested')).toBe('ขอเลื่อน');
     expect(followStaffCallText('no_answer')).toBe('ติดต่อไม่ได้');
-    expect(followStaffCallText('acknowledged')).toBe('ติดต่อสำเร็จ');
+    // 11 พ.ย. 2569 ปุ่ม "เตรียมตัว" ใช้รหัสนี้ (เจ้าของ Choice "ติดต่อได้ ยังไม่ใช่ไป")
+    expect(followStaffCallText('acknowledged')).toBe('เตรียมตัว');
   });
 
   it('🔴 ปุ่มสายคนโทร = ไป / ไม่ไป / ขอเลื่อน / ติดต่อไม่ได้ (เจ้าของเคาะ 6 ต.ค. 2569) · รหัสผ่านตัวตรวจของ server', () => {
     expect(FOLLOW_STAFF_QUICK_RESULTS).toEqual([
       { outcome: 'confirmed', label: 'ไป' },
+      { outcome: 'acknowledged', label: 'เตรียมตัว' },
       { outcome: 'declined', label: 'ไม่ไป' },
       { outcome: 'reschedule_requested', label: 'ขอเลื่อน' },
       { outcome: 'no_answer', label: 'ติดต่อไม่ได้' },
@@ -196,7 +198,7 @@ describe('ปฏิทิน: ลงผลแล้วช่องต้อง�
     expect(r.state).toBe('result');
     expect(callCategory(r)).toBe('other');
     expect(roundTone(r)).toBe('violet');
-    expect(roundResultLabel(r)).toBe('ติดต่อสำเร็จ');
+    expect(roundResultLabel(r)).toBe('เตรียมตัว');
     expect(inFollowRoundBucket(r.entry, 'connected')).toBe(true);
   });
 
@@ -232,5 +234,12 @@ describe('🔴 server: ลงผลบนสาย AI (7 ต.ค. 2569)', () => 
     expect(h).toContain('if (isAiFinalOutcome(q[0]?.outcome))');
     expect(h).toContain('if (isAiRow && aiQueuePending)');
     expect(h).not.toContain("where id = $1 and cancelled_at is null and call_mode = 'manual'");
+  });
+});
+
+describe('ปุ่มเตรียมตัว (เจ้าของ 11 พ.ย. 2569 Choice "ติดต่อได้ ยังไม่ใช่ไป")', () => {
+  it('ไม่ถามจบเรื่อง (ไม่อยู่ในชุดจบ) · ไม่นับเป็นไป', () => {
+    expect(STAFF_FINISH_OUTCOME.acknowledged).toBeUndefined();
+    expect(FOLLOW_STAFF_QUICK_RESULTS.find((q) => q.label === 'เตรียมตัว')?.outcome).toBe('acknowledged');
   });
 });
