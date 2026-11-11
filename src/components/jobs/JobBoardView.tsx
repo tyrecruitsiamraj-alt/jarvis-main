@@ -1341,7 +1341,18 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
               <DropdownMenu key="posting-pick">
                 <DropdownMenuTrigger asChild>
                   <button type="button" aria-current={picked ? 'page' : undefined} className={cn(glassTabClass(Boolean(picked)), 'gap-1')} data-testid="posting-pick">
-                    {picked?.label ?? POSTING_PICKS[0].label}
+                    {/* ชื่อทุกตัวซ้อนกันในช่องเดียว โชว์ตัวที่เลือก — ปุ่มกว้างเท่าชื่อยาวสุดเสมอ แท็บข้าง ๆ ไม่เลื่อนตอนสลับ (11 พ.ย. 2569) */}
+                    <span className="grid">
+                      {POSTING_PICKS.map((p) => (
+                        <span
+                          key={p.id}
+                          className={cn('col-start-1 row-start-1', p.id !== (picked ?? POSTING_PICKS[0]).id && 'invisible')}
+                          aria-hidden={p.id !== (picked ?? POSTING_PICKS[0]).id}
+                        >
+                          {p.label}
+                        </span>
+                      ))}
+                    </span>
                     <ChevronDown className="h-3.5 w-3.5 opacity-70" aria-hidden />
                   </button>
                 </DropdownMenuTrigger>
@@ -2229,7 +2240,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
               <Button size="sm"
                 type="button"
                 onClick={() => openApply(null)}
-                className="mt-5 inline-flex w-full justify-center px-8 py-3.5 text-sm font-medium transition-transform hover:scale-[1.02] active:scale-[0.98]"
+                className="mt-5 inline-flex w-full justify-center px-8 py-3.5 text-sm font-medium"
               >
                 กรอกใบสมัครงาน
                 <Send aria-hidden />

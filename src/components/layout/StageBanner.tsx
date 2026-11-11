@@ -72,7 +72,9 @@ const StageBanner: React.FC<{ className?: string }> = ({ className }) => {
   }
 
   const step = stepForPath(pathname, search);
-  if (!step) return null;
+  // หน้างานสรรหามีแถบแท็บของตัวเอง — แถบนี้ขึ้นแค่ ?view=match แล้วดันแท็บลง 36px ตอนสลับแท็บ
+  // (เจ้าของ 11 พ.ย. 2569 "กดแล้วเลื่อน เม้าต้องขยับตาม")
+  if (!step || pathname === '/jobs/board') return null;
   /** หน้าถัดไปในลำดับ — อ่านจาก**ลำดับใน array** ไม่ใช่เลขขั้น (เลขขั้นถูกถอดออกแล้ว) */
   const at = CONVEYOR_STEPS.findIndex((s) => s.key === step.key);
   const next = at >= 0 ? (CONVEYOR_STEPS[at + 1] ?? null) : null;

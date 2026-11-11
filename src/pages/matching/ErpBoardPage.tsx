@@ -124,6 +124,9 @@ const ErpBoardPage: React.FC = () => {
   }, [overview, selectionKey, rev]);
 
   const pick = (next: Selection) => {
+    // เดือนที่กางอยู่เพราะเลือกไว้ ต้องกางค้าง — เดิมเลือกเดือนอื่นแล้วเดือนบนหุบ ปุ่มที่กดเด้งขึ้น 234px
+    // (เจ้าของ 11 พ.ย. 2569 "กดแล้วเลื่อน เม้าต้องขยับตาม")
+    if (selectedMonthKey) setOpenMonths((x) => (selectedMonthKey in x ? x : { ...x, [selectedMonthKey]: true }));
     const sp = new URLSearchParams(searchParams);
     sp.delete('day');
     sp.delete('month');

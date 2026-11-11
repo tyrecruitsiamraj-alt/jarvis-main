@@ -592,7 +592,8 @@ const RecruitChannelsPage: React.FC = () => {
             <>
             {/* เลือกทั้งหน้า + ลบที่เลือก (7 ต.ค. 2569) */}
             <div className="flex flex-wrap items-center gap-3 border-b border-border px-3 py-2" data-testid="channel-bulk-bar">
-              <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
+              {/* min-h-7 = สูงเท่าปุ่ม "ลบที่เลือก" ที่โผล่ตอนติ๊ก — แถวไม่สูงขึ้น ช่องติ๊กไม่เลื่อน (11 พ.ย. 2569) */}
+              <label className="flex min-h-7 cursor-pointer items-center gap-2 text-xs text-muted-foreground">
                 <Checkbox
                   checked={pageAllOn ? true : pageSomeOn ? 'indeterminate' : false}
                   onCheckedChange={(v) => togglePage(v === true)}

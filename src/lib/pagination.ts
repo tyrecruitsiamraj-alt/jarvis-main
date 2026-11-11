@@ -15,20 +15,11 @@ export function getVisiblePageNumbers(currentPage: number, totalPages: number): 
   if (totalPages <= 7) {
     return Array.from({ length: totalPages }, (_, i) => i + 1);
   }
-
-  const pages: (number | 'ellipsis')[] = [1];
-
-  if (currentPage > 3) pages.push('ellipsis');
-
-  const start = Math.max(2, currentPage - 1);
-  const end = Math.min(totalPages - 1, currentPage + 1);
-  for (let p = start; p <= end; p += 1) {
-    if (!pages.includes(p)) pages.push(p);
+  // 🔴 7 ช่องเสมอ (เจ้าของ 11 พ.ย. 2569 "กดแล้วเลื่อน เม้าต้องขยับตาม") — เดิมจำนวนช่องเปลี่ยนตามหน้าที่อยู่
+  // แถบชิดขวาเลยเลื่อนทั้งแถบตอนกดเลขหน้า ⇒ ต้น 1–5 · ท้าย N-4–N · กลาง 1 … c-1 c c+1 … N
+  if (currentPage <= 4) return [1, 2, 3, 4, 5, 'ellipsis', totalPages];
+  if (currentPage >= totalPages - 3) {
+    return [1, 'ellipsis', totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
   }
-
-  if (currentPage < totalPages - 2) pages.push('ellipsis');
-
-  if (!pages.includes(totalPages)) pages.push(totalPages);
-
-  return pages;
+  return [1, 'ellipsis', currentPage - 1, currentPage, currentPage + 1, 'ellipsis', totalPages];
 }

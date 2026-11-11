@@ -322,17 +322,19 @@ function FilterPanelHeader({
   return (
     <div className="space-y-1">
       <div className="flex items-center justify-between gap-2">
-        <p className="text-sm font-medium text-foreground">ตัวกรองเพิ่มเติม</p>
+        {/* ปุ่มพับอยู่มุมซ้ายบน = จุดเดียวกับปุ่มกาง (`FilterRail` · m-3 เท่า p-3 ของแถบ) — กางแล้วกดพับได้โดยไม่ต้องขยับเมาส์
+            (เจ้าของ 11 พ.ย. 2569 "กดแล้วเลื่อน เม้าต้องขยับตาม") */}
         <span className="flex items-center gap-1">
-          <Button type="button" variant="ghost" size="xs" onClick={onClear} disabled={selected === 0}>
-            <X aria-hidden /> ล้าง
-          </Button>
           {onCollapse ? (
             <Button type="button" variant="ghost" size="iconXs" onClick={onCollapse} aria-label="พับตัวกรอง" title="พับตัวกรอง">
               <ChevronLeft aria-hidden />
             </Button>
           ) : null}
+          <p className="text-sm font-medium text-foreground">ตัวกรองเพิ่มเติม</p>
         </span>
+        <Button type="button" variant="ghost" size="xs" onClick={onClear} disabled={selected === 0}>
+          <X aria-hidden /> ล้าง
+        </Button>
       </div>
       {/* 🔴 จองบรรทัดไว้เสมอ (เจ้าของ 11 พ.ย. 2569 "ปุ่มมันขยับ … เม้าต้องขยับตามเพื่อกดอีกรอบ") — เดิมบรรทัดนี้โผล่ตอนติ๊กแรก
           ดันทุกตัวเลือกลงหนึ่งบรรทัด · ยังไม่ติ๊ก = ซ่อนตัวหนังสือแต่กินที่เท่าเดิม */}
@@ -392,7 +394,7 @@ export function FilterRail({ selected, onExpand }: { selected: number; onExpand:
       aria-expanded={false}
       aria-label={selected > 0 ? `กางตัวกรอง (ติ๊กอยู่ ${selected})` : 'กางตัวกรอง'}
       title="กางตัวกรอง"
-      className={cn(triggerClass(selected > 0), 'relative hidden shrink-0 self-start sm:inline-flex')}
+      className={cn(triggerClass(selected > 0), 'relative m-3 hidden shrink-0 self-start sm:inline-flex')}
     >
       <SlidersHorizontal aria-hidden />
       <IconCount n={selected} />

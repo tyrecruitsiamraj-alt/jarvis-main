@@ -364,7 +364,7 @@
   }
 
   .jarvis-menu-card:hover {
-    @apply -translate-y-1;
+    /* ไม่ลอยขึ้นตอนชี้ (เจ้าของ 11 พ.ย. 2569 "กดแล้วเลื่อน เม้าต้องขยับตาม") */
     box-shadow: 0 16px 48px rgba(24, 20, 16, 0.1);
     border-color: rgba(255, 255, 255, 0.9);
   }
@@ -464,7 +464,7 @@
   }
 
   .jarvis-interactive-card:hover {
-    @apply -translate-y-0.5;
+    /* ไม่ลอยขึ้นตอนชี้ (เจ้าของ 11 พ.ย. 2569 "กดแล้วเลื่อน เม้าต้องขยับตาม") */
     box-shadow: 0 14px 44px rgba(24, 20, 16, 0.09);
     border-color: rgba(255, 255, 255, 0.92);
   }

@@ -95,7 +95,7 @@ export function OverviewNode({
       disabled={!onClick}
       data-testid={testId}
       className={cn(
-        'h-auto min-w-0 flex-col items-stretch justify-start gap-1 whitespace-normal rounded-xl p-3 text-left font-normal transition-all duration-200 hover:-translate-y-0.5 disabled:opacity-100 motion-reduce:transition-none motion-reduce:hover:translate-y-0',
+        'h-auto min-w-0 flex-col items-stretch justify-start gap-1 whitespace-normal rounded-xl p-3 text-left font-normal transition-colors duration-200 disabled:opacity-100 motion-reduce:transition-none',
         variant === 'fill' && (emphasis ? TONE[emphasis].wash : 'bg-muted/50 hover:bg-muted'),
         variant === 'outline' && 'border border-border bg-card hover:bg-muted/50',
         variant === 'hero' && 'gap-2 rounded-2xl p-4 text-background hover:bg-background/10 hover:text-background dark:text-foreground dark:hover:bg-foreground/10 dark:hover:text-foreground',

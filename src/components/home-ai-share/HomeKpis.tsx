@@ -25,7 +25,7 @@ const NUM = new Intl.NumberFormat('th-TH');
  */
 const OUTER = cn(
   'h-full w-full flex-col items-stretch justify-start gap-3 whitespace-normal rounded-xl border border-foreground/10 p-4 text-left font-normal',
-  'shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md disabled:opacity-100',
+  'shadow-sm transition-shadow hover:shadow-md disabled:opacity-100',
 );
 
 export function KpiTile({

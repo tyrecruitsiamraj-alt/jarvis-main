@@ -86,7 +86,7 @@ const StatCard: React.FC<StatCardProps> = ({
       className={cn(
         'p-4 transition-all duration-300',
         v2 ? 'rounded-2xl border border-border/70 bg-card shadow-sm' : cn('glass-card border', variantStyles[variant]),
-        onClick && 'cursor-pointer hover:-translate-y-0.5',
+        onClick && 'cursor-pointer',
         onClick && !v2 && 'jarvis-interactive-card',
         onClick && v2 && 'hover:border-primary/30',
         className,

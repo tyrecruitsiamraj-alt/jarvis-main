@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { lockedBuOf, viewableBusOf } from '@/lib/userViewableBus';
 import { unitLabel } from '@/lib/unitDisplay';
+import { useLockedColumnWidths } from '@/hooks/useLockedColumnWidths';
 import { conveyorLabel } from '@/lib/soRecruitNav';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -491,6 +492,7 @@ const JobListPage: React.FC = () => {
     const start = (page - 1) * pageSize;
     return filtered.slice(start, start + pageSize);
   }, [filtered, page, pageSize]);
+  const lockedCols = useLockedColumnWidths(paginated.length > 0);
 
   // เมื่อตัวเลือกเปลี่ยน (เช่นเปลี่ยนแผนก) ให้ตัดเฉพาะค่าที่เลือกไว้แล้วไม่มีอยู่แล้ว
   useEffect(() => {
@@ -975,7 +977,15 @@ const JobListPage: React.FC = () => {
           </div>
         ) : (
           <div className={cn(DASH.card, 'overflow-x-auto', refreshing && 'opacity-50 pointer-events-none transition-opacity')}>
-            <table className="w-full text-sm min-w-[1000px]">
+            {/* คอลัมน์ล็อกกว้างตั้งแต่ขึ้นข้อมูลครั้งแรก — กดเรียง/เปลี่ยนหน้าแล้วหัวคอลัมน์ไม่เลื่อน (11 พ.ย. 2569) */}
+            <table ref={lockedCols.ref} className={cn('w-full text-sm min-w-[1000px]', lockedCols.widths && 'table-fixed')}>
+              {lockedCols.widths ? (
+                <colgroup>
+                  {lockedCols.widths.map((w, i) => (
+                    <col key={i} style={{ width: w }} />
+                  ))}
+                </colgroup>
+              ) : null}
               <thead>
                 {/* 🔴 หัวคอลัมน์กดเรียงได้**ทุกอัน** (เจ้าของสั่ง 20 ส.ค. 2569) —
                     กดซ้ำ = สลับขึ้น/ลง · ตรรกะอยู่ที่ lib/jobListTableSort (มีเทสต์) */}
@@ -1029,15 +1039,12 @@ const JobListPage: React.FC = () => {
                           )}
                         >
                           {label}
-                          {active ? (
-                            <span aria-hidden className="text-[10px] leading-none">
-                              {tableSort.dir === 'asc' ? '▲' : '▼'}
-                            </span>
-                          ) : (
-                            <span aria-hidden className="text-[10px] leading-none opacity-25">
-                              ▲▼
-                            </span>
-                          )}
+                          {/* 🔴 ลูกศรสองตัวเสมอ ตัวที่ใช้อยู่เข้ม (เจ้าของ 11 พ.ย. 2569 "กดแล้วเลื่อน เม้าต้องขยับตาม") —
+                              เดิมกดแล้วเหลือตัวเดียว หัวคอลัมน์แคบลง ตารางเลื่อนทั้งแถว */}
+                          <span aria-hidden className="text-[10px] leading-none">
+                            <span className={active && tableSort.dir === 'asc' ? '' : 'opacity-25'}>▲</span>
+                            <span className={active && tableSort.dir === 'desc' ? '' : 'opacity-25'}>▼</span>
+                          </span>
                         </button>
                       </th>
                     );

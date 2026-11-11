@@ -241,12 +241,6 @@ const MatchPriorityWeightsTab: React.FC<{
         })}
       </div>
 
-      {error ? (
-        <p className="rounded-xl bg-red-50 px-3.5 py-2.5 text-xs font-medium text-red-600 dark:bg-red-950/40 dark:text-red-300">
-          {error}
-        </p>
-      ) : null}
-
       <div className="flex flex-wrap items-center gap-2">
         <Button size="sm"
           type="button"
@@ -274,6 +268,12 @@ const MatchPriorityWeightsTab: React.FC<{
           </span>
         ) : null}
       </div>
+      {/* ข้อความผิดพลาดอยู่ใต้ปุ่ม — เดิมอยู่เหนือปุ่มแล้วดันปุ่มบันทึกลง 59px ตอนกด (11 พ.ย. 2569) */}
+      {error ? (
+        <p className="rounded-xl bg-red-50 px-3.5 py-2.5 text-xs font-medium text-red-600 dark:bg-red-950/40 dark:text-red-300">
+          {error}
+        </p>
+      ) : null}
     </div>
   );
 };

@@ -89,7 +89,7 @@ const RoleHubPage: React.FC<{ role: HubRole }> = ({ role }) => {
             >
               <div
                 className={cn(
-                  'w-11 h-11 rounded-2xl flex items-center justify-center mb-4 transition-transform group-hover:scale-105',
+                  'w-11 h-11 rounded-2xl flex items-center justify-center mb-4',
                   TONE[item.tone].tile,
                   TONE[item.tone].value,
                 )}

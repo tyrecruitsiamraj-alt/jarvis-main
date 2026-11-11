@@ -73,7 +73,8 @@ const ListPaginationBar: React.FC<ListPaginationBarProps> = ({
 
           {pageNumbers.map((item, idx) =>
             item === 'ellipsis' ? (
-              <span key={`ellipsis-${idx}`} className="px-1 text-xs text-muted-foreground">
+              // กว้างเท่าปุ่มเลข — สลับช่องเลข ↔ … แล้วปุ่มข้าง ๆ ไม่เลื่อน
+              <span key={`ellipsis-${idx}`} className="min-w-[2.25rem] text-center text-xs text-muted-foreground">
                 …
               </span>
             ) : (

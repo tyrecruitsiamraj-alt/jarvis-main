@@ -20,7 +20,7 @@ const buttonVariants = cva(
          * ต้องเขียนคู่ `dark:` ทุกครั้ง (ลืมบ่อย) · token ของธีมสลับให้เองอยู่แล้ว
          */
         default:
-          "bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 hover:-translate-y-0.5",
+          "border border-transparent bg-primary text-primary-foreground shadow-sm hover:bg-primary/90",
         destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-full",
         outline:
           "border border-border bg-background/70 text-foreground hover:bg-accent hover:text-accent-foreground",

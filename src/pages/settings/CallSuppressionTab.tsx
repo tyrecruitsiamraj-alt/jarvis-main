@@ -88,8 +88,10 @@ const CallSuppressionTab: React.FC = () => {
         </p>
       </div>
 
-      {error ? <p className={cn('text-sm', TONE.danger.value)}>{error}</p> : null}
-      {notice ? <p className={cn('text-sm', TONE.success.value)}>{notice}</p> : null}
+      {/* บรรทัดข้อความจองที่ไว้เสมอ — กดปลดแล้วรายการไม่ถูกดันลง (เจ้าของ 11 พ.ย. 2569 "กดแล้วเลื่อน เม้าต้องขยับตาม") */}
+      <p className={cn('min-h-5 text-sm', error ? TONE.danger.value : TONE.success.value)} role="status">
+        {error ?? notice ?? ''}
+      </p>
 
       {items === null ? (
         <p className="flex items-center gap-2 text-sm text-muted-foreground">

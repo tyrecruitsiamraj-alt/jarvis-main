@@ -80,7 +80,7 @@ const AftercarePlanningCalendar: React.FC<{
           <Button type="button" variant="outline" size="iconXs" aria-label="เดือนก่อนหน้า" onClick={() => onMonthChange(shiftMonth(month, -1))}>
             <ChevronLeft aria-hidden />
           </Button>
-          <span className="min-w-[110px] text-center text-sm font-medium text-foreground">
+          <span className="min-w-36 text-center text-sm font-medium text-foreground">
             {monthLabel(month)}
           </span>
           <Button type="button" variant="outline" size="iconXs" aria-label="เดือนถัดไป" onClick={() => onMonthChange(shiftMonth(month, 1))}>

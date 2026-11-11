@@ -29,6 +29,22 @@ const NavMenuTab: React.FC = () => {
   const isAdmin = user?.role === 'admin';
 
   const [prefs, setPrefs] = useState<NavPreferences>({});
+  /**
+   * ย้ายขึ้น/ลง · ซ่อน/เอากลับ แล้วแถวไปอยู่ที่ใหม่ — เลื่อนจอตามให้ปุ่มที่กดอยู่ใต้เมาส์เดิม กดซ้ำได้เลย
+   * (เจ้าของ 11 พ.ย. 2569 "กดแล้วเลื่อน เม้าต้องขยับตาม")
+   */
+  const keepUnderMouse = React.useRef<{ key: string; top: number } | null>(null);
+  const pressAndKeep = (key: string, e: React.MouseEvent<HTMLElement>, next: NavPreferences) => {
+    keepUnderMouse.current = { key, top: e.currentTarget.getBoundingClientRect().top };
+    setPrefs(next);
+  };
+  React.useLayoutEffect(() => {
+    const k = keepUnderMouse.current;
+    if (!k) return;
+    keepUnderMouse.current = null;
+    const el = document.querySelector<HTMLElement>(`[data-keep="${CSS.escape(k.key)}"]`);
+    if (el) window.scrollBy(0, el.getBoundingClientRect().top - k.top);
+  }, [prefs]);
   const [saved, setSaved] = useState<NavPreferences>({});
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -112,7 +128,8 @@ const NavMenuTab: React.FC = () => {
                 <button
                   type="button"
                   disabled={!isAdmin || index === 0}
-                  onClick={() => setPrefs(moveNavItem(baseItems, prefs, item.path, -1))}
+                  onClick={(e) => pressAndKeep(`${item.path}:up`, e, moveNavItem(baseItems, prefs, item.path, -1))}
+                  data-keep={`${item.path}:up`}
                   aria-label="ย้ายขึ้น"
                   className={cn('rounded-lg border p-1.5 disabled:opacity-30', TONE.neutral.outline)}
                 >
@@ -121,7 +138,8 @@ const NavMenuTab: React.FC = () => {
                 <button
                   type="button"
                   disabled={!isAdmin || index === preview.length - 1}
-                  onClick={() => setPrefs(moveNavItem(baseItems, prefs, item.path, 1))}
+                  onClick={(e) => pressAndKeep(`${item.path}:down`, e, moveNavItem(baseItems, prefs, item.path, 1))}
+                  data-keep={`${item.path}:down`}
                   aria-label="ย้ายลง"
                   className={cn('rounded-lg border p-1.5 disabled:opacity-30', TONE.neutral.outline)}
                 >
@@ -130,7 +148,8 @@ const NavMenuTab: React.FC = () => {
                 <button
                   type="button"
                   disabled={!isAdmin}
-                  onClick={() => setPrefs(toggleNavItemHidden(prefs, item.path))}
+                  onClick={(e) => pressAndKeep(`${item.path}:hidden`, e, toggleNavItemHidden(prefs, item.path))}
+                  data-keep={`${item.path}:hidden`}
                   aria-label="ซ่อนเมนูนี้"
                   className={cn('rounded-lg border p-1.5 disabled:opacity-30', TONE.neutral.outline)}
                 >
@@ -159,7 +178,8 @@ const NavMenuTab: React.FC = () => {
                 <button
                   type="button"
                   disabled={!isAdmin}
-                  onClick={() => setPrefs(toggleNavItemHidden(prefs, item.path))}
+                  onClick={(e) => pressAndKeep(`${item.path}:hidden`, e, toggleNavItemHidden(prefs, item.path))}
+                  data-keep={`${item.path}:hidden`}
                   className={cn(
                     'ml-auto rounded-lg border px-2 py-1 text-xs font-medium disabled:opacity-30',
                     TONE.neutral.outline,

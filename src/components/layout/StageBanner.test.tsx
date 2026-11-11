@@ -28,9 +28,10 @@ describe('StageBanner', () => {
   });
 
   it('หน้าอื่นยังมีไอคอน + ประโยคอธิบาย (เจ้าของเลือกเฉพาะหน้าติดตาม)', () => {
-    const matching = CONVEYOR_STEPS.find((s) => s.key === 'matching')!;
-    const { container } = renderAt(matching.path);
-    expect(screen.getByText(matching.blurb)).toBeTruthy();
+    // จับคู่งานย้ายไปอยู่ในหน้างานสรรหา (แถบนี้ไม่ขึ้นที่นั่น · 11 พ.ย. 2569) — ใช้หน้าใบขอแทน
+    const requests = CONVEYOR_STEPS.find((s) => s.key === 'requests')!;
+    const { container } = renderAt(requests.path);
+    expect(screen.getByText(requests.blurb)).toBeTruthy();
     expect(container.querySelectorAll('svg').length).toBe(2);
   });
 

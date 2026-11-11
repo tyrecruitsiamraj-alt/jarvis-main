@@ -147,8 +147,21 @@ const AdminSettings: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- ตามเฉพาะ URL (แท็บที่คนกดจัดการที่ setActiveTab แล้ว)
   }, [tabFromUrl]);
 
+  /**
+   * 🔴 กดหัวข้อในเมนูซ้ายแล้วเมนูต้องอยู่ที่เดิม (เจ้าของ 11 พ.ย. 2569 "กดแล้วเลื่อน เม้าต้องขยับตาม")
+   * เลื่อนลงในหัวข้อยาวแล้วกดหัวข้อสั้น = หน้าหด เบราว์เซอร์ดึงจอขึ้น เมนูเด้ง ⇒ เลื่อนจอไปจุดที่เนื้อหาเริ่ม (เมนูยังติดบนอยู่ที่เดิม)
+   */
+  const navRef = React.useRef<HTMLElement>(null);
   const setActiveTab = useCallback(
     (tab: SettingsTab) => {
+      const nav = navRef.current;
+      if (nav && nav.offsetParent) {
+        // ท้ายหน้าเมนูถูกดันขึ้นเหนือจุดติด (ขอบล่างกล่อง) — เลื่อนเพิ่มเท่าที่ถูกดัน เมนูจึงอยู่ตำแหน่งเดียวกับก่อนกด
+        const cssTop = parseFloat(getComputedStyle(nav).top) || 0;
+        const naturalTop = (nav.parentElement?.getBoundingClientRect().top ?? 0) + window.scrollY;
+        const target = naturalTop - cssTop + Math.max(0, cssTop - nav.getBoundingClientRect().top);
+        if (window.scrollY > target) window.scrollTo({ top: target });
+      }
       setActiveTabState(tab);
       setSearchParams({ tab }, { replace: false });
     },
@@ -474,8 +487,10 @@ const AdminSettings: React.FC = () => {
             </Select>
           </div>
 
-          {/* จอใหญ่: เมนูซ้าย เห็นทั้ง 12 หัวข้อพร้อมกัน ไม่ต้องเลื่อน */}
-          <nav aria-label="หัวข้อตั้งค่า" className="hidden lg:block lg:sticky lg:top-4">
+          {/* จอใหญ่: เมนูซ้าย เห็นทั้ง 12 หัวข้อพร้อมกัน ไม่ต้องเลื่อน
+              🔴 เมนูอยู่กับที่ตอนกดหัวข้อ (เจ้าของ 11 พ.ย. 2569 "กดแล้วเลื่อน เม้าต้องขยับตาม") — เดิมเมนูสูงกว่าจอ
+              กดหัวข้อที่เนื้อหาสั้นกว่า หน้าหดแล้วเมนูเด้งขึ้น ⇒ เมนูสูง 88% ของจอ (เลื่อนในตัวเอง · ไม่ชนขอบล่างจนโดนดัน) + ฝั่งเนื้อหาสูงอย่างน้อยเต็มจอ */}
+          <nav ref={navRef} aria-label="หัวข้อตั้งค่า" className="hidden lg:block lg:sticky lg:top-4 lg:max-h-[88vh] lg:self-start lg:overflow-y-auto">
             <div className="space-y-4 rounded-2xl border border-border/70 bg-card p-3">
               {navGroups.map((g) => (
                 <div key={g.id} className="space-y-1">
@@ -516,7 +531,7 @@ const AdminSettings: React.FC = () => {
             </div>
           </nav>
 
-          <div className="min-w-0 space-y-4">
+          <div className="min-w-0 space-y-4 lg:min-h-screen">
 
         {activeTab === 'appearance' && <BrandingAppearanceTab />}
 
