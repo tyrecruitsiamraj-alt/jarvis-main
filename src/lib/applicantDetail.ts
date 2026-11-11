@@ -137,12 +137,23 @@ export function detailCallRows(
       key: `staff-${c.id}`,
       at: c.held_at,
       who: c.held_by_name || 'เจ้าหน้าที่',
-      result: label ?? (c.released_at ? 'คืนงานโดยไม่บันทึกผล' : 'ถือไว้โทรอยู่'),
+      result: label ?? (c.released_at ? (RELEASE_REASON_LABEL[c.release_reason ?? ''] ?? 'คืนงานโดยไม่บันทึกผล') : 'ถือไว้โทรอยู่'),
       note: c.note,
     });
   }
   return rows.sort((a, b) => b.at.localeCompare(a.at));
 }
+
+/**
+ * เหตุที่งานโทรหลุดจากมือโดยไม่ได้ลงผล (เจ้าของ 11 พ.ย. 2569 "คืนงานไม่บันทึกผล คืออะไร" → Choice "บอกเหตุจริง")
+ * ค่า `release_reason` ของล็อกโทร (`candidateCallHolds.ts`) · ไม่รู้เหตุ = คำเดิม
+ */
+const RELEASE_REASON_LABEL: Record<string, string> = {
+  expired: 'หลุด ครบ 24 ชม. ไม่ลงผล',
+  to_ai: 'ส่งให้ AI โทร',
+  manual: 'กดคืนงาน',
+  transferred: 'หัวหน้าโอนงาน',
+};
 
 /** แท็บการนัดหมาย — เฉพาะครั้งที่ติดต่อแล้วนัดได้ (ล่าสุดก่อน ตามลำดับที่ API ส่งมา) */
 export function appointmentLogs(logs: readonly ContactLog[]): ContactLog[] {
