@@ -102,3 +102,26 @@ describe('ตัวกรองบนสุดคุมรายชื่อท�
     expect(src).not.toContain('appsOfFilter(all, filter, allRows');
   });
 });
+
+describe('จัดหน้าภาพรวมใหม่ (เจ้าของ 12 พ.ย. 2569 ติ๊กแบบร่าง 15 ใบ)', () => {
+  const body = readFileSync('src/components/dashboard-trends/stuck/RecruitStuckBody.tsx', 'utf8');
+  const v5 = body.slice(body.indexOf("if (layout === 'v5') {"), body.indexOf('\n  return (\n    <div className="space-y-5" data-testid="recruit-stuck">'));
+  it('ถอด สมการใบขอ · สถานะประกาศใบขอใหม่ · แนวโน้มใบขอ', () => {
+    expect(v5).not.toContain('<StuckEquationCard');
+    expect(v5).not.toContain('<ReleaseProgressCard');
+    expect(v5).not.toContain('requestTrend');
+  });
+  it('ใบที่เหลือหารวมเข้าข้อ 1 (รายการใบที่กดขึ้นใต้ตาราง) · จุดที่รายชื่อหลุด + เหตุผลอยู่ใต้ข้อ 2', () => {
+    expect(v5).not.toContain('<StuckPhasesCard');
+    expect(v5.indexOf('<StuckPickedList')).toBeGreaterThan(v5.indexOf('title="1. ใครต้องทำอะไร"'));
+    const two = v5.slice(v5.indexOf('title="2. ทำแล้วเป็นไง"'), v5.indexOf('{bringerCard}'));
+    expect(two).toContain('<PersonJourneyCard embedded');
+    expect(two).toContain('<ReasonColumns');
+  });
+  it('ลำดับ: ตัวกรอง → 1 → 2 → 3 → 4 → 5 → พื้นที่ → เทียบเดือน → รายงานแบบเดิม', () => {
+    const order = ['<StuckFilterBar', 'title="1. ใครต้องทำอะไร"', 'title="2. ทำแล้วเป็นไง"', '{bringerCard}', '{channelCard}', '<SoPostGroupsCard', '<StuckAreaTable', '<MonthlyBarsCard', 'data-testid="v5-legacy-reports"'];
+    const at = order.map((k) => v5.indexOf(k));
+    expect(at.every((x) => x >= 0)).toBe(true);
+    expect([...at].sort((a, b) => a - b)).toEqual(at);
+  });
+});

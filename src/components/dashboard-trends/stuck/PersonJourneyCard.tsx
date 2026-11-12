@@ -19,10 +19,13 @@ export default function PersonJourneyCard({
   list,
   sub,
   onOpenNames,
+  embedded = false,
 }: {
   list: readonly RecruitAppFact[];
   sub: string;
   onOpenNames: (title: string, ids: readonly string[]) => void;
+  /** อยู่ใต้ข้อ 2 "ทำแล้วเป็นไง" (เจ้าของ 12 พ.ย. 2569 เลือก "รวม") — ไม่ห่อการ์ดของตัวเอง หัวข้อย่อยแทน */
+  embedded?: boolean;
 }) {
   const stages = React.useMemo(() => buildPersonJourney(list), [list]);
   const callers = React.useMemo(() => buildFollowCallers(list), [list]);
@@ -36,8 +39,8 @@ export default function PersonJourneyCard({
       <span className={cn('-mr-2 px-2 tabular-nums', DASH.sub)}>0</span>
     );
 
-  return (
-    <OverviewCard icon={Route} title="จุดที่รายชื่อหลุด" sub={sub}>
+  const body = (
+    <>
       <div className="divide-y divide-border rounded-xl border border-border" data-testid="person-journey">
         {stages.map((s) => (
           <div key={s.key} className="grid gap-x-4 gap-y-1 p-3 sm:grid-cols-[minmax(0,11rem)_minmax(0,1fr)]" data-testid={`person-stage-${s.key}`}>
@@ -108,6 +111,16 @@ export default function PersonJourneyCard({
           </Table>
         </div>
       </div>
+    </>
+  );
+  return embedded ? (
+    <section className="space-y-3 border-t border-border pt-4" data-testid="person-journey-section">
+      <h3 className="text-base font-medium text-foreground">จุดที่รายชื่อหลุด</h3>
+      {body}
+    </section>
+  ) : (
+    <OverviewCard icon={Route} title="จุดที่รายชื่อหลุด" sub={sub}>
+      {body}
     </OverviewCard>
   );
 }

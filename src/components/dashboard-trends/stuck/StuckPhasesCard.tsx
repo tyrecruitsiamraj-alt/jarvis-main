@@ -54,7 +54,6 @@ export default function StuckPhasesCard({
 }) {
   const [phase, setPhase] = React.useState<StuckPhaseKey | null>(null);
   const [reason, setReason] = React.useState<StuckReasonKey | null>(null);
-  const [detail, setDetail] = React.useState<string | null>(null);
   React.useEffect(() => {
     onFocus?.({ phase, reason });
   }, [phase, reason, onFocus]);
@@ -65,7 +64,6 @@ export default function StuckPhasesCard({
   const maxReason = Math.max(1, ...Object.values(byReason).map((l) => l.length));
 
   const list = listOverride ?? (reason ? { title: STUCK_REASON_LABEL[reason], rows: byReason[reason] } : null);
-  const detailRow = detail ? rows.find((r) => r.requestNo === detail) ?? null : null;
 
   return (
     <OverviewCard icon={FileText} title={title} sub={sub}>
@@ -130,6 +128,36 @@ export default function StuckPhasesCard({
       </div>
 
       {list ? (
+        <StuckPickedList
+          list={list}
+          onClose={() => {
+            setReason(null);
+            onCloseList?.();
+          }}
+          onOpenRequest={onOpenRequest}
+        />
+      ) : null}
+    </OverviewCard>
+  );
+}
+
+/**
+ * รายการใบที่กดมา + เส้นทางของใบที่กด — ใช้ทั้งในการ์ดขั้นที่ติด (หน้าเดิม) และใต้ตารางข้อ 1 ของภาพรวม
+ * (เจ้าของ 12 พ.ย. 2569 เลือก "รวม" การ์ดใบที่เหลือหาเข้าข้อ 1)
+ */
+export function StuckPickedList({
+  list,
+  onClose,
+  onOpenRequest,
+}: {
+  list: { title: string; rows: StuckRequest[] };
+  onClose: () => void;
+  onOpenRequest?: (r: StuckRequest) => void;
+}) {
+  const [detail, setDetail] = React.useState<string | null>(null);
+  const detailRow = detail ? list.rows.find((r) => r.requestNo === detail) ?? null : null;
+  return (
+    <>
         <div className="space-y-2 rounded-xl border border-border p-3" data-testid="stuck-list">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-sm font-medium">
@@ -139,10 +167,7 @@ export default function StuckPhasesCard({
               type="button"
               variant="ghost"
               size="xs"
-              onClick={() => {
-                setReason(null);
-                onCloseList?.();
-              }}
+              onClick={onClose}
             >
               <X aria-hidden />
               ปิด
@@ -201,10 +226,8 @@ export default function StuckPhasesCard({
             </Table>
           </div>
         </div>
-      ) : null}
-
       {detailRow ? <StuckDetail row={detailRow} onClose={() => setDetail(null)} onOpenRequest={onOpenRequest} /> : null}
-    </OverviewCard>
+    </>
   );
 }
 

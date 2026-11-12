@@ -106,11 +106,12 @@ describe('H09 · R09 · G05', () => {
     expect(src).toContain('<AiShareListDialog');
     expect(src).toContain('win={winQ}');
   });
-  it('R09 แท็บแนวโน้มของโฉมต้นแบบมีการ์ดแนวโน้มใบขอรายวัน (ตัวเดียวกับรายงานเดิม · ตามตัวกรองบนสุด)', () => {
+  it('R09 การ์ดแนวโน้มใบขอรายวันถอดจากภาพรวมแล้ว (เจ้าของ 12 พ.ย. 2569 จัดหน้าใหม่) · ยังอยู่ในรายงานแบบเดิม', () => {
     const ov = readFileSync('src/components/dashboard-trends/RecruitOverview.tsx', 'utf8');
-    expect(ov).toContain("requestTrend={(rows, prevRows) => compareCard('requests', view, { rows, prevRows })}");
+    expect(ov).not.toContain('requestTrend={');
+    expect(ov).toContain("trend={(sc) => compareCard('requests', view, { rows: sc.rows, prevRows: sc.prevRows })}");
     const body = readFileSync('src/components/dashboard-trends/stuck/RecruitStuckBody.tsx', 'utf8');
-    expect(body).toContain('requestTrend?.(data.requestRows ? (filterRequestRows(data.requestRows, filter)');
+    expect(body).not.toContain('requestTrend');
   });
   it('G05 มือถือ: ป๊อปรายชื่อซ่อนคอลัมน์รอง แล้วย้ายเบอร์/ทีม/หน่วยงานใต้ชื่อ', () => {
     for (const f of ['src/components/dashboard-trends/JourneyNamesDialog.tsx', 'src/components/home-overview/FollowNamesDialog.tsx']) {

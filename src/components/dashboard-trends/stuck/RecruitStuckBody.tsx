@@ -18,7 +18,7 @@ import ChannelFunnelTable from '../ChannelFunnelTable';
 import { buildFbGroupClickRows, mergeFbGroupClicks } from '@/lib/fbGroupClicks';
 import StuckFilterBar from './StuckFilterBar';
 import SoPostGroupsCard from './SoPostGroupsCard';
-import StuckPhasesCard from './StuckPhasesCard';
+import StuckPhasesCard, { StuckPickedList } from './StuckPhasesCard';
 import StuckOwnerTable from './StuckOwnerTable';
 import StuckAreaTable from './StuckAreaTable';
 import MonthlyBarsCard from './MonthlyBarsCard';
@@ -50,12 +50,9 @@ export default function RecruitStuckBody({
   onOpenNames,
   onPickMonth,
   layout,
-  requestTrend,
 }: {
   data: RecruitOverviewResponse;
   win: RecruitOverviewResponse['window'];
-  /** การ์ดแนวโน้มใบขอรายวัน (ใบเข้า/ประกาศ/มีผู้สมัคร/ไม่มี) ของรายงานเดิม — โฉมต้นแบบวางในแท็บแนวโน้ม · ใบตามตัวกรองบนสุด */
-  requestTrend?: (rows: RecruitRequestRow[] | null, prevRows: RecruitRequestRow[] | null) => React.ReactNode;
   onOpenNames: (title: string, ids: readonly string[]) => void;
   onPickMonth: (month: string) => void;
   /** `v5` = โฉมต้นแบบ SO Recruit (10 พ.ย. 2569 · &dash=v5) — 11 พ.ย. 2569 หน้าเดียว 4 ข้อ ไม่มีแท็บ */
@@ -165,47 +162,28 @@ export default function RecruitStuckBody({
         {stuck.error || stuck.data?.errors.requests ? (
           <SectionError message={stuck.error ?? stuck.data?.errors.requests ?? 'อ่านใบขอที่เหลือหาไม่ได้'} onRetry={() => setRev((n) => n + 1)} />
         ) : null}
-        {stuck.data?.requests ? (
-          <>
-            <StuckEquationCard look="v5" rows={filtered} window={stuck.data.window ?? null} value={scope} onChange={setScope} />
-            <div ref={phasesRef} className="scroll-mt-20">
-              <StuckPhasesCard
-                key={scope}
-                rows={rows}
-                title={SCOPE_TITLE[scope].title}
-                sub={SCOPE_TITLE[scope].sub}
-                onFocus={setFocus}
-                onOpenRequest={openRequest}
-                listOverride={picked}
-                onCloseList={() => setPicked(null)}
-              />
-            </div>
-          </>
-        ) : stuck.error || stuck.data ? null : (
+        {/* 12 พ.ย. 2569 เจ้าของจัดหน้าใหม่ (แบบร่างติ๊ก 15 ใบ): ถอดสมการใบขอ · สถานะประกาศใบขอใหม่ · แนวโน้มใบขอ
+            "ใบที่เหลือหา แยกขั้นที่ติด" รวมเข้าข้อ 1 (รายการใบที่กดขึ้นใต้ตารางข้อ 1) · จุดที่รายชื่อหลุด + เหตุผลที่ไม่สำเร็จ อยู่ใต้ข้อ 2 */}
+        {stuck.data?.requests ? null : stuck.error || stuck.data ? null : (
           <div className="space-y-3" aria-busy>
-            <Skeleton className="h-32 rounded-2xl" />
             <Skeleton className="h-64 rounded-2xl" />
           </div>
         )}
-
-        {/*
-         * 🔴 หน้าเดียว ไม่มีแท็บ (เจ้าของ 11 พ.ย. 2569 "ทำไมต้องแยกกัน เอามันรวมกันเลย" → แบบร่างรอบ 2 "ทำตามแบบร่างนี้")
-         * 1 ใครต้องทำอะไร · 2 ทำแล้วเป็นไง · 3 ที่มามาจากใคร · 4 ช่องทางไหนทำได้ดี · ต่อท้ายพื้นที่ · แนวโน้ม
-         * การ์ดเดิมของแท็บอยู่ครบ: ใบขอใหม่ประกาศไปแค่ไหน (ข้อ 1) · คนที่กรอกมาไปถึงไหน + เหตุผลที่ไม่สำเร็จ (ข้อ 2)
-         */}
-        <V5Divider label="รายงาน" />
         {stuck.data?.requests ? (
-          <OverviewCard icon={ListChecks} title="1. ใครต้องทำอะไร" sub={`${rows.length.toLocaleString('th-TH')} ใบ${scope === 'remaining' ? 'ที่ยังเปิด' : STUCK_SCOPE_LABEL[scope]} แยกตามเจ้าหน้าที่สรรหาของใบ · กดเลขดูใบ`}>
-            <StuckTodoTable rows={rows} onPick={pick} />
-          </OverviewCard>
+          <div ref={phasesRef} className="scroll-mt-20">
+            <OverviewCard icon={ListChecks} title="1. ใครต้องทำอะไร" sub={`${rows.length.toLocaleString('th-TH')} ใบที่ยังเปิด แยกตามเจ้าหน้าที่สรรหาของใบ · กดเลขดูใบ`}>
+              <StuckTodoTable rows={rows} onPick={pick} />
+              {picked ? <StuckPickedList list={picked} onClose={() => setPicked(null)} onOpenRequest={openRequest} /> : null}
+            </OverviewCard>
+          </div>
         ) : null}
-        {stuck.data?.requests ? <ReleaseProgressCard rows={filtered} onPick={pick} /> : null}
         <OverviewCard icon={PhoneCall} title="2. ทำแล้วเป็นไง" sub={`${cohortSub} · ตัวแดง = ยังไม่ทำ กดดูชื่อไปทำต่อ`}>
           {appsUnknown ? appsError : <CallerResultsTable cohort={cohort} onOpen={onOpenNames} />}
-        </OverviewCard>
-        {appsUnknown ? null : <PersonJourneyCard list={cohort} sub={cohortSub} onOpenNames={onOpenNames} />}
-        <OverviewCard icon={AlertCircle} title="เหตุผลที่ไม่สำเร็จ" sub={`${cohortSub} · ผลล่าสุดของแต่ละคน`}>
-          {appsUnknown ? appsError : <ReasonColumns groups={reasons} onOpen={onOpenNames} />}
+          {appsUnknown ? null : <PersonJourneyCard embedded list={cohort} sub={cohortSub} onOpenNames={onOpenNames} />}
+          <section className="space-y-3 border-t border-border pt-4" data-testid="reasons-section">
+            <h3 className="text-base font-medium text-foreground">เหตุผลที่ไม่สำเร็จ</h3>
+            {appsUnknown ? appsError : <ReasonColumns groups={reasons} onOpen={onOpenNames} />}
+          </section>
         </OverviewCard>
         {bringerCard}
         {channelCard}
@@ -214,8 +192,6 @@ export default function RecruitStuckBody({
         {stuck.data?.requests ? (
           <StuckAreaTable rows={focused} title={scope === 'remaining' ? undefined : `พื้นที่ · ใบ${STUCK_SCOPE_LABEL[scope]}`} countLabel={scope === 'remaining' ? undefined : `ใบ${STUCK_SCOPE_LABEL[scope]}`} onPick={pick} />
         ) : null}
-        {/* ใบขอรายวันตามช่วงที่เลือก (R09) — ใบตามตัวกรองบนสุด · ช่วงก่อนสำหรับเทียบ */}
-        {requestTrend?.(data.requestRows ? (filterRequestRows(data.requestRows, filter) as RecruitRequestRow[]) : null, data.requestRowsPrev ? (filterRequestRows(data.requestRowsPrev, filter) as RecruitRequestRow[]) : null)}
         <MonthlyBarsCard rows={monthly.data} error={monthly.error} ok={jobOk} onPickMonth={onPickMonth} open={monthlyOpen} onOpen={() => setMonthlyOpen(true)} />
         {/* รายงานเดิม (ตำแหน่งสมัคร · เทียบช่วงก่อน · งานค้างตามอายุ · กรอกแล้วโทรวันไหน · ผลงานรายคน · ช่องทางแจ้งเข้า) — หน้าเดิมยังอยู่ครบ */}
         <div className="flex justify-end">

@@ -49,7 +49,10 @@ export default function SoPostGroupsCard({ from, to, bu }: { from: string; to: s
   const cells: Array<{ key: string; label: string; n: number | null; tone?: keyof typeof TONE }> = d
     ? [{ key: 'total', label: 'สั่งทั้งหมด', n: d.total }, ...d.statuses.map((st) => ({ key: st.key, label: st.label, n: d.counts[st.key] ?? 0, tone: STATUS_TONE[st.key] }))]
     : [];
-  /** สั่ง + 7 สถานะ = 8 ช่อง (มือถือ 2 · กลาง 4 · กว้าง 8 ต่อแถว) · จำนวนคี่ = ช่องแรกเต็มแถวบนมือถือ ไม่เหลือช่องว่างเทา */
+  /**
+   * สั่ง + 7 สถานะ = 8 ช่อง (มือถือ 2 · กลาง 4 · กว้าง 8 ต่อแถว) · สั่ง + 9 สถานะ = 10 ช่อง แถวละ 5 (So Scraping แยกไม่ได้โพสต์เป็น
+   * เครื่อง / บัญชี / ไม่ทราบสาเหตุ · prompt 12 พ.ย. 2569) · จำนวนคี่ = ช่องแรกเต็มแถวบนมือถือ ไม่เหลือช่องว่างเทา
+   */
   const n = cells.length || 8;
 
   return (
@@ -68,7 +71,7 @@ export default function SoPostGroupsCard({ from, to, bu }: { from: string; to: s
 
       {/* แถวเลข — สั่งทั้งหมด = ผลรวมทุกสถานะ · ระหว่างโหลดโครงเดิม (ไม่กระโดด) */}
       <div
-        className={cn('grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-border bg-border sm:grid-cols-4 lg:grid-cols-8', n % 2 === 1 && '[&>*:first-child]:col-span-2 sm:[&>*:first-child]:col-span-1')}
+        className={cn('grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-border bg-border', n % 5 === 0 ? 'sm:grid-cols-5' : 'sm:grid-cols-4 lg:grid-cols-8', n % 2 === 1 && '[&>*:first-child]:col-span-2 sm:[&>*:first-child]:col-span-1')}
         data-testid="so-post-groups-counts"
       >
         {(cells.length ? cells : Array.from({ length: 8 }, (_, i) => ({ key: `x${i}`, label: '', n: null as number | null, tone: undefined }))).map((c) => {
@@ -81,7 +84,7 @@ export default function SoPostGroupsCard({ from, to, bu }: { from: string; to: s
               disabled={c.n === null}
               aria-pressed={c.n === null ? undefined : active}
               onClick={() => setStatusPick(c.key === 'total' || statusPick === c.key ? null : c.key)}
-              className={cn('h-auto min-w-0 flex-col items-start justify-start gap-0.5 whitespace-normal rounded-none px-3 py-2 text-left font-normal disabled:opacity-100', active ? 'bg-muted hover:bg-muted' : 'bg-card')}
+              className={cn('h-full min-w-0 flex-col items-start justify-between gap-0.5 whitespace-normal rounded-none px-3 py-2 text-left font-normal disabled:opacity-100', active ? 'bg-muted hover:bg-muted' : 'bg-card')}
               data-testid={`so-post-count-${c.key}`}
             >
               <span className={cn('text-xs', active ? 'font-medium text-foreground' : 'text-muted-foreground')}>{c.label}</span>

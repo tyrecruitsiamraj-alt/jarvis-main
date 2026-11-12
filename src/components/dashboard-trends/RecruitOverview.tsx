@@ -421,8 +421,7 @@ const RecruitOverview: React.FC<{
       {legacyCards ? null : (
         <RecruitStuckBody
           layout={v5 ? 'v5' : undefined}
-          // แนวโน้มใบขอรายวัน (R09 · ชุดส่งต่อ) — การ์ดตัวเดียวกับรายงานเดิม (dash=cards) ใช้ในแท็บแนวโน้มของโฉมต้นแบบ
-          requestTrend={(rows, prevRows) => compareCard('requests', view, { rows, prevRows })}
+          // การ์ดแนวโน้มใบขอรายวันถอดจากหน้านี้แล้ว (เจ้าของ 12 พ.ย. 2569 จัดหน้าใหม่) — ยังอยู่ในรายงานเพิ่มเติม (แบบเดิม)
           data={data}
           win={win}
           onOpenNames={(title, ids) => setNames({ title, ids })}
