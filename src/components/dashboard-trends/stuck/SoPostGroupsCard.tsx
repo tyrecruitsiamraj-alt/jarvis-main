@@ -14,12 +14,13 @@ import { OverviewCard } from '../RecruitOverviewParts';
 /**
  * ═══ 5. โพสต์ลงกลุ่ม Facebook (เจ้าของ 11 พ.ย. 2569 · ข้อ 13 ของ JARVIS_OPTIONS_PROMPT.md ฝั่ง So Scraping) ═══
  * ใครสั่ง · บัญชีไหน · กลุ่มไหน · งานอะไร · วันที่ · ผล · ลิงก์ — ดึงจาก So Scraping ผ่าน `/api/so-post-groups` (key อยู่ฝั่ง server)
- * ช่วง/BU = ค่าที่ภาพรวมเลือกอยู่ · แถวเลข 7 ช่อง = สั่ง + 6 สถานะตามลำดับ `statuses` (ว่าง = 0) · หน้าละ 10 แถว
- * 🔴 สถานะ/เหตุใช้ตามที่ So Scraping ส่งมา ห้ามคิดเอง · ดึงไม่ได้ = การ์ดยังอยู่ บอกเหตุ + ลองใหม่
+ * ช่วง/BU = ค่าที่ภาพรวมเลือกอยู่ · หน้าละ 10 แถว · ดึงไม่ได้ = การ์ดยังอยู่ บอกเหตุ + ลองใหม่
+ * แถวเลข = สั่งทั้งหมด + ทุกสถานะตามลำดับ `statuses` (ว่าง = 0) · 12 พ.ย. 2569 So Scraping ใช้คำของแท็บ "เนื้อหาของคุณ" ใน Facebook แล้ว
+ *   (เผยแพร่แล้ว · รอดำเนินการ · ปฏิเสธแล้ว · ลบออกแล้ว · ไม่สำเร็จ · ไม่ได้โพสต์ · รอคิว) — 🔴 อ่านคำจาก `statuses` เสมอ ห้ามฝังรายการคำใน Jarvis
+ * แถวในตาราง: ป้าย = `status_label` · เหตุ = `error` ตรง ๆ · สีป้ายตามรหัส (รหัสที่ไม่รู้จัก = สีกลาง)
  */
 
-/** สีป้ายตามรหัสสถานะของ So Scraping (คำบนป้ายยังเป็น `status_label` เสมอ) */
-const STATUS_TONE: Record<string, keyof typeof TONE> = { posted: 'success', failed: 'danger', pending_approval: 'warn', unconfirmed: 'warn' };
+const STATUS_TONE: Record<string, keyof typeof TONE> = { posted: 'success', pending_approval: 'warn', declined: 'danger', removed: 'danger', failed: 'danger' };
 
 export default function SoPostGroupsCard({ from, to, bu }: { from: string; to: string; bu: string | null }) {
   const [page, setPage] = React.useState(1);
@@ -41,9 +42,11 @@ export default function SoPostGroupsCard({ from, to, bu }: { from: string; to: s
 
   const d = state.data;
   const sub = `${formatYmdTh(from)} – ${formatYmdTh(to)} · ${bu ?? 'ทุก BU'}`;
-  const cells: Array<{ key: string; label: string; n: number | null }> = d
-    ? [{ key: 'total', label: 'สั่ง (กลุ่ม)', n: d.total }, ...d.statuses.map((s) => ({ key: s.key, label: s.label, n: d.counts[s.key] ?? 0 }))]
+  const cells: Array<{ key: string; label: string; n: number | null; tone?: keyof typeof TONE }> = d
+    ? [{ key: 'total', label: 'สั่งทั้งหมด', n: d.total }, ...d.statuses.map((st) => ({ key: st.key, label: st.label, n: d.counts[st.key] ?? 0, tone: STATUS_TONE[st.key] }))]
     : [];
+  /** สั่ง + 7 สถานะ = 8 ช่อง (มือถือ 2 · กลาง 4 · กว้าง 8 ต่อแถว) · จำนวนคี่ = ช่องแรกเต็มแถวบนมือถือ ไม่เหลือช่องว่างเทา */
+  const n = cells.length || 8;
 
   return (
     <OverviewCard icon={Send} title="5. โพสต์ลงกลุ่ม Facebook" sub={sub}>
@@ -59,12 +62,15 @@ export default function SoPostGroupsCard({ from, to, bu }: { from: string; to: s
         </div>
       ) : null}
 
-      {/* แถวเลข 7 ช่อง — สั่ง = ผลรวมทุกสถานะ · ระหว่างโหลดโครงเดิม (ไม่กระโดด) */}
-      <div className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-border bg-border sm:grid-cols-7" data-testid="so-post-groups-counts">
-        {(cells.length ? cells : Array.from({ length: 7 }, (_, i) => ({ key: `x${i}`, label: '', n: null as number | null }))).map((c) => (
-          <div key={c.key} className="min-w-0 bg-card px-3 py-2 first:col-span-2 sm:first:col-span-1">
-            <p className="min-h-8 text-xs text-muted-foreground">{c.label}</p>
-            <p className={cn('text-xl font-medium tabular-nums', c.n === 0 ? 'text-muted-foreground' : 'text-foreground')}>
+      {/* แถวเลข — สั่งทั้งหมด = ผลรวมทุกสถานะ · ระหว่างโหลดโครงเดิม (ไม่กระโดด) */}
+      <div
+        className={cn('grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-border bg-border sm:grid-cols-4 lg:grid-cols-8', n % 2 === 1 && '[&>*:first-child]:col-span-2 sm:[&>*:first-child]:col-span-1')}
+        data-testid="so-post-groups-counts"
+      >
+        {(cells.length ? cells : Array.from({ length: 8 }, (_, i) => ({ key: `x${i}`, label: '', n: null as number | null, tone: undefined }))).map((c) => (
+          <div key={c.key} className="min-w-0 bg-card px-3 py-2" data-testid={`so-post-count-${c.key}`}>
+            <p className="text-xs text-muted-foreground">{c.label}</p>
+            <p className={cn('text-xl font-medium tabular-nums', c.n === null || c.n === 0 ? 'text-muted-foreground' : c.tone ? TONE[c.tone].value : 'text-foreground')}>
               {c.n === null ? '—' : c.n.toLocaleString('th-TH')}
             </p>
           </div>
@@ -75,7 +81,7 @@ export default function SoPostGroupsCard({ from, to, bu }: { from: string; to: s
         <Table className="min-w-[56rem]">
           <TableHeader>
             <TableRow className={DASH.tableHead}>
-              <TableHead className="text-xs">คนสั่ง</TableHead>
+              <TableHead className="whitespace-nowrap text-xs">คนสั่ง</TableHead>
               <TableHead className="text-xs">บัญชี</TableHead>
               <TableHead className="text-xs">กลุ่ม</TableHead>
               <TableHead className="text-xs">งาน</TableHead>

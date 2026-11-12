@@ -66,3 +66,18 @@ describe('การ์ดในภาพรวม', () => {
     expect(readFileSync('src/lib/soPostGroupsApi.ts', 'utf8')).not.toContain('x-api-key');
   });
 });
+
+describe('สถานะแบบ Facebook (So Scraping 12 พ.ย. 2569 af773a4)', () => {
+  it('ใช้คำและลำดับจาก statuses ตรง ๆ · ไม่ฝังรายการคำใน Jarvis · ผลรวม = สั่งทั้งหมด', () => {
+    const fb = [
+      { key: 'posted', label: 'เผยแพร่แล้ว' }, { key: 'pending_approval', label: 'รอดำเนินการ' }, { key: 'declined', label: 'ปฏิเสธแล้ว' },
+      { key: 'removed', label: 'ลบออกแล้ว' }, { key: 'failed', label: 'ไม่สำเร็จ' }, { key: 'not_tried', label: 'ไม่ได้โพสต์' }, { key: 'waiting', label: 'รอคิว' },
+    ];
+    const d = parseSoPostGroups({ ...BODY, total: 1661, statuses: fb, counts: { posted: 372, pending_approval: 210, declined: 0, removed: 0, failed: 170, not_tried: 907, waiting: 2 } });
+    expect(d.statuses.map((x) => x.label)).toEqual(fb.map((x) => x.label));
+    expect(Object.values(d.counts).reduce((a, b) => a + b, 0)).toBe(1661);
+    const card = readFileSync('src/components/dashboard-trends/stuck/SoPostGroupsCard.tsx', 'utf8');
+    expect(card).not.toContain("'เผยแพร่แล้ว'");
+    expect(card).toContain('d.statuses.map(');
+  });
+});

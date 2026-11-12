@@ -93,3 +93,4 @@ export function parseSoPostGroups(body: unknown): SoPostGroups {
     rows,
   };
 }
+
