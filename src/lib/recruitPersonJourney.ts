@@ -61,13 +61,13 @@ export function buildPersonJourney(list: readonly RecruitAppFact[], now: Date = 
   const overdue = noResult.filter((f) => !(ms(f.appointmentAt) > now.getTime()));
 
   return [
-    stage('apps', 'รายชื่อที่กรอกมา', list, [
+    stage('apps', 'กรอกเข้ามา', list, [
       part('aiCalled', 'AI โทรแล้ว', 'info', aiCalled, { next: true }),
-      part('staffOnly', 'คนโทรเอง ไม่ผ่าน AI', 'violet', staffOnly, {
+      part('staffOnly', 'คนโทรเอง', 'violet', staffOnly, {
         note: noteOf([['ติดต่อได้', staffOnlyReached.length], ['นัดได้', staffOnly.filter((f) => f.appointmentAt).length]]),
       }),
       part('queued', 'รอ AI โทร', 'neutral', queued),
-      part('noQueue', 'ยังไม่มีใครโทร ไม่มีคิว', 'danger', noQueue, {
+      part('noQueue', 'ยังไม่มีใครโทร', 'danger', noQueue, {
         note: noteOf([['เบอร์ผิด', noQueueBy('bad')], ['อายุเกิน', noQueueBy('overAge')], ['มาจาก iRecruit', noQueueBy('irecruit')], ['ยังไม่ส่ง AI', noQueueBy('notSent')]]),
       }),
     ]),
@@ -78,24 +78,24 @@ export function buildPersonJourney(list: readonly RecruitAppFact[], now: Date = 
       part('outOfArea', 'คนละพื้นที่', 'orange', ai('outOfArea')),
       part('other', 'ยังสรุปไม่ได้', 'warn', ai('other')),
     ]),
-    stage('follow', 'สนใจ · คนโทรต่อ', yes, [
+    stage('follow', 'สนใจ', yes, [
       part('reached', 'ติดต่อได้', 'success', reached, { next: true }),
       part('failed', 'ติดต่อไม่ได้', 'danger', failed),
-      part('waiting', 'ยังไม่มีคนโทรต่อ', 'warn', waiting),
+      part('waiting', 'ยังไม่มีคนโทร', 'warn', waiting),
     ]),
-    stage('appoint', 'ติดต่อได้ · นัด', reached, [
+    stage('appoint', 'ติดต่อได้', reached, [
       part('booked', 'นัดได้', 'success', booked, { next: true }),
       part('apptFailed', 'นัดไม่ได้', 'danger', apptFailed),
       part('saidNo', 'ไม่สนใจแล้ว', 'orange', saidNo),
       part('undecided', 'ยังไม่ลงผลนัด', 'warn', undecided),
     ]),
-    stage('attend', 'นัดได้ · มาไหม', booked, [
+    stage('attend', 'นัดได้', booked, [
       part('showed', 'มา', 'success', showed, { next: true }),
       part('noShow', 'ไม่มา', 'danger', noShow),
       part('upcoming', 'ยังไม่ถึงวันนัด', 'neutral', upcoming),
       part('overdue', 'เลยวันนัด ยังไม่ลงผล', 'warn', overdue),
     ]),
-    stage('pass', 'มา · ผลสัมภาษณ์', showed, [
+    stage('pass', 'มาตามนัด', showed, [
       part('passed', 'ผ่าน', 'success', showed.filter((f) => f.screening === 'passed'), { next: true }),
       part('notPassed', 'ไม่ผ่าน', 'danger', showed.filter((f) => f.screening === 'not_passed')),
       part('pending', 'ยังไม่ลงผล', 'warn', showed.filter((f) => f.screening !== 'passed' && f.screening !== 'not_passed')),

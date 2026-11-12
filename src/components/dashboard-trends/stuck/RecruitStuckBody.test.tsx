@@ -109,7 +109,7 @@ describe('หน้าภาพรวมโฉมใหม่', () => {
     expect([v('carried'), v('new'), v('filled'), v('cancelled'), v('remaining')]).toEqual([1, 3, 0, 1, 3]);
     expect(fetchRecruitStuck).toHaveBeenLastCalledWith(null, { from: '2026-10-29', to: '2026-11-04' });
     // ค่าเริ่ม: รายชื่อทุกคนในช่วง 2 คน · AI สนใจ 1 → อ้นเก็บไป ยังไม่โทร
-    expect(screen.getByTestId('person-stage-apps').textContent).toMatch(/^รายชื่อที่กรอกมา2/);
+    expect(screen.getByTestId('person-stage-apps').textContent).toMatch(/^กรอกเข้ามา2/);
     expect(within(screen.getByTestId('follow-callers')).getAllByTestId('follow-caller-row').map((r) => r.querySelector('td')?.textContent)).toEqual(['อ้น']);
     fireEvent.click(within(eq).getByTestId('stuck-eq-cancelled'));
     await waitFor(() => expect(screen.getByTestId('stuck-total').textContent).toContain('1'));
