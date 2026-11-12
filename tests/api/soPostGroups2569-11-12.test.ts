@@ -132,3 +132,10 @@ describe('กองเหตุจาก So Scraping (เจ้าของ 12 �
     expect(r.reasons).toEqual([{ error: null, n: 1 }]);
   });
 });
+
+describe('สีช่องไม่ได้โพสต์ 3 แบบ (เจ้าของ 12 พ.ย. 2569 "ทำเป็นสีแดงเหมือนไม่สำเร็จเลย")', () => {
+  it('เครื่อง/บัญชี/ไม่ทราบสาเหตุ ใช้สีเดียวกับไม่สำเร็จ', () => {
+    const src = readFileSync('src/components/dashboard-trends/stuck/SoPostGroupsCard.tsx', 'utf8');
+    for (const k of ['failed', 'not_tried_machine', 'not_tried_account', 'not_tried_unknown']) expect(src).toContain(`${k}: 'danger'`);
+  });
+});

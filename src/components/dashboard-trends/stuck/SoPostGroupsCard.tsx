@@ -21,7 +21,17 @@ import { OverviewCard } from '../RecruitOverviewParts';
  * กดช่องสถานะ (เจ้าของ 12 พ.ย. 2569 "ไม่ได้โพสต์ 909 กดแล้วดูเหตุได้ไหม") = ตารางเหลือสถานะนั้น + เหตุจัดกลุ่มนับ · กดซ้ำ/กดสั่งทั้งหมด = ทุกแถว
  */
 
-const STATUS_TONE: Record<string, keyof typeof TONE> = { posted: 'success', pending_approval: 'warn', declined: 'danger', removed: 'danger', failed: 'danger' };
+/** ไม่ได้โพสต์ 3 แบบ (เครื่อง/บัญชี/ไม่ทราบสาเหตุ) แดงเหมือน "ไม่สำเร็จ" — เจ้าของสั่ง 12 พ.ย. 2569 */
+const STATUS_TONE: Record<string, keyof typeof TONE> = {
+  posted: 'success',
+  pending_approval: 'warn',
+  declined: 'danger',
+  removed: 'danger',
+  failed: 'danger',
+  not_tried_machine: 'danger',
+  not_tried_account: 'danger',
+  not_tried_unknown: 'danger',
+};
 
 export default function SoPostGroupsCard({ from, to, bu }: { from: string; to: string; bu: string | null }) {
   const [page, setPage] = React.useState(1);
