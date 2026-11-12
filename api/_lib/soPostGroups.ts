@@ -64,12 +64,12 @@ export async function fetchSoPostGroups(q: SoPostGroupsQuery, fetchImpl: typeof 
  */
 const ALL_TTL_MS = 3 * 60_000;
 const SO_MAX_PAGE_SIZE = 200;
-const allCache = new Map<string, { at: number; p: Promise<{ statuses: SoPostGroupStatus[]; rows: SoPostGroupRow[] }> }>();
+const allCache = new Map<string, { at: number; p: Promise<{ statuses: SoPostGroupStatus[]; reasonGroups: SoPostGroupStatus[]; rows: SoPostGroupRow[] }> }>();
 
 export async function fetchAllSoPostGroupRows(
   q: { from: string; to: string; bu: string | null },
   fetchImpl: typeof fetch = fetch,
-): Promise<{ statuses: SoPostGroupStatus[]; rows: SoPostGroupRow[] }> {
+): Promise<{ statuses: SoPostGroupStatus[]; reasonGroups: SoPostGroupStatus[]; rows: SoPostGroupRow[] }> {
   const key = `${q.from}|${q.to}|${q.bu ?? ''}`;
   const hit = allCache.get(key);
   if (hit && Date.now() - hit.at < ALL_TTL_MS) return hit.p;
@@ -81,7 +81,7 @@ export async function fetchAllSoPostGroupRows(
     const rest = await Promise.all(
       Array.from({ length: Math.min(first.pages, 50) - 1 }, (_, i) => callSoPostGroups(k.baseUrl, k.key, { ...q, page: i + 2, pageSize: SO_MAX_PAGE_SIZE }, fetchImpl)),
     );
-    return { statuses: first.statuses, rows: [...first.rows, ...rest.flatMap((r) => r.rows)] };
+    return { statuses: first.statuses, reasonGroups: first.reasonGroups, rows: [...first.rows, ...rest.flatMap((r) => r.rows)] };
   })();
   allCache.set(key, { at: Date.now(), p });
   p.catch(() => allCache.delete(key));

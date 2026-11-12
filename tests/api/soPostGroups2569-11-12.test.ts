@@ -107,3 +107,28 @@ describe('กดช่องสถานะแล้วดูเหตุ + ย�
     expect(readFileSync('src/components/dashboard-trends/stuck/SoPostGroupsCard.tsx', 'utf8')).toContain('data-testid="so-post-groups-reasons"');
   });
 });
+
+describe('กองเหตุจาก So Scraping (เจ้าของ 12 พ.ย. 2569 เลือกให้ So Scraping แบ่ง)', () => {
+  const meta = { from: '2026-11-01', to: '2026-11-12', bu: null };
+  const base = parseSoPostGroups(BODY).rows[0];
+  const row = (i: number, error: string | null, reasonGroup: string | null) => ({ ...base, fbGroupId: `g${i}`, status: 'not_tried', error, reasonGroup });
+  it('ส่งกองมา = แบ่งกอง (คำจาก reason_groups) · ผลรวมกอง = จำนวนในสถานะ · เหตุย่อยในกอง', () => {
+    const parsed = parseSoPostGroups({ ...BODY, reason_groups: [{ key: 'machine', label: 'เครื่องของ So Scraping มีปัญหา' }, { key: 'account', label: 'บัญชี Facebook ใช้ไม่ได้' }, { key: 'unknown', label: 'ไม่รู้เหตุ' }], rows: [{ ...BODY.rows[1], reason_group: 'account' }] });
+    expect(parsed.reasonGroups.map((g) => g.key)).toEqual(['machine', 'account', 'unknown']);
+    expect(parsed.rows[0].reasonGroup).toBe('account');
+    const all = {
+      statuses: STATUSES,
+      reasonGroups: parsed.reasonGroups,
+      rows: [row(1, null, 'unknown'), row(2, null, 'unknown'), row(3, 'เครื่องเริ่มใหม่', 'machine'), row(4, 'บัญชี A ถูกพัก', 'account'), row(5, 'บัญชี B ถูกพัก', 'account'), row(6, 'บัญชี A ถูกพัก', 'account')],
+    };
+    const r = filterSoPostGroups(all, meta, 'not_tried', 1);
+    expect(r.reasonTree.map((g) => [g.label, g.n])).toEqual([['บัญชี Facebook ใช้ไม่ได้', 3], ['ไม่รู้เหตุ', 2], ['เครื่องของ So Scraping มีปัญหา', 1]]);
+    expect(r.reasonTree.reduce((a, g) => a + g.n, 0)).toBe(r.filteredTotal);
+    expect(r.reasonTree[0].items).toEqual([{ error: 'บัญชี A ถูกพัก', n: 2 }, { error: 'บัญชี B ถูกพัก', n: 1 }]);
+  });
+  it('ยังไม่ส่งกอง = ไม่แบ่ง (จอใช้รายการเหตุแบบเดิม)', () => {
+    const r = filterSoPostGroups({ statuses: STATUSES, rows: [row(1, null, null)] }, meta, 'not_tried', 1);
+    expect(r.reasonTree).toEqual([]);
+    expect(r.reasons).toEqual([{ error: null, n: 1 }]);
+  });
+});

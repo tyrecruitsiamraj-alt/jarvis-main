@@ -1,5 +1,5 @@
 import React from 'react';
-import { ExternalLink, Send } from 'lucide-react';
+import { ChevronDown, ExternalLink, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
@@ -27,6 +27,8 @@ export default function SoPostGroupsCard({ from, to, bu }: { from: string; to: s
   const [page, setPage] = React.useState(1);
   const [rev, setRev] = React.useState(0);
   const [statusPick, setStatusPick] = React.useState<string | null>(null);
+  /** กองเหตุที่พับไว้ (ค่าเริ่ม = กางทุกกอง) */
+  const [folded, setFolded] = React.useState<Set<string>>(() => new Set());
   const [state, setState] = React.useState<{ data: (SoPostGroups & Partial<SoPostGroupsFiltered>) | null; error: string | null; loading: boolean }>({ data: null, error: null, loading: true });
 
   // เปลี่ยนช่วง/BU/สถานะที่กด = กลับหน้าแรก
@@ -98,6 +100,42 @@ export default function SoPostGroupsCard({ from, to, bu }: { from: string; to: s
             เหตุที่{d.statuses.find((x) => x.key === statusPick)?.label ?? statusPick} {(d.filteredTotal ?? 0).toLocaleString('th-TH')} กลุ่ม
           </p>
           {d.reasons.length === 0 ? <p className={cn('text-xs', DASH.sub)}>ไม่มีกลุ่มในสถานะนี้</p> : null}
+          {/* So Scraping ส่งกองเหตุมาแล้ว = แบ่งกอง กดกองเพื่อพับ/กาง (เจ้าของ 12 พ.ย. 2569 แบบร่าง 3 กอง) · ยังไม่ส่ง = รายการเหตุแบบเดิม */}
+          {d.reasonTree && d.reasonTree.length > 0 ? (
+            <ul className="divide-y divide-border" data-testid="so-post-groups-reason-tree">
+              {d.reasonTree.map((g) => {
+                const open = !folded.has(g.key);
+                return (
+                  <li key={g.key} className="py-1">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="xs"
+                      aria-expanded={open}
+                      onClick={() => setFolded((cur) => { const next = new Set(cur); if (next.has(g.key)) next.delete(g.key); else next.add(g.key); return next; })}
+                      className="h-auto w-full justify-between gap-3 px-1 py-1 text-sm font-medium text-foreground"
+                    >
+                      <span className="flex min-w-0 items-center gap-1">
+                        <ChevronDown className={cn('shrink-0 transition-transform', !open && '-rotate-90')} aria-hidden />
+                        <span className="min-w-0 whitespace-normal text-left">{g.label}</span>
+                      </span>
+                      <span className="shrink-0 tabular-nums">{g.n.toLocaleString('th-TH')}</span>
+                    </Button>
+                    {open ? (
+                      <ul className="space-y-0.5 pb-1 pl-6">
+                        {g.items.map((x) => (
+                          <li key={x.error ?? '-'} className={cn('flex items-baseline justify-between gap-3 text-xs', DASH.sub)}>
+                            <span className="min-w-0">{x.error ?? 'So Scraping ไม่ได้บอกเหตุ'}</span>
+                            <span className="shrink-0 tabular-nums">{x.n.toLocaleString('th-TH')}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
+                  </li>
+                );
+              })}
+            </ul>
+          ) : (
           <ul className="space-y-0.5">
             {d.reasons.map((x) => (
               <li key={x.error ?? '-'} className="flex items-baseline justify-between gap-3 text-sm">
@@ -106,6 +144,7 @@ export default function SoPostGroupsCard({ from, to, bu }: { from: string; to: s
               </li>
             ))}
           </ul>
+          )}
         </div>
       ) : null}
 
