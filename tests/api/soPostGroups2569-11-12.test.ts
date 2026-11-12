@@ -2,7 +2,7 @@
 /** การ์ด "5. โพสต์ลงกลุ่ม Facebook" (เจ้าของ 11 พ.ย. 2569 · ข้อ 13 ของ JARVIS_OPTIONS_PROMPT.md ฝั่ง So Scraping) */
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { parseSoPostGroups } from '../../src/lib/soPostGroups';
+import { filterSoPostGroups, parseSoPostGroups, summarizeSoPostGroups } from '../../src/lib/soPostGroups';
 import { callSoPostGroups } from '../../api/_lib/soPostGroups';
 
 const STATUSES = [
@@ -79,5 +79,29 @@ describe('สถานะแบบ Facebook (So Scraping 12 พ.ย. 2569 af773a
     const card = readFileSync('src/components/dashboard-trends/stuck/SoPostGroupsCard.tsx', 'utf8');
     expect(card).not.toContain("'เผยแพร่แล้ว'");
     expect(card).toContain('d.statuses.map(');
+  });
+});
+
+describe('กดช่องสถานะแล้วดูเหตุ + ยอดต่อใบบนการ์ด (เจ้าของ 12 พ.ย. 2569)', () => {
+  const rows = (n: number, status: string, error: string | null, requestNo = 'OPL6905114') =>
+    Array.from({ length: n }, (_, i) => ({ ...parseSoPostGroups(BODY).rows[0], fbGroupId: `${status}${i}`, status, error, requestNo }));
+  const all = { statuses: STATUSES, rows: [...rows(3, 'not_tried', null), ...rows(2, 'not_tried', 'บัญชีถูกพัก'), ...rows(12, 'posted', null, 'OPL6910065')] };
+  const meta = { from: '2026-11-01', to: '2026-11-12', bu: null };
+  it('กรองเฉพาะสถานะ · เหตุจัดกลุ่มนับมากไปน้อย (ไม่มีเหตุ = null) · ยอดช่องยังเป็นของทั้งช่วง · หน้าละ 10', () => {
+    const r = filterSoPostGroups(all, meta, 'not_tried', 1);
+    expect(r.filteredTotal).toBe(5);
+    expect(r.reasons).toEqual([{ error: null, n: 3 }, { error: 'บัญชีถูกพัก', n: 2 }]);
+    expect(r.counts.posted).toBe(12);
+    expect(r.total).toBe(17);
+    expect(filterSoPostGroups(all, meta, 'posted', 2).rows).toHaveLength(2);
+  });
+  it('ยอดต่อเลขใบขอ = สั่งกี่กลุ่ม + แต่ละสถานะ', () => {
+    const s = summarizeSoPostGroups(all);
+    expect(s.byRequest.OPL6905114).toEqual({ total: 5, counts: { not_tried: 5 } });
+    expect(s.byRequest.OPL6910065).toEqual({ total: 12, counts: { posted: 12 } });
+  });
+  it('การ์ดใบขอบอกยอด · ช่องตัวเลขในภาพรวมกดได้', () => {
+    expect(readFileSync('src/components/jobs/BoardJobCard.tsx', 'utf8')).toContain('data-testid="board-card-post-groups"');
+    expect(readFileSync('src/components/dashboard-trends/stuck/SoPostGroupsCard.tsx', 'utf8')).toContain('data-testid="so-post-groups-reasons"');
   });
 });

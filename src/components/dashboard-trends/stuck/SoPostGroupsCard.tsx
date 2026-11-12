@@ -8,7 +8,7 @@ import { formatDateTimeTh, formatYmdTh } from '@/lib/dateTh';
 import { friendlyErrorText } from '@/lib/friendlyError';
 import { getVisiblePageNumbers } from '@/lib/pagination';
 import { fetchSoPostGroups } from '@/lib/soPostGroupsApi';
-import type { SoPostGroups } from '@/lib/soPostGroups';
+import type { SoPostGroups, SoPostGroupsFiltered } from '@/lib/soPostGroups';
 import { OverviewCard } from '../RecruitOverviewParts';
 
 /**
@@ -18,6 +18,7 @@ import { OverviewCard } from '../RecruitOverviewParts';
  * แถวเลข = สั่งทั้งหมด + ทุกสถานะตามลำดับ `statuses` (ว่าง = 0) · 12 พ.ย. 2569 So Scraping ใช้คำของแท็บ "เนื้อหาของคุณ" ใน Facebook แล้ว
  *   (เผยแพร่แล้ว · รอดำเนินการ · ปฏิเสธแล้ว · ลบออกแล้ว · ไม่สำเร็จ · ไม่ได้โพสต์ · รอคิว) — 🔴 อ่านคำจาก `statuses` เสมอ ห้ามฝังรายการคำใน Jarvis
  * แถวในตาราง: ป้าย = `status_label` · เหตุ = `error` ตรง ๆ · สีป้ายตามรหัส (รหัสที่ไม่รู้จัก = สีกลาง)
+ * กดช่องสถานะ (เจ้าของ 12 พ.ย. 2569 "ไม่ได้โพสต์ 909 กดแล้วดูเหตุได้ไหม") = ตารางเหลือสถานะนั้น + เหตุจัดกลุ่มนับ · กดซ้ำ/กดสั่งทั้งหมด = ทุกแถว
  */
 
 const STATUS_TONE: Record<string, keyof typeof TONE> = { posted: 'success', pending_approval: 'warn', declined: 'danger', removed: 'danger', failed: 'danger' };
@@ -25,20 +26,21 @@ const STATUS_TONE: Record<string, keyof typeof TONE> = { posted: 'success', pend
 export default function SoPostGroupsCard({ from, to, bu }: { from: string; to: string; bu: string | null }) {
   const [page, setPage] = React.useState(1);
   const [rev, setRev] = React.useState(0);
-  const [state, setState] = React.useState<{ data: SoPostGroups | null; error: string | null; loading: boolean }>({ data: null, error: null, loading: true });
+  const [statusPick, setStatusPick] = React.useState<string | null>(null);
+  const [state, setState] = React.useState<{ data: (SoPostGroups & Partial<SoPostGroupsFiltered>) | null; error: string | null; loading: boolean }>({ data: null, error: null, loading: true });
 
-  // เปลี่ยนช่วง/BU = กลับหน้าแรก
-  React.useEffect(() => setPage(1), [from, to, bu]);
+  // เปลี่ยนช่วง/BU/สถานะที่กด = กลับหน้าแรก
+  React.useEffect(() => setPage(1), [from, to, bu, statusPick]);
   React.useEffect(() => {
     let alive = true;
     setState((s) => ({ ...s, error: null, loading: true }));
-    fetchSoPostGroups({ from, to, bu, page })
+    fetchSoPostGroups({ from, to, bu, page, status: statusPick })
       .then((data) => alive && setState({ data, error: null, loading: false }))
       .catch((e: unknown) => alive && setState({ data: null, error: friendlyErrorText(e, 'ติดต่อ So Scraping ไม่ได้'), loading: false }));
     return () => {
       alive = false;
     };
-  }, [from, to, bu, page, rev]);
+  }, [from, to, bu, page, rev, statusPick]);
 
   const d = state.data;
   const sub = `${formatYmdTh(from)} – ${formatYmdTh(to)} · ${bu ?? 'ทุก BU'}`;
@@ -67,15 +69,45 @@ export default function SoPostGroupsCard({ from, to, bu }: { from: string; to: s
         className={cn('grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-border bg-border sm:grid-cols-4 lg:grid-cols-8', n % 2 === 1 && '[&>*:first-child]:col-span-2 sm:[&>*:first-child]:col-span-1')}
         data-testid="so-post-groups-counts"
       >
-        {(cells.length ? cells : Array.from({ length: 8 }, (_, i) => ({ key: `x${i}`, label: '', n: null as number | null, tone: undefined }))).map((c) => (
-          <div key={c.key} className="min-w-0 bg-card px-3 py-2" data-testid={`so-post-count-${c.key}`}>
-            <p className="text-xs text-muted-foreground">{c.label}</p>
-            <p className={cn('text-xl font-medium tabular-nums', c.n === null || c.n === 0 ? 'text-muted-foreground' : c.tone ? TONE[c.tone].value : 'text-foreground')}>
-              {c.n === null ? '—' : c.n.toLocaleString('th-TH')}
-            </p>
-          </div>
-        ))}
+        {(cells.length ? cells : Array.from({ length: 8 }, (_, i) => ({ key: `x${i}`, label: '', n: null as number | null, tone: undefined }))).map((c) => {
+          const active = c.key === 'total' ? statusPick === null : statusPick === c.key;
+          return (
+            <Button
+              key={c.key}
+              type="button"
+              variant="ghost"
+              disabled={c.n === null}
+              aria-pressed={c.n === null ? undefined : active}
+              onClick={() => setStatusPick(c.key === 'total' || statusPick === c.key ? null : c.key)}
+              className={cn('h-auto min-w-0 flex-col items-start justify-start gap-0.5 whitespace-normal rounded-none px-3 py-2 text-left font-normal disabled:opacity-100', active ? 'bg-muted hover:bg-muted' : 'bg-card')}
+              data-testid={`so-post-count-${c.key}`}
+            >
+              <span className={cn('text-xs', active ? 'font-medium text-foreground' : 'text-muted-foreground')}>{c.label}</span>
+              <span className={cn('text-xl font-medium tabular-nums', c.n === null || c.n === 0 ? 'text-muted-foreground' : c.tone ? TONE[c.tone].value : 'text-foreground')}>
+                {c.n === null ? '—' : c.n.toLocaleString('th-TH')}
+              </span>
+            </Button>
+          );
+        })}
       </div>
+
+      {/* เหตุของสถานะที่กด — คำตามที่ So Scraping ส่ง · ไม่มีเหตุ = บอกตรง ๆ */}
+      {statusPick && d?.reasons ? (
+        <div className="space-y-1 rounded-xl border border-border p-3" data-testid="so-post-groups-reasons">
+          <p className="text-sm font-medium text-foreground">
+            เหตุที่{d.statuses.find((x) => x.key === statusPick)?.label ?? statusPick} {(d.filteredTotal ?? 0).toLocaleString('th-TH')} กลุ่ม
+          </p>
+          {d.reasons.length === 0 ? <p className={cn('text-xs', DASH.sub)}>ไม่มีกลุ่มในสถานะนี้</p> : null}
+          <ul className="space-y-0.5">
+            {d.reasons.map((x) => (
+              <li key={x.error ?? '-'} className="flex items-baseline justify-between gap-3 text-sm">
+                <span className={cn('min-w-0', x.error ? 'text-foreground' : DASH.sub)}>{x.error ?? 'So Scraping ไม่ได้บอกเหตุ'}</span>
+                <span className="shrink-0 font-medium tabular-nums">{x.n.toLocaleString('th-TH')}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
 
       <div className="overflow-x-auto" data-testid="so-post-groups-table">
         <Table className="min-w-[56rem]">
@@ -135,7 +167,7 @@ export default function SoPostGroupsCard({ from, to, bu }: { from: string; to: s
       {/* แบ่งหน้า — ก่อนหน้า / เลขหน้า / ถัดไป · ปุ่มอยู่ที่เดิมเสมอ (ไม่มีหน้า = กดไม่ได้ ไม่ซ่อน) */}
       <div className="flex flex-wrap items-center justify-between gap-2" data-testid="so-post-groups-pager">
         <p className={cn('text-xs tabular-nums', DASH.sub)}>
-          {d ? `หน้า ${d.page.toLocaleString('th-TH')} จาก ${d.pages.toLocaleString('th-TH')} · ทั้งหมด ${d.total.toLocaleString('th-TH')} กลุ่ม` : ' '}
+          {d ? `หน้า ${d.page.toLocaleString('th-TH')} จาก ${d.pages.toLocaleString('th-TH')} · ${statusPick ? `${d.statuses.find((x) => x.key === statusPick)?.label ?? statusPick} ${(d.filteredTotal ?? 0).toLocaleString('th-TH')}` : `ทั้งหมด ${d.total.toLocaleString('th-TH')}`} กลุ่ม` : ' '}
         </p>
         <div className="flex items-center gap-1">
           <Button type="button" size="xs" variant="outline" disabled={!d || d.page <= 1 || state.loading} onClick={() => setPage((p) => Math.max(1, p - 1))}>

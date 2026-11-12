@@ -1,4 +1,5 @@
 import React from 'react';
+import type { SoPostGroupStatus } from '@/lib/soPostGroups';
 import { ArrowRight, Ban, EyeOff, FileSpreadsheet, Megaphone, StickyNote, Users } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -70,10 +71,15 @@ export type BoardJobCardProps = {
   onAutopost?: (job: JobRequest) => void;
   /** แถวในทะเบียนประกาศ — ขึ้น "ล่าสุด วันที่ โดย ชื่อ" ข้างชิปประกาศแล้ว (เจ้าของ 1 พ.ย. 2569 "ประกาศล่าสุดไปวันไหน ใครประกาศ") */
   release?: Pick<JobRelease, 'released_at' | 'released_by_name'> | null;
+  /**
+   * ยอดโพสต์ลงกลุ่ม Facebook ของใบนี้จาก So Scraping (เจ้าของ 12 พ.ย. 2569 "งานไหน สั่งไปเท่าไหร่ โพสต์ได้เท่าไหร่ บอกตรงนี้เลย")
+   * คำสถานะจาก `statuses` ของ So Scraping · `mine` null = ใบนี้ยังไม่เคยสั่งโพสต์ลงกลุ่ม · ไม่ส่ง = ยังโหลดไม่มา/โหลดไม่ได้
+   */
+  postGroups?: { statuses: SoPostGroupStatus[]; mine: { total: number; counts: Record<string, number> } | null } | null;
 };
 
 /** "บางพลี สมุทรปราการ" — อำเภอที่ทีม Online กรอก + จังหวัด · ไม่รู้ = บอกตรง ๆ (ไม่เดาจากจังหวัดไซต์) */
-const BoardJobCard: React.FC<BoardJobCardProps> = ({ job, readiness, applicants, ai, closed, onOpen, onApplicants, skip, onImport, so, onAutopost, release }) => {
+const BoardJobCard: React.FC<BoardJobCardProps> = ({ job, readiness, applicants, ai, closed, onOpen, onApplicants, skip, onImport, so, onAutopost, release, postGroups }) => {
   // เบอร์เจ้าหน้าที่สรรหาบรรทัดเดียวกับหน้า /apply (เจ้าของ 20 ต.ค. 2569 "ไหนเบอร์โทรเจ้าหน้าที่สรรหา")
   const contact = useRecruiterContact(job.recruiter_contact ? null : job.recruiter_name);
   const age = getJobAgeChipInfo(job);
@@ -157,6 +163,20 @@ const BoardJobCard: React.FC<BoardJobCardProps> = ({ job, readiness, applicants,
             );
           })}
         </div>
+      ) : null}
+      {/* ยอดโพสต์ลงกลุ่ม: สั่ง N กลุ่ม · ตามด้วยสถานะที่มีเลข (ลำดับ/คำของ So Scraping) */}
+      {postGroups?.mine ? (
+        <p className="text-xs tabular-nums text-muted-foreground" data-testid="board-card-post-groups">
+          โพสต์ลงกลุ่ม: <span className="font-medium text-foreground">สั่ง {postGroups.mine.total.toLocaleString('th-TH')} กลุ่ม</span>
+          {postGroups.statuses
+            .filter((st) => (postGroups.mine?.counts[st.key] ?? 0) > 0)
+            .map((st) => (
+              <span key={st.key} className={st.key === 'posted' ? cn('font-medium', TONE.success.value) : undefined}>
+                {' · '}
+                {st.label} {(postGroups.mine?.counts[st.key] ?? 0).toLocaleString('th-TH')}
+              </span>
+            ))}
+        </p>
       ) : null}
       {/* ใบที่ไม่สำเร็จ/ค้าง: เหตุ 1 บรรทัดบนการ์ดเลย ไม่ต้องเปิดป๊อปก่อนถึงรู้ (เจ้าของ 4 พ.ย. 2569 ฉบับ 9 ข้อ 6) */}
       {(so ?? []).map((r) => {

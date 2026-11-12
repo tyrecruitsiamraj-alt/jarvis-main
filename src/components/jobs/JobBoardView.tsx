@@ -1,4 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { fetchSoPostSummary } from '@/lib/soPostGroupsApi';
+import type { SoPostSummary } from '@/lib/soPostGroups';
 import { lazyPage } from '@/lib/staleChunkReload';
 import { GlassTabIndicator, glassTabClass, glassTabsListClass } from '@/components/ui/tabs';
 import { trackPublicClick } from '@/lib/publicClickApi';
@@ -42,7 +44,7 @@ import { PagePager } from '@/components/shared/PagePager';
 import { getTotalPages, PAGE_SIZE_OPTIONS, type PageSizeOption } from '@/lib/pagination';
 import { fetchRecruitPostings } from '@/lib/recruitPostingsApi';
 import { selectSilentLinkRows } from '@/lib/jobLinkSilence';
-import { buildCountIndex, buildJobKeyIndex, countFor } from '@/lib/jobKeyIndex';
+import { buildCountIndex, buildJobKeyIndex, countFor, requestNoOf } from '@/lib/jobKeyIndex';
 import {
   MOVED_ON_STAGE_KEYS,
   buildBoardStages,
@@ -563,6 +565,27 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
         });
     void load();
     // So Scraping เขียนสถานะกลับเมื่อไหร่ก็ได้ — โหลดใหม่ทุก 5 นาทีระหว่างเปิดหน้า
+    const t = window.setInterval(() => void load(), 5 * 60_000);
+    return () => {
+      alive = false;
+      window.clearInterval(t);
+    };
+  }, [isStaff, postingsRev]);
+  /**
+   * ยอดโพสต์ลงกลุ่มต่อใบ (เจ้าของ 12 พ.ย. 2569 "งานไหน สั่งไปเท่าไหร่ โพสต์ได้เท่าไหร่ บอกตรงนี้เลย") — `/api/so-post-summary`
+   * โหลดไม่ได้ = การ์ดไม่มีบรรทัดนี้ (ป้ายสถานะคำสั่งยังอยู่) · โหลดใหม่ตามรอบเดียวกับป้าย So Scraping
+   */
+  const [soPostSummary, setSoPostSummary] = useState<SoPostSummary | null>(null);
+  useEffect(() => {
+    if (!isStaff) return;
+    let alive = true;
+    const load = () =>
+      fetchSoPostSummary()
+        .then((v) => alive && setSoPostSummary(v))
+        .catch(() => {
+          /* ของแถมบนการ์ด — โหลดไม่ได้ = ไม่มีบรรทัด */
+        });
+    void load();
     const t = window.setInterval(() => void load(), 5 * 60_000);
     return () => {
       alive = false;
@@ -1730,6 +1753,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                 release={releaseByJob.get(job.id) ?? null}
                 onImport={onImportJob}
                 so={soByJob ? soByJob.get(job.id) ?? [] : null}
+                postGroups={soPostSummary ? { statuses: soPostSummary.statuses, mine: soPostSummary.byRequest[requestNoOf(job.id)] ?? null } : null}
                 onAutopost={setAutopostJob}
               />
             ) : (

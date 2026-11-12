@@ -94,3 +94,46 @@ export function parseSoPostGroups(body: unknown): SoPostGroups {
   };
 }
 
+/** ผลเมื่อกรองตามสถานะ (กดช่องตัวเลข) — `reasons` = เหตุที่ So Scraping ส่งมา จัดกลุ่มนับ (null = ไม่มีเหตุ) มากไปน้อย */
+export type SoPostGroupsFiltered = SoPostGroups & { status: string | null; filteredTotal: number; reasons: Array<{ error: string | null; n: number }> };
+
+export function filterSoPostGroups(
+  all: { statuses: SoPostGroupStatus[]; rows: SoPostGroupRow[] },
+  meta: { from: string; to: string; bu: string | null },
+  status: string,
+  page: number,
+): SoPostGroupsFiltered {
+  const counts = Object.fromEntries(all.statuses.map((s) => [s.key, 0]));
+  for (const r of all.rows) counts[r.status] = (counts[r.status] ?? 0) + 1;
+  const picked = all.rows.filter((r) => r.status === status);
+  const pages = Math.max(1, Math.ceil(picked.length / SO_POST_GROUPS_PAGE_SIZE));
+  const p = Math.min(pages, Math.max(1, page));
+  const byErr = new Map<string | null, number>();
+  for (const r of picked) byErr.set(r.error, (byErr.get(r.error) ?? 0) + 1);
+  return {
+    ...meta,
+    page: p,
+    pages,
+    total: all.rows.length,
+    statuses: all.statuses,
+    counts,
+    rows: picked.slice((p - 1) * SO_POST_GROUPS_PAGE_SIZE, p * SO_POST_GROUPS_PAGE_SIZE),
+    status,
+    filteredTotal: picked.length,
+    reasons: [...byErr].map(([error, n]) => ({ error, n })).sort((a, b) => b.n - a.n),
+  };
+}
+
+/** ยอดต่อเลขใบขอ — การ์ดบนหน้าโพสต์ประกาศ "งานไหน สั่งไปเท่าไหร่ โพสต์ได้เท่าไหร่" (เจ้าของ 12 พ.ย. 2569) */
+export type SoPostSummary = { statuses: SoPostGroupStatus[]; byRequest: Record<string, { total: number; counts: Record<string, number> }> };
+
+export function summarizeSoPostGroups(all: { statuses: SoPostGroupStatus[]; rows: SoPostGroupRow[] }): SoPostSummary {
+  const byRequest: SoPostSummary['byRequest'] = {};
+  for (const r of all.rows) {
+    if (!r.requestNo) continue;
+    const x = (byRequest[r.requestNo] ??= { total: 0, counts: {} });
+    x.total += 1;
+    x.counts[r.status] = (x.counts[r.status] ?? 0) + 1;
+  }
+  return { statuses: all.statuses, byRequest };
+}
