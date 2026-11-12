@@ -24,7 +24,6 @@ import { Button } from '@/components/ui/button';
 import { DASH, TONE } from '@/lib/designTokens';
 import { RELEASE_LANE_TEXT, type ReleaseLaneKey, type ReleaseLedger } from '@/lib/boardRelease';
 import { cn } from '@/lib/utils';
-import { OverviewNode, type Emphasis } from '@/components/home-overview/OverviewParts';
 import { ledgerStateText, type LedgerState } from '@/lib/boardDataState';
 
 export type BoardReleaseHeaderProps = {
@@ -50,46 +49,55 @@ export type BoardReleaseHeaderProps = {
 
 const th = (n: number) => n.toLocaleString('th-TH');
 
-/** ช่องของกล่อง 3 ก้อน — ใช้ทั้งตอนโหลดและตอนมีเลข ⇒ หน้าไม่กระโดด */
-const LANE_GRID = 'grid gap-2 sm:grid-cols-[minmax(0,0.8fr)_minmax(0,2fr)_minmax(0,2fr)]';
+/**
+ * แถบเดียว 7 ช่อง (เจ้าของ 11 พ.ย. 2569 แบบ C "บอกด้วยว่ายังไม่ประกาศเท่าไหร่ ประกาศแล้วเท่าไหร่ มี 7 ช่อง") —
+ * ช่องคั่นด้วยเส้น 1px (`gap-px` บนพื้นเส้น) · จอแคบตัดเป็น 2/4 ช่องต่อแถว · ใช้ทั้งตอนโหลดและตอนมีเลข ⇒ หน้าไม่กระโดด
+ */
+const LANE_GRID = 'grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-border bg-border sm:grid-cols-4 lg:grid-cols-7';
+/** ลำดับช่องซ้ายไปขวา: ทั้งหมด · ประกาศแล้ว (มีคนกรอก · ยังไม่มีคนกรอก) · ยังไม่ประกาศ (ยังต้องหาคน · เริ่มงานแล้ว) */
+const CELL_ORDER = ['all', 'released', 'applied', 'silent', 'unreleased', 'sourcing', 'started'] as const;
 
-/** ลำดับเลนหลัก 3 อัน — ใช้ตอนโชว์ขีด/โครงเปล่า */
-const LANE_ORDER = ['all', 'released', 'unreleased'] as const;
 
 /**
- * กล่องเลน — Visual Control (เจ้าของ 11 พ.ย. 2569 "อยากได้มันเป็น Visual Control ที่กดเพื่อพาไปลิสต์นั้นๆ")
- * กล่องตัวเลขชุดเดียวกับหน้าภาพรวม (`OverviewNode`) · กดแล้วการ์ดข้างล่างเหลือใบชุดนั้น · กดซ้ำ = ทุกใบ
- * กล่องที่เลือก = กรอบหนา (ไม่เปลี่ยนขนาด ของรอบข้างไม่ขยับ)
+ * ช่องเลน — กดแล้วการ์ดข้างล่างเหลือใบชุดนั้น · กดซ้ำ = ทุกใบ (เจ้าของ 11 พ.ย. 2569 "Visual Control ที่กดเพื่อพาไปลิสต์นั้นๆ")
+ * ช่องที่เลือก = พื้นเข้มขึ้น ไม่เปลี่ยนขนาด ของรอบข้างไม่ขยับ · ยังไม่มีคนกรอก/ยังต้องหาคน เลขเป็นสีเตือน
  */
-function LaneBox({
+function LaneCell({
   laneKey,
   count,
   active,
   onClick,
   sub,
-  emphasis = null,
-  className,
+  tone,
 }: {
   laneKey: ReleaseLaneKey;
-  count: number;
+  count: number | null;
   active: boolean;
-  onClick: () => void;
+  onClick?: () => void;
   sub?: string;
-  emphasis?: Emphasis;
-  className?: string;
+  tone?: 'warn' | 'danger';
 }) {
   return (
-    <OverviewNode
-      label={RELEASE_LANE_TEXT[laneKey].label}
-      value={count}
-      unit="ใบ"
-      sub={sub}
-      emphasis={emphasis}
-      variant={emphasis ? 'fill' : 'outline'}
+    <Button
+      type="button"
+      variant="ghost"
       onClick={onClick}
-      testId={`board-lane-${laneKey}`}
-      className={cn('ring-inset', active ? 'ring-2 ring-primary' : 'ring-0', className)}
-    />
+      disabled={!onClick}
+      aria-pressed={onClick ? active : undefined}
+      title={RELEASE_LANE_TEXT[laneKey].hint}
+      data-testid={`board-lane-${laneKey}`}
+      className={cn(
+        'h-auto min-w-0 flex-col items-start justify-start gap-0.5 whitespace-normal rounded-none px-3 py-2 text-left font-normal disabled:opacity-100',
+        active ? 'bg-muted hover:bg-muted' : 'bg-card',
+      )}
+    >
+      <span className={cn('text-xs', active ? 'font-medium text-foreground' : 'text-muted-foreground')}>{RELEASE_LANE_TEXT[laneKey].label}</span>
+      <span className={cn('text-xl font-medium tabular-nums', tone ? TONE[tone].value : 'text-foreground')}>
+        {count === null ? '—' : th(count)}
+        <span className="ml-1 text-xs font-normal text-muted-foreground">ใบ</span>
+      </span>
+      <span className="min-h-4 text-xs tabular-nums text-muted-foreground">{sub ?? ''}</span>
+    </Button>
   );
 }
 
@@ -121,13 +129,13 @@ const BoardReleaseHeader: React.FC<BoardReleaseHeaderProps> = ({
             </Button>
           ) : null}
         </div>
-        {/* โครงเดียวกับกล่องตอนโหลดเสร็จ (ทั้งหมด | ประกาศแล้ว | ยังไม่ประกาศ) — โหลดเสร็จแล้วหน้าไม่กระโดด */}
+        {/* โครงเดียวกับแถบตอนโหลดเสร็จ — โหลดเสร็จแล้วหน้าไม่กระโดด */}
         <div className={LANE_GRID}>
-          {LANE_ORDER.map((laneKey) =>
+          {CELL_ORDER.map((laneKey) =>
             broken ? (
-              <OverviewNode key={laneKey} label={RELEASE_LANE_TEXT[laneKey].label} value={null} variant="outline" className="sm:min-h-56" />
+              <LaneCell key={laneKey} laneKey={laneKey} count={null} active={false} />
             ) : (
-              <div key={laneKey} className="h-24 animate-pulse rounded-2xl bg-muted/70 sm:h-56" />
+              <div key={laneKey} className="h-20 animate-pulse bg-muted/70" />
             ),
           )}
         </div>
@@ -142,28 +150,22 @@ const BoardReleaseHeader: React.FC<BoardReleaseHeaderProps> = ({
       {/* อายุข้อมูล — โชว์เฉพาะตอนเก่าพอจะทำให้ตัดสินใจผิด หรือกำลังดูสำเนาเพราะต่อไม่ติด */}
       {ageLabel ? <p className={cn('text-xs', DASH.muted)}>{ageLabel}</p> : null}
 
-      {/* 🔴 เลขชุดนี้ **ตรงกับหน้าหลัก** · ประกาศแล้ว + ยังไม่ประกาศ = ใบขอทั้งหมดเป๊ะ
-          11 พ.ย. 2569 กล่องตัวเลข (Visual Control): ทั้งหมด | ประกาศแล้ว (มีคนกรอก · ยังไม่มีคนกรอก) | ยังไม่ประกาศ (ยังต้องหาคน · เริ่มงานแล้ว)
-          ทุกกล่องกดกรองการ์ดข้างล่าง · สองกล่องย่อยบวกกัน = กล่องหัวของกลุ่ม */}
+      {/* 🔴 เลขชุดนี้ **ตรงกับหน้าหลัก** · ประกาศแล้ว + ยังไม่ประกาศ = ใบขอทั้งหมด · มีคนกรอก + ยังไม่มีคนกรอก = ประกาศแล้ว
+          · ยังต้องหาคน + เริ่มงานแล้ว = ยังไม่ประกาศ (ก้อนย่อยเจ้าของเคาะ 21 ก.ย. 2569) · ทุกช่องกดกรองการ์ดข้างล่าง */}
       <div className={LANE_GRID} data-testid="board-release-tree">
-        <LaneBox laneKey="all" count={ledger.all} active={lane === null || lane === 'all'} onClick={() => onLaneChange(null)} className="sm:h-full" />
-        <div className="grid grid-cols-2 gap-2 rounded-2xl border border-border/70 p-2" data-testid="board-release-released">
-          <LaneBox laneKey="released" count={ledger.released} active={lane === 'released'} onClick={() => toggle('released')} className="col-span-2" />
-          <LaneBox
-            laneKey="applied"
-            count={ledger.releasedWithApplicants}
-            sub={`${th(ledger.applicantHeads)} คน`}
-            active={lane === 'applied'}
-            onClick={() => toggle('applied')}
-          />
-          <LaneBox laneKey="silent" count={ledger.releasedSilent} emphasis="warn" active={lane === 'silent'} onClick={() => toggle('silent')} />
-        </div>
-        <div className="grid grid-cols-2 gap-2 rounded-2xl border border-border/70 p-2" data-testid="board-release-unreleased">
-          <LaneBox laneKey="unreleased" count={ledger.unreleased} active={lane === 'unreleased'} onClick={() => toggle('unreleased')} className="col-span-2" />
-          {/* ก้อนย่อยของ "ยังไม่ปล่อย" (เจ้าของเคาะ 21 ก.ย. 2569) — ยังต้องหาคน + เริ่มงานแล้ว = ยังไม่ประกาศ */}
-          <LaneBox laneKey="sourcing" count={ledger.releasable} emphasis="danger" active={lane === 'sourcing'} onClick={() => toggle('sourcing')} />
-          <LaneBox laneKey="started" count={ledger.startedAlready} active={lane === 'started'} onClick={() => toggle('started')} />
-        </div>
+        <LaneCell laneKey="all" count={ledger.all} active={lane === null || lane === 'all'} onClick={() => onLaneChange(null)} />
+        <LaneCell laneKey="released" count={ledger.released} active={lane === 'released'} onClick={() => toggle('released')} />
+        <LaneCell
+          laneKey="applied"
+          count={ledger.releasedWithApplicants}
+          sub={`${th(ledger.applicantHeads)} คน`}
+          active={lane === 'applied'}
+          onClick={() => toggle('applied')}
+        />
+        <LaneCell laneKey="silent" count={ledger.releasedSilent} tone="warn" active={lane === 'silent'} onClick={() => toggle('silent')} />
+        <LaneCell laneKey="unreleased" count={ledger.unreleased} active={lane === 'unreleased'} onClick={() => toggle('unreleased')} />
+        <LaneCell laneKey="sourcing" count={ledger.releasable} tone="danger" active={lane === 'sourcing'} onClick={() => toggle('sourcing')} />
+        <LaneCell laneKey="started" count={ledger.startedAlready} active={lane === 'started'} onClick={() => toggle('started')} />
       </div>
     </div>
   );
