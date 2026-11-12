@@ -114,6 +114,13 @@ export async function runApplicationImport(input: {
   return (await r.json()) as ApplicationImportResult;
 }
 
+/** ตรวจไฟล์แนบก่อนส่ง — กติกาเดียวกับ server (`normalizeDocument`: PDF/JPG/PNG ≤ 3MB) · null = ใช้ได้ */
+export function applicationDocumentProblem(f: File): string | null {
+  if (!['application/pdf', 'image/jpeg', 'image/png'].includes(f.type)) return 'รองรับเฉพาะไฟล์ PDF, JPG หรือ PNG';
+  if (f.size > 3 * 1024 * 1024) return 'ไฟล์ใหญ่เกินไป (สูงสุด 3MB)';
+  return null;
+}
+
 /** แนบไฟล์ให้ใบที่นำเข้าแล้ว (เจ้าของ 12 พ.ย. 2569) — PDF/JPG/PNG ≤ 3MB ตรวจที่ server · แนบใหม่ = แทนไฟล์เดิม */
 export async function attachApplicationDocument(id: string, f: File): Promise<string> {
   const base64 = await readFileAsBase64(f);

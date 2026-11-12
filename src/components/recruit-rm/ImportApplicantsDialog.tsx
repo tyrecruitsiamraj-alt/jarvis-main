@@ -21,6 +21,7 @@ import { DASH, TONE } from '@/lib/designTokens';
 import { recruitChannelLabel, type RecruitChannelMatch } from '@/lib/recruitPostings';
 import { importDateTh, importStatusLabel } from '@/lib/applicantImportDuplicates';
 import {
+  applicationDocumentProblem,
   attachApplicationDocument,
   downloadApplicationImportTemplate,
   downloadImportDuplicates,
@@ -69,12 +70,18 @@ const ImportApplicantsDialog: React.FC<{
   /** PDPA (15 ต.ค. 2569) — ยืนยันว่าผู้สมัครในไฟล์ยินยอมแล้วก่อนนำเข้า */
   const [consent, setConsent] = useState(false);
   /** ไฟล์แนบข้างชื่อหลังนำเข้า (เจ้าของ 12 พ.ย. 2569) — คีย์ = id ใบสมัคร */
-  const [attached, setAttached] = useState<Record<string, AttachState>>({});
+  /**
+   * ไฟล์แนบรายคน — คีย์ = เลขแถวใน Excel (เจ้าของ 12 พ.ย. 2569 "พอนำเข้าปุ้บ ขึ้นตรวจสอบแล้วแนบทีละคน")
+   * เลือกได้ตั้งแต่ตารางตรวจสอบ (ยังไม่มีใบ = ถือไฟล์ไว้ในเครื่อง) · กดนำเข้าแล้วแนบให้ทีละคนเอง · หลังนำเข้าเปลี่ยน/เติมได้
+   */
+  const [attached, setAttached] = useState<Record<number, AttachState>>({});
+  const pendingFiles = useRef<Record<number, File>>({});
 
   useEffect(() => {
     if (!open) return;
     setShowDupes(false);
     setAttached({});
+    pendingFiles.current = {};
     setConsent(false);
     setResponsible(NO_STAFF);
     setChannel(null);
@@ -104,6 +111,8 @@ const ImportApplicantsDialog: React.FC<{
   const pickFile = async (f: File | null) => {
     setError(null);
     setPreview(null);
+    setAttached({});
+    pendingFiles.current = {};
     setFileName(f?.name ?? null);
     setFileBase64(null);
     if (!f) return;
@@ -125,15 +134,26 @@ const ImportApplicantsDialog: React.FC<{
     }
   };
 
-  const attach = async (id: string, f: File | null) => {
-    if (!f) return;
-    setAttached((a) => ({ ...a, [id]: { state: 'busy' } }));
+  const upload = async (row: number, id: string, f: File) => {
+    setAttached((a) => ({ ...a, [row]: { state: 'busy' } }));
     try {
       const name = await attachApplicationDocument(id, f);
-      setAttached((a) => ({ ...a, [id]: { state: 'done', name } }));
+      delete pendingFiles.current[row];
+      setAttached((a) => ({ ...a, [row]: { state: 'done', name } }));
     } catch (e) {
-      setAttached((a) => ({ ...a, [id]: { state: 'error', message: e instanceof Error ? e.message : 'แนบไฟล์ไม่สำเร็จ' } }));
+      setAttached((a) => ({ ...a, [row]: { state: 'error', message: e instanceof Error ? e.message : 'แนบไฟล์ไม่สำเร็จ' } }));
     }
+  };
+
+  /** ก่อนนำเข้า = ถือไฟล์ไว้ · นำเข้าแล้ว = อัปโหลดเลย */
+  const attach = (row: number, f: File | null) => {
+    if (!f) return;
+    const bad = applicationDocumentProblem(f);
+    if (bad) return setAttached((a) => ({ ...a, [row]: { state: 'error', message: bad } }));
+    const id = saved ? preview?.rows.find((r) => r.row === row)?.id : undefined;
+    if (id) return void upload(row, id, f);
+    pendingFiles.current[row] = f;
+    setAttached((a) => ({ ...a, [row]: { state: 'picked', name: f.name } }));
   };
 
   const save = async () => {
@@ -149,6 +169,13 @@ const ImportApplicantsDialog: React.FC<{
       });
       setPreview(result);
       onSaved(result.inserted ?? 0);
+      // แนบไฟล์ที่เลือกไว้ทีละคน (แถวที่ถูกข้ามตอนบันทึก = ไม่มีใบ ไฟล์ไม่ถูกส่ง)
+      for (const r of result.rows) {
+        const f = pendingFiles.current[r.row];
+        if (!f) continue;
+        if (r.id) await upload(r.row, r.id, f);
+        else setAttached((a) => ({ ...a, [r.row]: { state: 'error', message: 'ไม่ได้นำเข้า ไฟล์ไม่ถูกแนบ' } }));
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'นำเข้าไม่สำเร็จ');
     } finally {
@@ -406,8 +433,10 @@ const ImportApplicantsDialog: React.FC<{
                         {r.ok ? (saved ? 'นำเข้าแล้ว' : 'พร้อมนำเข้า') : r.reason}
                       </TableCell>
                       <TableCell className="px-3 py-2">
-                        {saved && r.id ? (
-                          <AttachCell state={attached[r.id]} onPick={(f) => void attach(r.id!, f)} />
+                        {r.ok && (!saved || r.id) ? (
+                          <AttachCell state={attached[r.row]} disabled={busy === 'saving'} onPick={(f) => attach(r.row, f)} />
+                        ) : attached[r.row]?.state === 'error' ? (
+                          <span className={TONE.danger.value}>{(attached[r.row] as { message: string }).message}</span>
                         ) : (
                           <span className="text-muted-foreground">—</span>
                         )}
@@ -464,10 +493,15 @@ const ImportApplicantsDialog: React.FC<{
   );
 };
 
-type AttachState = { state: 'busy' } | { state: 'done'; name: string } | { state: 'error'; message: string };
+type AttachState =
+  | { state: 'picked'; name: string }
+  | { state: 'busy' }
+  | { state: 'done'; name: string }
+  | { state: 'error'; message: string };
 
-/** ช่องแนบไฟล์ของหนึ่งแถว — PDF/JPG/PNG · แนบแล้วขึ้นชื่อไฟล์ กดเปลี่ยนได้ */
-function AttachCell({ state, onPick }: { state: AttachState | undefined; onPick: (f: File | null) => void }) {
+/** ช่องแนบไฟล์ของหนึ่งแถว — PDF/JPG/PNG · เลือกแล้ว/แนบแล้วขึ้นชื่อไฟล์ กดเปลี่ยนได้ */
+function AttachCell({ state, onPick, disabled }: { state: AttachState | undefined; onPick: (f: File | null) => void; disabled?: boolean }) {
+  const name = state?.state === 'picked' || state?.state === 'done' ? state.name : null;
   const input = useRef<HTMLInputElement>(null);
   return (
     <div className="flex min-w-40 flex-wrap items-center gap-2">
@@ -481,10 +515,14 @@ function AttachCell({ state, onPick }: { state: AttachState | undefined; onPick:
           e.target.value = '';
         }}
       />
-      {state?.state === 'done' ? <span className={cn('max-w-40 truncate', TONE.success.value)}>{state.name}</span> : null}
-      <Button type="button" size="xs" variant="outline" disabled={state?.state === 'busy'} onClick={() => input.current?.click()}>
+      {name ? (
+        <span className={cn('max-w-40 truncate', state?.state === 'done' ? TONE.success.value : 'text-foreground')} title={name}>
+          {name}
+        </span>
+      ) : null}
+      <Button type="button" size="xs" variant="outline" disabled={disabled || state?.state === 'busy'} onClick={() => input.current?.click()}>
         {state?.state === 'busy' ? <LoaderCircle className="animate-spin" aria-hidden /> : <Paperclip aria-hidden />}
-        {state?.state === 'done' ? 'เปลี่ยน' : 'เลือกไฟล์'}
+        {name ? 'เปลี่ยน' : 'เลือกไฟล์'}
       </Button>
       {state?.state === 'error' ? <span className={TONE.danger.value}>{state.message}</span> : null}
     </div>
