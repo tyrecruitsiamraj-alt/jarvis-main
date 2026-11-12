@@ -8,7 +8,7 @@
  * ไม่ได้ตั้งงานไหน = ใช้ Ollama จากไฟล์ตั้งค่าเซิร์ฟเวอร์ (`OLLAMA_BASE_URL`/`OLLAMA_MODEL`) แบบเดิม — ทางถอย
  */
 
-export const AI_TASKS = ['board_match', 'irecruit_match', 'recruit_lane', 'selection_recall', 'candidate_spec'] as const;
+export const AI_TASKS = ['board_match', 'irecruit_match', 'recruit_lane', 'selection_recall', 'candidate_spec', 'skill_report'] as const;
 export type AiTask = (typeof AI_TASKS)[number];
 
 /** ชื่องานบนจอ — คำเดียวกับที่ทีมเรียก */
@@ -18,6 +18,7 @@ export const AI_TASK_LABEL: Record<AiTask, string> = {
   recruit_lane: 'เลนสรรหา (หาคนจากกองสมัคร)',
   selection_recall: 'ชวนกลับคนที่เคยปฏิเสธ',
   candidate_spec: 'อ่านสเปคใบขอ',
+  skill_report: 'วิเคราะห์ผลแบบทดสอบพนักงาน',
 };
 
 export const AI_PROVIDER_KINDS = ['ollama', 'openai', 'anthropic'] as const;

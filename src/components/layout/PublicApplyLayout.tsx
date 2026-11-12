@@ -9,7 +9,8 @@ import ThemeToggleButton from '@/components/layout/ThemeToggleButton';
 /**
  * เลย์เอาต์สำหรับผู้สมัครงานเท่านั้น — ไม่มีเมนูเข้าระบบภายใน
  */
-const PublicApplyLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+/** `kicker` = คำเล็กเหนือชื่อแบรนด์ · `hideFooter` = ไม่โชว์บรรทัดท้ายเรื่องตำแหน่งงาน (หน้าแบบทดสอบพนักงาน 12 พ.ย. 2569) */
+const PublicApplyLayout: React.FC<{ children: React.ReactNode; kicker?: string; hideFooter?: boolean }> = ({ children, kicker = 'รับสมัครงาน', hideFooter = false }) => {
   const { config } = useBranding();
   const shellBg = getAppShellBackgroundStyle(config);
   /**
@@ -38,7 +39,7 @@ const PublicApplyLayout: React.FC<{ children: React.ReactNode }> = ({ children }
             <BrandMark size="md" className="hidden md:flex" />
             <div className="min-w-0">
               <p className="text-[10px] md:text-xs font-medium uppercase text-muted-foreground">
-                รับสมัครงาน
+                {kicker}
               </p>
               <BrandTitle className="truncate text-base md:text-lg font-medium text-foreground tracking-tight" />
             </div>
@@ -50,12 +51,14 @@ const PublicApplyLayout: React.FC<{ children: React.ReactNode }> = ({ children }
 
       <div className="flex-1 relative z-10">{children}</div>
 
+      {hideFooter ? null : (
       <footer className="relative z-10 border-t border-border bg-background/90 py-6 text-center text-xs text-muted-foreground">
         <p className="px-4">
           {/* QA 17 ต.ค. 2569: เดิมบอกให้ "ใช้ช่องทางสมัครที่ระบุ" ซึ่งไม่มีบนหน้า */}
           ข้อมูลตำแหน่งงานตามที่บริษัทประกาศ
         </p>
       </footer>
+      )}
     </div>
   );
 };

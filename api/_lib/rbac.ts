@@ -79,7 +79,8 @@ export type ApiResource =
   | 'recruit-channels'
   | 'recruit-reasons'
   | 'recruit-job-titles'
-  | 'recruit-postings';
+  | 'recruit-postings'
+  | 'skill-quiz';
 
 /**
  * Minimum role per API resource and HTTP method.
@@ -251,6 +252,10 @@ export function minimumRoleFor(
 
     case 'job-applications':
       // recruiter pipeline: staff read applicants and update their status/note
+      return 'staff';
+
+    case 'skill-quiz':
+      // แบบทดสอบพนักงาน (12 พ.ย. 2569) — เจ้าหน้าที่ทุกคนสร้างชุด/ลิงก์/ตรวจผลได้
       return 'staff';
 
     default:

@@ -57,7 +57,7 @@ describe('ตรวจค่าที่กรอก', () => {
     expect(parseAiRoutesInput({ routes: [{ task: 'board_match', connection_id: '', model: ' ' }] }).value).toEqual([
       { task: 'board_match', connection_id: null, model: null },
     ]);
-    expect(AI_TASKS).toHaveLength(5);
+    expect(AI_TASKS).toHaveLength(6);
   });
   it('key โชว์แค่ 4 ตัวท้าย · สั้นกว่า 8 ไม่โชว์', () => {
     expect(aiKeyHint('sk-abcdefgh1234')).toBe('1234');

@@ -181,7 +181,7 @@ export function drawFollowDayReport(
 }
 
 /** canvas → ดาวน์โหลดไฟล์ PNG · `false` = เซฟไม่ได้ */
-function downloadCanvas(canvas: HTMLCanvasElement, filename: string): Promise<boolean> {
+export function downloadCanvas(canvas: HTMLCanvasElement, filename: string): Promise<boolean> {
   return new Promise<boolean>((resolve) => {
     try {
       canvas.toBlob((blob) => {

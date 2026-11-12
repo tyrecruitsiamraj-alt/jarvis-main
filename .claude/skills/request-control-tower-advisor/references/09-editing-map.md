@@ -985,6 +985,17 @@ Lumos ส่งกลับได้จริง (funnel นับผลขอ�
 (แถวก่อน migration 070 ไม่มี `last_outcome` ถ้าไม่ถอยไปอ่าน `result` จะเห็น
 "มีผลกลับ แต่โทรติด 0" ซึ่งดูเหมือนพัง)
 
+## แบบทดสอบพนักงาน + รายงานส่งลูกค้า (12 พ.ย. 2569)
+
+เจ้าของสั่ง: สร้างข้อสอบ ส่งลิงก์ละคนให้พนักงานทำ สรุปคะแนน + AI ร่างบทวิเคราะห์ เจ้าหน้าที่แก้ แล้วโหลดรูปส่งลูกค้า
+- ตัวตัดสินคะแนน/เกรด/สถานะ/ตรวจฟอร์ม/ตัดเฉลย: `src/lib/skillQuiz.ts` ที่เดียว (เทสต์ `tests/api/skillQuiz2569-11-12.test.ts`)
+  รายทักษะ = ได้ ÷ เต็มของทักษะ · รวม = ได้ ÷ เต็มทั้งชุด · เขียนตอบยังไม่ให้คะแนน = null ห้ามนับ 0 · เกรด A85 B70 C60 D
+- ฐาน: migration 176 (`skill_quiz_sets` · `skill_quiz_attempts` · `skill_quiz_doc_seq`) · ลิงก์เก็บสำเนาชุดตอนสร้าง · ลบ = archived_at
+- server: `api/_lib/skillQuiz.ts` · เส้น `/api/skill-quiz` (staff · resource `skill-quiz`) · `/api/public/skill-quiz` (ไม่ล็อกอิน · ส่งได้ครั้งเดียว)
+- AI: งาน `skill_report` ใน `src/lib/aiSettings.ts` (เลือกเจ้าได้ที่ ตั้งค่า › AI ที่ใช้คิดงาน) · prompt ไม่มีชื่อพนักงาน
+- จอ: `src/pages/skill-quiz/SkillQuizPage.tsx` (`/skill-test` เมนูคลังข้อมูล) · `src/components/skill-quiz/*` · พนักงาน `src/pages/public/PublicSkillQuizPage.tsx` (`/quiz/:token`)
+- รูป PNG: `src/lib/skillQuizReportImage.ts` (canvas พื้นขาว สีจาก designTokens)
+
 ## การ implement อย่างปลอดภัย / feature flag
 
 แก้เอกสาร:

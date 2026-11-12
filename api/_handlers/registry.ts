@@ -38,6 +38,8 @@ import publicApplyLinkHandler from './public/apply-link.js';
 import publicChannelsHandler from './public/channels.js';
 import publicClickHandler from './public/click.js';
 import publicPrivacyRequestHandler from './public/privacy-request.js';
+import publicSkillQuizHandler from './public/skill-quiz.js';
+import skillQuizHandler from './skill-quiz.js';
 import pdpaRequestsHandler from './pdpa-requests.js';
 import publicClickStatsHandler from './public-click-stats.js';
 import recruitChannelsHandler from './recruit-channels.js';
@@ -242,6 +244,9 @@ export const apiRoutes: Record<string, ApiHandler> = {
   '/api/public/click': publicClickHandler as ApiHandler,
   // คำขอใช้สิทธิ์ PDPA — ผู้สมัครยื่นเอง (ไม่ต้องล็อกอิน · 18 ต.ค. 2569) · ฝั่งเจ้าหน้าที่ /api/pdpa-requests (admin)
   '/api/public/privacy-request': publicPrivacyRequestHandler as ApiHandler,
+  // แบบทดสอบพนักงาน (12 พ.ย. 2569) — ลิงก์ละคนไม่ต้องล็อกอิน · หน้าเจ้าหน้าที่ใช้สิทธิ์ staff
+  '/api/public/skill-quiz': publicSkillQuizHandler as ApiHandler,
+  '/api/skill-quiz': skillQuizHandler as ApiHandler,
   '/api/pdpa-requests': pdpaRequestsHandler as ApiHandler,
   '/api/public-click-stats': publicClickStatsHandler as ApiHandler,
   '/api/recruit/channels': recruitChannelsHandler as ApiHandler,

@@ -24,6 +24,7 @@ import {
   House,
   LayoutGrid,
   CalendarDays,
+  ClipboardCheck,
   ClipboardList,
   Megaphone,
   PhoneCall,
@@ -199,6 +200,18 @@ export const CONVEYOR_VAULT: VaultItem[] = [
    *   match: ['/wl'],
    * },
    */
+  /**
+   * 🔴 **แบบทดสอบพนักงาน** (เจ้าของสั่ง 12 พ.ย. 2569) — สร้างชุดข้อสอบ ส่งลิงก์ละคน ตรวจผลแล้วโหลดรูปส่งลูกค้า
+   * ไม่ใช่ขั้นของงานสรรหา จึงอยู่คลังข้อมูล · พนักงานทำที่ `/quiz/:token` (ไม่ต้องล็อกอิน)
+   */
+  {
+    key: 'skill-test',
+    label: 'แบบทดสอบพนักงาน',
+    blurb: 'สร้างข้อสอบ ส่งลิงก์ให้พนักงานทำ แล้วโหลดผลเป็นรูปส่งลูกค้า',
+    path: '/skill-test',
+    icon: ClipboardCheck,
+    match: ['/skill-test'],
+  },
   {
     key: 'dashboard',
     label: 'Dashboard',
