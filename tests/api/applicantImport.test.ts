@@ -138,7 +138,8 @@ describe('แผนต่อแถว', () => {
       (p) => `+66${p.slice(1)}`,
     );
     expect(toPreviewRows(marked)).toEqual([
-      { row: 2, name: 'สมชาย ใจดี', phone: '0812345678', ok: true, reason: null },
+      // แยกช่องชื่อ/นามสกุล/เพศ/อายุ/ที่อยู่ให้ตารางในป๊อป (12 พ.ย. 2569) · แถวที่ข้ามไม่มี
+      { row: 2, name: 'สมชาย ใจดี', phone: '0812345678', ok: true, reason: null, firstName: 'สมชาย', lastName: 'ใจดี', gender: 'male', age: 33, address: null },
       { row: 3, name: 'สมหญิง ใจดี', phone: '0812345678', ok: false, reason: 'เบอร์ซ้ำกับแถว 2 ในไฟล์' },
       { row: 4, name: 'สมชาย ใจดี', phone: '0822222222', ok: false, reason: 'สมัครเข้ามาแล้วภายใน 14 วัน (ได้ตั้งแต่ 9/10/2569)' },
     ]);

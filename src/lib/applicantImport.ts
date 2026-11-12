@@ -221,14 +221,40 @@ export function markBlockedPhones(
 }
 
 /** ผลที่ส่งกลับหน้าเว็บ (ตัวอย่างก่อนบันทึก / ผลหลังบันทึก) */
-/** `id` = ใบที่บันทึกแล้ว (บันทึกจริงเท่านั้น) — ใช้แนบไฟล์ข้างชื่อหลังนำเข้า (เจ้าของ 12 พ.ย. 2569) */
-export type ImportPreviewRow = { row: number; name: string; phone: string; ok: boolean; reason: string | null; id?: string };
+/**
+ * แถวในตารางป๊อปนำเข้า · `id` = ใบที่บันทึกแล้ว (บันทึกจริงเท่านั้น) ใช้แนบไฟล์ข้างชื่อ
+ * ชื่อ/นามสกุล/เพศ/อายุ/ที่อยู่ แยกช่อง (เจ้าของ 12 พ.ย. 2569 จัดตาราง) · แถวที่ข้าม = มีแค่ชื่อเต็ม + เบอร์ + เหตุ
+ */
+export type ImportPreviewRow = {
+  row: number;
+  name: string;
+  phone: string;
+  ok: boolean;
+  reason: string | null;
+  id?: string;
+  firstName?: string;
+  lastName?: string;
+  gender?: 'male' | 'female' | null;
+  age?: number | null;
+  address?: string | null;
+};
 
 export function toPreviewRows(plans: readonly ImportRowPlan[]): ImportPreviewRow[] {
   // narrow ด้วย `in` — tsconfig ฝั่งหน้าเว็บไม่ strict (narrow ด้วย ok: true/false ไม่ได้)
   return plans.map((p) =>
     'value' in p
-      ? { row: p.row, name: p.value.full_name, phone: p.value.phone, ok: true, reason: null }
+      ? {
+          row: p.row,
+          name: p.value.full_name,
+          phone: p.value.phone,
+          ok: true,
+          reason: null,
+          firstName: p.value.first_name,
+          lastName: p.value.last_name,
+          gender: p.value.gender,
+          age: p.value.age,
+          address: [p.value.district, p.value.province].filter(Boolean).join(' ') || null,
+        }
       : { row: p.row, name: p.name, phone: p.phone, ok: false, reason: p.reason },
   );
 }

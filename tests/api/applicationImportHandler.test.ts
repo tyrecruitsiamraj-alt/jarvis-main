@@ -126,7 +126,7 @@ describe('POST — ตัวอย่างก่อนบันทึก / บ�
     expect(json.mock.calls[0][0]).toEqual({
       dryRun: true,
       rows: [
-        { row: 2, name: 'สมชาย ใจดี', phone: '0812345678', ok: true, reason: null },
+        { row: 2, name: 'สมชาย ใจดี', phone: '0812345678', ok: true, reason: null, firstName: 'สมชาย', lastName: 'ใจดี', gender: 'male', age: 33, address: null },
         { row: 3, name: 'สมหญิง ใจดี', phone: '0822222222', ok: false, reason: repeatImportReason(LAST) },
       ],
       ready: 1,

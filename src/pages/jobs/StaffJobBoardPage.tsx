@@ -207,6 +207,7 @@ const StaffJobBoardPage: React.FC = () => {
                 id: importJob.id,
                 title: publicJobPositionLabel(importJob),
                 unitName: importJob.unit_name,
+                recruiterName: importJob.recruiter_name ?? null,
                 label: `${jobBoardCardTitle(importJob)} · ${publicJobPositionLabel(importJob)}`,
               }
             : null

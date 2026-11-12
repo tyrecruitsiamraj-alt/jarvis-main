@@ -4,7 +4,9 @@
    Instrument Sans (หน้าเข้าสู่ระบบ) ⇒ หน้าจอมีสามหน้าตาปนกัน + โหลดช้าโดยไม่จำเป็น
    ⚠️ ตัดสองตัวหลังออก · `font-mono` ถูก map ไป Kanit ที่ tailwind.config.ts แล้ว
    ตัวเลขยังเรียงตรงกันด้วย `tabular-nums` (Kanit มีชุดตัวเลขความกว้างเท่ากัน) */
-@import url('https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&display=swap');
+/* 🔴 หนาสุด = SemiBold 600 (เจ้าของ 12 พ.ย. 2569 "เอาขนาดไม่หนามากเป็นแค่ Semi พอ") — ไม่โหลด 700
+   ⇒ <b>/<strong>/bold ทุกที่แสดงเป็น 600 เอง (เบราว์เซอร์เลือกน้ำหนักที่ใกล้สุดที่มี) */
+@import url('https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;

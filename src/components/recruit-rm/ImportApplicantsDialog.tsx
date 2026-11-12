@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import {
   Dialog,
   DialogContent,
@@ -44,6 +45,8 @@ import {
  * ใบยังไม่ตั้งรายได้ = บอกก่อนกดว่า AI ยังไม่โทร (นำเข้าได้ ส่งทีหลังได้)
  */
 const NO_STAFF = '__none__';
+const IMPORT_TABLE_HEADS = ['แถว', 'ชื่อ', 'นามสกุล', 'เบอร์โทร', 'ที่อยู่', 'หน่วยงาน', 'เจ้าหน้าที่สรรหา', 'เพศ', 'อายุ', 'วันที่สมัคร', 'ผล', 'ไฟล์แนบ'];
+const GENDER_TH = { male: 'ชาย', female: 'หญิง' } as const;
 
 const ImportApplicantsDialog: React.FC<{
   open: boolean;
@@ -51,7 +54,7 @@ const ImportApplicantsDialog: React.FC<{
   /** บันทึกแล้ว — หน้าแม่โหลดรายชื่อใหม่ + ขึ้นข้อความ */
   onSaved: (inserted: number) => void;
   /** นำเข้าตามกล่อง — ผูกใบขอนี้ + ส่ง AI โทรเลย · ไม่ส่ง = นำเข้าแบบเดิม (AI ยังไม่โทร) */
-  job?: { id: string; title?: string | null; unitName?: string | null; label?: string | null } | null;
+  job?: { id: string; title?: string | null; unitName?: string | null; recruiterName?: string | null; label?: string | null } | null;
 }> = ({ open, onClose, onSaved, job = null }) => {
   const [staff, setStaff] = useState<Array<{ id: string; name: string; label?: string }>>([]);
   const [responsible, setResponsible] = useState(NO_STAFF);
@@ -154,6 +157,8 @@ const ImportApplicantsDialog: React.FC<{
   };
 
   const saved = preview !== null && !preview.dryRun;
+  /** วันที่สมัคร = วันที่นำเข้า (ใบบันทึกวันนี้) */
+  const today = new Date().toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit', timeZone: 'Asia/Bangkok' });
   const ready = preview?.dryRun ? (preview.ready ?? 0) : 0;
   const rows = preview?.rows ?? [];
   const dupes = preview?.duplicates ?? [];
@@ -164,7 +169,7 @@ const ImportApplicantsDialog: React.FC<{
 
   return (
     <Dialog open={open} onOpenChange={(o) => (!o && busy !== 'saving' ? onClose() : undefined)}>
-      <DialogContent className="max-h-[88vh] max-w-3xl overflow-y-auto">
+      <DialogContent className="max-h-[88vh] max-w-6xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{job ? 'นำเข้า Excel แล้วส่ง AI โทร' : 'นำเข้าผู้สมัครจาก Excel'}</DialogTitle>
           {job ? (
@@ -361,50 +366,56 @@ const ImportApplicantsDialog: React.FC<{
               </ul>
             ) : null}
 
+            {/* ตารางเรียงตามที่เจ้าของสั่ง 12 พ.ย. 2569: ชื่อ นามสกุล เบอร์ ที่อยู่ หน่วยงาน เจ้าหน้าที่สรรหา เพศ อายุ วันที่สมัคร ไฟล์ */}
             <div className="overflow-x-auto rounded-xl border border-border/70">
-              <table className="min-w-full border-collapse text-left" aria-label="ตัวอย่างก่อนนำเข้า">
-                <thead>
-                  <tr className={cn('border-b border-border', DASH.tableHead)}>
-                    <th className="px-3 py-2 text-[11px] font-medium">แถว</th>
-                    <th className="px-3 py-2 text-[11px] font-medium">ชื่อ</th>
-                    <th className="px-3 py-2 text-[11px] font-medium">เบอร์โทร</th>
-                    <th className="px-3 py-2 text-[11px] font-medium">ผล</th>
-                    <th className="px-3 py-2 text-[11px] font-medium">ไฟล์แนบ</th>
-                  </tr>
-                </thead>
-                <tbody data-testid="import-rows">
+              <Table aria-label="ตัวอย่างก่อนนำเข้า" className="text-xs">
+                <TableHeader>
+                  <TableRow className={DASH.tableHead}>
+                    {IMPORT_TABLE_HEADS.map((h) => (
+                      <TableHead key={h} className="h-9 whitespace-nowrap px-3 text-xs font-medium">
+                        {h}
+                      </TableHead>
+                    ))}
+                  </TableRow>
+                </TableHeader>
+                <TableBody data-testid="import-rows">
                   {rows.length === 0 ? (
-                    <tr>
-                      <td colSpan={5} className="px-3 py-6 text-center text-xs text-muted-foreground">
+                    <TableRow>
+                      <TableCell colSpan={IMPORT_TABLE_HEADS.length} className="px-3 py-6 text-center text-muted-foreground">
                         {fileName
                           ? busy === 'reading'
                             ? 'กำลังอ่านไฟล์'
                             : 'ไม่มีแถวข้อมูลในไฟล์'
                           : 'ยังไม่ได้เลือกไฟล์'}
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   ) : null}
                   {rows.map((r) => (
-                    <tr key={r.row} className="border-b border-border/50 last:border-0">
-                      <td className="px-3 py-2 text-xs tabular-nums text-muted-foreground">{r.row}</td>
-                      <td className="whitespace-nowrap px-3 py-2 text-xs text-foreground">{r.name || '—'}</td>
-                      <td className="px-3 py-2 text-xs tabular-nums text-foreground">{r.phone || '—'}</td>
-                      <td
-                        className={cn('px-3 py-2 text-xs font-medium', r.ok ? TONE.success.value : TONE.danger.value)}
-                      >
+                    <TableRow key={r.row}>
+                      <TableCell className="px-3 py-2 tabular-nums text-muted-foreground">{r.row}</TableCell>
+                      <TableCell className="whitespace-nowrap px-3 py-2">{r.firstName ?? (r.name || '—')}</TableCell>
+                      <TableCell className="whitespace-nowrap px-3 py-2">{r.lastName || '—'}</TableCell>
+                      <TableCell className="whitespace-nowrap px-3 py-2 tabular-nums">{r.phone || '—'}</TableCell>
+                      <TableCell className="min-w-32 px-3 py-2">{r.address || '—'}</TableCell>
+                      <TableCell className="min-w-32 px-3 py-2">{(r.ok && job?.unitName) || '—'}</TableCell>
+                      <TableCell className="whitespace-nowrap px-3 py-2">{(r.ok && job?.recruiterName) || '—'}</TableCell>
+                      <TableCell className="whitespace-nowrap px-3 py-2">{r.gender ? GENDER_TH[r.gender] : '—'}</TableCell>
+                      <TableCell className="px-3 py-2 tabular-nums">{r.age ?? '—'}</TableCell>
+                      <TableCell className="whitespace-nowrap px-3 py-2 tabular-nums">{r.ok ? today : '—'}</TableCell>
+                      <TableCell className={cn('min-w-28 px-3 py-2 font-medium', r.ok ? TONE.success.value : TONE.danger.value)}>
                         {r.ok ? (saved ? 'นำเข้าแล้ว' : 'พร้อมนำเข้า') : r.reason}
-                      </td>
-                      <td className="px-3 py-2 text-xs">
+                      </TableCell>
+                      <TableCell className="px-3 py-2">
                         {saved && r.id ? (
                           <AttachCell state={attached[r.id]} onPick={(f) => void attach(r.id!, f)} />
                         ) : (
                           <span className="text-muted-foreground">—</span>
                         )}
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   ))}
-                </tbody>
-              </table>
+                </TableBody>
+              </Table>
             </div>
 
             {error ? (
