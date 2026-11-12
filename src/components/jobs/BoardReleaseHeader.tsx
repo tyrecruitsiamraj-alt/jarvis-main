@@ -51,9 +51,9 @@ const th = (n: number) => n.toLocaleString('th-TH');
 
 /**
  * แถบเดียว 7 ช่อง (เจ้าของ 11 พ.ย. 2569 แบบ C "บอกด้วยว่ายังไม่ประกาศเท่าไหร่ ประกาศแล้วเท่าไหร่ มี 7 ช่อง") —
- * ช่องคั่นด้วยเส้น 1px (`gap-px` บนพื้นเส้น) · จอแคบตัดเป็น 2/4 ช่องต่อแถว · ใช้ทั้งตอนโหลดและตอนมีเลข ⇒ หน้าไม่กระโดด
+ * ช่องคั่นด้วยเส้น 1px (`gap-px` บนพื้นเส้น) · มือถือ 2 ช่องต่อแถว ช่องแรกเต็มแถว (7 ช่องไม่เหลือที่ว่างเทา) · ใช้ทั้งตอนโหลดและตอนมีเลข ⇒ หน้าไม่กระโดด
  */
-const LANE_GRID = 'grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-border bg-border sm:grid-cols-4 lg:grid-cols-7';
+const LANE_GRID = 'grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-border bg-border sm:grid-cols-7 [&>*:first-child]:col-span-2 sm:[&>*:first-child]:col-span-1';
 /** ลำดับช่องซ้ายไปขวา: ทั้งหมด · ประกาศแล้ว (มีคนกรอก · ยังไม่มีคนกรอก) · ยังไม่ประกาศ (ยังต้องหาคน · เริ่มงานแล้ว) */
 const CELL_ORDER = ['all', 'released', 'applied', 'silent', 'unreleased', 'sourcing', 'started'] as const;
 

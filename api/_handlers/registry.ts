@@ -57,6 +57,7 @@ import applicationAttendanceHandler from './application-attendance.js';
 import recruitRmOverviewHandler from './recruit-rm-overview.js';
 import recruitOverviewHandler from './recruit-overview.js';
 import recruitStuckHandler from './recruit-stuck.js';
+import soPostGroupsHandler from './so-post-groups.js';
 import requestPipelineHandler from './request-pipeline.js';
 import { soScrapingAiCallHandler, soScrapingLeadsHandler } from './so-scraping-integration.js';
 import integrationKeysHandler from './integration-keys.js';
@@ -256,6 +257,7 @@ export const apiRoutes: Record<string, ApiHandler> = {
   '/api/recruit-rm-overview': recruitRmOverviewHandler as ApiHandler,
   '/api/recruit-overview': recruitOverviewHandler as ApiHandler,
   '/api/recruit-stuck': recruitStuckHandler as ApiHandler,
+  '/api/so-post-groups': soPostGroupsHandler as ApiHandler,
   '/api/request-pipeline': requestPipelineHandler as ApiHandler,
   '/api/integrations/so-scraping/leads': soScrapingLeadsHandler as ApiHandler,
   '/api/integrations/so-scraping/ai-call': soScrapingAiCallHandler as ApiHandler,

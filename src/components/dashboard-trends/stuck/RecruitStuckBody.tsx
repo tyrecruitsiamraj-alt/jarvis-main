@@ -17,6 +17,7 @@ import { OverviewCard, ReasonColumns, SectionError } from '../RecruitOverviewPar
 import ChannelFunnelTable from '../ChannelFunnelTable';
 import { buildFbGroupClickRows, mergeFbGroupClicks } from '@/lib/fbGroupClicks';
 import StuckFilterBar from './StuckFilterBar';
+import SoPostGroupsCard from './SoPostGroupsCard';
 import StuckPhasesCard from './StuckPhasesCard';
 import StuckOwnerTable from './StuckOwnerTable';
 import StuckAreaTable from './StuckAreaTable';
@@ -208,6 +209,8 @@ export default function RecruitStuckBody({
         </OverviewCard>
         {bringerCard}
         {channelCard}
+        {/* 5. โพสต์ลงกลุ่ม Facebook จาก So Scraping (เจ้าของ 11 พ.ย. 2569) — ช่วง/BU ตามภาพรวม ไม่ตามตัวกรองย่อย (ข้อมูลอยู่ฝั่ง So Scraping) */}
+        <SoPostGroupsCard from={win.from} to={win.to} bu={data.bu} />
         {stuck.data?.requests ? (
           <StuckAreaTable rows={focused} title={scope === 'remaining' ? undefined : `พื้นที่ · ใบ${STUCK_SCOPE_LABEL[scope]}`} countLabel={scope === 'remaining' ? undefined : `ใบ${STUCK_SCOPE_LABEL[scope]}`} onPick={pick} />
         ) : null}
