@@ -221,7 +221,8 @@ export function markBlockedPhones(
 }
 
 /** ผลที่ส่งกลับหน้าเว็บ (ตัวอย่างก่อนบันทึก / ผลหลังบันทึก) */
-export type ImportPreviewRow = { row: number; name: string; phone: string; ok: boolean; reason: string | null };
+/** `id` = ใบที่บันทึกแล้ว (บันทึกจริงเท่านั้น) — ใช้แนบไฟล์ข้างชื่อหลังนำเข้า (เจ้าของ 12 พ.ย. 2569) */
+export type ImportPreviewRow = { row: number; name: string; phone: string; ok: boolean; reason: string | null; id?: string };
 
 export function toPreviewRows(plans: readonly ImportRowPlan[]): ImportPreviewRow[] {
   // narrow ด้วย `in` — tsconfig ฝั่งหน้าเว็บไม่ strict (narrow ด้วย ok: true/false ไม่ได้)

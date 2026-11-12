@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { ArrowLeft, Bot, FileDown, LoaderCircle, Upload, Users } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { ArrowLeft, Bot, FileDown, LoaderCircle, Paperclip, Upload, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -20,6 +20,7 @@ import { DASH, TONE } from '@/lib/designTokens';
 import { recruitChannelLabel, type RecruitChannelMatch } from '@/lib/recruitPostings';
 import { importDateTh, importStatusLabel } from '@/lib/applicantImportDuplicates';
 import {
+  attachApplicationDocument,
   downloadApplicationImportTemplate,
   downloadImportDuplicates,
   fetchResponsibleNames,
@@ -64,10 +65,13 @@ const ImportApplicantsDialog: React.FC<{
   const [showDupes, setShowDupes] = useState(false);
   /** PDPA (15 ต.ค. 2569) — ยืนยันว่าผู้สมัครในไฟล์ยินยอมแล้วก่อนนำเข้า */
   const [consent, setConsent] = useState(false);
+  /** ไฟล์แนบข้างชื่อหลังนำเข้า (เจ้าของ 12 พ.ย. 2569) — คีย์ = id ใบสมัคร */
+  const [attached, setAttached] = useState<Record<string, AttachState>>({});
 
   useEffect(() => {
     if (!open) return;
     setShowDupes(false);
+    setAttached({});
     setConsent(false);
     setResponsible(NO_STAFF);
     setChannel(null);
@@ -115,6 +119,17 @@ const ImportApplicantsDialog: React.FC<{
       setError(e instanceof Error ? e.message : 'อ่านไฟล์ไม่สำเร็จ');
     } finally {
       setBusy(null);
+    }
+  };
+
+  const attach = async (id: string, f: File | null) => {
+    if (!f) return;
+    setAttached((a) => ({ ...a, [id]: { state: 'busy' } }));
+    try {
+      const name = await attachApplicationDocument(id, f);
+      setAttached((a) => ({ ...a, [id]: { state: 'done', name } }));
+    } catch (e) {
+      setAttached((a) => ({ ...a, [id]: { state: 'error', message: e instanceof Error ? e.message : 'แนบไฟล์ไม่สำเร็จ' } }));
     }
   };
 
@@ -354,12 +369,13 @@ const ImportApplicantsDialog: React.FC<{
                     <th className="px-3 py-2 text-[11px] font-medium">ชื่อ</th>
                     <th className="px-3 py-2 text-[11px] font-medium">เบอร์โทร</th>
                     <th className="px-3 py-2 text-[11px] font-medium">ผล</th>
+                    <th className="px-3 py-2 text-[11px] font-medium">ไฟล์แนบ</th>
                   </tr>
                 </thead>
                 <tbody data-testid="import-rows">
                   {rows.length === 0 ? (
                     <tr>
-                      <td colSpan={4} className="px-3 py-6 text-center text-xs text-muted-foreground">
+                      <td colSpan={5} className="px-3 py-6 text-center text-xs text-muted-foreground">
                         {fileName
                           ? busy === 'reading'
                             ? 'กำลังอ่านไฟล์'
@@ -371,12 +387,19 @@ const ImportApplicantsDialog: React.FC<{
                   {rows.map((r) => (
                     <tr key={r.row} className="border-b border-border/50 last:border-0">
                       <td className="px-3 py-2 text-xs tabular-nums text-muted-foreground">{r.row}</td>
-                      <td className="px-3 py-2 text-xs text-foreground">{r.name || '—'}</td>
+                      <td className="whitespace-nowrap px-3 py-2 text-xs text-foreground">{r.name || '—'}</td>
                       <td className="px-3 py-2 text-xs tabular-nums text-foreground">{r.phone || '—'}</td>
                       <td
                         className={cn('px-3 py-2 text-xs font-medium', r.ok ? TONE.success.value : TONE.danger.value)}
                       >
                         {r.ok ? (saved ? 'นำเข้าแล้ว' : 'พร้อมนำเข้า') : r.reason}
+                      </td>
+                      <td className="px-3 py-2 text-xs">
+                        {saved && r.id ? (
+                          <AttachCell state={attached[r.id]} onPick={(f) => void attach(r.id!, f)} />
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -429,5 +452,32 @@ const ImportApplicantsDialog: React.FC<{
     </Dialog>
   );
 };
+
+type AttachState = { state: 'busy' } | { state: 'done'; name: string } | { state: 'error'; message: string };
+
+/** ช่องแนบไฟล์ของหนึ่งแถว — PDF/JPG/PNG · แนบแล้วขึ้นชื่อไฟล์ กดเปลี่ยนได้ */
+function AttachCell({ state, onPick }: { state: AttachState | undefined; onPick: (f: File | null) => void }) {
+  const input = useRef<HTMLInputElement>(null);
+  return (
+    <div className="flex min-w-40 flex-wrap items-center gap-2">
+      <input
+        ref={input}
+        type="file"
+        accept="application/pdf,image/jpeg,image/png"
+        className="hidden"
+        onChange={(e) => {
+          onPick(e.target.files?.[0] ?? null);
+          e.target.value = '';
+        }}
+      />
+      {state?.state === 'done' ? <span className={cn('max-w-40 truncate', TONE.success.value)}>{state.name}</span> : null}
+      <Button type="button" size="xs" variant="outline" disabled={state?.state === 'busy'} onClick={() => input.current?.click()}>
+        {state?.state === 'busy' ? <LoaderCircle className="animate-spin" aria-hidden /> : <Paperclip aria-hidden />}
+        {state?.state === 'done' ? 'เปลี่ยน' : 'เลือกไฟล์'}
+      </Button>
+      {state?.state === 'error' ? <span className={TONE.danger.value}>{state.message}</span> : null}
+    </div>
+  );
+}
 
 export default ImportApplicantsDialog;

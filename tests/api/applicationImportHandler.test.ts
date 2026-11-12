@@ -179,6 +179,12 @@ describe('POST — ตัวอย่างก่อนบันทึก / บ�
       [3, repeatImportReason(LAST)],
       [4, null],
     ]);
+    // แถวที่บันทึกได้ id ใบกลับไป (แนบไฟล์ข้างชื่อ · เจ้าของ 12 พ.ย. 2569) · บันทึกเรียงเบอร์ ก (แถว 4) ก่อน ค (แถว 2)
+    expect(body.rows.map((r: { row: number; id?: string }) => [r.row, r.id])).toEqual([
+      [2, 'new-2'],
+      [3, undefined],
+      [4, 'new-1'],
+    ]);
     const locks = txQuery.mock.calls
       .filter((c) => /pg_advisory_xact_lock/.test(String(c[0])))
       .map((c) => String((c[1] as unknown[])[0]));

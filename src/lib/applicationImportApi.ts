@@ -113,3 +113,14 @@ export async function runApplicationImport(input: {
   if (!r.ok) throw new Error(await readError(r, input.dryRun ? 'อ่านไฟล์ไม่สำเร็จ' : 'นำเข้าไม่สำเร็จ'));
   return (await r.json()) as ApplicationImportResult;
 }
+
+/** แนบไฟล์ให้ใบที่นำเข้าแล้ว (เจ้าของ 12 พ.ย. 2569) — PDF/JPG/PNG ≤ 3MB ตรวจที่ server · แนบใหม่ = แทนไฟล์เดิม */
+export async function attachApplicationDocument(id: string, f: File): Promise<string> {
+  const base64 = await readFileAsBase64(f);
+  const r = await apiFetch('/api/job-application-document', {
+    method: 'POST',
+    body: JSON.stringify({ id, document: { base64, filename: f.name, mime: f.type } }),
+  });
+  if (!r.ok) throw new Error(await readError(r, 'แนบไฟล์ไม่สำเร็จ'));
+  return ((await r.json()) as { filename: string }).filename;
+}

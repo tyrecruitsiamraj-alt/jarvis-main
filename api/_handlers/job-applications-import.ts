@@ -250,6 +250,8 @@ async function handler(req: AuthedReq, res: ApiRes) {
     const insertedIds: string[] = [];
     const insertedPhones = new Map<string, string>();
     const insertedValues = new Map<string, StaffApplicationValue>();
+    /** แถวในไฟล์ → id ใบที่บันทึก (หน้าจอใช้แนบไฟล์ข้างชื่อ · 12 พ.ย. 2569) */
+    const rowIds = new Map<number, string>();
     plans = await dbTransaction(async (client) => {
       const out = [...plans];
       const order = out
@@ -271,6 +273,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
           insertedIds.push(ins[0].id);
           insertedPhones.set(ins[0].id, p.value.phone);
           insertedValues.set(ins[0].id, p.value);
+          rowIds.set(p.row, ins[0].id);
         }
       }
       return out;
@@ -328,7 +331,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
       }
     }
 
-    const result = toPreviewRows(plans);
+    const result = toPreviewRows(plans).map((r) => (r.ok && rowIds.has(r.row) ? { ...r, id: rowIds.get(r.row) } : r));
     await auditFromAuthed(req, {
       action: 'job_application.import',
       entityType: 'job_application',
