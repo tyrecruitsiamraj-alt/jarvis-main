@@ -150,20 +150,6 @@ const BoardJobCard: React.FC<BoardJobCardProps> = ({ job, readiness, applicants,
           </Badge>
         </div>
       ) : null}
-      {so && so.length > 0 ? (
-        <div className="flex flex-wrap gap-1.5" data-testid="board-card-so">
-          {(['content', 'scraping'] as const).map((type) => {
-            const req = so.find((r) => r.request_type === type);
-            if (!req) return null;
-            const view = soStatusView(req);
-            return (
-              <Badge key={type} variant="outline" className={cn('font-medium', TONE[view.tone].outline)}>
-                {type === 'content' ? 'โพสต์' : 'Scrap'} · {view.label}
-              </Badge>
-            );
-          })}
-        </div>
-      ) : null}
       {/* ยอดโพสต์ลงกลุ่ม: สั่ง N กลุ่ม · ตามด้วยสถานะที่มีเลข (ลำดับ/คำของ So Scraping) */}
       {postGroups?.mine ? (
         <p className="text-xs tabular-nums text-muted-foreground" data-testid="board-card-post-groups">
@@ -178,9 +164,25 @@ const BoardJobCard: React.FC<BoardJobCardProps> = ({ job, readiness, applicants,
             ))}
         </p>
       ) : null}
+      {/* 🔴 โพสต์กับ Scrap คนละบรรทัด (เจ้าของ 12 พ.ย. 2569 "ต้องการตัวเลขสั่งโพสต์ ถ้า Scrap ก็แยกออกมาเป็นอีกอัน รวมกันก็งง")
+          มียอดโพสต์ลงกลุ่มแล้ว = บรรทัดยอดแทนป้าย "โพสต์ · …" (ป้ายบอกสถานะคำสั่งทั้งใบ ขัดกับยอดรายกลุ่ม) · Scrap ยังเป็นป้ายบรรทัดของตัวเอง */}
+      {so && so.some((r) => !(postGroups?.mine && r.request_type === 'content')) ? (
+        <div className="flex flex-wrap gap-1.5" data-testid="board-card-so">
+          {(['content', 'scraping'] as const).map((type) => {
+            const req = so.find((r) => r.request_type === type);
+            if (!req || (type === 'content' && postGroups?.mine)) return null;
+            const view = soStatusView(req);
+            return (
+              <Badge key={type} variant="outline" className={cn('font-medium', TONE[view.tone].outline)}>
+                {type === 'content' ? 'โพสต์' : 'Scrap'} · {view.label}
+              </Badge>
+            );
+          })}
+        </div>
+      ) : null}
       {/* ใบที่ไม่สำเร็จ/ค้าง: เหตุ 1 บรรทัดบนการ์ดเลย ไม่ต้องเปิดป๊อปก่อนถึงรู้ (เจ้าของ 4 พ.ย. 2569 ฉบับ 9 ข้อ 6) */}
       {(so ?? []).map((r) => {
-        const why = soStuckLine(r);
+        const why = r.request_type === 'content' && postGroups?.mine ? null : soStuckLine(r);
         return why ? (
           <p key={`why-${r.request_type}`} className={cn('line-clamp-1 text-xs', r.status === 'rejected' ? TONE.danger.value : TONE.warn.value)} data-testid="board-card-so-why">
             {r.request_type === 'content' ? 'โพสต์' : 'Scrap'}: {why}

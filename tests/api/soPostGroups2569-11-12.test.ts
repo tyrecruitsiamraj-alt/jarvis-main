@@ -102,6 +102,8 @@ describe('กดช่องสถานะแล้วดูเหตุ + ย�
   });
   it('การ์ดใบขอบอกยอด · ช่องตัวเลขในภาพรวมกดได้', () => {
     expect(readFileSync('src/components/jobs/BoardJobCard.tsx', 'utf8')).toContain('data-testid="board-card-post-groups"');
+    // โพสต์กับ Scrap คนละบรรทัด — มียอดโพสต์แล้วไม่มีป้าย "โพสต์ · …" ซ้อน (เจ้าของ 12 พ.ย. 2569 "รวมกันก็งง")
+    expect(readFileSync('src/components/jobs/BoardJobCard.tsx', 'utf8')).toContain("if (!req || (type === 'content' && postGroups?.mine)) return null;");
     expect(readFileSync('src/components/dashboard-trends/stuck/SoPostGroupsCard.tsx', 'utf8')).toContain('data-testid="so-post-groups-reasons"');
   });
 });
