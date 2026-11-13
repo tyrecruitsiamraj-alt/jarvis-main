@@ -22,7 +22,7 @@ import { OverviewCard } from '../RecruitOverviewParts';
  */
 
 /** ไม่ได้โพสต์ 3 แบบ (เครื่อง/บัญชี/ไม่ทราบสาเหตุ) แดงเหมือน "ไม่สำเร็จ" — เจ้าของสั่ง 12 พ.ย. 2569 */
-const STATUS_TONE: Record<string, keyof typeof TONE> = {
+export const SO_POST_STATUS_TONE: Record<string, keyof typeof TONE> = {
   posted: 'success',
   pending_approval: 'warn',
   declined: 'danger',
@@ -57,7 +57,7 @@ export default function SoPostGroupsCard({ from, to, bu }: { from: string; to: s
   const d = state.data;
   const sub = `${formatYmdTh(from)} – ${formatYmdTh(to)} · ${bu ?? 'ทุก BU'}`;
   const cells: Array<{ key: string; label: string; n: number | null; tone?: keyof typeof TONE }> = d
-    ? [{ key: 'total', label: 'สั่งทั้งหมด', n: d.total }, ...d.statuses.map((st) => ({ key: st.key, label: st.label, n: d.counts[st.key] ?? 0, tone: STATUS_TONE[st.key] }))]
+    ? [{ key: 'total', label: 'สั่งทั้งหมด', n: d.total }, ...d.statuses.map((st) => ({ key: st.key, label: st.label, n: d.counts[st.key] ?? 0, tone: SO_POST_STATUS_TONE[st.key] }))]
     : [];
   /**
    * สั่ง + 7 สถานะ = 8 ช่อง (มือถือ 2 · กลาง 4 · กว้าง 8 ต่อแถว) · สั่ง + 9 สถานะ = 10 ช่อง แถวละ 5 (So Scraping แยกไม่ได้โพสต์เป็น
@@ -193,7 +193,7 @@ export default function SoPostGroupsCard({ from, to, bu }: { from: string; to: s
                   </TableCell>
                   <TableCell className="whitespace-nowrap text-xs tabular-nums">{formatDateTimeTh(r.orderedAt)}</TableCell>
                   <TableCell className="text-xs">
-                    <span className={cn('inline-block whitespace-nowrap rounded-full border px-2 py-0.5 font-medium', TONE[STATUS_TONE[r.status] ?? 'neutral'].soft, TONE[STATUS_TONE[r.status] ?? 'neutral'].value)}>
+                    <span className={cn('inline-block whitespace-nowrap rounded-full border px-2 py-0.5 font-medium', TONE[SO_POST_STATUS_TONE[r.status] ?? 'neutral'].soft, TONE[SO_POST_STATUS_TONE[r.status] ?? 'neutral'].value)}>
                       {r.statusLabel}
                     </span>
                     {r.postedAt ? <span className={cn('mt-0.5 block whitespace-nowrap tabular-nums', DASH.sub)}>{formatDateTimeTh(r.postedAt)}</span> : null}

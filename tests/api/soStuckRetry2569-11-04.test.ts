@@ -17,7 +17,7 @@ describe('คำบนจอ', () => {
     expect(SO_STATUS_LABEL.rejected).toBe('ไม่สำเร็จ');
     expect(SO_FACET_LABEL.rejected).toBe('ไม่สำเร็จ');
     expect(soNoticeTitle('content', 'rejected')).toBe('สั่งโพสต์ · ไม่สำเร็จ');
-    for (const f of ['src/components/jobs/AutopostDialog.tsx', 'src/components/jobs/OrderPostButton.tsx', 'src/components/jobs/BoardJobCard.tsx', 'src/components/jobs/SoStuckPanel.tsx']) {
+    for (const f of ['src/components/jobs/AutopostDialog.tsx', 'src/components/jobs/OrderPostButton.tsx', 'src/components/jobs/BoardJobCard.tsx', 'src/components/jobs/BoardCardActions.tsx', 'src/components/jobs/SoStuckPanel.tsx']) {
       expect(read(f), f).not.toMatch(/['">]ไม่รับงาน/);
     }
   });
@@ -67,6 +67,9 @@ describe('ต่อสาย', () => {
     expect(ap).not.toContain('รอให้เสร็จก่อนถึงสั่งใหม่ได้\n            </p>\n          ) : null}\n\n          {openPosting');
     const order = read('src/components/jobs/OrderPostButton.tsx');
     expect(order).toContain("scraping?.status === 'pending' ? (\n            <SoStuckPanel");
-    expect(read('src/components/jobs/BoardJobCard.tsx')).toContain('data-testid="board-card-so-why"');
+    // เหตุ 1 บรรทัดย้ายเข้ากล่อง Autopost / Scrap ของส่วน "ทำอะไรไปแล้ว" (13 พ.ย. 2569)
+    const actions = read('src/components/jobs/BoardCardActions.tsx');
+    expect(actions).toContain('const contentWhy = content ? soStuckLine(content) : null;');
+    expect(actions).toContain('const scrapWhy = scrap ? soStuckLine(scrap) : null;');
   });
 });

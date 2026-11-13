@@ -157,6 +157,10 @@ import { isHiddenFromPublicByWorkStatus } from '@/lib/publicJobVisibility';
 import { cn } from '@/lib/utils';
 import { fetchBoardJobPostings, type JobPostingRequest } from '@/lib/jobPostingRequestsApi';
 import AutopostDialog from '@/components/jobs/AutopostDialog';
+import JobPostActionsDialog from '@/components/jobs/JobPostActionsDialog';
+import type { BoardActionTab } from '@/components/jobs/BoardCardActions';
+import { fetchJobPostActions } from '@/lib/jobPostActionsApi';
+import { EMPTY_JOB_POST_ACTIONS, type JobPostActionsSummary } from '@/lib/jobPostActions';
 import { SEARCH_ALL_POOLS_AND_CALL } from '@/lib/candidateSearchLabels';
 import { Button } from '@/components/ui/button';
 
@@ -576,6 +580,28 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
    * โหลดไม่ได้ = การ์ดไม่มีบรรทัดนี้ (ป้ายสถานะคำสั่งยังอยู่) · โหลดใหม่ตามรอบเดียวกับป้าย So Scraping
    */
   const [soPostSummary, setSoPostSummary] = useState<SoPostSummary | null>(null);
+  /**
+   * "ทำอะไรไปแล้ว" ต่อใบ (เจ้าของ 13 พ.ย. 2569) — Autopost/โพสต์เอง/Scrap · `/api/job-post-actions`
+   * null = ยังโหลดไม่มา (กล่องขึ้นขีด ไม่ขึ้น 0 ปลอม) · โหลดใหม่ทุก 5 นาที และหลังสั่งงาน (postingsRev)
+   */
+  const [jobActions, setJobActions] = useState<Record<string, JobPostActionsSummary> | null>(null);
+  const [actionsOf, setActionsOf] = useState<{ job: { id: string; title: string }; tab: BoardActionTab } | null>(null);
+  useEffect(() => {
+    if (!isStaff) return;
+    let alive = true;
+    const load = () =>
+      fetchJobPostActions()
+        .then((v) => alive && setJobActions(v))
+        .catch(() => {
+          /* โหลดไม่ได้ = กล่องขึ้นขีด (ป๊อปของใบยังลองโหลดเองได้) */
+        });
+    void load();
+    const t = window.setInterval(() => void load(), 5 * 60_000);
+    return () => {
+      alive = false;
+      window.clearInterval(t);
+    };
+  }, [isStaff, postingsRev]);
   useEffect(() => {
     if (!isStaff) return;
     let alive = true;
@@ -1755,6 +1781,8 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                 so={soByJob ? soByJob.get(job.id) ?? [] : null}
                 postGroups={soPostSummary ? { statuses: soPostSummary.statuses, mine: soPostSummary.byRequest[requestNoOf(job.id)] ?? null } : null}
                 onAutopost={setAutopostJob}
+                actions={jobActions ? jobActions[job.id] ?? EMPTY_JOB_POST_ACTIONS : null}
+                onActions={isStaff ? (j, tab) => setActionsOf({ job: { id: j.id, title: `${jobBoardCardTitle(j)} · ${requestNoOf(j.id)}` }, tab }) : undefined}
               />
             ) : (
             <Card
@@ -2280,6 +2308,15 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
           (ปล่อยหน้าสาธารณะ · แก้ข้อความประกาศ · แก้ข้อมูลที่จะขึ้นประกาศ · Gen link ·
           ประวัติการแก้ไข) ย้ายไปแท็บ "ประกาศ / ลิงก์สมัคร" ของใบขอครบแล้ว
           ⇒ `/jobs/siamraj/:id/posting` (`UnitRequestPostingTabPage`) */}
+
+      {isStaff ? (
+        <JobPostActionsDialog
+          job={actionsOf?.job ?? null}
+          tab={actionsOf?.tab ?? 'autopost'}
+          onTabChange={(tab) => setActionsOf((a) => (a ? { ...a, tab } : a))}
+          onClose={() => setActionsOf(null)}
+        />
+      ) : null}
 
       {isStaff ? (
         <AutopostDialog

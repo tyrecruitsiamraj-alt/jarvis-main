@@ -128,9 +128,11 @@ describe('ตามงานได้โดยไม่ต้องเปิด�
     expect(soFacetValues([{ status: 'completed' }])).toEqual(['done']);
     // 1 พ.ย. 2569 เจ้าของ "ต้องมีสถานะบอก และต้อง Filter ดูได้" — ใบที่ยังไม่เคยสั่ง = ป้ายเทา + กรองได้
     expect(soFacetValues([])).toEqual(['none']);
-    expect(read('src/components/jobs/BoardJobCard.tsx')).toContain('data-testid="board-card-so-none"');
+    // 13 พ.ย. 2569 ป้ายย้ายเข้าส่วน "ทำอะไรไปแล้ว" — ยังไม่เคยสั่ง = กล่องบอก "ยังไม่สั่ง" (กล่องไม่หาย) · Scrap มีป้ายสถานะของตัวเอง
+    const actions = read('src/components/jobs/BoardCardActions.tsx');
+    expect(actions).toContain("a!.autopost.orders === 0 ? 'ยังไม่สั่ง'");
+    expect(actions).toContain('testId="board-action-scrap"');
     expect(read('src/components/jobs/JobBoardView.tsx')).toContain('so={soByJob ? soByJob.get(job.id) ?? [] : null}');
-    expect(read('src/components/jobs/BoardJobCard.tsx')).toContain('data-testid="board-card-so"');
     expect(read('src/lib/boardFilters.ts')).toContain("key: 'so',");
   });
   it('แจ้งเตือนคนสั่งเมื่อ โพสต์แล้ว / เสร็จ / ไม่รับงาน — ครั้งเดียวต่อสถานะ · กดแล้วเปิดใบนั้น', () => {

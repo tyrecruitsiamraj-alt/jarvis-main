@@ -101,9 +101,11 @@ describe('กดช่องสถานะแล้วดูเหตุ + ย�
     expect(s.byRequest.OPL6910065).toEqual({ total: 12, counts: { posted: 12 } });
   });
   it('การ์ดใบขอบอกยอด · ช่องตัวเลขในภาพรวมกดได้', () => {
-    expect(readFileSync('src/components/jobs/BoardJobCard.tsx', 'utf8')).toContain('data-testid="board-card-post-groups"');
-    // โพสต์กับ Scrap คนละบรรทัด — มียอดโพสต์แล้วไม่มีป้าย "โพสต์ · …" ซ้อน (เจ้าของ 12 พ.ย. 2569 "รวมกันก็งง")
-    expect(readFileSync('src/components/jobs/BoardJobCard.tsx', 'utf8')).toContain("if (!req || (type === 'content' && postGroups?.mine)) return null;");
+    // 13 พ.ย. 2569: ยอดอยู่กล่อง Autopost (เผยแพร่แล้ว · รอ · ไม่สำเร็จ) แยกกล่องจาก Scrap ("รวมกันก็งง" 12 พ.ย.)
+    const actions = readFileSync('src/components/jobs/BoardCardActions.tsx', 'utf8');
+    expect(actions).toContain('postGroupBuckets(postGroups.total, postGroups.counts)');
+    expect(actions).toContain('testId="board-action-autopost"');
+    expect(actions).toContain('testId="board-action-scrap"');
     expect(readFileSync('src/components/dashboard-trends/stuck/SoPostGroupsCard.tsx', 'utf8')).toContain('data-testid="so-post-groups-reasons"');
   });
 });

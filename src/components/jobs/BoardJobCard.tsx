@@ -5,6 +5,8 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import PrequestBadge from '@/components/jobs/PrequestBadge';
+import BoardCardActions, { type BoardActionTab } from '@/components/jobs/BoardCardActions';
+import type { JobPostActionsSummary } from '@/lib/jobPostActions';
 import { cn } from '@/lib/utils';
 import { DASH, TONE } from '@/lib/designTokens';
 import type { JobRequest } from '@/types';
@@ -12,8 +14,6 @@ import { jobBoardCardTitle, publicJobCardSubtitle } from '@/lib/unitRequestDispl
 import { publicJobTitle } from '@/lib/publicJobTitle';
 import JobPublicFacts from '@/components/jobs/JobPublicFacts';
 import { useRecruiterContact } from '@/hooks/useRecruiterContact';
-import { Badge } from '@/components/ui/badge';
-import { soStatusView, soStuckLine } from '@/lib/soScraping';
 import type { JobPostingRequest } from '@/lib/jobPostingRequestsApi';
 import { getJobAgeChipInfo, JOB_AGE_CHIP_META } from '@/lib/jobUrgency';
 import PublishReadinessChip from '@/components/jobs/PublishReadinessChip';
@@ -76,10 +76,14 @@ export type BoardJobCardProps = {
    * คำสถานะจาก `statuses` ของ So Scraping · `mine` null = ใบนี้ยังไม่เคยสั่งโพสต์ลงกลุ่ม · ไม่ส่ง = ยังโหลดไม่มา/โหลดไม่ได้
    */
   postGroups?: { statuses: SoPostGroupStatus[]; mine: { total: number; counts: Record<string, number> } | null } | null;
+  /** ยอด "ทำอะไรไปแล้ว" ของใบนี้ (13 พ.ย. 2569) · null = ยังโหลดไม่มา */
+  actions?: JobPostActionsSummary | null;
+  /** กดกล่อง Autopost / โพสต์เอง / Scrap = เปิดป๊อปของใบนี้ที่แท็บนั้น · ไม่ส่ง = ไม่มีส่วนนี้ (มุมมองที่ไม่ใช่เจ้าหน้าที่) */
+  onActions?: (job: JobRequest, tab: BoardActionTab) => void;
 };
 
 /** "บางพลี สมุทรปราการ" — อำเภอที่ทีม Online กรอก + จังหวัด · ไม่รู้ = บอกตรง ๆ (ไม่เดาจากจังหวัดไซต์) */
-const BoardJobCard: React.FC<BoardJobCardProps> = ({ job, readiness, applicants, ai, closed, onOpen, onApplicants, skip, onImport, so, onAutopost, release, postGroups }) => {
+const BoardJobCard: React.FC<BoardJobCardProps> = ({ job, readiness, applicants, ai, closed, onOpen, onApplicants, skip, onImport, so, onAutopost, release, postGroups, actions, onActions }) => {
   // เบอร์เจ้าหน้าที่สรรหาบรรทัดเดียวกับหน้า /apply (เจ้าของ 20 ต.ค. 2569 "ไหนเบอร์โทรเจ้าหน้าที่สรรหา")
   const contact = useRecruiterContact(job.recruiter_contact ? null : job.recruiter_name);
   const age = getJobAgeChipInfo(job);
@@ -141,54 +145,7 @@ const BoardJobCard: React.FC<BoardJobCardProps> = ({ job, readiness, applicants,
         )
       ) : null}
 
-      {/* ── สถานะที่ So Scraping เขียนกลับ (20 ต.ค. 2569) — เหลือง รอ/กำลังทำ · เขียว โพสต์แล้ว/เสร็จ · แดง ไม่สำเร็จ/รอนาน ── */}
-      {/* ยังไม่เคยสั่ง = ขึ้นป้ายเทาให้รู้ว่ายังว่าง (1 พ.ย. 2569 เจ้าของ "ต้องมีสถานะบอก" กันสั่งซ้ำ) · null = ยังโหลดไม่เสร็จ */}
-      {so && so.length === 0 ? (
-        <div className="flex flex-wrap gap-1.5" data-testid="board-card-so-none">
-          <Badge variant="outline" className={cn('font-medium', TONE.neutral.outline)}>
-            ยังไม่สั่งโพสต์
-          </Badge>
-        </div>
-      ) : null}
-      {/* ยอดโพสต์ลงกลุ่ม: สั่ง N กลุ่ม · ตามด้วยสถานะที่มีเลข (ลำดับ/คำของ So Scraping) */}
-      {postGroups?.mine ? (
-        <p className="text-xs tabular-nums text-muted-foreground" data-testid="board-card-post-groups">
-          โพสต์ลงกลุ่ม: <span className="font-medium text-foreground">สั่ง {postGroups.mine.total.toLocaleString('th-TH')} กลุ่ม</span>
-          {postGroups.statuses
-            .filter((st) => (postGroups.mine?.counts[st.key] ?? 0) > 0)
-            .map((st) => (
-              <span key={st.key} className={st.key === 'posted' ? cn('font-medium', TONE.success.value) : undefined}>
-                {' · '}
-                {st.label} {(postGroups.mine?.counts[st.key] ?? 0).toLocaleString('th-TH')}
-              </span>
-            ))}
-        </p>
-      ) : null}
-      {/* 🔴 โพสต์กับ Scrap คนละบรรทัด (เจ้าของ 12 พ.ย. 2569 "ต้องการตัวเลขสั่งโพสต์ ถ้า Scrap ก็แยกออกมาเป็นอีกอัน รวมกันก็งง")
-          มียอดโพสต์ลงกลุ่มแล้ว = บรรทัดยอดแทนป้าย "โพสต์ · …" (ป้ายบอกสถานะคำสั่งทั้งใบ ขัดกับยอดรายกลุ่ม) · Scrap ยังเป็นป้ายบรรทัดของตัวเอง */}
-      {so && so.some((r) => !(postGroups?.mine && r.request_type === 'content')) ? (
-        <div className="flex flex-wrap gap-1.5" data-testid="board-card-so">
-          {(['content', 'scraping'] as const).map((type) => {
-            const req = so.find((r) => r.request_type === type);
-            if (!req || (type === 'content' && postGroups?.mine)) return null;
-            const view = soStatusView(req);
-            return (
-              <Badge key={type} variant="outline" className={cn('font-medium', TONE[view.tone].outline)}>
-                {type === 'content' ? 'โพสต์' : 'Scrap'} · {view.label}
-              </Badge>
-            );
-          })}
-        </div>
-      ) : null}
-      {/* ใบที่ไม่สำเร็จ/ค้าง: เหตุ 1 บรรทัดบนการ์ดเลย ไม่ต้องเปิดป๊อปก่อนถึงรู้ (เจ้าของ 4 พ.ย. 2569 ฉบับ 9 ข้อ 6) */}
-      {(so ?? []).map((r) => {
-        const why = r.request_type === 'content' && postGroups?.mine ? null : soStuckLine(r);
-        return why ? (
-          <p key={`why-${r.request_type}`} className={cn('line-clamp-1 text-xs', r.status === 'rejected' ? TONE.danger.value : TONE.warn.value)} data-testid="board-card-so-why">
-            {r.request_type === 'content' ? 'โพสต์' : 'Scrap'}: {why}
-          </p>
-        ) : null;
-      })}
+      {/* สถานะ So Scraping / ยอดโพสต์ลงกลุ่ม ย้ายไปส่วน "ทำอะไรไปแล้ว" ก้นการ์ด (เจ้าของ 13 พ.ย. 2569 · `BoardCardActions`) */}
 
       {/* ── ข้อมูลงาน: ตัวเดียวกับการ์ดหน้า /apply (`JobPublicFacts`) — ติ๊กซ่อนในขั้น 3 แล้วที่นี่ก็หายด้วย
           (เจ้าของ 5 ต.ค. 2569: *"ไม่งั้นจะเช็คยังไงหล่ะว่าถูกต้องหรือเปล่า"*) ── */}
@@ -226,7 +183,11 @@ const BoardJobCard: React.FC<BoardJobCardProps> = ({ job, readiness, applicants,
           🔴 15 ต.ค. 2569: ปุ่มย้ายลงแถวของตัวเอง (ทุกใบเหมือนกัน การ์ดจึงสูงเท่ากัน) — เจ้าของหาปุ่ม Excel ไม่เจอ
           ("แต่ละกล่องไม่เห็นมีให้นำเข้าด้วย excel เลย") ตอนเป็นไอคอนเปล่า · ใส่คำแล้วแถวเดียวกับ "ผู้สมัคร N คน" ไม่พอที่จอ 3 คอลัมน์
           "ส่ง AI แล้ว x/y" อยู่บรรทัดใต้จำนวนผู้สมัครเหมือนเดิม */}
+      {/* ── ทำอะไรไปแล้ว: Autopost · โพสต์เอง · Scrap (เจ้าของ 13 พ.ย. 2569) — ตรึงก้นการ์ดเหนือผู้สมัคร ทุกใบอยู่ระดับเดียวกัน ── */}
       <div className="mt-auto space-y-2 border-t border-border/70 pt-2">
+        {onActions ? (
+          <BoardCardActions actions={actions ?? null} postGroups={postGroups?.mine ?? null} so={so ?? null} onOpen={(tab) => onActions(job, tab)} />
+        ) : null}
         <div className="min-w-0">
           {applicants === null ? (
             <Skeleton className="h-5 w-28" aria-label="กำลังโหลดผู้สมัคร" />
