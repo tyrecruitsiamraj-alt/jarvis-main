@@ -25,6 +25,7 @@ import { publicWorkSchedule } from '@/lib/publicJobPrivacy';
 import { isOtBenefit, publicBenefitList, publicFieldVisible } from '@/lib/publicFieldVisibility';
 import { benefitDisplayLabels, isRetiredBenefit } from '@/lib/extraBenefits';
 import { INCOME_OTHER_LABEL } from '@/lib/incomeBreakdown';
+import { lineIdCaptionLine } from '@/lib/buLineIds';
 import { MANUAL_INCOME_LINE_LABEL, RESIGNED_INCOME_LINE_LABEL } from '@/lib/publicFieldsForm';
 
 /** บรรทัดรายได้ที่เป็นยอดรวมทั้งก้อน (ทางใส่เอง / รายได้คนเก่า) — ไม่ใช่รายการย่อย */
@@ -144,7 +145,7 @@ function cleanRequirementLines(lines: readonly string[], hasWho: boolean): strin
 /** เบอร์ในแคปชั่น = ตัวเลขล้วน (ตามตัวอย่างของทีม "0901978522") */
 const phoneDigits = (p: string) => p.replace(/\D/g, '');
 
-export function buildAutopostCaption(job: JobRequest, opts: { contact: AutopostContact; link: string | null }): string {
+export function buildAutopostCaption(job: JobRequest, opts: { contact: AutopostContact; link: string | null; lineId?: string | null }): string {
   const out: string[] = [];
   const title = publicJobTitle(job).trim();
   const unit = unitText(job);
@@ -204,6 +205,8 @@ export function buildAutopostCaption(job: JobRequest, opts: { contact: AutopostC
 
   const phone = opts.contact ? phoneDigits(opts.contact.phone) : '';
   if (phone) out.push(`โทรติดต่อ : ${phone} (คุณ${opts.contact?.name})`);
+  // แอดไลน์ประจำ BU (เจ้าของ 13 พ.ย. 2569) — ตั้งที่ ตั้งค่า › แอดไลน์ประจำ BU · ไม่ได้ตั้ง = ไม่มีบรรทัด
+  if (opts.lineId) out.push(lineIdCaptionLine(opts.lineId));
   if (opts.link) out.push(`${phone ? 'หรือสมัครงานได้ที่' : 'สมัครงานได้ที่'} : ${opts.link}`);
 
   return out.join('\n').slice(0, AUTOPOST_CAPTION_MAX);

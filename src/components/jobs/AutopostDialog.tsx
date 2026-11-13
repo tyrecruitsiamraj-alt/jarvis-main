@@ -12,6 +12,7 @@ import { cn } from '@/lib/utils';
 import { DASH, TONE } from '@/lib/designTokens';
 import type { JobRequest } from '@/types';
 import { useRecruiterContact } from '@/hooks/useRecruiterContact';
+import { useBuLineId } from '@/lib/buLineIdsApi';
 import { jobBoardCardTitle, jobUnitSectorOf } from '@/lib/unitRequestDisplay';
 import { SoGroupFilterPicker } from '@/components/jobs/SoGroupPicker';
 import { publicJobTitle } from '@/lib/publicJobTitle';
@@ -247,7 +248,8 @@ export function AutopostBody({
   const openOrder = stuckOrder ?? runningOrder;
 
   // แคปชั่นร่างใหม่ตามลิงก์ที่เลือก จนกว่าคนจะแก้เอง · แก้แล้ว = แทนเฉพาะลิงก์สมัครในข้อความ (syncCaptionLink)
-  const draft = React.useMemo(() => buildAutopostCaption(job, { contact, link: captionLink }), [job, contact, captionLink]);
+  const lineId = useBuLineId(jobBuOf(job));
+  const draft = React.useMemo(() => buildAutopostCaption(job, { contact, link: captionLink, lineId }), [job, contact, captionLink, lineId]);
   React.useEffect(() => {
     if (!captionEdited) setCaption(draft);
     // ข้อความที่เคยแก้แล้วบันทึกไว้มีลิงก์ของรอบก่อน (3 พ.ย. 2569 รูปจากหน้างาน: ขึ้น "ข้อความต้องมีลิงก์สมัครที่เลือก" กดส่งไม่ได้)

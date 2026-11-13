@@ -29,6 +29,7 @@ export const SETTINGS_TAB_IDS = [
   'integrations',
   'pdpaRequests',
   'applyLinks',
+  'lineIds',
   'autoMove',
   'health',
   'reference',
@@ -57,6 +58,7 @@ export const SETTINGS_TAB_LABEL: Record<SettingsTabId, string> = {
   integrations: 'เชื่อมระบบภายนอก',
   pdpaRequests: 'คำขอข้อมูลส่วนบุคคล',
   applyLinks: 'ลิงก์หน้าสมัคร',
+  lineIds: 'แอดไลน์ประจำ BU',
   autoMove: 'ย้ายใบสมัครอัตโนมัติ',
   health: 'สถานะระบบ',
   reference: 'ข้อมูลอ้างอิง',
@@ -80,6 +82,7 @@ export const SETTINGS_TAB_HINT: Record<SettingsTabId, string> = {
   integrations: 'key ของ So Scraping · ออกใหม่ / ยกเลิก',
   pdpaRequests: 'ขอดู ขอแก้ ขอลบข้อมูล (PDPA) · โทรยืนยันตัวตนแล้วทำต่อ',
   applyLinks: 'ลิงก์ /apply แยก BU · ล็อกตำแหน่ง',
+  lineIds: 'ID LINE ที่ขึ้นท้ายข้อความประกาศ แยก BU',
   autoMove: 'ย้ายใบสมัครตามผลโทรอัตโนมัติ',
   health: 'ไฟสถานะ · สวิตช์ที่เปิดอยู่ · ของค้าง',
   reference: 'ตัวเลือกในดรอปดาวน์ต่าง ๆ',
@@ -106,7 +109,7 @@ export const SETTINGS_GROUP_TABS: Record<SettingsGroupId, readonly SettingsTabId
   people: ['users', 'roles'],
   look: ['appearance', 'navMenu'],
   automation: ['lumosMode', 'callRetry', 'callScripts', 'aiSettings', 'callSuppression', 'autoMove', 'matchWeights', 'integrations'],
-  data: ['workStatus', 'leadRules', 'reference', 'applyLinks', 'pdpaRequests'],
+  data: ['workStatus', 'leadRules', 'reference', 'applyLinks', 'lineIds', 'pdpaRequests'],
   monitor: ['health', 'audit'],
 };
 

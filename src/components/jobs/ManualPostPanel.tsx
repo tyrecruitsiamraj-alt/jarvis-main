@@ -22,6 +22,7 @@ import SoGroupPicker from '@/components/jobs/SoGroupPicker';
 import MultiChannelPicker from '@/components/shared/MultiChannelPicker';
 import { syncCaptionLink } from '@/components/jobs/AutopostDialog';
 import { copyText } from '@/lib/copyText';
+import { useBuLineId } from '@/lib/buLineIdsApi';
 import { markManualPosted } from '@/lib/jobPostActionsApi';
 
 /** แถวที่เตรียมแล้ว — ลิงก์ละแถว · กลุ่ม Facebook มี `group` (ปุ่มเปิดกลุ่ม) · ช่องทางอื่นไม่มี */
@@ -44,7 +45,8 @@ export default function ManualPostPanel({ job, onChanged }: { job: JobRequest; o
    * ข้อความประกาศแก้ได้ (เจ้าของ 13 พ.ย. 2569 "ตอนเลือกโพสต์เองมันไม่มีให้แก้ caption") — ช่องเดียวกับ Autopost
    * (`post_caption` ของใบขอ) แก้ที่ไหนก็ใช้ทั้งสองทาง · แก้แล้วบันทึกเองหลังหยุดพิมพ์ · ไม่แก้ = ข้อความที่ระบบร่าง
    */
-  const draft = React.useMemo(() => buildAutopostCaption(job, { contact, link: AUTOPOST_LINK_PLACEHOLDER }), [job, contact]);
+  const lineId = useBuLineId(jobBuOf(job));
+  const draft = React.useMemo(() => buildAutopostCaption(job, { contact, link: AUTOPOST_LINK_PLACEHOLDER, lineId }), [job, contact, lineId]);
   const saved = job.public_post_text?.trim() || null;
   const [caption, setCaption] = React.useState(saved ?? '');
   const [edited, setEdited] = React.useState(Boolean(saved));
