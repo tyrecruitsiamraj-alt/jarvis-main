@@ -10,6 +10,7 @@ import { getVisiblePageNumbers } from '@/lib/pagination';
 import { fetchSoPostGroups } from '@/lib/soPostGroupsApi';
 import type { SoPostGroups, SoPostGroupsFiltered } from '@/lib/soPostGroups';
 import { OverviewCard } from '../RecruitOverviewParts';
+import TrendDelta from './TrendDelta';
 
 /**
  * ═══ 5. โพสต์ลงกลุ่ม Facebook (เจ้าของ 11 พ.ย. 2569 · ข้อ 13 ของ JARVIS_OPTIONS_PROMPT.md ฝั่ง So Scraping) ═══
@@ -41,7 +42,21 @@ export function soPostCellLabel(st: { key: string; label: string }): string {
   return st.key.startsWith('not_tried') && !st.label.includes('ไม่ได้โพสต์') ? `ไม่ได้โพสต์ · ${st.label}` : st.label;
 }
 
-export default function SoPostGroupsCard({ from, to, bu }: { from: string; to: string; bu: string | null }) {
+/** ยอดช่วงก่อนของแถวเลข (หน้าแม่ดึงมาแล้วใช้ในแถบบนสุดด้วย) */
+export type SoPostPrevCounts = { total: number; counts: Record<string, number> };
+
+export default function SoPostGroupsCard({
+  from,
+  to,
+  bu,
+  prev,
+}: {
+  from: string;
+  to: string;
+  bu: string | null;
+  /** ยอดช่วงก่อน (13 พ.ย. 2569 เทียบเพิ่มขึ้น/ลดลง) — ไม่ส่ง = ไม่มีป้ายเทียบ · null = ดึงช่วงก่อนไม่ได้ ("เทียบไม่ได้") */
+  prev?: SoPostPrevCounts | null;
+}) {
   const [page, setPage] = React.useState(1);
   const [rev, setRev] = React.useState(0);
   const [statusPick, setStatusPick] = React.useState<string | null>(null);
@@ -109,6 +124,16 @@ export default function SoPostGroupsCard({ from, to, bu }: { from: string; to: s
               <span className={cn('text-xl font-medium tabular-nums', c.n === null || c.n === 0 ? 'text-muted-foreground' : c.tone ? TONE[c.tone].value : 'text-foreground')}>
                 {c.n === null ? '—' : c.n.toLocaleString('th-TH')}
               </span>
+              {/* ช่วงก่อนดึงไม่ได้/ก่อนเริ่มสั่ง = บอกครั้งเดียวที่ช่องสั่งทั้งหมด ไม่ซ้ำทุกช่อง */}
+              {prev === undefined ? null : c.n === null || (prev === null && c.key !== 'total') ? (
+                <span className="min-h-4" aria-hidden />
+              ) : (
+                <TrendDelta
+                  cur={c.n}
+                  prev={prev === null ? null : c.key === 'total' ? prev.total : (prev.counts[c.key] ?? 0)}
+                  sense={c.tone === 'success' ? 'good' : c.tone === 'danger' ? 'bad' : 'plain'}
+                />
+              )}
             </Button>
           );
         })}

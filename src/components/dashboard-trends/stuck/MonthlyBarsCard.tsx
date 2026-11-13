@@ -9,6 +9,7 @@ import { monthLabel } from '@/lib/recruitOverviewWindow';
 import { STUCK_TREND_LABEL, monthlySeries, monthlyUnreadable, type StuckMonthlyRow, type StuckTrendKey } from '@/lib/recruitStuck';
 import { OverviewCard, SectionError } from '../RecruitOverviewParts';
 import { useGrown } from './GrowBar';
+import TrendDelta from './TrendDelta';
 
 const KEYS = Object.keys(STUCK_TREND_LABEL) as StuckTrendKey[];
 
@@ -16,6 +17,7 @@ const KEYS = Object.keys(STUCK_TREND_LABEL) as StuckTrendKey[];
  * ═══ ส่วนที่ 5: เทียบเดือน (เจ้าของ 4 พ.ย. 2569 "เทียบได้ว่าเดือนไหนเยอะ") ═══
  * แท่งละเดือน ย้อน 6 เดือน · เลือกดู ใบขอ / รายชื่อ / นัดได้ / ได้ลงงาน · แท่งยืดขึ้นตอนวาด · ตามตัวกรองบนสุด (`ok`)
  * กดแท่ง = เลือกช่วงเวลาของหน้าเป็นเดือนนั้น
+ * 13 พ.ย. 2569 ใต้แท่งบอกเพิ่มขึ้น/ลดลงจากเดือนก่อน (เจ้าของ "ต้องดูแนวโน้มได้ เพิ่มหรือลด") · เดือนนี้ยังไม่จบ = ไม่เทียบ
  */
 export default function MonthlyBarsCard({
   rows,
@@ -40,8 +42,6 @@ export default function MonthlyBarsCard({
   const unreadable = rows ? monthlyUnreadable(rows, key) : false;
   const max = Math.max(1, ...series.map((s) => s.value));
   const last = series[series.length - 1];
-  const prev = series[series.length - 2];
-  const pct = prev && prev.value > 0 && last ? Math.round(((last.value - prev.value) / prev.value) * 100) : null;
   return (
     <OverviewCard
       icon={BarChart3}
@@ -64,16 +64,16 @@ export default function MonthlyBarsCard({
           เปิดดู
         </Button>
       ) : rows === null && !error ? (
-        <p className={cn('flex h-44 items-center justify-center text-sm', DASH.sub)}>กำลังโหลด…</p>
+        <p className={cn('flex h-52 items-center justify-center text-sm', DASH.sub)}>กำลังโหลด…</p>
       ) : rows === null ? (
         <SectionError message={error ?? 'อ่านยอดรายเดือนไม่ได้'} />
       ) : unreadable ? (
-        <p className={cn('flex h-44 items-center justify-center text-sm', DASH.sub)} data-testid="stuck-trend-unreadable">
+        <p className={cn('flex h-52 items-center justify-center text-sm', DASH.sub)} data-testid="stuck-trend-unreadable">
           อ่านแจ้งเข้า ERP ไม่ได้
         </p>
       ) : (
         <>
-          <div className="grid h-44 grid-flow-col auto-cols-fr items-end gap-2 pt-6" data-testid="stuck-trend">
+          <div className="grid h-52 grid-flow-col auto-cols-fr items-end gap-2 pt-6" data-testid="stuck-trend">
             {series.map((s, i) => (
               <div key={s.month} className="flex h-full min-w-0 flex-col items-center justify-end gap-1">
                 <span className="text-xs font-medium tabular-nums text-foreground">{fmt(s.value)}</span>
@@ -89,12 +89,18 @@ export default function MonthlyBarsCard({
                   style={{ height: `${grown ? (s.value / max) * 100 : 0}%` }}
                 />
                 <span className={cn('whitespace-nowrap text-xs', DASH.sub)}>{monthLabel(s.month).replace(/ \d+$/, '')}</span>
+                <span className="flex min-h-8 items-start justify-center text-center">
+                  {i === 0 ? null : i === series.length - 1 ? (
+                    <span className={cn('text-xs', DASH.sub)}>ยังไม่จบเดือน</span>
+                  ) : (
+                    <TrendDelta cur={s.value} prev={series[i - 1].value} className="whitespace-normal" />
+                  )}
+                </span>
               </div>
             ))}
           </div>
           <p className={cn('text-xs tabular-nums', DASH.sub)}>
             {last ? `${STUCK_TREND_LABEL[key]} ${monthLabel(last.month)} ${fmt(last.value)}` : 'ยังไม่มีข้อมูล'}
-            {prev ? ` · เดือนก่อน ${fmt(prev.value)}${pct !== null ? ` (${pct >= 0 ? '+' : ''}${pct}%)` : ''}` : ''}
           </p>
         </>
       )}

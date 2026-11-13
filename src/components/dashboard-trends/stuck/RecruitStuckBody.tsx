@@ -1,6 +1,6 @@
 import React from 'react';
 import { AlertCircle, ListChecks, Megaphone, PhoneCall, UserRound } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { V5Divider } from '@/components/so-recruit-v5/V5Parts';
@@ -28,6 +28,16 @@ import StuckTodoTable from './StuckTodoTable';
 import CallerResultsTable from './CallerResultsTable';
 import PersonJourneyCard from './PersonJourneyCard';
 import ReleaseProgressCard from './ReleaseProgressCard';
+import RecruitScaleView, { type ScaleStripCell } from './RecruitScaleView';
+import DailyCompareChart from './DailyCompareChart';
+import type { SoPostPrevCounts } from './SoPostGroupsCard';
+import { buildCallerResults } from '@/lib/callerResults';
+import { SCALE_TITLES, SO_POST_SINCE, comparableSince, isScaleSection, prevCohortOf, type ScaleSectionKey } from '@/lib/recruitScale';
+import { fetchSoPostGroups } from '@/lib/soPostGroupsApi';
+import { fetchManualPostDays } from '@/lib/jobPostActionsApi';
+import type { ManualPostDays } from '@/lib/jobPostActions';
+import { rangeText } from '@/lib/teamOnline';
+import { formatYmdTh } from '@/lib/dateTh';
 
 
 const SCOPE_TITLE: Record<StuckScope, { title: string; sub: string }> = {
@@ -56,8 +66,11 @@ export default function RecruitStuckBody({
   win: RecruitOverviewResponse['window'];
   onOpenNames: (title: string, ids: readonly string[]) => void;
   onPickMonth: (month: string) => void;
-  /** `v5` = โฉมต้นแบบ SO Recruit (10 พ.ย. 2569 · &dash=v5) — 11 พ.ย. 2569 หน้าเดียว 4 ข้อ ไม่มีแท็บ */
-  layout?: 'v5';
+  /**
+   * `scale` = ค่าเริ่ม (เจ้าของ 13 พ.ย. 2569 "เปิดมาปุ้บเป็นภาพใหญ่ พอกดอะไรก็ Scale ลงไป") แถบ 6 ช่อง + เทียบช่วงก่อนทุกเลข
+   * `v5` = หน้าเดียวเลื่อนลง (11 พ.ย. 2569) — ทางถอย `&dash=list`
+   */
+  layout?: 'v5' | 'scale';
 }) {
   const navigate = useNavigate();
   const [stuck, setStuck] = React.useState<{ data: RecruitStuckResponse | null; error: string | null }>({ data: null, error: null });
@@ -142,11 +155,178 @@ export default function RecruitStuckBody({
   /** รายการใบที่กดมาจาก "ติดที่ใคร" / "พื้นที่" — ขึ้นในส่วนที่ 1 แล้วเลื่อนไปหา */
   const [picked, setPicked] = React.useState<{ title: string; rows: StuckRequest[] } | null>(null);
   const phasesRef = React.useRef<HTMLDivElement>(null);
+  const pickedRef = React.useRef<HTMLDivElement>(null);
+  const scale = layout === 'scale';
   const pick = (title: string, list: StuckRequest[]) => {
     setPicked({ title, rows: list });
-    requestAnimationFrame(() => phasesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+    requestAnimationFrame(() => (scale ? pickedRef : phasesRef).current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
   };
   const openRequest = (r: StuckRequest) => r.jobId && navigate(requestPathOfJobId(r.jobId));
+
+  // ═══ Scale ลง (13 พ.ย. 2569) — ข้อที่เลือกอยู่ใน `?sec=` (กดย้อนกลับ/ส่งลิงก์ได้) · ทุกเลขเทียบช่วงก่อน ═══
+  const [searchParams, setSearchParams] = useSearchParams();
+  const secParam = searchParams.get('sec');
+  const section: ScaleSectionKey = isScaleSection(secParam) ? secParam : 'todo';
+  const pickSection = (k: ScaleSectionKey) => {
+    setPicked(null);
+    setSearchParams(
+      (p) => {
+        const next = new URLSearchParams(p);
+        next.set('sec', k);
+        return next;
+      },
+      { replace: true },
+    );
+  };
+  // เทียบเดือนโหลดตอนเปิดข้อนั้น (ของเดิมพับไว้เพราะหน้าโหลดช้า 9 พ.ย. 2569)
+  React.useEffect(() => {
+    if (scale && section === 'mon') setMonthlyOpen(true);
+  }, [scale, section]);
+  /** รายชื่อช่วงก่อน ผ่านตัวกรองชุดเดียวกับช่วงนี้ · null = เทียบไม่ได้ */
+  const prevCohort = React.useMemo(() => {
+    if (!scale) return null;
+    const all = prevCohortOf(data.apps ?? [], win, data.firstDay, data.generatedAt);
+    if (!all) return null;
+    const byFilter = appsOfFilter(all, filter, filtered, recruiterOf);
+    return narrowIds ? byFilter.filter((f) => Boolean(f.jobId && narrowIds.has(f.jobId))) : byFilter;
+  }, [scale, data.apps, win, data.firstDay, data.generatedAt, filter, filtered, recruiterOf, narrowIds]);
+  const prevChannels = React.useMemo(() => (prevCohort ? buildChannelFunnelTree(prevCohort) : null), [prevCohort]);
+  const prevBringers = React.useMemo(() => (prevCohort ? buildBringerFunnelTree(prevCohort) : null), [prevCohort]);
+  const prevReasons = React.useMemo(() => (prevCohort ? reasonGroups(prevCohort) : null), [prevCohort]);
+  const kept = React.useMemo(() => (scale ? buildCallerResults(cohort).total.kept.length : 0), [scale, cohort]);
+  const prevKept = React.useMemo(() => (prevCohort ? buildCallerResults(prevCohort).total.kept.length : null), [prevCohort]);
+  /** ยอดข้อ 5–6 ของแถบบน + ช่วงก่อนที่ส่งให้การ์ด · ดึงไม่ได้ = null ("—" / "เทียบไม่ได้") */
+  const [posts, setPosts] = React.useState<{ so: number | null; soPrev: SoPostPrevCounts | null; manual: ManualPostDays['total'] | null; manualPrev: ManualPostDays['total'] | null }>({
+    so: null,
+    soPrev: null,
+    manual: null,
+    manualPrev: null,
+  });
+  React.useEffect(() => {
+    if (!scale) return;
+    let alive = true;
+    const soComparable = !win.all && comparableSince(win.prevFrom, SO_POST_SINCE);
+    const none = Promise.resolve(null);
+    Promise.all([
+      fetchSoPostGroups({ from: win.from, to: win.to, bu: data.bu, page: 1 }).catch(() => null),
+      soComparable ? fetchSoPostGroups({ from: win.prevFrom, to: win.prevTo, bu: data.bu, page: 1 }).catch(() => null) : none,
+      fetchManualPostDays({ from: win.from, to: win.to, bu: data.bu }).catch(() => null),
+      win.all ? none : fetchManualPostDays({ from: win.prevFrom, to: win.prevTo, bu: data.bu }).catch(() => null),
+    ]).then(([so, soPrev, manual, manualPrev]) => {
+      if (!alive) return;
+      setPosts({
+        so: so ? so.total : null,
+        soPrev: soPrev ? { total: soPrev.total, counts: soPrev.counts } : null,
+        manual: manual ? manual.total : null,
+        manualPrev: manualPrev ? manualPrev.total : null,
+      });
+    });
+    return () => {
+      alive = false;
+    };
+  }, [scale, data.bu, win.from, win.to, win.prevFrom, win.prevTo, win.all]);
+
+  if (scale) {
+    const curLabel = rangeText({ from: win.from, to: win.to });
+    const prevLabel = rangeText({ from: win.prevFrom, to: win.prevTo });
+    const strip: Record<'todo' | 'done' | 'src' | 'ch' | 'fb' | 'self', ScaleStripCell> = {
+      // ยอด ณ วันนี้ ไม่มียอดย้อนหลังรายวัน = เทียบไม่ได้ (ห้ามโชว์ช่วงก่อน 0)
+      todo: { n: stuck.data?.requests ? rows.length : null, unit: 'ใบที่เหลือหา', prev: null },
+      done: { n: appsUnknown ? null : kept, unit: 'เก็บไป', prev: appsUnknown ? null : prevKept },
+      src: { n: appsUnknown ? null : cohort.length, unit: 'รายชื่อ', prev: appsUnknown ? null : (prevCohort?.length ?? null) },
+      ch: { n: appsUnknown ? null : channels.total.booked.value, unit: 'นัดได้', prev: appsUnknown ? null : (prevChannels?.total.booked.value ?? null) },
+      fb: { n: posts.so, unit: 'ที่สั่ง', prev: posts.soPrev?.total ?? null, sense: 'plain' },
+      self: { n: posts.manual?.jobs ?? null, unit: 'ใบขอ', prev: posts.manualPrev?.jobs ?? null },
+    };
+    const stuckWait = stuck.error || stuck.data ? null : <Skeleton className="h-64 rounded-2xl" />;
+    const pickedList = picked ? (
+      <div ref={pickedRef} className="scroll-mt-20">
+        <StuckPickedList list={picked} onClose={() => setPicked(null)} onOpenRequest={openRequest} />
+      </div>
+    ) : null;
+    const zone = (() => {
+      switch (section) {
+        case 'todo':
+          return stuck.data?.requests ? (
+            <OverviewCard icon={ListChecks} title={SCALE_TITLES.todo} sub={`ยอด ณ ${formatYmdTh(data.today)}`}>
+              <StuckTodoTable rows={rows} onPick={pick} />
+              {pickedList}
+            </OverviewCard>
+          ) : (
+            stuckWait
+          );
+        case 'done':
+          return (
+            <OverviewCard icon={PhoneCall} title={SCALE_TITLES.done} sub={cohortSub}>
+              {appsUnknown ? appsError : <CallerResultsTable cohort={cohort} onOpen={onOpenNames} prev={prevCohort} prevLabel={prevLabel} />}
+              {appsUnknown ? null : <PersonJourneyCard embedded list={cohort} sub={cohortSub} onOpenNames={onOpenNames} prev={prevCohort} />}
+            </OverviewCard>
+          );
+        case 'src':
+          return (
+            <OverviewCard icon={UserRound} title={SCALE_TITLES.src} sub={cohortSub}>
+              {appsUnknown ? appsError : (
+                <>
+                  {prevCohort ? <DailyCompareChart list={cohort} prevList={prevCohort} from={win.from} to={win.to} prevFrom={win.prevFrom} prevTo={win.prevTo} curLabel={curLabel} prevLabel={prevLabel} /> : null}
+                  <ChannelFunnelTable groups={bringers.groups} total={bringers.total} onOpen={onOpenNames} firstLabel="คนหา" prev={prevBringers} prevLabel={prevLabel} />
+                </>
+              )}
+            </OverviewCard>
+          );
+        case 'ch':
+          return (
+            <OverviewCard icon={Megaphone} title={SCALE_TITLES.ch} sub={channelSub}>
+              {appsUnknown ? appsError : <ChannelFunnelTable groups={channels.groups} total={channels.total} onOpen={onOpenNames} clicks={channels.clicks} prev={prevChannels} prevLabel={prevLabel} />}
+            </OverviewCard>
+          );
+        case 'fb':
+          return <SoPostGroupsCard from={win.from} to={win.to} bu={data.bu} prev={posts.soPrev} />;
+        case 'self':
+          return <ManualPostDaysCard from={win.from} to={win.to} bu={data.bu} prev={posts.manualPrev} prevFrom={win.prevFrom} />;
+        case 'area':
+          return stuck.data?.requests ? (
+            <div className="space-y-4">
+              <StuckAreaTable rows={focused} onPick={pick} />
+              {pickedList}
+            </div>
+          ) : (
+            stuckWait
+          );
+        case 'mon':
+          return <MonthlyBarsCard rows={monthly.data} error={monthly.error} ok={jobOk} onPickMonth={onPickMonth} open={monthlyOpen} onOpen={() => setMonthlyOpen(true)} />;
+        case 'why':
+          return (
+            <OverviewCard icon={AlertCircle} title={SCALE_TITLES.why} sub={`${cohortSub} · ผลล่าสุดของแต่ละคน`}>
+              {appsUnknown ? appsError : <ReasonColumns groups={reasons} onOpen={onOpenNames} prev={prevReasons} />}
+            </OverviewCard>
+          );
+      }
+    })();
+    return (
+      <div className="space-y-6" data-testid="recruit-stuck">
+        <StuckFilterBar rows={allRows} appRecruiters={appRecruiters} value={filter} onChange={setFilter} />
+        {stuck.error || stuck.data?.errors.requests ? (
+          <SectionError message={stuck.error ?? stuck.data?.errors.requests ?? 'อ่านใบขอที่เหลือหาไม่ได้'} onRetry={() => setRev((n) => n + 1)} />
+        ) : null}
+        <RecruitScaleView value={section} onChange={pickSection} strip={strip}>
+          {zone}
+        </RecruitScaleView>
+        <div className="flex justify-end">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => {
+              navigate(legacyReportsPath(win, data.bu, requestFilterToParams(filter)));
+              window.scrollTo({ top: 0 });
+            }}
+            data-testid="v5-legacy-reports"
+          >
+            รายงานเพิ่มเติม (แบบเดิม)
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   if (layout === 'v5') {
     const bringerCard = (

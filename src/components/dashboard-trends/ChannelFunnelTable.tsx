@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils';
 import { formatTrendNumber as fmt } from '@/lib/trends/format';
 import { FUNNEL_COLUMNS, type ChannelFunnelRow, type FunnelNode } from '@/lib/channelFunnel';
 import type { FunnelClickCell } from '@/lib/fbGroupClicks';
+import TrendDelta from './stuck/TrendDelta';
 
 /**
  * ═══ ตาราง "ช่องทาง → แจ้งเข้า" (เจ้าของ 19 ต.ค. 2569 · ทีม Online) ═══
@@ -17,6 +18,8 @@ import type { FunnelClickCell } from '@/lib/fbGroupClicks';
  * 🔴 11 พ.ย. 2569 กางในที่ (เจ้าของ "กด facebook ก็ขยายช่องทางรองออกมา แล้วพวก tiktok ก็ยังอยู่ … ไม่ใช่กดแล้วเด้ง
  *   … กด facebook Group ก็เรียงกลุ่มลงมาเลย แล้วบอกว่ากลุ่มไหนกรอกเยอะ ไปน้อยสุด") — เดิมกดแล้วตารางเปลี่ยนเป็นชั้นลูก
  *   ⇒ ตอนนี้กดแถว = ชั้นลูกกางใต้แถวนั้น แถวอื่นอยู่ที่เดิม · กดซ้ำ = หุบ · ชั้นลูกเรียงรายชื่อ (กรอก) มากไปน้อย
+ * 13 พ.ย. 2569 `prev` = ต้นไม้ชุดเดียวกันของช่วงก่อน → ช่องเทียบช่วงก่อนต่อแถว (รายชื่อ) + แถวช่วงก่อน/เทียบช่วงก่อนใต้รวม
+ *   แถวที่ช่วงก่อนไม่มี = ช่วงก่อน 0 ("ใหม่")
  */
 const pct = (n: number | null, of: number | null) => (n === null || !of ? null : Math.round((n / of) * 100));
 
@@ -44,7 +47,21 @@ const ChannelFunnelTable: React.FC<{
    * แถวที่ไม่มีลิงก์นับคลิก = "—" · ใต้เลขบอกกดสมัคร / สมัครซ้ำโดนกัน เมื่อมี
    */
   clicks?: ReadonlyMap<string, FunnelClickCell>;
-}> = ({ groups, total, onOpen, firstLabel = 'ช่องทาง', clicks }) => {
+  /** ต้นไม้ชุดเดียวกันของช่วงก่อน — ไม่ส่ง = ไม่มีช่องเทียบ (โฉมเดิม) */
+  prev?: { groups: readonly FunnelNode[]; total: ChannelFunnelRow } | null;
+  prevLabel?: string;
+}> = ({ groups, total, onOpen, firstLabel = 'ช่องทาง', clicks, prev, prevLabel = 'ช่วงก่อน' }) => {
+  /** แถวช่วงก่อนตามคีย์เต็มของชั้น (ชุดเดียวกับคีย์กาง/หุบ) */
+  const prevById = React.useMemo(() => {
+    const m = new Map<string, ChannelFunnelRow>();
+    const walk = (nodes: readonly FunnelNode[], prefix: string) =>
+      nodes.forEach((n) => {
+        m.set(`${prefix}/${n.key}`, n);
+        if (n.children) walk(n.children, `${prefix}/${n.key}`);
+      });
+    if (prev) walk(prev.groups, '');
+    return m;
+  }, [prev]);
   /** แถวที่กางอยู่ (คีย์เต็มตามชั้น) — เก็บเป็นคีย์ เลขเปลี่ยนตามช่วงแล้วแถวที่กางไว้ยังกางอยู่ */
   const [open, setOpen] = useState<ReadonlySet<string>>(() => new Set());
   const toggle = (id: string) =>
@@ -81,11 +98,20 @@ const ChannelFunnelTable: React.FC<{
         {clicks ? <ClickCell cell={node ? clicks.get(node.key) : undefined} strong={strong} /> : null}
         {FUNNEL_COLUMNS.map((c) => {
           const cell = r[c.key];
+          const before = strong ? prev?.total : id ? prevById.get(id) : undefined;
+          const trendCell =
+            prev && c.key === 'names' ? (
+              <TableCell key="trend" className="text-right align-top">
+                <span className="inline-flex h-7 items-center">
+                  <TrendDelta cur={cell.value} prev={cell.value === null ? null : (before?.names.value ?? 0)} />
+                </span>
+              </TableCell>
+            ) : null;
           const canOpen = !!onOpen && cell.value !== null && cell.value > 0 && cell.ids.length > 0;
           const text = cell.value === null ? '—' : fmt(cell.value);
           // รายชื่อ = % ของชั้นแม่ · ขั้นอื่น = % ของรายชื่อแถวนี้
           const p = c.key === 'names' ? (strong ? null : pct(cell.value, parentNames)) : pct(cell.value, r.names.value);
-          return (
+          const main = (
             <TableCell key={c.key} className={cn('text-right text-sm tabular-nums', strong && 'font-medium')}>
               {canOpen ? (
                 <Button
@@ -103,6 +129,7 @@ const ChannelFunnelTable: React.FC<{
               <span className="block text-xs font-normal text-muted-foreground">{p === null ? '' : `${p}%`}</span>
             </TableCell>
           );
+          return trendCell ? [main, trendCell] : main;
         })}
       </TableRow>
     );
@@ -130,16 +157,45 @@ const ChannelFunnelTable: React.FC<{
           <TableRow>
             <TableHead className="text-xs">{firstLabel}</TableHead>
             {clicks ? <TableHead className="whitespace-nowrap text-right text-xs">คลิก</TableHead> : null}
-            {FUNNEL_COLUMNS.map((c) => (
+            {FUNNEL_COLUMNS.flatMap((c) => [
               <TableHead key={c.key} className="whitespace-nowrap text-right text-xs">
                 {c.label}
-              </TableHead>
-            ))}
+              </TableHead>,
+              prev && c.key === 'names' ? (
+                <TableHead key="trend" className="whitespace-nowrap text-right text-xs">
+                  เทียบช่วงก่อน
+                </TableHead>
+              ) : null,
+            ])}
           </TableRow>
         </TableHeader>
         <TableBody>
           {rows(groups, 0, '', total.names.value)}
           {line({ ...total, channel: 'รวม' }, { strong: true, parentNames: null })}
+          {prev ? (
+            <>
+              <TableRow data-testid="channel-funnel-prev">
+                <TableCell className="whitespace-nowrap text-sm text-muted-foreground">{prevLabel}</TableCell>
+                {clicks ? <TableCell /> : null}
+                {FUNNEL_COLUMNS.flatMap((c) => [
+                  <TableCell key={c.key} className="text-right text-sm tabular-nums text-muted-foreground">
+                    {prev.total[c.key].value === null ? '—' : fmt(prev.total[c.key].value as number)}
+                  </TableCell>,
+                  c.key === 'names' ? <TableCell key="trend" /> : null,
+                ])}
+              </TableRow>
+              <TableRow data-testid="channel-funnel-delta">
+                <TableCell className="whitespace-nowrap text-sm text-muted-foreground">เทียบช่วงก่อน</TableCell>
+                {clicks ? <TableCell /> : null}
+                {FUNNEL_COLUMNS.flatMap((c) => [
+                  <TableCell key={c.key} className="text-right">
+                    {c.key === 'names' ? null : <TrendDelta cur={total[c.key].value} prev={prev.total[c.key].value} />}
+                  </TableCell>,
+                  c.key === 'names' ? <TableCell key="trend" /> : null,
+                ])}
+              </TableRow>
+            </>
+          ) : null}
         </TableBody>
       </Table>
     </div>

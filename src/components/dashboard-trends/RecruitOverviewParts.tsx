@@ -32,6 +32,7 @@ import type { RecruitAiRow, RecruitBacklog, RecruitStaffRow } from '@/lib/recrui
 import type { RegionCount } from '@/lib/bkkRegion';
 import { journeyPctText, type JourneyStep } from '@/lib/recruitJourney';
 import { DeltaChip } from './TrendParts';
+import TrendDelta from './stuck/TrendDelta';
 
 /**
  * ═══ ชิ้นส่วนหน้า "ภาพรวมงานสรรหา" แบบ iRecruit (30 ก.ย. 2569) ═══
@@ -594,23 +595,45 @@ export function PositionList({ rows }: { rows: readonly PositionRow[] }) {
 /* ─────────── เหตุผลที่ไม่สำเร็จ ─────────── */
 
 /** `onOpen` = กดเหตุผลแล้วเปิดรายชื่อ (4 พ.ย. 2569 "ทุกข้อมูลต้องกดดูได้") · ไม่ส่ง = ตัวเลขเฉย ๆ แบบเดิม */
-export function ReasonColumns({ groups, onOpen }: { groups: readonly ReasonGroup[]; onOpen?: (title: string, ids: readonly string[]) => void }) {
+/**
+ * `prev` (13 พ.ย. 2569 "ต้องดูแนวโน้มได้ เพิ่มหรือลด") = กลุ่มเหตุผลของช่วงก่อน → ป้ายเพิ่มขึ้น/ลดลงทุกบรรทัด (เพิ่ม = แดง)
+ * เหตุที่ช่วงนี้ไม่มีแต่ช่วงก่อนมี ขึ้นท้ายกลุ่มเป็น 0 — ลดลงแล้วยังเห็น
+ */
+export function ReasonColumns({
+  groups,
+  onOpen,
+  prev,
+}: {
+  groups: readonly ReasonGroup[];
+  onOpen?: (title: string, ids: readonly string[]) => void;
+  prev?: readonly ReasonGroup[] | null;
+}) {
   return (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-      {groups.map((g) => (
+      {groups.map((g) => {
+        const pg = prev ? (prev.find((x) => x.key === g.key) ?? { total: 0, reasons: [] }) : null;
+        const prevCount = (label: string) => pg?.reasons.find((x) => x.label === label)?.count ?? 0;
+        const gone = pg ? pg.reasons.filter((x) => !g.reasons.some((r) => r.label === x.label)).map((x) => ({ label: x.label, count: 0, ids: [] as string[] })) : [];
+        const list = [...g.reasons, ...gone];
+        return (
         <div key={g.key} className="space-y-2">
           <p className="flex items-baseline justify-between gap-2 text-sm">
             <span className="font-medium text-foreground">{g.label}</span>
-            <span className={cn('text-xs tabular-nums', DASH.sub)}>{fmt(g.total)} รายชื่อ</span>
+            <span className="flex items-baseline gap-2">
+              {pg ? <TrendDelta cur={g.total} prev={pg.total} sense="bad" /> : null}
+              <span className={cn('text-xs tabular-nums', DASH.sub)}>{fmt(g.total)} รายชื่อ</span>
+            </span>
           </p>
-          {g.reasons.length === 0 ? (
+          {list.length === 0 ? (
             <EmptyNote>ไม่มีข้อมูล</EmptyNote>
           ) : (
             <ul className="space-y-2">
-              {g.reasons.map((r) => (
+              {list.map((r) => (
                 <li key={r.label} className="space-y-1">
                   <div className="flex items-baseline justify-between gap-2 text-sm">
                     <span className="min-w-0 break-words text-foreground">{r.label}</span>
+                    <span className="flex shrink-0 items-baseline gap-2">
+                    {pg ? <TrendDelta cur={r.count} prev={prevCount(r.label)} sense="bad" /> : null}
                     {onOpen && r.ids.length > 0 ? (
                       <Button type="button" variant="ghost" size="xs" className="-mr-2 h-6 shrink-0 px-2 tabular-nums" onClick={() => onOpen(`${g.label} · ${r.label}`, r.ids)}>
                         {fmt(r.count)}
@@ -618,6 +641,7 @@ export function ReasonColumns({ groups, onOpen }: { groups: readonly ReasonGroup
                     ) : (
                       <span className={cn('shrink-0 tabular-nums', DASH.cell)}>{fmt(r.count)}</span>
                     )}
+                    </span>
                   </div>
                   <RatioBar pct={g.total > 0 ? (r.count / g.total) * 100 : null} tone="danger" />
                 </li>
@@ -625,7 +649,8 @@ export function ReasonColumns({ groups, onOpen }: { groups: readonly ReasonGroup
             </ul>
           )}
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

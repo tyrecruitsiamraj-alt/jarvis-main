@@ -12,6 +12,8 @@ import { requestPathOfJobId } from '@/lib/jobNavigation';
 import { fetchManualPostDays } from '@/lib/jobPostActionsApi';
 import type { ManualPostDays } from '@/lib/jobPostActions';
 import { OverviewCard } from '../RecruitOverviewParts';
+import { LINK_CLICKS_SINCE, MANUAL_POSTED_SINCE, comparableSince } from '@/lib/recruitScale';
+import TrendDelta from './TrendDelta';
 
 /**
  * ═══ 6. โพสต์เอง รายวัน (เจ้าของ 13 พ.ย. 2569 "อยากดูจำนวนรวมของแต่ละวัน ว่าโพสต์งานไหนไปบ้างจากโพสต์มือ") ═══
@@ -22,7 +24,23 @@ const th = (n: number) => n.toLocaleString('th-TH');
 /** ป้ายลิงก์เต็ม "Facebook · Facebook Group · ชื่อกลุ่ม" → ชื่อท้ายสุด (ชื่อกลุ่ม/ช่องทาง) */
 const placeName = (label: string) => label.split('·').map((p) => p.trim()).filter(Boolean).pop() ?? label;
 
-export default function ManualPostDaysCard({ from, to, bu }: { from: string; to: string; bu: string | null }) {
+export default function ManualPostDaysCard({
+  from,
+  to,
+  bu,
+  prev,
+  prevFrom,
+}: {
+  from: string;
+  to: string;
+  bu: string | null;
+  /**
+   * ยอดรวมช่วงก่อน (13 พ.ย. 2569 เทียบเพิ่มขึ้น/ลดลง) — ไม่ส่ง = ไม่มีป้ายเทียบ · null = ดึงไม่ได้ ("เทียบไม่ได้")
+   * โพสต์แล้ว/Gen link เริ่มแยก 13 พ.ย. · คลิก เริ่มนับ 10 พ.ย. 2569 — ช่วงก่อนเริ่มก่อนนั้น = บอกวันเริ่มนับ ไม่โชว์ช่วงก่อน 0
+   */
+  prev?: ManualPostDays['total'] | null;
+  prevFrom?: string;
+}) {
   const navigate = useNavigate();
   const [rev, setRev] = React.useState(0);
   const [pick, setPick] = React.useState<string | null>(null);
@@ -43,12 +61,13 @@ export default function ManualPostDaysCard({ from, to, bu }: { from: string; to:
   const d = state.data;
   const picked = pick && d ? (d.days.find((x) => x.day === pick) ?? null) : null;
   /** โพสต์แล้ว = มีลิงก์โพสต์วางกลับมา · Gen link = ยังไม่มี (เจ้าของ 13 พ.ย. 2569) · สองช่องรวม = กลุ่ม/ช่องทางทั้งหมด */
-  const cells: Array<{ key: string; label: string; n: number | null; tone?: keyof typeof TONE }> = [
-    { key: 'jobs', label: 'ใบขอ', n: d ? d.total.jobs : null },
-    { key: 'posted', label: 'โพสต์แล้ว', n: d ? d.total.posted : null, tone: 'success' },
-    { key: 'genlink', label: 'Gen link', n: d ? d.total.places - d.total.posted : null },
-    { key: 'clicks', label: 'คลิก', n: d ? d.total.clicks : null },
-    { key: 'applicants', label: 'กรอก', n: d ? d.total.applicants : null, tone: 'success' },
+  const since = (ymd: string) => (prevFrom && !comparableSince(prevFrom, ymd) ? ymd : null);
+  const cells: Array<{ key: string; label: string; n: number | null; tone?: keyof typeof TONE; before: number | null; since?: string | null }> = [
+    { key: 'jobs', label: 'ใบขอ', n: d ? d.total.jobs : null, before: prev ? prev.jobs : null },
+    { key: 'posted', label: 'โพสต์แล้ว', n: d ? d.total.posted : null, tone: 'success', before: prev ? prev.posted : null, since: since(MANUAL_POSTED_SINCE) },
+    { key: 'genlink', label: 'Gen link', n: d ? d.total.places - d.total.posted : null, before: prev ? prev.places - prev.posted : null, since: since(MANUAL_POSTED_SINCE) },
+    { key: 'clicks', label: 'คลิก', n: d ? d.total.clicks : null, before: prev ? prev.clicks : null, since: since(LINK_CLICKS_SINCE) },
+    { key: 'applicants', label: 'กรอก', n: d ? d.total.applicants : null, tone: 'success', before: prev ? prev.applicants : null },
   ];
 
   return (
@@ -69,6 +88,11 @@ export default function ManualPostDaysCard({ from, to, bu }: { from: string; to:
             <span className={cn('text-xl font-medium tabular-nums', c.n === null || c.n === 0 ? 'text-muted-foreground' : c.tone ? TONE[c.tone].value : 'text-foreground')}>
               {c.n === null ? '—' : th(c.n)}
             </span>
+            {prev === undefined || c.n === null ? null : c.since ? (
+              <span className="text-xs text-muted-foreground">เริ่มนับ {formatYmdTh(c.since)}</span>
+            ) : (
+              <TrendDelta cur={c.n} prev={c.before} />
+            )}
           </div>
         ))}
       </div>
