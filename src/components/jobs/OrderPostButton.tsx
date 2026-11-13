@@ -216,7 +216,8 @@ export default function OrderPostButton({
   const scrapOpen = Boolean(scrapingView?.open);
 
   return (
-    <div className="space-y-3 rounded-xl border border-border/70 p-3" data-testid="order-post">
+    // กรอบซ้อนเอาออก (เจ้าของ 13 พ.ย. 2569 "เส้นกรอบไรไม่รู้เยอะแยะ") — กรอบอยู่ที่ตัวที่วางฟอร์มนี้ชั้นเดียว
+    <div className="space-y-3" data-testid="order-post">
       <div className="space-y-2">
         {statusRow('โพสต์', content, contentView, 'so-status-content')}
         {runMessage ? (
@@ -247,7 +248,7 @@ export default function OrderPostButton({
       </div>
 
       {kind === 'autopost' ? (
-        <div className="rounded-xl border border-border/70 p-3" data-testid="so-order-autopost">
+        <div data-testid="so-order-autopost">
           <AutopostBody
             embedded
             job={job}
@@ -261,12 +262,12 @@ export default function OrderPostButton({
           />
         </div>
       ) : kind === 'manual' ? (
-        <div className="space-y-3 rounded-xl border border-border/70 p-3" data-testid="so-order-manual">
+        <div className="space-y-3" data-testid="so-order-manual">
           {/* 13 พ.ย. 2569 เจ้าของ "อย่าแยกแบบนี้ ทำเหมือนตอน gen link" — ช่องทางหลัก → รอง → (Facebook Group) กลุ่ม ในที่เดียว */}
           <ManualPostPanel job={job} onChanged={onLinksChanged} />
         </div>
       ) : (
-        <div className="space-y-3 rounded-xl border border-border/70 p-3" data-testid="so-order-scrap-form">
+        <div className="space-y-3" data-testid="so-order-scrap-form">
           {/* ค้าง = บอกเหตุ + ส่งอีกครั้ง / ยกเลิกแล้วสั่งใหม่ · กำลังทำ = รอ (เจ้าของ 4 พ.ย. 2569 ฉบับ 9) */}
           {scraping?.status === 'pending' ? (
             <SoStuckPanel

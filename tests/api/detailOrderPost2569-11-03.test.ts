@@ -11,6 +11,7 @@ describe('ใบขอมีแท็บ Autopost / Scrap / โพสต์เ�
     expect(tab).toContain("{tab === 'actions' ? (");
     expect(tab).toContain('<OrderPostButton job={job} onLinksChanged={() => setActionsRev((n) => n + 1)} />');
     expect(tab).toContain('<JobPostActionsPanel jobId={job.id} tab={actionsTab} onTabChange={setActionsTab} reloadKey={actionsRev} />');
+    expect(tab.indexOf('data-testid="unit-actions-done"')).toBeLessThan(tab.indexOf('data-testid="unit-actions-order"'));
     const detail = readFileSync('src/pages/jobs/SiamrajUnitRequestDetailPage.tsx', 'utf8');
     expect(detail).not.toContain('data-testid="detail-order-post"');
     expect(detail).not.toContain('<OrderPostFold');

@@ -201,16 +201,17 @@ const UnitRequestTabPage: React.FC<{ tab: UnitRequestSubTab }> = ({ tab }) => {
         ) : null}
 
         {/* ── Autopost / Scrap / โพสต์เอง (เจ้าของ 13 พ.ย. 2569 "ย้ายไปเป็นอีกแท็บ … เอาทำอะไรไปแล้วโชว์ด้วย") ──
-            ฟอร์มสั่งตัวเดียวกับป๊อปประกาศ (`OrderPostButton`) กางไว้เลย · ข้างล่าง = ทำอะไรไปแล้ว (ตัวเดียวกับป๊อปบนการ์ด) */}
+            บน = ทำอะไรไปแล้ว (ตัวเดียวกับป๊อปบนการ์ด) · ล่าง = ฟอร์มสั่งตัวเดียวกับป๊อปประกาศ (`OrderPostButton`) กางไว้เลย */}
         {tab === 'actions' ? (
           job ? (
             <>
-              <section className="space-y-3 rounded-2xl border border-border bg-card p-4" data-testid="unit-actions-order">
-                <OrderPostButton job={job} onLinksChanged={() => setActionsRev((n) => n + 1)} />
-              </section>
+              {/* ทำอะไรไปแล้ว อยู่บนฟอร์มสั่ง (เจ้าของ 13 พ.ย. 2569 "ทำอะไรไปแล้ว ไว้สูงกว่า") */}
               <section className="space-y-3 rounded-2xl border border-border bg-card p-4" data-testid="unit-actions-done">
                 <h2 className="text-base font-medium text-foreground">ทำอะไรไปแล้ว</h2>
                 <JobPostActionsPanel jobId={job.id} tab={actionsTab} onTabChange={setActionsTab} reloadKey={actionsRev} />
+              </section>
+              <section className="space-y-3 rounded-2xl border border-border bg-card p-4" data-testid="unit-actions-order">
+                <OrderPostButton job={job} onLinksChanged={() => setActionsRev((n) => n + 1)} />
               </section>
             </>
           ) : (

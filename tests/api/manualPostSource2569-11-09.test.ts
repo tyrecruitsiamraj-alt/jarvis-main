@@ -60,6 +60,9 @@ describe('ตารางช่องทางชั้นที่ 4', () => {
     expect(manual).toContain("groups.filter((x) => picked.includes(x.id)), groups, 'manual')");
     expect(manual).toContain('addPostingLink(posting.id, { channelId: c.id, channelLabel: label, note: SO_LINK_NOTE.manual })');
     expect(readFileSync('src/components/jobs/OrderPostButton.tsx', 'utf8')).not.toContain('MANUAL_CHANNEL_OPTIONS');
+    // แก้ข้อความประกาศได้ (13 พ.ย. 2569 "ตอนเลือกโพสต์เองมันไม่มีให้แก้ caption") — ช่องเดียวกับ Autopost
+    expect(manual).toContain('data-testid="manual-post-caption"');
+    expect(manual).toContain('saveUnitFieldOverridesPatch(requestNo, { post_caption: pending.text })');
     expect(readFileSync('src/components/jobs/AutopostDialog.tsx', 'utf8')).toContain("opts.groups, 'autopost')");
     // เตรียมซ้ำในป๊อปเดิมต้องได้ลิงก์เดิม (ทดสอบผ่านหน้าจอ 9 พ.ย. 2569 — เดิมป๊อปไม่จำลิงก์ที่เพิ่งสร้าง)
     expect(readFileSync('src/components/jobs/ManualPostPanel.tsx', 'utf8')).toContain('const current = { ...posting, links: [...posting.links, ...made] };');

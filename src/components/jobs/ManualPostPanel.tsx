@@ -12,7 +12,10 @@ import { jobPostingBody } from '@/lib/recruitPostingDraft';
 import { releaseJobsToPublic } from '@/lib/jobPublicReleaseApi';
 import { applyLinkPath, recruitChannelLabel, type RecruitChannelMatch, type RecruitPosting, type RecruitPostingLink } from '@/lib/recruitPostings';
 import { AUTOPOST_LINK_PLACEHOLDER } from '@/lib/postText';
-import { buildAutopostCaption } from '@/lib/autopostCaption';
+import { AUTOPOST_CAPTION_MAX, buildAutopostCaption } from '@/lib/autopostCaption';
+import { saveUnitFieldOverridesPatch } from '@/lib/siamrajUnitRequestsApi';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { ensureSoGroupLinks } from '@/lib/soGroupLinks';
 import { isFacebookGroupChannel, jobBuOf, SO_LINK_NOTE, soGroupLinkName, type SoOptGroup } from '@/lib/soScraping';
 import SoGroupPicker from '@/components/jobs/SoGroupPicker';
@@ -36,10 +39,35 @@ type Row = { key: string; name: string; group: SoOptGroup | null; link: RecruitP
 export default function ManualPostPanel({ job, onChanged }: { job: JobRequest; onChanged?: () => void }) {
   const looked = useRecruiterContact(job.recruiter_contact ? null : job.recruiter_name);
   const contact = job.recruiter_contact ?? looked;
-  const caption = React.useMemo(
-    () => job.public_post_text?.trim() || buildAutopostCaption(job, { contact, link: AUTOPOST_LINK_PLACEHOLDER }),
-    [job, contact],
-  );
+  /**
+   * ข้อความประกาศแก้ได้ (เจ้าของ 13 พ.ย. 2569 "ตอนเลือกโพสต์เองมันไม่มีให้แก้ caption") — ช่องเดียวกับ Autopost
+   * (`post_caption` ของใบขอ) แก้ที่ไหนก็ใช้ทั้งสองทาง · แก้แล้วบันทึกเองหลังหยุดพิมพ์ · ไม่แก้ = ข้อความที่ระบบร่าง
+   */
+  const draft = React.useMemo(() => buildAutopostCaption(job, { contact, link: AUTOPOST_LINK_PLACEHOLDER }), [job, contact]);
+  const saved = job.public_post_text?.trim() || null;
+  const [caption, setCaption] = React.useState(saved ?? '');
+  const [edited, setEdited] = React.useState(Boolean(saved));
+  const [dirty, setDirty] = React.useState<{ text: string | null } | null>(null);
+  const [captionSave, setCaptionSave] = React.useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  React.useEffect(() => {
+    if (!edited) setCaption(draft);
+  }, [draft, edited]);
+  React.useEffect(() => {
+    if (!dirty) return;
+    const requestNo = (job.request_no ?? '').trim();
+    if (!requestNo) return;
+    const pending = dirty;
+    const t = window.setTimeout(() => {
+      setCaptionSave('saving');
+      saveUnitFieldOverridesPatch(requestNo, { post_caption: pending.text })
+        .then(() => {
+          setCaptionSave('saved');
+          setDirty((cur) => (cur === pending ? null : cur));
+        })
+        .catch(() => setCaptionSave('error'));
+    }, 900);
+    return () => window.clearTimeout(t);
+  }, [dirty, job.request_no]);
   const [groups, setGroups] = React.useState<SoOptGroup[] | null>(null);
   const [postings, setPostings] = React.useState<RecruitPosting[] | null>(null);
   const [picked, setPicked] = React.useState<string[]>([]);
@@ -174,8 +202,61 @@ export default function ManualPostPanel({ job, onChanged }: { job: JobRequest; o
     <div className="space-y-3" data-testid="manual-post">
       <MultiChannelPicker value={channels} onChange={setChannels} />
       {fbGroupChannel ? <SoGroupPicker groups={groups} jobBu={jobBuOf(job)} jobSector={jobUnitSectorOf(job)} value={picked} onChange={setPicked} /> : null}
+      <section className="space-y-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <Label htmlFor={`manual-caption-${job.id}`} className="text-sm font-medium">
+            ข้อความประกาศ
+          </Label>
+          {edited ? (
+            <Button
+              type="button"
+              size="xs"
+              variant="ghost"
+              onClick={() => {
+                setEdited(false);
+                setCaption(draft);
+                setDirty({ text: null });
+              }}
+            >
+              ใช้ข้อความที่ระบบร่าง
+            </Button>
+          ) : null}
+        </div>
+        <Textarea
+          id={`manual-caption-${job.id}`}
+          value={caption}
+          onChange={(e) => {
+            setCaption(e.target.value);
+            setEdited(true);
+            setDirty({ text: e.target.value });
+          }}
+          rows={12}
+          data-testid="manual-post-caption"
+        />
+        <p className={cn('flex justify-between gap-2 text-xs tabular-nums', DASH.muted)}>
+          <span className={captionSave === 'error' || !caption.includes(AUTOPOST_LINK_PLACEHOLDER) ? TONE.danger.value : undefined}>
+            {!caption.includes(AUTOPOST_LINK_PLACEHOLDER)
+              ? `ข้อความต้องมี ${AUTOPOST_LINK_PLACEHOLDER} ตรงที่จะใส่ลิงก์สมัคร`
+              : captionSave === 'saving'
+                ? 'กำลังบันทึก…'
+                : captionSave === 'saved'
+                  ? 'บันทึกแล้ว'
+                  : captionSave === 'error'
+                    ? 'บันทึกไม่สำเร็จ'
+                    : ''}
+          </span>
+          <span className={caption.length > AUTOPOST_CAPTION_MAX ? TONE.danger.value : undefined}>
+            {caption.length.toLocaleString('th-TH')}/{AUTOPOST_CAPTION_MAX.toLocaleString('th-TH')}
+          </span>
+        </p>
+      </section>
       {error ? <p className={cn('text-sm', TONE.danger.value)}>{error}</p> : null}
-      <Button type="button" disabled={busy || linkCount === 0 || missingGroup} onClick={() => void prepare()} data-testid="manual-post-prepare">
+      <Button
+        type="button"
+        disabled={busy || linkCount === 0 || missingGroup || !caption.includes(AUTOPOST_LINK_PLACEHOLDER) || caption.length > AUTOPOST_CAPTION_MAX}
+        onClick={() => void prepare()}
+        data-testid="manual-post-prepare"
+      >
         {busy ? 'กำลังเตรียม…' : missingGroup ? 'เลือกกลุ่ม Facebook' : `เตรียมโพสต์ ${linkCount} ลิงก์`}
       </Button>
     </div>
