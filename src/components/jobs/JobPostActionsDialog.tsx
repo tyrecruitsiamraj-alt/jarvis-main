@@ -63,11 +63,14 @@ export function JobPostActionsPanel({
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [statusPick, setStatusPick] = useState<string | null>(null);
+  /** โพสต์เองแยก 2 แท็บ (เจ้าของ 13 พ.ย. 2569 "พอกดไปเจอ 2 แท็บมี genlink กับ โพสต์") — Gen link = ยังไม่มีลิงก์โพสต์ · โพสต์ = มีลิงก์โพสต์ */
+  const [manualPick, setManualPick] = useState<'gen' | 'posted'>('gen');
 
   useEffect(() => {
     setD(null);
     setError(null);
     setStatusPick(null);
+    setManualPick('gen');
     let alive = true;
     fetchJobPostActionsDetail(jobId)
       .then((v) => alive && setD(v))
@@ -76,7 +79,7 @@ export function JobPostActionsPanel({
       alive = false;
     };
   }, [jobId, reloadKey]);
-  useEffect(() => setPage(1), [tab, statusPick, jobId]);
+  useEffect(() => setPage(1), [tab, statusPick, manualPick, jobId]);
 
   const groups = d?.groups;
   const counts = useMemo(() => {
@@ -85,7 +88,10 @@ export function JobPostActionsPanel({
     return c;
   }, [groups]);
   const groupRows = useMemo(() => (groups?.rows ?? []).filter((r) => !statusPick || r.status === statusPick), [groups, statusPick]);
-  const manualLinks = useMemo(() => (d?.links ?? []).filter((l) => l.origin === 'manual'), [d]);
+  const manualAll = useMemo(() => (d?.links ?? []).filter((l) => l.origin === 'manual'), [d]);
+  const manualGen = useMemo(() => manualAll.filter((l) => !l.post_url), [manualAll]);
+  const manualPosted = useMemo(() => manualAll.filter((l) => l.post_url), [manualAll]);
+  const manualLinks = manualPick === 'posted' ? manualPosted : manualGen;
   const scrapOrders = useMemo(() => (d?.orders ?? []).filter((o) => o.request_type === 'scraping'), [d]);
   const list = tab === 'autopost' ? groupRows : tab === 'manual' ? manualLinks : scrapOrders;
   const pages = Math.max(1, Math.ceil(list.length / PAGE));
@@ -220,23 +226,45 @@ export function JobPostActionsPanel({
 
         {d && tab === 'manual' ? (
           <div className="space-y-3">
+            {/* 2 แท็บ: Gen link (ยังไม่มีลิงก์โพสต์) · โพสต์ (มีลิงก์โพสต์ กดเปิดดูโพสต์) — สองแท็บรวม = ลิงก์ทั้งหมด */}
+            <div className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-border bg-border" role="tablist" data-testid="job-actions-manual-tabs">
+              {(
+                [
+                  { key: 'gen', label: 'Gen link', n: manualGen.length },
+                  { key: 'posted', label: 'โพสต์', n: manualPosted.length },
+                ] as const
+              ).map((c) => (
+                <Button
+                  key={c.key}
+                  type="button"
+                  role="tab"
+                  variant="ghost"
+                  aria-selected={manualPick === c.key}
+                  onClick={() => setManualPick(c.key)}
+                  className={cn('h-full flex-col items-start gap-0.5 rounded-none px-3 py-2 text-left font-normal', manualPick === c.key ? 'bg-muted hover:bg-muted' : 'bg-card')}
+                  data-testid={`job-actions-manual-${c.key}`}
+                >
+                  <span className={cn('text-xs', manualPick === c.key ? 'font-medium text-foreground' : 'text-muted-foreground')}>{c.label}</span>
+                  <span className={cn('text-lg font-medium tabular-nums', c.n > 0 && c.key === 'posted' ? TONE.success.value : 'text-foreground')}>{th(c.n)}</span>
+                </Button>
+              ))}
+            </div>
             <div className="overflow-x-auto">
-              <Table className="min-w-[48rem]">
+              <Table className="min-w-[44rem]">
                 <TableHeader>
                   <TableRow className={DASH.tableHead}>
                     <TableHead className="whitespace-nowrap text-xs">วันที่สร้าง</TableHead>
                     <TableHead className="text-xs">ช่องทาง / กลุ่ม</TableHead>
                     <TableHead className="text-right text-xs">คลิก</TableHead>
                     <TableHead className="text-right text-xs">กรอก</TableHead>
-                    <TableHead className="text-xs">ลิงก์สมัคร</TableHead>
-                    <TableHead className="text-xs">โพสต์</TableHead>
+                    <TableHead className="text-xs">{manualPick === 'posted' ? 'โพสต์' : 'ลิงก์สมัคร'}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {manualLinks.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} className={cn('py-6 text-center text-sm', DASH.sub)}>
-                        ยังไม่มีลิงก์โพสต์เอง
+                      <TableCell colSpan={5} className={cn('py-6 text-center text-sm', DASH.sub)}>
+                        {manualPick === 'posted' ? 'ยังไม่มีกลุ่มที่วางลิงก์โพสต์' : 'ไม่มี Gen link ที่ยังไม่ได้วางลิงก์โพสต์'}
                       </TableCell>
                     </TableRow>
                   ) : (
@@ -246,23 +274,19 @@ export function JobPostActionsPanel({
                         <TableCell className="max-w-80 text-sm">{l.channel_label ?? '—'}</TableCell>
                         <TableCell className="text-right text-sm tabular-nums">{th(l.clicks)}</TableCell>
                         <TableCell className="text-right text-sm tabular-nums">{th(l.applicants)}</TableCell>
-                        <TableCell className="text-xs">
-                          <Button asChild type="button" size="xs" variant="outline">
-                            <a href={`/apply/p/${l.code}`} target="_blank" rel="noopener noreferrer">
-                              <ExternalLink aria-hidden /> เปิดลิงก์
-                            </a>
-                          </Button>
-                        </TableCell>
-                        {/* ลิงก์โพสต์ที่วางกลับมา (13 พ.ย. 2569) — บอกทุกแถวว่ามี/ไม่มี */}
                         <TableCell className="text-xs" data-testid="job-actions-post-cell">
-                          {l.post_url ? (
+                          {manualPick === 'posted' && l.post_url ? (
                             <Button asChild type="button" size="xs" variant="outline">
                               <a href={l.post_url} target="_blank" rel="noopener noreferrer">
                                 <ExternalLink aria-hidden /> เปิดดูโพสต์
                               </a>
                             </Button>
                           ) : (
-                            <span className={cn('whitespace-nowrap', DASH.sub)}>ไม่มีลิงก์โพสต์</span>
+                            <Button asChild type="button" size="xs" variant="outline">
+                              <a href={`/apply/p/${l.code}`} target="_blank" rel="noopener noreferrer">
+                                <ExternalLink aria-hidden /> เปิดลิงก์สมัคร
+                              </a>
+                            </Button>
                           )}
                         </TableCell>
                       </TableRow>

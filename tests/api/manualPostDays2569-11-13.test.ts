@@ -104,7 +104,7 @@ describe('ลิงก์โพสต์ที่วางกลับมา (�
     expect(readFileSync('src/components/dashboard-trends/stuck/ManualPostDaysCard.tsx', 'utf8')).toContain('มีลิงก์โพสต์');
     const dlg = readFileSync('src/components/jobs/JobPostActionsDialog.tsx', 'utf8');
     expect(dlg).toContain('เปิดดูโพสต์');
-    expect(dlg).toContain('ไม่มีลิงก์โพสต์');
+    expect(dlg).toContain('job-actions-manual-tabs');
   });
   it('migration 179 เพิ่มคอลัมน์อย่างเดียว', () => {
     const sql = readFileSync('migrations/179_posting_link_post_url.sql', 'utf8');
