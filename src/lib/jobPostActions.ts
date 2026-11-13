@@ -30,19 +30,23 @@ export type JobPostLinkTotals = { links: number; clicks: number; applicants: num
 export type JobPostScrapView = { orders: number; status: string | null; updated_at: string | null };
 
 /** ยอดต่อใบสำหรับการ์ด */
+/**
+ * โพสต์เองแยก 2 กอง (เจ้าของ 13 พ.ย. 2569 "ถ้ามี Link โพสต์ นับว่าโพสต์ ถ้าไม่มี link กลับมานับเป็นแค่การ Gen link")
+ * `posted` = ลิงก์ที่มีลิงก์โพสต์วางกลับมา · Gen link = `links - posted` ⇒ สองกองรวม = ลิงก์ทั้งหมดเสมอ
+ */
 export type JobPostActionsSummary = {
   autopost: { orders: number } & JobPostLinkTotals;
-  manual: JobPostLinkTotals;
+  manual: JobPostLinkTotals & { posted: number };
   scrap: JobPostScrapView;
 };
 
 export const EMPTY_JOB_POST_ACTIONS: JobPostActionsSummary = {
   autopost: { orders: 0, links: 0, clicks: 0, applicants: 0 },
-  manual: { links: 0, clicks: 0, applicants: 0 },
+  manual: { links: 0, posted: 0, clicks: 0, applicants: 0 },
   scrap: { orders: 0, status: null, updated_at: null },
 };
 
-export type JobPostLinkInput = { job_id: string; note: string | null; created_at: string; hit_count: number; applicants: number };
+export type JobPostLinkInput = { job_id: string; note: string | null; created_at: string; hit_count: number; applicants: number; post_url?: string | null };
 export type JobPostOrderInput = { job_id: string; request_type: 'content' | 'scraping'; status: string; created_at: string; updated_at: string };
 
 /** รวมยอดทุกใบ — ลิงก์แยก Autopost/โพสต์เอง · Scrap = จำนวนคำสั่ง + สถานะของคำสั่งล่าสุด */
@@ -63,8 +67,10 @@ export function summarizeJobPostActions(links: readonly JobPostLinkInput[], orde
   }
   for (const l of links) {
     const s = get(l.job_id);
-    const bucket = jobPostLinkOrigin(l, autopostTimes.get(l.job_id) ?? []) === 'autopost' ? s.autopost : s.manual;
+    const manual = jobPostLinkOrigin(l, autopostTimes.get(l.job_id) ?? []) !== 'autopost';
+    const bucket = manual ? s.manual : s.autopost;
     bucket.links += 1;
+    if (manual && l.post_url) s.manual.posted += 1;
     bucket.clicks += Math.max(0, l.hit_count || 0);
     bucket.applicants += Math.max(0, l.applicants || 0);
   }
@@ -108,8 +114,9 @@ export type ManualPostLinkInput = {
 };
 /** `places` = ป้ายกลุ่ม/ช่องทาง ลิงก์ละอัน · `postUrls` = ลิงก์โพสต์ของป้ายนั้น (null = ยังไม่วาง) ลำดับเดียวกับ `places` */
 export type ManualPostDayJob = { jobId: string; title: string | null; by: string[]; places: string[]; postUrls: Array<string | null>; clicks: number; applicants: number };
-export type ManualPostDay = { day: string; jobs: number; places: number; clicks: number; applicants: number; list: ManualPostDayJob[] };
-export type ManualPostDays = { days: ManualPostDay[]; total: { jobs: number; places: number; clicks: number; applicants: number } };
+/** `places` = กลุ่ม/ช่องทางทั้งหมด = `posted` (มีลิงก์โพสต์) + Gen link (`places - posted`) */
+export type ManualPostDay = { day: string; jobs: number; places: number; posted: number; clicks: number; applicants: number; list: ManualPostDayJob[] };
+export type ManualPostDays = { days: ManualPostDay[]; total: { jobs: number; places: number; posted: number; clicks: number; applicants: number } };
 
 const NO_PLACE = 'ไม่ระบุช่องทาง';
 
@@ -147,9 +154,12 @@ export function manualPostDays(
     .map((day): ManualPostDay => {
       const list = [...(byDay.get(day)?.values() ?? [])].sort((a, b) => b.places.length - a.places.length || a.jobId.localeCompare(b.jobId));
       const sum = (f: (j: ManualPostDayJob) => number) => list.reduce((acc, j) => acc + f(j), 0);
-      return { day, jobs: list.length, places: sum((j) => j.places.length), clicks: sum((j) => j.clicks), applicants: sum((j) => j.applicants), list };
+      return { day, jobs: list.length, places: sum((j) => j.places.length), posted: sum((j) => j.postUrls.filter(Boolean).length), clicks: sum((j) => j.clicks), applicants: sum((j) => j.applicants), list };
     });
-  const total = days.reduce((t, d) => ({ jobs: t.jobs + d.jobs, places: t.places + d.places, clicks: t.clicks + d.clicks, applicants: t.applicants + d.applicants }), { jobs: 0, places: 0, clicks: 0, applicants: 0 });
+  const total = days.reduce(
+    (t, d) => ({ jobs: t.jobs + d.jobs, places: t.places + d.places, posted: t.posted + d.posted, clicks: t.clicks + d.clicks, applicants: t.applicants + d.applicants }),
+    { jobs: 0, places: 0, posted: 0, clicks: 0, applicants: 0 },
+  );
   return { days, total };
 }
 

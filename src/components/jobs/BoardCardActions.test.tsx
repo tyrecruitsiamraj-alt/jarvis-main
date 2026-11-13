@@ -15,7 +15,8 @@ describe('BoardCardActions', () => {
     for (const b of boxes) expect(b.children).toHaveLength(3);
     expect(shape(boxes[0])).toBe(shape(boxes[1]));
     expect(boxes[0].textContent).toContain('0เผยแพร่แล้ว');
-    expect(boxes[1].textContent).toContain('0ลิงก์');
+    expect(boxes[1].textContent).toContain('0โพสต์แล้ว');
+    expect(boxes[1].textContent).toContain('0Gen link');
     expect(boxes[2].textContent).toContain('ยังไม่สั่งสถานะล่าสุด');
   });
   it('ยังโหลดไม่มา: ช่องเดิมขึ้นขีด ไม่ใช่ 0 ปลอม', () => {

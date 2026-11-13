@@ -112,15 +112,16 @@ export default function BoardCardActions({
           <Foot text={dash ? null : `คลิก ${th(a!.autopost.clicks)} · กรอก ${th(a!.autopost.applicants)}`} />
         )}
       </Box>
-      <Box testId="board-action-manual" title="โพสต์เอง" right={dash ? '—' : a!.manual.links === 0 ? 'ยังไม่มีลิงก์' : ''} onClick={() => onOpen('manual')}>
+      {/* โพสต์แล้ว = มีลิงก์โพสต์วางกลับมา · Gen link = ยังไม่มี (เจ้าของ 13 พ.ย. 2569) · สองช่องรวม = ลิงก์ทั้งหมด */}
+      <Box testId="board-action-manual" title="โพสต์เอง" right={dash ? '—' : a!.manual.links === 0 ? 'ยังไม่มีลิงก์' : `${th(a!.manual.links)} ลิงก์`} onClick={() => onOpen('manual')}>
         <Cells
           cells={[
-            { label: 'ลิงก์', value: dash ? null : a!.manual.links },
-            { label: 'คลิก', value: dash ? null : a!.manual.clicks },
+            { label: 'โพสต์แล้ว', value: dash ? null : a!.manual.posted, tone: 'success' },
+            { label: 'Gen link', value: dash ? null : a!.manual.links - a!.manual.posted },
             { label: 'กรอก', value: dash ? null : a!.manual.applicants, tone: 'success' },
           ]}
         />
-        <Foot text={null} />
+        <Foot text={dash ? null : `คลิก ${th(a!.manual.clicks)}`} />
       </Box>
       <Box testId="board-action-scrap" title="Scrap" right={dash ? '—' : a!.scrap.orders === 0 ? 'ยังไม่สั่ง' : `สั่ง ${th(a!.scrap.orders)} ครั้ง`} onClick={() => onOpen('scrap')}>
         <StatusCell label={scrapView ? scrapView.label : dash ? '—' : 'ยังไม่สั่ง'} toneClass={scrapView ? TONE[scrapView.tone].value : 'text-muted-foreground'} />

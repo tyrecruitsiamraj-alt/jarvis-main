@@ -52,8 +52,8 @@ describe('manualPostDays', () => {
     expect(r.days.find((d) => d.day === '2026-11-11')).toMatchObject({ jobs: 1, places: 1, clicks: 3 });
   });
   it('แถวรวม = ผลบวกทุกวัน', () => {
-    const sum = (k: 'jobs' | 'places' | 'clicks' | 'applicants') => r.days.reduce((a, d) => a + d[k], 0);
-    expect(r.total).toEqual({ jobs: sum('jobs'), places: sum('places'), clicks: sum('clicks'), applicants: sum('applicants') });
+    const sum = (k: 'jobs' | 'places' | 'posted' | 'clicks' | 'applicants') => r.days.reduce((a, d) => a + d[k], 0);
+    expect(r.total).toEqual({ jobs: sum('jobs'), places: sum('places'), posted: sum('posted'), clicks: sum('clicks'), applicants: sum('applicants') });
   });
   it('การ์ดอยู่ในหน้าภาพรวมต่อจากโพสต์ลงกลุ่ม Facebook', () => {
     const src = readFileSync('src/components/dashboard-trends/stuck/RecruitStuckBody.tsx', 'utf8');
@@ -110,5 +110,31 @@ describe('ลิงก์โพสต์ที่วางกลับมา (�
     const sql = readFileSync('migrations/179_posting_link_post_url.sql', 'utf8');
     expect(sql).toContain('add column if not exists post_url');
     expect(sql).not.toMatch(/\b(drop|delete|update)\b/i);
+  });
+});
+
+describe('โพสต์แล้ว (มีลิงก์โพสต์) vs Gen link (ไม่มี) — เจ้าของ 13 พ.ย. 2569', () => {
+  it('รายวัน: posted = แถวที่มีลิงก์โพสต์ · Gen link = ที่เหลือ · รวม = กลุ่ม/ช่องทางทั้งหมด', () => {
+    const r = manualPostDays(
+      [L({ post_url: 'https://www.facebook.com/groups/1/posts/2/' }), L({ channel_label: 'B' }), L({ job_id: 'siamraj-sql:OPL6910068', channel_label: 'C' })],
+      new Map(),
+      { from: '2026-11-12', to: '2026-11-12' },
+    );
+    expect(r.days[0]).toMatchObject({ places: 3, posted: 1 });
+    expect(r.total.posted).toBe(1);
+  });
+  it('การ์ดหน้าโพสต์ประกาศ: manual.posted นับลิงก์โพสต์เองที่มีลิงก์โพสต์ (Autopost ไม่นับ)', async () => {
+    const { summarizeJobPostActions } = await import('@/lib/jobPostActions');
+    const base = { job_id: 'siamraj-pre:LBM6909002', created_at: '2026-11-12T03:00:00Z', hit_count: 0, applicants: 0 };
+    const s = summarizeJobPostActions(
+      [
+        { ...base, note: 'โพสต์เอง', post_url: 'https://www.facebook.com/groups/1/posts/2/' },
+        { ...base, note: 'โพสต์เอง', post_url: null },
+        { ...base, note: 'Autopost', post_url: 'https://www.facebook.com/groups/1/posts/3/' },
+      ],
+      [],
+    )['siamraj-pre:LBM6909002'];
+    expect(s.manual).toMatchObject({ links: 2, posted: 1 });
+    expect(s.autopost.links).toBe(1);
   });
 });

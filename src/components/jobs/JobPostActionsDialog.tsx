@@ -106,7 +106,8 @@ export function JobPostActionsPanel({
           key: 'manual',
           title: 'โพสต์เอง',
           right: d.summary.manual.links === 0 ? 'ยังไม่มีลิงก์' : `${th(d.summary.manual.links)} ลิงก์`,
-          sub: `คลิก ${th(d.summary.manual.clicks)} · กรอก ${th(d.summary.manual.applicants)}`,
+          // โพสต์แล้ว = มีลิงก์โพสต์ · Gen link = ยังไม่มี (13 พ.ย. 2569)
+          sub: `โพสต์แล้ว ${th(d.summary.manual.posted)} · Gen link ${th(d.summary.manual.links - d.summary.manual.posted)} · คลิก ${th(d.summary.manual.clicks)} · กรอก ${th(d.summary.manual.applicants)}`,
         },
         {
           key: 'scrap',

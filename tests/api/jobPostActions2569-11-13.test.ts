@@ -24,7 +24,7 @@ describe('ยอดต่อใบ', () => {
       [order('scraping', '2026-11-03T01:11:05Z', 'pending'), order('content', '2026-11-04T01:24:28Z'), order('scraping', '2026-11-05T00:00:00Z', 'in_progress')],
     )[J];
     expect(s.autopost).toEqual({ orders: 1, links: 1, clicks: 3, applicants: 1 });
-    expect(s.manual).toEqual({ links: 2, clicks: 7, applicants: 2 });
+    expect(s.manual).toEqual({ links: 2, posted: 0, clicks: 7, applicants: 2 });
     expect(s.scrap).toEqual({ orders: 2, status: 'in_progress', updated_at: '2026-11-05T00:00:00Z' });
   });
   it('กองสถานะบนการ์ด 3 ช่อง บวกกัน = สั่งทั้งหมดเสมอ (SQ6909009 จริง 22 กลุ่ม)', () => {
