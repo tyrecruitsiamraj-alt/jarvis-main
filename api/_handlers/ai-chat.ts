@@ -88,7 +88,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
 
   const target = await resolveAssistantTarget();
   if (!target) {
-    return res.status(409).json({ ok: false, message: 'ยังไม่ได้ตั้งผู้ช่วย AI — ผู้ดูแลระบบเลือก OpenAI และรุ่นของงาน "ผู้ช่วยแชท" ที่ ตั้งค่า › AI ที่ใช้คิดงาน' });
+    return res.status(409).json({ ok: false, message: 'ยังไม่ได้ตั้งผู้ช่วย AI ให้ผู้ดูแลระบบใส่กุญแจ OpenAI แล้วเลือกรุ่นที่กล่อง "ผู้ช่วย AI" ใน ตั้งค่า › AI ที่ใช้คิดงาน' });
   }
 
   // ข้อความผู้ใช้: ปิดข้อมูลส่วนตัวเป็นป้ายมีเลข (เติมกลับตอนขึ้นการ์ด) · ผลคำสั่งจากเบราว์เซอร์: ปิดแบบไม่มีเลข
