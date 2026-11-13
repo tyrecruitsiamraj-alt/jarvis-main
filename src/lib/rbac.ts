@@ -44,6 +44,8 @@ type RouteRule = {
 const ROUTE_RULES: RouteRule[] = [
   { match: (p) => p === '/admin', minimumRole: 'admin', note: 'admin hub' },
   { match: (p) => p === '/settings' || p.startsWith('/settings/'), minimumRole: 'admin', note: 'settings' },
+  // Flow ระบบ (13 พ.ย. 2569 · เจ้าของ Choice "เห็นแค่ Admin")
+  { match: (p) => p === '/system-flow', minimumRole: 'admin', note: 'system flow' },
   { match: (p) => p === '/supervisor', minimumRole: 'supervisor', note: 'supervisor hub' },
   { match: (p) => p === '/wl/employees/add', minimumRole: 'supervisor', note: 'create employee' },
 ];

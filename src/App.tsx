@@ -83,6 +83,8 @@ const AftercarePage = lazyPage(() => import("@/pages/aftercare/AftercarePage"));
 const SkillQuizPage = lazyPage(() => import("@/pages/skill-quiz/SkillQuizPage"));
 const SupervisorDashboard = lazyPage(() => import("@/pages/dashboard/SupervisorDashboard"));
 const AdminSettings = lazyPage(() => import("@/pages/settings/AdminSettings"));
+// Flow ระบบ — ผังปุ่มไหนกดแล้วไปไหน (13 พ.ย. 2569 · admin เท่านั้น)
+const SystemFlowPage = lazyPage(() => import("@/pages/system-flow/SystemFlowPage"));
 const ChangePasswordPage = lazyPage(() => import("@/pages/ChangePasswordPage"));
 const NotFound = lazyPage(() => import("./pages/NotFound"));
 const RoleHubPage = lazyPage(() => import("./pages/RoleHubPage"));
@@ -189,6 +191,7 @@ const ProtectedRoutes = () => {
             <Route path="/jobs/:id" element={<JobDetailPage />} />
             <Route path="/dashboard" element={<SupervisorDashboard />} />
             <Route path="/settings" element={<AdminSettings />} />
+            <Route path="/system-flow" element={<SystemFlowPage />} />
             <Route path="/account/change-password" element={<ChangePasswordPage />} />
             <Route path="*" element={<NotFound />} />
             </Routes>

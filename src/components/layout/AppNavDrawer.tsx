@@ -7,7 +7,7 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { ExternalLink, KeyRound, ListChecks, LogOut, Settings } from 'lucide-react';
+import { ExternalLink, KeyRound, ListChecks, LogOut, Settings, Workflow } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { consumeBackMarkerForNavigation } from '@/hooks/useCloseOnBack';
 import { useUiV2 } from '@/lib/uiV2';
@@ -245,6 +245,13 @@ const AppNavDrawer: React.FC<Props> = ({
             >
               <Settings className="h-4 w-4 shrink-0" />
               <span className="truncate">ตั้งค่า</span>
+            </button>
+          ) : null}
+          {/* Flow ระบบ — ผังปุ่มไหนกดแล้วไปไหน (เจ้าของ 13 พ.ย. 2569 · admin เท่านั้น) */}
+          {userRole === 'admin' ? (
+            <button type="button" onClick={() => go('/system-flow')} className={rowClass(location.pathname.startsWith('/system-flow'))}>
+              <Workflow className="h-4 w-4 shrink-0" />
+              <span className="truncate">Flow ระบบ</span>
             </button>
           ) : null}
           {/* ย้ายมาจากหัวเว็บ — จอมือถือใส่ปุ่มพวกนี้ไว้บนหัวไม่พอ ปุ่มจะเบียดทับกัน
