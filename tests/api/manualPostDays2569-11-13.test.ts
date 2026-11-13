@@ -73,3 +73,11 @@ describe('กดคัดลอกข้อความ = จดว่าโพ�
     expect(sql).not.toMatch(/\b(drop|delete|update)\b/i);
   });
 });
+
+describe('คนโพสต์ = คนที่กดคัดลอกวันนั้น', () => {
+  it('ใช้ชื่อเล่นคนกดคัดลอกก่อน ไม่มีค่อยใช้คนสร้างลิงก์', () => {
+    const src = readFileSync('api/_lib/jobPostActions.ts', 'utf8');
+    expect(src).toContain('left join ${USERS} bu on bu.id = ev1.by_id');
+    expect(src.indexOf('nullif(btrim(bu.nickname)')).toBeLessThan(src.indexOf("${linkOwnerSql('l.id', 'p.id')}) as created_by_name"));
+  });
+});
