@@ -24,6 +24,11 @@ import { boardCardAge, boardCardGender, boardCardPlace } from '@/lib/boardCardFa
 import { publicWorkSchedule } from '@/lib/publicJobPrivacy';
 import { isOtBenefit, publicBenefitList, publicFieldVisible } from '@/lib/publicFieldVisibility';
 import { benefitDisplayLabels, isRetiredBenefit } from '@/lib/extraBenefits';
+import { INCOME_OTHER_LABEL } from '@/lib/incomeBreakdown';
+import { MANUAL_INCOME_LINE_LABEL, RESIGNED_INCOME_LINE_LABEL } from '@/lib/publicFieldsForm';
+
+/** บรรทัดรายได้ที่เป็นยอดรวมทั้งก้อน (ทางใส่เอง / รายได้คนเก่า) — ไม่ใช่รายการย่อย */
+const TOTAL_INCOME_LABELS = new Set([MANUAL_INCOME_LINE_LABEL, RESIGNED_INCOME_LINE_LABEL]);
 
 export const AUTOPOST_CAPTION_MAX = 2000;
 const GENERIC_TITLE = /^(|อื่น\s?ๆ|พนักงาน|ไม่ระบุ|—)$/;
@@ -88,6 +93,20 @@ export function autopostIncome(job: JobRequest): AutopostIncome | null {
       : null;
   if (d && d.lines.length > 0) {
     const unit = d.period === 'daily' ? 'วัน' : 'เดือน';
+    /**
+     * 🔴 รายได้แบบ "ใส่เอง" / "รายได้โดยประมาณ" = ยอดรวมทั้งก้อนอยู่แล้ว (เจ้าของ 13 พ.ย. 2569 "ทำไมรายได้เป็น 43,250" —
+     * ใส่เอง 23,000 แต่ร่างเอาไปบวกฐาน ERP 13,000 + เงินในสวัสดิการ 7,250 ซ้ำ) ⇒ ยอดรวม = ยอดนั้น ·
+     * ฐาน + เงินในสวัสดิการเป็นรายการย่อยใต้ยอด · ขาดเท่าไหร่ = บรรทัด "อื่น ๆ (เช่น OT)" ให้บวกลงตัว (กติกาเดียวกับ `buildIncomeDisplay`)
+     * รายการย่อยรวมเกินยอดที่ใส่ = ใช้ผลบวก (เลขห้ามโกหกลง)
+     */
+    const totalLine = d.lines.length === 1 && TOTAL_INCOME_LABELS.has(d.lines[0].label) ? d.lines[0] : null;
+    if (totalLine) {
+      const base = unit === 'เดือน' ? erpBase : null;
+      const items = unit === 'เดือน' ? benefitIncomeItems(job).map((b) => ({ label: b.label, amount: b.amount })) : [];
+      const sum = (base ?? 0) + items.reduce((acc, l) => acc + l.amount, 0);
+      if (totalLine.amount > sum && sum > 0) items.push({ label: INCOME_OTHER_LABEL, amount: totalLine.amount - sum });
+      return { unit, base, items, total: Math.max(totalLine.amount, sum) };
+    }
     const baseLine = d.lines.find((l) => l.label === 'ฐานเงินเดือน' && l.amount > 0);
     const base = baseLine ? baseLine.amount : unit === 'เดือน' ? erpBase : null;
     const items = d.lines.filter((l) => l !== baseLine && l.amount > 0).map((l) => ({ label: l.label, amount: l.amount }));

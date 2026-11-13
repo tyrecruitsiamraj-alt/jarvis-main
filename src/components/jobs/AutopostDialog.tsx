@@ -20,7 +20,7 @@ import { jobPostingBody } from '@/lib/recruitPostingDraft';
 import { ensureSoGroupLinks } from '@/lib/soGroupLinks';
 import { releaseJobsToPublic } from '@/lib/jobPublicReleaseApi';
 import { AUTOPOST_LINK_PLACEHOLDER } from '@/lib/postText';
-import { saveUnitFieldOverridesPatch } from '@/lib/siamrajUnitRequestsApi';
+import { saveUnitFieldOverridesPatch, unitRequestNoteKey } from '@/lib/siamrajUnitRequestsApi';
 import { applyLinkPath, type RecruitPosting } from '@/lib/recruitPostings';
 import {
   composeJobSnapshot,
@@ -158,14 +158,15 @@ export function AutopostBody({
   // ตัวรับจากหน้าแม่เป็นฟังก์ชันใหม่ทุกรอบวาด — เก็บใน ref ไม่งั้นบันทึกเสร็จแล้ววนบันทึกซ้ำ
   const onCaptionSavedRef = React.useRef(onCaptionSaved);
   onCaptionSavedRef.current = onCaptionSaved;
+  // คีย์เดียวกับที่ API อ่านกลับ — ใบขอล่วงหน้าใช้ siamraj-pre:<เลข> (13 พ.ย. 2569 แคปชั่น Bitkub เด้งกลับเพราะเคยบันทึกด้วยเลขเปล่า)
+  const noteKey = unitRequestNoteKey(job);
   React.useEffect(() => {
     if (!captionDirty) return;
-    const requestNo = (job.request_no ?? '').trim();
-    if (!requestNo) return;
+    if (!noteKey) return;
     const pending = captionDirty;
     const t = window.setTimeout(() => {
       setCaptionSave('saving');
-      saveUnitFieldOverridesPatch(requestNo, { post_caption: pending.text })
+      saveUnitFieldOverridesPatch(noteKey, { post_caption: pending.text })
         .then(() => {
           setCaptionSave('saved');
           setCaptionDirty((cur) => (cur === pending ? null : cur));
@@ -174,7 +175,7 @@ export function AutopostBody({
         .catch(() => setCaptionSave('error'));
     }, 900);
     return () => window.clearTimeout(t);
-  }, [captionDirty, job.request_no]);
+  }, [captionDirty, noteKey]);
   const [busy, setBusy] = React.useState<'send' | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [sent, setSent] = React.useState<JobPostingRequest | null>(null);

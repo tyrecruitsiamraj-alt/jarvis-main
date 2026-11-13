@@ -17,7 +17,7 @@ import { useRecruiterContact } from '@/hooks/useRecruiterContact';
 import type { JobPostingRequest } from '@/lib/jobPostingRequestsApi';
 import { getJobAgeChipInfo, JOB_AGE_CHIP_META } from '@/lib/jobUrgency';
 import PublishReadinessChip from '@/components/jobs/PublishReadinessChip';
-import { readinessActionText, type PublishReadiness } from '@/lib/publishReadiness';
+import { publishGapsOf, readinessActionText, type PublishReadiness } from '@/lib/publishReadiness';
 import { isHiddenFromPublicByWorkStatus } from '@/lib/publicJobVisibility';
 import { isUnitRequestWorkStatus, UNIT_REQUEST_WORK_STATUS_LABELS } from '@/lib/unitRequestWorkStatus';
 import { releaseSkipText, type JobReleaseSkip } from '@/lib/jobReleaseSkips';
@@ -91,6 +91,11 @@ const BoardJobCard: React.FC<BoardJobCardProps> = ({ job, readiness, applicants,
   const hidden = isUnitRequestWorkStatus(job.work_status) && isHiddenFromPublicByWorkStatus(job.work_status);
   /** ชิปสภาพ — ใบที่ ERP พาไปต่อแล้วและซ่อนจากหน้าสาธารณะมีชิปสถานะงานของตัวเองอยู่แล้ว · ใบที่ตั้งไม่ประกาศมีชิปแดง ⇒ ไม่ซ้ำ */
   const showReadiness = readiness !== null && !(readiness.kind === 'moved' && hidden) && readiness.kind !== 'skipped';
+  /**
+   * ขาดอะไรต้องเตือนทุกใบที่ยังเปิด (เจ้าของ 13 พ.ย. 2569 "ขาดสถานที่เหมือนกันทำไมไม่เตือน") — เดิมป้าย "ขาด:" ขึ้นเฉพาะใบที่ยังหาคน
+   * ใบที่ ERP พาไปขั้นอื่นแล้ว (จ่ายรายวัน/รอเริ่มงาน) หรือประกาศแล้ว ไม่มีป้ายเตือน · ตัวตัดสินเดียว `publishGapsOf` · ใบตั้งไม่ประกาศไม่เตือน
+   */
+  const extraGaps = readiness && readiness.kind !== 'gaps' && readiness.kind !== 'skipped' ? publishGapsOf(job) : [];
 
   return (
     <Card
@@ -130,6 +135,7 @@ const BoardJobCard: React.FC<BoardJobCardProps> = ({ job, readiness, applicants,
         </div>
       </div>
 
+      {extraGaps.length > 0 ? <PublishReadinessChip readiness={{ kind: 'gaps', gaps: extraGaps }} /> : null}
       {/* ── พร้อมประกาศไหม / ขาดอะไร (2 ต.ค. 2569 — แทน "ติดขั้น N" + จุด 4 ขั้น) ── */}
       {showReadiness && readiness ? (
         readiness.kind === 'released' && release ? (

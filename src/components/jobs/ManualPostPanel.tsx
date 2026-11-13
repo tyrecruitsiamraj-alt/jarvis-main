@@ -13,7 +13,7 @@ import { releaseJobsToPublic } from '@/lib/jobPublicReleaseApi';
 import { applyLinkPath, recruitChannelLabel, type RecruitChannelMatch, type RecruitPosting, type RecruitPostingLink } from '@/lib/recruitPostings';
 import { AUTOPOST_LINK_PLACEHOLDER } from '@/lib/postText';
 import { AUTOPOST_CAPTION_MAX, buildAutopostCaption } from '@/lib/autopostCaption';
-import { saveUnitFieldOverridesPatch } from '@/lib/siamrajUnitRequestsApi';
+import { saveUnitFieldOverridesPatch, unitRequestNoteKey } from '@/lib/siamrajUnitRequestsApi';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { ensureSoGroupLinks } from '@/lib/soGroupLinks';
@@ -52,14 +52,15 @@ export default function ManualPostPanel({ job, onChanged }: { job: JobRequest; o
   React.useEffect(() => {
     if (!edited) setCaption(draft);
   }, [draft, edited]);
+  // คีย์เดียวกับที่ API อ่านกลับ — ใบขอล่วงหน้าใช้ siamraj-pre:<เลข> (13 พ.ย. 2569 แคปชั่น Bitkub เด้งกลับเพราะเคยบันทึกด้วยเลขเปล่า)
+  const noteKey = unitRequestNoteKey(job);
   React.useEffect(() => {
     if (!dirty) return;
-    const requestNo = (job.request_no ?? '').trim();
-    if (!requestNo) return;
+    if (!noteKey) return;
     const pending = dirty;
     const t = window.setTimeout(() => {
       setCaptionSave('saving');
-      saveUnitFieldOverridesPatch(requestNo, { post_caption: pending.text })
+      saveUnitFieldOverridesPatch(noteKey, { post_caption: pending.text })
         .then(() => {
           setCaptionSave('saved');
           setDirty((cur) => (cur === pending ? null : cur));
@@ -67,7 +68,7 @@ export default function ManualPostPanel({ job, onChanged }: { job: JobRequest; o
         .catch(() => setCaptionSave('error'));
     }, 900);
     return () => window.clearTimeout(t);
-  }, [dirty, job.request_no]);
+  }, [dirty, noteKey]);
   const [groups, setGroups] = React.useState<SoOptGroup[] | null>(null);
   const [postings, setPostings] = React.useState<RecruitPosting[] | null>(null);
   const [picked, setPicked] = React.useState<string[]>([]);

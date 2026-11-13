@@ -45,7 +45,7 @@ describe('เก็บกับใบขอ', () => {
   it('Autopost บันทึกเฉพาะตอนคนพิมพ์ (เปิดดูไม่เขียนฐาน) · หน้าสาธารณะส่งข้อความที่ตัดลิงก์แล้ว', () => {
     const ap = readFileSync('src/components/jobs/AutopostDialog.tsx', 'utf8');
     expect(ap).toContain('setCaptionDirty({ text: e.target.value });');
-    expect(ap).toContain("saveUnitFieldOverridesPatch(requestNo, { post_caption: pending.text })");
+    expect(ap).toContain("saveUnitFieldOverridesPatch(noteKey, { post_caption: pending.text })");
     expect(readFileSync('api/_handlers/public/jobs.ts', 'utf8')).toContain('public_post_text: publicPostText(');
     expect(readFileSync('api/_handlers/siamraj-unit-requests.ts', 'utf8')).toContain('if (fo.post_caption) it.public_post_text = fo.post_caption;');
   });
