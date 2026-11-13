@@ -96,6 +96,8 @@ export type ManualPostLinkInput = {
   day: string;
   /** มาจากการกดคัดลอกข้อความในหน้าโพสต์เอง (นับเป็นโพสต์เองเสมอ) */
   recorded?: boolean;
+  /** ลิงก์โพสต์ที่วางกลับมา (ไม่บังคับ) */
+  post_url?: string | null;
   note: string | null;
   created_at: string;
   hit_count: number;
@@ -104,7 +106,8 @@ export type ManualPostLinkInput = {
   created_by_name: string | null;
   title: string | null;
 };
-export type ManualPostDayJob = { jobId: string; title: string | null; by: string[]; places: string[]; clicks: number; applicants: number };
+/** `places` = ป้ายกลุ่ม/ช่องทาง ลิงก์ละอัน · `postUrls` = ลิงก์โพสต์ของป้ายนั้น (null = ยังไม่วาง) ลำดับเดียวกับ `places` */
+export type ManualPostDayJob = { jobId: string; title: string | null; by: string[]; places: string[]; postUrls: Array<string | null>; clicks: number; applicants: number };
 export type ManualPostDay = { day: string; jobs: number; places: number; clicks: number; applicants: number; list: ManualPostDayJob[] };
 export type ManualPostDays = { days: ManualPostDay[]; total: { jobs: number; places: number; clicks: number; applicants: number } };
 
@@ -129,10 +132,11 @@ export function manualPostDays(
     const day = l.day;
     if (day < range.from || day > range.to) continue;
     const jobs = byDay.get(day) ?? new Map<string, ManualPostDayJob>();
-    const j = jobs.get(l.job_id) ?? { jobId: l.job_id, title: l.title, by: [], places: [], clicks: 0, applicants: 0 };
+    const j = jobs.get(l.job_id) ?? { jobId: l.job_id, title: l.title, by: [], places: [], postUrls: [], clicks: 0, applicants: 0 };
     const who = (l.created_by_name ?? '').trim();
     if (who && !j.by.includes(who)) j.by.push(who);
     j.places.push((l.channel_label ?? '').trim() || NO_PLACE);
+    j.postUrls.push(l.post_url ?? null);
     j.clicks += Math.max(0, l.hit_count || 0);
     j.applicants += Math.max(0, l.applicants || 0);
     jobs.set(l.job_id, j);
@@ -147,4 +151,21 @@ export function manualPostDays(
     });
   const total = days.reduce((t, d) => ({ jobs: t.jobs + d.jobs, places: t.places + d.places, clicks: t.clicks + d.clicks, applicants: t.applicants + d.applicants }), { jobs: 0, places: 0, clicks: 0, applicants: 0 });
   return { days, total };
+}
+
+export const POST_URL_MAX = 1000;
+/**
+ * ลิงก์โพสต์ที่คนวาง (เจ้าของ 13 พ.ย. 2569 · ไม่บังคับ) — https เท่านั้น (กดแล้วเปิดแท็บใหม่ · กันลิงก์แปลก)
+ * ว่าง = null · ไม่ใช่ลิงก์ https = 'invalid'
+ */
+export function normalizePostUrl(raw: unknown): string | null | 'invalid' {
+  const v = typeof raw === 'string' ? raw.trim() : '';
+  if (!v) return null;
+  if (v.length > POST_URL_MAX) return 'invalid';
+  try {
+    const u = new URL(v);
+    return u.protocol === 'https:' && u.hostname.includes('.') ? u.toString() : 'invalid';
+  } catch {
+    return 'invalid';
+  }
 }

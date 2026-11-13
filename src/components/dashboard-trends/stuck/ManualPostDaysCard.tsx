@@ -151,9 +151,24 @@ export default function ManualPostDaysCard({ from, to, bu }: { from: string; to:
                       {j.title ? <span className={cn('block line-clamp-2 text-xs', DASH.sub)}>{j.title}</span> : null}
                     </TableCell>
                     <TableCell className="text-sm">{j.by.length ? j.by.join(', ') : '—'}</TableCell>
-                    <TableCell className="max-w-72 text-sm">
+                    <TableCell className="max-w-80 text-sm">
                       <span className="tabular-nums">{th(j.places.length)}</span>
-                      <span className={cn('block line-clamp-2 text-xs', DASH.sub)}>{[...new Set(j.places.map(placeName))].join(' · ')}</span>
+                      {/* มีลิงก์โพสต์กี่กลุ่ม (เจ้าของ 13 พ.ย. 2569 "บอกด้วยว่าอันไหนมีลิงค์ที่ไปโพสต์") — มีลิงก์ = กดชื่อกลุ่มเปิดโพสต์ */}
+                      <span className={cn('ml-2 text-xs tabular-nums', DASH.sub)}>มีลิงก์โพสต์ {th(j.postUrls.filter(Boolean).length)}</span>
+                      <span className="mt-0.5 flex flex-wrap gap-x-2 gap-y-0.5 text-xs">
+                        {j.places.map((p, i) => {
+                          const url = j.postUrls[i];
+                          return url ? (
+                            <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="text-primary underline-offset-4 hover:underline" data-testid="manual-post-day-post-link">
+                              {placeName(p)}
+                            </a>
+                          ) : (
+                            <span key={i} className={DASH.sub}>
+                              {placeName(p)}
+                            </span>
+                          );
+                        })}
+                      </span>
                     </TableCell>
                     <TableCell className="text-right text-sm tabular-nums">{th(j.clicks)}</TableCell>
                     <TableCell className="text-right text-sm tabular-nums">{th(j.applicants)}</TableCell>

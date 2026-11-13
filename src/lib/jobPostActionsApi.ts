@@ -16,7 +16,7 @@ export async function fetchJobPostActions(): Promise<Record<string, JobPostActio
 
 export type JobPostActionsDetail = {
   summary: JobPostActionsSummary;
-  links: Array<{ id: string; origin: JobPostLinkOrigin; code: string; channel_label: string | null; created_at: string; created_by_name: string | null; clicks: number; applicants: number }>;
+  links: Array<{ id: string; origin: JobPostLinkOrigin; code: string; channel_label: string | null; created_at: string; created_by_name: string | null; clicks: number; applicants: number; post_url: string | null }>;
   orders: Array<{ request_type: 'content' | 'scraping'; status: string; created_at: string; requested_by_name: string | null; notes: string | null }>;
   groups: { statuses: SoPostGroupStatus[]; rows: SoPostGroupRow[]; error: string | null };
 };
@@ -36,8 +36,9 @@ export async function fetchManualPostDays(opts: { from: string; to: string; bu: 
   return (await r.json()) as ManualPostDays;
 }
 
-/** จดว่าโพสต์เองแล้ววันนี้ (กดคัดลอกข้อความของกลุ่ม/ช่องทาง · 13 พ.ย. 2569) — กดซ้ำวันเดียวกันฝั่ง server ไม่นับเพิ่ม */
-export async function markManualPosted(linkId: string): Promise<void> {
-  const r = await apiFetch('/api/job-post-actions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ link_id: linkId }) });
+/** จดว่าโพสต์เองแล้ววันนี้ (กดคัดลอกข้อความของกลุ่ม/ช่องทาง · 13 พ.ย. 2569) — กดซ้ำวันเดียวกันฝั่ง server ไม่นับเพิ่ม · `postUrl` = ลิงก์โพสต์ที่วาง (ไม่ส่ง = คงเดิม) */
+export async function markManualPosted(linkId: string, postUrl?: string | null): Promise<void> {
+  const body = postUrl === undefined ? { link_id: linkId } : { link_id: linkId, post_url: postUrl };
+  const r = await apiFetch('/api/job-post-actions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   if (!r.ok) return readError(r);
 }

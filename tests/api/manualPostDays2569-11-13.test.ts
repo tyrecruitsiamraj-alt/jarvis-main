@@ -81,3 +81,34 @@ describe('คนโพสต์ = คนที่กดคัดลอกวั�
     expect(src.indexOf('nullif(btrim(bu.nickname)')).toBeLessThan(src.indexOf("${linkOwnerSql('l.id', 'p.id')}) as created_by_name"));
   });
 });
+
+describe('ลิงก์โพสต์ที่วางกลับมา (ไม่บังคับ · บอกว่ามี/ไม่มี)', () => {
+  it('รับเฉพาะ https · ว่าง = ไม่มี', async () => {
+    const { normalizePostUrl } = await import('@/lib/jobPostActions');
+    expect(normalizePostUrl('')).toBeNull();
+    expect(normalizePostUrl(' https://www.facebook.com/groups/1/posts/2/ ')).toBe('https://www.facebook.com/groups/1/posts/2/');
+    expect(normalizePostUrl('http://facebook.com/x')).toBe('invalid');
+    expect(normalizePostUrl('javascript:alert(1)')).toBe('invalid');
+    expect(normalizePostUrl('facebook.com/x')).toBe('invalid');
+  });
+  it('รายวันเก็บลิงก์โพสต์ต่อกลุ่ม ลำดับเดียวกับป้าย', () => {
+    const r = manualPostDays(
+      [L({ post_url: 'https://www.facebook.com/groups/1/posts/2/' }), L({ channel_label: 'Facebook · Facebook Group · กลุ่ม B' })],
+      new Map(),
+      { from: '2026-11-12', to: '2026-11-12' },
+    );
+    expect(r.days[0].list[0].postUrls).toEqual(['https://www.facebook.com/groups/1/posts/2/', null]);
+  });
+  it('จอ: ช่องวางลิงก์อยู่ทุกแถวของโพสต์เอง · การ์ด 6 บอกจำนวนที่มีลิงก์ · ป๊อปบอกทุกแถวว่ามี/ไม่มี', () => {
+    expect(readFileSync('src/components/jobs/ManualPostPanel.tsx', 'utf8')).toContain('placeholder="วางลิงก์โพสต์ (ถ้ามี)"');
+    expect(readFileSync('src/components/dashboard-trends/stuck/ManualPostDaysCard.tsx', 'utf8')).toContain('มีลิงก์โพสต์');
+    const dlg = readFileSync('src/components/jobs/JobPostActionsDialog.tsx', 'utf8');
+    expect(dlg).toContain('เปิดดูโพสต์');
+    expect(dlg).toContain('ไม่มีลิงก์โพสต์');
+  });
+  it('migration 179 เพิ่มคอลัมน์อย่างเดียว', () => {
+    const sql = readFileSync('migrations/179_posting_link_post_url.sql', 'utf8');
+    expect(sql).toContain('add column if not exists post_url');
+    expect(sql).not.toMatch(/\b(drop|delete|update)\b/i);
+  });
+});

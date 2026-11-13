@@ -37,8 +37,9 @@ const USERS = tableInAppSchema('users');
 const SO_POST_FROM = '2026-10-01';
 
 async function loadLinks(jobId?: string) {
-  const { rows } = await dbQuery<JobPostLinkInput & { id: string; code: string; channel_label: string | null; fb_group_id: string | null; created_by_name: string | null }>(
+  const { rows } = await dbQuery<JobPostLinkInput & { id: string; code: string; channel_label: string | null; fb_group_id: string | null; created_by_name: string | null; post_url: string | null }>(
     `select l.id::text, p.job_id, l.note, l.created_at, l.hit_count, l.code, l.channel_label, l.fb_group_id, p.created_by_name,
+       (select x.post_url from ${POSTS} x where x.link_id = l.id and x.post_url is not null order by x.day desc limit 1) as post_url,
        coalesce(a.n, 0)::int as applicants
      from ${LINKS} l join ${POSTINGS} p on p.id = l.posting_id
      left join (select link_id, count(*) as n from ${APPS} where link_id is not null group by link_id) a on a.link_id = l.id
@@ -69,7 +70,7 @@ export async function listJobPostActions(allowJob: (jobId: string) => boolean): 
 
 export type JobPostActionsDetail = {
   summary: JobPostActionsSummary;
-  links: Array<{ id: string; origin: JobPostLinkOrigin; code: string; channel_label: string | null; created_at: string; created_by_name: string | null; clicks: number; applicants: number }>;
+  links: Array<{ id: string; origin: JobPostLinkOrigin; code: string; channel_label: string | null; created_at: string; created_by_name: string | null; clicks: number; applicants: number; post_url: string | null }>;
   orders: Array<{ request_type: 'content' | 'scraping'; status: string; created_at: string; requested_by_name: string | null; notes: string | null }>;
   groups: { statuses: SoPostGroupStatus[]; rows: SoPostGroupRow[]; error: string | null };
 };
@@ -97,6 +98,7 @@ export async function getJobPostActions(jobId: string, requestNo: string): Promi
         created_by_name: l.created_by_name,
         clicks: l.hit_count,
         applicants: l.applicants,
+        post_url: l.post_url,
       }))
       .reverse(),
     orders: orders
@@ -118,12 +120,13 @@ export async function linkJobId(linkId: string): Promise<string | null> {
   return rows[0]?.job_id ?? null;
 }
 
-export async function recordManualPost(linkId: string, by: { id: string | null; name: string | null }): Promise<void> {
+/** `postUrl` = ลิงก์โพสต์ที่วาง (ไม่ส่ง = คงของเดิม) · วางลิงก์ = นับว่าโพสต์วันนี้ด้วย */
+export async function recordManualPost(linkId: string, by: { id: string | null; name: string | null }, postUrl?: string | null): Promise<void> {
   await dbQuery(
-    `insert into ${POSTS} (link_id, day, posted_by_user_id, posted_by_name)
-     values ($1::uuid, (now() at time zone 'Asia/Bangkok')::date, $2::uuid, $3)
-     on conflict (link_id, day) do nothing`,
-    [linkId, by.id, by.name],
+    `insert into ${POSTS} (link_id, day, posted_by_user_id, posted_by_name, post_url)
+     values ($1::uuid, (now() at time zone 'Asia/Bangkok')::date, $2::uuid, $3, $4)
+     on conflict (link_id, day) do update set post_url = case when $5::boolean then excluded.post_url else ${POSTS}.post_url end`,
+    [linkId, by.id, by.name, postUrl ?? null, postUrl !== undefined],
   );
 }
 
@@ -136,16 +139,17 @@ export async function recordManualPost(linkId: string, by: { id: string | null; 
 export async function loadManualPostDays(opts: { from: string; to: string; buSet: BuSet }): Promise<ManualPostDays> {
   const { rows } = await dbQuery<ManualPostLinkInput & { link_id: string; recorded: boolean }>(
     `with ev as (
-       select l.id as link_id, (l.created_at at time zone 'Asia/Bangkok')::date as day, false as recorded, null::uuid as by_id, null::text as by_name
+       select l.id as link_id, (l.created_at at time zone 'Asia/Bangkok')::date as day, false as recorded, null::uuid as by_id, null::text as by_name, null::text as post_url
          from ${LINKS} l
         where l.created_at >= ($1::date)::timestamp at time zone 'Asia/Bangkok'
           and l.created_at < ($2::date + 1)::timestamp at time zone 'Asia/Bangkok'
        union all
-       select x.link_id, x.day, true, x.posted_by_user_id, x.posted_by_name from ${POSTS} x where x.day between $1::date and $2::date
+       select x.link_id, x.day, true, x.posted_by_user_id, x.posted_by_name, x.post_url from ${POSTS} x where x.day between $1::date and $2::date
      ), ev1 as (
-       select link_id, day, bool_or(recorded) as recorded, max(by_id::text)::uuid as by_id, max(by_name) as by_name from ev group by link_id, day
+       select link_id, day, bool_or(recorded) as recorded, max(by_id::text)::uuid as by_id, max(by_name) as by_name, max(post_url) as post_url
+         from ev group by link_id, day
      )
-     select l.id::text as link_id, ev1.recorded, p.job_id, l.note, l.created_at, to_char(ev1.day, 'YYYY-MM-DD') as day,
+     select l.id::text as link_id, ev1.recorded, ev1.post_url, p.job_id, l.note, l.created_at, to_char(ev1.day, 'YYYY-MM-DD') as day,
        coalesce(h.hits, 0)::int as hit_count, l.channel_label, p.title,
        coalesce(nullif(btrim(bu.nickname), ''), nullif(btrim(bu.full_name), ''), nullif(split_part(btrim(ev1.by_name), '@', 1), ''),
                 ${linkOwnerSql('l.id', 'p.id')}) as created_by_name,

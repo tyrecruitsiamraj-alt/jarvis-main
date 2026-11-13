@@ -2,7 +2,7 @@
  * GET /api/job-post-actions            → ยอด "ทำอะไรไปแล้ว" ทุกใบ (การ์ดหน้าโพสต์ประกาศ · เจ้าของ 13 พ.ย. 2569)
  * GET /api/job-post-actions?job=<id>   → รายละเอียดใบเดียว (ป๊อป: Autopost รายกลุ่ม · ลิงก์โพสต์เอง · คำสั่ง Scrap)
  * GET /api/job-post-actions?days=1&from=&to=&bu= → โพสต์เองรายวัน (การ์ด 6 หน้าภาพรวม · BU แบบหน้าภาพรวม)
- * POST /api/job-post-actions { link_id }       → จดว่าโพสต์เองแล้ววันนี้ (กดคัดลอกข้อความในหน้าโพสต์เอง · 13 พ.ย. 2569)
+ * POST /api/job-post-actions { link_id, post_url? } → จดว่าโพสต์เองแล้ววันนี้ (กดคัดลอกข้อความ / วางลิงก์โพสต์ในหน้าโพสต์เอง · 13 พ.ย. 2569)
  * อ่านอย่างเดียว · สิทธิ์เดียวกับหน้าโพสต์ประกาศ (`job-applications`) · จำกัด BU ตามเลขใบขอแบบเส้น board ของ So Scraping
  */
 import { withRbac, sendError, handleApiError, type ApiRes, type AuthedReq } from '../_lib/http.js';
@@ -11,6 +11,7 @@ import { getJobPostActions, linkJobId, listJobPostActions, loadManualPostDays, r
 import { loadMatchingBuScope } from '../_lib/departmentScope.js';
 import { pickDashboardBuSet } from '../_lib/homeBuSql.js';
 import { requestNoOf } from '../../src/lib/jobKeyIndex.js';
+import { normalizePostUrl } from '../../src/lib/jobPostActions.js';
 
 const one = (v: unknown) => (Array.isArray(v) ? v[0] : v);
 const OUT_OF_SCOPE = 'ไม่มีสิทธิ์ดูใบขอนี้';
@@ -21,13 +22,16 @@ async function handler(req: AuthedReq, res: ApiRes) {
   const method = (req.method || 'GET').toUpperCase();
   if (method === 'POST') {
     try {
-      const linkId = String((req.body as { link_id?: unknown } | undefined)?.link_id ?? '').trim();
+      const b = (req.body ?? {}) as { link_id?: unknown; post_url?: unknown };
+      const linkId = String(b.link_id ?? '').trim();
       if (!UUID.test(linkId)) return sendError(res, 400, 'bad_request', 'ไม่รู้ว่าลิงก์ไหน');
+      const postUrl = 'post_url' in b ? normalizePostUrl(b.post_url) : undefined;
+      if (postUrl === 'invalid') return sendError(res, 400, 'bad_request', 'ลิงก์โพสต์ต้องขึ้นต้นด้วย https://');
       const jobId = await linkJobId(linkId);
       if (!jobId) return sendError(res, 404, 'not_found', 'ไม่พบลิงก์นี้');
       const scoped = await loadScopedRequestNoSet(req.user);
       if (scoped !== null && !scoped.has(requestNoOf(jobId))) return sendError(res, 403, 'Forbidden', OUT_OF_SCOPE);
-      await recordManualPost(linkId, { id: req.user?.sub ?? null, name: req.user?.email ?? null });
+      await recordManualPost(linkId, { id: req.user?.sub ?? null, name: req.user?.email ?? null }, postUrl);
       return res.status(200).json({ ok: true });
     } catch (e) {
       return handleApiError(res, e, 'job-post-actions.record', { userId: req.user?.sub });

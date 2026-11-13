@@ -24,6 +24,8 @@ import { syncCaptionLink } from '@/components/jobs/AutopostDialog';
 import { copyText } from '@/lib/copyText';
 import { useBuLineId } from '@/lib/buLineIdsApi';
 import { markManualPosted } from '@/lib/jobPostActionsApi';
+import { normalizePostUrl } from '@/lib/jobPostActions';
+import { Input } from '@/components/ui/input';
 
 /** แถวที่เตรียมแล้ว — ลิงก์ละแถว · กลุ่ม Facebook มี `group` (ปุ่มเปิดกลุ่ม) · ช่องทางอื่นไม่มี */
 type Row = { key: string; name: string; group: SoOptGroup | null; link: RecruitPostingLink };
@@ -83,6 +85,9 @@ export default function ManualPostPanel({ job, onChanged }: { job: JobRequest; o
   const missingGroup = fbGroupChannel && picked.length === 0;
   const [rows, setRows] = React.useState<Row[] | null>(null);
   const [copied, setCopied] = React.useState<ReadonlySet<string>>(new Set());
+  /** ลิงก์โพสต์ที่วางกลับมา (เจ้าของ 13 พ.ย. 2569 Choice "ทำ ไม่บังคับ") — แถวละช่อง อยู่ตั้งแต่เตรียมโพสต์ (ไม่โผล่ทีหลังให้ของขยับ) */
+  const [postUrls, setPostUrls] = React.useState<Record<string, string>>({});
+  const [postUrlState, setPostUrlState] = React.useState<Record<string, { saved: string | null; error: string | null; busy: boolean }>>({});
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -136,6 +141,8 @@ export default function ManualPostPanel({ job, onChanged }: { job: JobRequest; o
       const current = { ...posting, links: [...posting.links, ...made] };
       setPostings((prev) => [current, ...(prev ?? []).filter((p) => p.id !== current.id)]);
       setRows(out);
+      setPostUrls({});
+      setPostUrlState({});
       if (made.length > 0) onChanged?.();
       setCopied(new Set());
     } catch (e) {
@@ -158,6 +165,25 @@ export default function ManualPostPanel({ job, onChanged }: { job: JobRequest; o
     }
     // คัดลอก = วันนี้โพสต์กลุ่มนี้ (เจ้าของ 13 พ.ย. 2569 Choice "คัดลอกข้อความ") — นับในการ์ด 6 หน้าภาพรวม · จดไม่ได้ต้องบอก ไม่กลืนเงียบ
     markManualPosted(r.link.id).catch((e: unknown) => setError(`คัดลอกแล้ว แต่ระบบนับการโพสต์ไม่ได้ (${e instanceof Error ? e.message : 'ลองกดอีกครั้ง'})`));
+  };
+
+  /** บันทึกลิงก์โพสต์ของแถว — ตอนออกจากช่อง/กด Enter · ค่าเดิม = ไม่ยิงซ้ำ · ผิดรูปแบบบอกใต้ช่อง */
+  const savePostUrl = async (r: Row) => {
+    const raw = (postUrls[r.key] ?? '').trim();
+    const cur = postUrlState[r.key];
+    if (cur?.busy || raw === (cur?.saved ?? '')) return;
+    const v = normalizePostUrl(raw);
+    if (v === 'invalid') {
+      setPostUrlState((m) => ({ ...m, [r.key]: { saved: cur?.saved ?? null, error: 'ลิงก์ต้องขึ้นต้นด้วย https://', busy: false } }));
+      return;
+    }
+    setPostUrlState((m) => ({ ...m, [r.key]: { saved: cur?.saved ?? null, error: null, busy: true } }));
+    try {
+      await markManualPosted(r.link.id, v);
+      setPostUrlState((m) => ({ ...m, [r.key]: { saved: v, error: null, busy: false } }));
+    } catch (e) {
+      setPostUrlState((m) => ({ ...m, [r.key]: { saved: cur?.saved ?? null, error: e instanceof Error ? e.message : 'บันทึกไม่ได้', busy: false } }));
+    }
   };
 
   if (rows) {
@@ -196,6 +222,26 @@ export default function ManualPostPanel({ job, onChanged }: { job: JobRequest; o
                     ไม่มีลิงก์กลุ่ม
                   </Button>
                 )}
+                <div className="flex w-full items-center gap-2">
+                  <Input
+                    value={postUrls[r.key] ?? ''}
+                    placeholder="วางลิงก์โพสต์ (ถ้ามี)"
+                    inputMode="url"
+                    className="h-8 text-sm"
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setPostUrls((m) => ({ ...m, [r.key]: v }));
+                    }}
+                    onBlur={() => void savePostUrl(r)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') void savePostUrl(r);
+                    }}
+                    data-testid="manual-post-url"
+                  />
+                  <span className={cn('w-32 shrink-0 text-xs', postUrlState[r.key]?.error ? TONE.danger.value : postUrlState[r.key]?.saved ? TONE.success.value : DASH.sub)}>
+                    {postUrlState[r.key]?.busy ? 'กำลังบันทึก…' : postUrlState[r.key]?.error ? postUrlState[r.key]?.error : postUrlState[r.key]?.saved ? 'มีลิงก์โพสต์' : 'ยังไม่มีลิงก์โพสต์'}
+                  </span>
+                </div>
               </li>
             );
           })}

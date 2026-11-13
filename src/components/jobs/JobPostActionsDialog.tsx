@@ -220,20 +220,21 @@ export function JobPostActionsPanel({
         {d && tab === 'manual' ? (
           <div className="space-y-3">
             <div className="overflow-x-auto">
-              <Table className="min-w-[40rem]">
+              <Table className="min-w-[48rem]">
                 <TableHeader>
                   <TableRow className={DASH.tableHead}>
                     <TableHead className="whitespace-nowrap text-xs">วันที่สร้าง</TableHead>
                     <TableHead className="text-xs">ช่องทาง / กลุ่ม</TableHead>
                     <TableHead className="text-right text-xs">คลิก</TableHead>
                     <TableHead className="text-right text-xs">กรอก</TableHead>
-                    <TableHead className="text-xs">ลิงก์</TableHead>
+                    <TableHead className="text-xs">ลิงก์สมัคร</TableHead>
+                    <TableHead className="text-xs">โพสต์</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {manualLinks.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={5} className={cn('py-6 text-center text-sm', DASH.sub)}>
+                      <TableCell colSpan={6} className={cn('py-6 text-center text-sm', DASH.sub)}>
                         ยังไม่มีลิงก์โพสต์เอง
                       </TableCell>
                     </TableRow>
@@ -250,6 +251,18 @@ export function JobPostActionsPanel({
                               <ExternalLink aria-hidden /> เปิดลิงก์
                             </a>
                           </Button>
+                        </TableCell>
+                        {/* ลิงก์โพสต์ที่วางกลับมา (13 พ.ย. 2569) — บอกทุกแถวว่ามี/ไม่มี */}
+                        <TableCell className="text-xs" data-testid="job-actions-post-cell">
+                          {l.post_url ? (
+                            <Button asChild type="button" size="xs" variant="outline">
+                              <a href={l.post_url} target="_blank" rel="noopener noreferrer">
+                                <ExternalLink aria-hidden /> เปิดดูโพสต์
+                              </a>
+                            </Button>
+                          ) : (
+                            <span className={cn('whitespace-nowrap', DASH.sub)}>ไม่มีลิงก์โพสต์</span>
+                          )}
                         </TableCell>
                       </TableRow>
                     ))
