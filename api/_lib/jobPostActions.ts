@@ -10,6 +10,7 @@ import { toBangkokYmd } from './businessDate.js';
 import { buMatchSql, type BuSet } from './homeBuSql.js';
 import { linkBuSql } from './postingLinkHits.js';
 import { linkOwnerSql } from './recruitPostings.js';
+import { STAFF_NAME_SQL } from './staffNameSql.js';
 import {
   EMPTY_JOB_POST_ACTIONS,
   jobPostLinkOrigin,
@@ -52,8 +53,10 @@ async function loadLinks(jobId?: string) {
 
 async function loadOrders(jobId?: string) {
   const { rows } = await dbQuery<JobPostOrderInput & { request_no: string | null; requested_by_name: string | null; notes: string | null }>(
-    `select job_id, request_no, request_type, status, created_at, updated_at, requested_by_name, notes
-     from ${ORDERS} ${jobId ? 'where job_id = $1' : ''} order by created_at`,
+    // คนสั่ง = ชื่อเล่น (เจ้าของ 13 พ.ย. 2569 Choice "ชื่อเล่น" แทนอีเมล)
+    `select o.job_id, o.request_no, o.request_type, o.status, o.created_at, o.updated_at,
+       ${STAFF_NAME_SQL('u', 'o.requested_by_name')} as requested_by_name, o.notes
+     from ${ORDERS} o left join ${USERS} u on u.id = o.requested_by_user_id ${jobId ? 'where o.job_id = $1' : ''} order by o.created_at`,
     jobId ? [jobId] : [],
   );
   return rows;

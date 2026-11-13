@@ -1,5 +1,6 @@
 import { dbQuery, isPgUndefinedTable } from './postgres.js';
 import { tableInAppSchema } from './schema.js';
+import { STAFF_NAME_SQL } from './staffNameSql.js';
 import { isAttendanceResult, type AttendanceResult } from '../../src/lib/appointmentAttendance.js';
 
 const table = tableInAppSchema('application_appointment_results');
@@ -97,10 +98,12 @@ export async function loadLatestAttendanceByApplication(
 /** ประวัติผลนัดของใบเดียว (ล่าสุดก่อน) */
 export async function listAttendanceLogs(applicationId: string): Promise<AttendanceLog[]> {
   try {
+    // บันทึกโดย = ชื่อเล่น (เจ้าของ 13 พ.ย. 2569 Choice "ชื่อเล่น") — ตัวเดียวกับประวัติติดต่อ `STAFF_NAME_SQL`
     const { rows } = await dbQuery<Row>(
-      `select ${COLS} from ${table}
-        where application_id = $1
-        order by created_at desc
+      `select ${COLS.split(',').map((c) => c.trim()).map((c) => (c === 'recorded_by_name' ? `${STAFF_NAME_SQL('u', 'a.recorded_by_name')} as recorded_by_name` : `a.${c}`)).join(', ')}
+         from ${table} a left join ${tableInAppSchema('users')} u on u.id = a.recorded_by
+        where a.application_id = $1
+        order by a.created_at desc
         limit 50`,
       [applicationId],
     );

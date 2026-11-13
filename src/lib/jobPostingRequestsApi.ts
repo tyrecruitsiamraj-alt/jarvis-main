@@ -150,7 +150,17 @@ export async function fetchSoRunMessage(requestNo: string): Promise<string | nul
   const r = await apiFetch(`/api/matching/job-postings?run_message=1&request_no=${encodeURIComponent(requestNo)}`);
   if (!r.ok) return null;
   const d = (await r.json().catch(() => ({}))) as { run_message?: unknown };
-  return typeof d.run_message === 'string' && d.run_message.trim() ? d.run_message.trim() : null;
+  return typeof d.run_message === 'string' ? soRunMessageShown(d.run_message) : null;
+}
+
+/**
+ * ข้อความรอบล่าสุดจาก So Scraping ที่ขึ้นจอ — "Worker run completed" ไม่โชว์ (เจ้าของ 13 พ.ย. 2569 Choice "ไม่โชว์":
+ * ป้ายสถานะบอกว่าโพสต์แล้วอยู่แล้ว) · ข้อความอื่น (ข้ามกลุ่ม · เตือน) ขึ้นตามเดิม
+ */
+export function soRunMessageShown(raw: string | null | undefined): string | null {
+  const m = (raw ?? '').trim();
+  if (!m || /^worker run completed\.?$/i.test(m)) return null;
+  return m;
 }
 
 /** `requestNo` = ส่งเลขใบขอให้ So Scraping บอกกลุ่มที่ใบนี้เพิ่งลง (`repostWait` · สเปค 6.2) */

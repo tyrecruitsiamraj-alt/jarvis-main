@@ -1,5 +1,6 @@
 import { dbQuery, isPgUndefinedTable } from './postgres.js';
 import { tableInAppSchema } from './schema.js';
+import { STAFF_NAME_SQL } from './staffNameSql.js';
 
 const table = tableInAppSchema('application_contact_logs');
 const usersTable = tableInAppSchema('users');
@@ -139,8 +140,11 @@ export async function createContactLog(input: CreateContactLogInput): Promise<Co
 /** ประวัติการติดต่อของใบ (ล่าสุดก่อน) — ตารางยังไม่ migrate คืนว่าง ไม่พัง */
 export async function listContactLogs(applicationId: string): Promise<ContactLog[]> {
   try {
+    // บันทึกโดย = ชื่อเล่น (เจ้าของ 13 พ.ย. 2569 Choice "ชื่อเล่น") — ไม่ได้ตั้ง = ชื่อในบัญชี → ส่วนหน้า @ ของอีเมล · ไม่โชว์อีเมลเต็ม
     const { rows } = await dbQuery<Row>(
-      `select ${COLS} from ${table} where application_id = $1 order by created_at desc limit 50`,
+      `select ${COLS.split(',').map((c) => c.trim()).map((c) => (c === 'created_by_name' ? `${STAFF_NAME_SQL('u', 'c.created_by_name')} as created_by_name` : `c.${c}`)).join(', ')}
+         from ${table} c left join ${usersTable} u on u.id = c.created_by
+        where c.application_id = $1 order by c.created_at desc limit 50`,
       [applicationId],
     );
     return rows.map(mapRow);

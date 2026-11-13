@@ -147,6 +147,9 @@ export function JobPostActionsPanel({
           ))}
         </div>
 
+        {/* 🔴 กรอบสูงคงที่ทุกแท็บ (เจ้าของ 13 พ.ย. 2569 "พอกดแท็บสลับไปสลับมาแล้วมันเลื่อน") — แท็บมีแถวไม่เท่ากัน (Gen link 37 · โพสต์ 0)
+            ตารางสูงต่างกันแล้วดันฟอร์มสั่งงานข้างล่างขึ้นลง ⇒ เนื้อแท็บอยู่ในกรอบ h-96 เลื่อนดูข้างใน · ตัวแบ่งหน้าอยู่ที่เดิมเสมอ */}
+        <div className="h-96 space-y-3 overflow-y-auto" data-testid="job-actions-body">
         {error ? <p className={cn('text-sm', TONE.warn.value)}>{error}</p> : !d ? <p className={cn('text-sm', DASH.sub)}>กำลังโหลด…</p> : null}
 
         {d && tab === 'autopost' ? (
@@ -173,15 +176,16 @@ export function JobPostActionsPanel({
               })}
             </div>
             <div className="overflow-x-auto">
-              <Table className="min-w-[48rem]">
+              {/* table-fixed + ความกว้างคอลัมน์ตายตัว — กดกรองสถานะแล้วหัวตารางไม่ขยับ (เจ้าของ 13 พ.ย. 2569) */}
+              <Table className="min-w-[48rem] table-fixed">
                 <TableHeader>
                   <TableRow className={DASH.tableHead}>
-                    <TableHead className="whitespace-nowrap text-xs">วันที่สั่ง</TableHead>
-                    <TableHead className="text-xs">คนสั่ง</TableHead>
-                    <TableHead className="text-xs">บัญชี</TableHead>
+                    <TableHead className="w-36 whitespace-nowrap text-xs">วันที่สั่ง</TableHead>
+                    <TableHead className="w-24 text-xs">คนสั่ง</TableHead>
+                    <TableHead className="w-32 text-xs">บัญชี</TableHead>
                     <TableHead className="text-xs">กลุ่ม</TableHead>
-                    <TableHead className="text-xs">สถานะ</TableHead>
-                    <TableHead className="text-xs">ลิงก์ / เหตุ</TableHead>
+                    <TableHead className="w-32 text-xs">สถานะ</TableHead>
+                    <TableHead className="w-40 text-xs">ลิงก์ / เหตุ</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -197,11 +201,11 @@ export function JobPostActionsPanel({
                       return (
                         <TableRow key={`${r.fbGroupId}-${r.orderedAt}-${i}`} data-testid="job-actions-group-row">
                           <TableCell className="whitespace-nowrap text-xs tabular-nums">{formatDateTimeTh(r.orderedAt)}</TableCell>
-                          <TableCell className="whitespace-nowrap text-sm">{r.orderedByName ?? '—'}</TableCell>
-                          <TableCell className="text-sm">{r.account ?? '—'}</TableCell>
-                          <TableCell className="max-w-64 text-sm">{r.groupName ?? r.fbGroupId ?? '—'}</TableCell>
+                          <TableCell className="truncate text-sm">{r.orderedByName ?? '—'}</TableCell>
+                          <TableCell className="break-words text-sm">{r.account ?? '—'}</TableCell>
+                          <TableCell className="break-words text-sm">{r.groupName ?? r.fbGroupId ?? '—'}</TableCell>
                           <TableCell className="text-xs">
-                            <span className={cn('inline-block whitespace-nowrap rounded-full border px-2 py-0.5 font-medium', tone.soft, tone.value)}>{r.statusLabel}</span>
+                            <span className={cn('inline-block rounded-full border px-2 py-0.5 font-medium', tone.soft, tone.value)}>{r.statusLabel}</span>
                           </TableCell>
                           <TableCell className="max-w-64 text-xs">
                             {r.postLink ? (
@@ -250,14 +254,15 @@ export function JobPostActionsPanel({
               ))}
             </div>
             <div className="overflow-x-auto">
-              <Table className="min-w-[44rem]">
+              {/* table-fixed + ความกว้างคอลัมน์ตายตัว — สลับ Gen link / โพสต์ แล้วหัวตารางไม่ขยับ (เจ้าของ 13 พ.ย. 2569 "พวกวันที่สั่ง ลิงค์ อะไรนั่นมันเลื่อน") */}
+              <Table className="min-w-[44rem] table-fixed">
                 <TableHeader>
                   <TableRow className={DASH.tableHead}>
-                    <TableHead className="whitespace-nowrap text-xs">วันที่สร้าง</TableHead>
+                    <TableHead className="w-36 whitespace-nowrap text-xs">วันที่สร้าง</TableHead>
                     <TableHead className="text-xs">ช่องทาง / กลุ่ม</TableHead>
-                    <TableHead className="text-right text-xs">คลิก</TableHead>
-                    <TableHead className="text-right text-xs">กรอก</TableHead>
-                    <TableHead className="text-xs">{manualPick === 'posted' ? 'โพสต์' : 'ลิงก์สมัคร'}</TableHead>
+                    <TableHead className="w-16 text-right text-xs">คลิก</TableHead>
+                    <TableHead className="w-16 text-right text-xs">กรอก</TableHead>
+                    <TableHead className="w-40 text-xs">{manualPick === 'posted' ? 'โพสต์' : 'ลิงก์สมัคร'}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -271,7 +276,7 @@ export function JobPostActionsPanel({
                     slice(manualLinks).map((l) => (
                       <TableRow key={l.id} data-testid="job-actions-link-row">
                         <TableCell className="whitespace-nowrap text-xs tabular-nums">{formatDateTimeTh(l.created_at)}</TableCell>
-                        <TableCell className="max-w-80 text-sm">{l.channel_label ?? '—'}</TableCell>
+                        <TableCell className="break-words text-sm">{l.channel_label ?? '—'}</TableCell>
                         <TableCell className="text-right text-sm tabular-nums">{th(l.clicks)}</TableCell>
                         <TableCell className="text-right text-sm tabular-nums">{th(l.applicants)}</TableCell>
                         <TableCell className="text-xs" data-testid="job-actions-post-cell">
@@ -300,12 +305,12 @@ export function JobPostActionsPanel({
 
         {d && tab === 'scrap' ? (
           <div className="overflow-x-auto">
-            <Table className="min-w-[36rem]">
+            <Table className="min-w-[36rem] table-fixed">
               <TableHeader>
                 <TableRow className={DASH.tableHead}>
-                  <TableHead className="whitespace-nowrap text-xs">วันที่สั่ง</TableHead>
-                  <TableHead className="text-xs">คนสั่ง</TableHead>
-                  <TableHead className="text-xs">สถานะ</TableHead>
+                  <TableHead className="w-36 whitespace-nowrap text-xs">วันที่สั่ง</TableHead>
+                  <TableHead className="w-24 text-xs">คนสั่ง</TableHead>
+                  <TableHead className="w-32 text-xs">สถานะ</TableHead>
                   <TableHead className="text-xs">เหตุ</TableHead>
                 </TableRow>
               </TableHeader>
@@ -335,6 +340,8 @@ export function JobPostActionsPanel({
             </Table>
           </div>
         ) : null}
+
+        </div>
 
         {d ? (
           <div className="flex items-center justify-between gap-2">
