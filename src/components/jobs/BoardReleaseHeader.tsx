@@ -50,10 +50,16 @@ export type BoardReleaseHeaderProps = {
 const th = (n: number) => n.toLocaleString('th-TH');
 
 /**
- * แถบเดียว 7 ช่อง (เจ้าของ 11 พ.ย. 2569 แบบ C "บอกด้วยว่ายังไม่ประกาศเท่าไหร่ ประกาศแล้วเท่าไหร่ มี 7 ช่อง") —
- * ช่องคั่นด้วยเส้น 1px (`gap-px` บนพื้นเส้น) · มือถือ 2 ช่องต่อแถว ช่องแรกเต็มแถว (7 ช่องไม่เหลือที่ว่างเทา) · ใช้ทั้งตอนโหลดและตอนมีเลข ⇒ หน้าไม่กระโดด
+ * แถบเดียว 7 ช่อง (เจ้าของ 11 พ.ย. 2569 แบบ C "บอกด้วยว่ายังไม่ประกาศเท่าไหร่ ประกาศแล้วเท่าไหร่ มี 7 ช่อง")
+ * 🔴 โฉม 13 พ.ย. 2569 (แบบแถบเดียวที่เจ้าของอนุมัติ · preview/strip.html): ช่องเท่ากันแถวเดียว กรอบบาง มุม xl พื้นการ์ด
+ * · จอแคบกว่า lg = แถวเดียวเหมือนเดิม เลื่อนแนวนอนในแถบ (ช่องละ ≥ 9rem) ไม่ซ่อนช่อง ไม่ทำทั้งหน้าล้น
+ * · ประกอบจาก Tailwind ล้วน (กติกา repo ห้ามไฟล์ CSS ใหม่) · ใช้ทั้งตอนโหลดและตอนมีเลข ⇒ หน้าไม่กระโดด
  */
-const LANE_GRID = 'grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-border bg-border sm:grid-cols-7 [&>*:first-child]:col-span-2 sm:[&>*:first-child]:col-span-1';
+const LANE_GRID =
+  'grid snap-x grid-cols-[repeat(7,minmax(9rem,1fr))] overflow-x-auto rounded-xl border border-border bg-card p-1.5 lg:grid-cols-7';
+/** เส้นคั่นบาง ๆ ซ้ายของแต่ละช่อง (ช่องแรกไม่มี) · ช่อง 2 กับ 5 (ต้นก้อนประกาศแล้ว / ยังไม่ประกาศ) เส้นเข้มกว่า */
+const CELL_DIVIDER =
+  "before:absolute before:inset-y-3 before:-left-px before:w-px before:bg-border/60 before:content-[''] first:before:hidden [&:nth-child(2)]:before:bg-border [&:nth-child(5)]:before:bg-border";
 /** ลำดับช่องซ้ายไปขวา: ทั้งหมด · ประกาศแล้ว (มีคนกรอก · ยังไม่มีคนกรอก) · ยังไม่ประกาศ (ยังต้องหาคน · เริ่มงานแล้ว) */
 const CELL_ORDER = ['all', 'released', 'applied', 'silent', 'unreleased', 'sourcing', 'started'] as const;
 
@@ -87,14 +93,18 @@ function LaneCell({
       title={RELEASE_LANE_TEXT[laneKey].hint}
       data-testid={`board-lane-${laneKey}`}
       className={cn(
-        'h-auto min-w-0 flex-col items-start justify-start gap-0.5 whitespace-normal rounded-none px-3 py-2 text-left font-normal disabled:opacity-100',
-        active ? 'bg-muted hover:bg-muted' : 'bg-card',
+        'relative h-auto min-h-24 min-w-0 snap-start flex-col items-start justify-center gap-0 whitespace-nowrap rounded-lg px-3.5 py-2.5 text-left font-normal shadow-none transition-colors duration-150 motion-reduce:transition-none disabled:opacity-100',
+        CELL_DIVIDER,
+        // ช่องที่เลือก = พื้นอ่อน + เส้นล่าง 2px · ไม่ขยายขนาด ช่องอื่นไม่ขยับ
+        active
+          ? "bg-primary/5 hover:bg-primary/10 after:absolute after:inset-x-3.5 after:bottom-0 after:h-0.5 after:rounded-full after:bg-primary after:content-['']"
+          : 'hover:bg-muted',
       )}
     >
-      <span className={cn('text-xs', active ? 'font-medium text-foreground' : 'text-muted-foreground')}>{RELEASE_LANE_TEXT[laneKey].label}</span>
-      <span className={cn('text-xl font-medium tabular-nums', tone ? TONE[tone].value : 'text-foreground')}>
+      <span className={cn('text-xs', active ? 'text-primary' : 'text-muted-foreground')}>{RELEASE_LANE_TEXT[laneKey].label}</span>
+      <span className={cn('text-[26px] font-medium leading-9 tabular-nums', active ? 'text-primary' : tone ? TONE[tone].value : 'text-foreground')}>
         {count === null ? '—' : th(count)}
-        <span className="ml-1 text-xs font-normal text-muted-foreground">ใบ</span>
+        <span className="ml-1.5 text-xs font-normal text-muted-foreground">ใบ</span>
       </span>
       <span className="min-h-4 text-xs tabular-nums text-muted-foreground">{sub ?? ''}</span>
     </Button>
@@ -135,7 +145,7 @@ const BoardReleaseHeader: React.FC<BoardReleaseHeaderProps> = ({
             broken ? (
               <LaneCell key={laneKey} laneKey={laneKey} count={null} active={false} />
             ) : (
-              <div key={laneKey} className="h-20 animate-pulse bg-muted/70" />
+              <div key={laneKey} className="min-h-24 animate-pulse rounded-lg bg-muted/70 motion-reduce:animate-none" />
             ),
           )}
         </div>
