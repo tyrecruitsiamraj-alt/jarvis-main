@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { FieldSelect } from '@/components/shared/FieldSelect';
+import AssistantAiCard from '@/pages/settings/AssistantAiCard';
 import { DASH, TONE } from '@/lib/designTokens';
 import { cn } from '@/lib/utils';
 import {
@@ -11,6 +12,7 @@ import {
   AI_PROVIDER_KINDS,
   AI_PROVIDER_LABEL,
   AI_TASKS,
+  ROUTED_AI_TASKS,
   AI_TASK_LABEL,
   aiKindNeedsKey,
   type AiConnectionInput,
@@ -123,7 +125,7 @@ const AiSettingsTab: React.FC = () => {
   const routesDirty = useMemo(() => {
     if (!view || !routes) return false;
     const base = toRouteDrafts(view);
-    return AI_TASKS.some((t) => base[t].connection_id !== routes[t].connection_id || base[t].model.trim() !== routes[t].model.trim());
+    return ROUTED_AI_TASKS.some((t) => base[t].connection_id !== routes[t].connection_id || base[t].model.trim() !== routes[t].model.trim());
   }, [view, routes]);
 
   const patchConn = (key: string, patch: Partial<ConnDraft>) =>
@@ -218,11 +220,14 @@ const AiSettingsTab: React.FC = () => {
       {error ? <p className={cn('rounded-xl border px-3 py-2 text-sm', TONE.danger.soft, TONE.danger.value)}>{error}</p> : null}
       {notice ? <p className={cn('rounded-xl border px-3 py-2 text-sm', TONE.success.soft, TONE.success.value)}>{notice}</p> : null}
 
+      {/* ── ผู้ช่วย AI (13 พ.ย. 2569) — กุญแจ + รุ่น จบในกล่องเดียวแบบ KNOWA ── */}
+      <AssistantAiCard view={view} onSaved={apply} />
+
       {/* ── งานไหนใช้ AI ตัวไหน ── */}
       <section className={cn('space-y-3 rounded-2xl border p-4', DASH.card)}>
         <h3 className="text-base font-medium">งานไหนใช้ AI ตัวไหน</h3>
         <ul className="space-y-3">
-          {AI_TASKS.map((task) => {
+          {ROUTED_AI_TASKS.map((task) => {
             const r = routes[task];
             const conn = savedConns.find((c) => c.id === r.connection_id);
             const defaultModel = conn ? conn.model : (view.env_default?.model ?? '');
@@ -260,7 +265,7 @@ const AiSettingsTab: React.FC = () => {
               void run('routes', async () => {
                 apply(
                   await saveAiRoutes(
-                    AI_TASKS.map((t) => ({ task: t, connection_id: routes[t].connection_id || null, model: routes[t].model.trim() || null })),
+                    ROUTED_AI_TASKS.map((t) => ({ task: t, connection_id: routes[t].connection_id || null, model: routes[t].model.trim() || null })),
                   ),
                 );
                 setNotice('บันทึกแล้ว — งานที่เริ่มหลังจากนี้ใช้ AI ตัวใหม่ (ภายใน 30 วิ)');

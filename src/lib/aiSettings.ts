@@ -23,6 +23,17 @@ export const AI_TASK_LABEL: Record<AiTask, string> = {
   assistant_chat: 'ผู้ช่วยแชท (ต้องเป็น OpenAI)',
 };
 
+/** งานที่เลือก AI จากตาราง "งานไหนใช้ AI ตัวไหน" — ผู้ช่วยแชทตั้งที่กล่อง "ผู้ช่วย AI" ของตัวเอง (13 พ.ย. 2569) ไม่ซ้ำสองที่ */
+export const ROUTED_AI_TASKS = AI_TASKS.filter((t) => t !== 'assistant_chat');
+
+/** รุ่นที่ใช้แชท + เรียกเครื่องมือได้จากบัญชี OpenAI จริง (ตัดรุ่นภาพ/เสียง/ฝังเวกเตอร์ · บทเรียน KNOWA) — ไม่ฝังชื่อรุ่น */
+export function assistantChatModels(ids: readonly string[]): string[] {
+  return ids
+    .filter((id) => /^(gpt-|o\d|chatgpt-)/.test(id))
+    .filter((id) => !/(audio|realtime|transcribe|tts|image|search|embedding|moderation|instruct|dall-e|whisper)/.test(id))
+    .sort();
+}
+
 export const AI_PROVIDER_KINDS = ['ollama', 'openai', 'anthropic'] as const;
 export type AiProviderKind = (typeof AI_PROVIDER_KINDS)[number];
 

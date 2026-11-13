@@ -109,3 +109,19 @@ describe('ใช้ได้เฉพาะ admin + supervisor · หน้า�
     expect(aiChatLinkLabel('/follow')).toBe('หน้าติดตาม');
   });
 });
+
+describe('ตั้งผู้ช่วยในกล่องเดียวแบบ KNOWA (เจ้าของ 13 พ.ย. 2569 "ตั้งไรเยอะแยะ")', () => {
+  it('รุ่นจากบัญชีจริง ตัดรุ่นภาพ/เสียง/ฝังเวกเตอร์ · ไม่ฝังชื่อรุ่น', async () => {
+    const { assistantChatModels, ROUTED_AI_TASKS } = await import('@/lib/aiSettings');
+    expect(assistantChatModels(['text-embedding-3-small', 'gpt-x-mini', 'gpt-x-audio', 'whisper-1', 'o9', 'dall-e-3'])).toEqual(['gpt-x-mini', 'o9']);
+    expect(ROUTED_AI_TASKS).not.toContain('assistant_chat');
+  });
+  it('กล่องผู้ช่วยอยู่บนสุดของหน้า · ตารางงานเดิมไม่มีแถวผู้ช่วยซ้ำ และบันทึกตารางไม่ทับค่าผู้ช่วย', () => {
+    const tab = read('src/pages/settings/AiSettingsTab.tsx');
+    expect(tab.indexOf('<AssistantAiCard')).toBeLessThan(tab.indexOf('งานไหนใช้ AI ตัวไหน</h3>'));
+    expect(tab).toContain('ROUTED_AI_TASKS.map((t) => ({ task: t, connection_id');
+    const card = read('src/pages/settings/AssistantAiCard.tsx');
+    expect(card).toContain("saveAiRoutes([{ task: 'assistant_chat', connection_id: c.id, model }])");
+    expect(card).toContain('type="password"');
+  });
+});
