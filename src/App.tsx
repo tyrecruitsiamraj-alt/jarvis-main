@@ -23,6 +23,8 @@ const PublicPostingApplyPage = lazyPage(() => import("@/pages/public/PublicPosti
 const PrivacyRequestPage = lazyPage(() => import("@/pages/public/PrivacyRequestPage"));
 const PublicSkillQuizPage = lazyPage(() => import("@/pages/public/PublicSkillQuizPage"));
 const ShortLinkRedirectPage = lazyPage(() => import("@/pages/public/ShortLinkRedirectPage"));
+// ผู้ช่วย AI มุมขวาล่าง (13 พ.ย. 2569) — admin + supervisor · ทุกหน้าหลังล็อกอิน · โหลดแยก ไม่ถ่วงหน้าแรก
+const AiChat = lazyPage(() => import("@/components/ai/AiChat"));
 const MagicLinkVerifyPage = lazyPage(() => import("@/pages/MagicLinkVerifyPage"));
 const ResetPasswordPage = lazyPage(() => import("@/pages/ResetPasswordPage"));
 const HomePage = lazyPage(() => import("@/pages/HomePage"));
@@ -97,7 +99,7 @@ const PageLoadingFallback = () => (
 );
 
 const ProtectedRoutes = () => {
-  const { isAuthenticated, bootstrapping } = useAuth();
+  const { isAuthenticated, bootstrapping, user } = useAuth();
   const location = useLocation();
   if (bootstrapping) {
     return (
@@ -194,6 +196,11 @@ const ProtectedRoutes = () => {
           </PageErrorBoundary>
         </RequireRole>
       </AppLayout>
+      {user?.role === "admin" || user?.role === "supervisor" ? (
+        <Suspense fallback={null}>
+          <AiChat />
+        </Suspense>
+      ) : null}
     </RequireDepartment>
   );
 };

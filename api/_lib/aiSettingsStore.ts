@@ -132,6 +132,18 @@ export async function resolveAiTarget(task: AiTask): Promise<AiTarget | null> {
   return envTarget();
 }
 
+/**
+ * AI ของผู้ช่วยแชท (13 พ.ย. 2569) — ต้องตั้งงาน "ผู้ช่วยแชท" เป็นเจ้า OpenAI ที่มีกุญแจ + รุ่นเท่านั้น
+ * ไม่ถอยไป Ollama ของเซิร์ฟเวอร์ (ผู้ช่วยต้องเรียกเครื่องมือแบบ OpenAI) · ไม่ได้ตั้ง = null ⇒ จอบอกให้ไปตั้ง
+ */
+export async function resolveAssistantTarget(): Promise<AiTarget | null> {
+  const { conns, routes } = await loadRaw();
+  const route = routes.find((r) => r.task === 'assistant_chat');
+  const c = route?.connection_id ? conns.find((x) => x.id === route.connection_id) : null;
+  const t = c ? toTarget(c, route?.model ?? null) : null;
+  return t && t.kind === 'openai' && t.apiKey && t.model ? t : null;
+}
+
 /** ใช้กับการเชื่อมต่อที่ยังไม่บันทึก (ปุ่มทดสอบ) หรือที่บันทึกแล้ว */
 export async function targetForConnection(id: string, model?: string | null): Promise<AiTarget | null> {
   const { conns } = await loadRaw();
