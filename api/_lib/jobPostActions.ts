@@ -7,10 +7,16 @@ import { dbQuery } from './postgres.js';
 import { tableInAppSchema } from './schema.js';
 import { fetchAllSoPostGroupRows } from './soPostGroups.js';
 import { toBangkokYmd } from './businessDate.js';
+import { buMatchSql, type BuSet } from './homeBuSql.js';
+import { linkBuSql } from './postingLinkHits.js';
+import { linkOwnerSql } from './recruitPostings.js';
 import {
   EMPTY_JOB_POST_ACTIONS,
   jobPostLinkOrigin,
+  manualPostDays,
   summarizeJobPostActions,
+  type ManualPostDays,
+  type ManualPostLinkInput,
   type JobPostActionsSummary,
   type JobPostLinkInput,
   type JobPostLinkOrigin,
@@ -22,6 +28,9 @@ const LINKS = tableInAppSchema('recruit_posting_links');
 const POSTINGS = tableInAppSchema('recruit_postings');
 const APPS = tableInAppSchema('public_job_applications');
 const ORDERS = tableInAppSchema('job_posting_requests');
+const MAP = tableInAppSchema('job_site_map');
+const POSTS = tableInAppSchema('recruit_posting_link_posts');
+const HITS = tableInAppSchema('recruit_posting_link_hits');
 
 /** ช่วงที่ So Scraping มีผลรายกลุ่ม (เส้น post-groups เริ่ม 1 ต.ค. 2569 — ตัวเดียวกับ so-post-summary) */
 const SO_POST_FROM = '2026-10-01';
@@ -94,4 +103,65 @@ export async function getJobPostActions(jobId: string, requestNo: string): Promi
       .reverse(),
     groups,
   };
+}
+
+/**
+ * จด "โพสต์เองแล้ว" ตอนกดคัดลอกข้อความของกลุ่ม (เจ้าของ 13 พ.ย. 2569 Choice "คัดลอกข้อความ") — (ลิงก์ · วันไทย) ละแถว กดซ้ำวันเดียวกันไม่นับเพิ่ม
+ * คืน job_id ของลิงก์ (ให้เส้นเช็กสิทธิ์ BU) · ไม่มีลิงก์ = null
+ */
+export async function linkJobId(linkId: string): Promise<string | null> {
+  const { rows } = await dbQuery<{ job_id: string | null }>(
+    `select p.job_id from ${LINKS} l join ${POSTINGS} p on p.id = l.posting_id where l.id = $1::uuid`,
+    [linkId],
+  );
+  return rows[0]?.job_id ?? null;
+}
+
+export async function recordManualPost(linkId: string, by: { id: string | null; name: string | null }): Promise<void> {
+  await dbQuery(
+    `insert into ${POSTS} (link_id, day, posted_by_user_id, posted_by_name)
+     values ($1::uuid, (now() at time zone 'Asia/Bangkok')::date, $2::uuid, $3)
+     on conflict (link_id, day) do nothing`,
+    [linkId, by.id, by.name],
+  );
+}
+
+/**
+ * โพสต์เองรายวันของหน้าภาพรวม (การ์ด 6 · 13 พ.ย. 2569) — BU = BU ของใบขอ (`linkBuSql` ตัวเดียวกับตารางคลิกลิงก์)
+ * ครั้งที่โพสต์ = วันที่สร้างลิงก์ (ลิงก์ที่ `jobPostLinkOrigin` ตัดสินว่าโพสต์เอง) + วันที่กดคัดลอกข้อความ (`recordManualPost`) · ลิงก์ละวันนับครั้งเดียว
+ * คลิก/กรอก = ของวันนั้นของลิงก์นั้น (คลิกรายวันมีตั้งแต่ 10 พ.ย. 2569 · กรอก = ใบสมัครที่กรอกวันนั้นผ่านลิงก์นั้น)
+ */
+export async function loadManualPostDays(opts: { from: string; to: string; buSet: BuSet }): Promise<ManualPostDays> {
+  const { rows } = await dbQuery<ManualPostLinkInput & { link_id: string; recorded: boolean }>(
+    `with ev as (
+       select l.id as link_id, (l.created_at at time zone 'Asia/Bangkok')::date as day, false as recorded
+         from ${LINKS} l
+        where l.created_at >= ($1::date)::timestamp at time zone 'Asia/Bangkok'
+          and l.created_at < ($2::date + 1)::timestamp at time zone 'Asia/Bangkok'
+       union all
+       select x.link_id, x.day, true from ${POSTS} x where x.day between $1::date and $2::date
+     ), ev1 as (
+       select link_id, day, bool_or(recorded) as recorded from ev group by link_id, day
+     )
+     select l.id::text as link_id, ev1.recorded, p.job_id, l.note, l.created_at, to_char(ev1.day, 'YYYY-MM-DD') as day,
+       coalesce(h.hits, 0)::int as hit_count, l.channel_label, p.title,
+       ${linkOwnerSql('l.id', 'p.id')} as created_by_name,
+       (select count(*) from ${APPS} a where a.link_id = l.id
+          and (a.created_at at time zone 'Asia/Bangkok')::date = ev1.day)::int as applicants
+     from ev1 join ${LINKS} l on l.id = ev1.link_id join ${POSTINGS} p on p.id = l.posting_id
+     left join ${MAP} bm on bm.job_id = p.job_id
+     left join ${HITS} h on h.link_id = l.id and h.day = ev1.day
+     where p.job_id is not null and ${buMatchSql(linkBuSql, '$3')}`,
+    [opts.from, opts.to, opts.buSet],
+  );
+  const jobIds = [...new Set(rows.map((r) => r.job_id))];
+  const times = new Map<string, number[]>();
+  if (jobIds.length > 0) {
+    const { rows: orders } = await dbQuery<{ job_id: string; created_at: string }>(
+      `select job_id, created_at from ${ORDERS} where request_type = 'content' and job_id = any($1::text[])`,
+      [jobIds],
+    );
+    for (const o of orders) times.set(o.job_id, [...(times.get(o.job_id) ?? []), new Date(o.created_at).getTime()]);
+  }
+  return manualPostDays(rows, times, { from: opts.from, to: opts.to });
 }

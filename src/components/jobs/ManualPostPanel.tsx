@@ -22,6 +22,7 @@ import SoGroupPicker from '@/components/jobs/SoGroupPicker';
 import MultiChannelPicker from '@/components/shared/MultiChannelPicker';
 import { syncCaptionLink } from '@/components/jobs/AutopostDialog';
 import { copyText } from '@/lib/copyText';
+import { markManualPosted } from '@/lib/jobPostActionsApi';
 
 /** แถวที่เตรียมแล้ว — ลิงก์ละแถว · กลุ่ม Facebook มี `group` (ปุ่มเปิดกลุ่ม) · ช่องทางอื่นไม่มี */
 type Row = { key: string; name: string; group: SoOptGroup | null; link: RecruitPostingLink };
@@ -151,7 +152,10 @@ export default function ManualPostPanel({ job, onChanged }: { job: JobRequest; o
       setError(null);
     } catch {
       setError('คัดลอกไม่ได้ — ลองกดอีกครั้ง');
+      return;
     }
+    // คัดลอก = วันนี้โพสต์กลุ่มนี้ (เจ้าของ 13 พ.ย. 2569 Choice "คัดลอกข้อความ") — นับในการ์ด 6 หน้าภาพรวม · จดไม่ได้ต้องบอก ไม่กลืนเงียบ
+    markManualPosted(r.link.id).catch((e: unknown) => setError(`คัดลอกแล้ว แต่ระบบนับการโพสต์ไม่ได้ (${e instanceof Error ? e.message : 'ลองกดอีกครั้ง'})`));
   };
 
   if (rows) {

@@ -18,6 +18,7 @@ import ChannelFunnelTable from '../ChannelFunnelTable';
 import { buildFbGroupClickRows, mergeFbGroupClicks } from '@/lib/fbGroupClicks';
 import StuckFilterBar from './StuckFilterBar';
 import SoPostGroupsCard from './SoPostGroupsCard';
+import ManualPostDaysCard from './ManualPostDaysCard';
 import StuckPhasesCard, { StuckPickedList } from './StuckPhasesCard';
 import StuckOwnerTable from './StuckOwnerTable';
 import StuckAreaTable from './StuckAreaTable';
@@ -188,6 +189,8 @@ export default function RecruitStuckBody({
         {channelCard}
         {/* 5. โพสต์ลงกลุ่ม Facebook จาก So Scraping (เจ้าของ 11 พ.ย. 2569) — ช่วง/BU ตามภาพรวม ไม่ตามตัวกรองย่อย (ข้อมูลอยู่ฝั่ง So Scraping) */}
         <SoPostGroupsCard from={win.from} to={win.to} bu={data.bu} />
+        {/* 6. โพสต์เอง รายวัน (เจ้าของ 13 พ.ย. 2569) — ช่วง/BU ตามภาพรวม */}
+        <ManualPostDaysCard from={win.from} to={win.to} bu={data.bu} />
         {stuck.data?.requests ? (
           <StuckAreaTable rows={focused} title={scope === 'remaining' ? undefined : `พื้นที่ · ใบ${STUCK_SCOPE_LABEL[scope]}`} countLabel={scope === 'remaining' ? undefined : `ใบ${STUCK_SCOPE_LABEL[scope]}`} onPick={pick} />
         ) : null}

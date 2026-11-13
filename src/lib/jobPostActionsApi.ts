@@ -1,5 +1,5 @@
 import { apiFetch } from './apiFetch';
-import type { JobPostActionsSummary, JobPostLinkOrigin } from './jobPostActions';
+import type { JobPostActionsSummary, JobPostLinkOrigin, ManualPostDays } from './jobPostActions';
 import type { SoPostGroupRow, SoPostGroupStatus } from './soPostGroups';
 
 /** "ทำอะไรไปแล้ว" ของใบขอ (13 พ.ย. 2569) — พังโยนข้อความไทยจาก server */
@@ -25,4 +25,19 @@ export async function fetchJobPostActionsDetail(jobId: string): Promise<JobPostA
   const r = await apiFetch(`/api/job-post-actions?job=${encodeURIComponent(jobId)}`);
   if (!r.ok) return readError(r);
   return (await r.json()) as JobPostActionsDetail;
+}
+
+/** โพสต์เองรายวัน (การ์ด 6 หน้าภาพรวม · 13 พ.ย. 2569) — ช่วง/BU ตามภาพรวม */
+export async function fetchManualPostDays(opts: { from: string; to: string; bu: string | null }): Promise<ManualPostDays> {
+  const q = new URLSearchParams({ days: '1', from: opts.from, to: opts.to });
+  if (opts.bu) q.set('bu', opts.bu);
+  const r = await apiFetch(`/api/job-post-actions?${q.toString()}`);
+  if (!r.ok) return readError(r);
+  return (await r.json()) as ManualPostDays;
+}
+
+/** จดว่าโพสต์เองแล้ววันนี้ (กดคัดลอกข้อความของกลุ่ม/ช่องทาง · 13 พ.ย. 2569) — กดซ้ำวันเดียวกันฝั่ง server ไม่นับเพิ่ม */
+export async function markManualPosted(linkId: string): Promise<void> {
+  const r = await apiFetch('/api/job-post-actions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ link_id: linkId }) });
+  if (!r.ok) return readError(r);
 }

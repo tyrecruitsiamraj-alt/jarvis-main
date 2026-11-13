@@ -81,3 +81,70 @@ export function postGroupBuckets(total: number, counts: Record<string, number>):
   const waiting = (counts.pending_approval ?? 0) + (counts.waiting ?? 0);
   return { posted, waiting, failed: Math.max(0, total - posted - waiting) };
 }
+
+/**
+ * ═══ โพสต์เองรายวัน (การ์ด 6 หน้าภาพรวม · เจ้าของ 13 พ.ย. 2569) ═══
+ * > *"อยากดูจำนวนรวมของแต่ละวัน ว่าโพสต์งานไหนไปบ้างจากโพสต์มือ"* → Choice "การ์ดในหน้าภาพรวม"
+ * 1 แถวเข้า = ลิงก์ 1 อันใน 1 วัน: วันที่สร้างลิงก์ หรือวันที่กดคัดลอกข้อความ (`recorded` · โพสต์ซ้ำลงกลุ่มเดิมใช้ลิงก์เดิม — เจ้าของ 13 พ.ย.
+ * "โพสต์มือไปแล้วของวันนี้ทำไมไม่มีอะไรโชว์เลย") · ไม่ได้กดคัดลอก = ใช้ตัวตัดสินโพสต์เอง/Autopost `jobPostLinkOrigin` ตัวเดียวกับการ์ดหน้าโพสต์ประกาศ
+ * 1 ลิงก์ = 1 กลุ่ม/ช่องทาง · คลิก/กรอก = ของวันนั้น (ส่งมาแล้วต่อวัน) ⇒ ลิงก์เดียวโพสต์สองวันไม่นับคลิกซ้ำ
+ * ใบขอของแต่ละวันนับไม่ซ้ำในวัน · แถวรวม = ผลบวกทุกวัน (ใบเดียวโพสต์สองวัน = 2) ⇒ ทุกเลขบวกลงตัว
+ */
+export type ManualPostLinkInput = {
+  job_id: string;
+  /** วันไทยที่นับว่าโพสต์ */
+  day: string;
+  /** มาจากการกดคัดลอกข้อความในหน้าโพสต์เอง (นับเป็นโพสต์เองเสมอ) */
+  recorded?: boolean;
+  note: string | null;
+  created_at: string;
+  hit_count: number;
+  applicants: number;
+  channel_label: string | null;
+  created_by_name: string | null;
+  title: string | null;
+};
+export type ManualPostDayJob = { jobId: string; title: string | null; by: string[]; places: string[]; clicks: number; applicants: number };
+export type ManualPostDay = { day: string; jobs: number; places: number; clicks: number; applicants: number; list: ManualPostDayJob[] };
+export type ManualPostDays = { days: ManualPostDay[]; total: { jobs: number; places: number; clicks: number; applicants: number } };
+
+const NO_PLACE = 'ไม่ระบุช่องทาง';
+
+function ymdRange(from: string, to: string): string[] {
+  const out: string[] = [];
+  const end = Date.parse(`${to}T00:00:00Z`);
+  for (let t = Date.parse(`${from}T00:00:00Z`); Number.isFinite(t) && t <= end && out.length < 400; t += 86_400_000) out.push(new Date(t).toISOString().slice(0, 10));
+  return out;
+}
+
+/** ทุกวันในช่วงขึ้นเสมอ (ไม่มีโพสต์ = 0) · ใหม่สุดก่อน · `autopostTimes` = เวลาคำสั่ง Autopost ต่อใบ (ไว้แยกลิงก์เก่าที่ไม่มีป้าย) */
+export function manualPostDays(
+  links: readonly ManualPostLinkInput[],
+  autopostTimes: ReadonlyMap<string, readonly number[]>,
+  range: { from: string; to: string },
+): ManualPostDays {
+  const byDay = new Map<string, Map<string, ManualPostDayJob>>();
+  for (const l of links) {
+    if (!l.recorded && jobPostLinkOrigin(l, autopostTimes.get(l.job_id) ?? []) !== 'manual') continue;
+    const day = l.day;
+    if (day < range.from || day > range.to) continue;
+    const jobs = byDay.get(day) ?? new Map<string, ManualPostDayJob>();
+    const j = jobs.get(l.job_id) ?? { jobId: l.job_id, title: l.title, by: [], places: [], clicks: 0, applicants: 0 };
+    const who = (l.created_by_name ?? '').trim();
+    if (who && !j.by.includes(who)) j.by.push(who);
+    j.places.push((l.channel_label ?? '').trim() || NO_PLACE);
+    j.clicks += Math.max(0, l.hit_count || 0);
+    j.applicants += Math.max(0, l.applicants || 0);
+    jobs.set(l.job_id, j);
+    byDay.set(day, jobs);
+  }
+  const days = ymdRange(range.from, range.to)
+    .reverse()
+    .map((day): ManualPostDay => {
+      const list = [...(byDay.get(day)?.values() ?? [])].sort((a, b) => b.places.length - a.places.length || a.jobId.localeCompare(b.jobId));
+      const sum = (f: (j: ManualPostDayJob) => number) => list.reduce((acc, j) => acc + f(j), 0);
+      return { day, jobs: list.length, places: sum((j) => j.places.length), clicks: sum((j) => j.clicks), applicants: sum((j) => j.applicants), list };
+    });
+  const total = days.reduce((t, d) => ({ jobs: t.jobs + d.jobs, places: t.places + d.places, clicks: t.clicks + d.clicks, applicants: t.applicants + d.applicants }), { jobs: 0, places: 0, clicks: 0, applicants: 0 });
+  return { days, total };
+}

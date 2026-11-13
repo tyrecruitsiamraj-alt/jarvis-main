@@ -44,7 +44,7 @@ export async function recordDailyLinkHit(linkId: string): Promise<void> {
 }
 
 /** BU ของลิงก์ = BU ของใบขอที่ประกาศ (ไซต์) ไม่มีค่อยใช้แผนกของประกาศลอย */
-const linkBuSql = `${trendBuSql(`coalesce(${siteBuSql('bm.site_code')}, nullif(btrim(p.department_code), ''))`)}`;
+export const linkBuSql = `${trendBuSql(`coalesce(${siteBuSql('bm.site_code')}, nullif(btrim(p.department_code), ''))`)}`;
 
 /**
  * กลุ่มที่ So Scraping ลบไปแล้วไม่ขึ้นในการ์ด (เจ้าของ 10 พ.ย. 2569 *"กลุ่มที่ลบไปแล้วจาก So Scraping อันนี้ก็ลบด้วย"*)
