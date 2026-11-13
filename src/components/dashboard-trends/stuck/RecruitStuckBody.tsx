@@ -73,6 +73,8 @@ export default function RecruitStuckBody({
 
   // เทียบเดือน: พับไว้ โหลดตอนกด (9 พ.ย. 2569 · หน้าโหลดช้า) — อ่าน 6 เดือนแยกเส้น `part=monthly`
   const [monthlyOpen, setMonthlyOpen] = React.useState(false);
+  /** เหตุผลที่ไม่สำเร็จ พับไว้ล่างสุด (เจ้าของ 13 พ.ย. 2569) */
+  const [reasonsOpen, setReasonsOpen] = React.useState(false);
   const [monthly, setMonthly] = React.useState<{ data: RecruitStuckResponse['monthly']; error: string | null }>({ data: null, error: null });
   React.useEffect(() => {
     if (!monthlyOpen) return;
@@ -163,7 +165,8 @@ export default function RecruitStuckBody({
           <SectionError message={stuck.error ?? stuck.data?.errors.requests ?? 'อ่านใบขอที่เหลือหาไม่ได้'} onRetry={() => setRev((n) => n + 1)} />
         ) : null}
         {/* 12 พ.ย. 2569 เจ้าของจัดหน้าใหม่ (แบบร่างติ๊ก 15 ใบ): ถอดสมการใบขอ · สถานะประกาศใบขอใหม่ · แนวโน้มใบขอ
-            "ใบที่เหลือหา แยกขั้นที่ติด" รวมเข้าข้อ 1 (รายการใบที่กดขึ้นใต้ตารางข้อ 1) · จุดที่รายชื่อหลุด + เหตุผลที่ไม่สำเร็จ อยู่ใต้ข้อ 2 */}
+            "ใบที่เหลือหา แยกขั้นที่ติด" รวมเข้าข้อ 1 (รายการใบที่กดขึ้นใต้ตารางข้อ 1) · จุดที่รายชื่อหลุด อยู่ใต้ข้อ 2
+            · 13 พ.ย. เหตุผลที่ไม่สำเร็จ ย้ายไปล่างสุด พับไว้ */}
         {stuck.data?.requests ? null : stuck.error || stuck.data ? null : (
           <div className="space-y-3" aria-busy>
             <Skeleton className="h-64 rounded-2xl" />
@@ -180,10 +183,6 @@ export default function RecruitStuckBody({
         <OverviewCard icon={PhoneCall} title="2. ทำแล้วเป็นไง" sub={`${cohortSub} · ตัวแดง = ยังไม่ทำ กดดูชื่อไปทำต่อ`}>
           {appsUnknown ? appsError : <CallerResultsTable cohort={cohort} onOpen={onOpenNames} />}
           {appsUnknown ? null : <PersonJourneyCard embedded list={cohort} sub={cohortSub} onOpenNames={onOpenNames} />}
-          <section className="space-y-3 border-t border-border pt-4" data-testid="reasons-section">
-            <h3 className="text-base font-medium text-foreground">เหตุผลที่ไม่สำเร็จ</h3>
-            {appsUnknown ? appsError : <ReasonColumns groups={reasons} onOpen={onOpenNames} />}
-          </section>
         </OverviewCard>
         {bringerCard}
         {channelCard}
@@ -193,6 +192,27 @@ export default function RecruitStuckBody({
           <StuckAreaTable rows={focused} title={scope === 'remaining' ? undefined : `พื้นที่ · ใบ${STUCK_SCOPE_LABEL[scope]}`} countLabel={scope === 'remaining' ? undefined : `ใบ${STUCK_SCOPE_LABEL[scope]}`} onPick={pick} />
         ) : null}
         <MonthlyBarsCard rows={monthly.data} error={monthly.error} ok={jobOk} onPickMonth={onPickMonth} open={monthlyOpen} onOpen={() => setMonthlyOpen(true)} />
+        {/* เหตุผลที่ไม่สำเร็จ ย้ายจากใต้ข้อ 2 มาล่างสุด พับไว้ (เจ้าของ 13 พ.ย. 2569 "เอาไปย่อไว้ล่างสุด") */}
+        <OverviewCard
+          icon={AlertCircle}
+          title="เหตุผลที่ไม่สำเร็จ"
+          sub={`${cohortSub} · ผลล่าสุดของแต่ละคน`}
+          actions={
+            reasonsOpen ? (
+              <Button type="button" variant="outline" size="sm" onClick={() => setReasonsOpen(false)}>
+                ย่อ
+              </Button>
+            ) : null
+          }
+        >
+          {!reasonsOpen ? (
+            <Button type="button" variant="outline" size="sm" className="self-start" onClick={() => setReasonsOpen(true)} data-testid="reasons-open">
+              เปิดดู
+            </Button>
+          ) : (
+            appsUnknown ? appsError : <ReasonColumns groups={reasons} onOpen={onOpenNames} />
+          )}
+        </OverviewCard>
         {/* รายงานเดิม (ตำแหน่งสมัคร · เทียบช่วงก่อน · งานค้างตามอายุ · กรอกแล้วโทรวันไหน · ผลงานรายคน · ช่องทางแจ้งเข้า) — หน้าเดิมยังอยู่ครบ */}
         <div className="flex justify-end">
           <Button type="button" variant="outline" onClick={() => {

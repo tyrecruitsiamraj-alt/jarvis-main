@@ -111,15 +111,20 @@ describe('จัดหน้าภาพรวมใหม่ (เจ้าข�
     expect(v5).not.toContain('<ReleaseProgressCard');
     expect(v5).not.toContain('requestTrend');
   });
-  it('ใบที่เหลือหารวมเข้าข้อ 1 (รายการใบที่กดขึ้นใต้ตาราง) · จุดที่รายชื่อหลุด + เหตุผลอยู่ใต้ข้อ 2', () => {
+  it('ใบที่เหลือหารวมเข้าข้อ 1 (รายการใบที่กดขึ้นใต้ตาราง) · จุดที่รายชื่อหลุดอยู่ใต้ข้อ 2 · เหตุผลไม่อยู่ข้อ 2 แล้ว (13 พ.ย.)', () => {
     expect(v5).not.toContain('<StuckPhasesCard');
     expect(v5.indexOf('<StuckPickedList')).toBeGreaterThan(v5.indexOf('title="1. ใครต้องทำอะไร"'));
     const two = v5.slice(v5.indexOf('title="2. ทำแล้วเป็นไง"'), v5.indexOf('{bringerCard}'));
     expect(two).toContain('<PersonJourneyCard embedded');
-    expect(two).toContain('<ReasonColumns');
+    expect(two).not.toContain('<ReasonColumns');
   });
-  it('ลำดับ: ตัวกรอง → 1 → 2 → 3 → 4 → 5 → พื้นที่ → เทียบเดือน → รายงานแบบเดิม', () => {
-    const order = ['<StuckFilterBar', 'title="1. ใครต้องทำอะไร"', 'title="2. ทำแล้วเป็นไง"', '{bringerCard}', '{channelCard}', '<SoPostGroupsCard', '<StuckAreaTable', '<MonthlyBarsCard', 'data-testid="v5-legacy-reports"'];
+  it('เหตุผลที่ไม่สำเร็จ อยู่ล่างสุดหลังเทียบเดือน พับไว้ก่อน (เจ้าของ 13 พ.ย. 2569 "เอาไปย่อไว้ล่างสุด")', () => {
+    expect(v5.indexOf('title="เหตุผลที่ไม่สำเร็จ"')).toBeGreaterThan(v5.indexOf('<MonthlyBarsCard'));
+    expect(body).toContain('const [reasonsOpen, setReasonsOpen] = React.useState(false);');
+    expect(v5).toContain('{!reasonsOpen ? (');
+  });
+  it('ลำดับ: ตัวกรอง → 1 → 2 → 3 → 4 → 5 → พื้นที่ → เทียบเดือน → เหตุผลที่ไม่สำเร็จ → รายงานแบบเดิม', () => {
+    const order = ['<StuckFilterBar', 'title="1. ใครต้องทำอะไร"', 'title="2. ทำแล้วเป็นไง"', '{bringerCard}', '{channelCard}', '<SoPostGroupsCard', '<StuckAreaTable', '<MonthlyBarsCard', 'title="เหตุผลที่ไม่สำเร็จ"', 'data-testid="v5-legacy-reports"'];
     const at = order.map((k) => v5.indexOf(k));
     expect(at.every((x) => x >= 0)).toBe(true);
     expect([...at].sort((a, b) => a - b)).toEqual(at);
