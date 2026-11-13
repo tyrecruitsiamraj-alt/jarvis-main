@@ -56,6 +56,8 @@ DialogOverlay.displayName = DialogPrimitive.Overlay.displayName;
 /**
  * 🔴 QA 5 ต.ค. 2569: โหมดมืดพื้นป๊อปโปร่ง 66–86% (jarvis-frost) ตัวหนังสือหน้าหลังทะลุขึ้นมา
  * ⇒ `bg-card` รองพื้นทึบใต้ไล่สี · ม่านหลังป๊อปโหมดมืดใช้สีพื้น (เดิม foreground = ม่านเทาอ่อน)
+ * 🔴 13 พ.ย. 2569 (เจ้าของ "กรอบมันเยอะชวนตาลาย"): `jarvis-frost` ตั้ง `background` แบบรวบ ⇒ ล้างสีพื้นเป็นโปร่ง `bg-card` ไม่เคยติด
+ *   วัดจริง: background-color = transparent · การ์ดหน้าหลังทะลุเป็นเส้นจาง ๆ ในป๊อป ⇒ `!bg-card` ให้สีพื้นทึบชนะเสมอ (ไล่สียังอยู่ข้างบน)
  */
 /**
  * 🔴 ป๊อปยึดขอบบน (5vh) ไม่อยู่กลางจอ (เจ้าของ 11 พ.ย. 2569 "กดแล้วเลื่อน เม้าต้องขยับตาม") — กลางจอ + เนื้อหาสูง/เตี้ยลงตอนสลับตัวเลือก
@@ -71,7 +73,7 @@ const DialogContent = React.forwardRef<
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        "fixed left-[50%] top-[5vh] z-50 grid max-h-[90vh] w-full max-w-lg translate-x-[-50%] gap-4 overflow-y-auto jarvis-frost bg-card dark:bg-card rounded-[1.75rem] border-white/80 p-6 shadow-[0_20px_60px_rgba(24,20,16,0.12)] duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=open]:slide-in-from-left-1/2",
+        "fixed left-[50%] top-[5vh] z-50 grid max-h-[90vh] w-full max-w-lg translate-x-[-50%] gap-4 overflow-y-auto jarvis-frost !bg-card rounded-[1.75rem] border-white/80 p-6 shadow-[0_20px_60px_rgba(24,20,16,0.12)] duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=open]:slide-in-from-left-1/2",
         className,
       )}
       {...props}

@@ -176,8 +176,9 @@ export function SoGroupFilterPicker({
         </div>
       </div>
 
-      <div className="rounded-xl border border-border/70">
-        <div className="flex items-center gap-2 border-b border-border/70 px-3 py-2">
+      {/* พื้นสีอ่อนแทนเส้นกรอบ + เส้นคั่นหัว (เจ้าของ 13 พ.ย. 2569 "กรอบมันเยอะชวนตาลาย") */}
+      <div className="rounded-xl bg-muted/40">
+        <div className="flex items-center gap-2 px-3 py-2">
           <Checkbox
             id={`${idPrefix}-all`}
             checked={n === 0 ? false : n === ids.length ? true : 'indeterminate'}

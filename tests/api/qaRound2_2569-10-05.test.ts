@@ -104,7 +104,8 @@ describe('ดีไซน์ / มือถือ / สถานะจอ (ก�
   });
   it('ป๊อปมีพื้นทึบทั้งสองธีม + ม่านโหมดมืดเข้ม + ปุ่มปิด 36px', () => {
     const d = read('src/components/ui/dialog.tsx');
-    expect(d).toContain('jarvis-frost bg-card dark:bg-card');
+    // 13 พ.ย. 2569: bg-card เดิมแพ้ background รวบของ jarvis-frost (พื้นโปร่งจริง) ⇒ !bg-card
+    expect(d).toContain('jarvis-frost !bg-card');
     expect(d).toContain('dark:bg-background/80');
     expect(d).toContain('h-9 w-9');
   });
