@@ -10,17 +10,14 @@ const read = (p: string) => readFileSync(p, 'utf8');
 describe('Gen link รวมในกล่อง Autopost / Scrap', () => {
   // 11 พ.ย. 2569 เจ้าของรวมเหลือ 3 อย่าง (Autopost · Scrap · โพสต์เอง) — Gen link อยู่ใน โพสต์เอง › ช่องทางอื่น ทุกที่
   it('หน้ารายละเอียดใบขอ: กล่องเดียว หัว "Autopost / Scrap / โพสต์เอง" · ไม่มีกล่องลิงก์สมัครแยก', () => {
-    const detail = read('src/pages/jobs/SiamrajUnitRequestDetailPage.tsx');
-    // 4 พ.ย. 2569 "ย่อไว้ พอกดค่อยกางออกมา" — กล่องพับไว้ กดหัวแล้วค่อยขึ้นฟอร์ม
-    // ป๊อปประกาศใช้กล่องพับตัวเดียวกัน (เจ้าของ 4 พ.ย. 2569 "ทำเหมือนกับตรงหน้าใบขอ") · ป๊อปจากปุ่ม Autopost บนการ์ดไม่พับ
-    expect(detail).toContain('<OrderPostFold job={data} />');
+    // 13 พ.ย. 2569 กล่องนี้ย้ายจากหน้ารายละเอียดไปแท็บของตัวเอง (`/actions`) · ป๊อปประกาศยังใช้กล่องพับตัวเดิม
     const order = read('src/components/jobs/OrderPostButton.tsx');
     expect(order).toContain('const [open, setOpen] = React.useState(false);');
     expect(order).toContain('{open ? <OrderPostButton {...props} /> : null}');
     expect(order).toContain('        Autopost / Scrap / โพสต์เอง\n');
     expect(order).not.toContain('withGenLink');
     expect(read('src/components/jobs/AutopostDialog.tsx')).toContain('<OrderPostButton key={job.id} job={job} defaultKind="autopost" onSent={onSent} />');
-    expect(detail).not.toContain('detail-apply-links');
+    expect(read('src/pages/jobs/SiamrajUnitRequestDetailPage.tsx')).not.toContain('detail-apply-links');
   });
 
   it('ช่อง "สั่งอะไร" 3 อย่างทุกที่ · โพสต์เอง = เลือกช่องทางแบบ Gen link ในที่เดียว ไม่แยก กลุ่ม Facebook / ช่องทางอื่น (13 พ.ย. 2569)', () => {

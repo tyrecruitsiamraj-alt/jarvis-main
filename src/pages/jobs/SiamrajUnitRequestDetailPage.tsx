@@ -24,7 +24,6 @@ import { refreshJobStaffFromApi } from '@/lib/jobStaffRemote';
 import { JOB_STAFF_ROSTER_CHANGED_EVENT } from '@/lib/jobStaffRemote';
 import { UnitRequestNoteDetail } from '@/components/jobs/UnitRequestNoteField';
 import UnitRequestInfoFields from '@/components/jobs/UnitRequestInfoFields';
-import { OrderPostFold } from '@/components/jobs/OrderPostButton';
 import UnitRequestTabs from '@/components/jobs/UnitRequestTabs';
 import { UnitRequestReplacementSelect } from '@/components/jobs/UnitRequestReplacementToggle';
 import {
@@ -288,14 +287,7 @@ const SiamrajUnitRequestDetailPage: React.FC = () => {
 
             {/* เกณฑ์ความเร่งเฉพาะใบ ย้ายไป ตั้งค่า › เกณฑ์ความเร่งใบขอ แล้ว (เจ้าของ 3 พ.ย. 2569) */}
 
-            {/* สั่ง Autopost / ขอ Scrap จากหน้าใบขอ (เจ้าของ 3 พ.ย. 2569 "ทำให้สั่ง autopost กับ Scrap ตรงนี้ได้ด้วยเลย")
-                ตัวเดียวกับป๊อปประกาศ (`OrderPostButton`) — สถานะล่าสุด + Autopost กดทีเดียวจบ + ขอ Scrap
-                + Gen link เป็นตัวเลือกที่ 3 ในช่องเดียวกัน (เจ้าของ 4 พ.ย. 2569 "เอารวมกันสิ่" — เดิมเป็นกล่องลิงก์สมัครแยก) */}
-            {/* พับไว้ตอนเปิดหน้า กดหัวกล่องแล้วค่อยกางเลือกว่าจะทำอะไร (เจ้าของ 4 พ.ย. 2569 "ย่อไว้ พอกดค่อยกางออกมาแล้วค่อยเลือก")
-                แบบเดียวกับกล่อง "ข้อมูลใบขอ" — ทั้งแถวกดได้ · พับอยู่ = ยังไม่โหลดบัญชี/กลุ่มของ So Scraping (`OrderPostFold` ตัวเดียวกับป๊อปประกาศ) */}
-            <section className="glass-card rounded-3xl p-4 border border-white/70 space-y-3" data-testid="detail-order-post">
-              <OrderPostFold job={data} />
-            </section>
+            {/* กล่อง Autopost / Scrap / โพสต์เอง ย้ายไปแท็บของตัวเอง (เจ้าของ 13 พ.ย. 2569) — `/jobs/siamraj/:id/actions` */}
 
             <section className="glass-card rounded-3xl p-4 border border-white/70 space-y-2">
               {/* หัวข้อเป็นปุ่มกาง/หุบ (เจ้าของสั่ง 25 ส.ค. 2569) — ลูกศรหมุนตามสถานะ

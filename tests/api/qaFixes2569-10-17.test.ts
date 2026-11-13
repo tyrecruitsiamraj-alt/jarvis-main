@@ -26,10 +26,10 @@ describe('1 · แท็บผู้สมัคร/การติดต่อ�
 });
 
 describe('2 · แท็บ AI Match ใช้กองใหม่ + ป้ายถังปัจจุบัน', () => {
-  it('หัวไม่พูดถึง To do แล้ว', () => {
+  it('แท็บ AI Match ของใบขอถอดแล้ว (เจ้าของ 13 พ.ย. 2569 "ย้ายไปหน้างานสรรหาแล้ว") — ไม่มีหัวกองค้างในหน้าใบขอ', () => {
     const src = read('src/pages/jobs/UnitRequestTabPage.tsx');
     expect(src).not.toContain('(To do · ไม่มีงาน)');
-    expect(src).toContain('(ไม่มีงาน · Re Use · Drop)');
+    expect(src).not.toContain("tab === 'ai-match'");
   });
   it('ป้ายถังในผลแมทเก่าถูกทับด้วยถังปัจจุบัน · ไม่รู้ = คงเดิม', () => {
     const ctx = {

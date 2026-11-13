@@ -5,11 +5,14 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
-describe('หน้ารายละเอียดใบขอมีกล่อง Autopost / Scrap', () => {
-  it('ใช้ OrderPostButton ตัวเดียวกับป๊อปประกาศ', () => {
-    const src = readFileSync('src/pages/jobs/SiamrajUnitRequestDetailPage.tsx', 'utf8');
-    expect(src).toContain("import { OrderPostFold } from '@/components/jobs/OrderPostButton';");
-    expect(src).toContain('<OrderPostFold job={data} />' /* 4 พ.ย. 2569 กล่องพับไว้ · 11 พ.ย. 2569 Gen link อยู่ในโพสต์เองทุกที่ */);
-    expect(src).toContain('data-testid="detail-order-post"');
+describe('ใบขอมีแท็บ Autopost / Scrap / โพสต์เอง (เจ้าของ 13 พ.ย. 2569 "ย้ายไปเป็นอีกแท็บ")', () => {
+  it('ใช้ OrderPostButton ตัวเดียวกับป๊อปประกาศ + ทำอะไรไปแล้ว · หน้ารายละเอียดไม่มีกล่องนี้แล้ว', () => {
+    const tab = readFileSync('src/pages/jobs/UnitRequestTabPage.tsx', 'utf8');
+    expect(tab).toContain("{tab === 'actions' ? (");
+    expect(tab).toContain('<OrderPostButton job={job} onLinksChanged={() => setActionsRev((n) => n + 1)} />');
+    expect(tab).toContain('<JobPostActionsPanel jobId={job.id} tab={actionsTab} onTabChange={setActionsTab} reloadKey={actionsRev} />');
+    const detail = readFileSync('src/pages/jobs/SiamrajUnitRequestDetailPage.tsx', 'utf8');
+    expect(detail).not.toContain('data-testid="detail-order-post"');
+    expect(detail).not.toContain('<OrderPostFold');
   });
 });

@@ -78,7 +78,6 @@ describe('candidateSearchLabels', () => {
   it('ทุกจุดเรียกใช้ต้องอ้างค่าจากไฟล์นี้ — ห้ามพิมพ์คำเดิมค้างในหน้า', () => {
     const files = [
       'src/pages/matching/MatchingPage.tsx',
-      'src/pages/jobs/UnitRequestTabPage.tsx',
       'src/components/jobs/JobBoardView.tsx',
     ];
     for (const f of files) {

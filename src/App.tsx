@@ -180,7 +180,9 @@ const ProtectedRoutes = () => {
             <Route path="/jobs/add" element={<Navigate to="/jobs/list" replace />} />
             <Route path="/jobs/siamraj/:id" element={<SiamrajUnitRequestDetailPage />} />
             <Route path="/jobs/siamraj/:id/applicants" element={<UnitRequestTabPage tab="applicants" />} />
-            <Route path="/jobs/siamraj/:id/ai-match" element={<UnitRequestTabPage tab="ai-match" />} />
+            <Route path="/jobs/siamraj/:id/actions" element={<UnitRequestTabPage tab="actions" />} />
+            {/* แท็บ AI Match ถอดแล้ว (13 พ.ย. 2569) — ลิงก์เก่าพาไปจับคู่งานของหน้างานสรรหา */}
+            <Route path="/jobs/siamraj/:id/ai-match" element={<Navigate to="/jobs/board?view=match" replace />} />
             <Route path="/jobs/siamraj/:id/contact" element={<UnitContactMovedRedirect />} />
             <Route path="/jobs/:id" element={<JobDetailPage />} />
             <Route path="/dashboard" element={<SupervisorDashboard />} />

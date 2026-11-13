@@ -77,31 +77,12 @@ describe('ตัวเลือกหน่วยงานในป๊อป (�
   });
 });
 
-describe('แท็บ AI Match ลงมือได้ (6.7)', () => {
+describe('แท็บ AI Match ของใบขอถอดแล้ว (เจ้าของ 13 พ.ย. 2569 "Ai match มันถูกย้ายไปหน้างานสรรหาแล้ว")', () => {
   const tab = stripComments(read('src/pages/jobs/UnitRequestTabPage.tsx'));
-
-  it('ใช้แถบปุ่มเดียวกับหน้าจับคู่งาน (lumosSendActions คุมเหตุผลปุ่ม)', () => {
-    expect(tab).toContain('LumosSendBar');
-    expect(tab).not.toContain('lumosSendActionStates');
-  });
-
-  it('ใช้เส้นส่งเดียวกัน — ไม่ยิง fetch เอง', () => {
-    expect(tab).toContain('dispatchLumosCalls');
-    expect(tab).not.toMatch(/fetch\(|apiFetch\(/);
-  });
-
-  it('🔴 มีป๊อปยืนยันพร้อมรายชื่อก่อนยิงสายจริง', () => {
-    expect(tab).toContain('sendConfirm');
-    expect(tab).toMatch(/ให้ AI โทรหา \{pickedMatches\.length\} คนนี้\?/);
-    expect(tab).toContain('pickedMatches.slice(0, 12)');
-  });
-
-  it('ติ๊กได้เฉพาะคนที่มีเบอร์ (ส่ง/ล็อกไม่ได้ถ้าไม่มีเบอร์)', () => {
-    expect(tab).toMatch(/disabled=\{!\(m\.mobile \?\? ''\)\.trim\(\)/);
-  });
-
-  it('เก็บไปโทรเอง = ล็อกเบอร์ (คนพวกนี้ไม่มีใบสมัครให้ claim)', () => {
-    expect(tab).toContain('acquireCallHold');
+  it('ไม่มีแถบส่ง AI / เส้นส่ง / ป๊อปยืนยันของ AI Match ในหน้าใบขอแล้ว · ส่ง AI ทำที่จับคู่งานของหน้างานสรรหา', () => {
+    expect(tab).not.toContain('<LumosSendBar');
+    expect(tab).not.toContain('dispatchLumosCalls');
+    expect(tab).not.toContain('fetchBoardMatchForJob');
   });
 });
 

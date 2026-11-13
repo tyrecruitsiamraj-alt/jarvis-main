@@ -8,7 +8,6 @@ import { ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { SO_POST_STATUS_TONE } from '@/components/dashboard-trends/stuck/SoPostGroupsCard';
 import { cn } from '@/lib/utils';
 import { DASH, TONE } from '@/lib/designTokens';
@@ -16,6 +15,7 @@ import { formatDateTimeTh } from '@/lib/dateTh';
 import { soStatusView, soStuckLine } from '@/lib/soScraping';
 import { fetchJobPostActionsDetail, type JobPostActionsDetail } from '@/lib/jobPostActionsApi';
 import type { BoardActionTab } from './BoardCardActions';
+import { postGroupBuckets } from '@/lib/jobPostActions';
 
 const PAGE = 10;
 const th = (n: number) => n.toLocaleString('th-TH');
@@ -31,6 +31,34 @@ export default function JobPostActionsDialog({
   onTabChange: (t: BoardActionTab) => void;
   onClose: () => void;
 }) {
+  return (
+    <Dialog open={job !== null} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="max-h-[90vh] max-w-5xl overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>{job ? `${job.title} · ทำอะไรไปแล้ว` : 'ทำอะไรไปแล้ว'}</DialogTitle>
+        </DialogHeader>
+        {job ? <JobPostActionsPanel jobId={job.id} tab={tab} onTabChange={onTabChange} /> : null}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/**
+ * เนื้อ "ทำอะไรไปแล้ว" ของใบเดียว — ใช้ทั้งป๊อปบนการ์ดและแท็บของหน้าใบขอ (เจ้าของ 13 พ.ย. 2569 "ย้ายไปเป็นอีกแท็บ …
+ * เอาทำอะไรไปแล้วโชว์ด้วย เพื่อจะได้บอกได้ว่ายอดอะไรยังไงบ้าง") · 3 กล่องบนสุด = ยอดสรุป + เป็นตัวสลับแท็บ
+ * `reloadKey` เปลี่ยน = โหลดใหม่ (หลังสั่งงานจากฟอร์มข้างบน)
+ */
+export function JobPostActionsPanel({
+  jobId,
+  tab,
+  onTabChange,
+  reloadKey,
+}: {
+  jobId: string;
+  tab: BoardActionTab;
+  onTabChange: (t: BoardActionTab) => void;
+  reloadKey?: unknown;
+}) {
   const [d, setD] = useState<JobPostActionsDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
@@ -40,16 +68,15 @@ export default function JobPostActionsDialog({
     setD(null);
     setError(null);
     setStatusPick(null);
-    if (!job) return;
     let alive = true;
-    fetchJobPostActionsDetail(job.id)
+    fetchJobPostActionsDetail(jobId)
       .then((v) => alive && setD(v))
       .catch((e: unknown) => alive && setError(e instanceof Error ? e.message : 'โหลดไม่ได้'));
     return () => {
       alive = false;
     };
-  }, [job]);
-  useEffect(() => setPage(1), [tab, statusPick, job]);
+  }, [jobId, reloadKey]);
+  useEffect(() => setPage(1), [tab, statusPick, jobId]);
 
   const groups = d?.groups;
   const counts = useMemo(() => {
@@ -64,27 +91,59 @@ export default function JobPostActionsDialog({
   const pages = Math.max(1, Math.ceil(list.length / PAGE));
   const slice = <T,>(xs: readonly T[]) => xs.slice((page - 1) * PAGE, page * PAGE);
 
+  const latestScrap = scrapOrders[0] ? soStatusView(scrapOrders[0]) : null;
+  const b = d ? postGroupBuckets(groups?.rows.length ?? 0, counts) : null;
+  /** 3 กล่องสรุป = แท็บ · กดกล่องไหนตารางข้างล่างเป็นของกล่องนั้น */
+  const boxes: Array<{ key: BoardActionTab; title: string; right: string; sub: string }> = d
+    ? [
+        {
+          key: 'autopost',
+          title: 'Autopost',
+          right: d.summary.autopost.orders === 0 ? 'ยังไม่สั่ง' : `สั่ง ${th(d.summary.autopost.orders)} ครั้ง · ${th(groups?.rows.length ?? 0)} กลุ่ม`,
+          sub: b ? `เผยแพร่แล้ว ${th(b.posted)} · รอ ${th(b.waiting)} · ไม่สำเร็จ ${th(b.failed)} · คลิก ${th(d.summary.autopost.clicks)} · กรอก ${th(d.summary.autopost.applicants)}` : '',
+        },
+        {
+          key: 'manual',
+          title: 'โพสต์เอง',
+          right: d.summary.manual.links === 0 ? 'ยังไม่มีลิงก์' : `${th(d.summary.manual.links)} ลิงก์`,
+          sub: `คลิก ${th(d.summary.manual.clicks)} · กรอก ${th(d.summary.manual.applicants)}`,
+        },
+        {
+          key: 'scrap',
+          title: 'Scrap',
+          right: d.summary.scrap.orders === 0 ? 'ยังไม่สั่ง' : `สั่ง ${th(d.summary.scrap.orders)} ครั้ง`,
+          sub: latestScrap ? `ล่าสุด ${latestScrap.label}` : '',
+        },
+      ]
+    : [];
+
   return (
-    <Dialog open={job !== null} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-h-[90vh] max-w-5xl overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>{job ? `${job.title} · ทำอะไรไปแล้ว` : 'ทำอะไรไปแล้ว'}</DialogTitle>
-        </DialogHeader>
-        <Tabs value={tab} onValueChange={(v) => onTabChange(v as BoardActionTab)}>
-          <TabsList>
-            <TabsTrigger value="autopost">Autopost{d ? ` ${th(groups?.rows.length ?? 0)} กลุ่ม` : ''}</TabsTrigger>
-            <TabsTrigger value="manual">โพสต์เอง{d ? ` ${th(manualLinks.length)} ลิงก์` : ''}</TabsTrigger>
-            <TabsTrigger value="scrap">Scrap{d ? ` ${th(scrapOrders.length)}` : ''}</TabsTrigger>
-          </TabsList>
-        </Tabs>
+    <div className="space-y-3">
+        <div className="grid gap-2 sm:grid-cols-3" role="tablist" data-testid="job-actions-boxes">
+          {boxes.map((x) => (
+            <Button
+              key={x.key}
+              type="button"
+              role="tab"
+              variant="ghost"
+              aria-selected={tab === x.key}
+              onClick={() => onTabChange(x.key)}
+              className={cn(
+                'h-auto flex-col items-stretch gap-1 rounded-xl border px-3 py-2 text-left font-normal',
+                tab === x.key ? 'border-primary bg-primary/5 hover:bg-primary/10' : 'border-border bg-card hover:bg-muted/60',
+              )}
+            >
+              <span className="text-sm font-medium text-foreground">{x.title}</span>
+              <span className="whitespace-normal text-xs tabular-nums text-foreground">{x.right}</span>
+              <span className="min-h-4 whitespace-normal text-xs tabular-nums text-muted-foreground">{x.sub}</span>
+            </Button>
+          ))}
+        </div>
 
         {error ? <p className={cn('text-sm', TONE.warn.value)}>{error}</p> : !d ? <p className={cn('text-sm', DASH.sub)}>กำลังโหลด…</p> : null}
 
         {d && tab === 'autopost' ? (
           <div className="space-y-3">
-            <p className={cn('text-xs tabular-nums', DASH.sub)}>
-              สั่ง {th(d.summary.autopost.orders)} ครั้ง · คลิกลิงก์ {th(d.summary.autopost.clicks)} · กรอก {th(d.summary.autopost.applicants)}
-            </p>
             {groups?.error ? <p className={cn('text-sm', TONE.warn.value)}>ดึงผลจาก So Scraping ไม่ได้: {groups.error}</p> : null}
             {/* ช่องสถานะ — คำ/ลำดับจาก So Scraping · กดกรองตาราง กดซ้ำกลับทั้งหมด (แบบเดียวกับการ์ดหน้าภาพรวม) */}
             <div className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-border bg-border sm:grid-cols-5" data-testid="job-actions-status">
@@ -160,9 +219,6 @@ export default function JobPostActionsDialog({
 
         {d && tab === 'manual' ? (
           <div className="space-y-3">
-            <p className={cn('text-xs tabular-nums', DASH.sub)}>
-              {th(d.summary.manual.links)} ลิงก์ · คลิก {th(d.summary.manual.clicks)} · กรอก {th(d.summary.manual.applicants)}
-            </p>
             <div className="overflow-x-auto">
               <Table className="min-w-[40rem]">
                 <TableHeader>
@@ -257,7 +313,6 @@ export default function JobPostActionsDialog({
             </div>
           </div>
         ) : null}
-      </DialogContent>
-    </Dialog>
+    </div>
   );
 }
