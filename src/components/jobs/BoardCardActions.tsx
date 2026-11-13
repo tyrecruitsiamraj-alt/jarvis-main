@@ -2,6 +2,8 @@
  * ส่วน "ทำอะไรไปแล้ว" บนการ์ดหน้าโพสต์ประกาศ (เจ้าของ 13 พ.ย. 2569 · แบบร่าง SQ6909009 ที่เจ้าของเคาะ)
  * 3 กล่องเรียงเท่ากันทุกใบ: Autopost · โพสต์เอง · Scrap — ตัวเลขอยู่ในช่องตายตัว (ไม่ห่อเป็นป้ายสะเปะสะปะ)
  * กดกล่อง = เปิดป๊อปของใบนี้ที่แท็บนั้น · ยังไม่เคยทำ = กล่องยังอยู่ บอก "ยังไม่สั่ง" (ว่างแล้วห้ามหาย)
+ * 🔴 ทุกกล่องสูงเท่ากันเสมอ (เจ้าของ 13 พ.ย. 2569 "ทำช่องไว้รอให้เท่าๆกันเลย ไม่งั้นอันไหนไม่สั่งกล่องก็ยุบ") —
+ *   หัว + แถวช่องตัวเลข (ไม่มีข้อมูล = 0 · ยังโหลดไม่มา = —) + บรรทัดล่าง 1 บรรทัด (ว่าง = เว้นที่ไว้) · Scrap ช่องเดียวบอกสถานะล่าสุด
  */
 import React from 'react';
 import { cn } from '@/lib/utils';
@@ -34,18 +36,35 @@ function Box({ title, right, onClick, children, testId }: { title: string; right
   );
 }
 
-/** 3 ช่องตัวเลขขนาดเท่ากัน เลขบน คำล่าง */
-function Cells({ cells }: { cells: Array<{ label: string; value: number; tone?: 'success' | 'warn' | 'danger' }> }) {
+/** 3 ช่องตัวเลขขนาดเท่ากัน เลขบน คำล่าง · `value` null = ยังโหลดไม่มา (ขีด) */
+function Cells({ cells }: { cells: Array<{ label: string; value: number | null; tone?: 'success' | 'warn' | 'danger' }> }) {
   return (
     <span className="grid w-full grid-cols-3 divide-x divide-border rounded-lg bg-muted/40 py-1">
       {cells.map((c) => (
         <span key={c.label} className="flex min-w-0 flex-col items-center px-1">
-          <span className={cn('text-base font-medium tabular-nums', c.value > 0 && c.tone ? TONE[c.tone].value : 'text-foreground')}>{th(c.value)}</span>
+          <span className={cn('text-base font-medium tabular-nums', c.value && c.tone ? TONE[c.tone].value : c.value ? 'text-foreground' : 'text-muted-foreground')}>
+            {c.value === null ? '—' : th(c.value)}
+          </span>
           <span className="truncate text-xs text-muted-foreground">{c.label}</span>
         </span>
       ))}
     </span>
   );
+}
+
+/** ช่องเดียวความสูงเท่า `Cells` — Scrap บอกสถานะล่าสุด (เจ้าของเลือก "สถานะอย่างเดียว") */
+function StatusCell({ label, toneClass }: { label: string; toneClass: string }) {
+  return (
+    <span className="flex w-full flex-col items-center rounded-lg bg-muted/40 py-1">
+      <span className={cn('max-w-full truncate px-2 text-base font-medium', toneClass)}>{label}</span>
+      <span className="text-xs text-muted-foreground">สถานะล่าสุด</span>
+    </span>
+  );
+}
+
+/** บรรทัดล่างของกล่อง — มีหรือไม่มีก็กินที่ 1 บรรทัดเท่ากัน */
+function Foot({ text, className }: { text: string | null; className?: string }) {
+  return <span className={cn('line-clamp-1 min-h-4 text-xs tabular-nums', className ?? 'text-muted-foreground')}>{text ?? '\u00a0'}</span>;
 }
 
 export default function BoardCardActions({
@@ -80,48 +99,32 @@ export default function BoardCardActions({
         right={dash ? '—' : a!.autopost.orders === 0 ? 'ยังไม่สั่ง' : `สั่ง ${th(a!.autopost.orders)} ครั้ง${postGroups ? ` · ${th(postGroups.total)} กลุ่ม` : ''}`}
         onClick={() => onOpen('autopost')}
       >
-        {b ? (
-          <Cells
-            cells={[
-              { label: 'เผยแพร่แล้ว', value: b.posted, tone: 'success' },
-              { label: 'รอ', value: b.waiting, tone: 'warn' },
-              { label: 'ไม่สำเร็จ', value: b.failed, tone: 'danger' },
-            ]}
-          />
-        ) : null}
-        {!dash && a!.autopost.orders > 0 ? (
-          <span className="text-xs tabular-nums text-muted-foreground">
-            คลิก {th(a!.autopost.clicks)} · กรอก {th(a!.autopost.applicants)}
-          </span>
-        ) : null}
-        {contentWhy ? <span className={cn('line-clamp-1 text-xs', content?.status === 'rejected' ? TONE.danger.value : TONE.warn.value)}>{contentWhy}</span> : null}
+        <Cells
+          cells={[
+            { label: 'เผยแพร่แล้ว', value: b ? b.posted : dash ? null : 0, tone: 'success' },
+            { label: 'รอ', value: b ? b.waiting : dash ? null : 0, tone: 'warn' },
+            { label: 'ไม่สำเร็จ', value: b ? b.failed : dash ? null : 0, tone: 'danger' },
+          ]}
+        />
+        {contentWhy ? (
+          <Foot text={contentWhy} className={content?.status === 'rejected' ? TONE.danger.value : TONE.warn.value} />
+        ) : (
+          <Foot text={dash ? null : `คลิก ${th(a!.autopost.clicks)} · กรอก ${th(a!.autopost.applicants)}`} />
+        )}
       </Box>
-      <Box
-        testId="board-action-manual"
-        title="โพสต์เอง"
-        right={dash ? '—' : a!.manual.links === 0 ? 'ยังไม่มีลิงก์' : ''}
-        onClick={() => onOpen('manual')}
-      >
-        {!dash && a!.manual.links > 0 ? (
-          <Cells
-            cells={[
-              { label: 'ลิงก์', value: a!.manual.links },
-              { label: 'คลิก', value: a!.manual.clicks },
-              { label: 'กรอก', value: a!.manual.applicants, tone: 'success' },
-            ]}
-          />
-        ) : null}
+      <Box testId="board-action-manual" title="โพสต์เอง" right={dash ? '—' : a!.manual.links === 0 ? 'ยังไม่มีลิงก์' : ''} onClick={() => onOpen('manual')}>
+        <Cells
+          cells={[
+            { label: 'ลิงก์', value: dash ? null : a!.manual.links },
+            { label: 'คลิก', value: dash ? null : a!.manual.clicks },
+            { label: 'กรอก', value: dash ? null : a!.manual.applicants, tone: 'success' },
+          ]}
+        />
+        <Foot text={null} />
       </Box>
-      <Box
-        testId="board-action-scrap"
-        title="Scrap"
-        right={dash ? '—' : a!.scrap.orders === 0 ? 'ยังไม่สั่ง' : `สั่ง ${th(a!.scrap.orders)} ครั้ง`}
-        onClick={() => onOpen('scrap')}
-      >
-        {scrapView ? (
-          <span className={cn('w-fit rounded-full border px-2 py-0.5 text-xs font-medium', TONE[scrapView.tone].outline)}>{scrapView.label}</span>
-        ) : null}
-        {scrapWhy ? <span className={cn('line-clamp-1 text-xs', scrap?.status === 'rejected' ? TONE.danger.value : TONE.warn.value)}>{scrapWhy}</span> : null}
+      <Box testId="board-action-scrap" title="Scrap" right={dash ? '—' : a!.scrap.orders === 0 ? 'ยังไม่สั่ง' : `สั่ง ${th(a!.scrap.orders)} ครั้ง`} onClick={() => onOpen('scrap')}>
+        <StatusCell label={scrapView ? scrapView.label : dash ? '—' : 'ยังไม่สั่ง'} toneClass={scrapView ? TONE[scrapView.tone].value : 'text-muted-foreground'} />
+        <Foot text={scrapWhy} className={scrap?.status === 'rejected' ? TONE.danger.value : TONE.warn.value} />
       </Box>
     </div>
   );
