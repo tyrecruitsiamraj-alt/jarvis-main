@@ -204,7 +204,8 @@ async function handler(req: AuthedReq, res: ApiRes) {
         entityId: existing.id,
         after: { so_start: soStart },
       });
-      return res.status(200).json({ so_start: soStart });
+      // แถวใหม่จากฐานด้วย (สถานะเปลี่ยนระหว่าง start) — จออัปเดตป้าย/กล่องค้างได้โดยไม่ต้องรีเฟรช
+      return res.status(200).json({ so_start: soStart, item: (await getJobPostingRequestById(existing.id)) ?? existing });
     } catch (e) {
       return handleApiError(res, e, 'matching-job-postings start', { userId: req.user.sub });
     }
@@ -275,14 +276,19 @@ async function handler(req: AuthedReq, res: ApiRes) {
 
       // เอกสารรอบ 3: บันทึกแล้วเรียกให้ So Scraping เริ่มงานทันที (ยังไม่ใส่ key = ข้าม So Scraping หยิบเองแบบเดิม)
       const soStart = await startSoRequest(item.request_no);
+      /**
+       * 🔴 อ่านแถวใหม่หลังสั่งเริ่ม (13 พ.ย. 2569 · LMO6911012) — So Scraping เปลี่ยนสถานะในฐานระหว่าง start (pending → in_progress
+       * 0.3 วิหลังสร้าง) ตอบแถวตอนสร้างกลับไป = จอเห็น "ค้างอยู่" ทั้งที่เริ่มแล้ว · อ่านไม่เจอ = แถวตอนสร้าง (ไม่เดาสถานะเอง)
+       */
+      const fresh = (await getJobPostingRequestById(item.id)) ?? item;
       await auditFromAuthed(req, {
         action: 'job_posting_request.create',
         entityType: 'job_posting_request',
         entityId: item.id,
-        after: { job_id: item.job_id, request_type: item.request_type, status: item.status, so_start: soStart },
+        after: { job_id: fresh.job_id, request_type: fresh.request_type, status: fresh.status, so_start: soStart },
       });
 
-      return res.status(200).json({ ...item, so_start: soStart });
+      return res.status(200).json({ ...fresh, so_start: soStart });
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
       if (/is required|must be|invalid/i.test(message)) {

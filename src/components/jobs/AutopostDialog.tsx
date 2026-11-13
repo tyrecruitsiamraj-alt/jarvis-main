@@ -182,6 +182,8 @@ export function AutopostBody({
   const [sent, setSent] = React.useState<JobPostingRequest | null>(null);
   /** ใบที่เพิ่งยกเลิกในป๊อปนี้ (ค้างอยู่ → ยกเลิกแล้วสั่งใหม่) */
   const [cancelledOrder, setCancelledOrder] = React.useState<JobPostingRequest | null>(null);
+  /** แถวใบล่าสุดจากฐานหลังกด "ส่งอีกครั้ง" ในกล่องค้าง (13 พ.ย. 2569) — แทนใบล่าสุดของใบขอ ป้าย/กล่องค้างจะได้ตรงฐาน */
+  const [refreshedOrder, setRefreshedOrder] = React.useState<JobPostingRequest | null>(null);
   /** ใบที่เติมฟอร์มให้แล้ว — เติมครั้งเดียว คนแก้ต่อได้ */
   const [prefilledFrom, setPrefilledFrom] = React.useState<string | null>(null);
 
@@ -240,7 +242,7 @@ export function AutopostBody({
    * ค้าง (pending) = บอกเหตุ + ส่งอีกครั้ง / ยกเลิกแล้วสั่งใหม่ · กำลังทำ = รอ · ไม่สำเร็จ = บอกเหตุ + ปุ่ม "สั่งใหม่"
    * สั่งใหม่ = เติมข้อความ กลุ่ม โหมด จากใบเดิม · บัญชีตั้งต้นไม่ใช่บัญชีเดิม (เหตุที่ไม่สำเร็จบ่อยสุด: Facebook จำกัดการโพสต์)
    */
-  const lastOrder = cancelledOrder ?? state?.latest.find((r) => r.request_type === 'content') ?? null;
+  const lastOrder = cancelledOrder ?? refreshedOrder ?? state?.latest.find((r) => r.request_type === 'content') ?? null;
   const stuckOrder = lastOrder?.status === 'pending' ? lastOrder : null;
   const runningOrder = lastOrder?.status === 'in_progress' ? lastOrder : null;
   const rejectedOrder = lastOrder?.status === 'rejected' ? lastOrder : null;
@@ -401,7 +403,7 @@ export function AutopostBody({
               {soStatusView(sent).label}
             </Badge>
           </p>
-          <SoStartLine requestId={sent.id} initial={sent.so_start} />
+          <SoStartLine requestId={sent.id} initial={sent.so_start} onItem={(item) => setSent((cur) => (cur ? { ...item, so_start: cur.so_start } : item))} />
           <Button type="button" variant="outline" onClick={onClose}>
             ปิด
           </Button>
@@ -413,6 +415,11 @@ export function AutopostBody({
               order={stuckOrder}
               onCancelled={(item) => {
                 setCancelledOrder(item);
+                onOrderChanged?.(item);
+              }}
+              // ส่งอีกครั้งแล้วเริ่มแล้ว = ใช้แถวใหม่จากฐาน กล่องค้างหาย (13 พ.ย. 2569)
+              onItem={(item) => {
+                setRefreshedOrder(item);
                 onOrderChanged?.(item);
               }}
             />

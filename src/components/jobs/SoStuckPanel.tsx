@@ -3,7 +3,7 @@ import { LoaderCircle, RotateCw, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { DASH, TONE } from '@/lib/designTokens';
-import { cancelJobPostingRequest, fetchSoIssues, startJobPostingRequest, type JobPostingRequest } from '@/lib/jobPostingRequestsApi';
+import { cancelJobPostingRequest, fetchSoIssues, startJobPostingRequestWithItem, type JobPostingRequest } from '@/lib/jobPostingRequestsApi';
 import { soStartText, type SoStartView } from '@/lib/soScraping';
 
 /**
@@ -16,9 +16,12 @@ import { soStartText, type SoStartView } from '@/lib/soScraping';
 export default function SoStuckPanel({
   order,
   onCancelled,
+  onItem,
 }: {
   order: JobPostingRequest;
   onCancelled: (cancelled: JobPostingRequest) => void;
+  /** แถวใบล่าสุดจากฐานหลัง "ส่งอีกครั้ง" (13 พ.ย. 2569) — เริ่มแล้ว = หน้าแม่แทนแถวเดิม กล่องค้างหายเอง */
+  onItem?: (item: JobPostingRequest) => void;
 }) {
   const type = order.request_type === 'scraping' ? 'scraping' : 'content';
   const [issues, setIssues] = React.useState<string[] | null>(null);
@@ -44,7 +47,9 @@ export default function SoStuckPanel({
     setBusy('retry');
     setError(null);
     try {
-      setStart(await startJobPostingRequest(order.id));
+      const r = await startJobPostingRequestWithItem(order.id);
+      setStart(r.start);
+      if (r.item) onItem?.(r.item);
     } catch (e) {
       setStart({ state: 'error', message: e instanceof Error ? e.message : 'ส่งไม่สำเร็จ' });
     } finally {

@@ -249,8 +249,13 @@ export async function cancelJobPostingRequest(id: string): Promise<JobPostingReq
 
 /** เริ่มงานที่ So Scraping อีกครั้ง (ครั้งก่อนติดปัญหา) — เรียกซ้ำได้ ไม่สร้างงานซ้ำ */
 export async function startJobPostingRequest(id: string): Promise<SoStartView> {
+  return (await startJobPostingRequestWithItem(id)).start;
+}
+
+/** เริ่มงานอีกครั้ง + แถวใบล่าสุดจากฐาน (13 พ.ย. 2569) — สถานะเปลี่ยนระหว่าง start ⇒ จอใช้แถวนี้แทนของเดิม · server รุ่นเก่าไม่ส่ง = null */
+export async function startJobPostingRequestWithItem(id: string): Promise<{ start: SoStartView; item: JobPostingRequest | null }> {
   const r = await apiFetch(`/api/matching/job-postings?action=start&id=${encodeURIComponent(id)}`, { method: 'POST' });
   if (!r.ok) return readError(r, 'เริ่มงานไม่สำเร็จ');
-  const d = (await r.json().catch(() => ({}))) as { so_start?: SoStartView };
-  return d.so_start ?? { state: 'skipped' };
+  const d = (await r.json().catch(() => ({}))) as { so_start?: SoStartView; item?: JobPostingRequest };
+  return { start: d.so_start ?? { state: 'skipped' }, item: d.item ?? null };
 }

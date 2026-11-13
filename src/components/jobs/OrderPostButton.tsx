@@ -183,6 +183,7 @@ export default function OrderPostButton({
           ...(scrapeWorker !== AUTO_WORKER ? { scrape_worker: scrapeWorker } : {}),
         },
       });
+      // item = แถวที่ server อ่านใหม่จากฐานหลังสั่งเริ่มแล้ว (13 พ.ย. 2569 — เดิมเป็นแถวตอนสร้าง pending ⇒ กล่อง "ค้างอยู่" ขึ้นผิด)
       setLatest((prev) => [item, ...(prev ?? []).filter((p) => p.request_type !== 'scraping')]);
       setLastScrap(item);
       onSent?.(item);
@@ -273,6 +274,7 @@ export default function OrderPostButton({
             <SoStuckPanel
               order={scraping}
               onCancelled={(item) => setLatest((prev) => [item, ...(prev ?? []).filter((p) => p.request_type !== 'scraping')])}
+              onItem={(item) => setLatest((prev) => [item, ...(prev ?? []).filter((p) => p.request_type !== 'scraping')])}
             />
           ) : scrapOpen ? (
             <p className={cn('rounded-xl border px-3 py-2 text-sm', TONE.warn.soft)} data-testid="so-scrap-open-order">
@@ -350,7 +352,13 @@ export default function OrderPostButton({
             />
           </section>
 
-          {lastScrap ? <SoStartLine requestId={lastScrap.id} initial={lastScrap.so_start} /> : null}
+          {lastScrap ? (
+            <SoStartLine
+              requestId={lastScrap.id}
+              initial={lastScrap.so_start}
+              onItem={(item) => setLatest((prev) => [item, ...(prev ?? []).filter((p) => p.request_type !== 'scraping')])}
+            />
+          ) : null}
           {!scrapOpen && scrapProblems.length > 0 ? (
             <ul className={cn('space-y-0.5 text-xs', TONE.warn.value)} data-testid="so-scrap-problems">
               {scrapProblems.map((p) => (
