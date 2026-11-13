@@ -23,12 +23,11 @@ describe('Gen link รวมในกล่อง Autopost / Scrap', () => {
     expect(detail).not.toContain('detail-apply-links');
   });
 
-  it('ช่อง "สั่งอะไร" 3 อย่างทุกที่ · โพสต์เอง › ช่องทางอื่น = ลิงก์ที่มี + ปุ่ม Gen link พับไว้ กดกางค่อยใช้', () => {
+  it('ช่อง "สั่งอะไร" 3 อย่างทุกที่ · โพสต์เอง = เลือกช่องทางแบบ Gen link ในที่เดียว ไม่แยก กลุ่ม Facebook / ช่องทางอื่น (13 พ.ย. 2569)', () => {
     const order = read('src/components/jobs/OrderPostButton.tsx');
     expect(order).toContain('options={KIND_OPTIONS}');
-    expect(order).toContain("{ value: 'other', label: 'ช่องทางอื่น (Tiktok · Facebook Page · LINE · Webjob …)' }");
-    // 4 พ.ย. 2569 เจ้าของ "ย่อไว้กดกางออกค่อยให้ทำงานได้" — ไม่กางฟอร์มค้าง
-    expect(order).toContain('<JobApplyLinks job={job} onChanged={onLinksChanged} />');
+    expect(order).not.toContain("label: 'ช่องทางอื่น (Tiktok · Facebook Page · LINE · Webjob …)'");
+    expect(order).toContain('<ManualPostPanel job={job} onChanged={onLinksChanged} />');
     expect(read('src/components/jobs/ApplyLinksPanel.tsx')).not.toContain('formOpen');
   });
 

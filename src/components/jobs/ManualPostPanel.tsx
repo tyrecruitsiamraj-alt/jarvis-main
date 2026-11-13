@@ -7,27 +7,33 @@ import type { JobRequest } from '@/types';
 import { useRecruiterContact } from '@/hooks/useRecruiterContact';
 import { jobUnitSectorOf } from '@/lib/unitRequestDisplay';
 import { fetchSoOptions } from '@/lib/jobPostingRequestsApi';
-import { createRecruitPosting, fetchRecruitPostings } from '@/lib/recruitPostingsApi';
+import { addPostingLink, createRecruitPosting, fetchRecruitPostings } from '@/lib/recruitPostingsApi';
 import { jobPostingBody } from '@/lib/recruitPostingDraft';
 import { releaseJobsToPublic } from '@/lib/jobPublicReleaseApi';
-import { applyLinkPath, type RecruitPosting, type RecruitPostingLink } from '@/lib/recruitPostings';
+import { applyLinkPath, recruitChannelLabel, type RecruitChannelMatch, type RecruitPosting, type RecruitPostingLink } from '@/lib/recruitPostings';
 import { AUTOPOST_LINK_PLACEHOLDER } from '@/lib/postText';
 import { buildAutopostCaption } from '@/lib/autopostCaption';
 import { ensureSoGroupLinks } from '@/lib/soGroupLinks';
-import { jobBuOf, soGroupLinkName, type SoOptGroup } from '@/lib/soScraping';
+import { isFacebookGroupChannel, jobBuOf, SO_LINK_NOTE, soGroupLinkName, type SoOptGroup } from '@/lib/soScraping';
 import SoGroupPicker from '@/components/jobs/SoGroupPicker';
+import MultiChannelPicker from '@/components/shared/MultiChannelPicker';
 import { syncCaptionLink } from '@/components/jobs/AutopostDialog';
 import { copyText } from '@/lib/copyText';
 
-type Row = { group: SoOptGroup; link: RecruitPostingLink };
+/** แถวที่เตรียมแล้ว — ลิงก์ละแถว · กลุ่ม Facebook มี `group` (ปุ่มเปิดกลุ่ม) · ช่องทางอื่นไม่มี */
+type Row = { key: string; name: string; group: SoOptGroup | null; link: RecruitPostingLink };
 
 /**
+ * 🔴 13 พ.ย. 2569 เจ้าของ "ทำเหมือนตอน gen link ไปเลย ถ้าเลือก facebook ก็ขึ้นช่องทางรองมาด้วย แล้วถ้าเลือก facebook Group
+ * ก็ค่อยมีกลุ่มมาให้เลือก" — เลือกช่องทางหลัก → รอง (ตัวเดียวกับ Gen link · `MultiChannelPicker`) · มี Facebook Group = ค่อยเลือกกลุ่ม
+ * ช่องทางอื่นได้ลิงก์ช่องละ 1 อัน (จด note = โพสต์เอง เหมือนลิงก์กลุ่ม)
+ *
  * ═══ โพสต์เอง — คนโพสต์ลงกลุ่ม Facebook เอง ทีละกลุ่ม (เจ้าของ 9 พ.ย. 2569 "ฉันจะให้คนสามารถโพสต์เองได้" · "เสนอมาดีมาก") ═══
  * เลือกกลุ่ม → เตรียมโพสต์ → แถวละกลุ่ม: คัดลอกข้อความ (ใส่ลิงก์สมัครของกลุ่มนั้นให้แล้ว) · เปิดกลุ่ม
  * ลิงก์กลุ่มละลิงก์ จด `note` = โพสต์เอง (`ensureSoGroupLinks`) ⇒ ผู้สมัครบอกได้ว่ามาจากกลุ่มไหน และโพสต์เองหรือ Autopost
  * ข้อความ = ที่แก้บันทึกไว้กับใบขอ (ช่อง "ข้อความประกาศ" ของ Autopost) · ไม่เคยแก้ = ข้อความที่ระบบร่าง
  */
-export default function ManualPostPanel({ job }: { job: JobRequest }) {
+export default function ManualPostPanel({ job, onChanged }: { job: JobRequest; onChanged?: () => void }) {
   const looked = useRecruiterContact(job.recruiter_contact ? null : job.recruiter_name);
   const contact = job.recruiter_contact ?? looked;
   const caption = React.useMemo(
@@ -37,6 +43,12 @@ export default function ManualPostPanel({ job }: { job: JobRequest }) {
   const [groups, setGroups] = React.useState<SoOptGroup[] | null>(null);
   const [postings, setPostings] = React.useState<RecruitPosting[] | null>(null);
   const [picked, setPicked] = React.useState<string[]>([]);
+  const [channels, setChannels] = React.useState<RecruitChannelMatch[]>([]);
+  const fbGroupChannel = channels.some((c) => isFacebookGroupChannel(c.name));
+  const otherChannels = channels.filter((c) => !isFacebookGroupChannel(c.name));
+  /** ต้องมีช่องทาง · เลือก Facebook Group แล้วต้องเลือกกลุ่มด้วย (กติกาเดียวกับ Gen link 4 พ.ย. 2569) */
+  const linkCount = otherChannels.length + (fbGroupChannel ? picked.length : 0);
+  const missingGroup = fbGroupChannel && picked.length === 0;
   const [rows, setRows] = React.useState<Row[] | null>(null);
   const [copied, setCopied] = React.useState<ReadonlySet<string>>(new Set());
   const [busy, setBusy] = React.useState(false);
@@ -61,7 +73,7 @@ export default function ManualPostPanel({ job }: { job: JobRequest }) {
   }, [job.id, job.request_no]);
 
   const prepare = async () => {
-    if (busy || !groups || picked.length === 0) return;
+    if (busy || linkCount === 0 || missingGroup || (fbGroupChannel && !groups)) return;
     setBusy(true);
     setError(null);
     try {
@@ -71,11 +83,28 @@ export default function ManualPostPanel({ job }: { job: JobRequest }) {
         posting = await createRecruitPosting(jobPostingBody(job));
         await releaseJobsToPublic([job.id]);
       }
-      const { links, made } = await ensureSoGroupLinks(posting, groups.filter((g) => picked.includes(g.id)), groups, 'manual');
-      // จำลิงก์ที่เพิ่งสร้าง — กด "เลือกกลุ่มใหม่" แล้วเตรียมซ้ำต้องได้ลิงก์เดิม ไม่สร้างซ้ำ
+      const made: RecruitPostingLink[] = [];
+      const out: Row[] = [];
+      // ช่องทางอื่น — ช่องละลิงก์ · มีลิงก์โพสต์เองของช่องนี้แล้วใช้ตัวเดิม (เตรียมซ้ำไม่งอกลิงก์)
+      for (const c of otherChannels) {
+        const label = recruitChannelLabel(c);
+        let l = [...posting.links, ...made].find((x) => x.channelId === c.id && !x.fbGroupId && (x.note ?? '').trim() === SO_LINK_NOTE.manual) ?? null;
+        if (!l) {
+          l = await addPostingLink(posting.id, { channelId: c.id, channelLabel: label, note: SO_LINK_NOTE.manual });
+          made.push(l);
+        }
+        out.push({ key: `c-${c.id}`, name: label, group: null, link: l });
+      }
+      if (fbGroupChannel && groups) {
+        const g = await ensureSoGroupLinks({ ...posting, links: [...posting.links, ...made] }, groups.filter((x) => picked.includes(x.id)), groups, 'manual');
+        made.push(...g.made);
+        for (const r of g.links) out.push({ key: `g-${r.group.id}`, name: soGroupLinkName(r.group, groups), group: r.group, link: r.link });
+      }
+      // จำลิงก์ที่เพิ่งสร้าง — กด "เลือกใหม่" แล้วเตรียมซ้ำต้องได้ลิงก์เดิม ไม่สร้างซ้ำ
       const current = { ...posting, links: [...posting.links, ...made] };
       setPostings((prev) => [current, ...(prev ?? []).filter((p) => p.id !== current.id)]);
-      setRows(links);
+      setRows(out);
+      if (made.length > 0) onChanged?.();
       setCopied(new Set());
     } catch (e) {
       setError(e instanceof Error ? e.message : 'เตรียมโพสต์ไม่สำเร็จ');
@@ -89,7 +118,7 @@ export default function ManualPostPanel({ job }: { job: JobRequest }) {
   const copy = async (r: Row) => {
     try {
       await copyText(textOf(r));
-      setCopied((prev) => new Set(prev).add(r.group.id));
+      setCopied((prev) => new Set(prev).add(r.key));
       setError(null);
     } catch {
       setError('คัดลอกไม่ได้ — ลองกดอีกครั้ง');
@@ -101,26 +130,26 @@ export default function ManualPostPanel({ job }: { job: JobRequest }) {
       <div className="space-y-2" data-testid="manual-post-rows">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="text-sm font-medium text-foreground">
-            เตรียมโพสต์ {rows.length} กลุ่ม · <span className="tabular-nums">คัดลอกแล้ว {copied.size}/{rows.length}</span>
+            เตรียมโพสต์ {rows.length} ลิงก์ · <span className="tabular-nums">คัดลอกแล้ว {copied.size}/{rows.length}</span>
           </p>
           <Button type="button" variant="ghost" size="sm" onClick={() => setRows(null)}>
-            เลือกกลุ่มใหม่
+            เลือกใหม่
           </Button>
         </div>
         <ul className="divide-y divide-border rounded-xl border border-border">
           {rows.map((r) => {
-            const done = copied.has(r.group.id);
+            const done = copied.has(r.key);
             return (
-              <li key={r.group.id} className="flex flex-wrap items-center gap-2 px-3 py-2" data-testid="manual-post-row">
+              <li key={r.key} className="flex flex-wrap items-center gap-2 px-3 py-2" data-testid="manual-post-row">
                 <span className={cn('flex min-w-0 flex-1 items-center gap-1.5 text-sm', done ? DASH.sub : 'text-foreground')}>
                   {done ? <Check className={cn('h-4 w-4 shrink-0', TONE.success.value)} aria-hidden /> : null}
-                  <span className="min-w-0 break-words">{soGroupLinkName(r.group, groups ?? [])}</span>
+                  <span className="min-w-0 break-words">{r.name}</span>
                 </span>
                 <Button type="button" size="sm" variant={done ? 'outline' : 'default'} onClick={() => void copy(r)} data-testid="manual-post-copy">
                   <Copy aria-hidden />
                   {done ? 'คัดลอกแล้ว' : 'คัดลอกข้อความ'}
                 </Button>
-                {r.group.url ? (
+                {!r.group ? null : r.group.url ? (
                   <Button asChild size="sm" variant="outline">
                     <a href={r.group.url} target="_blank" rel="noopener noreferrer" data-testid="manual-post-open">
                       <ExternalLink aria-hidden />
@@ -143,10 +172,11 @@ export default function ManualPostPanel({ job }: { job: JobRequest }) {
 
   return (
     <div className="space-y-3" data-testid="manual-post">
-      <SoGroupPicker groups={groups} jobBu={jobBuOf(job)} jobSector={jobUnitSectorOf(job)} value={picked} onChange={setPicked} />
+      <MultiChannelPicker value={channels} onChange={setChannels} />
+      {fbGroupChannel ? <SoGroupPicker groups={groups} jobBu={jobBuOf(job)} jobSector={jobUnitSectorOf(job)} value={picked} onChange={setPicked} /> : null}
       {error ? <p className={cn('text-sm', TONE.danger.value)}>{error}</p> : null}
-      <Button type="button" disabled={busy || picked.length === 0} onClick={() => void prepare()} data-testid="manual-post-prepare">
-        {busy ? 'กำลังเตรียม…' : `เตรียมโพสต์ ${picked.length} กลุ่ม`}
+      <Button type="button" disabled={busy || linkCount === 0 || missingGroup} onClick={() => void prepare()} data-testid="manual-post-prepare">
+        {busy ? 'กำลังเตรียม…' : missingGroup ? 'เลือกกลุ่ม Facebook' : `เตรียมโพสต์ ${linkCount} ลิงก์`}
       </Button>
     </div>
   );

@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { FieldSelect } from '@/components/shared/FieldSelect';
-import { JobApplyLinks } from '@/components/jobs/ApplyLinksPanel';
 import { cn } from '@/lib/utils';
 import { DASH, TONE } from '@/lib/designTokens';
 import type { JobRequest } from '@/types';
@@ -60,11 +59,6 @@ const KIND_OPTIONS: Array<{ value: OrderKind; label: string }> = [
   // เจ้าของ 9 พ.ย. 2569 "ฉันจะให้คนสามารถโพสต์เองได้"
   { value: 'manual', label: 'โพสต์เอง — เอาลิงก์ไปโพสต์เอง' },
 ];
-type ManualChannel = 'fbGroup' | 'other';
-const MANUAL_CHANNEL_OPTIONS: Array<{ value: ManualChannel; label: string }> = [
-  { value: 'fbGroup', label: 'กลุ่ม Facebook' },
-  { value: 'other', label: 'ช่องทางอื่น (Tiktok · Facebook Page · LINE · Webjob …)' },
-];
 
 export default function OrderPostButton({
   job,
@@ -85,7 +79,6 @@ export default function OrderPostButton({
   onLinksChanged?: () => void;
 }) {
   const [kind, setKind] = React.useState<OrderKind>(defaultKind);
-  const [manualChannel, setManualChannel] = React.useState<ManualChannel>('fbGroup');
   const [latest, setLatest] = React.useState<JobPostingRequest[] | null>(null);
   const [loadError, setLoadError] = React.useState<string | null>(null);
   const [busy, setBusy] = React.useState(false);
@@ -269,25 +262,8 @@ export default function OrderPostButton({
         </div>
       ) : kind === 'manual' ? (
         <div className="space-y-3 rounded-xl border border-border/70 p-3" data-testid="so-order-manual">
-          <div className="space-y-1">
-            <p className="text-sm font-medium text-foreground">1 · ช่องทาง</p>
-            <FieldSelect
-              id={`so-manual-channel-${job.id}`}
-              value={manualChannel}
-              onChange={(v) => setManualChannel(v === 'other' ? 'other' : 'fbGroup')}
-              ariaLabel="โพสต์ที่ช่องทางไหน"
-              testId="so-manual-channel"
-              options={MANUAL_CHANNEL_OPTIONS}
-            />
-          </div>
-          {/* กลุ่ม Facebook = เลือกกลุ่ม คัดลอกข้อความกลุ่มละแถว · ช่องทางอื่น = ฟอร์มลิงก์สมัคร (Gen link เดิม) */}
-          {manualChannel === 'fbGroup' ? (
-            <ManualPostPanel job={job} />
-          ) : (
-            <div data-testid="so-order-genlink">
-              <JobApplyLinks job={job} onChanged={onLinksChanged} />
-            </div>
-          )}
+          {/* 13 พ.ย. 2569 เจ้าของ "อย่าแยกแบบนี้ ทำเหมือนตอน gen link" — ช่องทางหลัก → รอง → (Facebook Group) กลุ่ม ในที่เดียว */}
+          <ManualPostPanel job={job} onChanged={onLinksChanged} />
         </div>
       ) : (
         <div className="space-y-3 rounded-xl border border-border/70 p-3" data-testid="so-order-scrap-form">

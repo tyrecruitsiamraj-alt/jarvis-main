@@ -53,8 +53,13 @@ describe('ตารางช่องทางชั้นที่ 4', () => {
   it('ปุ่มโพสต์เองอยู่ในช่อง "สั่งอะไร" · ลิงก์จด note โพสต์เอง', () => {
     const order = readFileSync('src/components/jobs/OrderPostButton.tsx', 'utf8');
     expect(order).toContain("{ value: 'manual', label: 'โพสต์เอง — เอาลิงก์ไปโพสต์เอง' }");
-    expect(order).toContain("{ value: 'fbGroup', label: 'กลุ่ม Facebook' }");
-    expect(readFileSync('src/components/jobs/ManualPostPanel.tsx', 'utf8')).toContain("ensureSoGroupLinks(posting, groups.filter((g) => picked.includes(g.id)), groups, 'manual')");
+    // 13 พ.ย. 2569 "ทำเหมือนตอน gen link" — เลือกช่องทางหลัก → รอง ในที่เดียว · Facebook Group ค่อยเลือกกลุ่ม · ช่องทางอื่นช่องละลิงก์ (note โพสต์เอง)
+    const manual = readFileSync('src/components/jobs/ManualPostPanel.tsx', 'utf8');
+    expect(manual).toContain('<MultiChannelPicker value={channels} onChange={setChannels} />');
+    expect(manual).toContain('{fbGroupChannel ? <SoGroupPicker');
+    expect(manual).toContain("groups.filter((x) => picked.includes(x.id)), groups, 'manual')");
+    expect(manual).toContain('addPostingLink(posting.id, { channelId: c.id, channelLabel: label, note: SO_LINK_NOTE.manual })');
+    expect(readFileSync('src/components/jobs/OrderPostButton.tsx', 'utf8')).not.toContain('MANUAL_CHANNEL_OPTIONS');
     expect(readFileSync('src/components/jobs/AutopostDialog.tsx', 'utf8')).toContain("opts.groups, 'autopost')");
     // เตรียมซ้ำในป๊อปเดิมต้องได้ลิงก์เดิม (ทดสอบผ่านหน้าจอ 9 พ.ย. 2569 — เดิมป๊อปไม่จำลิงก์ที่เพิ่งสร้าง)
     expect(readFileSync('src/components/jobs/ManualPostPanel.tsx', 'utf8')).toContain('const current = { ...posting, links: [...posting.links, ...made] };');
