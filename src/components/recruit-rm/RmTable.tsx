@@ -609,7 +609,8 @@ const RmTable: React.FC<{
                             // มือถือปุ่ม 40px (เดิม 32px ติดกัน กด "ส่ง AI โทร" พลาดโดน "ดูรายละเอียด")
                             className={
                               worded
-                                ? 'rounded-full max-sm:min-h-9'
+                                ? // มือถือ: ปุ่มมีคำกินแถวของตัวเองในตาราง 2×2 — ไม่งั้นคอลัมน์กว้างจนมุดใต้ชื่อที่ติดซ้าย (15 พ.ย. 2569 รูปมือถือ)
+                                  cn('rounded-full max-sm:min-h-9', a === 'ai' && 'max-sm:col-span-2')
                                 : 'rounded-full text-muted-foreground hover:text-foreground max-sm:h-10 max-sm:w-10'
                             }
                           >
