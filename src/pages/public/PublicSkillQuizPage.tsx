@@ -160,6 +160,11 @@ export default function PublicSkillQuizPage() {
         </>
       )}
 
+      {/*
+        ส่งแล้ว = ถอดกล่องยืนยันทิ้งทันที ไม่รอแอนิเมชันปิด (15 พ.ย. 2569 เจ้าของ "แก้บั๊กกล่องส่งคำตอบค้าง")
+        กดส่งแล้วสลับแอป/แท็บทันที เบราว์เซอร์หยุดแอนิเมชันปิด ⇒ กล่องค้างจาง ๆ ทับหน้าขอบคุณ
+      */}
+      {quiz.submitted || sent ? null : (
       <AlertDialog open={confirm} onOpenChange={setConfirm}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -174,6 +179,7 @@ export default function PublicSkillQuizPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      )}
     </div>
   );
 }
