@@ -144,11 +144,25 @@ export type FollowPlanningRound = {
    * เช่น เคสจริง 15 ต.ค.: 07:00 ตอบวันหยุด → ระบบถอนคิว 08:00 · เดิมจอขึ้น "เลยเวลานัด" + อยู่กองสายที่จะไม่ถูกโทร
    * มีค่า = สายนี้ `state` เป็น `cancelled` (จบ) · ป้าย "ไม่โทร · สาย 07:00 ตอบวันหยุดแล้ว" · ตั้งใน `buildFollowPlanningRows`
    */
-  stoppedBy?: { time: string | null; category: FollowCallCategory } | null;
+  stoppedBy?: { time: string | null; category: FollowCallCategory; earlierDay?: boolean } | null;
 };
 
 /** หมวดคำตอบที่ทำให้ระบบหยุดสายที่เหลือของวัน (ตัวหยุดคือ `cancelFollowSetAfterDecline` / ลงผลวันหยุด-ลางาน) */
 const DAY_STOP_ANSWERS: ReadonlySet<FollowCallCategory> = new Set(['agreed', 'lost', 'dayOff', 'leave']);
+
+const REPLACE_REF_RE = /^(irecruit|manual)-replace:/;
+const refUnit = (ref: string | null | undefined) => (ref ?? '').split(':').slice(0, 2).join(':');
+/**
+ * สายที่ตอบแล้วหยุดสายนี้ได้ไหม — กติกาเดียวกับเซิร์ฟเวอร์ `followSameStopUnitSql` (`api/_lib/followDayScope.ts`)
+ * คนเริ่มงาน = วันเดียวกัน · คนแทน = ใบงานเดียวกัน (สายคอนเฟิร์ม 16:00 อยู่วันก่อนเข้างาน)
+ * 🔴 QA 15 พ.ย. 2569: เดิมจอดูแค่วันเดียวกัน — ตอบตอนคอนเฟิร์มแล้วเซิร์ฟเวอร์ถอนสายเช้าวันรุ่งขึ้น
+ *    แต่จอขึ้น "ส่งให้ AI แล้ว ยังไม่มีผลกลับ" ค้างทั้งวัน (15 พ.ย. 19 สาย)
+ */
+function sameStopUnit(answered: FollowPlanningRound, round: FollowPlanningRound): boolean {
+  const meRef = answered.entry.source_ref ?? '';
+  if (REPLACE_REF_RE.test(meRef)) return refUnit(round.entry.source_ref) === refUnit(meRef);
+  return answered.ymd === round.ymd;
+}
 
 /**
  * สายที่ระบบถอนคิวเอง (คิว `cancelled` แต่รายการยังเปิด ไม่มีผล) และมีสายก่อนหน้าวันเดียวกันได้คำตอบแล้ว
@@ -164,7 +178,7 @@ export function stoppedByEarlierAnswer(
   const at = ms(e.scheduled_at);
   let best: FollowPlanningRound | null = null;
   for (const r of sameDay) {
-    if (r === round || r.ymd !== round.ymd || r.state !== 'result') continue;
+    if (r === round || r.state !== 'result' || !sameStopUnit(r, round)) continue;
     const t = ms(r.entry.scheduled_at);
     if (at !== null && t !== null && t >= at) continue;
     if (!DAY_STOP_ANSWERS.has(callCategory(r))) continue;
@@ -178,7 +192,9 @@ export function stoppedLabel(stopped: NonNullable<FollowPlanningRound['stoppedBy
   const ans = FOLLOW_CALL_CATEGORY_LABEL[stopped.category];
   // ไป/ไม่ไป (คำชุดเดียวทั้งระบบ 18 ต.ค. 2569) อ่านเป็น "ตอบว่าไม่ไปแล้ว" · อื่น ๆ "ตอบวันหยุดแล้ว"
   const said = ans.startsWith('ตอบ') ? ans : ans === 'ไป' || ans === 'ไม่ไป' ? `ตอบว่า${ans}` : `ตอบ${ans}`;
-  return `ไม่โทร · ${stopped.time ? `สาย ${stopped.time} ` : 'สายก่อนหน้า'}${said}แล้ว`;
+  // คนแทน: สายคอนเฟิร์มอยู่วันก่อนเข้างาน (QA 15 พ.ย. 2569) — บอกว่าเป็นสายของวันก่อน
+  const day = stopped.earlierDay ? 'วันก่อน ' : '';
+  return `ไม่โทร · ${stopped.time ? `สาย ${stopped.time} ${day}` : 'สายก่อนหน้า'}${said}แล้ว`;
 }
 
 /**
@@ -291,7 +307,7 @@ export function buildFollowPlanningRows(
     for (const r of rounds) {
       const by = stoppedByEarlierAnswer(r, rounds);
       if (!by) continue;
-      r.stoppedBy = { time: by.time, category: callCategory(by) };
+      r.stoppedBy = { time: by.time, category: callCategory(by), earlierDay: by.ymd !== r.ymd };
       r.state = 'cancelled';
     }
 

@@ -69,9 +69,16 @@ export function followQueueGroupOf(
   const caller = followCallerOf(e);
   if (caller === 'manual') return { group: 'staff', reason: 'สายคนโทร' };
   if (round.state === 'notSent') return { group: 'staff', reason: roundDispatchReason(round) };
-  const aiStillCalling = person.calls.some(
-    (c) => c !== call && !c.round.entry.cancelled && followCallerOf(c.round.entry) === 'ai' && AI_PENDING.has(c.round.state),
-  );
+  /**
+   * สาย AI อื่นของคนนี้ที่ยังจะโทร — ยังไม่ถึงเวลา หรือเพิ่งเลยไม่ถึง 15 นาที
+   * 🔴 QA 15 พ.ย. 2569: เดิมนับสายที่เลยเวลานานแล้วด้วย ⇒ สาย AI ไม่มีผล 2 สายของคนเดียวกันกันกันเอง ไม่มีสายไหนขึ้นให้คนตาม
+   */
+  const aiStillCalling = person.calls.some((c) => {
+    if (c === call || c.round.entry.cancelled || followCallerOf(c.round.entry) !== 'ai' || !AI_PENDING.has(c.round.state)) return false;
+    if (c.round.state !== 'overdue') return true;
+    const t = atOf(c);
+    return t !== null && (now.getTime() - t) / 60_000 < AI_NO_RESULT_HANDOFF_MIN;
+  });
   if (AI_PENDING.has(round.state)) {
     /**
      * 🔴 ส่ง AI แล้วเลยเวลา 15 นาทีไม่มีผลกลับ (28 ต.ค. 2569 · เจ้าของ Choice "แก้ครบ 6 ข้อ")
