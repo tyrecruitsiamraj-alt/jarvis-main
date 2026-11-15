@@ -65,7 +65,7 @@ import { homeWindowFromParams, homeWindowToParams, requestPathOfJobId, withRange
 import BuTrendTable from '@/components/so-recruit-v5/BuTrendTable';
 import { fetchRecruitStuck } from '@/lib/recruitStuckApi';
 import { STUCK_REASON_LABEL } from '@/lib/recruitStuck';
-import { PREQUEST_LEDGER_PREFIX, ledgerJobIdOf } from '@/lib/requestPenaltyLedger';
+import { PREQUEST_LEDGER_PREFIX, REQUEST_LEDGER_SINCE, ledgerJobIdOf } from '@/lib/requestPenaltyLedger';
 import type { RecruitRequestItem } from '@/lib/recruitOverviewTypes';
 import { RANGE_MAX_DAYS, rangeWindow } from '@/lib/recruitOverviewWindow';
 const dayNumberOf = (ymd: string) => Math.round(Date.parse(`${ymd}T00:00:00Z`) / 86_400_000);
@@ -741,7 +741,7 @@ const HomeOverviewPage: React.FC<{
           <header className="flex flex-wrap items-start justify-between gap-4">
             <h1 className="text-3xl font-medium tracking-tight">หน้าหลัก</h1>
             <div className="flex items-center gap-2">
-              <PeriodPicker value={win} onChange={setWin} />
+              <PeriodPicker value={win} onChange={setWin} minYmd={REQUEST_LEDGER_SINCE} />
               {buChoices?.length ? (
                 <BuChoiceSelect value={bu} choices={buChoices} onChange={setBu} allOption triggerClassName="h-10 w-32 bg-card" />
               ) : moneyNow?.forcedBu && moneyNow.bu ? (
@@ -1033,7 +1033,7 @@ const HomeOverviewPage: React.FC<{
           </Tabs>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <PeriodPicker value={win} onChange={setWin} />
+          <PeriodPicker value={win} onChange={setWin} minYmd={REQUEST_LEDGER_SINCE} />
           {buChoices?.length ? (
             <BuChoiceSelect value={bu} choices={buChoices} onChange={setBu} allOption triggerClassName="h-10 w-32 bg-card" />
           ) : moneyNow?.forcedBu && moneyNow.bu ? (

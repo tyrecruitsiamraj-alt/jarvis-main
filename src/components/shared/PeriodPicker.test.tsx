@@ -81,6 +81,18 @@ describe('ปฏิทินเลือกช่วง', () => {
     expect(onChange).toHaveBeenCalledWith({ from: '2026-03-01', to: '2026-03-31', unit: 'month' });
   });
 
+  it('วันแรกที่เลือกได้ (minYmd · เจ้าของ 15 พ.ย. 2569 "ปฏิทินเลือกได้ตั้งแต่ ม.ค. 2567"): ปี/เดือน/ปุ่มปีก่อน กดไม่ได้', () => {
+    render(<PeriodPicker value={{ from: '2026-09-24', to: '2026-09-30' }} onChange={vi.fn()} today={TODAY} minYmd="2024-01-01" />);
+    fireEvent.click(screen.getByRole('button', { name: /ช่วงเวลา/ }));
+    tab('ปี');
+    expect((screen.getByRole('button', { name: 'ปี 2566' }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole('button', { name: 'ปี 2567' }) as HTMLButtonElement).disabled).toBe(false);
+    tab('เดือน');
+    for (let i = 0; i < 2; i++) fireEvent.click(screen.getByRole('button', { name: 'ปีก่อน' }));
+    expect((screen.getByRole('button', { name: 'ปีก่อน' }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole('button', { name: 'มกราคม 2567' }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
   it('เทียบปี: กดสองปี = ทั้งสองปี', () => {
     const onChange = open();
     tab('ปี');

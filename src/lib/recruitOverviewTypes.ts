@@ -62,6 +62,8 @@ export type RecruitAppFact = {
   appointmentFailed?: boolean;
   /** คนที่เก็บไปหน้าการติดต่อ (ชื่อเล่น) · null = ยังไม่มีใครเก็บ · ไม่มี = เส้นรุ่นเก่า (4 พ.ย. 2569) */
   claimedBy?: string | null;
+  /** เก็บไปเมื่อไหร่ — บันทึกติดต่อก่อนเวลานี้เป็นของคนก่อน (QA 15 พ.ย. 2569 · ตัวเดียวกับป๊อปรายชื่อ `holderStateOf`) */
+  claimedAt?: string | null;
   /** ผ่าน/ไม่ผ่าน หลังมาตามนัด (151) */
   screening?: 'passed' | 'not_passed' | null;
   /** อายุ 58 ปีขึ้นไป — ระบบไม่ส่งให้ AI (`isOverAge` · 19 ต.ค. 2569) */

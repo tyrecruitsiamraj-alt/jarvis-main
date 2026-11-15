@@ -21,7 +21,7 @@ import React from 'react';
 import { genderLabel } from '@/lib/genderRequirement';
 
 import { formatYmdTh } from '@/lib/dateTh';
-import { jobPositionUnits } from '@/lib/jobPositionUnits';
+import { jobPositionUnits, remainingPositionsOf } from '@/lib/jobPositionUnits';
 import { moneyFieldText } from '@/lib/unitRequestDetail';
 import { postingPositionText } from '@/lib/publicJobTitle';
 import type { JobRequest } from '@/types';
@@ -79,7 +79,7 @@ const UnitRequestInfoFields: React.FC<{ job: JobRequest }> = ({ job: data }) => 
           : undefined
       }
     />
-    <Field label="เหลือหา" value={`${jobPositionUnits(data)} อัตรา`} />
+    <Field label="เหลือหา" value={`${remainingPositionsOf(data)} อัตรา`} />
     <Field
       label="ทำงานวันสุดท้าย"
       value={data.lastWorkingDay ? formatYmdTh(data.lastWorkingDay) : undefined}

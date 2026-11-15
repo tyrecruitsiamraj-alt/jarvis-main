@@ -94,13 +94,21 @@ export function followLedgerBucket(
   r: Record<string, unknown>,
   derived: ReturnType<typeof categorizeFollowRows>,
 ): FollowBucketKey {
-  const first = String(r.ledger_bucket) as 'done' | 'waiting' | 'failed' | 'cancelled';
-  if (first !== 'done') return first;
   const d = derived.get(String(r.id));
+  /**
+   * 🔴 เจ้าของ 15 พ.ย. 2569 Choice "แบบหน้าติดตามทุกหน้า" — ทุกสายแบ่งด้วยหมวดของหน้าติดตาม (`categorizeFollowRows`) ตัวเดียว
+   * เดิมตัดด้วยผลคิวก่อน (เคาะ 10 ต.ค.) ⇒ สาย AI ที่คิวขึ้น failed นับไม่รับสายหมด แม้หน้าติดตามนับเป็นยกเลิก
+   * (ระบบหยุดเพราะสายก่อนวันเดียวกันได้คำตอบแล้ว) · QA: หน้าหลัก 1–15 พ.ย. ไม่รับสาย 1,089 > Dashboard ติดตาม 30 วัน 1,027
+   */
+  if (!d) {
+    const first = String(r.ledger_bucket) as 'done' | 'waiting' | 'failed' | 'cancelled';
+    return first === 'done' ? 'unclear' : first;
+  }
   const outcome =
     (typeof r.staff_call_outcome === 'string' && r.staff_call_outcome.trim()) ||
     (typeof r.call_outcome === 'string' ? r.call_outcome : null);
-  return d ? doneBucketOf(journeyResultOf(d.category, outcome)) : 'unclear';
+  const result = journeyResultOf(d.category, outcome);
+  return result === 'waiting' ? 'waiting' : doneBucketOf(result);
 }
 
 const BUCKET_COLS = `count(*)::int as total,

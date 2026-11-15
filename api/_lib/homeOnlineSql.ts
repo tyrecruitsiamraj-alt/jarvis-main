@@ -129,37 +129,51 @@ async function loadOnlineRequestGroups(opts: OnlineRequestOpts) {
  * เดิมแท็บงานสรรหานับ "ใบที่ยังเปิด + ใบขอล่วงหน้า" และ "การกดประกาศในช่วง (รวมใบเก่า)" ⇒ 55 · 44 ขณะที่ทีม Online 54 · 4
  * 🔴 ห้ามจับด้วยเลขที่ใบ — ใบขอล่วงหน้าเลขซ้ำใบจริง (`buildReleaseIndex` จับเลขด้วย)
  */
+export type ReleaseMatch = { firstAt: string; lastAt: string; by: string | null };
+
 /**
- * วันที่ประกาศของใบชุดนี้ — จับคู่ทะเบียนประกาศด้วย `buildReleaseIndex` **ตัวเดียวกับกล่องงาน** (id เต็ม หรือเลขที่ใบที่ไม่ซ้ำ)
- * 🔴 QA 15 พ.ย. 2569: เดิมเทียบ job_id ตรง ๆ ⇒ ใบที่ประกาศไว้ใต้ id อีกรูปแบบ (siamraj-pre/siamraj-sql) ไม่นับ
- * กล่องงาน "ยังไม่ประกาศ 164" แต่ภาพรวม 166 จากใบชุดเดียวกัน
+ * ทะเบียนประกาศของใบชุดนี้ — จับคู่ด้วย `buildReleaseIndex` **ตัวเดียวกับกล่องงาน** (id เต็ม หรือเลขที่ใบที่ไม่ซ้ำ)
+ * 🔴 QA 15 พ.ย. 2569: เดิมทุกเส้นฝั่ง server เทียบ job_id ตรง ๆ ⇒ ใบที่ประกาศไว้ใต้ id อีกรูปแบบ (siamraj-pre/siamraj-sql) ไม่นับ
+ * กล่องงาน "ยังไม่ประกาศ 164" แต่ภาพรวม 166 จากใบชุดเดียวกัน · ใช้ร่วม: ภาพรวม (`loadOnlineRequestRows`) · ใครต้องทำอะไร (`recruit-stuck`)
  */
-async function loadReleasedAt(jobIds: readonly string[]): Promise<Map<string, string>> {
+export async function loadReleaseMatches(jobIds: readonly string[]): Promise<Map<string, ReleaseMatch>> {
   const nos = [...new Set(jobIds.map((id) => requestNoOf(id).trim()).filter(Boolean))];
-  const { rows } = await dbQuery<{ job_id: string; request_no: string | null; released_at: string }>(
-    `select job_id, request_no, released_at from ${RELEASES}
+  const { rows } = await dbQuery<{ job_id: string; request_no: string | null; released_at: string | Date; released_by_name: string | null }>(
+    `select job_id, request_no, released_at, released_by_name from ${RELEASES}
       where job_id = any($1::text[]) or request_no = any($2::text[]) or regexp_replace(job_id, '^.*:', '') = any($2::text[])`,
     [jobIds, nos],
   );
   const idx = buildReleaseIndex(rows, jobIds);
-  const later = (m: Map<string, string>, k: string, at: string) => {
-    if (!m.has(k) || at > m.get(k)!) m.set(k, at);
+  const add = (m: Map<string, ReleaseMatch>, k: string, at: string, by: string | null) => {
+    const cur = m.get(k);
+    if (!cur) m.set(k, { firstAt: at, lastAt: at, by });
+    else {
+      if (at < cur.firstAt) cur.firstAt = at;
+      if (at > cur.lastAt) cur.lastAt = at;
+      if (by && (!cur.by || by > cur.by)) cur.by = by;
+    }
   };
-  const byId = new Map<string, string>();
-  const byNo = new Map<string, string>();
+  const byId = new Map<string, ReleaseMatch>();
+  const byNo = new Map<string, ReleaseMatch>();
   for (const r of rows) {
     const at = new Date(r.released_at).toISOString();
-    later(byId, r.job_id, at);
+    const by = r.released_by_name?.trim() || null;
+    add(byId, r.job_id, at, by);
     const no = (r.request_no || requestNoOf(r.job_id)).trim();
-    if (no) later(byNo, no, at);
+    if (no) add(byNo, no, at, by);
   }
-  const out = new Map<string, string>();
+  const out = new Map<string, ReleaseMatch>();
   for (const id of jobIds) {
     if (!idx.has(id)) continue;
-    const at = byId.get(id) ?? byNo.get(requestNoOf(id).trim());
-    if (at) out.set(id, at);
+    const m = byId.get(id) ?? byNo.get(requestNoOf(id).trim());
+    if (m) out.set(id, m);
   }
   return out;
+}
+
+/** วันที่ประกาศล่าสุดของใบชุดนี้ (`loadReleaseMatches`) */
+async function loadReleasedAt(jobIds: readonly string[]): Promise<Map<string, string>> {
+  return new Map([...(await loadReleaseMatches(jobIds))].map(([id, m]) => [id, m.lastAt]));
 }
 
 export async function loadOnlineRequestCounts(opts: OnlineRequestOpts): Promise<{ total: number; released: number }> {

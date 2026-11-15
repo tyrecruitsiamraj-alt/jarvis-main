@@ -10,3 +10,11 @@ export function jobPositionUnits(job: JobRequest): number {
 export function sumJobPositionUnits(jobs: JobRequest[]): number {
   return jobs.reduce((sum, j) => sum + jobPositionUnits(j), 0);
 }
+
+/**
+ * เหลือหาที่โชว์บนจอ — ใบปิดแล้ว = 0 (QA 15 พ.ย. 2569: ERP ส่งเหลือหา 0 มาเป็นค่าว่าง ⇒ `jobPositionUnits` ถอยไป 1
+ * ใบปิดขึ้น "ขอ 1 · หาได้ 1 · เหลือหา 1") · ใบเปิดใช้ `jobPositionUnits` ตามเดิม
+ */
+export function remainingPositionsOf(job: JobRequest): number {
+  return job.status === 'closed' ? 0 : jobPositionUnits(job);
+}

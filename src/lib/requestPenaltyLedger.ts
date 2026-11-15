@@ -72,6 +72,11 @@ export type PenaltyRequestRow = {
 };
 /** ขึ้นต้นเลขใบขอชั่วคราวในสมุด — กันชนเลขใบจริง (ใบขอล่วงหน้าเลขซ้ำใบจริง 64%) */
 export const PREQUEST_LEDGER_PREFIX = 'ชั่วคราว ';
+/**
+ * วันแรกของสมุดใบขอ (ค่าเริ่ม · server ทับด้วย SIAMRAJ_OPEN_REQUEST_MIN_DATE ได้) — ปฏิทินหน้าหลักเลือกย้อนได้ถึงวันนี้
+ * เจ้าของ 15 พ.ย. 2569 Choice "ปฏิทินเลือกได้ตั้งแต่ ม.ค. 2567": ปี 2564 ใบขอเข้า-ปิดขึ้น 0 แต่การ์ดอื่นยังมีเลข
+ */
+export const REQUEST_LEDGER_SINCE = '2024-01-01';
 /** เลขใบในสมุด → id ของใบ (ตัวเดียวกับเมนูใบขอ) */
 export const ledgerJobIdOf = (r: Pick<PenaltyRequestRow, 'requestNo' | 'prequest'>): string =>
   r.prequest ? `siamraj-pre:${r.requestNo.slice(PREQUEST_LEDGER_PREFIX.length)}` : `siamraj-sql:${r.requestNo}`;

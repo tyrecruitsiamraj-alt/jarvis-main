@@ -20,7 +20,7 @@ import { logError } from '../_lib/logger.js';
 import { readUnitRequestListThroughCache } from './siamraj-unit-requests.js';
 import { attachRequestRecruiters, loadFactsForJobs, toRequestRows } from './recruit-overview.js';
 import { listLatestJobPostingsForBoard } from '../_lib/jobPostingRequests.js';
-import { loadErpExtras, loadOnlineRequestRows, type ErpExtra } from '../_lib/homeOnlineSql.js';
+import { loadErpExtras, loadOnlineRequestRows, loadReleaseMatches, type ErpExtra } from '../_lib/homeOnlineSql.js';
 import { loadInformDaysByPhone } from '../_lib/applicantSourceSql.js';
 import { informedSince, phone9Of } from '../../src/lib/applicantSourceMatch.js';
 import { countsOf } from '../../src/lib/requestPipeline.js';
@@ -40,7 +40,6 @@ import { stuckReasonOf, type StuckMonthlyRow, type StuckPostStatus, type StuckRe
 import type { RecruitAppFact } from '../../src/lib/recruitOverviewTypes.js';
 import type { JobRequest } from '../../src/types/index.js';
 
-const RELEASES = tableInAppSchema('job_public_releases');
 const POSTINGS = tableInAppSchema('recruit_postings');
 const LINKS = tableInAppSchema('recruit_posting_links');
 const APPS = tableInAppSchema('public_job_applications');
@@ -259,10 +258,8 @@ async function loadStuckRequests(departmentScope: Scope, buSet: readonly string[
   const [rows, facts, releases, links, postings] = await Promise.all([
     toRequestRows(base.map((b) => b.online)),
     loadFactsForJobs(jobIds, null),
-    dbQuery<{ job_id: string; at: string | Date; who: string | null }>(
-      `select job_id, min(released_at) as at, max(released_by_name) as who from ${RELEASES} where job_id = any($1::text[]) group by job_id`,
-      [jobIds],
-    ),
+    // จับคู่ทะเบียนประกาศตัวเดียวกับกล่องงาน (QA 15 พ.ย. 2569: เดิมเทียบ job_id ตรง ๆ ⇒ ยังไม่ประกาศ 166 vs กล่องงาน 164)
+    loadReleaseMatches(jobIds),
     dbQuery<{ job_id: string; n: number }>(
       `select p.job_id, count(l.id)::int as n from ${POSTINGS} p join ${LINKS} l on l.posting_id = p.id where p.job_id = any($1::text[]) and p.status = 'open' group by p.job_id`,
       [jobIds],
@@ -277,7 +274,7 @@ async function loadStuckRequests(departmentScope: Scope, buSet: readonly string[
     if (list) list.push(f);
     else factsBy.set(f.jobId, [f]);
   }
-  const relBy = new Map(releases.rows.map((r) => [r.job_id, r]));
+  const relBy = releases;
   const linkBy = new Map(links.rows.map((r) => [r.job_id, Number(r.n)]));
   const postBy = new Map<string, StuckPostStatus>();
   for (const p of postings) if (p.request_type === 'content' && POST_STATUSES.includes(p.status as StuckPostStatus) && !postBy.has(p.job_id)) postBy.set(p.job_id, p.status as StuckPostStatus);
@@ -317,8 +314,8 @@ async function loadStuckRequests(departmentScope: Scope, buSet: readonly string[
       screener: text(j?.screener_name),
       signals,
       reason: stuckReasonOf(signals),
-      releasedAt: rel ? (rel.at instanceof Date ? rel.at.toISOString() : String(rel.at)) : null,
-      releasedBy: rel ? text(rel.who) : null,
+      releasedAt: rel ? rel.firstAt : null,
+      releasedBy: rel ? rel.by : null,
       state,
       inRange: b.inRange,
     } satisfies StuckRequest;

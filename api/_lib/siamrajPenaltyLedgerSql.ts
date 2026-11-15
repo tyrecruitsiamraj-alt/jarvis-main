@@ -14,10 +14,10 @@ import { activeInformWhereSql, effectiveInformQtySql } from './siamrajStaffingOp
 import { boardStaffingRequestTypeWhereSql, excludeInternalReplacementRoleWhereSql } from './siamrajBoardRequestTypes.js';
 import { scopeCacheKey, sqlServerCodesClause, sqlServerDepartmentScopeClause, type DepartmentScope } from './departmentScope.js';
 import { buFromSiteCode } from '../../src/lib/homeBu.js';
-import { PREQUEST_LEDGER_PREFIX, type PenaltyInform, type PenaltyRequestRow } from '../../src/lib/requestPenaltyLedger.js';
+import { PREQUEST_LEDGER_PREFIX, REQUEST_LEDGER_SINCE, type PenaltyInform, type PenaltyRequestRow } from '../../src/lib/requestPenaltyLedger.js';
 
 /** นับตั้งแต่วันนี้ (เจ้าของ "นับทั้งหมด") — เท่ากับขอบเขตเก่าสุดของ feed ใบขอ */
-export const LEDGER_SINCE = (process.env.SIAMRAJ_OPEN_REQUEST_MIN_DATE || '').trim() || '2024-01-01';
+export const LEDGER_SINCE = (process.env.SIAMRAJ_OPEN_REQUEST_MIN_DATE || '').trim() || REQUEST_LEDGER_SINCE;
 const CACHE_MS = 10 * 60_000;
 
 /** ลูกค้าหักเงินรายวัน (วันที่ใบรับเงิน) ต่อไซต์ — หน้าเว็บตัดตามช่วงได้เป๊ะ (24 ต.ค. 2569 · เดิมรายเดือน เทียบช่วงสั้นไม่ได้) */

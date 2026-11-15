@@ -6,6 +6,8 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { countPresence, matchesPresence, type PresencePerson } from '@/lib/homePresence';
+import { remainingPositionsOf } from '@/lib/jobPositionUnits';
+import type { JobRequest } from '@/types';
 import { followCountedYmd } from '@/lib/trends/followTrends';
 import { funnelChannelOf, FUNNEL_CHANNELS } from '@/lib/homeOverviewFunnel';
 import type { FollowTrendRow } from '@/lib/trends/types';
@@ -27,8 +29,16 @@ describe('ผู้ใช้งาน: ชิปสถานะรวมกั�
 });
 
 describe('ใบขอ: ใบปิดแล้ว = เหลือหา 0', () => {
+  it('ใบปิด = 0 · ใบเปิดไม่มีค่า = 1 ตามเดิม', () => {
+    expect(remainingPositionsOf({ status: 'closed' } as JobRequest)).toBe(0);
+    expect(remainingPositionsOf({ status: 'open', position_units: 3 } as JobRequest)).toBe(3);
+    expect(remainingPositionsOf({ status: 'open' } as JobRequest)).toBe(1);
+  });
   it('ไม่ถอยไป 1 ตอนเหลือหาว่าง', () => {
-    expect(read('src/pages/jobs/JobListPage.tsx')).toContain("{j.status === 'closed' ? 0 : jobPositionUnits(j)}");
+    const page = read('src/pages/jobs/JobListPage.tsx');
+    // การ์ด (มือถือ) + ตาราง (จอคอม) + หน้ารายละเอียดใบขอ ใช้ตัวเดียวกัน — รอบแรกแก้แค่การ์ด ตารางยังขึ้น 1
+    expect(page.match(/remainingPositionsOf\(j\)/g)).toHaveLength(2);
+    expect(read('src/components/jobs/UnitRequestInfoFields.tsx')).toContain('remainingPositionsOf(data)');
   });
 });
 
@@ -38,6 +48,12 @@ describe('ประกาศแล้ว: ภาพรวมจับคู่�
     expect(sql).toContain('const idx = buildReleaseIndex(rows, jobIds);');
     expect(sql).not.toContain('from ${RELEASES} where job_id = any($1::text[])');
     expect(sql.match(/loadReleasedAt\(jobIds\)/g)?.length).toBe(3);
+    // ตาราง "ใครต้องทำอะไร" + หน้าหลักผู้บริหาร ใช้ตัวจับคู่เดียวกัน (เคยค้าง 166 หลังแก้รอบแรก)
+    for (const f of ['api/_handlers/recruit-stuck.ts', 'api/_handlers/request-pipeline.ts']) {
+      const h = read(f);
+      expect(h, f).toContain('loadReleaseMatches(jobIds)');
+      expect(h, f).not.toMatch(/from \$\{RELEASES\} where job_id = any/);
+    }
   });
 });
 
@@ -81,5 +97,27 @@ describe('Dashboard ศูนย์ควบคุมใบขอ: ใบขอ�
     const src = read('src/lib/dashboard/buildDashboardData.ts');
     expect(src).toContain('const pre = withPrequest || totalOverride ? buildPrequestKpi(jobs) : null;');
     expect(src).toContain('const nonePositions = Math.max(total - leafTotal - preTotal, 0);');
+  });
+});
+
+describe('3 คู่ที่เหลือ (เจ้าของ Choice 15 พ.ย. 2569)', () => {
+  it('ไม่รับสาย: หน้าหลักแบ่งทุกสายด้วยหมวดของหน้าติดตาม ("แบบหน้าติดตามทุกหน้า")', () => {
+    const src = read('api/_lib/homeLumosSummarySql.ts');
+    const fn = src.slice(src.indexOf('export function followLedgerBucket'), src.indexOf('const BUCKET_COLS'));
+    expect(fn).toContain("return result === 'waiting' ? 'waiting' : doneBucketOf(result);");
+    expect(fn).not.toContain("if (first !== 'done') return first;");
+  });
+  it('ยังไม่โทร: บันทึกก่อนคนที่ถืออยู่เก็บไป ไม่นับว่าคนนี้โทรแล้ว ("อ้นยังไม่โทร")', async () => {
+    const { buildCallerResults } = await import('@/lib/callerResults');
+    const base = { createdAt: '2026-11-02T03:00:00Z', jobId: 'siamraj-sql:LBM6911007', channelLabel: null, referralSource: null, calledByAi: false, calledByStaff: true, aiAnswer: null, appointmentAt: null, attendance: null, appointmentFailed: false, phoneOk: true, claimedBy: 'อ้น' };
+    const r = buildCallerResults([
+      { ...base, id: 'e7d27d1d-0001', logOk: false, logAt: '2026-11-03T03:00:00Z', claimedAt: '2026-11-04T03:00:00Z' },
+      { ...base, id: 'e7d27d1d-0002', logOk: true, logAt: '2026-11-05T03:00:00Z', claimedAt: '2026-11-04T03:00:00Z' },
+    ] as never);
+    expect([r.total.notLogged, r.total.ok, r.total.notOk]).toEqual([['e7d27d1d-0001'], ['e7d27d1d-0002'], []]);
+  });
+  it('ปีเก่า: ปฏิทินหน้าหลักเลือกได้ตั้งแต่วันแรกของสมุดใบขอ ("ปฏิทินเลือกได้ตั้งแต่ ม.ค. 2567")', () => {
+    expect(read('src/pages/HomeOverviewPage.tsx').match(/minYmd=\{REQUEST_LEDGER_SINCE\}/g)).toHaveLength(2);
+    expect(read('api/_lib/siamrajPenaltyLedgerSql.ts')).toContain('|| REQUEST_LEDGER_SINCE;');
   });
 });
