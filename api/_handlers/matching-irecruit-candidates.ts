@@ -25,8 +25,14 @@ async function handler(req: AuthedReq, res: ApiRes) {
   const method = (req.method || 'GET').toUpperCase();
 
   try {
-    if (method !== 'GET') {
+    // 🔴 สั่ง AI โทร (send=1) ต้องเป็น POST เท่านั้น (QA 15 พ.ย. 2569) — 10 พ.ย. แก้เลนสรรหา/คัดสรรแล้วแต่ตกเส้นนี้
+    // แค่เปิดลิงก์ ?send=1 ก็โทรหาผู้สมัคร iRecruit จริง · บทบาทอ่านอย่างเดียวผ่านด่าน (ด่านกันแค่การเขียน)
+    if (method !== 'GET' && method !== 'POST') {
       return sendError(res, 405, 'Method not allowed', 'Read-only iRecruit matching');
+    }
+    const wantsSend = getQuery(req, 'send') === '1';
+    if (wantsSend && method !== 'POST') {
+      return sendError(res, 405, 'Method not allowed', 'สั่งให้ AI โทรต้องกดปุ่มส่ง (POST)');
     }
 
     const unavailable = irecruitUnavailableReason();
@@ -60,7 +66,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
     // - `send=1` = เลนคัดสรรกด "หาคนเพิ่ม" → ส่งทันทีไม่ต้องอนุมัติ (เจ้าของเคาะ 16 ส.ค.)
     // - หรือโหมด auto เดิม (`irecruit_search`) ก็ยังส่ง
     // OT/สวัสดิการติดไปเองตอนเสิร์ฟคิว (siamrajJobBenefits)
-    const forceSend = getQuery(req, 'send') === '1';
+    const forceSend = wantsSend;
     let dispatch: (Awaited<ReturnType<typeof enqueueLumosInterviewForIrecruit>>) | null = null;
     if (forceSend || (await isAutoDispatchEnabled('irecruit_search'))) {
       dispatch = await enqueueLumosInterviewForIrecruit(job as Record<string, unknown>, result);

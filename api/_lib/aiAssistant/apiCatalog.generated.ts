@@ -1436,15 +1436,16 @@ export const API_CATALOG: ApiCatalogEntry[] = [
   "path": "/api/matching/irecruit-candidates",
   "file": "api/_handlers/matching-irecruit-candidates.ts",
   "methods": [
-   "GET"
+   "GET",
+   "POST"
   ],
   "doc": "",
   "query": [
+   "send",
    "jobId",
    "job_id",
    "refresh",
-   "owner",
-   "send"
+   "owner"
   ],
   "body": [],
   "reachesPeople": true

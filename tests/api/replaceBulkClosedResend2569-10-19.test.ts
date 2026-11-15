@@ -92,7 +92,7 @@ describe('ส่ง AI ใหม่ (สายเงียบเกิน 24 ช
     const s = aiQueueStatusOf({ last_call_status: 'pending', last_call_attempts: 1, last_call_followup: 'needs_human', last_call_push_state: 'push_gave_up' });
     expect(s?.kind).toBe('silent');
     expect(s?.sub).toBe('เกิน 24 ชม. กดส่ง AI ใหม่ได้');
-    expect(read('src/components/recruit-rm/RmTable.tsx')).toContain("resend ? 'ส่ง AI ใหม่' : 'บันทึกผล'");
+    expect(read('src/components/recruit-rm/RmTable.tsx')).toContain("resend ? 'ส่ง AI ใหม่' : a === 'ai' ? 'ส่ง AI โทร' : 'บันทึกผล'");
   });
   it('API ตั้งโทรซ้ำตอนนี้เฉพาะแถวเงียบ (ตัวส่งซ้ำยิงเป็นรอบใหม่) — ไม่มีรอบอัตโนมัติ', () => {
     const cc = read('api/_handlers/application-call-choice.ts');

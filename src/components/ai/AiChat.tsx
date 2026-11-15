@@ -15,6 +15,7 @@ import { apiFetch } from '@/lib/apiFetch';
 import { cn } from '@/lib/utils';
 import { TONE } from '@/lib/designTokens';
 import { aiChatLinkLabel, AI_CHAT_LINK_RE } from '@/lib/aiChatLinks';
+import { describePending } from '@/lib/aiChatPendingView';
 
 type ToolCall = { id: string; type: 'function'; function: { name: string; arguments: string } };
 type Msg =
@@ -180,6 +181,8 @@ export default function AiChat() {
           {pending ? (
             <div className="space-y-3 rounded-xl border border-primary/40 p-3" data-testid="ai-chat-pending">
               <p className="text-sm font-medium text-foreground">{pending.summary}</p>
+              {/* ของจริงที่จะยิง — สรุปของ AI อย่างเดียวไม่พอ (QA 15 พ.ย. 2569) */}
+              <PendingDetail method={pending.method} path={pending.path} body={pending.body} />
               <div className="flex flex-wrap gap-2">
                 <Button type="button" size="sm" disabled={busy !== null} onClick={() => void answerPending(true)} data-testid="ai-chat-run">
                   {busy === 'run' ? <LoaderCircle className="animate-spin" aria-hidden /> : null}
@@ -254,5 +257,28 @@ export default function AiChat() {
         </form>
       </SheetContent>
     </Sheet>
+  );
+}
+
+function PendingDetail(p: { method: string; path: string; body: unknown }) {
+  const d = describePending(p);
+  return (
+    <div className="space-y-1 rounded-lg bg-muted p-2 text-xs" data-testid="ai-chat-pending-detail">
+      <p className="text-foreground">
+        <span className={cn('font-medium', d.verb === 'ลบ' ? TONE.danger.value : undefined)}>{d.verb}</span>{' '}
+        <span className="break-all">{d.target}</span>
+      </p>
+      {d.fields.length ? (
+        <ul className="space-y-0.5">
+          {d.fields.map((f, i) => (
+            <li key={`${f.key}-${i}`} className="flex gap-2">
+              <span className="shrink-0 text-muted-foreground">{f.key}</span>
+              <span className="min-w-0 break-all text-foreground">{f.value}</span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {d.more ? <p className="text-muted-foreground">อีก {d.more} ช่อง</p> : null}
+    </div>
   );
 }

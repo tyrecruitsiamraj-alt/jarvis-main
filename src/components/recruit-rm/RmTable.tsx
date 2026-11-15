@@ -593,7 +593,8 @@ const RmTable: React.FC<{
                         // แท็บนัดหมาย: ปุ่มเปิดบันทึกผลมีคำ (QA 18 ต.ค. 2569 — กฎปุ่มต้องมีคำ)
                         // ส่ง AI ใหม่ (19 ต.ค. 2569) — สายเดิมเงียบเกิน 24 ชม. ปุ่มมีคำให้เห็นชัด
                         const resend = a === 'ai' && silentAi && !disabled;
-                        const worded = (tab === 'appointments' && a === 'rule') || resend;
+                        // ปุ่มส่ง AI โทรมีคำเสมอ (QA 15 พ.ย. 2569) — เดิมเป็นไอคอนเปล่าวางติดปุ่มเก็บ Lead/ดูรายละเอียด กดสั่งโทรจริงพลาดได้
+                        const worded = (tab === 'appointments' && a === 'rule') || a === 'ai';
                         // ปุ่มกลมไม่มีกรอบ สีเทา แบบ iRecruit (rm-action-btn) — ใช้ Button ของ shadcn
                         return (
                           <Button
@@ -613,7 +614,7 @@ const RmTable: React.FC<{
                             }
                           >
                             <Icon aria-hidden />
-                            {worded ? (resend ? 'ส่ง AI ใหม่' : 'บันทึกผล') : null}
+                            {worded ? (resend ? 'ส่ง AI ใหม่' : a === 'ai' ? 'ส่ง AI โทร' : 'บันทึกผล') : null}
                           </Button>
                         );
                       })}

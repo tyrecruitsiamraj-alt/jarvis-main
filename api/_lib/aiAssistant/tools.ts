@@ -37,6 +37,16 @@ const WRITE_BLOCKED: { re: RegExp; why: string }[] = [
 ];
 const PEOPLE_WHY = 'คำสั่งนี้ไปถึงคนจริง (AI โทร · โพสต์ · Scrap · ส่งข้อความ) ต้องกดเองที่หน้าจอ';
 
+/**
+ * อ่าน (GET) ที่ทำให้ AI โทรได้ — ผู้ช่วยรัน GET ทันทีไม่ขึ้นการ์ด จึงต้องกันที่นี่ (QA 15 พ.ย. 2569)
+ * ค้นผู้สมัคร iRecruit: เปิดโหมดส่งอัตโนมัติ `irecruit_search` ไว้ = แค่ค้นก็เข้าคิวโทร
+ * เส้นที่ไปถึงคนจริงแล้วมี `send=1` = สั่งโทร (เซิร์ฟเวอร์รับเฉพาะ POST แล้ว — กันซ้ำอีกชั้น)
+ */
+const READ_BLOCKED: { re: RegExp; why: string }[] = [
+  { re: /^\/api\/matching\/irecruit-candidates$/, why: 'ค้นผู้สมัคร iRecruit อาจส่งให้ AI โทรเองถ้าเปิดโหมดอัตโนมัติ ต้องกดเองที่หน้าจับคู่งาน' },
+];
+const SEND_PARAM = /[?&](send|run|dispatch)=/i;
+
 const ENTRY = new Map(API_CATALOG.map((e) => [e.path, e]));
 
 export type ResolvedCall = { ok: true; entry: ApiCatalogEntry; path: string; pathname: string } | { ok: false; message: string };
@@ -53,7 +63,11 @@ export function resolveCall(method: string, rawPath: string): ResolvedCall {
   const entry = ENTRY.get(pathname);
   if (!entry) return { ok: false, message: `ไม่มีคำสั่ง ${pathname} ในระบบ — ใช้ search_api หาก่อน` };
   if (!entry.methods.includes(m)) return { ok: false, message: `${pathname} รับเฉพาะ ${entry.methods.join('/')}` };
-  if (m !== 'GET') {
+  if (m === 'GET') {
+    const rb = READ_BLOCKED.find((b) => b.re.test(pathname));
+    if (rb) return { ok: false, message: `ผู้ช่วยทำคำสั่งนี้ไม่ได้: ${rb.why}` };
+    if (entry.reachesPeople && SEND_PARAM.test(rawPath)) return { ok: false, message: `ผู้ช่วยทำคำสั่งนี้ไม่ได้: ${PEOPLE_WHY}` };
+  } else {
     const wb = WRITE_BLOCKED.find((b) => b.re.test(pathname));
     if (wb) return { ok: false, message: `ผู้ช่วยทำคำสั่งนี้ไม่ได้: ${wb.why}` };
     if (entry.reachesPeople) return { ok: false, message: `ผู้ช่วยทำคำสั่งนี้ไม่ได้: ${PEOPLE_WHY}` };
@@ -63,11 +77,12 @@ export function resolveCall(method: string, rawPath: string): ResolvedCall {
 
 /** เส้นนี้ผู้ช่วยสั่งเขียนได้ไหม (ใช้ทำสารบัญ) */
 function writable(e: ApiCatalogEntry): boolean {
-  return !e.reachesPeople && !WRITE_BLOCKED.some((b) => b.re.test(e.path));
+  return !e.reachesPeople && !WRITE_BLOCKED.some((b) => b.re.test(e.path)) && !READ_BLOCKED.some((b) => b.re.test(e.path));
 }
 const listed = (e: ApiCatalogEntry) => !BLOCKED.some((b) => b.re.test(e.path));
 /** ป้ายของเส้นที่ผู้ช่วยสั่งเขียนไม่ได้ — มี GET = อ่านได้อย่างเดียว · ไม่มี GET = ใช้ไม่ได้เลย */
-const lockTag = (e: ApiCatalogEntry) => (e.methods.includes('GET') ? ' [อ่านอย่างเดียว]' : ' [ผู้ช่วยใช้ไม่ได้]');
+const lockTag = (e: ApiCatalogEntry) =>
+  e.methods.includes('GET') && !READ_BLOCKED.some((b) => b.re.test(e.path)) ? ' [อ่านอย่างเดียว]' : ' [ผู้ช่วยใช้ไม่ได้]';
 
 /**
  * ปิดข้อมูลติดต่อและเลขบัตรก่อนส่งให้ OpenAI — อีเมล · เลข 13 หลัก (มี/ไม่มีขีด) · เบอร์มือถือ/บ้าน (0x · +66 · 66)

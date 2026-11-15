@@ -1003,12 +1003,14 @@ const MatchingPage: React.FC<{ embedded?: boolean }> = ({ embedded = false }) =>
    * ไม่มีเจ้าหน้าที่ถืออยู่) ไม่งั้นกดอนุมัติทั้งใบแล้วได้จำนวนไม่ตรงกับที่ติ๊กเองทีละคน
    * ซึ่งอธิบายให้ผู้ใช้ไม่ได้ · และไม่รวมคนที่ปฏิเสธใบนี้ไปแล้ว (ถูกซ่อนอยู่)
    */
+  // 🔴 ส่งทั้งใบ = เฉพาะคนที่ AI แนะนำ (เขียว/เหลือง) แม้จอโชว์คนห่างไกลอยู่ (QA 15 พ.ย. 2569)
+  // เดิมตามสวิตช์โชว์คนไกล (เปิดเป็นค่าเริ่ม) ⇒ ป๊อปบอก "AI แนะนำ 2" แต่ปุ่มส่ง 4 รวมคนไกล/Drop · คนไกลติ๊กส่งเองทีละคนได้
   const approveAllTargets = useMemo(() => {
     if (!jobDetail) return { board: [] as number[], irecruit: [] as number[] };
     const board = (boardMatchById[jobDetail.id]?.matches ?? [])
       .filter(
         (m) =>
-          (showDistantCandidates || isRecommendedTier(m.tier)) &&
+          isRecommendedTier(m.tier) &&
           !(hideProposed && proposedByKey[proposalKey('board', m.card_id)]) &&
           !declinedRefs.has(boardPersonRef(m.card_id)) &&
           Boolean(m.mobile) &&
@@ -1019,7 +1021,7 @@ const MatchingPage: React.FC<{ embedded?: boolean }> = ({ embedded = false }) =>
     const irecruit = (irMatchById[jobDetail.id]?.matches ?? [])
       .filter(
         (m) =>
-          (showDistantCandidates || isRecommendedTier(m.tier)) &&
+          isRecommendedTier(m.tier) &&
           !(hideProposed && proposedByKey[proposalKey('irecruit', m.id)]) &&
           !declinedRefs.has(irecruitPersonRef(m.id)) &&
           Boolean(m.phone_number) &&
@@ -1033,7 +1035,6 @@ const MatchingPage: React.FC<{ embedded?: boolean }> = ({ embedded = false }) =>
     boardMatchById,
     irMatchById,
     declinedRefs,
-    showDistantCandidates,
     hideProposed,
     proposedByKey,
     lumosStatusByRef,
@@ -1706,7 +1707,8 @@ const MatchingPage: React.FC<{ embedded?: boolean }> = ({ embedded = false }) =>
       const params = new URLSearchParams({ jobId });
       if (refresh) params.set('refresh', '1');
       if (send) params.set('send', '1');
-      const r = await apiFetch(`/api/matching/irecruit-candidates?${params.toString()}`);
+      // สั่ง AI โทร = POST (เซิร์ฟเวอร์ไม่รับ send ผ่าน GET แล้ว · 15 พ.ย. 2569)
+      const r = await apiFetch(`/api/matching/irecruit-candidates?${params.toString()}`, send ? { method: 'POST' } : undefined);
       if (!r.ok) {
         const data = (await r.json().catch(() => ({}))) as { message?: string; detail?: string; error?: string };
         throw new Error(data.message || data.detail || data.error || `ค้นหาไม่สำเร็จ (HTTP ${r.status})`);
