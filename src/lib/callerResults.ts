@@ -7,6 +7,7 @@
  * ทุกช่องเก็บ id ไว้กดดูชื่อ · pure — เทสต์ `tests/api/recruitOverviewFourQuestions2569-11-11.test.ts`
  */
 import type { RecruitAppFact } from '@/lib/recruitOverviewTypes';
+import { isTalkedBucket } from '@/lib/callMicroOutcome';
 
 export type CallerCellKey =
   | 'kept'
@@ -66,7 +67,6 @@ function place(row: CallerResultRow, f: RecruitAppFact, id: string) {
 }
 
 export type AiResultRow = { sent: string[]; notCalled: string[]; unreachable: string[]; reached: string[]; notInterested: string[]; interested: string[] };
-const AI_REACHED = new Set(['said_yes', 'said_no', 'not_yet', 'talked_unclear']);
 
 export function buildCallerResults(cohort: readonly RecruitAppFact[]): { rows: CallerResultRow[]; total: CallerResultRow; ai: AiResultRow } {
   const by = new Map<string, CallerResultRow>();
@@ -78,7 +78,8 @@ export function buildCallerResults(cohort: readonly RecruitAppFact[]): { rows: C
     if (!who) {
       ai.sent.push(f.id);
       if (!f.calledByAi) ai.notCalled.push(f.id);
-      else if (f.aiAnswer && AI_REACHED.has(f.aiAnswer)) {
+      // ติดต่อได้ = ตัวตัดสินกลาง `isTalkedBucket` (รีวิวโค้ด 15 พ.ย. 2569: เดิมเขียนชุดคำตอบซ้ำไว้ที่นี่)
+      else if (isTalkedBucket(f.aiAnswer)) {
         ai.reached.push(f.id);
         (f.aiAnswer === 'said_yes' ? ai.interested : ai.notInterested).push(f.id);
       } else ai.unreachable.push(f.id);

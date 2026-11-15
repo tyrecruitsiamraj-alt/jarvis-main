@@ -111,7 +111,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
       return res.status(200).json({ attempt: await getQuizAttempt(id) });
     }
     if (action === 'ai_draft') {
-      const r = await draftQuizWithAi(id);
+      const r = await draftQuizWithAi(id, { manual: true });
       if (!r.ok) return sendError(res, 502, 'ai_failed', r.message);
       return res.status(200).json({ attempt: await getQuizAttempt(id) });
     }

@@ -54,7 +54,8 @@ describe('ตัวลองส่งใบสมัครเข้า AI ซ้
   it('ใบที่ผูกใบขอไม่ตัดที่ 7 วัน (เจ้าของ 10 พ.ย. 2569 ส่งซ้ำจนกว่าจะส่งได้) · ใบใหม่ก่อน · ใบไม่ผูกใบขอยังตัด 7 วัน', () => {
     const linked = unsentApplicationsSql();
     expect(linked).not.toContain("interval '7 days'");
-    expect(linked).toContain('order by a.created_at desc');
+    // ใบติดเหตุหมุนสุ่ม ไม่ค้างที่ 100 ใบใหม่สุดตลอดไป (รีวิวโค้ด 15 พ.ย. 2569)
+    expect(linked).toContain('order by (a.ai_block_reason is null) desc, case when a.ai_block_reason is null then a.created_at end desc, random()');
     expect(linked).toContain('a.created_at >= $1::timestamptz');
     const unlinked = unsentUnlinkedApplicationsSql();
     expect(unlinked).toContain("interval '7 days'");

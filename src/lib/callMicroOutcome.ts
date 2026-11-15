@@ -270,14 +270,18 @@ export function emptyCallMicroSummary(): CallMicroSummary {
   };
 }
 
+/** คุยกันได้ (= "ติดต่อได้" ของ AI) — ตัวตัดสินเดียว · ใช้ที่ยอดรวมนี้และตารางผลต่อคน (`callerResults.ts`) */
+export function isTalkedBucket(bucket: string | null | undefined): boolean {
+  return Boolean(bucket) && (CALL_MICRO_KEYS as readonly string[]).includes(bucket as string) && bucket !== 'no_pickup' && bucket !== 'wrong_person' && bucket !== 'picked_silent';
+}
+
 /** บวกหนึ่งสายเข้าไปในยอดรวม — แยกออกมาเพื่อให้ฝั่ง server รวมทีละแถวได้ */
 export function addCallMicro(sum: CallMicroSummary, bucket: CallMicroOutcome | null): void {
   if (!bucket) return;
   sum[bucket] += 1;
   sum.withResult += 1;
   if (bucket !== 'no_pickup') sum.pickedUp += 1;
-  if (bucket !== 'no_pickup' && bucket !== 'wrong_person' && bucket !== 'picked_silent')
-    sum.talked += 1;
+  if (isTalkedBucket(bucket)) sum.talked += 1;
 }
 
 export function summarizeCallMicro(

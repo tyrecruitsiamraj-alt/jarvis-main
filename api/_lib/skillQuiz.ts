@@ -144,8 +144,11 @@ export async function archiveQuizAttempt(id: string): Promise<boolean> {
 /**
  * ให้ AI ร่างคะแนนเขียนตอบ + บทวิเคราะห์ — ทับเฉพาะของที่ AI เขียน (ข้อที่เจ้าหน้าที่ให้คะแนนเองแล้วคงไว้)
  * ล้ม = เก็บเหตุใน ai_error ให้จอบอก · ไม่โยนต่อ (เรียกเบื้องหลังหลังพนักงานส่ง)
+ * 🔴 รีวิวโค้ด 15 พ.ย. 2569: เดิมทับบทวิเคราะห์ที่เจ้าหน้าที่ตรวจแล้ว แต่จอยังขึ้น "ตรวจแล้วโดย …"
+ *    - เบื้องหลังหลังพนักงานส่ง (`manual` ไม่ส่ง) = เขียนเฉพาะใบที่ยังไม่ตรวจ (ฐานตัดสินใน where — ตรวจก่อน AI ตอบเสร็จก็ไม่ทับ)
+ *    - เจ้าหน้าที่กดให้ AI ร่างใหม่เอง (`manual`) = ทับได้ และล้างสถานะตรวจแล้ว (ต้องตรวจใหม่ก่อนส่งลูกค้า)
  */
-export async function draftQuizWithAi(id: string): Promise<{ ok: true } | { ok: false; message: string }> {
+export async function draftQuizWithAi(id: string, opts: { manual?: boolean } = {}): Promise<{ ok: true } | { ok: false; message: string }> {
   const a = await getQuizAttempt(id);
   if (!a || !a.answers) return { ok: false, message: 'ยังไม่มีคำตอบ' };
   const fail = async (message: string) => {
@@ -173,9 +176,13 @@ export async function draftQuizWithAi(id: string): Promise<{ ok: true } | { ok: 
   if (!parsed) return fail('อ่านคำตอบของ AI ไม่ได้ — ลองใหม่ หรือเขียนเอง');
   const keepStaff = Object.fromEntries(Object.entries(a.text_scores ?? {}).filter(([, s]) => s.by === 'staff'));
   const textScores = { ...parsed.textScores, ...keepStaff };
-  await dbQuery(
-    `update ${ATTEMPTS} set text_scores = $2::jsonb, analysis = $3::jsonb, analysis_by = 'ai', ai_error = null where id = $1::uuid`,
-    [id, JSON.stringify(textScores), JSON.stringify(parsed.analysis)],
+  const { rows } = await dbQuery<{ id: string }>(
+    `update ${ATTEMPTS} set text_scores = $2::jsonb, analysis = $3::jsonb, analysis_by = 'ai', ai_error = null,
+            reviewed_at = null, reviewed_by_name = null
+      where id = $1::uuid and ($4::boolean or reviewed_at is null)
+      returning id::text`,
+    [id, JSON.stringify(textScores), JSON.stringify(parsed.analysis), opts.manual === true],
   );
+  if (rows.length === 0) return { ok: false, message: 'เจ้าหน้าที่ตรวจใบนี้แล้ว — ไม่ทับบทวิเคราะห์' };
   return { ok: true };
 }

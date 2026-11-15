@@ -6,6 +6,7 @@
  *      ⇒ ด่านสิทธิ์ · ขอบเขต BU · audit ทำงานเหมือนกดเอง · ทำได้ไม่เกินสิทธิ์คนสั่ง
  *   ② อ่าน (GET) ทำทันทีฝั่งเซิร์ฟเวอร์ · เปลี่ยนข้อมูล **ไม่ทำที่นี่** — ส่งกลับเป็นการ์ดให้คนกด "ทำเลย" แล้วเบราว์เซอร์ยิงเอง
  *   ③ ทุกอย่างที่ส่งให้ OpenAI ปิดเบอร์ · อีเมล · เลข 13 หลักก่อนเสมอ (`maskPersonal`)
+ *      + ผลอ่านปิดชื่อและที่อยู่ของคน (`maskPeopleJson` · เจ้าของ Choice 15 พ.ย. 2569 "ปิดชื่อและที่อยู่ด้วย")
  *   ④ ห้ามสั่งงานที่ไปถึงคนจริง (Lumos โทร · Autopost · Scrap · ส่งข้อความออก) — เจ้าของ Choice "ไม่ให้สั่งเลย"
  *      ตัดสินจากโค้ดจริงตอนสร้างสารบัญ (`reachesPeople`) + เส้นที่เปลี่ยนวิธีที่ AI โทรหาคน (รายการ `WRITE_BLOCKED`)
  */
@@ -95,6 +96,38 @@ export function maskPersonal(text: string): string {
     .replace(/(?<![\d-])(?:\+?66[\s-]?|0)(?:[689]\d(?:[\s-]?\d){7}|[2-7](?:[\s-]?\d){7})(?![\d-])/g, '[เบอร์]');
 }
 
+/**
+ * ปิดชื่อ/ที่อยู่ของคนในผลอ่าน (JSON) ก่อนส่งให้ OpenAI — เจ้าของ Choice 15 พ.ย. 2569 "ปิดชื่อและที่อยู่ด้วย"
+ * (รีวิวโค้ด 15 พ.ย.: เดิมปิดแค่เบอร์/อีเมล/เลขบัตร ชื่อ-ที่อยู่-อายุผู้สมัครออกไปทั้งก้อน)
+ * - ช่องชื่อคนชัด ๆ (full_name · first/last_name · recipient_name · nickname …) = [ชื่อ] เสมอ
+ * - ช่อง `name` เฉย ๆ ปิดเฉพาะก้อนที่มีเบอร์อยู่ด้วย (= ระเบียนของคน) — ชื่อใบขอ/กลุ่ม/ตำแหน่งยังอ่านได้
+ * - ที่อยู่ (address · ตำบล/อำเภอ · บ้านเลขที่ ถนน ซอย) = [ที่อยู่] · จังหวัดยังอ่านได้ (ใช้นับตามพื้นที่)
+ * ไม่ใช่ JSON = คืนเดิม
+ */
+const PERSON_NAME_KEY = /(^|_)(full_?name|first_?name|last_?name|surname|nick_?name|recipient_name|applicant_name|candidate_name|person_name|customer_name|name_th|name_en)$/i;
+const ADDRESS_KEY = /(^|_)(address\w*|addr|house_?no|road|soi|moo|sub_?district|district|tambon|amphoe|postcode|zip)$/i;
+const PHONE_KEY = /(^|_)(phone|mobile|tel|phone_number|recipient_phone)$/i;
+function maskPeopleValue(v: unknown): unknown {
+  if (Array.isArray(v)) return v.map(maskPeopleValue);
+  if (!v || typeof v !== 'object') return v;
+  const o = v as Record<string, unknown>;
+  const person = Object.keys(o).some((k) => PHONE_KEY.test(k));
+  const out: Record<string, unknown> = {};
+  for (const [k, val] of Object.entries(o)) {
+    if (typeof val === 'string' && val.trim() && (PERSON_NAME_KEY.test(k) || (person && k.toLowerCase() === 'name'))) out[k] = '[ชื่อ]';
+    else if (typeof val === 'string' && val.trim() && ADDRESS_KEY.test(k)) out[k] = '[ที่อยู่]';
+    else out[k] = maskPeopleValue(val);
+  }
+  return out;
+}
+export function maskPeopleJson(payload: string): string {
+  try {
+    return JSON.stringify(maskPeopleValue(JSON.parse(payload)));
+  } catch {
+    return payload;
+  }
+}
+
 const MAX_RESULT = 24_000;
 export function clip(text: string): string {
   return text.length > MAX_RESULT ? `${text.slice(0, MAX_RESULT)}\n…(ตัดเหลือ ${MAX_RESULT} ตัวอักษร — กรองให้แคบลงถ้าต้องการส่วนที่เหลือ)` : text;
@@ -130,7 +163,7 @@ export async function runRead(rawPath: string, headers: ApiReq['headers']): Prom
     },
   };
   await handler({ method: 'GET', query, headers: { ...headers }, body: undefined }, res);
-  return clip(`HTTP ${status}\n${maskPersonal(payload)}`);
+  return clip(`HTTP ${status}\n${maskPersonal(maskPeopleJson(payload))}`);
 }
 
 /** ค้นคำสั่งจากคำค้น — คืนคำอธิบายเต็มของเส้น (หัวคอมเมนต์ทั้งก้อน · ไม่ตัด) + ช่อง query/body ที่โค้ดอ่าน */

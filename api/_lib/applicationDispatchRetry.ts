@@ -105,7 +105,9 @@ function unsentSql(linked: boolean): string {
       and not exists (select 1 from ${QUEUE} q where q.person_ref = 'app-' || a.id::text)
       and not exists (select 1 from ${CANCELLATIONS} c where c.application_id = a.id)
       and not exists (select 1 from ${IRECRUIT_DUPS} d where d.application_id = a.id)
-    order by a.created_at ${linked ? 'desc' : 'asc'}
+    -- 🔴 รีวิวโค้ด 15 พ.ย. 2569: ใบที่ติดกฎ (ใบขอปิด/ไม่มีรายได้) ไม่ได้แถวคิวจึงถูกหยิบซ้ำทุกรอบ — สะสมเกิน ${LIMIT} ใบ ใบเก่ากว่าไม่ถูกดูอีกเลย
+    -- ⇒ ใบผูกใบขอ: ใบที่ยังไม่ติดเหตุ (ใหม่สุดก่อน) แล้วค่อยใบที่ติดเหตุแบบสุ่ม ทุกใบถูกดูซ้ำในไม่กี่รอบ
+    order by ${linked ? '(a.ai_block_reason is null) desc, case when a.ai_block_reason is null then a.created_at end desc, random()' : 'a.created_at asc'}
     limit ${LIMIT}`;
 }
 
