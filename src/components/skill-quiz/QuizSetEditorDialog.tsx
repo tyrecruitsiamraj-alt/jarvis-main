@@ -4,7 +4,7 @@
  * ตรวจฟอร์มด้วย `parseQuizSetInput` ตัวเดียวกับ server · แก้ชุดแล้วลิงก์ที่สร้างไปแล้วไม่เปลี่ยน
  */
 import { useEffect, useState } from 'react';
-import { Plus, Trash2 } from 'lucide-react';
+import { FileUp, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -23,6 +23,7 @@ import {
   type QuizSetContent,
 } from '@/lib/skillQuiz';
 import { saveQuizSet } from '@/lib/skillQuizApi';
+import QuizImportPanel from './QuizImportPanel';
 
 type Props = { open: boolean; onOpenChange: (v: boolean) => void; setId: string | null; initial: QuizSetContent | null; onSaved: () => void };
 
@@ -46,11 +47,13 @@ export default function QuizSetEditorDialog({ open, onOpenChange, setId, initial
   const [c, setC] = useState<QuizSetContent>(() => initial ?? blankContent());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [importing, setImporting] = useState(false);
 
   useEffect(() => {
     if (open) {
       setC(initial ? structuredClone(initial) : blankContent());
       setError(null);
+      setImporting(false);
     }
   }, [open, initial]);
 
@@ -227,9 +230,23 @@ export default function QuizSetEditorDialog({ open, onOpenChange, setId, initial
               )}
             </div>
           ))}
-          <Button type="button" variant="outline" size="sm" onClick={() => setC({ ...c, questions: [...c.questions, blankQuestion(c.questions[c.questions.length - 1]?.skillId ?? c.skills[0].id)] })}>
-            <Plus /> เพิ่มข้อ
-          </Button>
+          {importing ? (
+            <QuizImportPanel
+              content={c}
+              fallbackSkillId={c.questions[c.questions.length - 1]?.skillId ?? c.skills[0].id}
+              onAdd={setC}
+              onClose={() => setImporting(false)}
+            />
+          ) : null}
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" variant="outline" size="sm" onClick={() => setC({ ...c, questions: [...c.questions, blankQuestion(c.questions[c.questions.length - 1]?.skillId ?? c.skills[0].id)] })}>
+              <Plus /> เพิ่มข้อ
+            </Button>
+            {/* นำเข้าจากไฟล์แบบ KNOWA (เจ้าของ 15 พ.ย. 2569) — แผงเปิดใต้ข้อสุดท้าย ตรงที่กด */}
+            <Button type="button" variant="outline" size="sm" disabled={importing} onClick={() => setImporting(true)} data-testid="quiz-import-open">
+              <FileUp /> นำเข้าจากไฟล์
+            </Button>
+          </div>
         </section>
 
         {error ? <p className="text-sm text-destructive">{error}</p> : null}

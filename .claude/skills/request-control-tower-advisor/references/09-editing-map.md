@@ -995,6 +995,7 @@ Lumos ส่งกลับได้จริง (funnel นับผลขอ�
 - AI: งาน `skill_report` ใน `src/lib/aiSettings.ts` (เลือกเจ้าได้ที่ ตั้งค่า › AI ที่ใช้คิดงาน) · prompt ไม่มีชื่อพนักงาน
 - จอ: `src/pages/skill-quiz/SkillQuizPage.tsx` (`/skill-test` เมนูคลังข้อมูล) · `src/components/skill-quiz/*` · พนักงาน `src/pages/public/PublicSkillQuizPage.tsx` (`/quiz/:token`)
 - รูป PNG: `src/lib/skillQuizReportImage.ts` (canvas พื้นขาว สีจาก designTokens)
+- นำเข้าข้อสอบจากไฟล์แบบ KNOWA (15 พ.ย. 2569): ตัวอ่านตัวเดียว `src/lib/quizImport.ts` (จับคอลัมน์จากหัวตาราง · ไม่มีหัว = ทักษะ คำถาม ก–ง เฉลย คะแนน · ปรนัยตอบได้ข้อเดียว · ไม่มีตัวเลือก = เขียนตอบ เฉลย = แนวคำตอบ) · อ่าน .xlsx/.docx/CSV ในเบราว์เซอร์ `src/lib/officeTable.ts` · แบบฟอร์ม Excel/Word `src/lib/officeTemplate.ts` · แผงในป๊อปชุดข้อสอบ `QuizImportPanel.tsx` (ยังไม่บันทึกจนกดบันทึกชุด) · เทสต์ `quizImport2569-11-15.test.ts`
 
 ## การ implement อย่างปลอดภัย / feature flag
 
