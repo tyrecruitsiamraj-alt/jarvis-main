@@ -259,7 +259,10 @@ async function loadStuckRequests(departmentScope: Scope, buSet: readonly string[
     toRequestRows(base.map((b) => b.online)),
     loadFactsForJobs(jobIds, null),
     // จับคู่ทะเบียนประกาศตัวเดียวกับกล่องงาน (QA 15 พ.ย. 2569: เดิมเทียบ job_id ตรง ๆ ⇒ ยังไม่ประกาศ 166 vs กล่องงาน 164)
-    loadReleaseMatches(jobIds),
+    loadReleaseMatches(
+      jobIds,
+      base.filter((b) => b.state === 'open').map((b) => b.online.jobId as string),
+    ),
     dbQuery<{ job_id: string; n: number }>(
       `select p.job_id, count(l.id)::int as n from ${POSTINGS} p join ${LINKS} l on l.posting_id = p.id where p.job_id = any($1::text[]) and p.status = 'open' group by p.job_id`,
       [jobIds],

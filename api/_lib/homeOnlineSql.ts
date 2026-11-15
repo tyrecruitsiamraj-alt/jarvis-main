@@ -136,14 +136,19 @@ export type ReleaseMatch = { firstAt: string; lastAt: string; by: string | null 
  * 🔴 QA 15 พ.ย. 2569: เดิมทุกเส้นฝั่ง server เทียบ job_id ตรง ๆ ⇒ ใบที่ประกาศไว้ใต้ id อีกรูปแบบ (siamraj-pre/siamraj-sql) ไม่นับ
  * กล่องงาน "ยังไม่ประกาศ 164" แต่ภาพรวม 166 จากใบชุดเดียวกัน · ใช้ร่วม: ภาพรวม (`loadOnlineRequestRows`) · ใครต้องทำอะไร (`recruit-stuck`)
  */
-export async function loadReleaseMatches(jobIds: readonly string[]): Promise<Map<string, ReleaseMatch>> {
+/**
+ * `boardIds` = ใบที่กล่องงานเห็น (ใบเปิด) ใช้ตัดสินว่าเลขที่ใบไหน "ซ้ำ" — ตัวเดียวกับกล่องงานที่ส่งใบบนกระดาน
+ * ⇒ ใบชั่วคราวที่ปิดไปแล้ว (ทำเป็นใบจริงแล้ว) ไม่ทำให้เลขของใบจริงกลายเป็นเลขซ้ำ (QA 15 พ.ย. 2569: LBM6910005 ประกาศไว้ใต้ใบชั่วคราว
+ * กล่องงานนับประกาศแล้ว แต่ภาพรวมนับยังไม่ประกาศ) · ไม่ส่ง = ใช้ทุกใบ
+ */
+export async function loadReleaseMatches(jobIds: readonly string[], boardIds?: readonly string[]): Promise<Map<string, ReleaseMatch>> {
   const nos = [...new Set(jobIds.map((id) => requestNoOf(id).trim()).filter(Boolean))];
   const { rows } = await dbQuery<{ job_id: string; request_no: string | null; released_at: string | Date; released_by_name: string | null }>(
     `select job_id, request_no, released_at, released_by_name from ${RELEASES}
       where job_id = any($1::text[]) or request_no = any($2::text[]) or regexp_replace(job_id, '^.*:', '') = any($2::text[])`,
     [jobIds, nos],
   );
-  const idx = buildReleaseIndex(rows, jobIds);
+  const idx = buildReleaseIndex(rows, boardIds ?? jobIds);
   const add = (m: Map<string, ReleaseMatch>, k: string, at: string, by: string | null) => {
     const cur = m.get(k);
     if (!cur) m.set(k, { firstAt: at, lastAt: at, by });
@@ -171,15 +176,19 @@ export async function loadReleaseMatches(jobIds: readonly string[]): Promise<Map
   return out;
 }
 
+/** ใบเปิด = ใบที่กล่องงานเห็น — ใช้ตัดสินเลขซ้ำแบบเดียวกับกล่องงาน */
+const openIdsOf = (groups: readonly Parameters<typeof onlineRequestStateOf>[0][], ids: readonly string[]) =>
+  ids.filter((_, i) => onlineRequestStateOf(groups[i]) === 'open');
+
 /** วันที่ประกาศล่าสุดของใบชุดนี้ (`loadReleaseMatches`) */
-async function loadReleasedAt(jobIds: readonly string[]): Promise<Map<string, string>> {
-  return new Map([...(await loadReleaseMatches(jobIds))].map(([id, m]) => [id, m.lastAt]));
+async function loadReleasedAt(jobIds: readonly string[], boardIds?: readonly string[]): Promise<Map<string, string>> {
+  return new Map([...(await loadReleaseMatches(jobIds, boardIds))].map(([id, m]) => [id, m.lastAt]));
 }
 
 export async function loadOnlineRequestCounts(opts: OnlineRequestOpts): Promise<{ total: number; released: number }> {
   const { withBu, jobIds } = await loadOnlineRequestGroups(opts);
   if (withBu.length === 0) return { total: 0, released: 0 };
-  return { total: withBu.length, released: (await loadReleasedAt(jobIds)).size };
+  return { total: withBu.length, released: (await loadReleasedAt(jobIds, openIdsOf(withBu, jobIds))).size };
 }
 
 /**
@@ -192,7 +201,7 @@ export async function loadOnlineRequestPosting(
   const { withBu, jobIds } = await loadOnlineRequestGroups(opts);
   const out = { total: withBu.length, released: 0, notReleasedOpen: 0, notReleasedEnded: 0 };
   if (withBu.length === 0) return out;
-  const released = await loadReleasedAt(jobIds);
+  const released = await loadReleasedAt(jobIds, openIdsOf(withBu, jobIds));
   withBu.forEach((g, i) => {
     if (released.has(jobIds[i])) out.released += 1;
     else if (onlineRequestStateOf(g) === 'open') out.notReleasedOpen += 1;
@@ -209,7 +218,7 @@ export async function loadOnlineRequestRows(opts: OnlineRequestOpts): Promise<On
     // ใบขอชั่วคราวไม่อ่านข้อมูลใบจริง (เลขซ้ำกันได้ — ได้ข้อมูลผิดใบ)
     loadErpExtras(withBu.filter((g) => !g.prequest).map((g) => g.requestNo)),
     getUnitSectorMap(),
-    loadReleasedAt(jobIds),
+    loadReleasedAt(jobIds, openIdsOf(withBu, jobIds)),
     dbQuery<{ job_id: string; n: number }>(
       `select a.job_id, count(*)::int as n
          from ${APPS} a

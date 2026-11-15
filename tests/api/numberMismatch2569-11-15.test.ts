@@ -45,13 +45,14 @@ describe('ใบขอ: ใบปิดแล้ว = เหลือหา 0', 
 describe('ประกาศแล้ว: ภาพรวมจับคู่ทะเบียนประกาศแบบเดียวกับกล่องงาน', () => {
   it('ใช้ buildReleaseIndex (id เต็ม หรือเลขที่ใบที่ไม่ซ้ำ) ทุกเส้น ไม่เทียบ job_id ตรง ๆ', () => {
     const sql = read('api/_lib/homeOnlineSql.ts');
-    expect(sql).toContain('const idx = buildReleaseIndex(rows, jobIds);');
     expect(sql).not.toContain('from ${RELEASES} where job_id = any($1::text[])');
-    expect(sql.match(/loadReleasedAt\(jobIds\)/g)?.length).toBe(3);
+    expect(sql.match(/loadReleasedAt\(jobIds, openIdsOf\(withBu, jobIds\)\)/g)?.length).toBe(3);
+    // เลขซ้ำตัดสินจากใบเปิดเท่านั้นแบบกล่องงาน (LBM6910005 ประกาศใต้ใบชั่วคราวที่ปิดแล้ว)
+    expect(sql).toContain('const idx = buildReleaseIndex(rows, boardIds ?? jobIds);');
     // ตาราง "ใครต้องทำอะไร" + หน้าหลักผู้บริหาร ใช้ตัวจับคู่เดียวกัน (เคยค้าง 166 หลังแก้รอบแรก)
     for (const f of ['api/_handlers/recruit-stuck.ts', 'api/_handlers/request-pipeline.ts']) {
       const h = read(f);
-      expect(h, f).toContain('loadReleaseMatches(jobIds)');
+      expect(h, f).toMatch(/loadReleaseMatches\(\s*jobIds/);
       expect(h, f).not.toMatch(/from \$\{RELEASES\} where job_id = any/);
     }
   });
