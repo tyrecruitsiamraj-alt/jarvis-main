@@ -901,7 +901,9 @@ const JobListPage: React.FC = () => {
                       ตำแหน่ง: ขอ {j.request_positions ?? jobPositionUnits(j)}
                       {j.filled_positions != null ? ` · หาได้ ${j.filled_positions}` : ''}
                       {' · เหลือหา '}
-                      {jobPositionUnits(j)}
+                      {/* ใบปิดแล้ว = เหลือหา 0 (QA 15 พ.ย. 2569: ERP ส่งเหลือหา 0 มาเป็นค่าว่าง ⇒ jobPositionUnits ถอยไป 1
+                          จอขึ้น "ขอ 1 · หาได้ 1 · เหลือหา 1" ทั้งที่ปิดไปแล้ว) */}
+                      {j.status === 'closed' ? 0 : jobPositionUnits(j)}
                     </span>
                   </div>
                   <RequestGapsLine job={j} className="mt-1" />

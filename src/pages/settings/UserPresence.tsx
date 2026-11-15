@@ -52,6 +52,8 @@ export function PresenceFilterChips({
   const chips: Array<{ key: PresenceFilter; label: string; count: number }> = [
     { key: 'all', label: 'ทั้งหมด', count: total },
     ...PRESENCE_STATUSES.map((s) => ({ key: s, label: PRESENCE_LABEL[s], count: counts[s] })),
+    // บัญชีปิดใช้งานไม่มีสถานะ — ชิปของตัวเองให้ทุกชิปรวมกันเท่าทั้งหมด (QA 15 พ.ย. 2569 · 0 ก็ยังโชว์)
+    { key: 'inactive', label: 'ปิดใช้งาน', count: Math.max(0, total - counts.total) },
   ];
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -63,10 +65,10 @@ export function PresenceFilterChips({
             size="xs"
             variant={value === c.key ? 'default' : 'outline'}
             aria-pressed={value === c.key}
-            title={c.key === 'all' ? undefined : metricHelp(HELP[c.key])}
+            title={c.key === 'all' || c.key === 'inactive' ? undefined : metricHelp(HELP[c.key])}
             onClick={() => onChange(c.key)}
           >
-            {c.key !== 'all' ? <span className={cn('inline-block h-2 w-2 rounded-full', TONE[PRESENCE_TONE[c.key]].dot)} aria-hidden /> : null}
+            {c.key !== 'all' && c.key !== 'inactive' ? <span className={cn('inline-block h-2 w-2 rounded-full', TONE[PRESENCE_TONE[c.key]].dot)} aria-hidden /> : null}
             {c.label} {NUM.format(c.count)}
           </Button>
         ))}

@@ -108,7 +108,22 @@ export function followTrendPersonKey(row: FollowTrendRow): string {
  */
 export function followCountedYmd(rows: readonly FollowTrendRow[]): (row: FollowTrendRow, metric: FollowMetric) => string | null {
   const counted = new Map<FollowMetric, Set<string>>();
+  /**
+   * 🔴 ปิดงาน · ไปแล้ว · ไม่ไป/ยกเลิก/ลา = ผลปิดงาน **ล่าสุด** ของคนนั้นแถวเดียว (เจ้าของ 15 พ.ย. 2569 Choice "ผลล่าสุดของคนนั้น")
+   * เดิมแต่ละเมตริกเลือกแถวแรกของตัวเอง ⇒ ไปแล้วมาจากแถวหนึ่ง ปิดงานมาจากอีกแถว (คนละเจ้าหน้าที่ได้)
+   * QA: อัตราปิดงานว่าไป 133% · ไปแล้ว 196 + ไม่ไป 26 = 222 แต่ปิดงาน 210
+   */
+  const lastClose = new Map<string, FollowTrendRow>();
+  for (const r of rows) {
+    if (!r.completedAt) continue;
+    const k = followTrendPersonKey(r);
+    const cur = lastClose.get(k);
+    if (!cur || Date.parse(r.completedAt) > Date.parse(cur.completedAt ?? '')) lastClose.set(k, r);
+  }
+  const closeIds = new Set([...lastClose.values()].map((r) => r.id));
+  for (const m of ['completed', 'success', 'dropped'] as const) counted.set(m, closeIds);
   for (const m of FOLLOW_PERSON_METRICS) {
+    if (counted.has(m)) continue;
     const first = new Map<string, { id: string; ymd: string }>();
     for (const r of rows) {
       const y = followEventYmd(r, m);

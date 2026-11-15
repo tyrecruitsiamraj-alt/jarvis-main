@@ -13,6 +13,7 @@ const f = (id: string, over: Partial<RecruitAppFact>): RecruitAppFact =>
   ({
     id, createdAt: '2026-11-02T03:00:00Z', jobId: 'siamraj-sql:LBM6911007', channelLabel: null, referralSource: null,
     calledByAi: false, calledByStaff: false, aiAnswer: null, logOk: null, appointmentAt: null, attendance: null, appointmentFailed: false,
+    phoneOk: true,
     ...over,
   }) as RecruitAppFact;
 

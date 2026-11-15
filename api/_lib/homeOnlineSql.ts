@@ -16,6 +16,8 @@ import { primaryJobRoleLabel } from './siamrajJobMapping.js';
 import { drivingSubtypeOf } from '../../src/lib/boardFilters.js';
 import { isDrivingPositionLabel } from '../../src/lib/jobBoardPositionPreset.js';
 import type { JobRequest } from '../../src/types/index.js';
+import { buildReleaseIndex } from '../../src/lib/jobReleaseIndex.js';
+import { requestNoOf } from '../../src/lib/jobKeyIndex.js';
 import type { DepartmentScope } from './departmentScope.js';
 import { normalizeTrendBu, trendBuFromSiteCode } from '../../src/lib/trends/bu.js';
 import { loadPenaltyLedgerRaw } from './siamrajPenaltyLedgerSql.js';
@@ -127,14 +129,43 @@ async function loadOnlineRequestGroups(opts: OnlineRequestOpts) {
  * เดิมแท็บงานสรรหานับ "ใบที่ยังเปิด + ใบขอล่วงหน้า" และ "การกดประกาศในช่วง (รวมใบเก่า)" ⇒ 55 · 44 ขณะที่ทีม Online 54 · 4
  * 🔴 ห้ามจับด้วยเลขที่ใบ — ใบขอล่วงหน้าเลขซ้ำใบจริง (`buildReleaseIndex` จับเลขด้วย)
  */
+/**
+ * วันที่ประกาศของใบชุดนี้ — จับคู่ทะเบียนประกาศด้วย `buildReleaseIndex` **ตัวเดียวกับกล่องงาน** (id เต็ม หรือเลขที่ใบที่ไม่ซ้ำ)
+ * 🔴 QA 15 พ.ย. 2569: เดิมเทียบ job_id ตรง ๆ ⇒ ใบที่ประกาศไว้ใต้ id อีกรูปแบบ (siamraj-pre/siamraj-sql) ไม่นับ
+ * กล่องงาน "ยังไม่ประกาศ 164" แต่ภาพรวม 166 จากใบชุดเดียวกัน
+ */
+async function loadReleasedAt(jobIds: readonly string[]): Promise<Map<string, string>> {
+  const nos = [...new Set(jobIds.map((id) => requestNoOf(id).trim()).filter(Boolean))];
+  const { rows } = await dbQuery<{ job_id: string; request_no: string | null; released_at: string }>(
+    `select job_id, request_no, released_at from ${RELEASES}
+      where job_id = any($1::text[]) or request_no = any($2::text[]) or regexp_replace(job_id, '^.*:', '') = any($2::text[])`,
+    [jobIds, nos],
+  );
+  const idx = buildReleaseIndex(rows, jobIds);
+  const later = (m: Map<string, string>, k: string, at: string) => {
+    if (!m.has(k) || at > m.get(k)!) m.set(k, at);
+  };
+  const byId = new Map<string, string>();
+  const byNo = new Map<string, string>();
+  for (const r of rows) {
+    const at = new Date(r.released_at).toISOString();
+    later(byId, r.job_id, at);
+    const no = (r.request_no || requestNoOf(r.job_id)).trim();
+    if (no) later(byNo, no, at);
+  }
+  const out = new Map<string, string>();
+  for (const id of jobIds) {
+    if (!idx.has(id)) continue;
+    const at = byId.get(id) ?? byNo.get(requestNoOf(id).trim());
+    if (at) out.set(id, at);
+  }
+  return out;
+}
+
 export async function loadOnlineRequestCounts(opts: OnlineRequestOpts): Promise<{ total: number; released: number }> {
   const { withBu, jobIds } = await loadOnlineRequestGroups(opts);
   if (withBu.length === 0) return { total: 0, released: 0 };
-  const { rows } = await dbQuery<{ n: number }>(
-    `select count(distinct job_id)::int as n from ${RELEASES} where job_id = any($1::text[])`,
-    [jobIds],
-  );
-  return { total: withBu.length, released: Number(rows[0]?.n ?? 0) };
+  return { total: withBu.length, released: (await loadReleasedAt(jobIds)).size };
 }
 
 /**
@@ -147,8 +178,7 @@ export async function loadOnlineRequestPosting(
   const { withBu, jobIds } = await loadOnlineRequestGroups(opts);
   const out = { total: withBu.length, released: 0, notReleasedOpen: 0, notReleasedEnded: 0 };
   if (withBu.length === 0) return out;
-  const { rows } = await dbQuery<{ job_id: string }>(`select distinct job_id from ${RELEASES} where job_id = any($1::text[])`, [jobIds]);
-  const released = new Set(rows.map((r) => r.job_id));
+  const released = await loadReleasedAt(jobIds);
   withBu.forEach((g, i) => {
     if (released.has(jobIds[i])) out.released += 1;
     else if (onlineRequestStateOf(g) === 'open') out.notReleasedOpen += 1;
@@ -165,10 +195,7 @@ export async function loadOnlineRequestRows(opts: OnlineRequestOpts): Promise<On
     // ใบขอชั่วคราวไม่อ่านข้อมูลใบจริง (เลขซ้ำกันได้ — ได้ข้อมูลผิดใบ)
     loadErpExtras(withBu.filter((g) => !g.prequest).map((g) => g.requestNo)),
     getUnitSectorMap(),
-    dbQuery<{ job_id: string; released_at: string }>(
-      `select job_id, released_at from ${RELEASES} where job_id = any($1::text[])`,
-      [jobIds],
-    ),
+    loadReleasedAt(jobIds),
     dbQuery<{ job_id: string; n: number }>(
       `select a.job_id, count(*)::int as n
          from ${APPS} a
@@ -178,7 +205,7 @@ export async function loadOnlineRequestRows(opts: OnlineRequestOpts): Promise<On
       [jobIds],
     ),
   ]);
-  const releasedAt = new Map(releases.rows.map((r) => [r.job_id, new Date(r.released_at).toISOString()]));
+  const releasedAt = releases;
   const appCount = new Map(apps.rows.map((r) => [r.job_id, Number(r.n)]));
 
   return withBu.map((g, i) => {

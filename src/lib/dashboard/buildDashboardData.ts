@@ -603,7 +603,9 @@ function buildWorkStatusKpis(
   }
   const leafTotal = Object.values(counts).reduce((s, n) => s + n, 0);
   const leafRequests = Object.values(requestCounts).reduce((s, n) => s + n, 0);
-  const pre = withPrequest && !totalOverride ? buildPrequestKpi(jobs) : null;
+  // 🔴 QA 15 พ.ย. 2569: โหมดมีงวดยอด cohort รวมใบขอชั่วคราวแล้ว (11 พ.ย. "นับรวมเหมือนหน้าหลัก") แต่เดิมไม่หักกล่องใบขอชั่วคราว
+  // ⇒ ใบชั่วคราว 11 ไปโผล่ซ้ำเป็น "ไม่มีสถานะ 11" · กล่องย่อยรวม 122 แต่ทั้งหมด 111 ⇒ หักทุกโหมด
+  const pre = withPrequest || totalOverride ? buildPrequestKpi(jobs) : null;
   const preTotal = pre && pre.value > 0 ? pre.value : 0;
   const total = totalOverride?.positions ?? leafTotal + preTotal;
   const totalRequests = totalOverride?.requests ?? leafRequests + (preTotal ? (pre?.secondaryCount ?? 0) : 0);
@@ -631,7 +633,7 @@ function buildWorkStatusKpis(
       secondaryCount: totalRequests,
       secondaryLabel: 'ใบขอ',
       description: preTotal
-        ? `${scopeHint} · สถานะ ${leafTotal.toLocaleString('th-TH')} + ${PREQUEST_LABEL} ${preTotal.toLocaleString('th-TH')} = ${total.toLocaleString('th-TH')} อัตรา · ${totalRequests.toLocaleString('th-TH')} ใบ`
+        ? `${scopeHint} · สถานะ ${leafTotal.toLocaleString('th-TH')}${nonePositions > 0 ? ` + ไม่มีสถานะ ${nonePositions.toLocaleString('th-TH')}` : ''} + ${PREQUEST_LABEL} ${preTotal.toLocaleString('th-TH')} = ${total.toLocaleString('th-TH')} อัตรา · ${totalRequests.toLocaleString('th-TH')} ใบ`
         : `${scopeHint} · ผลรวมสถานะ = ${total.toLocaleString('th-TH')} อัตรา · ${totalRequests.toLocaleString('th-TH')} ใบ`,
       trendPercent: null,
     },

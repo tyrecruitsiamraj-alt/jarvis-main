@@ -492,7 +492,7 @@ export function recruitProportionRows(
     ],
     steps: [
       { key: 'called', title: 'โทรไปแล้ว', value: afterCalled, parts: [], sub: whoSub(0, 0, afterCalled) },
-      { key: 'talked', title: 'ติดต่อได้', value: ok.length, parts: [], indent: true },
+      { key: 'talked', title: 'สนใจแล้วติดต่อได้', value: ok.length, parts: [], indent: true },
       { key: 'notTalked', title: 'ติดต่อไม่ได้', value: fail.length, parts: [], indent: true },
       {
         key: 'waiting',
@@ -520,7 +520,8 @@ export function recruitProportionRows(
   const informed = showed.filter((a) => a.informed === true).length;
   const appt: Ladder = {
     unit: 'คน',
-    totalLabel: 'ติดต่อได้ทั้งหมด',
+    // คนที่บอก AI ว่าสนใจแล้วคนโทรต่อติด — คนละกลุ่มกับ "ติดต่อได้" ของหน้าหลัก (ทุกคนที่คนโทรติด) · เจ้าของ 15 พ.ย. 2569 Choice "เปลี่ยนคำให้ต่างกัน"
+    totalLabel: 'สนใจแล้วติดต่อได้',
     total: ok.length,
     equation: [
       { label: 'นัดได้', value: booked.length },
@@ -567,7 +568,8 @@ export function recruitProportionRows(
       both,
       staff,
       none: apps.length - called,
-      noneLabel: 'ยังไม่โทร',
+      // ยังไม่มีใครโทร = รอ AI (มีคิว) + ไม่มีคิว — "ยังไม่โทร" สงวนไว้กับไม่มีคิว (uiWords · QA 15 พ.ย. 2569 เลขชนกับหน้าหลัก)
+      noneLabel: 'ยังไม่มีใครโทร',
       ladder: prescreen,
     },
     {
@@ -584,7 +586,7 @@ export function recruitProportionRows(
     {
       key: 'appointment',
       name: 'นัดได้',
-      note: `จากที่ติดต่อได้ ${n(ok.length)} คน`,
+      note: `จากที่สนใจแล้วติดต่อได้ ${n(ok.length)} คน`,
       ai: 0,
       both: 0,
       staff: booked.length,

@@ -10,24 +10,37 @@ import { appliedYmd } from './recruitOverview';
 import { aiBranchOf } from './recruitPersonJourney';
 import type { RecruitAppFact } from './recruitOverviewTypes';
 import { FOUR_MAIN_OTHER, fourMainOf } from './channelFourMain';
+import { funnelPlaceOf, type FunnelGroupKey } from './channelFunnel';
+import { APPLICANT_CALLED, APPLICANT_NOT_CALLED, applicantCallBucketOf } from './recruitRequestTab';
 
 /**
- * 4 ช่องทางหลักของหน้าช่องทาง + iRecruit (เจ้าของ 28 ต.ค. 2569 Choice "นับเป็น iRecruit ทั้งหมด") +
- * อื่น ๆ (ป้ายที่ไม่เข้า 4 หลัก เช่น LINE OA — ขึ้นเมื่อมีคน) · ไม่มี "ไม่ระบุ" (เจ้าของ "ไม่เอาไม่ระบุ")
+ * 4 ช่องทางหลักของหน้าช่องทาง + อื่น ๆ (ป้ายที่ไม่เข้า 4 หลัก / ไม่รู้ช่องทาง — ขึ้นเมื่อมีคน) · ไม่มี "ไม่ระบุ" (เจ้าของ "ไม่เอาไม่ระบุ")
+ * 🔴 15 พ.ย. 2569 เจ้าของ Choice "กระจายตามช่องทางต้นทาง" — ใบจาก iRecruit ไม่มีแถบของตัวเองแล้ว (แทนข้อเคาะ 28 ต.ค. "นับเป็น iRecruit ทั้งหมด")
+ * QA เจอหน้าหลัก Facebook 848 + iRecruit 86 แต่ภาพรวม Facebook 921 จากคนชุดเดียวกัน
  */
-export const FUNNEL_CHANNELS = ['Facebook', 'Tiktok', 'Webjob', 'Offline', 'iRecruit', FOUR_MAIN_OTHER] as const;
+export const FUNNEL_CHANNELS = ['Facebook', 'Tiktok', 'Webjob', 'Offline', FOUR_MAIN_OTHER] as const;
 export type FunnelChannel = (typeof FUNNEL_CHANNELS)[number];
+
+const GROUP_CHANNEL: Record<FunnelGroupKey, FunnelChannel> = {
+  facebook: 'Facebook',
+  tiktok: 'Tiktok',
+  webjob: 'Webjob',
+  offline: 'Offline',
+  unknown: FOUR_MAIN_OTHER,
+};
 
 /**
  * ช่องทางของใบ — กติกาแยกช่องทางตัวเดียวกับกราฟช่องทาง (`fourMainOf`) ห้ามเขียนซ้ำ
- * - ป้ายขึ้นต้น iRecruit (รวม "iRecruit · Jobthai") = iRecruit ทุกใบ
+ * - ใบจาก iRecruit (ป้ายขึ้นต้น iRecruit) = ช่องทางที่ลงทะเบียนใน iRecruit ตามตารางช่องทางหน้าภาพรวม (`funnelPlaceOf`)
+ *   ไม่รู้ช่องทาง = อื่น ๆ
  * - ป้าย "หลัก · รอง" = ตัดสินจากส่วนหัว
  * - ไม่มีป้าย = ช่องทางที่ผู้สมัครเลือกในฟอร์มเก่า (referral) · ไม่มีอะไรเลย = กรอกผ่านเว็บสมัครงานของเรา ⇒ Webjob
  *   (เจ้าของ 28 ต.ค. 2569 Choice "ย้ายเข้า Webjob · เว็บสมัครงาน So Recruit" · ฟอร์มบังคับเลือกช่องทางแล้ว)
  */
-export function funnelChannelOf(f: Pick<RecruitAppFact, 'channelLabel' | 'referralSource'>): FunnelChannel {
+export function funnelChannelOf(f: Pick<RecruitAppFact, 'channelLabel' | 'referralSource' | 'sourceChannel'>): FunnelChannel {
   const parts = (f.channelLabel ?? '').split(' · ').map((p) => p.trim()).filter(Boolean);
-  if (parts.length) return /^irecruit$/i.test(parts[0]) ? 'iRecruit' : fourMainOf(parts[0]);
+  if (parts.length && /^irecruit$/i.test(parts[0])) return GROUP_CHANNEL[funnelPlaceOf(f).group];
+  if (parts.length) return fourMainOf(parts[0]);
   const r = (f.referralSource ?? '').trim();
   if (r === 'facebook') return 'Facebook';
   if (r === 'tiktok') return 'Tiktok';
@@ -78,9 +91,13 @@ const NUM = new Intl.NumberFormat('th-TH');
  * เดิม "AI คัดกรอง" ซ้ำกับ AI โทรแล้ว · หัว "นัดหมาย" ใช้เลขติดต่อได้ · หัว "มาตามนัด" ใช้เลขนัดได้ · "รับไปโทรในช่วงนี้" บวกไม่ลง
  */
 export function buildApplicantFunnel(apps: readonly RecruitAppFact[]): FunnelStep[] {
-  const aiCalled = apps.filter((f) => f.calledByAi);
-  const aiQueued = apps.filter((f) => !f.calledByAi && f.aiQueued === true);
-  const notCalled = apps.filter((f) => !f.calledByAi && f.aiQueued !== true);
+  // 🔴 แบ่งด้วยตัวตัดสินเดียวกับภาพรวมงานสรรหา (`applicantCallBucketOf`) — QA 15 พ.ย. 2569: หน้าหลักไม่แยก "คนโทรเอง"
+  // และนับเบอร์ใช้ไม่ได้ที่ค้างคิวเป็นรอ AI ⇒ "รอ AI 177 · ยังไม่โทร 176" แต่ภาพรวม "รอ AI 127 · ยังไม่มีใครโทร 114 · คนโทรเอง 112"
+  const bucketIs = (keys: readonly string[]) => apps.filter((f) => keys.includes(applicantCallBucketOf(f)));
+  const aiCalled = bucketIs(APPLICANT_CALLED);
+  const staffOnly = bucketIs(['staff']);
+  const aiQueued = bucketIs(['queued']);
+  const notCalled = bucketIs(APPLICANT_NOT_CALLED);
   // 🔴 ผล AI ตัวตัดสินเดียวกับหน้าภาพรวมงานสรรหา (`aiBranchOf`) — เดิมหน้าหลักแบ่งเอง "ไม่สนใจ 209 · อื่น ๆ 104"
   // แต่ภาพรวมได้ "ไม่สนใจ 301 · คนละพื้นที่ 11 · ยังสรุปไม่ได้ 1" จากคนกลุ่มเดียวกัน (ตรวจทั้งระบบ 10 พ.ย. 2569 · รวมผล Codex)
   const aiOf = (k: ReturnType<typeof aiBranchOf>) => aiCalled.filter((f) => aiBranchOf(f) === k);
@@ -108,7 +125,12 @@ export function buildApplicantFunnel(apps: readonly RecruitAppFact[]): FunnelSte
       key: 'applied',
       label: 'กรอกมา',
       value: apps.length,
-      rows: [row('aiCalled', 'AI โทรแล้ว', aiCalled, 'neutral'), row('aiQueued', 'รอ AI โทร', aiQueued, 'warn'), row('notCalled', 'ยังไม่โทร', notCalled, 'warn')],
+      rows: [
+        row('aiCalled', 'AI โทรแล้ว', aiCalled, 'neutral'),
+        row('staffOnly', 'คนโทรเอง', staffOnly, 'neutral'),
+        row('aiQueued', 'รอ AI โทร', aiQueued, 'warn'),
+        row('notCalled', 'ยังไม่มีใครโทร', notCalled, 'warn'),
+      ],
       channels: channelsOf(apps),
       ids: idsOf(apps),
     },
