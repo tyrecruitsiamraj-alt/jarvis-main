@@ -79,11 +79,12 @@ export function buildPersonJourney(list: readonly RecruitAppFact[], now: Date = 
       part('other', 'ยังสรุปไม่ได้', 'warn', ai('other')),
     ]),
     stage('follow', 'สนใจ', yes, [
-      part('reached', 'ติดต่อได้', 'success', reached, { next: true }),
+      // 168 vs 348 (QA 15 พ.ย. 2569): คนที่สนใจแล้วติดต่อได้ ≠ ติดต่อได้ทั้งหมด — เจ้าของ Choice "เปลี่ยนคำให้ต่างกัน"
+      part('reached', 'สนใจแล้วติดต่อได้', 'success', reached, { next: true }),
       part('failed', 'ติดต่อไม่ได้', 'danger', failed),
       part('waiting', 'ยังไม่มีคนโทร', 'warn', waiting),
     ]),
-    stage('appoint', 'ติดต่อได้', reached, [
+    stage('appoint', 'สนใจแล้วติดต่อได้', reached, [
       part('booked', 'นัดได้', 'success', booked, { next: true }),
       part('apptFailed', 'นัดไม่ได้', 'danger', apptFailed),
       part('saidNo', 'ไม่สนใจแล้ว', 'orange', saidNo),

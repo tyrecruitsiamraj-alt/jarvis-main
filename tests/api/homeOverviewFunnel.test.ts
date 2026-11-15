@@ -8,19 +8,20 @@ const f = (over: Partial<RecruitAppFact>): RecruitAppFact =>
   ({
     id: 'a', createdAt: '2026-10-10T03:00:00Z', jobId: 'siamraj-sql:LBM6910007', channelLabel: null, referralSource: null,
     calledByAi: false, calledByStaff: false, aiAnswer: null, logOk: null, appointmentAt: null, attendance: null, appointmentFailed: false,
+    phoneOk: true,
     ...over,
   }) as RecruitAppFact;
 
 describe('ช่องทางของใบ', () => {
-  it('ป้ายจริงบนเว็บ 28 ต.ค. ลงช่องตามหน้าช่องทาง · iRecruit ทุกใบ = iRecruit · ไม่มีป้าย = Webjob (เว็บสมัครงานของเรา)', () => {
+  it('ป้ายจริงบนเว็บ 28 ต.ค. ลงช่องตามหน้าช่องทาง · iRecruit ไปตามช่องทางต้นทาง (15 พ.ย.) · ไม่มีป้าย = Webjob (เว็บสมัครงานของเรา)', () => {
     const cases: Array<[string | null, string | null, string]> = [
       ['Facebook Group · กลุ่มหางานจังหวัด', null, 'Facebook'],
       ['Facebook · Facebook Page', null, 'Facebook'],
       ['Tiktok · Tiktok Live', null, 'Tiktok'],
       ['Webjob · JOBBKK', null, 'Webjob'],
-      ['iRecruit', null, 'iRecruit'],
-      ['iRecruit · Jobthai', null, 'iRecruit'],
-      ['iRecruit · Line', null, 'iRecruit'],
+      ['iRecruit', null, 'อื่น ๆ'],
+      ['iRecruit · Jobthai', null, 'Webjob'],
+      ['iRecruit · Line', null, 'Webjob'],
       ['Call in', null, 'Offline'],
       [null, 'tiktok', 'Tiktok'],
       [null, null, 'Webjob'],
@@ -31,6 +32,9 @@ describe('ช่องทางของใบ', () => {
     ];
     for (const [label, ref, want] of cases) expect(funnelChannelOf({ channelLabel: label, referralSource: ref }), `${label}|${ref}`).toBe(want);
     expect(FUNNEL_CHANNELS).not.toContain('ไม่ระบุ');
+    // เจ้าของ 15 พ.ย. 2569 Choice "กระจายตามช่องทางต้นทาง" — ไม่มีแถบ iRecruit แล้ว · ใบ iRecruit ที่รู้ช่องทางไปตามช่องทางนั้น
+    expect(FUNNEL_CHANNELS).not.toContain('iRecruit');
+    expect(funnelChannelOf({ channelLabel: 'iRecruit', referralSource: null, sourceChannel: 'Facebook Group' })).toBe('Facebook');
     // กติกาแยกช่องทางมีที่เดียว (`fourMainOf`) — รีวิว 28 ต.ค. 2569
     expect(readFileSync('src/lib/homeOverviewFunnel.ts', 'utf8')).not.toMatch(/jobthai\|jobbkk/);
   });
@@ -66,7 +70,7 @@ describe('เส้นผู้สมัคร 6 ขั้นต่อกัน�
       expect(Object.values(s.channels).reduce((a, b) => a + b, 0), s.key).toBe(s.value);
       expect(s.rows.reduce((a, r) => a + r.value, 0), s.key).toBe(s.value);
     }
-    expect(rowsOf('applied')).toEqual({ aiCalled: 6, aiQueued: 1, notCalled: 1 });
+    expect(rowsOf('applied')).toEqual({ aiCalled: 6, staffOnly: 0, aiQueued: 1, notCalled: 1 });
     expect(rowsOf('ai').yes).toBe(steps[2].value);
     expect(rowsOf('interested')).toEqual({ staffCalled: 2, staffNotYet: 1 });
     expect(steps[3].from).toBe('สนใจ 2 + กลุ่มอื่น 1');
@@ -76,6 +80,11 @@ describe('เส้นผู้สมัคร 6 ขั้นต่อกัน�
     expect(steps.flatMap((s) => s.rows.map((r) => r.label))).not.toContain('รับไปโทรในช่วงนี้');
   });
 
+  it('แถวกรอกมา = ตัวตัดสินเดียวกับภาพรวม: คนโทรเอง แยก · เบอร์ใช้ไม่ได้ที่ค้างคิว = ยังไม่มีใครโทร (QA 15 พ.ย. 2569)', () => {
+    const s = buildApplicantFunnel([f({ calledByStaff: true, logOk: true }), f({ aiQueued: true, phoneOk: false }), f({ aiQueued: true })]);
+    expect(Object.fromEntries(s[0].rows.map((r) => [r.key, r.value]))).toEqual({ aiCalled: 0, staffOnly: 1, aiQueued: 1, notCalled: 1 });
+    expect(s[0].rows.map((r) => r.label)).toEqual(['AI โทรแล้ว', 'คนโทรเอง', 'รอ AI โทร', 'ยังไม่มีใครโทร']);
+  });
   it('ว่าง = ทุกขั้น 0 (ห้ามหาย)', () => {
     const empty = buildApplicantFunnel([]);
     expect(empty).toHaveLength(6);

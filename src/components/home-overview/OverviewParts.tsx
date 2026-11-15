@@ -192,7 +192,6 @@ export const CHANNEL_TONE: Record<FunnelChannel, ToneKey> = {
   Tiktok: 'primary',
   Webjob: 'teal',
   Offline: 'orange',
-  iRecruit: 'violet',
   'อื่น ๆ': 'neutral',
 };
 

@@ -94,7 +94,8 @@ describe('โครงแผงของแต่ละเรื่อง (เ�
     expect([stepOf(after.ladder!, 'talked').value, stepOf(after.ladder!, 'waiting').value]).toEqual([1, 1]);
     // นัดได้: จากที่ติดต่อสำเร็จทั้งหมด → นัดได้ 1 (มา 1) · บรรทัดผ่าน/แจ้งเข้า
     const al = appt.ladder!;
-    expect(al.totalLabel).toBe('ติดต่อได้ทั้งหมด');
+    // คนที่สนใจแล้วติดต่อได้ ≠ ติดต่อได้ของหน้าหลัก (ทุกคนที่คนโทรติด) — เจ้าของ 15 พ.ย. 2569 Choice "เปลี่ยนคำให้ต่างกัน"
+    expect(al.totalLabel).toBe('สนใจแล้วติดต่อได้');
     expect(ladderAddsUp(al)).toBe(true);
     expect(stepOf(al, 'booked').parts.map((p) => [p.label, p.value])).toEqual([['มาตามนัด', 1]]);
     expect(al.steps[0].sub).toBe('มาแล้ว ผ่าน 1 · แจ้งเข้า ERP 1');

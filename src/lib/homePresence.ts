@@ -133,8 +133,11 @@ export function sortPresence(people: readonly PresencePerson[]): PresencePerson[
   );
 }
 
-/** ตัวกรองสถานะของตารางผู้ใช้งาน — ทั้งหมด หรือสถานะใดสถานะหนึ่ง */
-export type PresenceFilter = 'all' | PresenceStatus;
+/**
+ * ตัวกรองสถานะของตารางผู้ใช้งาน — ทั้งหมด · สถานะใดสถานะหนึ่ง · ปิดใช้งาน (บัญชีที่ไม่มีสถานะ)
+ * 🔴 QA 15 พ.ย. 2569: ทั้งหมด 70 แต่ Online + Offline + ยังไม่เข้าระบบ = 69 — บัญชีปิดใช้งานไม่มีชิปของตัวเอง ⇒ ชิปรวมกัน = ทั้งหมด
+ */
+export type PresenceFilter = 'all' | PresenceStatus | 'inactive';
 
 /**
  * เรียงบัญชีในตารางผู้ใช้งานตามสถานะ — ลำดับเดียวกับ `sortPresence` (Online ใช้ล่าสุดก่อน → Offline เข้าล่าสุดก่อน →
@@ -150,6 +153,7 @@ export function sortByPresence<T extends { id: string }>(items: readonly T[], pe
 
 /** บัญชีนี้ผ่านตัวกรองไหม — "ทั้งหมด" ผ่านทุกบัญชี (รวมบัญชีที่ไม่มีสถานะ) */
 export function matchesPresence(person: PresencePerson | undefined, filter: PresenceFilter): boolean {
+  if (filter === 'inactive') return !person;
   return filter === 'all' || person?.status === filter;
 }
 
