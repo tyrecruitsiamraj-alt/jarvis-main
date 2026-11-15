@@ -142,8 +142,14 @@ export default function FollowCallQueue({
           ) : null}
           <div className="truncate text-xs text-muted-foreground">
             {[e.unit_name?.trim() || person.row.group.unitName, e.replace_position, callLabel].filter(Boolean).join(' · ')}
-            {' · '}
-            <span className={it.group === 'done' ? TONE[FOLLOW_CALL_CATEGORY_TONE[call.category]].value : undefined}>{it.reason}</span>
+            {/* มือถือ: เหตุผลขึ้นบรรทัดของตัวเองและตัดคำได้ — เดิมถูกตัดเหลือ "ไม่โท…" อ่านไม่ออกว่าทำไมไม่โทร (รูปมือถือ 15 พ.ย. 2569) */}
+            <span className="max-sm:hidden"> · </span>
+            <span
+              className={cn('max-sm:block max-sm:whitespace-normal', it.group === 'done' ? TONE[FOLLOW_CALL_CATEGORY_TONE[call.category]].value : undefined)}
+              data-testid="queue-reason"
+            >
+              {it.reason}
+            </span>
           </div>
         </div>
         <div className="col-span-2 flex flex-wrap items-center gap-1.5 md:col-span-1 md:justify-end">
