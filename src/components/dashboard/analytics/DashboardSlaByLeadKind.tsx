@@ -97,8 +97,8 @@ const DashboardSlaByLeadKind: React.FC<Props> = ({
         return (
           <td key={c} className="py-1.5 text-center">
             {v === 0 ? (
-              // ช่องว่างไม่ทาสี — ไม่งั้น 0 หลายสิบช่องกลายเป็นลายพราง
-              <span className={cn('text-xs tabular-nums', DASH.cellMuted)}>—</span>
+              // ช่องว่างไม่ทาสี — ไม่งั้น 0 หลายสิบช่องกลายเป็นลายพราง · ขึ้น 0 ไม่ใช่ขีด (เจ้าของ "ว่างให้โชว์ 0")
+              <span className={cn('text-sm tabular-nums', DASH.cellMuted)} data-testid="sla-cell-zero">0</span>
             ) : clickable ? (
               <button
                 type="button"

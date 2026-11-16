@@ -44,6 +44,8 @@ describe('มือถือ', () => {
   });
   it('Dashboard ปิดทัน/ไม่ทัน บอกรวมกับ % ใต้ชื่อแถวบนมือถือ', () => {
     expect(read('src/components/dashboard/analytics/DashboardSlaByLeadKind.tsx')).toContain("ใบ · ปิดทัน {row.onTimeRatePercent === null ? '—'");
+    // ช่องที่ไม่มีใบ = 0 ไม่ใช่ขีด
+    expect(read('src/components/dashboard/analytics/DashboardSlaByLeadKind.tsx')).toContain('data-testid="sla-cell-zero">0</span>');
   });
 });
 
