@@ -3,12 +3,13 @@
  * GET /api/job-post-actions?job=<id>   → รายละเอียดใบเดียว (ป๊อป: Autopost รายกลุ่ม · ลิงก์โพสต์เอง · คำสั่ง Scrap)
  *   job=standalone:<ประเภท> = กล่องลอย (16 พ.ย. 2569 · มีแต่ลิงก์โพสต์เอง) · ยอดทุกใบคืน `byKind` ของกล่องลอยด้วย
  * GET /api/job-post-actions?days=1&from=&to=&bu= → โพสต์เองรายวัน (การ์ด 6 หน้าภาพรวม · BU แบบหน้าภาพรวม)
+ * GET /api/job-post-actions?links=1&from=&to=&bu= → โพสต์เองรายลิงก์ (ภาพรวม 8 เรื่อง · 16 พ.ย. 2569)
  * POST /api/job-post-actions { link_id, post_url? } → จดว่าโพสต์เองแล้ววันนี้ (กดคัดลอกข้อความ / วางลิงก์โพสต์ในหน้าโพสต์เอง · 13 พ.ย. 2569)
  * อ่านอย่างเดียว · สิทธิ์เดียวกับหน้าโพสต์ประกาศ (`job-applications`) · จำกัด BU ตามเลขใบขอแบบเส้น board ของ So Scraping
  */
 import { withRbac, sendError, handleApiError, type ApiRes, type AuthedReq } from '../_lib/http.js';
 import { loadScopedRequestNoSet } from '../_lib/siamrajUnitRequests.js';
-import { getJobPostActions, linkJobId, listJobPostActions, loadManualPostDays, recordManualPost, STANDALONE_KEY_PREFIX } from '../_lib/jobPostActions.js';
+import { getJobPostActions, linkJobId, listJobPostActions, loadManualLinks, loadManualPostDays, recordManualPost, STANDALONE_KEY_PREFIX } from '../_lib/jobPostActions.js';
 import { loadMatchingBuScope } from '../_lib/departmentScope.js';
 import { pickDashboardBuSet } from '../_lib/homeBuSql.js';
 import { requestNoOf } from '../../src/lib/jobKeyIndex.js';
@@ -43,6 +44,14 @@ async function handler(req: AuthedReq, res: ApiRes) {
     return sendError(res, 405, 'Method not allowed');
   }
   try {
+    if (one(req.query?.links) === '1') {
+      const from = String(one(req.query?.from) ?? '').trim();
+      const to = String(one(req.query?.to) ?? '').trim();
+      if (!YMD.test(from) || !YMD.test(to) || from > to) return sendError(res, 400, 'bad_request', 'ช่วงวันที่ไม่ถูกต้อง');
+      const { buSet } = pickDashboardBuSet(await loadMatchingBuScope(req.user), one(req.query?.bu));
+      res.setHeader?.('Cache-Control', 'no-store');
+      return res.status(200).json({ links: await loadManualLinks({ from, to, buSet }) });
+    }
     if (one(req.query?.days) === '1') {
       const from = String(one(req.query?.from) ?? '').trim();
       const to = String(one(req.query?.to) ?? '').trim();

@@ -1,5 +1,5 @@
 import { apiFetch } from './apiFetch';
-import type { JobPostActionsSummary, JobPostLinkOrigin, ManualPostDays } from './jobPostActions';
+import type { JobPostActionsSummary, JobPostLinkOrigin, ManualLinkRow, ManualPostDays } from './jobPostActions';
 import type { SoPostGroupRow, SoPostGroupStatus } from './soPostGroups';
 
 /** "ทำอะไรไปแล้ว" ของใบขอ (13 พ.ย. 2569) — พังโยนข้อความไทยจาก server */
@@ -30,6 +30,15 @@ export async function fetchJobPostActionsDetail(jobId: string): Promise<JobPostA
 }
 
 /** โพสต์เองรายวัน (การ์ด 6 หน้าภาพรวม · 13 พ.ย. 2569) — ช่วง/BU ตามภาพรวม */
+/** โพสต์เองรายลิงก์ของลิงก์ที่สร้างในช่วง (ภาพรวม 8 เรื่อง · 16 พ.ย. 2569) */
+export async function fetchManualLinks(opts: { from: string; to: string; bu: string | null }): Promise<ManualLinkRow[]> {
+  const q = new URLSearchParams({ links: '1', from: opts.from, to: opts.to });
+  if (opts.bu) q.set('bu', opts.bu);
+  const r = await apiFetch(`/api/job-post-actions?${q.toString()}`);
+  if (!r.ok) return readError(r);
+  return ((await r.json()) as { links: ManualLinkRow[] }).links ?? [];
+}
+
 export async function fetchManualPostDays(opts: { from: string; to: string; bu: string | null }): Promise<ManualPostDays> {
   const q = new URLSearchParams({ days: '1', from: opts.from, to: opts.to });
   if (opts.bu) q.set('bu', opts.bu);

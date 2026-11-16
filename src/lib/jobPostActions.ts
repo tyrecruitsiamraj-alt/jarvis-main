@@ -120,6 +120,41 @@ export type ManualPostDays = { days: ManualPostDay[]; total: { jobs: number; pla
 
 const NO_PLACE = 'ไม่ระบุช่องทาง';
 
+/**
+ * ═══ โพสต์เองรายลิงก์ (ภาพรวม 8 เรื่อง · เจ้าของ 16 พ.ย. 2569 "ถ้าจะดูแค่ โพสต์แล้วมันว่าคลิกเท่าไหร่ กรอกเท่าไหร่ ดูแบบย้อนกลับด้วยได้ไหม") ═══
+ * ลิงก์ละแถว — โพสต์แล้ว = มีลิงก์โพสต์วางกลับมา (นิยามเดียวกับการ์ด `JobPostActionsSummary.manual.posted`) · ไม่มี = Gen link
+ * คลิก/กรอก = ยอดถึงวันนี้ของลิงก์นั้น (ลิงก์เดียวไม่ถูกนับซ้ำหลายวันแบบรายวัน `manualPostDays`)
+ */
+export type ManualLinkInput = {
+  link_id: string;
+  job_id: string;
+  note: string | null;
+  created_at: string;
+  channel_label: string | null;
+  post_url: string | null;
+  hit_count: number;
+  applicants: number;
+  created_by_name: string | null;
+};
+export type ManualLinkRow = { linkId: string; jobId: string; day: string; place: string; by: string; posted: boolean; clicks: number; applicants: number };
+
+const bkkDay = (iso: string) => new Date(Date.parse(iso) + 7 * 3_600_000).toISOString().slice(0, 10);
+
+export function manualLinkRows(links: readonly ManualLinkInput[], autopostTimes: ReadonlyMap<string, readonly number[]>): ManualLinkRow[] {
+  return links
+    .filter((l) => jobPostLinkOrigin(l, autopostTimes.get(l.job_id) ?? []) === 'manual')
+    .map((l) => ({
+      linkId: l.link_id,
+      jobId: l.job_id,
+      day: bkkDay(l.created_at),
+      place: (l.channel_label ?? '').trim() || NO_PLACE,
+      by: (l.created_by_name ?? '').trim() || 'ไม่รู้',
+      posted: Boolean((l.post_url ?? '').trim()),
+      clicks: Math.max(0, Number(l.hit_count) || 0),
+      applicants: Math.max(0, Number(l.applicants) || 0),
+    }));
+}
+
 function ymdRange(from: string, to: string): string[] {
   const out: string[] = [];
   const end = Date.parse(`${to}T00:00:00Z`);

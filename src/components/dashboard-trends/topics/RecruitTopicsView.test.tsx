@@ -12,7 +12,12 @@ import type { StuckRequest } from '@/lib/recruitStuck';
 const fetchRecruitStuck = vi.fn();
 vi.mock('@/lib/recruitStuckApi', () => ({ fetchRecruitStuck: (...a: unknown[]) => fetchRecruitStuck(...a) }));
 vi.mock('@/lib/soPostGroupsApi', () => ({ fetchSoPostGroups: vi.fn(async () => ({ total: 0, counts: {}, rows: [], statuses: [], reasonGroups: [], page: 1, pages: 1 })) }));
-vi.mock('@/lib/jobPostActionsApi', () => ({ fetchManualPostDays: vi.fn(async () => ({ days: [], total: { jobs: 0, places: 0, posted: 0, clicks: 0, applicants: 0 } })) }));
+const LINKS = [
+  { linkId: 'l1', jobId: 'siamraj-sql:OPL6911001', day: '2026-11-13', place: 'Facebook · Facebook Group · กลุ่มคนขับรถ', by: 'เจมส์', posted: true, clicks: 30, applicants: 1 },
+  { linkId: 'l2', jobId: 'siamraj-sql:OPL6911001', day: '2026-11-14', place: 'ไม่ระบุช่องทาง', by: 'ไอซ์', posted: false, clicks: 10, applicants: 4 },
+  { linkId: 'l3', jobId: 'siamraj-sql:OPL6911002', day: '2026-11-14', place: 'Facebook · Facebook Group · กลุ่มคนขับรถ', by: 'เจมส์', posted: true, clicks: 5, applicants: 0 },
+];
+vi.mock('@/lib/jobPostActionsApi', () => ({ fetchManualLinks: vi.fn(async ({ bu }: { bu: string }) => (bu === 'LBD' ? LINKS : [])) }));
 const { default: RecruitTopicsView } = await import('./RecruitTopicsView');
 
 afterEach(cleanup);
@@ -106,5 +111,21 @@ describe('ภาพรวม 8 เรื่อง เทียบ BU', () => {
     fireEvent.click(screen.getByTestId('topic-day-2026-11-03'));
     const dlg = await screen.findByRole('dialog');
     expect(within(dlg).getByTestId('topic-equation').textContent).toContain('4');
+  });
+
+  it('โพสต์เอง: ลิงก์ = โพสต์แล้ว + Gen link · คลิก/กรอกแยกกอง · ย้อนกลับจากคนที่กรอก · ปุ่มเฉพาะโพสต์แล้ว', async () => {
+    fetchRecruitStuck.mockResolvedValue({ monthly: [], errors: {} });
+    renderView('/?topic=self');
+    const panel = await screen.findByTestId('self-links');
+    const eqs = within(panel).getAllByTestId('topic-equation').map((e) => e.textContent ?? '');
+    expect(eqs[0]).toContain('ลิงก์ทั้งหมด 3');
+    expect(eqs[1]).toContain('คลิก 45');
+    expect(eqs[2]).toContain('กรอก 5');
+    for (const e of eqs) expect(e).not.toContain('ไม่ลงตัว');
+    expect(within(screen.getByTestId('self-links-back')).getAllByRole('row')).toHaveLength(3); // หัว + 2 ลิงก์ที่มีคนกรอก
+    fireEvent.click(screen.getByTestId('self-filter-posted'));
+    expect(within(screen.getByTestId('self-links-back')).getAllByRole('row')).toHaveLength(2);
+    // แท่ง BU = จำนวนลิงก์ · รายวันรวมเท่ายอด
+    expect(screen.getByTestId('topic-bu-LBD').textContent).toContain('3');
   });
 });

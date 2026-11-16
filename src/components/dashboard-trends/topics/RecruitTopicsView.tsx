@@ -1,5 +1,5 @@
 import React from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ListChecks } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -12,8 +12,10 @@ import type { StuckRequest } from '@/lib/recruitStuck';
 import { monthlySeries, type StuckMonthlyRow } from '@/lib/recruitStuck';
 import { fetchRecruitStuck } from '@/lib/recruitStuckApi';
 import { fetchSoPostGroups } from '@/lib/soPostGroupsApi';
-import { fetchManualPostDays } from '@/lib/jobPostActionsApi';
-import { manualPostDaysFrom, SO_POST_SINCE } from '@/lib/recruitScale';
+import { fetchManualLinks } from '@/lib/jobPostActionsApi';
+import type { ManualLinkRow } from '@/lib/jobPostActions';
+import { MANUAL_POSTED_SINCE, SO_POST_SINCE } from '@/lib/recruitScale';
+import { requestPathOfJobId } from '@/lib/jobNavigation';
 import { reasonGroups } from '@/lib/recruitOverview';
 import { buildBringerFunnelTree, buildChannelFunnelTree } from '@/lib/channelFunnel';
 import { informedOf } from '@/lib/recruitPersonJourney';
@@ -30,6 +32,7 @@ import {
   peopleSteps,
   requestPhaseParts,
   requestStateParts,
+  selfParts,
   staffParts,
   startMethods,
   startParts,
@@ -44,7 +47,7 @@ import StuckTodoTable from '../stuck/StuckTodoTable';
 import StuckAreaTable from '../stuck/StuckAreaTable';
 import CallerResultsTable from '../stuck/CallerResultsTable';
 import SoPostGroupsCard from '../stuck/SoPostGroupsCard';
-import ManualPostDaysCard from '../stuck/ManualPostDaysCard';
+import SelfLinksPanel from './SelfLinksPanel';
 import TrendDelta from '../stuck/TrendDelta';
 import TopicBuBars from './TopicBuBars';
 import TopicEquation from './TopicEquation';
@@ -102,6 +105,7 @@ export default function RecruitTopicsView({
   onPickMonth: (month: string) => void;
 }) {
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   const topicParam = searchParams.get('topic');
   const topic: TopicKey = isTopicKey(topicParam) ? topicParam : 'req';
   // เรียง BU ตามตัวอย่างที่เจ้าของเคาะ (LBD ก่อน) ไม่ใช่ลำดับในสิทธิ์ (SN ขึ้นก่อน)
@@ -129,7 +133,7 @@ export default function RecruitTopicsView({
   const rowsBu = React.useMemo(() => openRows.filter((r) => r.bu === selBu), [openRows, selBu]);
 
   // ── ยอดโพสต์ต่อ BU (ข้อมูลอยู่ฝั่ง So Scraping / ลิงก์ — ดึงทีละ BU) ──
-  const [posts, setPosts] = React.useState<Record<string, { fb: TopicPart[] | null; self: TopicPart[] | null }> | null>(null);
+  const [posts, setPosts] = React.useState<Record<string, { fb: TopicPart[] | null; links: ManualLinkRow[] | null }> | null>(null);
   // โหลดครั้งเดียวต่อช่วง — สลับ โพสต์กลุ่ม ↔ โพสต์เอง ไม่โหลดซ้ำ (เดิมรอ 10 วิทุกครั้งที่สลับ · 16 พ.ย. 2569)
   const postTopic = topic === 'fb' || topic === 'self';
   React.useEffect(() => {
@@ -138,9 +142,11 @@ export default function RecruitTopicsView({
     setPosts(null);
     Promise.all(
       bus.map(async (bu) => {
-        const [so, manual] = await Promise.all([
+        // โพสต์เองรายลิงก์ นับตั้งแต่ 13 พ.ย. 2569 (วันเริ่มระบบโพสต์เอง · Choice เจ้าของ)
+        const linkFrom = win.from < MANUAL_POSTED_SINCE ? MANUAL_POSTED_SINCE : win.from;
+        const [so, links] = await Promise.all([
           fetchSoPostGroups({ from: win.from, to: win.to, bu, page: 1 }).catch(() => null),
-          fetchManualPostDays({ from: win.from, to: win.to, bu }).catch(() => null),
+          linkFrom <= win.to ? fetchManualLinks({ from: linkFrom, to: win.to, bu }).catch(() => null) : Promise.resolve([] as ManualLinkRow[]),
         ]);
         const c = so?.counts ?? {};
         const fb: TopicPart[] | null = so
@@ -152,14 +158,7 @@ export default function RecruitTopicsView({
               { key: 'removed', label: 'ลบออกแล้ว', tone: 'orange', value: c.removed ?? 0 },
             ]
           : null;
-        const t = manual ? manualPostDaysFrom(manual).total : null;
-        const self: TopicPart[] | null = t
-          ? [
-              { key: 'posted', label: 'โพสต์แล้ว', tone: 'success', value: t.posted },
-              { key: 'genlink', label: 'Gen link', tone: 'info', value: Math.max(0, t.places - t.posted) },
-            ]
-          : null;
-        return [bu, { fb, self }] as const;
+        return [bu, { fb, links }] as const;
       }),
     ).then((list) => alive && setPosts(Object.fromEntries(list)));
     return () => {
@@ -183,8 +182,9 @@ export default function RecruitTopicsView({
       case 'why':
         return cohort ? buBarsOf(bus, apps, (f) => f.bu, whyParts) : null;
       case 'fb':
+        return posts ? bus.map((bu) => ({ bu, parts: posts[bu]?.fb ?? [], total: sumParts(posts[bu]?.fb ?? []) })) : null;
       case 'self':
-        return posts ? bus.map((bu) => ({ bu, parts: posts[bu]?.[topic] ?? [], total: sumParts(posts[bu]?.[topic] ?? []) })) : null;
+        return posts ? bus.map((bu) => ({ bu, parts: selfParts(posts[bu]?.links ?? []), total: posts[bu]?.links?.length ?? 0 })) : null;
     }
   }, [topic, requestsReady, bus, openRows, cohort, apps, posts]);
   const prevBars = React.useMemo(() => {
@@ -219,12 +219,10 @@ export default function RecruitTopicsView({
     };
   }, [selBu, win.from, win.to]);
   const [postMonths, setPostMonths] = React.useState<TimeMonth[] | null>(null);
-  const [selfDays, setSelfDays] = React.useState<TimeDay[] | null>(null);
   React.useEffect(() => {
     if (topic !== 'fb' && topic !== 'self') return;
     let alive = true;
     setPostMonths(null);
-    setSelfDays(null);
     const months = lastMonths(curMonth).filter((m) => m >= (topic === 'fb' ? SO_POST_SINCE : '2026-11-13').slice(0, 7));
     Promise.all(
       months.map(async (m) => {
@@ -233,32 +231,11 @@ export default function RecruitTopicsView({
           const so = await fetchSoPostGroups({ from: r.from, to: r.to, bu: selBu, page: 1 }).catch(() => null);
           return { month: m, label: monthLabel(m), value: so ? so.total : null };
         }
-        const md = await fetchManualPostDays({ from: r.from, to: r.to, bu: selBu }).catch(() => null);
-        return { month: m, label: monthLabel(m), value: md ? manualPostDaysFrom(md).total.places : null };
+        const from = r.from < MANUAL_POSTED_SINCE ? MANUAL_POSTED_SINCE : r.from;
+        const links = await fetchManualLinks({ from, to: r.to, bu: selBu }).catch(() => null);
+        return { month: m, label: monthLabel(m), value: links ? links.length : null };
       }),
     ).then((list) => alive && setPostMonths(list));
-    if (topic === 'self')
-      fetchManualPostDays({ from: win.from, to: win.to, bu: selBu })
-        .then((md) => {
-          if (!alive) return;
-          const days = manualPostDaysFrom(md).days;
-          const byDay = new Map(days.map((d) => [d.day, d] as const));
-          setSelfDays(
-            daysOf(win.from, win.to).map((day) => {
-              // วันก่อนเริ่มนับโพสต์แล้ว/Gen link (13 พ.ย.) = 0 — รวมทุกวันต้องเท่าแท่งเดือน (เดิมนับวันก่อนเริ่มด้วย 557 vs รายวันรวมเกิน)
-              const raw = byDay.get(day);
-              const d = raw && !raw.before ? raw : undefined;
-              return {
-                day,
-                parts: [
-                  { key: 'posted', label: 'โพสต์แล้ว', tone: 'success', value: d?.posted ?? 0 },
-                  { key: 'genlink', label: 'Gen link', tone: 'info', value: d ? Math.max(0, d.places - d.posted) : 0 },
-                ],
-              };
-            }),
-          );
-        })
-        .catch(() => alive && setSelfDays(null));
     return () => {
       alive = false;
     };
@@ -280,7 +257,12 @@ export default function RecruitTopicsView({
 
   const dayParts = React.useMemo(() => ({ people: peopleParts, staff: staffParts, channel: channelParts, why: whyParts }) as const, []);
   const timeDays: TimeDay[] | null = React.useMemo(() => {
-    if (topic === 'self') return selfDays;
+    if (topic === 'self') {
+      // รายวัน = ลิงก์ที่สร้างวันนั้น (ชุดเดียวกับแท่ง BU · ก่อน 13 พ.ย. ไม่มีลิงก์ในชุด = 0)
+      const links = posts?.[selBu]?.links;
+      if (!links) return null;
+      return [...groupByDay(links, (r) => r.day, win.from, win.to)].map(([day, list]) => ({ day, parts: selfParts(list) }));
+    }
     if (topic === 'fb') return null;
     if (topic === 'req' || topic === 'start') {
       // ใบขอเข้ามาแต่ละวัน (ใบที่ส่งเข้ามาในช่วง ทุกสถานะ) — แยก ยังเปิด / ได้คนแล้ว / ยกเลิก
@@ -290,7 +272,7 @@ export default function RecruitTopicsView({
     if (!cohort) return null;
     const of = dayParts[topic];
     return [...groupByDay(cohortBu, (f) => (f.createdAt ? bkkDayOf(f.createdAt) : null), win.from, win.to)].map(([day, list]) => ({ day, parts: of(list) }));
-  }, [topic, selfDays, cohort, cohortBu, dayParts, win.from, win.to, requestRows, selBu]);
+  }, [topic, posts, cohort, cohortBu, dayParts, win.from, win.to, requestRows, selBu]);
   const prevDays = React.useMemo(() => {
     if (!prevBu || !(topic in dayParts)) return null;
     // วันเดียวกันของช่วงก่อน — เลื่อนตามระยะเริ่มช่วง
@@ -374,7 +356,11 @@ export default function RecruitTopicsView({
       case 'fb':
         return <SoPostGroupsCard from={win.from} to={win.to} bu={selBu} />;
       case 'self':
-        return <ManualPostDaysCard from={win.from} to={win.to} bu={selBu} />;
+        return posts ? (
+          <SelfLinksPanel rows={posts[selBu]?.links ?? []} onOpenRequest={(jobId) => navigate(requestPathOfJobId(jobId))} />
+        ) : (
+          <Skeleton className="h-64 rounded-2xl" />
+        );
       case 'people':
         return (
           appsError ?? (

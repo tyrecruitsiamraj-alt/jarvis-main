@@ -14,6 +14,7 @@ import { STUCK_PHASES, stuckInScope, stuckPhaseOf, type StuckRequest } from './r
 import { reasonGroups } from './recruitOverview';
 import { buildCallerResults } from './callerResults';
 import { FUNNEL_GROUP_LABEL, funnelPlaceOf, type FunnelGroupKey } from './channelFunnel';
+import type { ManualLinkRow } from './jobPostActions';
 
 export const TOPIC_KEYS = ['req', 'start', 'fb', 'self', 'people', 'staff', 'channel', 'why'] as const;
 export type TopicKey = (typeof TOPIC_KEYS)[number];
@@ -210,4 +211,27 @@ export function groupByDay<T>(items: readonly T[], dayOf: (t: T) => string | nul
     if (d) m.get(d)?.push(t);
   }
   return m;
+}
+
+/* ─────────── โพสต์เองรายลิงก์ ─────────── */
+
+/** โพสต์แล้ว (มีลิงก์โพสต์วางกลับมา) · Gen link (ยังไม่โพสต์) — นับลิงก์ */
+export function selfParts(rows: readonly ManualLinkRow[]): TopicPart[] {
+  const posted = rows.filter((r) => r.posted).length;
+  return [
+    { key: 'posted', label: 'โพสต์แล้ว', tone: 'success', value: posted },
+    { key: 'genlink', label: 'Gen link', tone: 'info', value: rows.length - posted },
+  ];
+}
+export type LinkTotals = { links: number; clicks: number; applicants: number };
+export const linkTotalsOf = (rows: readonly ManualLinkRow[]): LinkTotals => ({
+  links: rows.length,
+  clicks: rows.reduce((s, r) => s + r.clicks, 0),
+  applicants: rows.reduce((s, r) => s + r.applicants, 0),
+});
+/** แยกตามกลุ่ม/ช่องทาง หรือคนสร้างลิงก์ — เรียงคลิกมากก่อน */
+export function linkGroupsBy(rows: readonly ManualLinkRow[], keyOf: (r: ManualLinkRow) => string): Array<LinkTotals & { key: string }> {
+  const m = new Map<string, ManualLinkRow[]>();
+  for (const r of rows) m.set(keyOf(r), [...(m.get(keyOf(r)) ?? []), r]);
+  return [...m.entries()].map(([key, list]) => ({ key, ...linkTotalsOf(list) })).sort((a, b) => b.applicants - a.applicants || b.clicks - a.clicks || a.key.localeCompare(b.key, 'th'));
 }

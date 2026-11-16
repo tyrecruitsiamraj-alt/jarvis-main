@@ -17,6 +17,9 @@ import {
   manualPostDays,
   summarizeJobPostActions,
   type ManualPostDays,
+  manualLinkRows,
+  type ManualLinkInput,
+  type ManualLinkRow,
   type ManualPostLinkInput,
   type JobPostActionsSummary,
   type JobPostLinkInput,
@@ -156,6 +159,34 @@ export async function recordManualPost(linkId: string, by: { id: string | null; 
  * คนโพสต์ = คนที่กดคัดลอกวันนั้น (ชื่อเล่น) · ไม่มี = คนสร้างลิงก์ (`linkOwnerSql`)
  * คลิก/กรอก = ของวันนั้นของลิงก์นั้น (คลิกรายวันมีตั้งแต่ 10 พ.ย. 2569 · กรอก = ใบสมัครที่กรอกวันนั้นผ่านลิงก์นั้น)
  */
+/** โพสต์เองรายลิงก์ของลิงก์ที่สร้างในช่วง (ภาพรวม 16 พ.ย. 2569) — BU แบบเดียวกับรายวัน · อ่านอย่างเดียว */
+export async function loadManualLinks(opts: { from: string; to: string; buSet: BuSet }): Promise<ManualLinkRow[]> {
+  const { rows } = await dbQuery<ManualLinkInput>(
+    `select l.id::text as link_id, p.job_id, l.note, l.created_at, l.channel_label,
+       (select max(x.post_url) from ${POSTS} x where x.link_id = l.id) as post_url,
+       coalesce(l.hit_count, 0)::int as hit_count,
+       (select count(*) from ${APPS} a where a.link_id = l.id)::int as applicants,
+       ${linkOwnerSql('l.id', 'p.id')} as created_by_name
+     from ${LINKS} l join ${POSTINGS} p on p.id = l.posting_id
+     left join ${MAP} bm on bm.job_id = p.job_id
+     where p.job_id is not null
+       and l.created_at >= ($1::date)::timestamp at time zone 'Asia/Bangkok'
+       and l.created_at < ($2::date + 1)::timestamp at time zone 'Asia/Bangkok'
+       and ${buMatchSql(linkBuSql, '$3')}`,
+    [opts.from, opts.to, opts.buSet],
+  );
+  const jobIds = [...new Set(rows.map((r) => r.job_id))];
+  const times = new Map<string, number[]>();
+  if (jobIds.length > 0) {
+    const { rows: orders } = await dbQuery<{ job_id: string; created_at: string }>(
+      `select job_id, created_at from ${ORDERS} where request_type = 'content' and job_id = any($1::text[])`,
+      [jobIds],
+    );
+    for (const o of orders) times.set(o.job_id, [...(times.get(o.job_id) ?? []), new Date(o.created_at).getTime()]);
+  }
+  return manualLinkRows(rows, times);
+}
+
 export async function loadManualPostDays(opts: { from: string; to: string; buSet: BuSet }): Promise<ManualPostDays> {
   const { rows } = await dbQuery<ManualPostLinkInput & { link_id: string; recorded: boolean }>(
     `with ev as (
