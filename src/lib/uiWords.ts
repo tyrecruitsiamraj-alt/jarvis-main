@@ -74,3 +74,19 @@ export const UI_WORD_RULES: readonly UiWordRule[] = [
     since: 'QA 30 ต.ค. 2569',
   },
 ];
+
+/** ภาพรวมงานสรรหา: ชื่อเรื่องและหมายเหตุสั้น ใช้ชุดเดียวกันทั้ง 8 เรื่อง */
+export const RECRUIT_TOPIC_WORDS = {
+  titles: { req: 'ใบขอเหลือหา', start: 'เริ่มหาแล้ว / ยังไม่เริ่ม', fb: 'โพสต์ลงกลุ่ม Facebook', self: 'โพสต์เอง', people: 'รายชื่อ → ลงงาน', staff: 'คนโทรต่อ', channel: 'ช่องทาง', why: 'เหตุผลที่ไม่สำเร็จ' },
+  todayStock: 'ยอด ณ วันนี้',
+  dailyStock: 'ยอดสิ้นวัน · เริ่ม 16 พ.ย. 2569',
+  requestInflow: 'ใบขอเข้า · ยอดสิ้นวันเริ่ม 16 พ.ย. 2569',
+  fbSince: 'รายกลุ่มตั้งแต่ 20 ต.ค. 2569 · ไม่มีรายวัน',
+  selfSince: 'ลิงก์ตั้งแต่ 13 พ.ย. 2569',
+  staffTime: 'เดือน: รายชื่อกรอก · วัน: เก็บไปโทรต่อ',
+  whyTime: 'เดือน: รายชื่อกรอก · วัน: ไม่สำเร็จ',
+  overlappingMethods: 'ใบเดียวใช้ได้หลายวิธี',
+  loadFailed: 'โหลดข้อมูลไม่ได้',
+  posted: 'เผยแพร่แล้ว', pending: 'รอดำเนินการ', failed: 'ไม่สำเร็จ', notPosted: 'ไม่ได้โพสต์', removed: 'ลบออกแล้ว',
+  loading: 'กำลังโหลด…', total: 'รวม', daily: 'รายวัน', previousDay: 'วันเดียวกันของช่วงก่อน',
+} as const;

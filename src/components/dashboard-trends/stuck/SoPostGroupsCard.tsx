@@ -69,7 +69,9 @@ export default function SoPostGroupsCard({
   bu,
   buChoices,
   prevRange,
+  initialData,
 }: {
+  initialData?: SoPostGroups;
   from: string;
   to: string;
   /** BU ที่ภาพรวมเลือกอยู่ (null = ไม่ได้เลือก) */
@@ -116,13 +118,16 @@ export default function SoPostGroupsCard({
   React.useEffect(() => {
     let alive = true;
     setState((s) => ({ ...s, error: null, loading: true }));
-    fetchSoPostGroups({ from, to, bu: cardBu, page, status: statusPick })
+    const load = initialData && page === 1 && !statusPick && rev === 0 && cardBu === bu
+      ? Promise.resolve(initialData)
+      : fetchSoPostGroups({ from, to, bu: cardBu, page, status: statusPick });
+    load
       .then((data) => alive && setState({ data, error: null, loading: false }))
       .catch((e: unknown) => alive && setState({ data: null, error: friendlyErrorText(e, 'ติดต่อ So Scraping ไม่ได้'), loading: false }));
     return () => {
       alive = false;
     };
-  }, [from, to, cardBu, page, rev, statusPick]);
+  }, [from, to, cardBu, page, rev, statusPick, initialData, bu]);
 
   const d = state.data;
   // ชื่อ BU = ที่เซิร์ฟเวอร์ส่งไป So Scraping จริง · ยังไม่ได้คำตอบ = ยังไม่บอก BU

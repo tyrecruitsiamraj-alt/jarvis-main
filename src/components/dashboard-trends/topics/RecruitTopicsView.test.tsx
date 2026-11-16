@@ -3,15 +3,16 @@
  * ปุ่มเรื่อง · กราฟ BU กดแล้วรายละเอียดเปลี่ยน · สมการบวกลงตัว · กดแท่งเดือน = ทั้งหน้าเป็นเดือนนั้น · กดวัน = ป๊อปแยกก้อน
  */
 import React from 'react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import type { RecruitAppFact, RecruitOverviewResponse } from '@/lib/recruitOverviewTypes';
 import type { StuckRequest } from '@/lib/recruitStuck';
 
 const fetchRecruitStuck = vi.fn();
+const fetchComparison = vi.fn();
 vi.mock('@/lib/recruitStuckApi', () => ({ fetchRecruitStuck: (...a: unknown[]) => fetchRecruitStuck(...a) }));
-vi.mock('@/lib/soPostGroupsApi', () => ({ fetchSoPostGroups: vi.fn(async () => ({ total: 0, counts: {}, rows: [], statuses: [], reasonGroups: [], page: 1, pages: 1 })) }));
+vi.mock('@/lib/soPostGroupsApi', () => ({ fetchRecruitPostComparison: (...a: unknown[]) => fetchComparison(...a), fetchSoPostGroups: vi.fn(async () => ({ total: 0, counts: {}, rows: [], statuses: [], reasonGroups: [], page: 1, pages: 1 })) }));
 const LINKS = [
   { linkId: 'l1', jobId: 'siamraj-sql:OPL6911001', day: '2026-11-13', place: 'Facebook · Facebook Group · กลุ่มคนขับรถ', by: 'เจมส์', posted: true, clicks: 30, applicants: 1 },
   { linkId: 'l2', jobId: 'siamraj-sql:OPL6911001', day: '2026-11-14', place: 'ไม่ระบุช่องทาง', by: 'ไอซ์', posted: false, clicks: 10, applicants: 4 },
@@ -20,6 +21,9 @@ const LINKS = [
 vi.mock('@/lib/jobPostActionsApi', () => ({ fetchManualLinks: vi.fn(async ({ bu }: { bu: string }) => (bu === 'LBD' ? LINKS : [])) }));
 const { default: RecruitTopicsView } = await import('./RecruitTopicsView');
 
+beforeEach(() => {
+  fetchComparison.mockReset().mockResolvedValue(Object.fromEntries(['LBD', 'LBA', 'LM', 'DS', 'SN'].map((bu) => [bu, { fb: { total: 0, counts: {}, rows: [], statuses: [], page: 1, pages: 1 }, links: bu === 'LBD' ? LINKS : [] }])));
+});
 afterEach(cleanup);
 (globalThis as unknown as { ResizeObserver: unknown }).ResizeObserver = class {
   observe() {}
@@ -56,11 +60,11 @@ const data = {
 } as unknown as RecruitOverviewResponse;
 
 const onPickMonth = vi.fn();
-const renderView = (path = '/') =>
+const renderView = (path = '/', viewData = data) =>
   render(
     <MemoryRouter initialEntries={[path]}>
       <RecruitTopicsView
-        data={data}
+        data={viewData}
         win={data.window}
         cohort={APPS}
         prevCohort={[fact('p1', 'LBD', { createdAt: '2026-10-03T03:00:00.000Z' })]}
@@ -149,5 +153,36 @@ describe('ภาพรวม 8 เรื่อง เทียบ BU', () => {
     const dlg = await screen.findByRole('dialog');
     expect(within(dlg).getByTestId('topic-equation').textContent).toContain('7');
     expect(within(dlg).getByTestId('topic-equation').textContent).not.toContain('ไม่ลงตัว');
+  });
+});
+
+
+describe('สิทธิ์และคำตอบที่โหลดไม่สำเร็จ', () => {
+  it('Supervisor BU เดียว: URL ขอ BU อื่นไม่ได้ และลิงก์เป็นของ BU ตัวเอง', async () => {
+    fetchRecruitStuck.mockResolvedValue({ monthly: [], errors: {} });
+    renderView('/?topic=self&tbu=LBD', { ...data, bu: 'LBA', buChoices: null });
+    await screen.findByTestId('self-links');
+    expect(screen.getByTestId('topic-bu-LBA').textContent).toContain('รวม 0');
+    expect(screen.queryByTestId('topic-bu-LBD')).toBeNull();
+    expect(fetchComparison).toHaveBeenCalledWith({ from: data.window.from, to: data.window.to, bu: 'LBA' });
+    expect(screen.getByTestId('self-links').textContent).not.toContain('เจมส์');
+  });
+  it('API พังต้องบอกว่าอ่านไม่ได้ ห้ามเปลี่ยนเป็นยอด 0', async () => {
+    fetchRecruitStuck.mockResolvedValue({ monthly: [], errors: {} });
+    fetchComparison.mockRejectedValue(new Error('offline'));
+    renderView('/?topic=self');
+    await waitFor(() => expect(screen.getByTestId('topic-bu-LBD').textContent).toContain('โหลดข้อมูลไม่ได้'));
+    expect(screen.getByTestId('topic-bu-LBD').textContent).not.toContain('รวม 0');
+    expect(screen.queryByTestId('self-links')).toBeNull();
+  });
+  it('สลับ Facebook/โพสต์เองไม่โหลดเปรียบเทียบซ้ำ', async () => {
+    fetchRecruitStuck.mockResolvedValue({ monthly: [], errors: {} });
+    renderView('/?topic=self');
+    await screen.findByTestId('self-links');
+    fireEvent.click(screen.getByTestId('topic-fb'));
+    await screen.findByTestId('so-post-groups-counts');
+    fireEvent.click(screen.getByTestId('topic-self'));
+    await screen.findByTestId('self-links');
+    expect(fetchComparison).toHaveBeenCalledTimes(1);
   });
 });

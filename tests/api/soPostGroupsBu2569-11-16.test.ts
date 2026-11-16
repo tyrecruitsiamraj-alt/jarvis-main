@@ -9,6 +9,8 @@ import type { DepartmentScope } from '../../api/_lib/departmentScope';
 let scope: DepartmentScope = { mode: 'all' };
 const fetchSoPostGroups = vi.fn();
 const fetchAllSoPostGroupRows = vi.fn();
+const loadManualLinks = vi.fn();
+vi.mock('../../api/_lib/jobPostActions.js', () => ({ loadManualLinks: (...a: unknown[]) => loadManualLinks(...a) }));
 
 vi.mock('../../api/_lib/http.js', async (orig) => ({ ...(await orig<typeof import('../../api/_lib/http.js')>()), withRbac: (h: unknown) => h }));
 vi.mock('../../api/_lib/departmentScope.js', async (orig) => ({
@@ -28,7 +30,7 @@ const EMPTY = { from: '2026-11-01', to: '2026-11-16', bu: null, page: 1, pages: 
 
 async function call(query: Record<string, string>) {
   let status = 0;
-  let body: { meta?: { bu: string | null; choices: string[] | null; allowAll: boolean } } = {};
+  let body: { byBu?: Record<string, { fb: unknown; links: unknown }>; meta?: { bu: string | null; choices: string[] | null; allowAll: boolean } } = {};
   const res = {
     setHeader: () => {},
     status: (s: number) => {
@@ -41,12 +43,13 @@ async function call(query: Record<string, string>) {
     res as never,
   );
   const sent = fetchSoPostGroups.mock.calls.at(-1)?.[0] as { bu: string | null } | undefined;
-  return { status, meta: body.meta, sentBu: sent ? sent.bu : undefined };
+  return { body, status, meta: body.meta, sentBu: sent ? sent.bu : undefined };
 }
 
 beforeEach(() => {
   fetchSoPostGroups.mockReset().mockResolvedValue(EMPTY);
   fetchAllSoPostGroupRows.mockReset();
+  loadManualLinks.mockReset().mockResolvedValue([]);
 });
 
 describe('สิทธิ์ทุก BU', () => {
@@ -89,5 +92,30 @@ describe('ตัวเลือก BU บนการ์ด (รู้ตั้�
     expect(soPostBuPicker(null, null)).toEqual({ choices: ['SN', 'DS', 'LM', 'LBA', 'LBD'], allowAll: true });
     expect(soPostBuPicker(null, ['LBD', 'LBA'])).toEqual({ choices: ['LBD', 'LBA'], allowAll: false });
     expect(soPostBuPicker('LBD', null)).toBeNull();
+  });
+});
+
+
+describe('คำขอเดียวสำหรับกราฟเปรียบเทียบ', () => {
+  it('Supervisor ล็อกทั้ง So Scraping และลิงก์ แม้ขอ BU อื่น', async () => {
+    scope = { mode: 'code', code: 'LBA', codes: ['LBA'] };
+    const r = await call({ compare: '1', bu: 'LBD' });
+    expect(Object.keys(r.body.byBu ?? {})).toEqual(['LBA']);
+    expect(fetchSoPostGroups.mock.calls.map(([q]) => q.bu)).toEqual(['LBA']);
+    expect(loadManualLinks).toHaveBeenCalledWith({ from: '2026-11-13', to: '2026-11-16', buSet: ['LBA'] });
+  });
+  it('ไม่ผูก BU = ไม่เรียกแหล่งข้อมูล, ไม่มีสิทธิ์ขยายเป็นทุก BU', async () => {
+    scope = { mode: 'none' };
+    const r = await call({ compare: '1' });
+    expect(r.body.byBu).toEqual({});
+    expect(fetchSoPostGroups).not.toHaveBeenCalled();
+    expect(loadManualLinks).not.toHaveBeenCalled();
+  });
+  it('แหล่งใดล่มเป็น null ไม่ใช่ 0 และไม่กระทบ BU อื่น', async () => {
+    scope = { mode: 'code', code: 'LBD', codes: ['LBD', 'LBA'] };
+    fetchSoPostGroups.mockImplementation(async ({ bu }) => { if (bu === 'LBD') throw new Error('offline'); return EMPTY; });
+    const r = await call({ compare: '1' });
+    expect(r.body.byBu?.LBD).toEqual({ fb: null, links: [] });
+    expect(r.body.byBu?.LBA.fb).toEqual(EMPTY);
   });
 });

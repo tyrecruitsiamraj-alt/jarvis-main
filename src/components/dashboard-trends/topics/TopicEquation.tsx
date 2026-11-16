@@ -26,8 +26,8 @@ export default function TopicEquation({
   const sum = parts.reduce((s, p) => s + p.value, 0);
   const pct = (v: number) => (total > 0 ? (v / total) * 100 : 0);
   return (
-    <div className="space-y-2 rounded-xl border border-border p-3" data-testid="topic-equation">
-      <p className="text-sm text-foreground">
+    <div className="min-w-0 space-y-2 rounded-xl border border-border p-3" data-testid="topic-equation">
+      <p className="break-words text-sm text-foreground">
         <span className="font-medium">{label}</span> <span className="text-base font-medium tabular-nums">{fmt(total)}</span>
         <span className={cn('text-xs', DASH.sub)}> {unit}</span>
         {parts.length > 0 ? <span className={DASH.sub}> = {parts.map((p) => `${p.label} ${fmt(p.value)}`).join(' + ')}</span> : null}
@@ -45,11 +45,11 @@ export default function TopicEquation({
               size="xs"
               disabled={!canOpen}
               onClick={() => canOpen && onOpenNames?.(`${label} · ${p.label}`, p.ids ?? [])}
-              className="h-7 gap-1.5 rounded-full px-2.5 font-normal disabled:opacity-100"
+              className="h-auto min-h-7 max-w-full whitespace-normal gap-1.5 rounded-full px-2.5 font-normal disabled:opacity-100"
             >
               <span className={cn('size-2.5 rounded-sm', TONE[p.tone].dot)} aria-hidden />
               {p.label}
-              <span className="font-medium tabular-nums">{fmt(p.value)}</span>
+              <span className="shrink-0 font-medium tabular-nums">{fmt(p.value)}</span>
             </Button>
           );
         })}

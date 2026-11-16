@@ -1,6 +1,7 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { RECRUIT_TOPIC_WORDS as W } from '@/lib/uiWords';
 import { DASH, TONE } from '@/lib/designTokens';
 import { formatTrendNumber as fmt } from '@/lib/trends/format';
 import type { BuBar } from '@/lib/recruitTopics';
@@ -29,9 +30,9 @@ export default function TopicBuBars({
 }) {
   const grown = useGrown();
   const max = Math.max(1, ...(bars ?? []).map((b) => b.total));
-  const legend = bars?.[0]?.parts ?? [];
+  const legend = bars?.find((b) => !b.unavailable)?.parts ?? [];
   return (
-    <div className="space-y-3" data-testid="topic-bu-bars">
+    <div className="min-w-0 space-y-3" data-testid="topic-bu-bars">
       <div>
         <h3 className="text-base font-medium text-foreground">{title}</h3>
         {sub ? <p className={cn('text-xs', DASH.sub)}>{sub}</p> : null}
@@ -70,11 +71,11 @@ export default function TopicBuBars({
                     <span key={p.key} className={cn('block h-full', TONE[p.tone].dot)} style={{ width: `${(p.value / b.total) * 100}%` }} title={`${p.label} ${fmt(p.value)}`} />
                   ))}
               </span>
-              <span className={cn('col-start-2 flex flex-wrap gap-x-3 text-xs tabular-nums', DASH.sub)}>{meta ? meta(b) : <span>รวม {fmt(b.total)}</span>}</span>
+              <span className={cn('col-start-2 flex min-w-0 flex-wrap break-words gap-x-3 text-xs tabular-nums', DASH.sub)}>{meta ? meta(b) : <span>รวม {fmt(b.total)}</span>}</span>
             </Button>
           );
         })}
-        {loading ? <p className={cn('text-xs', DASH.sub)}>กำลังโหลด…</p> : null}
+        <p className={cn('min-h-4 text-xs', DASH.sub)} aria-live="polite">{loading ? W.loading : '\u00a0'}</p>
       </div>
     </div>
   );

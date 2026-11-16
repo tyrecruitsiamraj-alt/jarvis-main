@@ -14,6 +14,8 @@ import { withRbac, sendError, handleApiError, type ApiRes, type AuthedReq } from
 import { fetchAllSoPostGroupRows, fetchSoPostGroups, SoPostGroupsError } from '../_lib/soPostGroups.js';
 import { filterSoPostGroups } from '../../src/lib/soPostGroups.js';
 import { APP_DEPARTMENT_CODES, loadMatchingBuScope, type DepartmentScope } from '../_lib/departmentScope.js';
+import { loadManualLinks } from '../_lib/jobPostActions.js';
+import { MANUAL_POSTED_SINCE } from '../../src/lib/recruitScale.js';
 import { pickDashboardBuSet } from '../_lib/homeBuSql.js';
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
@@ -54,7 +56,24 @@ export async function soPostGroupsHandler(req: AuthedReq, res: ApiRes) {
   const status = String(one(req.query?.status) ?? '').trim();
   if (status && !/^[a-z_]{1,30}$/.test(status)) return sendError(res, 400, 'bad_request', 'status ไม่ถูกต้อง');
   try {
-    const pick = soPostBuOf(await loadMatchingBuScope(req.user), buRaw || null);
+    const scope = await loadMatchingBuScope(req.user);
+    // คำขอเดียวของกราฟเปรียบเทียบ: ชุด BU มาจากสิทธิ์ฝั่ง server เท่านั้น
+    if (one(req.query?.compare) === '1') {
+      if (from > to) return sendError(res, 400, 'bad_request', 'ช่วงวันที่ไม่ถูกต้อง');
+      const { buSet } = pickDashboardBuSet(scope, buRaw || null);
+      const bus = buSet === null ? [...APP_DEPARTMENT_CODES] : [...buSet];
+      const linkFrom = from < MANUAL_POSTED_SINCE ? MANUAL_POSTED_SINCE : from;
+      const pairs = await Promise.all(bus.map(async (bu) => {
+        const [fb, links] = await Promise.all([
+          fetchSoPostGroups({ from, to, bu, page: 1 }).catch(() => null),
+          linkFrom <= to ? loadManualLinks({ from: linkFrom, to, buSet: [bu] }).catch(() => null) : Promise.resolve([]),
+        ]);
+        return [bu, { fb, links }] as const;
+      }));
+      res.setHeader?.('Cache-Control', 'no-store');
+      return res.status(200).json({ byBu: Object.fromEntries(pairs) });
+    }
+    const pick = soPostBuOf(scope, buRaw || null);
     const meta = { bu: pick.bu, choices: pick.choices, allowAll: pick.allowAll };
     res.setHeader?.('Cache-Control', 'no-store');
     if (pick.none) return res.status(200).json({ ...filterSoPostGroups({ statuses: [], rows: [] }, { from, to, bu: null }, status, page), meta });

@@ -38,7 +38,7 @@ export default function SelfLinksPanel({ rows, onOpenRequest }: { rows: readonly
   const totalsTable = (title: string, list: ReturnType<typeof linkGroupsBy>, first: string) => (
     <div className="space-y-1.5">
       <p className="text-sm font-medium text-foreground">{title}</p>
-      <div className="overflow-x-auto">
+      <div className="min-w-0 max-w-full overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
@@ -59,7 +59,7 @@ export default function SelfLinksPanel({ rows, onOpenRequest }: { rows: readonly
             ) : (
               list.map((r) => (
                 <TableRow key={r.key}>
-                  <TableCell className="max-w-72 whitespace-normal">{r.key}</TableCell>
+                  <TableCell className="max-w-72 whitespace-normal break-words">{r.key}</TableCell>
                   <TableCell className="text-right tabular-nums">{fmt(r.links)}</TableCell>
                   <TableCell className="text-right tabular-nums">{fmt(r.clicks)}</TableCell>
                   <TableCell className="text-right tabular-nums">{fmt(r.applicants)}</TableCell>
@@ -74,7 +74,7 @@ export default function SelfLinksPanel({ rows, onOpenRequest }: { rows: readonly
   );
 
   return (
-    <div className="space-y-3" data-testid="self-links">
+    <div className="min-w-0 space-y-3" data-testid="self-links">
       <TopicEquation label="ลิงก์ทั้งหมด" unit="ลิงก์" total={rows.length} parts={[part('posted', 'โพสต์แล้ว', posted.length, 'success'), part('gen', 'Gen link', gen.length, 'info')]} />
       <TopicEquation label="คลิก" unit="ครั้ง" total={p.clicks + g.clicks} parts={[part('posted', 'จากโพสต์แล้ว', p.clicks, 'success'), part('gen', 'จาก Gen link', g.clicks, 'info')]} />
       <TopicEquation label="กรอก" total={p.applicants + g.applicants} parts={[part('posted', 'จากโพสต์แล้ว', p.applicants, 'success'), part('gen', 'จาก Gen link', g.applicants, 'info')]} />
@@ -91,7 +91,7 @@ export default function SelfLinksPanel({ rows, onOpenRequest }: { rows: readonly
         <p className="text-sm font-medium text-foreground">
           ย้อนกลับจากคนที่กรอก {fmt(back.reduce((s, r) => s + r.applicants, 0))} คน · มาจาก {fmt(back.length)} ลิงก์
         </p>
-        <div className="overflow-x-auto">
+        <div className="min-w-0 max-w-full overflow-x-auto">
           <Table data-testid="self-links-back">
             <TableHeader>
               <TableRow>
@@ -115,7 +115,7 @@ export default function SelfLinksPanel({ rows, onOpenRequest }: { rows: readonly
                 back.map((r) => (
                   <TableRow key={r.linkId}>
                     <TableCell className="text-right font-medium tabular-nums">{fmt(r.applicants)}</TableCell>
-                    <TableCell className="max-w-72 whitespace-normal">{r.place}</TableCell>
+                    <TableCell className="max-w-72 whitespace-normal break-words">{r.place}</TableCell>
                     <TableCell>{r.posted ? 'โพสต์แล้ว' : 'Gen link'}</TableCell>
                     <TableCell>{r.by}</TableCell>
                     <TableCell>

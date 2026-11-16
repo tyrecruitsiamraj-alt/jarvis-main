@@ -5,15 +5,15 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
+import { RECRUIT_TOPIC_WORDS as W } from '@/lib/uiWords';
 import { DASH } from '@/lib/designTokens';
 import { formatTrendNumber as fmt } from '@/lib/trends/format';
 import type { RecruitAppFact, RecruitOverviewResponse } from '@/lib/recruitOverviewTypes';
 import type { StuckRequest } from '@/lib/recruitStuck';
 import { STUCK_PHASES, monthlySeries, type StuckDailyRow, type StuckMonthlyRow } from '@/lib/recruitStuck';
 import { fetchRecruitStuck } from '@/lib/recruitStuckApi';
-import { fetchSoPostGroups } from '@/lib/soPostGroupsApi';
+import { fetchRecruitPostComparison, fetchSoPostGroups, type RecruitPostComparison } from '@/lib/soPostGroupsApi';
 import { fetchManualLinks } from '@/lib/jobPostActionsApi';
-import type { ManualLinkRow } from '@/lib/jobPostActions';
 import { MANUAL_POSTED_SINCE, SO_POST_SINCE } from '@/lib/recruitScale';
 import { requestPathOfJobId } from '@/lib/jobNavigation';
 import { reasonGroups } from '@/lib/recruitOverview';
@@ -71,6 +71,15 @@ const monthRange = (m: string) => {
   return { from: `${m}-01`, to: `${m}-${String(last).padStart(2, '0')}` };
 };
 const BU_ORDER = ['LBD', 'LBA', 'LM', 'DS', 'SN'];
+
+const fbParts = (c: Record<string, number>): TopicPart[] => [
+  { key: 'posted', label: W.posted, tone: 'success', value: c.posted ?? 0 },
+  { key: 'pending', label: W.pending, tone: 'warn', value: (c.pending_approval ?? 0) + (c.waiting ?? 0) },
+  { key: 'failed', label: W.failed, tone: 'danger', value: (c.failed ?? 0) + (c.declined ?? 0) },
+  { key: 'notTried', label: W.notPosted, tone: 'neutral', value: (c.not_tried_machine ?? 0) + (c.not_tried_account ?? 0) + (c.not_tried_unknown ?? 0) },
+  { key: 'removed', label: W.removed, tone: 'orange', value: c.removed ?? 0 },
+];
+
 const sumParts = (ps: readonly TopicPart[]) => ps.reduce((s, p) => s + p.value, 0);
 
 /**
@@ -111,11 +120,11 @@ export default function RecruitTopicsView({
   // เรียง BU ตามตัวอย่างที่เจ้าของเคาะ (LBD ก่อน) ไม่ใช่ลำดับในสิทธิ์ (SN ขึ้นก่อน)
   const bus = React.useMemo(() => {
     if (data.bu) return [data.bu];
-    const allowed = data.buChoices?.length ? data.buChoices : BU_ORDER;
+    const allowed = data.buChoices ?? BU_ORDER;
     return [...BU_ORDER.filter((b) => allowed.includes(b)), ...allowed.filter((b) => !BU_ORDER.includes(b))];
   }, [data.bu, data.buChoices]);
   const tbuParam = searchParams.get('tbu');
-  const selBu = tbuParam && bus.includes(tbuParam) ? tbuParam : bus.includes('LBD') ? 'LBD' : bus[0];
+  const selBu = tbuParam && bus.includes(tbuParam) ? tbuParam : bus.includes('LBD') ? 'LBD' : bus[0] ?? '';
   const setParam = (k: string, v: string) =>
     setSearchParams(
       (p) => {
@@ -132,39 +141,19 @@ export default function RecruitTopicsView({
   const prevBu = React.useMemo(() => (prevCohort ? appsOf(selBu, prevCohort) : null), [prevCohort, selBu]); // eslint-disable-line react-hooks/exhaustive-deps
   const rowsBu = React.useMemo(() => openRows.filter((r) => r.bu === selBu), [openRows, selBu]);
 
-  // ── ยอดโพสต์ต่อ BU (ข้อมูลอยู่ฝั่ง So Scraping / ลิงก์ — ดึงทีละ BU) ──
-  const [posts, setPosts] = React.useState<Record<string, { fb: TopicPart[] | null; links: ManualLinkRow[] | null }> | null>(null);
-  // โหลดครั้งเดียวต่อช่วง — สลับ โพสต์กลุ่ม ↔ โพสต์เอง ไม่โหลดซ้ำ (เดิมรอ 10 วิทุกครั้งที่สลับ · 16 พ.ย. 2569)
+  // ช่วง + สิทธิ์เป็น key: เปลี่ยน calendar/BU แล้วไม่ใช้คำตอบเก่า แม้กลับมาไม่ตามลำดับ
+  const postKey = JSON.stringify([win.from, win.to, data.bu, bus]);
+  const [postState, setPostState] = React.useState<{ key: string; data: RecruitPostComparison } | null>(null);
+  const posts = postState?.key === postKey ? postState.data : null;
   const postTopic = topic === 'fb' || topic === 'self';
   React.useEffect(() => {
-    if (!postTopic) return;
+    if (!postTopic || posts) return;
     let alive = true;
-    setPosts(null);
-    Promise.all(
-      bus.map(async (bu) => {
-        // โพสต์เองรายลิงก์ นับตั้งแต่ 13 พ.ย. 2569 (วันเริ่มระบบโพสต์เอง · Choice เจ้าของ)
-        const linkFrom = win.from < MANUAL_POSTED_SINCE ? MANUAL_POSTED_SINCE : win.from;
-        const [so, links] = await Promise.all([
-          fetchSoPostGroups({ from: win.from, to: win.to, bu, page: 1 }).catch(() => null),
-          linkFrom <= win.to ? fetchManualLinks({ from: linkFrom, to: win.to, bu }).catch(() => null) : Promise.resolve([] as ManualLinkRow[]),
-        ]);
-        const c = so?.counts ?? {};
-        const fb: TopicPart[] | null = so
-          ? [
-              { key: 'posted', label: 'เผยแพร่แล้ว', tone: 'success', value: c.posted ?? 0 },
-              { key: 'pending', label: 'รอดำเนินการ', tone: 'warn', value: (c.pending_approval ?? 0) + (c.waiting ?? 0) },
-              { key: 'failed', label: 'ไม่สำเร็จ', tone: 'danger', value: (c.failed ?? 0) + (c.declined ?? 0) },
-              { key: 'notTried', label: 'ไม่ได้โพสต์', tone: 'neutral', value: (c.not_tried_machine ?? 0) + (c.not_tried_account ?? 0) + (c.not_tried_unknown ?? 0) },
-              { key: 'removed', label: 'ลบออกแล้ว', tone: 'orange', value: c.removed ?? 0 },
-            ]
-          : null;
-        return [bu, { fb, links }] as const;
-      }),
-    ).then((list) => alive && setPosts(Object.fromEntries(list)));
-    return () => {
-      alive = false;
-    };
-  }, [postTopic, bus, win.from, win.to]);
+    fetchRecruitPostComparison({ from: win.from, to: win.to, bu: data.bu ?? null })
+      .then((data) => alive && setPostState({ key: postKey, data }))
+      .catch(() => alive && setPostState({ key: postKey, data: Object.fromEntries(bus.map((bu) => [bu, { fb: null, links: null }])) }));
+    return () => { alive = false; };
+  }, [postTopic, postKey, posts, bus, win.from, win.to, data.bu]);
 
   // ── ซ้าย: เทียบ BU ──
   const bars: BuBar[] | null = React.useMemo(() => {
@@ -182,9 +171,9 @@ export default function RecruitTopicsView({
       case 'why':
         return cohort ? buBarsOf(bus, apps, (f) => f.bu, whyParts) : null;
       case 'fb':
-        return posts ? bus.map((bu) => ({ bu, parts: posts[bu]?.fb ?? [], total: sumParts(posts[bu]?.fb ?? []) })) : null;
+        return posts ? bus.map((bu) => ({ bu, parts: fbParts(posts[bu]?.fb?.counts ?? {}), total: posts[bu]?.fb?.total ?? 0, unavailable: !posts[bu]?.fb })) : null;
       case 'self':
-        return posts ? bus.map((bu) => ({ bu, parts: selfParts(posts[bu]?.links ?? []), total: posts[bu]?.links?.length ?? 0 })) : null;
+        return posts ? bus.map((bu) => ({ bu, parts: selfParts(posts[bu]?.links ?? []), total: posts[bu]?.links?.length ?? 0, unavailable: !posts[bu]?.links })) : null;
     }
   }, [topic, requestsReady, bus, openRows, cohort, apps, posts]);
   const prevBars = React.useMemo(() => {
@@ -193,7 +182,7 @@ export default function RecruitTopicsView({
     return of ? new Map(buBarsOf(bus, prevCohort, (f) => f.bu, of).map((b) => [b.bu, b.total] as const)) : null;
   }, [topic, prevCohort, bus]);
   const unit = topic === 'req' || topic === 'start' ? 'ใบ' : topic === 'fb' ? 'โพสต์' : topic === 'self' ? 'ลิงก์' : 'คน';
-  const leftTotal = bars ? sumParts(bars.flatMap((b) => b.parts)) : null;
+  const leftTotal = bars && !bars.some((b) => b.unavailable) ? sumParts(bars.flatMap((b) => b.parts)) : null;
   const leftTitle = {
     req: 'ใบขอเหลือหา',
     start: 'ใบขอเหลือหา · เริ่มหาแล้ว / ยังไม่เริ่ม',
@@ -333,14 +322,14 @@ export default function RecruitTopicsView({
   }, [prevBu, topic, dayParts, win.from, win.prevFrom]);
 
   const timeNote: string | null = {
-    req: dailyByDay ? 'ยอด ณ สิ้นวัน · เริ่มจด 16 พ.ย. 2569' : 'กราฟเป็นใบขอเข้ามา · ระบบเริ่มจดยอดเหลือหาทุกวันตั้งแต่ 16 พ.ย. 2569',
-    start: dailyByDay ? 'ยอด ณ สิ้นวัน · เริ่มจด 16 พ.ย. 2569' : 'กราฟเป็นใบขอเข้ามา · ระบบเริ่มจดยอดเริ่มหาทุกวันตั้งแต่ 16 พ.ย. 2569',
-    fb: 'Autopost มีผลรายกลุ่มตั้งแต่ 20 ต.ค. 2569 · รายวันยังไม่มี',
-    self: 'โพสต์แล้ว / Gen link เริ่มนับ 13 พ.ย. 2569',
+    req: dailyByDay ? W.dailyStock : W.requestInflow,
+    start: dailyByDay ? W.dailyStock : W.requestInflow,
+    fb: W.fbSince,
+    self: W.selfSince,
     people: null,
-    staff: 'รายเดือนเป็นรายชื่อที่กรอกมา · รายวันเป็นคนเก็บไปโทรต่อ',
+    staff: W.staffTime,
     channel: null,
-    why: 'รายเดือนเป็นรายชื่อที่กรอกมา · รายวันเป็นรายชื่อที่ไม่สำเร็จ',
+    why: W.whyTime,
   }[topic];
 
   // ── ขวา: รายละเอียด BU ที่กด ──
@@ -393,16 +382,16 @@ export default function RecruitTopicsView({
                 </div>
               ))}
             </div>
-            <p className={cn('text-xs', DASH.sub)}>ใบเดียวทำได้หลายอย่าง ยอดสามช่องจึงรวมเกินจำนวนใบที่เริ่มหา</p>
+            <p className={cn('text-xs', DASH.sub)}>{W.overlappingMethods}</p>
           </div>
         ) : (
           <Skeleton className="h-64 rounded-2xl" />
         );
       }
       case 'fb':
-        return <SoPostGroupsCard from={win.from} to={win.to} bu={selBu} />;
+        return posts ? <SoPostGroupsCard key={`${postKey}:${selBu}`} from={win.from} to={win.to} bu={selBu} initialData={posts[selBu]?.fb ?? undefined} /> : <Skeleton className="h-64 rounded-2xl" />;
       case 'self':
-        return posts ? (
+        return posts?.[selBu]?.links === null ? <SectionError message={W.loadFailed} /> : posts ? (
           <SelfLinksPanel rows={posts[selBu]?.links ?? []} onOpenRequest={(jobId) => navigate(requestPathOfJobId(jobId))} />
         ) : (
           <Skeleton className="h-64 rounded-2xl" />
@@ -438,7 +427,7 @@ export default function RecruitTopicsView({
   })();
 
   return (
-    <div className="space-y-4" data-testid="recruit-topics">
+    <div className="min-w-0 space-y-4" data-testid="recruit-topics">
       <div className="flex flex-wrap gap-2" role="group" aria-label="เรื่อง">
         {TOPIC_KEYS.map((k, i) => (
           <Button key={k} type="button" size="sm" variant={k === topic ? 'default' : 'outline'} aria-pressed={k === topic} onClick={() => setParam('topic', k)} data-testid={`topic-${k}`}>
@@ -447,7 +436,7 @@ export default function RecruitTopicsView({
         ))}
       </div>
 
-      <Card variant="solid" className="p-4">
+      <Card variant="solid" className="min-w-0 p-4">
         <TopicTimeCard
           title={`${selBu} · ${TOPIC_TITLES[topic]}`}
           unit={unit}
@@ -462,25 +451,25 @@ export default function RecruitTopicsView({
       </Card>
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
-        <Card variant="solid" className="self-start p-4">
+        <Card variant="solid" className="min-w-0 self-start p-4">
           <TopicBuBars
             title={`${leftTitle} ${leftTotal == null ? '' : fmt(leftTotal)} ${unit}`}
-            sub={topic === 'req' || topic === 'start' ? `ยอด ณ วันนี้` : undefined}
+            sub={topic === 'req' || topic === 'start' ? W.todayStock : undefined}
             bars={bars}
             loading={!bars}
             selected={selBu}
             onSelect={(bu) => setParam('tbu', bu)}
             meta={(b) => (
               <>
-                <span>
+                {b.unavailable ? <span>{W.loadFailed}</span> : <><span>
                   รวม <b className="font-medium text-foreground">{fmt(b.total)}</b> {unit}
                 </span>
                 {prevBars ? <TrendDelta cur={b.total} prev={prevBars.get(b.bu) ?? 0} /> : null}
-                {b.parts.slice(0, 3).map((p) => (
+                {b.parts.map((p) => (
                   <span key={p.key}>
                     {p.label} {fmt(p.value)}
                   </span>
-                ))}
+                ))}</>}
               </>
             )}
           />

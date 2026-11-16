@@ -2,6 +2,7 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
+import { RECRUIT_TOPIC_WORDS as W } from '@/lib/uiWords';
 import { DASH, TONE } from '@/lib/designTokens';
 import { formatTrendNumber as fmt } from '@/lib/trends/format';
 import { formatYmdTh } from '@/lib/dateTh';
@@ -53,11 +54,11 @@ export default function TopicTimeCard({
   // block — span เป็น inline ความสูงไม่มีผล (แท่งแบนติดพื้น · เจอบนเว็บจริง 16 พ.ย. 2569)
   const barCls = cn('block w-3/5 shrink-0 rounded-t-md transition-all duration-700 ease-out motion-reduce:transition-none', TONE.primary.dot);
   return (
-    <div className="space-y-4" data-testid="topic-time">
+    <div className="min-w-0 space-y-4" data-testid="topic-time">
       <div>
         <h3 className="text-base font-medium text-foreground">{title}</h3>
       </div>
-      <div className="grid h-36 items-end gap-2" style={{ gridTemplateColumns: `repeat(${Math.max(1, months?.length ?? 1)}, minmax(3rem, 1fr))` }}>
+      <div className="grid h-36 items-end gap-2" style={{ gridTemplateColumns: `repeat(${Math.max(1, months?.length ?? 1)}, minmax(0, 1fr))` }}>
         {(months ?? []).map((m) => {
           const on = m.month === currentMonth;
           return (
@@ -67,7 +68,7 @@ export default function TopicTimeCard({
               variant="ghost"
               aria-pressed={on}
               onClick={() => onPickMonth(m.month)}
-              className={cn('flex h-full flex-col items-center justify-end gap-1 rounded-xl px-1 py-1 font-normal', on && 'bg-muted ring-1 ring-primary')}
+              className={cn('flex h-full min-w-0 flex-col items-center justify-end gap-1 rounded-xl px-1 py-1 font-normal', on && 'bg-muted ring-1 ring-primary')}
               data-testid={`topic-month-${m.month}`}
             >
               <span className="text-xs font-medium tabular-nums text-foreground">{m.value == null ? '—' : fmt(m.value)}</span>
@@ -79,8 +80,8 @@ export default function TopicTimeCard({
       </div>
       {days ? (
         <div className="space-y-2">
-          <p className={cn('text-xs', DASH.sub)}>รายวัน</p>
-          <div className="overflow-x-auto">
+          <p className={cn('text-xs', DASH.sub)}>{W.daily}</p>
+          <div className="min-w-0 max-w-full overflow-x-auto">
             <div className="grid h-32 min-w-full items-end gap-1" style={{ gridTemplateColumns: `repeat(${days.length}, minmax(1.25rem, 1fr))` }}>
               {days.map((d, i) => (
                 <Button
@@ -89,11 +90,11 @@ export default function TopicTimeCard({
                   variant="ghost"
                   disabled={d.missing}
                   onClick={() => setOpen(d)}
-                  className="flex h-full flex-col items-center justify-end gap-1 rounded-lg px-0 py-1 font-normal"
+                  className="flex h-full min-w-0 flex-col items-center justify-end gap-1 rounded-lg px-0 py-1 font-normal"
                   title={`${formatYmdTh(d.day)} ${fmt(dTotals[i])} ${unit}`}
                   data-testid={`topic-day-${d.day}`}
                 >
-                  <span className="text-[10px] tabular-nums text-foreground">{d.missing ? '—' : dTotals[i] ? fmt(dTotals[i]) : ''}</span>
+                  <span className="text-[10px] tabular-nums text-foreground">{d.missing ? '—' : fmt(dTotals[i])}</span>
                   <span className={barCls} style={{ height: `${grown && dTotals[i] ? Math.max(2, (dTotals[i] / dMax) * 80) : 0}px` }} />
                   <span className={cn('text-[10px]', DASH.sub)}>{Number(d.day.slice(8))}</span>
                 </Button>
@@ -121,7 +122,7 @@ export default function TopicTimeCard({
               />
               {prevDays ? (
                 <p className={cn('flex flex-wrap items-center gap-2 text-xs', DASH.sub)}>
-                  วันเดียวกันของช่วงก่อน {fmt(prevDays.get(open.day) ?? 0)} {unit}
+                  {W.previousDay} {fmt(prevDays.get(open.day) ?? 0)} {unit}
                   <TrendDelta cur={open.parts.reduce((s, p) => s + p.value, 0)} prev={prevDays.get(open.day) ?? 0} />
                 </p>
               ) : null}

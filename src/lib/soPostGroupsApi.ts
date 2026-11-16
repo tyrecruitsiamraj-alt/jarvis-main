@@ -25,3 +25,13 @@ export async function fetchSoPostSummary(): Promise<SoPostSummary> {
   if (!r.ok) return readError(r);
   return (await r.json()) as SoPostSummary;
 }
+
+/** กราฟเปรียบเทียบ BU: โหลดโพสต์กลุ่ม + ลิงก์เองในคำขอเดียว · server ล็อกสิทธิ์ BU */
+export type RecruitPostComparison = Record<string, { fb: SoPostGroups | null; links: import('./jobPostActions').ManualLinkRow[] | null }>;
+export async function fetchRecruitPostComparison(q: { from: string; to: string; bu: string | null }): Promise<RecruitPostComparison> {
+  const p = new URLSearchParams({ compare: '1', from: q.from, to: q.to });
+  if (q.bu) p.set('bu', q.bu);
+  const r = await apiFetch(`/api/so-post-groups?${p.toString()}`);
+  if (!r.ok) return readError(r);
+  return ((await r.json()) as { byBu: RecruitPostComparison }).byBu;
+}

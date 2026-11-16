@@ -6,6 +6,7 @@
  *    ไฟล์นี้แค่จัดกลุ่มตาม BU/วัน ห้ามนับเองใหม่ (เลขต้องตรงกับหน้าอื่น)
  * pure — เทสต์ `tests/api/recruitTopics2569-11-16.test.ts`
  */
+import { RECRUIT_TOPIC_WORDS } from './uiWords';
 import type { ToneKey } from './designTokens';
 import type { RecruitAppFact } from './recruitOverviewTypes';
 import { aiStage } from './recruitJourney';
@@ -20,21 +21,12 @@ export const TOPIC_KEYS = ['req', 'start', 'fb', 'self', 'people', 'staff', 'cha
 export type TopicKey = (typeof TOPIC_KEYS)[number];
 
 /** ชื่อเรื่อง — ชุดเดียวกับตัวอย่างที่เจ้าของเคาะ */
-export const TOPIC_TITLES: Record<TopicKey, string> = {
-  req: 'ใบขอเหลือหา',
-  start: 'เริ่มหาแล้ว / ยังไม่เริ่ม',
-  fb: 'โพสต์ลงกลุ่ม Facebook',
-  self: 'โพสต์เอง',
-  people: 'รายชื่อ → ลงงาน',
-  staff: 'คนโทรต่อ',
-  channel: 'ช่องทาง',
-  why: 'เหตุผลที่ไม่สำเร็จ',
-};
+export const TOPIC_TITLES: Record<TopicKey, string> = RECRUIT_TOPIC_WORDS.titles;
 export const isTopicKey = (v: string | null | undefined): v is TopicKey => Boolean(v && (TOPIC_KEYS as readonly string[]).includes(v));
 
 /** ก้อนหนึ่งในแท่ง/สมการ — `ids` = id ใบสมัคร (กดเปิดรายชื่อ) · ใบขอไม่มี id */
 export type TopicPart = { key: string; label: string; value: number; tone: ToneKey; ids?: string[] };
-export type BuBar = { bu: string; total: number; parts: TopicPart[] };
+export type BuBar = { bu: string; total: number; parts: TopicPart[]; unavailable?: boolean };
 
 const sumOf = (parts: readonly TopicPart[]) => parts.reduce((s, p) => s + p.value, 0);
 const bar = (bu: string, parts: TopicPart[]): BuBar => ({ bu, total: sumOf(parts), parts });
