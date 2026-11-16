@@ -62,7 +62,7 @@ function BirthDateSelect({ id, value, onChange, today }: { id: string; value: st
       </Select>
       <Select value={parts.y} onValueChange={(y) => set({ y })}>
         <SelectTrigger aria-label="ปีเกิด (พ.ศ.)">
-          <SelectValue placeholder="ปี พ.ศ." />
+          <SelectValue placeholder="ปี" />
         </SelectTrigger>
         <SelectContent>
           {years.map((y) => (

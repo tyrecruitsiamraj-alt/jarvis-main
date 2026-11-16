@@ -127,7 +127,7 @@ export default function QuizResultDialog({ attemptId, onOpenChange, onChanged }:
             </div>
             <div>
               <dt className="text-muted-foreground">เลขบัตร</dt>
-              <dd className="tabular-nums">{a.citizen_id_masked ?? '—'}</dd>
+              <dd className="whitespace-nowrap tabular-nums">{a.citizen_id_masked ?? '—'}</dd>
             </div>
           </dl>
         ) : null}

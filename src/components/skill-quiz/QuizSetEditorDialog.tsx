@@ -155,7 +155,7 @@ export default function QuizSetEditorDialog({ open, onOpenChange, setId, initial
             <div className="flex flex-wrap gap-4 rounded-xl border border-border p-3">
               {(people?.bus ?? []).map((bu) => (
                 <Label key={bu} className="flex cursor-pointer items-center gap-2 text-sm font-normal">
-                  <Checkbox checked={viewers.bus.includes(bu)} onCheckedChange={(v) => setViewers((x) => ({ ...x, bus: toggle(x.bus, bu, v === true) }))} />
+                  <Checkbox aria-label={bu} checked={viewers.bus.includes(bu)} onCheckedChange={(v) => setViewers((x) => ({ ...x, bus: toggle(x.bus, bu, v === true) }))} />
                   {bu}
                 </Label>
               ))}
@@ -174,6 +174,7 @@ export default function QuizSetEditorDialog({ open, onOpenChange, setId, initial
                   shownPeople.map((p) => (
                     <Label key={p.id} className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm font-normal hover:bg-muted/50">
                       <Checkbox
+                        aria-label={p.name}
                         checked={viewers.userIds.includes(p.id)}
                         onCheckedChange={(v) => setViewers((x) => ({ ...x, userIds: toggle(x.userIds, p.id, v === true) }))}
                       />
