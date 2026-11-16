@@ -130,8 +130,10 @@ export default function RecruitTopicsView({
 
   // ── ยอดโพสต์ต่อ BU (ข้อมูลอยู่ฝั่ง So Scraping / ลิงก์ — ดึงทีละ BU) ──
   const [posts, setPosts] = React.useState<Record<string, { fb: TopicPart[] | null; self: TopicPart[] | null }> | null>(null);
+  // โหลดครั้งเดียวต่อช่วง — สลับ โพสต์กลุ่ม ↔ โพสต์เอง ไม่โหลดซ้ำ (เดิมรอ 10 วิทุกครั้งที่สลับ · 16 พ.ย. 2569)
+  const postTopic = topic === 'fb' || topic === 'self';
   React.useEffect(() => {
-    if (topic !== 'fb' && topic !== 'self') return;
+    if (!postTopic) return;
     let alive = true;
     setPosts(null);
     Promise.all(
@@ -163,7 +165,7 @@ export default function RecruitTopicsView({
     return () => {
       alive = false;
     };
-  }, [topic, bus, win.from, win.to]);
+  }, [postTopic, bus, win.from, win.to]);
 
   // ── ซ้าย: เทียบ BU ──
   const bars: BuBar[] | null = React.useMemo(() => {
@@ -243,7 +245,9 @@ export default function RecruitTopicsView({
           const byDay = new Map(days.map((d) => [d.day, d] as const));
           setSelfDays(
             daysOf(win.from, win.to).map((day) => {
-              const d = byDay.get(day);
+              // วันก่อนเริ่มนับโพสต์แล้ว/Gen link (13 พ.ย.) = 0 — รวมทุกวันต้องเท่าแท่งเดือน (เดิมนับวันก่อนเริ่มด้วย 557 vs รายวันรวมเกิน)
+              const raw = byDay.get(day);
+              const d = raw && !raw.before ? raw : undefined;
               return {
                 day,
                 parts: [
