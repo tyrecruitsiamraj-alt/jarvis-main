@@ -1,5 +1,5 @@
 import React from 'react';
-import { AlertCircle, ListChecks, Megaphone, PhoneCall, UserRound } from 'lucide-react';
+import { AlertCircle, Building2, ListChecks, Megaphone, PhoneCall, UserRound } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
@@ -15,6 +15,9 @@ import { friendlyErrorText } from '@/lib/friendlyError';
 import { legacyReportsPath, requestPathOfJobId } from '@/lib/jobNavigation';
 import { OverviewCard, ReasonColumns, SectionError } from '../RecruitOverviewParts';
 import ChannelFunnelTable from '../ChannelFunnelTable';
+import BuCompareTable from './BuCompareTable';
+import { buildBuCompare } from '@/lib/buCompare';
+import { APP_DEPARTMENT_CODES } from '@/lib/departmentCodes';
 import { buildFbGroupClickRows, mergeFbGroupClicks } from '@/lib/fbGroupClicks';
 import StuckFilterBar from './StuckFilterBar';
 import SoPostGroupsCard from './SoPostGroupsCard';
@@ -193,6 +196,20 @@ export default function RecruitStuckBody({
   const prevChannels = React.useMemo(() => (prevCohort ? buildChannelFunnelTree(prevCohort) : null), [prevCohort]);
   const prevBringers = React.useMemo(() => (prevCohort ? buildBringerFunnelTree(prevCohort) : null), [prevCohort]);
   const prevReasons = React.useMemo(() => (prevCohort ? reasonGroups(prevCohort) : null), [prevCohort]);
+  /**
+   * เทียบ BU (16 พ.ย. 2569) — เลือก BU อยู่ = แถวเดียว · หลาย BU ไม่ครบ = BU ในสิทธิ์ · ครบทุก BU/แอดมิน = ทุก BU
+   * ช่วงก่อนคิดด้วยตัวเดียวกัน (BU เดียวกัน ขั้นเดียวกัน)
+   */
+  const buOnly = React.useMemo(
+    () => (data.bu ? [data.bu] : data.buChoices && !APP_DEPARTMENT_CODES.every((c) => data.buChoices!.includes(c)) ? data.buChoices : null),
+    [data.bu, data.buChoices],
+  );
+  const buCompare = React.useMemo(() => buildBuCompare(cohort, buOnly), [cohort, buOnly]);
+  const prevBuCompare = React.useMemo(() => {
+    if (!prevCohort) return null;
+    const p = buildBuCompare(prevCohort, buOnly);
+    return new Map([...p.rows, p.total].map((r) => [r.key, r] as const));
+  }, [prevCohort, buOnly]);
   const kept = React.useMemo(() => (scale ? buildCallerResults(cohort).total.kept.length : 0), [scale, cohort]);
   const prevKept = React.useMemo(() => (prevCohort ? buildCallerResults(prevCohort).total.kept.length : null), [prevCohort]);
   /** ยอดข้อ 5–6 ของแถบบน + ช่วงก่อนที่ส่งให้การ์ด · ดึงไม่ได้ = null ("—" / "เทียบไม่ได้") */
@@ -302,6 +319,12 @@ export default function RecruitStuckBody({
           );
         case 'self':
           return <ManualPostDaysCard from={win.from} to={win.to} bu={data.bu} prev={posts.manualPrev} prevFrom={win.prevFrom} />;
+        case 'bu':
+          return (
+            <OverviewCard icon={Building2} title={SCALE_TITLES.bu} sub={cohortSub}>
+              {appsUnknown ? appsError : <BuCompareTable rows={buCompare.rows} total={buCompare.total} prev={prevBuCompare} onOpen={onOpenNames} />}
+            </OverviewCard>
+          );
         case 'area':
           return stuck.data?.requests ? (
             <div className="space-y-4">

@@ -20,6 +20,8 @@ export type RecruitAppFact = {
   /** เวลากรอกใบ (ISO) */
   createdAt: string;
   jobId: string | null;
+  /** BU ของใบ (ตัวเดียวกับที่ภาพรวมกรอง BU · 16 พ.ย. 2569 ตารางเทียบ BU) · null = ไม่รู้ BU · ไม่ส่ง = server รุ่นเก่า */
+  bu?: string | null;
   /** ช่องทางจากตารางช่องทางของลิงก์ (แม่นกว่า) */
   channelLabel: string | null;
   /** ช่องทางที่ผู้สมัครเลือกเอง (`facebook` · `flyer` …) */

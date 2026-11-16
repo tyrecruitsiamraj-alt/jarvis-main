@@ -27,9 +27,9 @@ describe('เพิ่มขึ้น / ลดลง', () => {
 });
 
 describe('แถบบน + ข้อที่เลือก', () => {
-  it('หัวข้อเป็นคำเจ้าของ 6 ช่อง + 3 ปุ่ม · ค่าใน URL แปลก ๆ ไม่นับเป็นข้อ', () => {
+  it('หัวข้อเป็นคำเจ้าของ 6 ช่อง + 4 ปุ่ม (เทียบ BU 16 พ.ย. 2569) · ค่าใน URL แปลก ๆ ไม่นับเป็นข้อ', () => {
     expect(SCALE_STRIP.map((k) => SCALE_TITLES[k])).toEqual(['1. ใครต้องทำอะไร', '2. ทำแล้วเป็นไง', '3. ที่มามาจากใคร', '4. ช่องทางไหนทำได้ดี', '5. โพสต์ลงกลุ่ม Facebook', '6. โพสต์เอง']);
-    expect(SCALE_MORE.map((k) => SCALE_TITLES[k])).toEqual(['พื้นที่ที่เหลือหา', 'เทียบเดือน', 'เหตุผลที่ไม่สำเร็จ']);
+    expect(SCALE_MORE.map((k) => SCALE_TITLES[k])).toEqual(['เทียบ BU', 'พื้นที่ที่เหลือหา', 'เทียบเดือน', 'เหตุผลที่ไม่สำเร็จ']);
     expect(isScaleSection('why')).toBe(true);
     expect(isScaleSection('toString')).toBe(false);
     expect(isScaleSection(null)).toBe(false);

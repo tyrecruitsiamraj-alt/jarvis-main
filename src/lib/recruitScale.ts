@@ -9,7 +9,7 @@ import { cohortOf, trimLastDayToNow } from './recruitOverview';
 import type { RecruitAppFact, RecruitOverviewResponse } from './recruitOverviewTypes';
 import type { ManualPostDay, ManualPostDays } from './jobPostActions';
 
-export type ScaleSectionKey = 'todo' | 'done' | 'src' | 'ch' | 'fb' | 'self' | 'area' | 'mon' | 'why';
+export type ScaleSectionKey = 'todo' | 'done' | 'src' | 'ch' | 'fb' | 'self' | 'bu' | 'area' | 'mon' | 'why';
 
 /** หัวข้อเป็นคำของเจ้าของเอง — ห้ามแก้คำ */
 export const SCALE_TITLES: Record<ScaleSectionKey, string> = {
@@ -22,11 +22,13 @@ export const SCALE_TITLES: Record<ScaleSectionKey, string> = {
   area: 'พื้นที่ที่เหลือหา',
   mon: 'เทียบเดือน',
   why: 'เหตุผลที่ไม่สำเร็จ',
+  // เจ้าของ 16 พ.ย. 2569 "เทียบทุก Bu ได้ ดูแยก Bu ได้" — ตาราง `BuCompareTable`
+  bu: 'เทียบ BU',
 };
 /** ช่องบนแถบ (ภาพใหญ่) · ที่เหลือเป็นปุ่มใต้แถบ */
 export type ScaleStripKey = 'todo' | 'done' | 'src' | 'ch' | 'fb' | 'self';
 export const SCALE_STRIP: readonly ScaleStripKey[] = ['todo', 'done', 'src', 'ch', 'fb', 'self'];
-export const SCALE_MORE: readonly ScaleSectionKey[] = ['area', 'mon', 'why'];
+export const SCALE_MORE: readonly ScaleSectionKey[] = ['bu', 'area', 'mon', 'why'];
 export const isScaleSection = (v: string | null | undefined): v is ScaleSectionKey => Boolean(v && Object.prototype.hasOwnProperty.call(SCALE_TITLES, v));
 
 /** ทิศของตัวเลข: เพิ่มแล้วดี (เขียว) · เพิ่มแล้วแย่ (แดง) · ไม่ตัดสิน (สีปกติ) */

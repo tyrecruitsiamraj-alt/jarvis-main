@@ -157,6 +157,8 @@ export function factsSql(
 ): string {
   return `
   select a.id::text as id, a.created_at, a.job_id,
+         -- BU ของใบ — ตัวเดียวกับที่ภาพรวมใช้กรอง BU (appBuSql) · ตารางเทียบ BU (เจ้าของ 16 พ.ย. 2569)
+         ${appBuSql('a')} as bu,
          -- ช่องทางของใบ → ไม่มี = ช่องทางของลิงก์ที่กรอกผ่าน (19 ต.ค. 2569)
          coalesce(nullif(btrim(a.channel_label), ''),
                   (select nullif(btrim(l.channel_label), '') from ${POSTING_LINKS} l where l.id = a.link_id)) as channel_label,
@@ -365,6 +367,7 @@ export function toFact(r: Row, boardPhones: Set<string> | null, sources?: AppSou
     id: text(r.id) ?? undefined,
     createdAt: iso(r.created_at) ?? '',
     jobId: text(r.job_id),
+    bu: text(r.bu),
     channelLabel: text(r.channel_label),
     referralSource: text(r.referral_source),
     position: text(r.position),

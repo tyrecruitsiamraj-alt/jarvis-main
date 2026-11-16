@@ -126,7 +126,7 @@ describe('รายชื่ออ่านไม่ได้ ห้ามโช
   it('การ์ดที่นับจากรายชื่อ (เส้นทาง · ทำไมไม่สำเร็จ · ช่องทาง · ใครหารายชื่อ) ขึ้นข้อความอ่านไม่ได้แทน', () => {
     const src = readFileSync('src/components/dashboard-trends/stuck/RecruitStuckBody.tsx', 'utf8');
     expect(src).toContain('const appsUnknown = data.apps == null;');
-    // 8 จุดเดิม (หน้าเลื่อนลง + โฉมก่อน) + 4 จุดของแบบ Scale ลง 13 พ.ย. 2569 (ข้อ 2 · 3 · 4 · เหตุผล)
-    expect(src.match(/appsUnknown \? appsError :/g)?.length).toBe(12);
+    // 8 จุดเดิม (หน้าเลื่อนลง + โฉมก่อน) + 4 จุดของแบบ Scale ลง 13 พ.ย. 2569 (ข้อ 2 · 3 · 4 · เหตุผล) + เทียบ BU 16 พ.ย.
+    expect(src.match(/appsUnknown \? appsError :/g)?.length).toBe(13);
   });
 });

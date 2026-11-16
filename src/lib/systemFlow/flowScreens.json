@@ -7583,6 +7583,15 @@
      "src": "src/components/dashboard-trends/stuck/StuckFilterBar.tsx:55"
     },
     {
+     "label": "เทียบ BU (ปุ่มใต้แถบบนสุด) — ตารางแถวละ BU: รายชื่อเข้า · AI โทรแล้ว · สนใจ · คนโทรแล้ว · ติดต่อได้ · นัดได้ · มา (% ของขั้นก่อน · เพิ่มขึ้น/ลดลง) · กดเลข",
+     "action": "popup",
+     "target": "popup-journey-names",
+     "api": null,
+     "effects": [],
+     "when": null,
+     "src": "src/components/dashboard-trends/stuck/RecruitStuckBody.tsx:322"
+    },
+    {
      "label": "การ์ด 1. ใครต้องทำอะไร — เลข 'N ใบ' ในช่อง ยังไม่ประกาศ/ยังไม่โพสต์/ไม่มีคนกรอก/มีชื่อ ยังไม่โทร/โทรแล้ว ยังไม่ได้คน/ได้คนแล้ว รอปิดใบ (ต่อเจ้าหน้าที่ + แถวทุกคน)",
      "action": "filter",
      "target": "รายการใบใต้ตาราง 1 (StuckPickedList)",
