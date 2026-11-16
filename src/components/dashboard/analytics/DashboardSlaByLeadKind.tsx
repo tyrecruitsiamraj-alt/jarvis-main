@@ -6,13 +6,14 @@
  *
  * 🔴 กติกาบนจอ:
  * 1. ทุกช่องที่มีของ **กดได้** → เปิดรายการใบขอของช่องนั้น (แพตเทิร์น DetailListDialog เดิม)
- * 2. **คอลัมน์ที่ว่างทั้งตารางถูกตัดออก** — ตารางที่มีแต่ 0 คือพื้นหลัง ไม่ใช่ข้อมูล
- * 3. ช่อง 0 ไม่ทาสี ไม่กดได้ — ของน้อยคือสัญญาณ ของเยอะคือพื้นหลัง
- * 4. เกณฑ์ต่างกันต่อชนิด (ย้อนหลัง 7 วัน · ฉุกเฉิน/ล่วงหน้า 15 วัน) เขียนบอกท้ายตาราง
- *    ไม่งั้นคนอ่านเทียบ % ข้ามแถวแล้วสรุปผิด
+ * 2. คอลัมน์ครบเสมอ (QA 15 พ.ย. 2569) · ช่อง 0 ขึ้น 0 ไม่ทาสี ไม่กดได้
+ * 3. เกณฑ์ต่างกันต่อชนิด (ย้อนหลัง 7 วัน · ฉุกเฉิน/ล่วงหน้า 15 วัน) — เอาเมาส์ชี้ชื่อชนิดแล้วขึ้น
+ *    สูตร "ปิดทัน %" ชี้ที่หัวคอลัมน์ (เจ้าของ 16 พ.ย. 2569 "เม้าไปชี้ตรงคำว่า ฉุกเฉิน/ย้อนหลัง แล้วค่อยขึ้นคำอธิบาย")
+ *    ไม่เขียนท้ายตารางแล้ว
  */
 import React from 'react';
 
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { DASH, TONE } from '@/lib/designTokens';
 import {
   SLA_CELL_LABEL,
@@ -21,7 +22,7 @@ import {
   type SlaCellKey,
   type SlaLeadKindRow,
 } from '@/lib/dashboard/slaByLeadKind';
-import type { RequestLeadKind } from '@/lib/requestLeadKind';
+import { DEFAULT_REQUEST_LEAD_RULES, REQUEST_LEAD_KIND_HINT, type RequestLeadKind } from '@/lib/requestLeadKind';
 import { cn } from '@/lib/utils';
 
 type Props = {
@@ -48,6 +49,13 @@ type Props = {
 
 const num = (n: number) => n.toLocaleString('th-TH');
 
+/** เกณฑ์ของแต่ละชนิด — วันอ่านจากค่ากลางที่เดียว (`requestLeadKind.ts`) */
+const SLA_RULE_OF: Record<RequestLeadKind, string> = {
+  retroactive: `ต้องหาให้ได้ใน ${DEFAULT_REQUEST_LEAD_RULES.slaDays.retroactive} วัน นับจากวันที่ยื่น`,
+  urgent: `ต้องหาให้ได้ใน ${DEFAULT_REQUEST_LEAD_RULES.slaDays.urgent} วัน นับจากวันที่ต้องการ`,
+  advance: `ต้องหาให้ได้ใน ${DEFAULT_REQUEST_LEAD_RULES.slaDays.advance} วัน นับจากวันที่ต้องการ`,
+};
+
 const DashboardSlaByLeadKind: React.FC<Props> = ({
   table,
   onCellClick,
@@ -73,15 +81,26 @@ const DashboardSlaByLeadKind: React.FC<Props> = ({
         {isTotal || !onRowClick ? (
           <span className={cn('text-xs', DASH.cellStrong)}>{row.label}</span>
         ) : (
-          <button
-            type="button"
-            onClick={() => onRowClick(row.kind, row.label)}
-            className="inline-flex items-center gap-1.5 text-xs hover:underline"
-            title={`ดูใบขอชนิด "${row.label}" ทั้งหมด ${num(row.total)} ใบ`}
-          >
-            <span className={cn('inline-block h-2 w-2 rounded-full', TONE[row.tone].dot)} aria-hidden />
-            <span className={DASH.cellStrong}>{row.label}</span>
-          </button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={() => onRowClick(row.kind, row.label)}
+                className="inline-flex items-center gap-1.5 text-xs hover:underline"
+                aria-label={`ดูใบขอชนิด "${row.label}" ทั้งหมด ${num(row.total)} ใบ`}
+                data-testid={`sla-kind-${row.kind}`}
+              >
+                <span className={cn('inline-block h-2 w-2 rounded-full', TONE[row.tone].dot)} aria-hidden />
+                <span className={DASH.cellStrong}>{row.label}</span>
+              </button>
+            </TooltipTrigger>
+            {row.kind ? (
+              <TooltipContent side="right" className="max-w-xs space-y-0.5 text-left">
+                <p className="font-medium">{SLA_RULE_OF[row.kind]}</p>
+                <p className="text-muted-foreground">{REQUEST_LEAD_KIND_HINT[row.kind]}</p>
+              </TooltipContent>
+            ) : null}
+          </Tooltip>
         )}
         {/* มือถือ: % กับรวมอยู่นอกจอ ต้องปัดข้าง (QA 15 พ.ย. 2569) ⇒ บอกใต้ชื่อแถวด้วย */}
         <span className={cn('block text-[11px] tabular-nums sm:hidden', DASH.cellMuted)}>
@@ -183,7 +202,16 @@ const DashboardSlaByLeadKind: React.FC<Props> = ({
                 รวม
               </th>
               <th scope="col" className="py-1.5 pl-3 text-right font-medium">
-                ปิดทัน %
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="cursor-help underline decoration-dotted underline-offset-4" data-testid="sla-rate-head">
+                      ปิดทัน %
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-xs text-left">
+                    ปิดทัน ÷ (ปิดทัน + ปิดไม่ทัน + ยังไม่ปิด · เกินแล้ว)
+                  </TooltipContent>
+                </Tooltip>
               </th>
             </tr>
           </thead>
@@ -215,11 +243,6 @@ const DashboardSlaByLeadKind: React.FC<Props> = ({
           )}
         </p>
       ) : null}
-
-      <p className={cn('mt-2', DASH.sub)}>
-        เกณฑ์ SLA ต่างกันตามชนิดใบขอ — ฉุกเฉิน/ย้อนหลัง 7 วันจากวันที่ยื่น · ฉุกเฉิน &amp; ล่วงหน้า
-        15 วันจากวันที่ต้องการ · “ปิดทัน %” = ปิดทัน ÷ (ปิดทัน + ปิดไม่ทัน + ยังไม่ปิด·เกินแล้ว)
-      </p>
     </div>
   );
 };

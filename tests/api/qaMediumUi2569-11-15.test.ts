@@ -65,3 +65,15 @@ describe('สถานะจอ / ตัวเลขไล่กลับได�
     expect(t).toContain("${STAFF_NAME_SQL('u', 'f.created_by_name')} as staff_name");
   });
 });
+
+describe('ตาราง SLA: เกณฑ์ขึ้นตอนเอาเมาส์ชี้ (เจ้าของ 16 พ.ย. 2569)', () => {
+  const f = read('src/components/dashboard/analytics/DashboardSlaByLeadKind.tsx');
+  it('ไม่มีย่อหน้าเกณฑ์ท้ายตาราง · ชื่อชนิด + หัว ปิดทัน % มี Tooltip ของ shadcn · วันอ่านจากค่ากลาง', () => {
+    expect(f).not.toContain('เกณฑ์ SLA ต่างกันตามชนิดใบขอ');
+    expect(f).toContain("from '@/components/ui/tooltip'");
+    expect(f).toContain('{SLA_RULE_OF[row.kind]}');
+    expect(f).toContain('data-testid="sla-rate-head"');
+    expect(f).toContain('DEFAULT_REQUEST_LEAD_RULES.slaDays.retroactive');
+    expect(f).not.toMatch(/ใน 7 วัน|ใน 15 วัน/);
+  });
+});
