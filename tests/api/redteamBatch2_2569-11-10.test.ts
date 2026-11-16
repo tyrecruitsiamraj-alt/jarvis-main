@@ -63,7 +63,7 @@ describe('ตัวเลขหน้าหลัก', () => {
   const page = read('src/pages/HomeOverviewPage.tsx');
   it('การ์ดเงิน: จำนวนใบ + ดูทุกใบ = ชุดเดียวกับยอดเงิน (ใบที่มีเงินในช่วง)', () => {
     expect(page).toContain("left={moneyNow ? `${NUM.format(chargedRows.length)} ใบที่มีผลกระทบ` : '—'}");
-    expect(page).toContain("openList('ใบที่เสียเงิน', chargedRows,");
+    expect(page).toContain("openList('ใบที่เสียเงิน', chargedRows)");
     expect(page).toContain('const buKeyOf = (r: MoneyRequest) => normalizeTrendBu(r.bu) ??');
   });
   it('ช่วงยาว/ทั้งหมด: ขอแบบ all และเทียบกับช่วงที่เซิร์ฟเวอร์ตัดแล้ว', () => {
