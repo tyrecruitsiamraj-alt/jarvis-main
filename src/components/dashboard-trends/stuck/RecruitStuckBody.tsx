@@ -32,7 +32,7 @@ import RecruitScaleView, { type ScaleStripCell } from './RecruitScaleView';
 import DailyCompareChart from './DailyCompareChart';
 import type { SoPostPrevCounts } from './SoPostGroupsCard';
 import { buildCallerResults } from '@/lib/callerResults';
-import { MANUAL_POSTED_SINCE, SCALE_TITLES, SO_POST_SINCE, comparableSince, isScaleSection, manualPostSplit, prevCohortOf, type ScaleSectionKey } from '@/lib/recruitScale';
+import { MANUAL_POSTED_SINCE, SCALE_TITLES, SO_POST_SINCE, comparableSince, isScaleSection, manualPostDaysFrom, manualPostSplit, prevCohortOf, type ScaleSectionKey } from '@/lib/recruitScale';
 import { fetchSoPostGroups } from '@/lib/soPostGroupsApi';
 import { fetchManualPostDays } from '@/lib/jobPostActionsApi';
 import type { ManualPostDays } from '@/lib/jobPostActions';
@@ -217,8 +217,9 @@ export default function RecruitStuckBody({
       setPosts({
         so: so ? so.total : null,
         soPrev: soPrev ? { total: soPrev.total, counts: soPrev.counts } : null,
-        manual: manual ? manual.total : null,
-        manualPrev: manualPrev ? manualPrev.total : null,
+        // ข้อ 6 นับตั้งแต่ 13 พ.ย. 2569 (ตัวเดียวกับการ์ด · manualPostDaysFrom)
+        manual: manual ? manualPostDaysFrom(manual).total : null,
+        manualPrev: manualPrev ? manualPostDaysFrom(manualPrev).total : null,
       });
     });
     return () => {
@@ -242,7 +243,7 @@ export default function RecruitStuckBody({
         const comparable = !win.all && comparableSince(win.prevFrom, MANUAL_POSTED_SINCE);
         return {
           n: sp ? sp.total : null,
-          unit: 'ลิงก์',
+          unit: 'ลิงก์ทั้งหมด',
           prev: comparable ? (posts.manualPrev?.places ?? null) : null,
           note: sp && sp.total > 0 ? `โพสต์แล้ว ${sp.posted.toLocaleString('th-TH')} (${sp.postedPct}%) · Gen link ${sp.genlink.toLocaleString('th-TH')} (${sp.genlinkPct}%)` : null,
         };

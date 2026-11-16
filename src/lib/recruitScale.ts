@@ -7,6 +7,7 @@
 import { deltaOf } from './recruitCompare';
 import { cohortOf, trimLastDayToNow } from './recruitOverview';
 import type { RecruitAppFact, RecruitOverviewResponse } from './recruitOverviewTypes';
+import type { ManualPostDay, ManualPostDays } from './jobPostActions';
 
 export type ScaleSectionKey = 'todo' | 'done' | 'src' | 'ch' | 'fb' | 'self' | 'area' | 'mon' | 'why';
 
@@ -89,4 +90,24 @@ export function manualPostSplit(places: number, posted: number): { total: number
   if (places <= 0) return { total: 0, posted, genlink, postedPct: null, genlinkPct: null };
   const postedPct = Math.round((posted / places) * 100);
   return { total: places, posted, genlink, postedPct, genlinkPct: 100 - postedPct };
+}
+
+/**
+ * ข้อ 6 นับตั้งแต่วันที่มีระบบโพสต์เอง (เจ้าของ 16 พ.ย. 2569 Choice "เริ่ม 13 พ.ย." — "ระบบพึ่งมีมาเมื่อวันที่ 10 11 12 13 นี้เองนะ ทำไมช่วงก่อนวันที่ 10 มีมาด้วย")
+ * เดิมนับทุกลิงก์ที่ไม่ใช่ Autopost ตั้งแต่ 5 ส.ค. (Gen link ปุ่มเดิม) · วันก่อนเริ่ม = `before` (จอบอกยังไม่มีระบบ ไม่โชว์เลข) · ยอดรวมบวกเฉพาะวันที่นับ
+ */
+export function manualPostDaysFrom(data: ManualPostDays, since: string = MANUAL_POSTED_SINCE): { days: Array<ManualPostDay & { before: boolean }>; total: ManualPostDays['total'] } {
+  const total = { jobs: 0, places: 0, posted: 0, clicks: 0, applicants: 0 };
+  const days = data.days.map((d) => {
+    const before = d.day < since;
+    if (!before) {
+      total.jobs += d.jobs;
+      total.places += d.places;
+      total.posted += d.posted;
+      total.clicks += d.clicks;
+      total.applicants += d.applicants;
+    }
+    return { ...d, before };
+  });
+  return { days, total };
 }

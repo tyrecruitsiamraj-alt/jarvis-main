@@ -12,7 +12,7 @@ import { requestPathOfJobId } from '@/lib/jobNavigation';
 import { fetchManualPostDays } from '@/lib/jobPostActionsApi';
 import type { ManualPostDays } from '@/lib/jobPostActions';
 import { OverviewCard } from '../RecruitOverviewParts';
-import { LINK_CLICKS_SINCE, MANUAL_POSTED_SINCE, comparableSince, manualPostSplit } from '@/lib/recruitScale';
+import { MANUAL_POSTED_SINCE, comparableSince, manualPostDaysFrom, manualPostSplit } from '@/lib/recruitScale';
 import TrendDelta from './TrendDelta';
 
 /**
@@ -58,22 +58,23 @@ export default function ManualPostDaysCard({
     };
   }, [from, to, bu, rev]);
 
-  const d = state.data;
+  // นับตั้งแต่ 13 พ.ย. 2569 (วันที่มีระบบโพสต์เอง · เจ้าของ Choice 16 พ.ย.) — วันก่อนหน้าขึ้น "ยังไม่มีระบบ"
+  const d = React.useMemo(() => (state.data ? manualPostDaysFrom(state.data) : null), [state.data]);
   const picked = pick && d ? (d.days.find((x) => x.day === pick) ?? null) : null;
   /**
    * โพสต์แล้ว = มีลิงก์โพสต์วางกลับมา · Gen link = ยังไม่มี (เจ้าของ 13 พ.ย. 2569) · สองช่องรวม = ทั้งหมด (กลุ่ม/ช่องทางที่ปล่อยลิงก์)
    * 16 พ.ย. 2569 เจ้าของ "อยากรู้ว่าโพสต์เองมันทำเท่าไหร่ … จะได้รู้สัดส่วน" → ช่องทั้งหมด + % ของโพสต์แล้ว/Gen link (`manualPostSplit`)
-   * ทั้งหมดนับวันที่กดคัดลอกข้อความด้วยตั้งแต่ 13 พ.ย. = ช่วงก่อนหน้านั้นเทียบไม่ได้
+   * นับตั้งแต่ 13 พ.ย. ทุกช่อง = ช่วงก่อนที่เริ่มก่อนวันนั้นเทียบไม่ได้ (บอกวันเริ่มนับแทน)
    */
   const since = (ymd: string) => (prevFrom && !comparableSince(prevFrom, ymd) ? ymd : null);
   const split = d ? manualPostSplit(d.total.places, d.total.posted) : null;
   const cells: Array<{ key: string; label: string; n: number | null; pct?: number | null; tone?: keyof typeof TONE; before: number | null; since?: string | null }> = [
-    { key: 'jobs', label: 'ใบขอ', n: d ? d.total.jobs : null, before: prev ? prev.jobs : null },
+    { key: 'jobs', label: 'ใบขอ', n: d ? d.total.jobs : null, before: prev ? prev.jobs : null, since: since(MANUAL_POSTED_SINCE) },
     { key: 'places', label: 'ทั้งหมด', n: split ? split.total : null, before: prev ? prev.places : null, since: since(MANUAL_POSTED_SINCE) },
     { key: 'posted', label: 'โพสต์แล้ว', n: split ? split.posted : null, pct: split?.postedPct, tone: 'success', before: prev ? prev.posted : null, since: since(MANUAL_POSTED_SINCE) },
     { key: 'genlink', label: 'Gen link', n: split ? split.genlink : null, pct: split?.genlinkPct, before: prev ? prev.places - prev.posted : null, since: since(MANUAL_POSTED_SINCE) },
-    { key: 'clicks', label: 'คลิก', n: d ? d.total.clicks : null, before: prev ? prev.clicks : null, since: since(LINK_CLICKS_SINCE) },
-    { key: 'applicants', label: 'กรอก', n: d ? d.total.applicants : null, tone: 'success', before: prev ? prev.applicants : null },
+    { key: 'clicks', label: 'คลิก', n: d ? d.total.clicks : null, before: prev ? prev.clicks : null, since: since(MANUAL_POSTED_SINCE) },
+    { key: 'applicants', label: 'กรอก', n: d ? d.total.applicants : null, tone: 'success', before: prev ? prev.applicants : null, since: since(MANUAL_POSTED_SINCE) },
   ];
 
   return (
@@ -136,19 +137,25 @@ export default function ManualPostDaysCard({
                         type="button"
                         variant="ghost"
                         size="xs"
-                        disabled={x.jobs === 0}
-                        aria-pressed={x.jobs === 0 ? undefined : active}
+                        disabled={x.before || x.jobs === 0}
+                        aria-pressed={x.before || x.jobs === 0 ? undefined : active}
                         onClick={() => setPick(active ? null : x.day)}
                         className="h-auto px-1 py-0.5 font-normal tabular-nums disabled:opacity-100"
                       >
                         {formatYmdTh(x.day)}
                       </Button>
                     </TableCell>
-                    {[x.jobs, x.places, x.posted, x.places - x.posted, x.clicks, x.applicants].map((n, i) => (
-                      <TableCell key={i} className={cn('text-right text-sm tabular-nums', n === 0 ? 'text-muted-foreground' : 'text-foreground')}>
-                        {th(n)}
+                    {x.before ? (
+                      <TableCell colSpan={6} className="text-right text-xs text-muted-foreground">
+                        ยังไม่มีระบบโพสต์เอง
                       </TableCell>
-                    ))}
+                    ) : (
+                      [x.jobs, x.places, x.posted, x.places - x.posted, x.clicks, x.applicants].map((n, i) => (
+                        <TableCell key={i} className={cn('text-right text-sm tabular-nums', n === 0 ? 'text-muted-foreground' : 'text-foreground')}>
+                          {th(n)}
+                        </TableCell>
+                      ))
+                    )}
                   </TableRow>
                 );
               })
@@ -191,6 +198,7 @@ export default function ManualPostDaysCard({
                     <TableCell className="max-w-80 text-sm">
                       {/* โพสต์แล้ว (มีลิงก์โพสต์ กดชื่อกลุ่มเปิดโพสต์) · Gen link (ยังไม่มีลิงก์โพสต์ ตัวเทา) — เจ้าของ 13 พ.ย. 2569 */}
                       <span className="text-xs tabular-nums">
+                        <span className="text-foreground">ทั้งหมด {th(j.postUrls.length)} · </span>
                         <span className={TONE.success.value}>โพสต์แล้ว {th(j.postUrls.filter(Boolean).length)}</span>
                         <span className={DASH.sub}> · Gen link {th(j.postUrls.filter((u) => !u).length)}</span>
                       </span>

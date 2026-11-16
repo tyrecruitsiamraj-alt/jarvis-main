@@ -65,3 +65,13 @@ describe('สัดส่วนโพสต์เอง (เจ้าของ 1
     expect(manualPostSplit(0, 0)).toEqual({ total: 0, posted: 0, genlink: 0, postedPct: null, genlinkPct: null });
   });
 });
+
+describe('ข้อ 6 นับตั้งแต่ 13 พ.ย. 2569 (เจ้าของ Choice 16 พ.ย. "ระบบพึ่งมีมาเมื่อวันที่ 10 11 12 13")', () => {
+  it('วันก่อน 13 พ.ย. = before ไม่บวกยอด · ยอดรวม = ผลบวกวันที่นับ', async () => {
+    const { manualPostDaysFrom } = await import('../../src/lib/recruitScale');
+    const day = (d: string, n: number) => ({ day: d, jobs: n, places: n * 10, posted: n, clicks: n * 2, applicants: 1, list: [] });
+    const r = manualPostDaysFrom({ days: [day('2026-11-14', 2), day('2026-11-13', 3), day('2026-11-12', 32)], total: { jobs: 37, places: 370, posted: 37, clicks: 74, applicants: 3 } });
+    expect(r.days.map((d) => d.before)).toEqual([false, false, true]);
+    expect(r.total).toEqual({ jobs: 5, places: 50, posted: 5, clicks: 10, applicants: 2 });
+  });
+});

@@ -64,8 +64,8 @@ describe('ภาพรวมแบบ Scale ลง', () => {
     expect(await cell('done')).toMatch(/1.*เก็บไป.*ทรงตัว/);
     await screen.findByText('ใหม่ ช่วงก่อน 0');
     expect(await cell('fb')).toMatch(/5.*ที่สั่ง.*ใหม่ ช่วงก่อน 0/);
-    // ข้อ 6 = โพสต์เองทั้งหมด (ลิงก์) แยกโพสต์แล้ว/Gen link + สัดส่วน (16 พ.ย. 2569) · ช่วงก่อนก่อน 13 พ.ย. = เทียบไม่ได้
-    expect(await cell('self')).toContain('6ลิงก์เทียบไม่ได้โพสต์แล้ว 1 (17%) · Gen link 5 (83%)');
+    // ข้อ 6 นับตั้งแต่ 13 พ.ย. 2569 (Choice 16 พ.ย.) — ช่วงนี้ทั้งช่วงอยู่ก่อนวันนั้น = 0 · ช่วงก่อนเทียบไม่ได้
+    expect(await cell('self')).toContain('0ลิงก์ทั้งหมดเทียบไม่ได้');
     // ช่วงก่อนดึงด้วยช่วงวันเท่ากัน
     expect(fetchManualPostDays).toHaveBeenCalledWith({ from: '2026-10-22', to: '2026-10-28', bu: null });
   });
