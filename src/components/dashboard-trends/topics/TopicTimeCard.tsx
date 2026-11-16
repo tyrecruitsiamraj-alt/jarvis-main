@@ -49,7 +49,8 @@ export default function TopicTimeCard({
   const mMax = Math.max(1, ...(months ?? []).map((m) => m.value ?? 0));
   const dTotals = (days ?? []).map((d) => d.parts.reduce((s, p) => s + p.value, 0));
   const dMax = Math.max(1, ...dTotals);
-  const barCls = cn('w-3/5 rounded-t-md transition-all duration-700 ease-out motion-reduce:transition-none', TONE.primary.dot);
+  // block — span เป็น inline ความสูงไม่มีผล (แท่งแบนติดพื้น · เจอบนเว็บจริง 16 พ.ย. 2569)
+  const barCls = cn('block w-3/5 shrink-0 rounded-t-md transition-all duration-700 ease-out motion-reduce:transition-none', TONE.primary.dot);
   return (
     <div className="space-y-4" data-testid="topic-time">
       <div>

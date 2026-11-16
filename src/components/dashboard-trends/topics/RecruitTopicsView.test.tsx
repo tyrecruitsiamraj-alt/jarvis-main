@@ -45,7 +45,7 @@ const APPS = [
   fact('a5', 'LBA', { calledByAi: true, aiAnswer: 'no_pickup', createdAt: '2026-11-05T03:00:00.000Z' }),
 ];
 const data = {
-  version: 1, generatedAt: '2026-11-16T10:00:00Z', today: '2026-11-16', bu: null, buChoices: ['LBD', 'LBA', 'LM', 'DS', 'SN'],
+  version: 1, generatedAt: '2026-11-16T10:00:00Z', today: '2026-11-16', bu: null, buChoices: ['SN', 'DS', 'LM', 'LBA', 'LBD'],
   window: { month: '2026-11', from: '2026-11-01', to: '2026-11-16', prevFrom: '2026-10-01', prevTo: '2026-10-16', isCurrent: true, range: false },
   firstDay: '2026-10-01', apps: APPS, errors: {}, appJobs: {},
 } as unknown as RecruitOverviewResponse;
@@ -74,6 +74,8 @@ describe('ภาพรวม 8 เรื่อง เทียบ BU', () => {
     fetchRecruitStuck.mockResolvedValue({ monthly: [{ month: '2026-11', jobId: 'siamraj-sql:OPL6911001', requests: 2, apps: 4, booked: 0, informed: 0 }], errors: {} });
     renderView();
     for (const bu of ['LBD', 'LBA', 'LM', 'DS', 'SN']) expect(screen.getByTestId(`topic-bu-${bu}`)).toBeTruthy();
+    // LBD ขึ้นก่อน (ตามตัวอย่าง) แม้สิทธิ์จะเรียง SN ก่อน
+    expect([...document.querySelectorAll('button[data-testid^="topic-bu-"]')].map((b) => b.getAttribute('data-testid'))).toEqual(['topic-bu-LBD', 'topic-bu-LBA', 'topic-bu-LM', 'topic-bu-DS', 'topic-bu-SN']);
     expect(screen.getByTestId('topic-bu-LBD').textContent).toContain('2');
     const eq = screen.getAllByTestId('topic-equation')[0];
     expect(eq.textContent).toContain('ใบขอเหลือหา 2');

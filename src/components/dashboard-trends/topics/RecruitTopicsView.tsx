@@ -67,6 +67,7 @@ const monthRange = (m: string) => {
   const last = new Date(Date.UTC(y, mm, 0)).getUTCDate();
   return { from: `${m}-01`, to: `${m}-${String(last).padStart(2, '0')}` };
 };
+const BU_ORDER = ['LBD', 'LBA', 'LM', 'DS', 'SN'];
 const sumParts = (ps: readonly TopicPart[]) => ps.reduce((s, p) => s + p.value, 0);
 
 /**
@@ -103,7 +104,12 @@ export default function RecruitTopicsView({
   const [searchParams, setSearchParams] = useSearchParams();
   const topicParam = searchParams.get('topic');
   const topic: TopicKey = isTopicKey(topicParam) ? topicParam : 'req';
-  const bus = React.useMemo(() => (data.bu ? [data.bu] : [...(data.buChoices?.length ? data.buChoices : ['LBD', 'LBA', 'LM', 'DS', 'SN'])]), [data.bu, data.buChoices]);
+  // เรียง BU ตามตัวอย่างที่เจ้าของเคาะ (LBD ก่อน) ไม่ใช่ลำดับในสิทธิ์ (SN ขึ้นก่อน)
+  const bus = React.useMemo(() => {
+    if (data.bu) return [data.bu];
+    const allowed = data.buChoices?.length ? data.buChoices : BU_ORDER;
+    return [...BU_ORDER.filter((b) => allowed.includes(b)), ...allowed.filter((b) => !BU_ORDER.includes(b))];
+  }, [data.bu, data.buChoices]);
   const tbuParam = searchParams.get('tbu');
   const selBu = tbuParam && bus.includes(tbuParam) ? tbuParam : bus.includes('LBD') ? 'LBD' : bus[0];
   const setParam = (k: string, v: string) =>
