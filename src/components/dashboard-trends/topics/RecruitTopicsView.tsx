@@ -9,7 +9,7 @@ import { DASH } from '@/lib/designTokens';
 import { formatTrendNumber as fmt } from '@/lib/trends/format';
 import type { RecruitAppFact, RecruitOverviewResponse } from '@/lib/recruitOverviewTypes';
 import type { StuckRequest } from '@/lib/recruitStuck';
-import { monthlySeries, type StuckMonthlyRow } from '@/lib/recruitStuck';
+import { STUCK_PHASES, monthlySeries, type StuckDailyRow, type StuckMonthlyRow } from '@/lib/recruitStuck';
 import { fetchRecruitStuck } from '@/lib/recruitStuckApi';
 import { fetchSoPostGroups } from '@/lib/soPostGroupsApi';
 import { fetchManualLinks } from '@/lib/jobPostActionsApi';
@@ -218,6 +218,20 @@ export default function RecruitTopicsView({
       alive = false;
     };
   }, [selBu, win.from, win.to]);
+  /** ยอดใบขอเหลือหา ณ สิ้นวันที่จดไว้ (6 เดือนถึงวันนี้) — เรื่องใบขอเหลือหา / เริ่มหา */
+  const [daily, setDaily] = React.useState<StuckDailyRow[] | null>(null);
+  React.useEffect(() => {
+    if (topic !== 'req' && topic !== 'start') return;
+    let alive = true;
+    setDaily(null);
+    const from = `${lastMonths(curMonth)[0]}-01`;
+    fetchRecruitStuck(selBu, { from, to: data.today }, 'daily')
+      .then((d) => alive && setDaily(d.daily ?? []))
+      .catch(() => alive && setDaily([]));
+    return () => {
+      alive = false;
+    };
+  }, [topic, selBu, curMonth, data.today]);
   const [postMonths, setPostMonths] = React.useState<TimeMonth[] | null>(null);
   React.useEffect(() => {
     if (topic !== 'fb' && topic !== 'self') return;
@@ -242,8 +256,33 @@ export default function RecruitTopicsView({
   }, [topic, selBu, curMonth, win.from, win.to]);
 
   const firstMonth = (data.firstDay ?? '').slice(0, 7);
+  /** วันที่จดไว้ → ยอดรวม/ก้อน ของเรื่องใบขอ (เหลือหา = ขั้นที่ติด · เริ่มหา = เริ่มแล้ว/ยังไม่เริ่ม) */
+  const dailyByDay = React.useMemo(() => {
+    if (!daily || daily.length === 0) return null;
+    const m = new Map<string, StuckDailyRow[]>();
+    for (const r of daily) m.set(r.day, [...(m.get(r.day) ?? []), r]);
+    return m;
+  }, [daily]);
+  const dailyParts = React.useCallback(
+    (rows: readonly StuckDailyRow[]): TopicPart[] =>
+      topic === 'start'
+        ? [
+            { key: 'started', label: 'เริ่มหาแล้ว', tone: 'success', value: rows.filter((r) => r.started).reduce((s, r) => s + r.requests, 0) },
+            { key: 'notStarted', label: 'ยังไม่เริ่ม', tone: 'neutral', value: rows.filter((r) => !r.started).reduce((s, r) => s + r.requests, 0) },
+          ]
+        : STUCK_PHASES.map((p) => ({ key: p.key, label: p.label, tone: p.tone, value: rows.filter((r) => r.phase === p.key).reduce((s, r) => s + r.requests, 0) })),
+    [topic],
+  );
   const timeMonths: TimeMonth[] | null = React.useMemo(() => {
     if (topic === 'fb' || topic === 'self') return postMonths;
+    if ((topic === 'req' || topic === 'start') && dailyByDay) {
+      // ยอด ณ สิ้นเดือน = วันสุดท้ายที่จดไว้ของเดือนนั้น · เดือนที่ยังไม่ได้จด = ขีด
+      const days = [...dailyByDay.keys()].sort();
+      return lastMonths(curMonth).map((m) => {
+        const last = days.filter((d) => d.startsWith(m)).pop();
+        return { month: m, label: monthLabel(m), value: last ? sumParts(dailyParts(dailyByDay.get(last) ?? [])) : null };
+      });
+    }
     if (!monthly) return null;
     const key = topic === 'req' || topic === 'start' ? 'requests' : 'apps';
     const series = new Map(monthlySeries(monthly, key, jobOk).map((s) => [s.month, s.value] as const));
@@ -264,6 +303,13 @@ export default function RecruitTopicsView({
       return [...groupByDay(links, (r) => r.day, win.from, win.to)].map(([day, list]) => ({ day, parts: selfParts(list) }));
     }
     if (topic === 'fb') return null;
+    if ((topic === 'req' || topic === 'start') && dailyByDay) {
+      // ยอด ณ สิ้นวันที่จดไว้ · วันที่ยังไม่ได้จด = ขีด (ไม่ใช่ 0)
+      return daysOf(win.from, win.to).map((day) => {
+        const rows = dailyByDay.get(day);
+        return rows ? { day, parts: dailyParts(rows) } : { day, parts: [], missing: true };
+      });
+    }
     if (topic === 'req' || topic === 'start') {
       // ใบขอเข้ามาแต่ละวัน (ใบที่ส่งเข้ามาในช่วง ทุกสถานะ) — แยก ยังเปิด / ได้คนแล้ว / ยกเลิก
       const rows = requestRows.filter((r) => r.bu === selBu && r.inRange !== false);
@@ -272,7 +318,7 @@ export default function RecruitTopicsView({
     if (!cohort) return null;
     const of = dayParts[topic];
     return [...groupByDay(cohortBu, (f) => (f.createdAt ? bkkDayOf(f.createdAt) : null), win.from, win.to)].map(([day, list]) => ({ day, parts: of(list) }));
-  }, [topic, posts, cohort, cohortBu, dayParts, win.from, win.to, requestRows, selBu]);
+  }, [topic, posts, cohort, cohortBu, dayParts, win.from, win.to, requestRows, selBu, dailyByDay, dailyParts]);
   const prevDays = React.useMemo(() => {
     if (!prevBu || !(topic in dayParts)) return null;
     // วันเดียวกันของช่วงก่อน — เลื่อนตามระยะเริ่มช่วง
@@ -287,8 +333,8 @@ export default function RecruitTopicsView({
   }, [prevBu, topic, dayParts, win.from, win.prevFrom]);
 
   const timeNote: string | null = {
-    req: 'กราฟเป็นใบขอเข้ามา · ยอดเหลือหาย้อนหลังยังไม่มี ระบบจะเริ่มจดทุกวันตั้งแต่วันที่หน้านี้ขึ้น',
-    start: 'กราฟเป็นใบขอเข้ามา · เริ่มหาแล้ว/ยังไม่เริ่มย้อนหลังยังไม่มี ระบบจะเริ่มจดทุกวันตั้งแต่วันที่หน้านี้ขึ้น',
+    req: dailyByDay ? 'ยอด ณ สิ้นวัน · เริ่มจด 16 พ.ย. 2569' : 'กราฟเป็นใบขอเข้ามา · ระบบเริ่มจดยอดเหลือหาทุกวันตั้งแต่ 16 พ.ย. 2569',
+    start: dailyByDay ? 'ยอด ณ สิ้นวัน · เริ่มจด 16 พ.ย. 2569' : 'กราฟเป็นใบขอเข้ามา · ระบบเริ่มจดยอดเริ่มหาทุกวันตั้งแต่ 16 พ.ย. 2569',
     fb: 'Autopost มีผลรายกลุ่มตั้งแต่ 20 ต.ค. 2569 · รายวันยังไม่มี',
     self: 'โพสต์แล้ว / Gen link เริ่มนับ 13 พ.ย. 2569',
     people: null,

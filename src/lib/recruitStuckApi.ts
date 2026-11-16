@@ -1,5 +1,5 @@
 import { apiFetch } from './apiFetch';
-import type { StuckMonthlyRow, StuckRequest } from './recruitStuck';
+import type { StuckDailyRow, StuckMonthlyRow, StuckRequest } from './recruitStuck';
 
 /** `GET /api/recruit-stuck` — ใบขอที่เหลือหา ติดตรงไหน + ยอดรายเดือน (หน้าภาพรวมโฉมใหม่ · 4 พ.ย. 2569) */
 export type RecruitStuckResponse = {
@@ -10,7 +10,9 @@ export type RecruitStuckResponse = {
   window?: { from: string; to: string };
   requests: StuckRequest[] | null;
   monthly: StuckMonthlyRow[] | null;
-  errors: Partial<Record<'requests' | 'monthly', string>>;
+  /** ยอดใบขอเหลือหา ณ สิ้นวัน (`part=daily`) */
+  daily?: StuckDailyRow[] | null;
+  errors: Partial<Record<'requests' | 'monthly' | 'daily', string>>;
 };
 
 /**
@@ -32,7 +34,7 @@ export function prefetchRecruitStuck(bu: string | null | undefined, range: { fro
 }
 
 /** `part: 'monthly'` = เทียบเดือนอย่างเดียว (โหลดตอนกางการ์ด · 9 พ.ย. 2569) · ไม่ส่ง = ใบขอ */
-export async function fetchRecruitStuck(bu?: string | null, range?: { from: string; to: string }, part?: 'monthly'): Promise<RecruitStuckResponse> {
+export async function fetchRecruitStuck(bu?: string | null, range?: { from: string; to: string }, part?: 'monthly' | 'daily'): Promise<RecruitStuckResponse> {
   if (!part) {
     const key = prefetchKey(bu, range);
     const hit = prefetched.get(key);
@@ -44,7 +46,7 @@ export async function fetchRecruitStuck(bu?: string | null, range?: { from: stri
   return requestRecruitStuck(bu, range, part);
 }
 
-async function requestRecruitStuck(bu?: string | null, range?: { from: string; to: string }, part?: 'monthly'): Promise<RecruitStuckResponse> {
+async function requestRecruitStuck(bu?: string | null, range?: { from: string; to: string }, part?: 'monthly' | 'daily'): Promise<RecruitStuckResponse> {
   const q = new URLSearchParams();
   if (bu) q.set('bu', bu);
   if (part) q.set('part', part);

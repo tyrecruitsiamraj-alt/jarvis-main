@@ -36,7 +36,8 @@ import { loadPenaltyLedgerRaw } from '../_lib/siamrajPenaltyLedgerSql.js';
 import { buildPenaltyLedger, ledgerJobIdOf, requestFlowRole, type LedgerRequest, type RequestFlowRole } from '../../src/lib/requestPenaltyLedger.js';
 import { normalizeTrendBu, trendBuFromSiteCode } from '../../src/lib/trends/bu.js';
 import { APPOINTMENT_AT_SQL } from '../_lib/applicantOverviewSql.js';
-import { stuckReasonOf, type StuckMonthlyRow, type StuckPostStatus, type StuckRequest, type StuckState } from '../../src/lib/recruitStuck.js';
+import { stuckReasonOf, type StuckDailyRow, type StuckMonthlyRow, type StuckPostStatus, type StuckRequest, type StuckState } from '../../src/lib/recruitStuck.js';
+import { loadRequestDaily } from '../_lib/requestDailySnapshot.js';
 import type { RecruitAppFact } from '../../src/lib/recruitOverviewTypes.js';
 import type { JobRequest } from '../../src/types/index.js';
 
@@ -54,7 +55,9 @@ export type RecruitStuckResponse = {
   window: { from: string; to: string };
   requests: StuckRequest[] | null;
   monthly: StuckMonthlyRow[] | null;
-  errors: Partial<Record<'requests' | 'monthly', string>>;
+  /** ยอดใบขอเหลือหา ณ สิ้นวัน (`part=daily`) */
+  daily?: StuckDailyRow[] | null;
+  errors: Partial<Record<'requests' | 'monthly' | 'daily', string>>;
 };
 
 const text = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null);
@@ -87,7 +90,7 @@ export function stuckWindowOf(from: unknown, to: unknown, today: string): Win {
  * `part` (9 พ.ย. 2569 "ตามร่างทั้งหมด" · หน้าโหลดช้า): ค่าเริ่ม = ใบขอ (ตอนเปิดหน้า) · `monthly` = เทียบเดือนอย่างเดียว (โหลดตอนกางการ์ด)
  * เทียบเดือนอ่านย้อน 6 เดือน (throughput + ERP + แจ้งเข้า) — เดิมโหลดทุกครั้งที่เปิดหน้า
  */
-export type StuckPart = 'requests' | 'monthly';
+export type StuckPart = 'requests' | 'monthly' | 'daily';
 export async function buildRecruitStuck(
   user: AuthedReq['user'],
   requestedBu: unknown,
@@ -102,6 +105,15 @@ export async function buildRecruitStuck(
   const win = stuckWindowOf(range.from, range.to, today);
   const body: RecruitStuckResponse = { generatedAt: now.toISOString(), today, bu: picked.bu, window: win, requests: null, monthly: null, errors: {} };
   if (buScope.mode === 'none') return body;
+  if (part === 'daily') {
+    try {
+      body.daily = await loadRequestDaily({ from: win.from, to: win.to, buSet });
+    } catch (e) {
+      logError('recruit-stuck: daily', e);
+      body.errors.daily = 'อ่านยอดรายวันไม่ได้';
+    }
+    return body;
+  }
 
   const skip = Promise.resolve(null);
   const [reqR, monR] = await Promise.allSettled([
@@ -122,6 +134,13 @@ export async function buildRecruitStuck(
 }
 
 type Scope = Awaited<ReturnType<typeof loadUserDepartmentScope>>;
+
+/** ใบขอที่ยังเปิดทั้งระบบ ณ วันนี้ — ตัวจดยอดรายวัน (`requestDailySnapshot`) · ชุดเดียวกับหน้าภาพรวม */
+export async function loadOpenStuckRequestsAll(now = new Date()): Promise<StuckRequest[]> {
+  const today = toBangkokYmd(now);
+  const rows = await loadStuckRequests({ mode: 'all' }, null, { from: today, to: today }, today);
+  return rows.filter((r) => (r.state ?? 'open') === 'open');
+}
 type Win = { from: string; to: string };
 const SQL_PREFIX = 'siamraj-sql:';
 
@@ -380,7 +399,8 @@ async function handler(req: AuthedReq, res: ApiRes) {
     return sendError(res, 405, 'Method not allowed');
   }
   try {
-    const body = await buildRecruitStuck(req.user, req.query?.bu, { from: req.query?.from, to: req.query?.to }, new Date(), req.query?.part === 'monthly' ? 'monthly' : 'requests');
+    const part = req.query?.part === 'monthly' ? 'monthly' : req.query?.part === 'daily' ? 'daily' : 'requests';
+    const body = await buildRecruitStuck(req.user, req.query?.bu, { from: req.query?.from, to: req.query?.to }, new Date(), part);
     res.setHeader?.('Cache-Control', 'no-store');
     return res.status(200).json(body);
   } catch (e) {

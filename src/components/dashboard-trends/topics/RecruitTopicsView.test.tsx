@@ -128,4 +128,26 @@ describe('ภาพรวม 8 เรื่อง เทียบ BU', () => {
     // แท่ง BU = จำนวนลิงก์ · รายวันรวมเท่ายอด
     expect(screen.getByTestId('topic-bu-LBD').textContent).toContain('3');
   });
+
+  it('ใบขอเหลือหา: มียอดที่จดไว้ = กราฟเป็นยอด ณ สิ้นวัน · วันที่ยังไม่จด = ขีด กดไม่ได้ · ป๊อปแยกขั้นที่ติด', async () => {
+    fetchRecruitStuck.mockImplementation(async (_bu: unknown, _r: unknown, part?: string) =>
+      part === 'daily'
+        ? { daily: [
+            { day: '2026-11-16', bu: 'LBD', phase: 'before', started: false, requests: 5, positions: 6 },
+            { day: '2026-11-16', bu: 'LBD', phase: 'calling', started: true, requests: 2, positions: 2 },
+          ], errors: {} }
+        : { monthly: [], errors: {} },
+    );
+    renderView('/?topic=req');
+    const day16 = await screen.findByTestId('topic-day-2026-11-16');
+    await waitFor(() => expect(day16.textContent).toContain('7'));
+    expect((screen.getByTestId('topic-day-2026-11-15') as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByTestId('topic-day-2026-11-15').textContent).toContain('—');
+    expect(screen.getByTestId('topic-month-2026-11').textContent).toContain('7');
+    expect(screen.getByTestId('topic-month-2026-10').textContent).toContain('—');
+    fireEvent.click(day16);
+    const dlg = await screen.findByRole('dialog');
+    expect(within(dlg).getByTestId('topic-equation').textContent).toContain('7');
+    expect(within(dlg).getByTestId('topic-equation').textContent).not.toContain('ไม่ลงตัว');
+  });
 });

@@ -247,6 +247,9 @@ export type StuckMonthlyRow = {
   /** null = อ่านแจ้งเข้า ERP ไม่ได้ (ห้ามยุบเป็น 0) */
   informed: number | null;
 };
+/** ยอดใบขอเหลือหา ณ สิ้นวัน (`181_recruit_request_daily` · เจ้าของ 16 พ.ย. 2569 "จดทุกคืน") — BU × ขั้นที่ติด × เริ่มหาแล้ว */
+export type StuckDailyRow = { day: string; bu: string; phase: string; started: boolean; requests: number; positions: number };
+
 export type StuckTrendKey = 'requests' | 'apps' | 'booked' | 'informed';
 export const STUCK_TREND_LABEL: Record<StuckTrendKey, string> = { requests: 'ใบขอเข้ามา', apps: 'รายชื่อที่กรอกมา', booked: 'นัดได้', informed: 'ได้ลงงาน' };
 

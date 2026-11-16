@@ -11,7 +11,8 @@ import TopicEquation from './TopicEquation';
 import TrendDelta from '../stuck/TrendDelta';
 
 export type TimeMonth = { month: string; label: string; value: number | null };
-export type TimeDay = { day: string; parts: TopicPart[] };
+/** `missing` = วันนั้นยังไม่มีข้อมูล (เช่น ก่อนเริ่มจดยอดรายวัน) — ขึ้นขีด กดไม่ได้ (ห้ามเป็น 0) */
+export type TimeDay = { day: string; parts: TopicPart[]; missing?: boolean };
 
 /**
  * ═══ กราฟเวลาของเรื่องที่เลือก (เจ้าของ 16 พ.ย. 2569) ═══
@@ -86,12 +87,13 @@ export default function TopicTimeCard({
                   key={d.day}
                   type="button"
                   variant="ghost"
+                  disabled={d.missing}
                   onClick={() => setOpen(d)}
                   className="flex h-full flex-col items-center justify-end gap-1 rounded-lg px-0 py-1 font-normal"
                   title={`${formatYmdTh(d.day)} ${fmt(dTotals[i])} ${unit}`}
                   data-testid={`topic-day-${d.day}`}
                 >
-                  <span className="text-[10px] tabular-nums text-foreground">{dTotals[i] ? fmt(dTotals[i]) : ''}</span>
+                  <span className="text-[10px] tabular-nums text-foreground">{d.missing ? '—' : dTotals[i] ? fmt(dTotals[i]) : ''}</span>
                   <span className={barCls} style={{ height: `${grown && dTotals[i] ? Math.max(2, (dTotals[i] / dMax) * 80) : 0}px` }} />
                   <span className={cn('text-[10px]', DASH.sub)}>{Number(d.day.slice(8))}</span>
                 </Button>
