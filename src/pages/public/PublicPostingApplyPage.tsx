@@ -36,7 +36,16 @@ const PublicPostingApplyPage: React.FC = () => {
       .then((data) => {
         if (cancelled) return;
         if (!data) setNotFound(true);
-        else setInfo(data);
+        else {
+          setInfo(data);
+          /**
+           * กดลิงก์ = ขึ้นฟอร์มทันที ข้ามหน้ารายละเอียด (เจ้าของ 16 พ.ย. 2569 — ลิงก์โพสต์คลิก 222 กรอก 0 ·
+           * Jame "รายละเอียดเค้าเห็นจากโพสต์อยู่แล้ว คลิกมาแล้วควรให้เค้ากรอกไปเลย") · งาน/ช่องทางล็อกตามลิงก์ ไม่ให้เลือก
+           * ปิดฟอร์ม = เห็นรายละเอียด + ปุ่ม "สมัครงาน" เดิม (ทางกลับ) · ปิดรับแล้ว = ไม่เด้ง
+           * ไม่นับ "กดสมัคร" ตอนเด้งเอง (นับเฉพาะคนกดปุ่มเอง)
+           */
+          if (data.status !== 'closed') setApplyOpen(true);
+        }
       })
       .catch(() => {
         if (!cancelled) setFailed(true);
