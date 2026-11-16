@@ -558,8 +558,8 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
   /** บวกหนึ่งเพื่อสั่งโหลดประกาศใหม่ — ใช้หลังสร้าง/แก้ประกาศ ไม่งั้นชิปช่องทางกับปุ่มแก้ไขไม่อัปเดตจนรีเฟรชหน้า */
   const [postingsRev, setPostingsRev] = useState(0);
   /**
-   * แท็บภาพรวมไม่ใช้ประกาศของกล่องงาน — ยังไม่โหลดจนกว่าจะไปแท็บอื่น (เจ้าของ 16 พ.ย. 2569 "แก้ข้อ 3" หน้าภาพรวมเปิดช้า ·
-   * วัดบนเว็บจริง: ประกาศทั้งก้อน 5 วิ ยิงพร้อมก้อนภาพรวม ⇒ ภาพรวมจาก 2 วิ กลายเป็น 6.4 วิ) · โหลดแล้วไม่ทิ้ง
+   * แท็บภาพรวมไม่ใช้ของบนการ์ดกล่องงาน (ประกาศ · ป้าย So Scraping · ยอดโพสต์ต่อใบ · ทำอะไรไปแล้ว) — ยังไม่โหลดจนกว่าจะไปแท็บอื่น
+   * (เจ้าของ 16 พ.ย. 2569 "แก้ข้อ 3" หน้าภาพรวมเปิดช้า · วัดบนเว็บจริง: ภาพรวมเดี่ยว ๆ 2 วิ แต่ยิงพร้อมของกล่องงาน 6.4–6.8 วิ) · โหลดแล้วไม่ทิ้ง
    */
   const [postingsWanted, setPostingsWanted] = useState(view !== 'dashboard');
   useEffect(() => {
@@ -571,7 +571,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
    */
   const [soByJob, setSoByJob] = useState<Map<string, JobPostingRequest[]> | null>(null);
   useEffect(() => {
-    if (!isStaff) return;
+    if (!isStaff || !postingsWanted) return;
     let alive = true;
     const load = () =>
       fetchBoardJobPostings()
@@ -591,7 +591,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
       alive = false;
       window.clearInterval(t);
     };
-  }, [isStaff, postingsRev]);
+  }, [isStaff, postingsRev, postingsWanted]);
   /**
    * ยอดโพสต์ลงกลุ่มต่อใบ (เจ้าของ 12 พ.ย. 2569 "งานไหน สั่งไปเท่าไหร่ โพสต์ได้เท่าไหร่ บอกตรงนี้เลย") — `/api/so-post-summary`
    * โหลดไม่ได้ = การ์ดไม่มีบรรทัดนี้ (ป้ายสถานะคำสั่งยังอยู่) · โหลดใหม่ตามรอบเดียวกับป้าย So Scraping
@@ -611,7 +611,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
   const [standaloneCounts, setStandaloneCounts] = useState<Record<string, number> | null>(null);
   const [actionsOf, setActionsOf] = useState<{ job: { id: string; title: string }; tab: BoardActionTab } | null>(null);
   useEffect(() => {
-    if (!isStaff) return;
+    if (!isStaff || !postingsWanted) return;
     let alive = true;
     const load = () =>
       fetchJobPostActions()
@@ -629,9 +629,9 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
       alive = false;
       window.clearInterval(t);
     };
-  }, [isStaff, postingsRev]);
+  }, [isStaff, postingsRev, postingsWanted]);
   useEffect(() => {
-    if (!isStaff) return;
+    if (!isStaff || !postingsWanted) return;
     let alive = true;
     const load = () =>
       fetchSoPostSummary()
@@ -645,7 +645,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
       alive = false;
       window.clearInterval(t);
     };
-  }, [isStaff, postingsRev]);
+  }, [isStaff, postingsRev, postingsWanted]);
   /**
    * 🔴 **โหลดประกาศเสร็จหรือยัง — ไม่ใช่ `postings.length > 0`**
    * ต้องรู้แน่ ๆ เพราะเลขบนหัวหน้าจอพึ่ง "ใบนี้มีลิงก์ไหม" · ยังไม่รู้ = ห้ามโชว์เลข

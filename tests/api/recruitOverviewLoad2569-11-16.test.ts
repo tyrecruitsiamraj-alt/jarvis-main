@@ -14,7 +14,15 @@ describe('หน้าภาพรวม 8 เรื่อง: หัวกา�
   it('แท็บภาพรวม = ยังไม่ยิงประกาศทั้งก้อน · ไปแท็บอื่นแล้วโหลด', () => {
     const board = readFileSync('src/components/jobs/JobBoardView.tsx', 'utf8');
     expect(board).toContain("useState(view !== 'dashboard')");
-    expect(board).toContain('if (!isStaff || !postingsWanted) return;');
-    expect(board).toContain('[isStaff, postingsRev, postingsWanted]');
+        // ประกาศ · ป้าย So Scraping · ทำอะไรไปแล้ว · ยอดโพสต์ต่อใบ = 4 เส้นรอทั้งหมด
+    expect(board.match(/if \(!isStaff \|\| !postingsWanted\) return;/g)).toHaveLength(4);
+    expect(board.match(/\[isStaff, postingsRev, postingsWanted\]/g)).toHaveLength(4);
+    expect(board).not.toContain('[isStaff, postingsRev]);');
+  });
+
+  it('แท็บภาพรวม = ยังไม่โหลดใบที่ปิดแล้ว', () => {
+    const page = readFileSync('src/pages/jobs/StaffJobBoardPage.tsx', 'utf8');
+    expect(page).toContain('useClosedRequestsFeed({ skip: !closedWanted })');
+    expect(page).toContain('useState(!onDashboard)');
   });
 });

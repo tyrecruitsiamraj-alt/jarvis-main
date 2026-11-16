@@ -74,7 +74,14 @@ const VIEW_TO_RM_TAB = {
 const StaffJobBoardPage: React.FC = () => {
   const { jobs, loading, refreshing, loadError, feedState, dataAgeSeconds, refetch } =
     useUnitRequestsFeed();
-  const closed = useClosedRequestsFeed();
+  const [searchParams, setSearchParams] = useSearchParams();
+  /** แท็บภาพรวมไม่ใช้ใบที่ปิดแล้ว — ยังไม่โหลดจนกว่าจะไปแท็บอื่น (เจ้าของ 16 พ.ย. 2569 หน้าภาพรวมเปิดช้า · ดู `postingsWanted` ใน JobBoardView) */
+  const onDashboard = searchParams.get('view') === 'dashboard';
+  const [closedWanted, setClosedWanted] = useState(!onDashboard);
+  useEffect(() => {
+    if (!onDashboard) setClosedWanted(true);
+  }, [onDashboard]);
+  const closed = useClosedRequestsFeed({ skip: !closedWanted });
   /** ยอดเหลือหาของกล่องงาน (ตัวเดียวกับหัวกล่องงาน) — ส่งให้แท็บ Dashboard ใช้ ห้ามนับชุดที่สอง */
   const boardOpen = useMemo(() => {
     if (loading || feedState !== 'ready') return null;
@@ -86,7 +93,6 @@ const StaffJobBoardPage: React.FC = () => {
    * ให้ตัวกรองดูเป็นคน (30 ก.ย. 2569) · ใช้ชุดเดิม ไม่ยิงเส้นใหม่
    */
   const allJobs = useMemo(() => [...jobs, ...closed.rows], [jobs, closed.rows]);
-  const [searchParams, setSearchParams] = useSearchParams();
   const raw = searchParams.get('view');
   const legacyBox = raw ? (LEGACY_BOX_VIEWS[raw] ?? null) : null;
   const view: BoardViewId = [...RM_VIEWS, ...EXTRA_VIEWS].includes((raw ?? '') as never)
