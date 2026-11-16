@@ -61,11 +61,11 @@ describe('🔴 ใบที่ยกเลิกข้อมูลไม่ถ�
     const end = HANDLER.indexOf('...(aiCounts ? { aiCounts } : {}),');
     const block = HANDLER.slice(start, end);
     expect(block).toContain('application_cancellations');
-    for (const name of ['originRows', 'leadRows', 'aiRows']) {
+    for (const name of ['originRows', 'leadRows', 'aiRows', 'kindRows']) {
       expect(block).toMatch(new RegExp(`const ${name} = await withoutCancelled<`));
     }
-    // ทุก query ของยอดบนการ์ดต้องต่อท้ายตัวกรอง \${f}
-    expect((block.match(/\$\{f\}/g) ?? []).length).toBe(3);
+    // ทุก query ของยอดบนการ์ดต้องต่อท้ายตัวกรอง \${f} (16 พ.ย. 2569 + ยอดผู้สมัครกล่องลอย = 4)
+    expect((block.match(/\$\{f\}/g) ?? []).length).toBe(4);
   });
 });
 

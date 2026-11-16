@@ -50,3 +50,17 @@ describe('การ์ดกล่องลอย', () => {
     expect(d).toContain(".filter((x) => !standalone || x.key === 'manual')");
   });
 });
+
+describe('เลขผู้สมัครบนการ์ดกล่องลอย = ที่ปุ่มดูรายชื่อเปิดเห็น (เจ้าของ 16 พ.ย. 2569)', () => {
+  it('server นับต่อประเภท: ไม่ผูกใบขอ · ไม่ Lead · ไม่มีคนเก็บไปโทร · ไม่ยกเลิก · BU ตามสิทธิ์', () => {
+    const h = readFileSync('api/_handlers/job-applications.ts', 'utf8');
+    expect(h).toContain('a.job_id is null and not a.is_lead and a.claimed_by is null ${f}');
+    expect(h).toContain('...(standaloneCounts ? { standaloneCounts } : {})');
+    expect(h).toContain('if (deptCodes && !(r.dept && deptCodes.includes(r.dept.trim().toUpperCase()))) continue;');
+  });
+  it('การ์ดใช้ standaloneCounts ไม่ใช่ applicationCount ของประกาศ · ยังไม่มา = ขีด', () => {
+    const v = readFileSync('src/components/jobs/JobBoardView.tsx', 'utf8');
+    expect(v).toContain("standaloneCounts ? (standaloneCounts[k.code] ?? 0).toLocaleString('th-TH') : '—'");
+    expect(v).not.toContain('a.applicants += p.applicationCount');
+  });
+});

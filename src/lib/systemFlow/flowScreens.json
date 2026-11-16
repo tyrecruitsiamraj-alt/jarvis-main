@@ -3616,16 +3616,16 @@
      "api": "GET /api/job-post-actions?job=standalone:<ประเภท>",
      "effects": [],
      "when": null,
-     "src": "src/components/jobs/JobBoardView.tsx:2279"
+     "src": "src/components/jobs/JobBoardView.tsx:2286"
     },
     {
      "label": "ดูรายชื่อ",
      "action": "tab",
-     "target": "แท็บรายชื่อผู้สมัคร ติ๊ก ใบขอที่สมัคร = กล่องลอย · ประเภทนั้น",
+     "target": "แท็บผู้สมัคร › รายชื่อทั้งหมด ติ๊ก ใบขอที่สมัคร = กล่องลอย · ประเภทนั้น",
      "api": null,
      "effects": [],
      "when": null,
-     "src": "src/components/jobs/JobBoardView.tsx:2301"
+     "src": "src/components/jobs/JobBoardView.tsx:2312"
     }
    ]
   },

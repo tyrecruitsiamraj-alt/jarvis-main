@@ -1691,8 +1691,39 @@ async function handler(req: AuthedReq, res: ApiRes) {
         aiCounts = undefined;
       }
 
+      /**
+       * ผู้สมัครต่อกล่องลอย (เจ้าของ 16 พ.ย. 2569 "ทำให้เลขบนการ์ดตรงกับที่กดเข้าไปเห็น") — กติกาเดียวกับ `counts`
+       * (ไม่นับ Lead · ไม่นับใบที่ยกเลิก) + ไม่นับใบที่มีคนเก็บไปโทรแล้ว (อยู่แท็บการติดต่อ ไม่อยู่แท็บผู้สมัครที่ปุ่มพาไป)
+       * + ชุดเดียวกับที่ปุ่ม "ดูรายชื่อ" กรอง: ใบไม่ผูกใบขอที่สมัครผ่านประกาศกล่องลอย
+       * + สิทธิ์ BU แบบรายชื่อ (ใบไม่ผูกใบขอเห็นได้เมื่อ BU ของใบอยู่ในสิทธิ์) · อ่านไม่ได้ = ไม่ส่งคีย์ (การ์ดใช้ยอดเดิม)
+       */
+      let standaloneCounts: Record<string, number> | undefined;
+      try {
+        const deptScope = await loadUserDepartmentScope(req.user);
+        const deptCodes = deptScope.mode === 'code' ? deptScope.codes : null;
+        if (deptScope.mode === 'none') {
+          standaloneCounts = {};
+        } else {
+          const kindRows = await withoutCancelled<{ kind: string; dept: string | null; n: string }>(
+            (f) => `select p.standalone_kind as kind, a.department_code as dept, count(*)::text as n
+               from ${tbl} a join ${tableInAppSchema('recruit_postings')} p on p.id = a.posting_id
+              where p.job_id is null and p.standalone_kind is not null and a.job_id is null and not a.is_lead and a.claimed_by is null ${f}
+              group by p.standalone_kind, a.department_code`,
+          );
+          standaloneCounts = {};
+          for (const r of kindRows) {
+            if (deptCodes && !(r.dept && deptCodes.includes(r.dept.trim().toUpperCase()))) continue;
+            standaloneCounts[r.kind] = (standaloneCounts[r.kind] ?? 0) + Number(r.n);
+          }
+        }
+      } catch (e) {
+        if (!isUndefinedColumn(e)) throw e;
+        standaloneCounts = undefined;
+      }
+
       return res.status(200).json({
         counts,
+        ...(standaloneCounts ? { standaloneCounts } : {}),
         ...(countsByOrigin ? { countsByOrigin } : {}),
         ...(leadCounts ? { leadCounts } : {}),
         ...(aiCounts ? { aiCounts } : {}),

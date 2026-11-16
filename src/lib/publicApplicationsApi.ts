@@ -433,6 +433,8 @@ export type JobApplicantBreakdown = {
    * server ยังบอกไม่ได้ (ห้ามตีเป็น 0/0)
    */
   aiCounts: Record<string, { sent: number; total: number }>;
+  /** ผู้สมัครต่อกล่องลอย (16 พ.ย. 2569 · ชุดเดียวกับปุ่ม "ดูรายชื่อ" บนการ์ดกล่องลอย) · null = server ยังบอกไม่ได้ */
+  standaloneCounts: Record<string, number> | null;
 };
 
 export async function fetchJobApplicantBreakdown(): Promise<JobApplicantBreakdown> {
@@ -444,8 +446,10 @@ export async function fetchJobApplicantBreakdown(): Promise<JobApplicantBreakdow
     countsByOrigin?: Record<string, Partial<Record<ApplicationOrigin, number>>>;
     leadCounts?: Record<string, number>;
     aiCounts?: Record<string, { sent: number; total: number }>;
+    standaloneCounts?: Record<string, number>;
   };
   return {
+    standaloneCounts: body.standaloneCounts ?? null,
     counts: body.counts ?? {},
     byOrigin: body.countsByOrigin ?? {},
     leadCounts: body.leadCounts ?? {},

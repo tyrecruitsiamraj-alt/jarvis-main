@@ -587,6 +587,11 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
   const [jobActions, setJobActions] = useState<Record<string, JobPostActionsSummary> | null>(null);
   /** กล่องลอยต่อประเภท (16 พ.ย. 2569 "ทำกล่องลอยให้เหมือนการ์ดใบขอ") — มีแต่โพสต์เอง · null = ยังโหลดไม่มา */
   const [kindActions, setKindActions] = useState<Record<string, JobPostActionsSummary> | null>(null);
+  /**
+   * ผู้สมัครต่อกล่องลอย — ชุดเดียวกับที่ปุ่ม "ดูรายชื่อ" เปิดเห็น (เจ้าของ 16 พ.ย. 2569 "ทำให้เลขบนการ์ดตรงกับที่กดเข้าไปเห็น")
+   * เดิมรวม applicationCount ของประกาศ (นับ Lead · ใบยกเลิก · ใบที่ผูกใบขอทีหลัง) การ์ดบอก 24 กดเข้าไปเห็น 8 · null = ยังโหลดไม่มา
+   */
+  const [standaloneCounts, setStandaloneCounts] = useState<Record<string, number> | null>(null);
   const [actionsOf, setActionsOf] = useState<{ job: { id: string; title: string }; tab: BoardActionTab } | null>(null);
   useEffect(() => {
     if (!isStaff) return;
@@ -1215,7 +1220,6 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
       string,
       {
         postings: number;
-        applicants: number;
         titles: string[];
         provinces: string[];
         bus: string[];
@@ -1224,13 +1228,12 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
       }
     > = {};
     for (const k of postingKinds) {
-      acc[k.code] = { postings: 0, applicants: 0, titles: [], provinces: [], bus: [], lastGen: null };
+      acc[k.code] = { postings: 0, titles: [], provinces: [], bus: [], lastGen: null };
     }
     for (const p of postings) {
       if (!p.standaloneKind || !acc[p.standaloneKind]) continue;
       const a = acc[p.standaloneKind];
       a.postings += 1;
-      a.applicants += p.applicationCount ?? 0;
       const title = p.title?.trim();
       if (title && !a.titles.includes(title)) a.titles.push(title);
       const province = p.province?.trim();
@@ -1315,6 +1318,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
         setOriginCounts(b.byOrigin);
         setLeadCounts(b.leadCounts);
         setAiCounts(b.aiCounts);
+        setStandaloneCounts(b.standaloneCounts);
         setBreakdownLoaded(true);
         setBreakdownFailed(false);
       })
@@ -2207,7 +2211,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                 const tone = TONE[STANDALONE_KIND_TONE[k.code] ?? 'neutral'];
                 const s =
                   standaloneSummary[k.code] ??
-                  { postings: 0, applicants: 0, titles: [], provinces: [], bus: [], lastGen: null };
+                  { postings: 0, titles: [], provinces: [], bus: [], lastGen: null };
                 const openGen = () =>
                   setGenStandalone({
                     kind: k.code,
@@ -2290,7 +2294,11 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                       <div className="flex w-full flex-wrap items-center justify-between gap-1.5">
                         <span className="inline-flex flex-wrap items-center gap-x-1.5 text-xs font-medium text-foreground">
                           <Users className={cn('h-3.5 w-3.5', TONE.info.value)} />
-                          ผู้สมัคร {s.applicants.toLocaleString('th-TH')} คน
+                          ผู้สมัคร{' '}
+                          <span className="text-sm font-medium tabular-nums">
+                            {standaloneCounts ? (standaloneCounts[k.code] ?? 0).toLocaleString('th-TH') : '—'}
+                          </span>{' '}
+                          คน
                         </span>
                         <Button
                           type="button"
