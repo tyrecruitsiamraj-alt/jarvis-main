@@ -179,12 +179,14 @@ describe('คำว่า "Gen link" ทั้งระบบ (เจ้าข�
 });
 
 describe('สีหลักโหมดมืดอ่านชัด (เจ้าของ Choice 5 ต.ค. 2569)', () => {
-  it('index.css: สีหลักสว่าง 353 70% 64% + ตัวหนังสือบนสีหลักกรมท่าเข้ม', () => {
+  // 16 พ.ย. 2569 เปลี่ยนเป็นชุดของ KNOWA (เจ้าของ "เอาแบบ Knowa ทำเลย") — เจตนาเดิมยังอยู่: สีเน้นสว่าง + ตัวหนังสือบนสีเน้นเป็นสีมืด ไม่ใช่ขาว
+  // วัดแล้ว: ปุ่ม (#101116 บน #ff4863) 5.71:1 · ตัวหนังสือสีเน้นบนการ์ด #191a22 5.25:1 (เดิม 5.3 / 5.2)
+  it('index.css: สีเน้นสว่าง #ff4863 + ตัวหนังสือบนสีเน้นเป็นพื้นมืด #101116', () => {
     const css = read('src/index.css');
     const dark = css.slice(css.indexOf('  .dark {'), css.indexOf('--sidebar-ring', css.indexOf('  .dark {')) + 40);
-    expect(dark).toContain('--primary: 353 70% 64%;');
-    expect(dark).toContain('--primary-foreground: 220 54% 12%;');
-    expect(dark).toContain('--sidebar-primary-foreground: 220 54% 12%;');
+    expect(dark).toContain('--primary: 351.15 100% 64.12%;');
+    expect(dark).toContain('--primary-foreground: 230 15.79% 7.45%;');
+    expect(dark).toContain('--sidebar-primary-foreground: 230 15.79% 7.45%;');
   });
   it('branding ไม่เขียนตัวหนังสือขาวทับโหมดมืด', () => {
     const b = read('src/lib/brandingStorage.ts');

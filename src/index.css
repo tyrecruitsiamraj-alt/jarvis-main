@@ -112,29 +112,37 @@
   /* ── Dark mode — สลับด้วย class `dark` บน <html> (src/lib/theme.ts) ──
      คุมโทนเดียวกับ light: พื้นเทาเย็นแบบ Apple + system blue accent */
   .dark {
-    /* ธีมมืด = **กรมท่าเข้ม** ไม่ใช่เทาดำ ⇒ อยู่จานเดียวกับธีมสว่างและหน้า Login */
-    --background: 220 40% 8%;
-    --foreground: 220 20% 92%;
+    /* 🔴 16 พ.ย. 2569 เจ้าของ "ถ้าโหมดมืดฉันอยากได้แบบ Knowa … เฉพาะโหมดมืดนะ" → แบบร่างเทียบแล้ว "เอาแบบ Knowa ทำเลย"
+       ธีมมืด = **เทาถ่าน + สีเน้นชมพูแดง** ค่าจากบล็อก `.dark` ของ KNOWA (`app/globals.css`) · ธีมสว่างไม่แตะ
+       เดิม (5 ต.ค.–15 พ.ย. 2569) = กรมท่าเข้ม 220° — ค่าเก่าอยู่ในประวัติ git ถ้าต้องการคืน
+       ⚠️ สีที่มีความหมาย (destructive/success/warning/info) คงเดิม — เป็นภาษาของตัวเลข */
+    /* พื้นหน้า #101116 (`--ground` ของ KNOWA) */
+    --background: 230 15.79% 7.45%;
+    /* หมึก #f6f4f8 */
+    --foreground: 270 22.22% 96.47%;
 
-    --card: 220 32% 12%;
-    --card-foreground: 220 20% 92%;
+    /* การ์ด #191a22 */
+    --card: 233.33 15.25% 11.57%;
+    --card-foreground: 270 22.22% 96.47%;
 
-    --popover: 220 32% 12%;
-    --popover-foreground: 220 20% 92%;
+    --popover: 233.33 15.25% 11.57%;
+    --popover-foreground: 270 22.22% 96.47%;
 
-    /* 🔴 สีหลักโหมดมืดสว่างขึ้น + ตัวหนังสือบนสีหลักเป็นกรมท่าเข้ม (เจ้าของ Choice 5 ต.ค. 2569)
-       เดิม 353 55% 50% ⇒ ตัวหนังสือสีหลักบนการ์ด 3.3:1 · ตอนนี้ 5.2:1 · ปุ่ม (กรมท่าบนเบอร์กันดี) 5.3:1 ผ่านทั้งคู่ */
-    --primary: 353 70% 64%;
-    --primary-foreground: 220 54% 12%;
+    /* สีเน้น ชมพูแดง #ff4863 · ตัวหนังสือบนสีเน้น = พื้นมืด #101116 (KNOWA) */
+    --primary: 351.15 100% 64.12%;
+    --primary-foreground: 230 15.79% 7.45%;
 
-    --secondary: 220 24% 17%;
-    --secondary-foreground: 220 16% 82%;
+    /* พื้นรอง/ชิป — KNOWA ใช้ #1b1a23 (ห่างการ์ดแค่ 0.4%) · ยกเป็น 14% ให้ช่องที่กดอยู่ (bg-muted) ยังเห็นต่างจากการ์ด */
+    --secondary: 246.67 14.75% 14%;
+    --secondary-foreground: 270 22.22% 96.47%;
 
-    --muted: 220 24% 17%;
-    --muted-foreground: 220 12% 64%;
+    --muted: 246.67 14.75% 14%;
+    /* ตัวหนังสือรอง #9998a8 */
+    --muted-foreground: 243.75 8.42% 62.75%;
 
-    --accent: 220 24% 18%;
-    --accent-foreground: 220 20% 92%;
+    /* พื้น hover #25212b */
+    --accent: 264 13.16% 14.9%;
+    --accent-foreground: 270 22.22% 96.47%;
 
     --destructive: 3 85% 58%;
     --destructive-foreground: 0 0% 100%;
@@ -149,28 +157,29 @@
     --info: 211 100% 62%;
     --info-foreground: 0 0% 100%;
 
-    --border: 220 20% 22%;
-    --input: 220 20% 22%;
-    --ring: 353 70% 64%;
+    /* เส้นขอบ #3a3742 · ช่องกรอก #4a4752 · วงโฟกัส ชมพู #ff8ca0 */
+    --border: 256.36 9.09% 23.73%;
+    --input: 257.14 9.09% 30.2%;
+    --ring: 349.57 100% 77.45%;
 
-    --sidebar-background: 220 36% 10%;
-    --sidebar-foreground: 220 16% 82%;
-    --sidebar-primary: 353 70% 64%;
-    --sidebar-primary-foreground: 220 54% 12%;
-    --sidebar-accent: 220 24% 17%;
-    --sidebar-accent-foreground: 220 20% 92%;
-    --sidebar-border: 220 20% 22%;
-    --sidebar-ring: 353 70% 64%;
+    --sidebar-background: 233.33 16.36% 9.5%;
+    --sidebar-foreground: 270 22.22% 96.47%;
+    --sidebar-primary: 351.15 100% 64.12%;
+    --sidebar-primary-foreground: 230 15.79% 7.45%;
+    --sidebar-accent: 264 13.16% 14.9%;
+    --sidebar-accent-foreground: 270 22.22% 96.47%;
+    --sidebar-border: 256.36 9.09% 23.73%;
+    --sidebar-ring: 349.57 100% 77.45%;
 
-    --gradient-card: linear-gradient(145deg, hsl(220 32% 13% / 0.92), hsl(220 36% 10% / 0.75));
-    --gradient-hero: linear-gradient(135deg, hsl(220 34% 11%), hsl(220 40% 8%));
+    --gradient-card: linear-gradient(145deg, hsl(233 15% 12.5% / 0.96), hsl(233 15% 10.5% / 0.88));
+    --gradient-hero: linear-gradient(135deg, hsl(233 15% 11.5%), hsl(230 16% 7.5%));
 
-    --shadow-glow: 0 0 40px hsl(353 55% 50% / 0.25);
-    --shadow-card: 0 8px 24px hsl(220 60% 3% / 0.5);
+    --shadow-glow: 0 0 40px hsl(351 100% 64% / 0.22);
+    --shadow-card: 0 8px 24px hsl(240 30% 2% / 0.5);
 
-    --jarvis-warm-1: #0d1220;
-    --jarvis-warm-2: #111728;
-    --jarvis-warm-3: #151d31;
+    --jarvis-warm-1: #101116;
+    --jarvis-warm-2: #14151c;
+    --jarvis-warm-3: #191a22;
   }
 }
 
@@ -477,13 +486,13 @@
 @layer utilities {
   .dark .glass-card {
     border-color: rgba(255, 255, 255, 0.08);
-    background: linear-gradient(145deg, rgba(22, 35, 63, 0.9), rgba(15, 25, 46, 0.74));
+    background: linear-gradient(145deg, rgba(27, 28, 37, 0.94), rgba(20, 21, 28, 0.86));
     box-shadow: 0 6px 24px rgba(4, 8, 18, 0.5);
   }
 
   .dark .jarvis-frost {
     border-color: rgba(255, 255, 255, 0.08);
-    background: linear-gradient(145deg, rgba(22, 35, 63, 0.86), rgba(15, 25, 46, 0.66));
+    background: linear-gradient(145deg, rgba(27, 28, 37, 0.92), rgba(20, 21, 28, 0.8));
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
   }
 
@@ -858,8 +867,9 @@
   .dark {
     /* ทองในธีมมืดต้องสว่างขึ้น ไม่งั้นจมพื้น — สลับที่ตัวแปร ไฟล์จอไม่ต้องมี dark: */
     --jarvis-gold: #cfae72;
-    --jarvis-ink: #16233f;
-    --jarvis-ink-hover: #1e3054;
+    /* เทาถ่านแบบ KNOWA (16 พ.ย. 2569) — เดิมกรมท่า #16233f / #1e3054 */
+    --jarvis-ink: #191a22;
+    --jarvis-ink-hover: #25212b;
     --jarvis-ink-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
   }
 }

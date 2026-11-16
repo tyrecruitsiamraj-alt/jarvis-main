@@ -289,7 +289,7 @@ const PRIMARY_FOREGROUND_VARS = ['--primary-foreground', '--sidebar-primary-fore
  * สีแบรนด์ (--primary ฯลฯ) ของธีมที่เปิดอยู่ — `null` = ใช้ค่าของธีมใน index.css (ถอด inline)
  *
  * 🔴 QA 5 ต.ค. 2569: เดิมเขียนค่าธีมสว่าง (353 50% 37%) ทับทั้งสองธีม ⇒ โหมดมืดตัวหนังสือ `text-primary`
- * บนพื้นเข้ม contrast 2.34:1 · ตอนนี้ธีมมืด + สีแบรนด์ตั้งต้น = ใช้ค่าธีมมืดของ index.css (353 70% 64%)
+ * บนพื้นเข้ม contrast 2.34:1 · ตอนนี้ธีมมืด + สีแบรนด์ตั้งต้น = ใช้ค่าธีมมืดของ index.css (ชุด KNOWA ชมพูแดง #ff4863 · 16 พ.ย. 2569)
  * · สีแบรนด์ที่ตั้งเองในโหมดมืด = โทนเดิม ความสว่าง 64% (เจ้าของ Choice 5 ต.ค. 2569)
  */
 export function brandPrimaryForTheme(primaryHsl: string, dark: boolean): string | null {
