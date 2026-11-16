@@ -127,9 +127,11 @@ export default function SoPostGroupsCard({
   const d = state.data;
   // ชื่อ BU = ที่เซิร์ฟเวอร์ส่งไป So Scraping จริง · ยังไม่ได้คำตอบ = ยังไม่บอก BU
   const sub = `${formatYmdTh(from)} – ${formatYmdTh(to)}${d?.meta ? ` · ${d.meta.bu ?? 'ทุก BU'}` : ''}`;
+  // ห่อด้วย span คุมความกว้าง — คลาสเก่า jarvis-soft-field ของ SelectTrigger บังคับกว้าง 100% (w-32 บนตัวมันไม่ชนะ)
   const buSelect = picker ? (
+    <span className="block w-32">
     <Select value={cardBu ?? ALL_BU} onValueChange={(v) => setCardBu(v === ALL_BU ? null : v)}>
-      <SelectTrigger className="h-9 w-32 text-sm" aria-label="BU" data-testid="so-post-bu">
+      <SelectTrigger className="h-9 text-sm" aria-label="BU" data-testid="so-post-bu">
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
@@ -141,6 +143,7 @@ export default function SoPostGroupsCard({
         ))}
       </SelectContent>
     </Select>
+    </span>
   ) : null;
   const cells: Array<{ key: string; label: string; n: number | null; tone?: keyof typeof TONE }> = d
     ? [{ key: 'total', label: 'สั่งทั้งหมด', n: d.total }, ...d.statuses.map((st) => ({ key: st.key, label: soPostCellLabel(st), n: d.counts[st.key] ?? 0, tone: SO_POST_STATUS_TONE[st.key] }))]
