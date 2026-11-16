@@ -173,6 +173,8 @@ export function factsSql(
          else nullif(btrim(a.created_by_name), '') end as bringer,
          nullif(btrim(a.position_interest), '') as position,
          a.phone_e164, a.age,
+         -- เหตุที่ระบบไม่ส่ง AI (ภาพรวม 8 เรื่อง 16 พ.ย. 2569 "ยังไม่ส่ง Ai เพราะอะไร") — คิดเป็นกองฝั่ง Node (aiBlockOf)
+         a.ai_block_reason,
          ${CALLED_BY_AI_SQL} as by_ai,
          ${CALLED_BY_STAFF_SQL} as by_staff,
          ${FIRST_CALLED_AT_SQL} as first_called_at,
@@ -353,6 +355,12 @@ export function postSourceOf(code: string | null, note: string | null, autopostC
 
 const IRECRUIT_LABEL = /^irecruit/i;
 
+/** เหตุที่ไม่ส่ง AI → กอง · ไม่มีเหตุ = ไม่ใส่ช่อง */
+export function aiBlockOf(reason: string | null): { aiBlock?: 'income' | 'paused' | 'other' } {
+  if (!reason) return {};
+  return { aiBlock: /รายได้/.test(reason) ? 'income' : /พัก/.test(reason) ? 'paused' : 'other' };
+}
+
 export function toFact(r: Row, boardPhones: Set<string> | null, sources?: AppSourceMaps): RecruitAppFact {
   const phone = text(r.phone_e164);
   const p9 = phone9Of(phone);
@@ -395,6 +403,7 @@ export function toFact(r: Row, boardPhones: Set<string> | null, sources?: AppSou
     claimedBy: text(r.claimed_by),
     claimedAt: iso(r.claimed_at),
     overAge: isOverAge(r.age as number | string | null),
+    ...aiBlockOf(text(r.ai_block_reason)),
     aiOutOfArea: Boolean(r.ai_outcome) && isOutOfAreaAnswer(text(r.ai_summary), text(r.ai_reply)),
     onBoard: boardPhones ? Boolean(phone && boardPhones.has(phone)) : null,
     informed: sources ? informedSince(sources.informDays, p9, createdAt) : null,

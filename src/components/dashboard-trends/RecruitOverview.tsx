@@ -446,7 +446,7 @@ const RecruitOverview: React.FC<{
       {legacyCards ? null : (
         <RecruitStuckBody
           // 13 พ.ย. 2569 ค่าเริ่ม = แบบ Scale ลง (เจ้าของ "ทำมาก่อนเลย") · หน้าเดียวเลื่อนลง 11 พ.ย. เปิดได้ที่ `&dash=list` (ทางถอย)
-          layout={v5 ? (searchParams.get('dash') === 'list' ? 'v5' : 'scale') : undefined}
+          layout={v5 ? (searchParams.get('dash') === 'list' ? 'v5' : searchParams.get('dash') === 'scale' ? 'scale' : 'topics') : undefined}
           // การ์ดแนวโน้มใบขอรายวันถอดจากหน้านี้แล้ว (เจ้าของ 12 พ.ย. 2569 จัดหน้าใหม่) — ยังอยู่ในรายงานเพิ่มเติม (แบบเดิม)
           data={data}
           win={win}

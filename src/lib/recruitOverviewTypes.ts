@@ -70,6 +70,8 @@ export type RecruitAppFact = {
   screening?: 'passed' | 'not_passed' | null;
   /** อายุ 58 ปีขึ้นไป — ระบบไม่ส่งให้ AI (`isOverAge` · 19 ต.ค. 2569) */
   overAge?: boolean;
+  /** เหตุที่ระบบไม่ส่ง AI (`ai_block_reason`) — income = ใบขอยังไม่ตั้งรายได้ · paused = เบอร์ถูกพัก · other = เหตุอื่น · ไม่มี = ไม่ได้ถูกกัน (16 พ.ย. 2569) */
+  aiBlock?: 'income' | 'paused' | 'other';
   /** คำตอบกับ AI บอกว่าอยู่ไกล/เดินทางไม่สะดวก (`isOutOfAreaAnswer` · เจ้าของ 19 ต.ค. 2569 "AI ตอนถามที่อยู่") */
   aiOutOfArea?: boolean;
   /** เบอร์นี้มีใบแจ้งเข้า ERP ที่ไม่ยกเลิกตั้งแต่วันกรอกใบ (19 ต.ค. 2569 "จับได้ถึงแจ้งเข้า") · null = อ่าน ERP ไม่ได้ */

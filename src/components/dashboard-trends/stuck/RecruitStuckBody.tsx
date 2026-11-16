@@ -32,6 +32,7 @@ import CallerResultsTable from './CallerResultsTable';
 import PersonJourneyCard from './PersonJourneyCard';
 import ReleaseProgressCard from './ReleaseProgressCard';
 import RecruitScaleView, { type ScaleStripCell } from './RecruitScaleView';
+import RecruitTopicsView from '../topics/RecruitTopicsView';
 import DailyCompareChart from './DailyCompareChart';
 import type { SoPostPrevCounts } from './SoPostGroupsCard';
 import { buildCallerResults } from '@/lib/callerResults';
@@ -73,7 +74,7 @@ export default function RecruitStuckBody({
    * `scale` = ค่าเริ่ม (เจ้าของ 13 พ.ย. 2569 "เปิดมาปุ้บเป็นภาพใหญ่ พอกดอะไรก็ Scale ลงไป") แถบ 6 ช่อง + เทียบช่วงก่อนทุกเลข
    * `v5` = หน้าเดียวเลื่อนลง (11 พ.ย. 2569) — ทางถอย `&dash=list`
    */
-  layout?: 'v5' | 'scale';
+  layout?: 'v5' | 'scale' | 'topics';
 }) {
   const navigate = useNavigate();
   const [stuck, setStuck] = React.useState<{ data: RecruitStuckResponse | null; error: string | null }>({ data: null, error: null });
@@ -160,6 +161,7 @@ export default function RecruitStuckBody({
   const phasesRef = React.useRef<HTMLDivElement>(null);
   const pickedRef = React.useRef<HTMLDivElement>(null);
   const scale = layout === 'scale';
+  const topics = layout === 'topics';
   const pick = (title: string, list: StuckRequest[]) => {
     setPicked({ title, rows: list });
     requestAnimationFrame(() => (scale ? pickedRef : phasesRef).current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
@@ -187,12 +189,12 @@ export default function RecruitStuckBody({
   }, [scale, section]);
   /** รายชื่อช่วงก่อน ผ่านตัวกรองชุดเดียวกับช่วงนี้ · null = เทียบไม่ได้ */
   const prevCohort = React.useMemo(() => {
-    if (!scale) return null;
+    if (!scale && !topics) return null;
     const all = prevCohortOf(data.apps ?? [], win, data.firstDay, data.generatedAt);
     if (!all) return null;
     const byFilter = appsOfFilter(all, filter, filtered, recruiterOf);
     return narrowIds ? byFilter.filter((f) => Boolean(f.jobId && narrowIds.has(f.jobId))) : byFilter;
-  }, [scale, data.apps, win, data.firstDay, data.generatedAt, filter, filtered, recruiterOf, narrowIds]);
+  }, [scale, topics, data.apps, win, data.firstDay, data.generatedAt, filter, filtered, recruiterOf, narrowIds]);
   const prevChannels = React.useMemo(() => (prevCohort ? buildChannelFunnelTree(prevCohort) : null), [prevCohort]);
   const prevBringers = React.useMemo(() => (prevCohort ? buildBringerFunnelTree(prevCohort) : null), [prevCohort]);
   const prevReasons = React.useMemo(() => (prevCohort ? reasonGroups(prevCohort) : null), [prevCohort]);
@@ -243,6 +245,46 @@ export default function RecruitStuckBody({
       alive = false;
     };
   }, [scale, data.bu, win.from, win.to, win.prevFrom, win.prevTo, win.all]);
+
+  /**
+   * ═══ 8 เรื่อง เทียบ BU (เจ้าของ 16 พ.ย. 2569 "ทำมาก่อน") = ค่าเริ่ม ═══ ทางถอย: `&dash=scale` (แถบ 6 ช่อง) · `&dash=list`
+   * ตัวกรองบนสุดชุดเดิมคุมทุกเรื่อง · ใบขอ = ใบที่ผ่านตัวกรอง · รายชื่อ = cohort ชุดเดียวกับข้อ 2–4 เดิม
+   */
+  if (topics) {
+    return (
+      <div className="space-y-6" data-testid="recruit-stuck">
+        <StuckFilterBar rows={allRows} appRecruiters={appRecruiters} value={filter} onChange={setFilter} />
+        {stuck.error || stuck.data?.errors.requests ? (
+          <SectionError message={stuck.error ?? stuck.data?.errors.requests ?? 'อ่านใบขอที่เหลือหาไม่ได้'} onRetry={() => setRev((n) => n + 1)} />
+        ) : null}
+        <RecruitTopicsView
+          data={data}
+          win={win}
+          cohort={appsUnknown ? null : cohort}
+          prevCohort={prevCohort}
+          openRows={filtered.filter((r) => stuckInScope(r, 'remaining'))}
+          requestRows={filtered}
+          requestsReady={Boolean(stuck.data?.requests)}
+          jobOk={jobOk}
+          onOpenNames={onOpenNames}
+          onPickMonth={onPickMonth}
+        />
+        <div className="flex justify-end">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => {
+              navigate(legacyReportsPath(win, data.bu, requestFilterToParams(filter)));
+              window.scrollTo({ top: 0 });
+            }}
+            data-testid="v5-legacy-reports"
+          >
+            รายงานเพิ่มเติม (แบบเดิม)
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   if (scale) {
     const curLabel = rangeText({ from: win.from, to: win.to });
