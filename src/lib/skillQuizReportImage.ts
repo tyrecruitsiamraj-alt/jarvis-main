@@ -6,12 +6,11 @@
  */
 import { LOGIN_SCENE, TONE } from '@/lib/designTokens';
 import { downloadCanvas } from '@/lib/followDayReportImage';
-import { quizSkillTone, scoreQuiz, type QuizAnalysis, type QuizAnswers, type QuizSetContent, type QuizTextScore } from '@/lib/skillQuiz';
+import { quizSkillTone, scoreQuiz, type QuizAnalysis, type QuizAnswers, type QuizSetContent } from '@/lib/skillQuiz';
 
 export type QuizReportInput = {
   content: QuizSetContent;
   answers: QuizAnswers;
-  textScores: Record<string, QuizTextScore>;
   analysis: QuizAnalysis;
   personName: string;
   personRole: string;
@@ -58,7 +57,7 @@ const SECTIONS: { key: keyof QuizAnalysis; label: string; tone: 'success' | 'war
 ];
 
 export function drawQuizReport(input: QuizReportInput): HTMLCanvasElement {
-  const r = scoreQuiz(input.content, input.answers, input.textScores);
+  const r = scoreQuiz(input.content, input.answers);
   const measurer = document.createElement('canvas').getContext('2d');
   const analysisLines = SECTIONS.map((s) => {
     if (!measurer) return [input.analysis[s.key]];

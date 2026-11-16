@@ -1,13 +1,13 @@
 // @vitest-environment node
 /**
  * แบบทดสอบพนักงาน (เจ้าของ 12 พ.ย. 2569) — ตัวตัดสินคะแนน/เกรด/ตรวจฟอร์ม/ตัดเฉลย ที่ `src/lib/skillQuiz.ts`
+ * 16 พ.ย. 2569 ถอดข้อเขียนตอบออกทั้งระบบ (เจ้าของ "ข้อสอบฉันไม่ได้ให้มีข้อเขียนนะ") — มีแต่ปรนัย คะแนนครบทันทีที่ส่ง
  */
 import { describe, expect, it } from 'vitest';
 import {
   parseQuizAiReply,
   parseQuizAnswers,
   parseQuizSetInput,
-  parseStaffTextScores,
   publicQuestions,
   quizAttemptStatus,
   quizDocNo,
@@ -27,10 +27,10 @@ const SET: QuizSetContent = {
     { id: 'sAir', name: 'ระบบปรับอากาศ' },
   ],
   questions: [
-    { id: 'q1', skillId: 'sElec', kind: 'choice', prompt: 'เบรกเกอร์ตัดบ่อยเกิดจาก', choices: ['โหลดเกิน', 'สีผนัง'], answer: 0, points: 2, guide: '' },
-    { id: 'q2', skillId: 'sElec', kind: 'choice', prompt: 'ไฟ 3 เฟสแรงดัน', choices: ['220', '380'], answer: 1, points: 2, guide: '' },
-    { id: 'q3', skillId: 'sAir', kind: 'choice', prompt: 'FCU คือ', choices: ['Fan Coil Unit', 'Fuse Control Unit'], answer: 0, points: 2, guide: '' },
-    { id: 'q4', skillId: 'sAir', kind: 'text', prompt: 'แอร์ไม่เย็น ตรวจอะไรก่อน', choices: [], answer: null, points: 4, guide: 'ฟิลเตอร์ น้ำยา คอยล์' },
+    { id: 'q1', skillId: 'sElec', kind: 'choice', prompt: 'เบรกเกอร์ตัดบ่อยเกิดจาก', choices: ['โหลดเกิน', 'สีผนัง'], answer: 0, points: 2 },
+    { id: 'q2', skillId: 'sElec', kind: 'choice', prompt: 'ไฟ 3 เฟสแรงดัน', choices: ['220', '380'], answer: 1, points: 2 },
+    { id: 'q3', skillId: 'sAir', kind: 'choice', prompt: 'FCU คือ', choices: ['Fan Coil Unit', 'Fuse Control Unit'], answer: 0, points: 2 },
+    { id: 'q4', skillId: 'sAir', kind: 'choice', prompt: 'แอร์ไม่เย็น ตรวจอะไรก่อน', choices: ['ฟิลเตอร์', 'สีรีโมต'], answer: 0, points: 4 },
   ],
 };
 
@@ -46,51 +46,46 @@ describe('ตรวจชุดข้อสอบจากหน้าจอ', (
     expect(parseQuizSetInput({ ...SET, skills: [...SET.skills, { id: 'sX', name: 'ความปลอดภัย' }] })).toEqual({ ok: false, message: 'ทักษะ "ความปลอดภัย" ยังไม่มีข้อ' });
     expect(parseQuizSetInput({ ...SET, passScore: 120 })).toEqual({ ok: false, message: 'เกณฑ์ผ่านต้องอยู่ระหว่าง 1–100' });
   });
+  it('ข้อเขียนตอบไม่รับ (16 พ.ย. 2569) · ไม่มีตัวเลือกไม่รับ', () => {
+    const text = { id: 'q5', skillId: 'sAir', kind: 'text', prompt: 'อธิบาย', choices: [], answer: null, points: 1 };
+    expect(parseQuizSetInput({ ...SET, questions: [...SET.questions, text] })).toEqual({ ok: false, message: 'ข้อ 5: แบบทดสอบนี้มีแต่ข้อปรนัย' });
+    expect(parseQuizSetInput({ ...SET, questions: [...SET.questions, { ...text, kind: 'choice' }] })).toEqual({ ok: false, message: 'ข้อ 5: ตัวเลือกต้องมีอย่างน้อย 2 ข้อ และไม่ว่าง' });
+  });
 });
 
 describe('ข้อสอบที่ส่งให้พนักงาน', () => {
-  it('ไม่มีเฉลย ไม่มีแนวคำตอบ', () => {
+  it('ไม่มีเฉลย', () => {
     const qs = publicQuestions(SET);
     expect(qs).toHaveLength(4);
     for (const q of qs) {
       expect(q).not.toHaveProperty('answer');
-      expect(q).not.toHaveProperty('guide');
       expect(q).not.toHaveProperty('skillId');
     }
   });
   it('ต้องตอบครบทุกข้อ · ตัวเลือกนอกช่วงไม่รับ', () => {
     expect(parseQuizAnswers(SET, { q1: 0, q2: 1, q3: 0 })).toEqual({ ok: false, message: 'ยังไม่ได้ตอบข้อ 4' });
-    expect(parseQuizAnswers(SET, { q1: 3, q2: 1, q3: 0, q4: 'x' })).toEqual({ ok: false, message: 'ยังไม่ได้ตอบข้อ 1' });
-    expect(parseQuizAnswers(SET, { q1: '0', q2: 1, q3: 0, q4: ' ดูฟิลเตอร์ ' })).toEqual({ ok: true, value: { q1: 0, q2: 1, q3: 0, q4: 'ดูฟิลเตอร์' } });
+    expect(parseQuizAnswers(SET, { q1: 3, q2: 1, q3: 0, q4: 0 })).toEqual({ ok: false, message: 'ยังไม่ได้ตอบข้อ 1' });
+    expect(parseQuizAnswers(SET, { q1: 0, q2: 1, q3: 0, q4: 'ดูฟิลเตอร์' })).toEqual({ ok: false, message: 'ยังไม่ได้ตอบข้อ 4' });
+    expect(parseQuizAnswers(SET, { q1: '0', q2: 1, q3: 0, q4: 1 })).toEqual({ ok: true, value: { q1: 0, q2: 1, q3: 0, q4: 1 } });
   });
 });
 
 describe('คะแนน · เกรด · ผ่านเกณฑ์', () => {
-  const answers = { q1: 0, q2: 0, q3: 0, q4: 'ดูฟิลเตอร์ก่อน' };
-  it('เขียนตอบยังไม่ให้คะแนน = ผลยังไม่ครบ (null) ไม่ใช่ 0', () => {
-    const r = scoreQuiz(SET, answers, {});
-    expect(r.pendingText).toBe(1);
-    expect(r.score).toBeNull();
-    expect(r.grade).toBeNull();
-    expect(r.passedSkills).toBeNull();
-    expect(r.skills[0]).toMatchObject({ earned: 2, full: 4, score: 50, passed: false });
-    expect(r.skills[1].score).toBeNull();
-  });
-  it('รวม = คะแนนที่ได้ ÷ เต็มทั้งชุด · รายทักษะ ÷ เต็มของทักษะ · บวกกันลงตัว', () => {
-    const r = scoreQuiz(SET, answers, { q4: { score: 3, reason: '', by: 'ai' } });
+  const answers = { q1: 0, q2: 0, q3: 0, q4: 1 };
+  it('ส่งแล้วคะแนนครบทันที · รวม = คะแนนที่ได้ ÷ เต็มทั้งชุด · รายทักษะ ÷ เต็มของทักษะ · บวกกันลงตัว', () => {
+    const r = scoreQuiz(SET, answers);
     expect(r.skills.map((s) => [s.earned, s.full, s.score, s.passed])).toEqual([
       [2, 4, 50, false],
-      [5, 6, 83, true],
+      [2, 6, 33, false],
     ]);
-    expect(r.earned).toBe(7);
+    expect(r.earned).toBe(4);
     expect(r.full).toBe(10);
     expect(r.earned).toBe(r.skills.reduce((a, s) => a + s.earned, 0));
-    expect(r.score).toBe(70);
-    expect(r.grade).toBe('B');
-    expect(r.passedSkills).toBe(1);
-  });
-  it('คะแนนเขียนตอบเกินเต็มถูกตัดที่เต็ม', () => {
-    expect(scoreQuiz(SET, answers, { q4: { score: 99, reason: '', by: 'staff' } }).skills[1].earned).toBe(6);
+    expect(r.score).toBe(40);
+    expect(r.grade).toBe('D');
+    expect(r.passedSkills).toBe(0);
+    const full = scoreQuiz(SET, { q1: 0, q2: 1, q3: 0, q4: 0 });
+    expect([full.score, full.grade, full.passedSkills]).toEqual([100, 'A', 2]);
   });
   it('เกรด A ≥ 85 · B ≥ 70 · C ≥ 60 · D · สีแท่ง', () => {
     expect([quizGrade(85), quizGrade(76), quizGrade(60), quizGrade(59)]).toEqual(['A', 'B', 'C', 'D']);
@@ -104,18 +99,11 @@ describe('คะแนน · เกรด · ผ่านเกณฑ์', () =>
   });
 });
 
-describe('AI ร่าง · เจ้าหน้าที่แก้', () => {
-  it('อ่าน JSON ของ AI · ตัดคะแนนให้อยู่ในช่วง · ข้อที่ไม่ใช่เขียนตอบไม่รับ', () => {
-    const r = parseQuizAiReply(SET, 'ผล: {"textScores":{"q4":{"score":9,"reason":"ครบ"},"q1":{"score":2}},"strengths":"ไฟฟ้าดี","gap":"แอร์ 50","advice":"งาน PM ได้"}');
-    expect(r?.textScores).toEqual({ q4: { score: 4, reason: 'ครบ', by: 'ai' } });
-    expect(r?.analysis).toEqual({ strengths: 'ไฟฟ้าดี', gap: 'แอร์ 50', advice: 'งาน PM ได้' });
-    expect(parseQuizAiReply(SET, 'ไม่ใช่ JSON')).toBeNull();
-  });
-  it('เจ้าหน้าที่แก้คะแนน = by staff · ค่าว่าง = ลบคะแนน · ค่าเดิมคงเจ้าของเดิม', () => {
-    const prev = { q4: { score: 3, reason: 'AI', by: 'ai' as const } };
-    expect(parseStaffTextScores(SET, { q4: 3 }, prev)).toEqual(prev);
-    expect(parseStaffTextScores(SET, { q4: 4 }, prev)).toEqual({ q4: { score: 4, reason: 'AI', by: 'staff' } });
-    expect(parseStaffTextScores(SET, { q4: null }, prev)).toEqual({});
-    expect(parseStaffTextScores(SET, { q1: 2 }, {})).toEqual({});
+describe('AI ร่าง', () => {
+  it('อ่าน JSON ของ AI เฉพาะบทวิเคราะห์ 3 หัว · อ่านไม่ได้ = null', () => {
+    const r = parseQuizAiReply('ผล: {"strengths":"ไฟฟ้าดี","gap":"แอร์ 33","advice":"งาน PM ได้"}');
+    expect(r?.analysis).toEqual({ strengths: 'ไฟฟ้าดี', gap: 'แอร์ 33', advice: 'งาน PM ได้' });
+    expect(parseQuizAiReply('ไม่ใช่ JSON')).toBeNull();
+    expect(parseQuizAiReply('{"x":1}')).toBeNull();
   });
 });

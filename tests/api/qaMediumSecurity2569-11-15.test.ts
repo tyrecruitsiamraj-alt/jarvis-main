@@ -42,7 +42,7 @@ describe('ผู้ช่วย AI ปิดชื่อและที่อย
 describe('AI ร่างแบบทดสอบไม่ทับของที่เจ้าหน้าที่ตรวจแล้ว', () => {
   it('เบื้องหลังเขียนเฉพาะใบที่ยังไม่ตรวจ · กดร่างใหม่เองล้างสถานะตรวจแล้ว', () => {
     const lib = read('api/_lib/skillQuiz.ts');
-    expect(lib).toContain('where id = $1::uuid and ($4::boolean or reviewed_at is null)');
+    expect(lib).toContain('where id = $1::uuid and ($3::boolean or reviewed_at is null)');
     expect(lib).toContain('reviewed_at = null, reviewed_by_name = null');
     expect(read('api/_handlers/skill-quiz.ts')).toContain('draftQuizWithAi(id, { manual: true })');
     expect(read('api/_handlers/public/skill-quiz.ts')).toContain('void draftQuizWithAi(a.id)');

@@ -1,18 +1,17 @@
 /**
  * ป๊อปผลแบบทดสอบของคนหนึ่งคน (เจ้าของ 12 พ.ย. 2569) — Choice "AI ร่าง แล้วเจ้าหน้าที่แก้ได้"
- * คะแนนรายทักษะ · คำตอบทุกข้อ (ถูก/ผิด) · คะแนนข้อเขียนตอบแก้ได้ · บทวิเคราะห์ 3 หัวแก้ได้ · บันทึกแล้วโหลดรูปส่งลูกค้า
+ * คะแนนรายทักษะ · คำตอบทุกข้อ (ถูก/ผิด) · บทวิเคราะห์ 3 หัวแก้ได้ · บันทึกแล้วโหลดรูปส่งลูกค้า · มีแต่ข้อปรนัย (16 พ.ย. 2569)
  * ตัวเลขทุกตัวจาก `scoreQuiz` ตัวเดียวกับรูปและตาราง
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
 import { Textarea } from '@/components/ui/textarea';
 import { TONE } from '@/lib/designTokens';
 import { cn } from '@/lib/utils';
-import { QUIZ_STATUS_LABEL, quizAttemptStatus, quizSkillTone, scoreQuiz, type QuizAnalysis, type QuizTextScore } from '@/lib/skillQuiz';
+import { QUIZ_STATUS_LABEL, quizAttemptStatus, quizSkillTone, scoreQuiz, type QuizAnalysis } from '@/lib/skillQuiz';
 import { draftQuizWithAi, fetchQuizAttempt, saveQuizReview, type QuizAttemptDetail } from '@/lib/skillQuizApi';
 import { downloadQuizReportPng } from '@/lib/skillQuizReportImage';
 
@@ -28,14 +27,12 @@ const SECTIONS: { key: keyof QuizAnalysis; label: string }[] = [
 export default function QuizResultDialog({ attemptId, onOpenChange, onChanged }: Props) {
   const [a, setA] = useState<QuizAttemptDetail | null>(null);
   const [analysis, setAnalysis] = useState<QuizAnalysis>(EMPTY);
-  const [scores, setScores] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState<null | 'save' | 'png' | 'ai'>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
   const adopt = useCallback((d: QuizAttemptDetail) => {
     setA(d);
     setAnalysis(d.analysis ?? EMPTY);
-    setScores(Object.fromEntries(Object.entries(d.text_scores ?? {}).map(([k, v]) => [k, String(v.score)])));
   }, []);
 
   useEffect(() => {
@@ -61,36 +58,20 @@ export default function QuizResultDialog({ attemptId, onOpenChange, onChanged }:
     return () => window.clearInterval(t);
   }, [aiRunning, attemptId, adopt]);
 
-  const textScores = useMemo(() => {
-    const out: Record<string, QuizTextScore> = {};
-    for (const q of a?.content.questions ?? []) {
-      if (q.kind !== 'text') continue;
-      const v = scores[q.id];
-      if (v === undefined || v.trim() === '' || !Number.isFinite(Number(v))) continue;
-      out[q.id] = { score: Math.max(0, Math.min(q.points, Math.round(Number(v)))), reason: a?.text_scores?.[q.id]?.reason ?? '', by: 'staff' };
-    }
-    return out;
-  }, [a, scores]);
-  const r = a?.answers ? scoreQuiz(a.content, a.answers, textScores) : null;
+  const r = a?.answers ? scoreQuiz(a.content, a.answers) : null;
 
   const save = async (thenPng: boolean) => {
     if (!a || !r) return;
     setBusy(thenPng ? 'png' : 'save');
     setNotice(null);
     try {
-      const payload = Object.fromEntries((a.content.questions ?? []).filter((q) => q.kind === 'text').map((q) => [q.id, scores[q.id]?.trim() ? Number(scores[q.id]) : null]));
-      const d = await saveQuizReview(a.id, { textScores: payload, analysis, reviewed: r.pendingText === 0 });
+      const d = await saveQuizReview(a.id, { analysis, reviewed: true });
       adopt(d);
       onChanged();
       if (thenPng) {
-        if (r.pendingText > 0) {
-          setNotice('ให้คะแนนข้อเขียนตอบให้ครบก่อนโหลดรูป');
-          return;
-        }
         const ok = await downloadQuizReportPng({
           content: d.content,
           answers: d.answers ?? {},
-          textScores: d.text_scores,
           analysis: d.analysis ?? analysis,
           personName: d.person_name,
           personRole: d.person_role,
@@ -141,14 +122,14 @@ export default function QuizResultDialog({ attemptId, onOpenChange, onChanged }:
               <div className="rounded-xl border border-border p-4 text-center">
                 <p className="text-sm text-muted-foreground">คะแนนทักษะรวม</p>
                 <p className="text-3xl font-medium tabular-nums">
-                  {r.score ?? '—'}
+                  {r.score}
                   <span className="text-base text-muted-foreground"> /100</span>
                 </p>
-                <p className="text-sm">{r.grade ? `Grade ${r.grade}` : 'รอคะแนนข้อเขียนตอบ'}</p>
+                <p className="text-sm">Grade {r.grade}</p>
               </div>
               <div className="rounded-xl border border-border p-4 text-center">
                 <p className="text-sm text-muted-foreground">ทักษะผ่านเกณฑ์</p>
-                <p className="text-3xl font-medium tabular-nums">{r.passedSkills === null ? '—' : `${r.passedSkills}/${r.skills.length}`}</p>
+                <p className="text-3xl font-medium tabular-nums">{`${r.passedSkills}/${r.skills.length}`}</p>
                 <p className="text-sm text-muted-foreground">เกณฑ์ขั้นต่ำ {a.content.passScore} คะแนน</p>
               </div>
             </div>
@@ -158,12 +139,12 @@ export default function QuizResultDialog({ attemptId, onOpenChange, onChanged }:
                 <div key={s.skillId} className="space-y-1">
                   <div className="flex items-center justify-between gap-3 text-sm">
                     <span>{s.name}</span>
-                    <span className={cn('tabular-nums', s.passed === false && TONE.danger.value)}>
-                      {s.score === null ? 'รอตรวจ' : `${s.score}/100`}
-                      {s.passed === false ? ' · ไม่ผ่าน' : ''}
+                    <span className={cn('tabular-nums', !s.passed && TONE.danger.value)}>
+                      {s.score}/100
+                      {s.passed ? '' : ' · ไม่ผ่าน'}
                     </span>
                   </div>
-                  <Progress value={s.score ?? 0} className="h-2" indicatorClassName={TONE[quizSkillTone(s.score ?? 0, a.content.passScore)].dot} />
+                  <Progress value={s.score} className="h-2" indicatorClassName={TONE[quizSkillTone(s.score, a.content.passScore)].dot} />
                 </div>
               ))}
             </section>
@@ -190,45 +171,17 @@ export default function QuizResultDialog({ attemptId, onOpenChange, onChanged }:
               {a.content.questions.map((q, i) => {
                 const ans = a.answers?.[q.id];
                 const skill = a.content.skills.find((s) => s.id === q.skillId)?.name ?? '';
-                if (q.kind === 'choice') {
-                  const right = ans === q.answer;
-                  return (
-                    <div key={q.id} className="rounded-xl border border-border p-3 text-sm">
-                      <p className="text-muted-foreground">
-                        ข้อ {i + 1} · {skill} · {q.points} คะแนน
-                      </p>
-                      <p className="whitespace-pre-wrap">{q.prompt}</p>
-                      <p className={right ? TONE.success.value : TONE.danger.value}>
-                        {right ? 'ถูก' : 'ผิด'} · ตอบ {q.choices[Number(ans)] ?? '—'}
-                        {right ? '' : ` · ที่ถูก ${q.choices[q.answer ?? -1] ?? ''}`}
-                      </p>
-                    </div>
-                  );
-                }
+                const right = ans === q.answer;
                 return (
-                  <div key={q.id} className="space-y-2 rounded-xl border border-border p-3 text-sm">
+                  <div key={q.id} className="rounded-xl border border-border p-3 text-sm">
                     <p className="text-muted-foreground">
-                      ข้อ {i + 1} · {skill} · เขียนตอบ
+                      ข้อ {i + 1} · {skill} · {q.points} คะแนน
                     </p>
                     <p className="whitespace-pre-wrap">{q.prompt}</p>
-                    <p className="whitespace-pre-wrap rounded-lg bg-muted/50 p-2">{String(ans ?? '')}</p>
-                    {q.guide ? <p className="text-muted-foreground">แนวคำตอบ: {q.guide}</p> : null}
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Label htmlFor={`quiz-ts-${q.id}`}>คะแนน</Label>
-                      <Input
-                        id={`quiz-ts-${q.id}`}
-                        type="number"
-                        min={0}
-                        max={q.points}
-                        className="h-9 w-20"
-                        value={scores[q.id] ?? ''}
-                        onChange={(e) => setScores({ ...scores, [q.id]: e.target.value })}
-                      />
-                      <span className="tabular-nums text-muted-foreground">/ {q.points}</span>
-                      {a.text_scores?.[q.id]?.by === 'ai' && a.text_scores[q.id].reason ? (
-                        <span className="text-muted-foreground">AI: {a.text_scores[q.id].reason}</span>
-                      ) : null}
-                    </div>
+                    <p className={right ? TONE.success.value : TONE.danger.value}>
+                      {right ? 'ถูก' : 'ผิด'} · ตอบ {q.choices[Number(ans)] ?? '—'}
+                      {right ? '' : ` · ที่ถูก ${q.choices[q.answer] ?? ''}`}
+                    </p>
                   </div>
                 );
               })}

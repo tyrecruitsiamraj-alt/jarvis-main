@@ -15,16 +15,16 @@ const BLANK_SKILL = { id: 's0', name: '' };
 const asFile = (name: string, bytes: Uint8Array) => ({ name, arrayBuffer: async () => bytes.slice().buffer as ArrayBuffer });
 
 describe('อ่านแบบฟอร์มของระบบ', () => {
-  it('ตัวอย่าง 3 ข้อ: ปรนัย · ถูก/ผิด · เขียนตอบ · ทักษะใหม่ 2 ทักษะ · คะแนนตามช่อง', () => {
+  it('ตัวอย่าง 3 ข้อ: ปรนัย · ถูก/ผิด · ปรนัย (ไม่มีข้อเขียนตอบ 16 พ.ย. 2569) · ทักษะใหม่ 2 ทักษะ · คะแนนตามช่อง', () => {
     const r = parseQuizImport(tsv([QUIZ_IMPORT_HEADERS, ...QUIZ_IMPORT_SAMPLE]), [BLANK_SKILL], 's0');
     expect(r.issues).toEqual([]);
     expect(r.newSkills.map((s) => s.name)).toEqual(['ระบบไฟฟ้าอาคาร', 'งานประปา']);
     expect(r.questions.map((q) => [q.kind, q.answer, q.choices.length, q.points])).toEqual([
       ['choice', 0, 4, 1],
       ['choice', 0, 2, 1],
-      ['text', null, 0, 3],
+      ['choice', 0, 4, 2],
     ]);
-    expect(r.questions[2].guide).toContain('ปิดวาล์วหลัก');
+    expect(r.questions[2].choices[0]).toContain('ปิดวาล์วหลัก');
     expect(r.questions[0].skillId).toBe(r.questions[1].skillId);
   });
 
@@ -60,14 +60,11 @@ describe('ไฟล์แบบอื่น', () => {
     expect(r.newSkills).toEqual([]);
     expect(r.questions[0]).toMatchObject({ skillId: 'sE', prompt: 'ไฟรั่ว, ทำอย่างไร', choices: ['ตัดไฟ', 'วิ่งหนี'], answer: 0, points: 2 });
   });
-  it('ข้อความแบบข้อสอบไทยใน Word: ทักษะ: · 1. · ก. · เฉลย: · คะแนน:', () => {
+  it('ข้อความแบบข้อสอบไทยใน Word: ทักษะ: · 1. · ก. · เฉลย: · คะแนน: · ข้อไม่มีตัวเลือก = แถวผิด', () => {
     const rows = paragraphsToRows(['ทักษะ: งานประปา', '1. ท่อน้ำรั่วต้องปิดอะไรก่อน', 'ก. วาล์วหลัก', 'ข. ก๊อกในห้องน้ำ', 'เฉลย: ก', 'คะแนน: 2', '2. อธิบายการพันเทปเกลียว', 'แนวคำตอบ: พันตามเกลียว 5–7 รอบ']);
     const r = parseQuizImport(rowsToTsv([PARAGRAPH_HEADERS, ...rows]), [], 's0');
-    expect(r.issues).toEqual([]);
-    expect(r.questions.map((q) => [q.kind, q.answer, q.points, q.guide])).toEqual([
-      ['choice', 0, 2, ''],
-      ['text', null, 1, 'พันตามเกลียว 5–7 รอบ'],
-    ]);
+    expect(r.issues.map((i) => i.message)).toEqual(['ยังไม่ได้ใส่ตัวเลือก ใส่อย่างน้อย 2 ช่อง']);
+    expect(r.questions.map((q) => [q.kind, q.answer, q.points])).toEqual([['choice', 0, 2]]);
     expect(r.newSkills.map((s) => s.name)).toEqual(['งานประปา']);
   });
 });
@@ -96,7 +93,7 @@ describe('แถวผิดบอกเลขแถว ไม่ล้มทั
 
 describe('เพิ่มเข้าชุด', () => {
   it('ข้อเปล่าในฟอร์มถูกแทน · ทักษะว่างที่ไม่มีข้อถูกเอาออก · บันทึกผ่านตัวตรวจของ server', () => {
-    const c: QuizSetContent = { title: 'ช่างอาคาร', roleLabel: '', headerLine: 'H', passScore: 70, skills: [BLANK_SKILL], questions: [{ id: 'q0', skillId: 's0', kind: 'choice', prompt: '', choices: ['', ''], answer: 0, points: 1, guide: '' }] };
+    const c: QuizSetContent = { title: 'ช่างอาคาร', roleLabel: '', headerLine: 'H', passScore: 70, skills: [BLANK_SKILL], questions: [{ id: 'q0', skillId: 's0', kind: 'choice', prompt: '', choices: ['', ''], answer: 0, points: 1 }] };
     const next = addImportedQuestions(c, parseQuizImport(tsv([QUIZ_IMPORT_HEADERS, ...QUIZ_IMPORT_SAMPLE]), c.skills, 's0'));
     expect(next.questions).toHaveLength(3);
     expect(next.skills.map((s) => s.name)).toEqual(['ระบบไฟฟ้าอาคาร', 'งานประปา']);

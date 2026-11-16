@@ -9,7 +9,6 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Textarea } from '@/components/ui/textarea';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -21,7 +20,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { fetchPublicQuiz, submitPublicQuiz, type PublicQuiz } from '@/lib/skillQuizApi';
-import { QUIZ_TEXT_ANSWER_MAX, type QuizAnswers } from '@/lib/skillQuiz';
+import type { QuizAnswers } from '@/lib/skillQuiz';
 
 const draftKey = (token: string) => `jarvis:quiz-draft:${token}`;
 
@@ -59,14 +58,8 @@ export default function PublicSkillQuizPage() {
   }, [token, answers]);
 
   const questions = useMemo(() => quiz?.questions ?? [], [quiz]);
-  const answered = questions.filter((q) => {
-    const v = answers[q.id];
-    return q.kind === 'choice' ? typeof v === 'number' : typeof v === 'string' && v.trim() !== '';
-  }).length;
-  const firstMissing = questions.findIndex((q) => {
-    const v = answers[q.id];
-    return q.kind === 'choice' ? typeof v !== 'number' : !(typeof v === 'string' && v.trim());
-  });
+  const answered = questions.filter((q) => typeof answers[q.id] === 'number').length;
+  const firstMissing = questions.findIndex((q) => typeof answers[q.id] !== 'number');
 
   const submit = async () => {
     setBusy(true);
@@ -124,28 +117,18 @@ export default function PublicSkillQuizPage() {
                 </p>
                 <span className="shrink-0 text-xs tabular-nums text-muted-foreground">{q.points} คะแนน</span>
               </div>
-              {q.kind === 'choice' ? (
-                <RadioGroup
-                  value={typeof answers[q.id] === 'number' ? String(answers[q.id]) : ''}
-                  onValueChange={(v) => setAnswers((a) => ({ ...a, [q.id]: Number(v) }))}
-                  className="gap-2"
-                >
-                  {q.choices.map((c, ci) => (
-                    <Label key={ci} htmlFor={`${q.id}-${ci}`} className="flex cursor-pointer items-start gap-3 rounded-xl border border-border p-3 text-sm font-normal hover:bg-muted/50">
-                      <RadioGroupItem id={`${q.id}-${ci}`} value={String(ci)} className="mt-0.5" />
-                      <span className="whitespace-pre-wrap">{c}</span>
-                    </Label>
-                  ))}
-                </RadioGroup>
-              ) : (
-                <Textarea
-                  value={typeof answers[q.id] === 'string' ? (answers[q.id] as string) : ''}
-                  onChange={(e) => setAnswers((a) => ({ ...a, [q.id]: e.target.value }))}
-                  maxLength={QUIZ_TEXT_ANSWER_MAX}
-                  rows={4}
-                  placeholder="พิมพ์คำตอบ"
-                />
-              )}
+              <RadioGroup
+                value={typeof answers[q.id] === 'number' ? String(answers[q.id]) : ''}
+                onValueChange={(v) => setAnswers((a) => ({ ...a, [q.id]: Number(v) }))}
+                className="gap-2"
+              >
+                {q.choices.map((c, ci) => (
+                  <Label key={ci} htmlFor={`${q.id}-${ci}`} className="flex cursor-pointer items-start gap-3 rounded-xl border border-border p-3 text-sm font-normal hover:bg-muted/50">
+                    <RadioGroupItem id={`${q.id}-${ci}`} value={String(ci)} className="mt-0.5" />
+                    <span className="whitespace-pre-wrap">{c}</span>
+                  </Label>
+                ))}
+              </RadioGroup>
             </Card>
           ))}
           <Card className="sticky bottom-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl p-4">

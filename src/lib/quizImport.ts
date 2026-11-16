@@ -6,7 +6,7 @@
  * คอลัมน์จับจาก **หัวตาราง** (เรียงแบบไหนก็ได้ · ไฟล์ของ KNOWA ใช้ได้) · ไม่มีหัว = เรียงตาม `QUIZ_IMPORT_HEADERS`
  *   ทักษะ · คำถาม · ตัวเลือก ก–ง (เพิ่ม จ–ซ ได้) · เฉลย · คะแนน
  *   ปรนัย = ตัวเลือก ≥ 2 · เฉลยเป็น ก ข ค ง / 1 2 3 4 / ข้อความของตัวเลือก / ถูก ผิด (ตอบได้ข้อเดียว — แบบทดสอบนี้ไม่มีหลายคำตอบ)
- *   เขียนตอบ = ไม่ใส่ตัวเลือก · ช่องเฉลย = แนวคำตอบ (ไม่โชว์พนักงาน)
+ *   ไม่มีข้อเขียนตอบ (เจ้าของ 16 พ.ย. 2569) — แถวที่ไม่ใส่ตัวเลือก = แถวผิด · คอลัมน์ "แนวคำตอบ" ในไฟล์ KNOWA อ่านข้าม
  *   ทักษะว่าง = ทักษะเดียวกับข้อก่อนหน้า · คะแนนว่าง = 1
  */
 import { QUIZ_MAX_CHOICES, QUIZ_MAX_QUESTIONS, quizLocalId, type QuizQuestion, type QuizSetContent, type QuizSkill } from './skillQuiz';
@@ -16,7 +16,7 @@ export const QUIZ_IMPORT_HEADERS = ['ทักษะ', 'คำถาม', 'ต�
 export const QUIZ_IMPORT_SAMPLE: string[][] = [
   ['ระบบไฟฟ้าอาคาร', 'ก่อนเปลี่ยนเบรกเกอร์ ต้องทำอะไรก่อน', 'สับคัตเอาต์ลงและแขวนป้ายห้ามสับ', 'ใส่ถุงมือแล้วทำได้เลย', 'แจ้งหัวหน้าหลังทำเสร็จ', 'รอให้ไฟดับเอง', 'ก', '1'],
   ['ระบบไฟฟ้าอาคาร', 'สายดินมีไว้ป้องกันไฟฟ้าดูด', 'ถูก', 'ผิด', '', '', 'ถูก', '1'],
-  ['งานประปา', 'อธิบายขั้นตอนเปลี่ยนวาล์วน้ำที่รั่ว', '', '', '', '', 'ปิดวาล์วหลัก · ระบายน้ำ · ถอดวาล์วเดิม · พันเทปเกลียว · ใส่ตัวใหม่ · เปิดทดสอบ', '3'],
+  ['งานประปา', 'วาล์วน้ำรั่ว ก่อนถอดวาล์วเดิมต้องทำอะไร', 'ปิดวาล์วหลักแล้วระบายน้ำในท่อ', 'ถอดได้เลยแล้วรีบใส่ตัวใหม่', 'พันเทปเกลียวทับรอยรั่ว', 'เปิดน้ำแรงขึ้นไล่ลม', 'ก', '2'],
 ];
 
 /** วิธีกรอก — แท็บที่สองของ Excel และย่อหน้าบนสุดของ Word */
@@ -24,7 +24,6 @@ export const QUIZ_IMPORT_HOWTO = [
   'แถวแรกคือหัวคอลัมน์ ห้ามลบ · หนึ่งแถวต่อหนึ่งข้อ ลบแถวตัวอย่างแล้วพิมพ์ข้อสอบแทน',
   'ข้อปรนัย ใส่ตัวเลือกอย่างน้อย 2 ช่อง แล้วช่องเฉลยใส่ ก ข ค ง (หรือ 1 2 3 4) ได้ข้อเดียว',
   'ข้อถูก/ผิด ใส่ตัวเลือก ก = ถูก ข = ผิด แล้วเฉลยเป็น ถูก หรือ ผิด',
-  'ข้อเขียนตอบ เว้นช่องตัวเลือกว่าง แล้วช่องเฉลยใส่แนวคำตอบ (พนักงานไม่เห็น)',
   'ทักษะว่าง = ใช้ทักษะเดียวกับข้อก่อนหน้า · คะแนนว่าง = 1 คะแนน',
   'กรอกเสร็จ กลับไปที่ป๊อปชุดข้อสอบ กด "นำเข้าจากไฟล์" แล้วเลือกไฟล์นี้ ระบบให้ตรวจก่อนเพิ่ม',
 ];
@@ -202,8 +201,9 @@ export function parseQuizImport(raw: string, skills: readonly QuizSkill[], fallb
     while (options.length && !options[options.length - 1]) options.pop();
     const answer = get('answer');
 
+    // ไม่มีข้อเขียนตอบ (เจ้าของ 16 พ.ย. 2569 "ข้อสอบฉันไม่ได้ให้มีข้อเขียนนะ") — ไม่มีตัวเลือก = แถวผิด
     if (options.length === 0) {
-      questions.push({ id: quizLocalId('q'), skillId, kind: 'text', prompt: prompt.slice(0, 2000), choices: [], answer: null, points, guide: (answer || get('guide')).slice(0, 2000) });
+      issues.push({ line, message: 'ยังไม่ได้ใส่ตัวเลือก ใส่อย่างน้อย 2 ช่อง' });
       continue;
     }
     if (options.some((o) => !o)) {
@@ -211,7 +211,7 @@ export function parseQuizImport(raw: string, skills: readonly QuizSkill[], fallb
       continue;
     }
     if (options.length < 2) {
-      issues.push({ line, message: 'ข้อปรนัยต้องมีตัวเลือกอย่างน้อย 2 ข้อ (ข้อเขียนตอบให้เว้นตัวเลือกว่างทั้งหมด)' });
+      issues.push({ line, message: 'ตัวเลือกต้องมีอย่างน้อย 2 ช่อง' });
       continue;
     }
     if (!answer) {
@@ -228,7 +228,7 @@ export function parseQuizImport(raw: string, skills: readonly QuizSkill[], fallb
       issues.push({ line, message: `เฉลย "${answer}" ไม่ตรงกับตัวเลือกใดเลย` });
       continue;
     }
-    questions.push({ id: quizLocalId('q'), skillId, kind: 'choice', prompt: prompt.slice(0, 2000), choices: options.map((o) => o.slice(0, 500)), answer: idx, points, guide: '' });
+    questions.push({ id: quizLocalId('q'), skillId, kind: 'choice', prompt: prompt.slice(0, 2000), choices: options.map((o) => o.slice(0, 500)), answer: idx, points });
   }
   if (questions.length === 0 && issues.length === 0) issues.push({ line: 0, message: 'ไม่พบข้อสอบ — แถวแรกต้องเป็นหัวคอลัมน์ หรือเรียงคอลัมน์ตามแบบฟอร์ม' });
   return { questions, newSkills, issues };

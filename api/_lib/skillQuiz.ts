@@ -3,7 +3,7 @@
  * ตรรกะคะแนน/เกรด/ตรวจฟอร์มอยู่ `src/lib/skillQuiz.ts` ที่เดียว
  *
  * ลิงก์ละคน: token สุ่ม 24 ตัว · ส่งคำตอบได้ครั้งเดียว (อัปเดตแบบมีเงื่อนไข `submitted_at is null` — ฐานตัดสิน)
- * ส่งแล้ว AI ร่างคะแนนเขียนตอบ + บทวิเคราะห์ต่อเบื้องหลัง · AI ล้ม = เก็บเหตุไว้ เจ้าหน้าที่เขียนเองได้
+ * ส่งแล้ว AI ร่างบทวิเคราะห์ต่อเบื้องหลัง · AI ล้ม = เก็บเหตุไว้ เจ้าหน้าที่เขียนเองได้
  */
 import { randomBytes } from 'node:crypto';
 import { dbQuery } from './postgres.js';
@@ -17,7 +17,6 @@ import {
   type QuizAnalysis,
   type QuizAnswers,
   type QuizSetContent,
-  type QuizTextScore,
 } from '../../src/lib/skillQuiz.js';
 
 const SETS = tableInAppSchema('skill_quiz_sets');
@@ -35,7 +34,6 @@ export type QuizAttemptRow = {
   person_role: string;
   content: QuizSetContent;
   answers: QuizAnswers | null;
-  text_scores: Record<string, QuizTextScore>;
   analysis: QuizAnalysis | null;
   analysis_by: 'ai' | 'staff' | null;
   ai_error: string | null;
@@ -47,7 +45,7 @@ export type QuizAttemptRow = {
   reviewed_by_name: string | null;
 };
 
-const ATTEMPT_COLUMNS = `id::text, set_id::text, token, doc_no, person_name, person_role, content, answers, text_scores, analysis, analysis_by,
+const ATTEMPT_COLUMNS = `id::text, set_id::text, token, doc_no, person_name, person_role, content, answers, analysis, analysis_by,
   ai_error, created_by_name, created_at, opened_at, submitted_at, reviewed_at, reviewed_by_name`;
 
 export async function listQuizSets(): Promise<QuizSetRow[]> {
@@ -124,14 +122,15 @@ export async function submitQuizAnswers(id: string, answers: QuizAnswers): Promi
 
 export async function saveQuizReview(
   id: string,
-  v: { textScores: Record<string, QuizTextScore>; analysis: QuizAnalysis; reviewed: boolean },
+  v: { analysis: QuizAnalysis; reviewed: boolean },
   byName: string | null,
 ): Promise<boolean> {
+  // คอลัมน์ text_scores ยังอยู่ในตาราง (migration เพิ่มอย่างเดียว) แต่ไม่ใช้แล้ว — ไม่มีข้อเขียนตอบ (16 พ.ย. 2569)
   const { rows } = await dbQuery<{ id: string }>(
-    `update ${ATTEMPTS} set text_scores = $2::jsonb, analysis = $3::jsonb, analysis_by = 'staff',
-       reviewed_at = case when $4 then now() else null end, reviewed_by_name = case when $4 then $5 else null end
+    `update ${ATTEMPTS} set analysis = $2::jsonb, analysis_by = 'staff',
+       reviewed_at = case when $3 then now() else null end, reviewed_by_name = case when $3 then $4 else null end
      where id = $1::uuid and submitted_at is not null and archived_at is null returning id::text`,
-    [id, JSON.stringify(v.textScores), JSON.stringify(v.analysis), v.reviewed, byName],
+    [id, JSON.stringify(v.analysis), v.reviewed, byName],
   );
   return rows.length > 0;
 }
@@ -142,7 +141,7 @@ export async function archiveQuizAttempt(id: string): Promise<boolean> {
 }
 
 /**
- * ให้ AI ร่างคะแนนเขียนตอบ + บทวิเคราะห์ — ทับเฉพาะของที่ AI เขียน (ข้อที่เจ้าหน้าที่ให้คะแนนเองแล้วคงไว้)
+ * ให้ AI ร่างบทวิเคราะห์ — เจ้าหน้าที่ตรวจแล้วไม่ทับ (เว้นกด "ให้ AI ร่างใหม่")
  * ล้ม = เก็บเหตุใน ai_error ให้จอบอก · ไม่โยนต่อ (เรียกเบื้องหลังหลังพนักงานส่ง)
  * 🔴 รีวิวโค้ด 15 พ.ย. 2569: เดิมทับบทวิเคราะห์ที่เจ้าหน้าที่ตรวจแล้ว แต่จอยังขึ้น "ตรวจแล้วโดย …"
  *    - เบื้องหลังหลังพนักงานส่ง (`manual` ไม่ส่ง) = เขียนเฉพาะใบที่ยังไม่ตรวจ (ฐานตัดสินใน where — ตรวจก่อน AI ตอบเสร็จก็ไม่ทับ)
@@ -172,16 +171,14 @@ export async function draftQuizWithAi(id: string, opts: { manual?: boolean } = {
     logError('skill_quiz.ai_fail', { id, message: e instanceof Error ? e.message : String(e) });
     return fail(e instanceof Error ? e.message : 'AI ไม่ตอบ');
   }
-  const parsed = parseQuizAiReply(a.content, reply);
+  const parsed = parseQuizAiReply(reply);
   if (!parsed) return fail('อ่านคำตอบของ AI ไม่ได้ — ลองใหม่ หรือเขียนเอง');
-  const keepStaff = Object.fromEntries(Object.entries(a.text_scores ?? {}).filter(([, s]) => s.by === 'staff'));
-  const textScores = { ...parsed.textScores, ...keepStaff };
   const { rows } = await dbQuery<{ id: string }>(
-    `update ${ATTEMPTS} set text_scores = $2::jsonb, analysis = $3::jsonb, analysis_by = 'ai', ai_error = null,
+    `update ${ATTEMPTS} set analysis = $2::jsonb, analysis_by = 'ai', ai_error = null,
             reviewed_at = null, reviewed_by_name = null
-      where id = $1::uuid and ($4::boolean or reviewed_at is null)
+      where id = $1::uuid and ($3::boolean or reviewed_at is null)
       returning id::text`,
-    [id, JSON.stringify(textScores), JSON.stringify(parsed.analysis), opts.manual === true],
+    [id, JSON.stringify(parsed.analysis), opts.manual === true],
   );
   if (rows.length === 0) return { ok: false, message: 'เจ้าหน้าที่ตรวจใบนี้แล้ว — ไม่ทับบทวิเคราะห์' };
   return { ok: true };

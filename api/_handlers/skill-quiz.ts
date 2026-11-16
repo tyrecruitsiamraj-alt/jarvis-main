@@ -20,7 +20,7 @@ import {
   saveQuizReview,
   updateQuizSet,
 } from '../_lib/skillQuiz.js';
-import { parseQuizAnalysis, parseQuizSetInput, parseStaffTextScores, quizAttemptStatus, scoreQuiz } from '../../src/lib/skillQuiz.js';
+import { parseQuizAnalysis, parseQuizSetInput, quizAttemptStatus, scoreQuiz } from '../../src/lib/skillQuiz.js';
 
 const UUID = /^[0-9a-f-]{36}$/i;
 const one = (v: unknown) => (Array.isArray(v) ? v[0] : v);
@@ -43,7 +43,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
       const rows = await listQuizAttempts();
       return res.status(200).json({
         attempts: rows.map((a) => {
-          const r = a.answers ? scoreQuiz(a.content, a.answers, a.text_scores ?? {}) : null;
+          const r = a.answers ? scoreQuiz(a.content, a.answers) : null;
           return {
             id: a.id,
             token: a.token,
@@ -101,12 +101,8 @@ async function handler(req: AuthedReq, res: ApiRes) {
     if (action === 'save_review') {
       const a = await getQuizAttempt(id);
       if (!a || !a.submitted_at) return sendError(res, 409, 'not_submitted', 'พนักงานยังไม่ได้ส่งคำตอบ');
-      const textScores = parseStaffTextScores(a.content, body.textScores, a.text_scores ?? {});
       const reviewed = body.reviewed === true;
-      if (reviewed && scoreQuiz(a.content, a.answers ?? {}, textScores).pendingText > 0) {
-        return sendError(res, 400, 'bad_request', 'ให้คะแนนข้อเขียนตอบให้ครบก่อน');
-      }
-      await saveQuizReview(id, { textScores, analysis: parseQuizAnalysis(body.analysis), reviewed }, byName);
+      await saveQuizReview(id, { analysis: parseQuizAnalysis(body.analysis), reviewed }, byName);
       void auditFromAuthed(req, { action: 'skill_quiz.review', entityType: 'skill_quiz_attempt', entityId: id, after: { reviewed } }).catch(() => {});
       return res.status(200).json({ attempt: await getQuizAttempt(id) });
     }

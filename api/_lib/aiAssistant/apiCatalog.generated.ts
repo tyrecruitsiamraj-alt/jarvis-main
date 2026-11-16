@@ -2302,7 +2302,6 @@ export const API_CATALOG: ApiCatalogEntry[] = [
    "setId",
    "personName",
    "personRole",
-   "textScores",
    "reviewed",
    "analysis"
   ],
@@ -2314,7 +2313,7 @@ export const API_CATALOG: ApiCatalogEntry[] = [
   "methods": [
    "GET"
   ],
-  "doc": "GET /api/so-post-groups?from=YYYY-MM-DD&to=YYYY-MM-DD&bu=LBD&page=1\nการ์ด \"5. โพสต์ลงกลุ่ม Facebook\" ในภาพรวมงานสรรหา (เจ้าของ 11 พ.ย. 2569) — ส่งต่อจาก So Scraping ด้วย key ฝั่ง server\nสิทธิ์เดียวกับภาพรวม (`job-applications`) · ทุกคนที่เห็นภาพรวมเห็นทุกใบ · from/to = วันที่ไทย รวมวันสุดท้าย · ไม่ส่ง bu = ทุก BU\n`status=not_tried` (12 พ.ย. 2569 \"กดแล้วดูเหตุได้ไหม\") = เฉพาะสถานะนั้น + เหตุจัดกลุ่มนับ (อ่านทุกแถวของช่วงแล้วกรองฝั่งเรา)",
+  "doc": "GET /api/so-post-groups?from=YYYY-MM-DD&to=YYYY-MM-DD&bu=LBD&page=1\nการ์ด \"5. โพสต์ลงกลุ่ม Facebook\" ในภาพรวมงานสรรหา (เจ้าของ 11 พ.ย. 2569) — ส่งต่อจาก So Scraping ด้วย key ฝั่ง server\nสิทธิ์เดียวกับภาพรวม (`job-applications`) · from/to = วันที่ไทย รวมวันสุดท้าย · ไม่ส่ง bu = ทุก BU (เฉพาะคนที่เห็นทุก BU)\n🔴 BU ล็อกที่เซิร์ฟเวอร์ (QA 15 พ.ย. 2569 · ข้อเคาะ 10 พ.ย. \"เห็นเฉพาะ BU ตัวเอง\") — เดิมรับ bu จาก query ตรง ไม่ส่ง = ทุก BU\n   เห็นหลาย BU แต่ไม่ได้เลือก = BU แรกในสิทธิ์ (หน้าสรุปเลือกทีละ BU) · ไม่มี BU = ไม่มีแถว\n`status=not_tried` (12 พ.ย. 2569 \"กดแล้วดูเหตุได้ไหม\") = เฉพาะสถานะนั้น + เหตุจัดกลุ่มนับ (อ่านทุกแถวของช่วงแล้วกรองฝั่งเรา)",
   "query": [
    "from",
    "to",
@@ -2331,7 +2330,7 @@ export const API_CATALOG: ApiCatalogEntry[] = [
   "methods": [
    "GET"
   ],
-  "doc": "GET /api/so-post-summary — ยอดโพสต์ลงกลุ่มต่อเลขใบขอ (สั่ง · แต่ละสถานะ) สำหรับการ์ดบนหน้าโพสต์ประกาศ\n(เจ้าของ 12 พ.ย. 2569 \"งานไหน สั่งไปเท่าไหร่ โพสต์ได้เท่าไหร่ บอกตรงนี้เลย\") · ช่วง 1 ต.ค. 2569 – วันนี้ (เส้น post-groups ของ So Scraping เริ่มที่วันนั้น)\nสิทธิ์เดียวกับหน้าโพสต์ประกาศ (`job-applications`) · key อยู่ฝั่ง server",
+  "doc": "GET /api/so-post-summary — ยอดโพสต์ลงกลุ่มต่อเลขใบขอ (สั่ง · แต่ละสถานะ) สำหรับการ์ดบนหน้าโพสต์ประกาศ\n(เจ้าของ 12 พ.ย. 2569 \"งานไหน สั่งไปเท่าไหร่ โพสต์ได้เท่าไหร่ บอกตรงนี้เลย\") · ช่วง 1 ต.ค. 2569 – วันนี้ (เส้น post-groups ของ So Scraping เริ่มที่วันนั้น)\nสิทธิ์เดียวกับหน้าโพสต์ประกาศ (`job-applications`) · key อยู่ฝั่ง server\n🔴 เหลือเฉพาะใบขอใน BU ของคนดู (QA 15 พ.ย. 2569 · ข้อเคาะ 10 พ.ย. \"เห็นเฉพาะ BU ตัวเอง\") — ตัวกรองเดียวกับ job-post-actions",
   "query": [],
   "body": [],
   "reachesPeople": true

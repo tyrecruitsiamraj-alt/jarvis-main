@@ -1,5 +1,5 @@
 import { apiFetch } from './apiFetch';
-import type { PublicQuizQuestion, QuizAnalysis, QuizAnswers, QuizAttemptStatus, QuizSetContent, QuizTextScore } from './skillQuiz';
+import type { PublicQuizQuestion, QuizAnalysis, QuizAnswers, QuizAttemptStatus, QuizSetContent } from './skillQuiz';
 
 /** แบบทดสอบพนักงาน (12 พ.ย. 2569) — พังโยนข้อความไทยจาก server */
 async function readError(r: Response): Promise<never> {
@@ -32,7 +32,6 @@ export type QuizAttemptDetail = {
   person_role: string;
   content: QuizSetContent;
   answers: QuizAnswers | null;
-  text_scores: Record<string, QuizTextScore>;
   analysis: QuizAnalysis | null;
   analysis_by: 'ai' | 'staff' | null;
   ai_error: string | null;
@@ -75,7 +74,7 @@ export const saveQuizSet = (id: string | null, content: QuizSetContent) => post<
 export const archiveQuizSet = (id: string) => post<{ ok: true }>({ action: 'archive_set', id });
 export const createQuizLink = (setId: string, personName: string, personRole: string) =>
   post<{ id: string; token: string; doc_no: string }>({ action: 'create_link', setId, personName, personRole });
-export const saveQuizReview = (id: string, v: { textScores: Record<string, number | null>; analysis: QuizAnalysis; reviewed: boolean }) =>
+export const saveQuizReview = (id: string, v: { analysis: QuizAnalysis; reviewed: boolean }) =>
   post<{ attempt: QuizAttemptDetail }>({ action: 'save_review', id, ...v }).then((d) => d.attempt);
 export const draftQuizWithAi = (id: string) => post<{ attempt: QuizAttemptDetail }>({ action: 'ai_draft', id }).then((d) => d.attempt);
 export const archiveQuizAttempt = (id: string) => post<{ ok: true }>({ action: 'archive_attempt', id });

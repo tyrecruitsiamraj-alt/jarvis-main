@@ -13,7 +13,7 @@ import { TONE } from '@/lib/designTokens';
 import { decodeTextFile, officeFileToTsv } from '@/lib/officeTable';
 import { buildTemplateDocx, buildTemplateXlsx } from '@/lib/officeTemplate';
 import { QUIZ_IMPORT_HEADERS, QUIZ_IMPORT_HOWTO, QUIZ_IMPORT_SAMPLE, addImportedQuestions, parseQuizImport } from '@/lib/quizImport';
-import { QUIZ_KIND_LABEL, QUIZ_MAX_QUESTIONS, type QuizSetContent } from '@/lib/skillQuiz';
+import { QUIZ_MAX_QUESTIONS, type QuizSetContent } from '@/lib/skillQuiz';
 
 const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
@@ -124,8 +124,7 @@ export default function QuizImportPanel({ content, fallbackSkillId, onAdd, onClo
                   <span className="min-w-0 flex-1">
                     {q.prompt}
                     <span className="block text-muted-foreground">
-                      {skillName(q.skillId)} · {QUIZ_KIND_LABEL[q.kind]} · {q.points} คะแนน
-                      {q.kind === 'choice' && q.answer != null ? ` · เฉลย ${LETTERS[q.answer]} ${q.choices[q.answer]}` : ''}
+                      {skillName(q.skillId)} · {q.points} คะแนน · เฉลย {LETTERS[q.answer]} {q.choices[q.answer]}
                     </span>
                   </span>
                 </li>
