@@ -804,7 +804,7 @@ async function patchClaim(req: AuthedReq, res: ApiRes, id: string, claim: boolea
   let curRows: Array<{ claimed_by: string | null; status: string; job_id: string | null; department_code: string | null }>;
   try {
     ({ rows: curRows } = await dbQuery<{ claimed_by: string | null; status: string; job_id: string | null; department_code: string | null }>(
-      `select claimed_by, status, job_id, department_code from ${tbl} where id = $1 limit 1`,
+      `select claimed_by, status, job_id, department_code, created_by_name from ${tbl} where id = $1 limit 1`,
       [id],
     ));
   } catch (e) {
@@ -977,7 +977,7 @@ async function patchLead(req: AuthedReq, res: ApiRes, id: string, lead: boolean)
   // จำกัดตาม BU ก่อนเสมอ — กันปัดใบสมัครของแผนกอื่นด้วยการเดา id (กติกาเดียวกับ patchStatus)
   // ต้องยอมใบที่จำแผนกตัวเองไว้ด้วย (082) ไม่งั้นใบขอปิดแล้วกดไม่ได้ทั้งที่แผนกตัวเอง
   const { rows: beforeRows } = await dbQuery<{ job_id: string | null; department_code: string | null }>(
-    `select job_id, department_code from ${tbl} where id = $1 limit 1`,
+    `select job_id, department_code, created_by_name from ${tbl} where id = $1 limit 1`,
     [id],
   );
   const before = beforeRows[0];
@@ -1045,7 +1045,7 @@ async function patchPhone(req: AuthedReq, res: ApiRes, id: string, rawPhone: str
     phone: string;
     job_id: string | null;
     department_code: string | null;
-  }>(`select phone, job_id, department_code from ${tbl} where id = $1 limit 1`, [id]);
+  }>(`select phone, job_id, department_code, created_by_name from ${tbl} where id = $1 limit 1`, [id]);
   const before = beforeRows[0];
   if (!before) return sendError(res, 404, 'Not found');
   if (!(await isApplicationInWriteScope(req.user, before))) {
@@ -1091,7 +1091,7 @@ async function patchDial(req: AuthedReq, res: ApiRes, id: string) {
   const { rows: beforeRows } = await dbQuery<{
     job_id: string | null;
     department_code: string | null;
-  }>(`select job_id, department_code from ${tbl} where id = $1 limit 1`, [id]);
+  }>(`select job_id, department_code, created_by_name from ${tbl} where id = $1 limit 1`, [id]);
   const before = beforeRows[0];
   if (!before) return sendError(res, 404, 'Not found');
   if (!(await isApplicationInWriteScope(req.user, before))) {
@@ -1156,7 +1156,7 @@ async function getApplicationDetailExtras(req: AuthedReq, res: ApiRes, id: strin
     phone_e164: string | null;
     job_id: string | null;
     department_code: string | null;
-  }>(`select id, phone_e164, job_id, department_code from ${tbl} where id = $1 limit 1`, [id]);
+  }>(`select id, phone_e164, job_id, department_code, created_by_name from ${tbl} where id = $1 limit 1`, [id]);
   const base = baseRows[0];
   if (!base) return sendError(res, 404, 'Not found');
   if (!(await isApplicationInWriteScope(req.user, base))) {
@@ -1186,7 +1186,7 @@ async function getApplicationDetailExtras(req: AuthedReq, res: ApiRes, id: strin
       status: string;
       channel_label: string | null;
     }>(
-      `select id, created_at, job_id, department_code, job_title, unit_name, position_interest,
+      `select id, created_at, job_id, department_code, created_by_name, job_title, unit_name, position_interest,
               status, channel_label
          from ${tbl}
         where phone_e164 = $1
@@ -1327,7 +1327,7 @@ async function patchProfile(req: AuthedReq, res: ApiRes, id: string, raw: unknow
   };
   const { rows: beforeRows } = await dbQuery<Before>(
     `select title_prefix, first_name, last_name, full_name, gender, age, line_id, province, district,
-            education, license_types, weight_kg, height_cm, note, job_id, department_code,
+            education, license_types, weight_kg, height_cm, note, job_id, department_code, created_by_name,
             recruiter_name, responsible_name, specific_type
        from ${tbl} where id = $1 limit 1`,
     [id],
@@ -1425,7 +1425,7 @@ async function patchProfile(req: AuthedReq, res: ApiRes, id: string, raw: unknow
  */
 async function patchCancelled(req: AuthedReq, res: ApiRes, id: string, cancelled: boolean, rawReason: unknown) {
   const { rows } = await dbQuery<{ job_id: string | null; department_code: string | null; full_name: string }>(
-    `select job_id, department_code, full_name from ${tbl} where id = $1 limit 1`,
+    `select job_id, department_code, created_by_name, full_name from ${tbl} where id = $1 limit 1`,
     [id],
   );
   const cur = rows[0];
@@ -1499,7 +1499,7 @@ async function patchStatus(req: AuthedReq, res: ApiRes) {
     admin_note: string | null;
     job_id: string | null;
     department_code: string | null;
-  }>(`select status, admin_note, job_id, department_code from ${tbl} where id = $1 limit 1`, [id]);
+  }>(`select status, admin_note, job_id, department_code, created_by_name from ${tbl} where id = $1 limit 1`, [id]);
   const before = beforeRows[0];
   if (!before) return sendError(res, 404, 'Not found');
 

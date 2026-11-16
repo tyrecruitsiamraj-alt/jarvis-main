@@ -12,7 +12,17 @@ const applicationsTable = tableInAppSchema('public_job_applications');
 export type ApplicationScopeRow = {
   job_id: string | null;
   department_code?: string | null;
+  /** คนคีย์ — 'iRecruit' = ดึงมาจาก iRecruit (ใช้ตัดสินคลังกลาง) */
+  created_by_name?: string | null;
 };
+
+/**
+ * ใบที่ดึงจาก iRecruit ที่หาเจ้าหน้าที่ดูแลไม่เจอ (ไม่ผูกใบขอ · ไม่มีแผนก) = คลังกลาง ทุกแผนกเห็น (เจ้าของ 10 พ.ย. 2569)
+ * 🔴 ตัวเดียวกับด่านอ่าน (`buildApplicationsListQuery`) — 16 พ.ย. 2569 ด่านเขียนไม่มีข้อนี้ คนที่ไม่ใช่แอดมิน (pakkorn ดู 5 BU)
+ *    เปิดป๊อปได้แต่กดบันทึกแล้วขึ้น "ไม่มีสิทธิ์เข้าถึงใบสมัครของแผนกอื่น"
+ */
+export const isUnassignedIrecruitRow = (row: ApplicationScopeRow): boolean =>
+  (row.created_by_name ?? '').trim() === 'iRecruit' && !row.job_id && !(row.department_code ?? '').trim();
 
 /**
  * ใบสมัครนี้อยู่ในสิทธิ์ "เขียน" ของผู้ใช้ไหม — ต้องตรงกับด่านฝั่ง **อ่าน**
@@ -32,6 +42,7 @@ export async function isApplicationInWriteScope(
   if (row.job_id && scopedJobIds.has(row.job_id)) return true;
 
   const dept = await loadUserDepartmentScope(user);
+  if (dept.mode === 'code' && isUnassignedIrecruitRow(row)) return true;
   if (dept.mode === 'code' && row.department_code) {
     // หลาย BU (26 ต.ค. 2569) — ใบที่ประทับ BU ใดก็ได้ในสิทธิ์
     return dept.codes.includes(normalizeDepartmentCode(row.department_code) ?? '');
@@ -66,8 +77,8 @@ export async function loadApplicationScopeRowOrNull(
   const id = (applicationId || '').trim();
   if (!/^[0-9a-f-]{36}$/i.test(id)) return null;
   try {
-    const { rows } = await dbQuery<{ job_id: string | null; department_code: string | null }>(
-      `select job_id, department_code from ${applicationsTable} where id = $1 limit 1`,
+    const { rows } = await dbQuery<{ job_id: string | null; department_code: string | null; created_by_name: string | null }>(
+      `select job_id, department_code, created_by_name from ${applicationsTable} where id = $1 limit 1`,
       [id],
     );
     return rows[0] ?? null;
@@ -95,8 +106,8 @@ export async function loadApplicationScopeRow(
   const id = (applicationId || '').trim();
   if (!/^[0-9a-f-]{36}$/i.test(id)) return { job_id: fallbackJobId };
   try {
-    const { rows } = await dbQuery<{ job_id: string | null; department_code: string | null }>(
-      `select job_id, department_code from ${applicationsTable} where id = $1 limit 1`,
+    const { rows } = await dbQuery<{ job_id: string | null; department_code: string | null; created_by_name: string | null }>(
+      `select job_id, department_code, created_by_name from ${applicationsTable} where id = $1 limit 1`,
       [id],
     );
     if (rows[0]) return rows[0];

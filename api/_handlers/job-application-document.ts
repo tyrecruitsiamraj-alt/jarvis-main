@@ -34,7 +34,7 @@ async function upload(req: AuthedReq, res: ApiRes) {
   const doc = normalizeDocument(body.document);
   if (doc.ok === false) return sendError(res, 400, 'Bad request', doc.message);
   if (!doc.value) return sendError(res, 400, 'Bad request', 'เลือกไฟล์ก่อน');
-  const { rows } = await dbQuery<Pick<Row, 'job_id' | 'department_code'>>(`select job_id, department_code from ${tbl} where id = $1 limit 1`, [id]);
+  const { rows } = await dbQuery<Pick<Row, 'job_id' | 'department_code'>>(`select job_id, department_code, created_by_name from ${tbl} where id = $1 limit 1`, [id]);
   const row = rows[0];
   if (!row) return sendError(res, 404, 'Not found', 'ไม่พบใบสมัครนี้');
   if (!(await isApplicationInWriteScope(req.user, row))) {
@@ -72,7 +72,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
 
   try {
     const { rows } = await dbQuery<Row>(
-      `select document_filename, document_mime, document_bytes, job_id, department_code from ${tbl} where id = $1 limit 1`,
+      `select document_filename, document_mime, document_bytes, job_id, department_code, created_by_name from ${tbl} where id = $1 limit 1`,
       [id],
     );
     const row = rows[0];

@@ -148,7 +148,7 @@ describe('PATCH profile — แก้ข้อมูลผู้สมัคร'
 describe('GET detail_of — ประวัติการสมัคร + การโทร', () => {
   function stubDetail(opts: { queueFails?: boolean } = {}) {
     dbQuery.mockImplementation((sql: string) => {
-      if (/select id, phone_e164, job_id, department_code from/i.test(sql)) {
+      if (/select id, phone_e164, job_id, department_code, created_by_name from/i.test(sql)) {
         return Promise.resolve({ rows: [{ id: ID, phone_e164: '+66812345678', job_id: 'J1', department_code: 'LBD' }] });
       }
       // 21 ต.ค. 2569: ประวัตินับใบนี้ด้วย (ไม่มี id <> $2 แล้ว)
