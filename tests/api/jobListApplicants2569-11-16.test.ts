@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { matchesApplicantPresenceFilter } from '../../src/lib/jobListApplicants';
+import { boardApplicantsPathOfJob, matchesApplicantPresenceFilter } from '../../src/lib/jobListApplicants';
 import { buildJobListSearchParams, parseJobListSearchParams, JOB_LIST_DEFAULTS } from '../../src/lib/jobListPageState';
 import { compareJobsByTableColumn, JOB_LIST_TABLE_COLUMN_LABEL } from '../../src/lib/jobListTableSort';
 import type { JobRequest } from '@/types';
@@ -42,10 +42,16 @@ describe('หน้าใบขอ: คนกรอกต่อใบ + ตั�
     expect(asc.map((j) => j.id)).toEqual(['d', 'a', 'b', 'c']);
   });
 
-  it('กดเลข = แท็บผู้สมัครของหน้ารายละเอียดใบขอ (ขึ้นทุกคน เลขตรงคอลัมน์ · OPL6808001 เคยขึ้น 3 เห็น 1)', () => {
+  it('กดเลข = แท็บผู้สมัครของกล่องงาน กรองใบนั้น ขึ้นทุกคน (ชุดเดียวกับปุ่ม "ดูรายชื่อ" บนการ์ด)', () => {
+    const path = boardApplicantsPathOfJob('siamraj-sql:OPL6808001');
+    const q = new URLSearchParams(path.split('?')[1]);
+    expect(path.startsWith('/jobs/board?')).toBe(true);
+    expect(q.get('view')).toBe('list');
+    expect(q.get('list')).toBe('all');
+    expect(q.getAll('a.job')).toEqual(['siamraj-sql:OPL6808001']);
+    expect(q.get('joball')).toBe('siamraj-sql:OPL6808001');
     const page = readFileSync('src/pages/jobs/JobListPage.tsx', 'utf8');
-    expect(page).toContain("navigateToUnitRequest(j, navigate, { returnTo, tab: 'applicants' })");
-    expect(page).not.toContain('applicantsListPathOfJob');
+    expect(page).toContain('navigate(boardApplicantsPathOfJob(applicantKeyIdx.get(j.id)?.key ?? j.id))');
   });
 
   it('หน้าใบขอ: ยอดตัวเดียวกับกล่องงาน · มีตัวกรอง · โหลดไม่ได้บอกบนจอ', () => {
