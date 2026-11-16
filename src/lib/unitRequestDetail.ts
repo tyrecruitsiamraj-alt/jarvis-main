@@ -49,6 +49,18 @@ const text = (v: string | null | undefined): DetailValue => {
 const known = (v: DetailValue): boolean => v.kind !== 'unknown';
 
 /** จำนวนเงินเป็นข้อความไทย — ผู้เรียกใช้กับ `kind: 'money'` เท่านั้น */
+/**
+ * รายละเอียดงาน / คุณสมบัติ **ตามใบขอ ERP** (เจ้าของ 3 พ.ย. 2569 ถามว่าหน้าใบขอ "มียัง") — ข้อความเดียวกับช่องบนหน้ารายละเอียดใบขอ
+ * ⇒ ทีมแก้ทับในป๊อปประกาศแล้วก็ยังใช้ของ ERP (`erp_*`) · ไม่ได้แก้ = ค่าปัจจุบันซึ่งคือของ ERP อยู่แล้ว
+ * ใช้ทั้งหน้าจอ (`UnitRequestInfoFields`) และคำขอ Scrap (`soScrapSnapshot` · 16 พ.ย. 2569) — ที่เดียว ข้อความตรงกันเสมอ · ไม่มี = null
+ */
+export function erpLinesText(job: JobRequest, key: 'job_details' | 'requirements'): string | null {
+  const erpKey = key === 'job_details' ? 'erp_job_details' : 'erp_requirements';
+  const lines = (erpKey in job ? job[erpKey] : job[key]) ?? [];
+  const text = lines.map((l) => l.trim()).filter(Boolean).join('\n');
+  return text || null;
+}
+
 export function formatMoney(amount: number): string {
   return `${amount.toLocaleString('th-TH', { maximumFractionDigits: 2 })} บาท`;
 }

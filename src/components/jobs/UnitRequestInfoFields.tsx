@@ -22,7 +22,7 @@ import { genderLabel } from '@/lib/genderRequirement';
 
 import { formatYmdTh } from '@/lib/dateTh';
 import { jobPositionUnits, remainingPositionsOf } from '@/lib/jobPositionUnits';
-import { moneyFieldText } from '@/lib/unitRequestDetail';
+import { erpLinesText, moneyFieldText } from '@/lib/unitRequestDetail';
 import { postingPositionText } from '@/lib/publicJobTitle';
 import type { JobRequest } from '@/types';
 
@@ -43,16 +43,7 @@ export function Field({
   );
 }
 
-/**
- * รายละเอียดงาน / คุณสมบัติ **ตามใบขอ ERP** (เจ้าของ 3 พ.ย. 2569 ถามว่าหน้าใบขอ "มียัง") — กล่องนี้คือ "ข้อมูลใบขอมาจาก ERP"
- * ⇒ ทีมแก้ทับในป๊อปประกาศแล้วก็ยังโชว์ของ ERP (`erp_*`) · ไม่ได้แก้ = ค่าปัจจุบันซึ่งคือของ ERP อยู่แล้ว (erpJobText.ts)
- */
-function erpLinesText(job: JobRequest, key: 'job_details' | 'requirements'): string | null {
-  const erpKey = key === 'job_details' ? 'erp_job_details' : 'erp_requirements';
-  const lines = (erpKey in job ? job[erpKey] : job[key]) ?? [];
-  const text = lines.map((l) => l.trim()).filter(Boolean).join('\n');
-  return text || null;
-}
+/** รายละเอียดงาน / คุณสมบัติ ตามใบขอ ERP — ตัวจัดข้อความอยู่ `erpLinesText` (ใช้ร่วมกับคำขอ Scrap) */
 
 const UnitRequestInfoFields: React.FC<{ job: JobRequest }> = ({ job: data }) => (
   <div className="grid gap-2 sm:grid-cols-2">

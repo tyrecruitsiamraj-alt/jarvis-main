@@ -8,6 +8,7 @@
  * ผล Scrap (Resume) อยู่ที่ So Scraping — Jarvis บอกแค่สถานะ
  */
 import type { JobRequest } from '@/types';
+import { erpLinesText } from '@/lib/unitRequestDetail';
 import { bkkWhen } from './bkkWhen';
 import type { ToneKey } from '@/lib/designTokens';
 import { inferProvinceFromAddress } from '@/lib/parseThaiJobAddress';
@@ -101,6 +102,12 @@ export function soScrapSnapshot(job: JobRequest, publicTitle?: string | null): R
   if (job.gender_requirement) out.gender = job.gender_requirement;
   if (job.total_income) out.income = job.total_income;
   if (job.work_schedule) out.work_schedule = job.work_schedule;
+  // รายละเอียดงาน + คุณสมบัติ ข้อความเต็มเหมือนหน้ารายละเอียดใบขอ (16 พ.ย. 2569 · LMO6911012 คุมทีมดูแลสวน So Scraping เห็นแค่ "คนสวน" ไปหาพนักงาน)
+  // ไม่มี = ไม่ใส่ช่อง (ไม่ส่งค่าว่าง)
+  const details = erpLinesText(job, 'job_details');
+  if (details) out.job_description = details;
+  const quals = erpLinesText(job, 'requirements');
+  if (quals) out.qualifications = quals;
   return out;
 }
 

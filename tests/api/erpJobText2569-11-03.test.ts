@@ -65,6 +65,7 @@ describe('หน้ารายละเอียดใบขอโชว์ร�
     const s = readFileSync('src/components/jobs/UnitRequestInfoFields.tsx', 'utf8');
     expect(s).toContain(`<Field label="รายละเอียดงาน" value={erpLinesText(data, 'job_details')} />`);
     expect(s).toContain(`<Field label="คุณสมบัติ" value={erpLinesText(data, 'requirements')} />`);
-    expect(s).toContain("const erpKey = key === 'job_details' ? 'erp_job_details' : 'erp_requirements';");
+    // ตัวจัดข้อความย้ายไป lib ที่เดียว (16 พ.ย. 2569 · ใช้ร่วมกับคำขอ Scrap)
+    expect(readFileSync('src/lib/unitRequestDetail.ts', 'utf8')).toContain("const erpKey = key === 'job_details' ? 'erp_job_details' : 'erp_requirements';");
   });
 });
