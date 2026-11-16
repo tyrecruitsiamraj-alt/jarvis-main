@@ -126,7 +126,6 @@ describe('กติกาและข้อความ', () => {
 
   it('ข้อความบอกว่าต้องรอ 14 วัน + วันที่สมัครใหม่ได้ · หน้าสาธารณะไม่บอกรายละเอียดใบเดิม', () => {
     expect(repeatPublicMessage('phone', LAST)).toBe('เบอร์นี้สมัครกับเราไปแล้ว ต้องรอ 14 วัน สมัครใหม่ได้ตั้งแต่วันที่ 15/10/2569');
-    expect(repeatPublicMessage('ip', LAST)).toBe('มีการสมัครจากเครือข่ายนี้ไปแล้ว ต้องรอ 14 วัน สมัครใหม่ได้ตั้งแต่วันที่ 15/10/2569');
     expect(repeatStaffMessage(LAST)).toBe('เบอร์นี้สมัครเข้ามาแล้วเมื่อ 1/10/2569 — ต้องรอ 14 วัน เพิ่มใหม่ได้ตั้งแต่ 15/10/2569');
     expect(repeatImportReason(LAST)).toBe('สมัครเข้ามาแล้วภายใน 14 วัน (ได้ตั้งแต่ 15/10/2569)');
   });
@@ -161,14 +160,14 @@ describe('POST /api/public/apply', () => {
     expect(JSON.stringify(event)).not.toMatch(/0812345678|ทดสอบ/);
   });
 
-  it('🔴 เบอร์ใหม่แต่ IP เดิมสมัครภายใน 14 วัน ⇒ 409 ข้อความของ IP · ล็อกเบอร์ก่อน IP เสมอ', async () => {
+  it('🔴 เบอร์ใหม่ IP เดิม ⇒ สมัครได้ (ถอดกติกา IP 16 พ.ย. 2569 — เน็ตมือถือใช้ IP ร่วมกัน) · ล็อกแค่เบอร์', async () => {
     stubTx({ ipLast: LAST });
-    const { res, status, json } = mockRes();
+    const { res, status } = mockRes();
     await applyHandler(publicReq(applyBody) as never, res as never);
-    expect(status).toHaveBeenCalledWith(409);
-    expect(json.mock.calls[0][0].message).toBe(repeatPublicMessage('ip', LAST));
+    expect(status).toHaveBeenCalledWith(201);
     const locks = calls(/pg_advisory_xact_lock/).map((c) => String((c[1] as unknown[])[0]));
-    expect(locks).toEqual(['apply-phone:+66812345678', 'apply-ip:203.0.113.7']);
+    expect(locks).toEqual(['apply-phone:+66812345678']);
+    expect(calls(/client_ip = \$1/)).toHaveLength(0);
   });
 
   it('ผ่านทั้งสอง ⇒ 201 · บันทึก client_ip ไว้กับใบ · จด log ของใบนั้น', async () => {
@@ -194,12 +193,13 @@ describe('POST /api/public/apply', () => {
     expect(calls(/where phone_e164 = jarvis_phone_e164_thai/)).toHaveLength(1);
   });
 
-  it('🔴 client_ip ยังไม่ migrate (deploy รันโค้ดก่อน migrate) ⇒ ข้ามกติกา IP + insert ชุดเดิม · ผู้สมัครยังส่งได้', async () => {
+  it('🔴 client_ip ยังไม่ migrate (deploy รันโค้ดก่อน migrate) ⇒ insert ชุดเดิม · ผู้สมัครยังส่งได้', async () => {
     stubTx({ clientIpMissing: true });
     const { res, status } = mockRes();
     await applyHandler(publicReq(applyBody) as never, res as never);
     expect(status).toHaveBeenCalledWith(201);
-    expect(calls(/rollback to savepoint/).length).toBeGreaterThanOrEqual(2);
+    // ถอยชุด insert ที่มี client_ip (กติกา IP ถอดแล้ว — เหลือแค่ถอยตอน insert)
+    expect(calls(/rollback to savepoint/).length).toBeGreaterThanOrEqual(1);
     const inserts = calls(/^insert into/i).map((c) => String(c[0]));
     expect(inserts.at(-1)).not.toMatch(/client_ip/);
   });

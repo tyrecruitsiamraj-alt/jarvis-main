@@ -192,8 +192,8 @@ export default async function handler(req: ApiReq, res: ApiRes) {
     const placeholders = (n: number) => Array.from({ length: n }, (_, i) => `$${i + 1}`).join(', ');
 
     /**
-     * 🔴 สมัครซ้ำต้องรอ 14 วัน (เจ้าของสั่ง 1 ต.ค. 2569) — เบอร์เดิม (ไม่ว่างานไหน) **หรือ** IP เดิม (Choice "IP ละ 1 ใบใน 14 วัน")
-     * ตัดสินในธุรกรรมเดียวกับ insert + ล็อกเบอร์/IP (`lockAndFindRepeat`) — กดส่งรัว ๆ ก็เข้าได้ใบเดียว
+     * 🔴 สมัครซ้ำต้องรอ 14 วัน (เจ้าของสั่ง 1 ต.ค. 2569) — เบอร์เดิม (ไม่ว่างานไหน) · กติกา IP ถอดแล้ว 16 พ.ย. 2569 (เน็ตมือถือใช้ IP ร่วมกัน)
+     * ตัดสินในธุรกรรมเดียวกับ insert + ล็อกเบอร์ (`lockAndFindRepeat`) — กดส่งรัว ๆ ก็เข้าได้ใบเดียว
      * ข้อความไม่บอกรายละเอียดใบเดิม (หน้าสาธารณะ ใครพิมพ์เบอร์ใครก็ได้) · บอกวันที่สมัครใหม่ได้
      *
      * ⚠️ **เส้นนี้เป็นสาธารณะ — ห้ามพังเพราะ schema ยังไม่อัปเดต**: ลองชุดเต็มก่อน แล้วถอยทีละชั้น
@@ -202,7 +202,7 @@ export default async function handler(req: ApiReq, res: ApiRes) {
      */
     const ip = applicantClientIp(req);
     const outcome = await dbTransaction(async (client) => {
-      const hit = await lockAndFindRepeat(client, { phone: v.phone, ip });
+      const hit = await lockAndFindRepeat(client, { phone: v.phone });
       if (hit) return { hit };
       const attempts: Array<{ cols: string; values: unknown[] }> = [
         // ใบจาก LINE Bot (168) — ยังไม่รัน 168 = ถอยไปชุดเดิม (ไม่เก็บ lid)
