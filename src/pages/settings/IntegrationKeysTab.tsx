@@ -27,6 +27,7 @@ import { cn } from '@/lib/utils';
 import type { IntegrationName } from '@/lib/integrationKeys';
 import LumosOldIdRepushCard from './LumosOldIdRepushCard';
 import SoScrapingKeyCard from './SoScrapingKeyCard';
+import PhoneBoxKeyCard from './PhoneBoxKeyCard';
 import LineBotKeyCard from './LineBotKeyCard';
 
 type KeyRow = { name: string; created_at: string; revoked_at: string | null; last_used_at: string | null } | null;
@@ -187,6 +188,8 @@ const IntegrationKeysTab: React.FC = () => {
 
       {/* key ที่ So Scraping ออกให้ Jarvis เรียกตัวเลือกตอนสั่งงาน (26 ต.ค. 2569) */}
       <SoScrapingKeyCard />
+      {/* มือถือโพสต์กลุ่ม Facebook (16 พ.ย. 2569) — อ่านสถานะอย่างเดียว */}
+      <PhoneBoxKeyCard />
       <LineBotKeyCard />
 
       {/* แผนติดตามรหัสเดิมที่ค้างที่ Lumos (22 ต.ค. 2569) */}

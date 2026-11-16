@@ -11,6 +11,7 @@
  * - PUT {outbound:'so-scraping', key?, base_url, clear?}: บันทึกแบบเข้ารหัส
  * - POST {outbound:'so-scraping', test:true, key?, base_url}: ลองเรียกจริง (ไม่ใส่ key = ใช้ตัวที่บันทึกไว้) ตอบจำนวนที่ได้
  * - PUT {outbound:'line-bot-sowork', key?, base_url, clear?} (28 ต.ค. 2569): secret ร่วมกับ LINE Bot So Work (`lineBotSoWork.ts`)
+ * - PUT/POST {outbound:'phone-box', …} (16 พ.ย. 2569): กุญแจมือถือโพสต์กลุ่ม · ทดสอบ = อ่านสถานะเครื่อง/บัญชี (`phoneBox.ts`)
  */
 import { randomBytes } from 'node:crypto';
 import { withAuth, sendError, handleApiError, type ApiRes, type AuthedReq } from '../_lib/http.js';
@@ -30,6 +31,7 @@ import {
   SO_OPTIONS_KEY_NAME,
 } from '../_lib/soScrapingOptions.js';
 import { getLineBotKeyView, LINE_BOT_KEY_NAME, saveLineBotKey } from '../_lib/lineBotSoWork.js';
+import { getPhoneBoxKeyView, PHONE_BOX_KEY_NAME, readPhoneBoxStatus, savedPhoneBoxKey, savePhoneBoxKey } from '../_lib/phoneBox.js';
 
 const KEYS = tableInAppSchema('app_integration_keys');
 const LEADS = tableInAppSchema('so_scraping_comment_leads');
@@ -54,7 +56,11 @@ async function handler(req: AuthedReq, res: ApiRes) {
       return res.status(200).json({
         items: INTEGRATIONS.map((i) => ({ ...i, key: rows.find((r) => r.name === i.name) ?? null })),
         soScraping: s[0] ?? null,
-        outbound: { [SO_OPTIONS_KEY_NAME]: await getSoKeyView(), [LINE_BOT_KEY_NAME]: await getLineBotKeyView() },
+        outbound: {
+          [SO_OPTIONS_KEY_NAME]: await getSoKeyView(),
+          [LINE_BOT_KEY_NAME]: await getLineBotKeyView(),
+          [PHONE_BOX_KEY_NAME]: await getPhoneBoxKeyView(),
+        },
       });
     }
     if (m === 'PUT') {
@@ -73,6 +79,20 @@ async function handler(req: AuthedReq, res: ApiRes) {
         });
         return res.status(200).json({ outbound: { [LINE_BOT_KEY_NAME]: await getLineBotKeyView() } });
       }
+      if (body?.outbound === PHONE_BOX_KEY_NAME) {
+        const baseUrl = normalizeSoBaseUrl(body.base_url);
+        if (!baseUrl) return sendError(res, 400, 'Bad request', 'URL ต้องขึ้นต้นด้วย https://');
+        const key = typeof body.key === 'string' && body.key.trim() ? body.key.trim() : null;
+        if (key && key.length > 500) return sendError(res, 400, 'Bad request', 'กุญแจยาวเกินไป');
+        await savePhoneBoxKey({ key, baseUrl, clear: body.clear === true }, req.user.email ?? req.user.sub);
+        await auditFromAuthed(req, {
+          action: 'outbound_key.save',
+          entityType: 'outbound_key',
+          entityId: PHONE_BOX_KEY_NAME,
+          after: { base_url: baseUrl, key_changed: Boolean(key), cleared: body.clear === true },
+        });
+        return res.status(200).json({ outbound: { [PHONE_BOX_KEY_NAME]: await getPhoneBoxKeyView() } });
+      }
       if (body?.outbound !== SO_OPTIONS_KEY_NAME) return sendError(res, 400, 'Bad request', 'ไม่รู้จักระบบนี้');
       const baseUrl = normalizeSoBaseUrl(body.base_url);
       if (!baseUrl) return sendError(res, 400, 'Bad request', 'URL ต้องขึ้นต้นด้วย https://');
@@ -89,6 +109,13 @@ async function handler(req: AuthedReq, res: ApiRes) {
     }
     if (m === 'POST') {
       const body = (await readJsonBody(req)) as { name?: unknown; outbound?: unknown; test?: unknown; key?: unknown; base_url?: unknown } | null;
+      if (body?.outbound === PHONE_BOX_KEY_NAME && body.test === true) {
+        const baseUrl = normalizeSoBaseUrl(body.base_url);
+        if (!baseUrl) return sendError(res, 400, 'Bad request', 'URL ต้องขึ้นต้นด้วย https://');
+        const key = (typeof body.key === 'string' && body.key.trim() ? body.key.trim() : null) ?? (await savedPhoneBoxKey());
+        if (!key) return sendError(res, 400, 'Bad request', 'ใส่กุญแจก่อนกดเช็ก');
+        return res.status(200).json(await readPhoneBoxStatus(baseUrl, key));
+      }
       if (body?.outbound === SO_OPTIONS_KEY_NAME && body.test === true) {
         const baseUrl = normalizeSoBaseUrl(body.base_url);
         if (!baseUrl) return sendError(res, 400, 'Bad request', 'URL ต้องขึ้นต้นด้วย https://');
