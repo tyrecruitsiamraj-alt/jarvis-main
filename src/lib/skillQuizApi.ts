@@ -1,5 +1,6 @@
 import { apiFetch } from './apiFetch';
 import type { PublicQuizQuestion, QuizAnalysis, QuizAnswers, QuizAttemptStatus, QuizSetContent } from './skillQuiz';
+import type { QuizViewerMode } from './skillQuizTaker';
 
 /** แบบทดสอบพนักงาน (12 พ.ย. 2569) — พังโยนข้อความไทยจาก server */
 async function readError(r: Response): Promise<never> {
@@ -7,7 +8,29 @@ async function readError(r: Response): Promise<never> {
   throw new Error(data.message || `ระบบตอบ ${r.status}`);
 }
 
-export type QuizSetItem = { id: string; content: QuizSetContent; created_by_name: string | null; created_at: string; updated_at: string; attempts: number };
+export type QuizSetItem = {
+  id: string;
+  content: QuizSetContent;
+  created_by_name: string | null;
+  created_by_user_id: string | null;
+  created_at: string;
+  updated_at: string;
+  attempts: number;
+  public_token: string | null;
+  viewer_bus: string[];
+  viewer_user_ids: string[];
+};
+
+/** ข้อมูลที่คนทำกรอกเอง (ลิงก์ของชุด · 16 พ.ย. 2569) — ลิงก์ละคนแบบเก่าเป็น null · เลขบัตรมาแบบปิดท้ายเท่านั้น */
+export type QuizTakerInfo = {
+  first_name: string | null;
+  last_name: string | null;
+  phone: string | null;
+  age: number | null;
+  birth_date: string | null;
+  citizen_id_masked: string | null;
+  consented_at: string | null;
+};
 
 export type QuizAttemptItem = {
   id: string;
@@ -22,7 +45,7 @@ export type QuizAttemptItem = {
   created_at: string;
   opened_at: string | null;
   submitted_at: string | null;
-};
+} & QuizTakerInfo;
 
 export type QuizAttemptDetail = {
   id: string;
@@ -40,10 +63,19 @@ export type QuizAttemptDetail = {
   submitted_at: string | null;
   reviewed_at: string | null;
   reviewed_by_name: string | null;
-};
+} & QuizTakerInfo;
 
-export function quizLinkUrl(token: string): string {
-  return `${window.location.origin}/quiz/${token}`;
+/** ลิงก์เดียวของชุด — ส่งให้ทุกคนที่ต้องทำ */
+export function quizSetLinkUrl(token: string): string {
+  return `${window.location.origin}/quiz/s/${token}`;
+}
+
+export type QuizPerson = { id: string; name: string; bu: string | null };
+
+export async function fetchQuizPeople(): Promise<{ people: QuizPerson[]; bus: string[]; myId: string }> {
+  const r = await apiFetch('/api/skill-quiz?view=people');
+  if (!r.ok) return readError(r);
+  return (await r.json()) as { people: QuizPerson[]; bus: string[]; myId: string };
 }
 
 export async function fetchQuizSets(): Promise<QuizSetItem[]> {
@@ -70,10 +102,10 @@ async function post<T>(body: Record<string, unknown>): Promise<T> {
   return (await r.json()) as T;
 }
 
-export const saveQuizSet = (id: string | null, content: QuizSetContent) => post<{ id: string }>(id ? { action: 'update_set', id, content } : { action: 'create_set', content });
+export type QuizViewersInput = { mode: QuizViewerMode; bus: string[]; userIds: string[] };
+export const saveQuizSet = (id: string | null, content: QuizSetContent, viewers: QuizViewersInput) =>
+  post<{ id: string }>(id ? { action: 'update_set', id, content, viewers } : { action: 'create_set', content, viewers });
 export const archiveQuizSet = (id: string) => post<{ ok: true }>({ action: 'archive_set', id });
-export const createQuizLink = (setId: string, personName: string, personRole: string) =>
-  post<{ id: string; token: string; doc_no: string }>({ action: 'create_link', setId, personName, personRole });
 export const saveQuizReview = (id: string, v: { analysis: QuizAnalysis; reviewed: boolean }) =>
   post<{ attempt: QuizAttemptDetail }>({ action: 'save_review', id, ...v }).then((d) => d.attempt);
 export const draftQuizWithAi = (id: string) => post<{ attempt: QuizAttemptDetail }>({ action: 'ai_draft', id }).then((d) => d.attempt);
@@ -92,3 +124,24 @@ export async function submitPublicQuiz(token: string, answers: QuizAnswers): Pro
   const r = await fetch('/api/public/skill-quiz', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token, answers }) });
   if (!r.ok) return readError(r);
 }
+
+/** หน้าแรกของลิงก์ชุด — ชื่อชุดกับจำนวนข้อ (ข้อสอบยังไม่ส่งจนกว่าจะกรอกข้อมูล) */
+export type PublicQuizSet = { title: string; roleLabel: string; questionCount: number };
+
+export async function fetchPublicQuizSet(setToken: string): Promise<PublicQuizSet> {
+  const r = await fetch(`/api/public/skill-quiz?set=${encodeURIComponent(setToken)}`);
+  if (!r.ok) return readError(r);
+  return (await r.json()) as PublicQuizSet;
+}
+
+async function publicPost(body: Record<string, unknown>): Promise<string> {
+  const r = await fetch('/api/public/skill-quiz', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  if (!r.ok) return readError(r);
+  return ((await r.json()) as { token: string }).token;
+}
+
+export type QuizTakerForm = { firstName: string; lastName: string; phone: string; age: string; citizenId: string; birthDate: string };
+
+export const startPublicQuiz = (setToken: string, f: QuizTakerForm, consent: boolean) =>
+  publicPost({ action: 'start', set: setToken, ...f, age: Number(f.age), consent });
+export const resumePublicQuiz = (setToken: string, citizenId: string, birthDate: string) => publicPost({ action: 'resume', set: setToken, citizenId, birthDate });

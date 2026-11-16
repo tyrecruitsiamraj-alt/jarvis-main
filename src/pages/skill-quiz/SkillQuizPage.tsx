@@ -1,7 +1,8 @@
 /**
  * /skill-test — แบบทดสอบพนักงาน (เจ้าของ 12 พ.ย. 2569)
- * แท็บ "ผลแบบทดสอบ" = ลิงก์ที่ส่งไปแล้ว + สถานะ + คะแนน · แท็บ "ชุดข้อสอบ" = สร้าง/แก้ชุด
- * ทางเดิน: สร้างชุด → สร้างลิงก์ (ใส่ชื่อพนักงาน) → คัดลอกส่ง → พนักงานทำ → AI ร่าง → เจ้าหน้าที่ตรวจ → บันทึกและโหลดรูป
+ * แท็บ "ผลแบบทดสอบ" = คนที่กรอกเข้ามา + สถานะ + คะแนน · แท็บ "ชุดข้อสอบ" = สร้าง/แก้ชุด + ลิงก์ของชุด
+ * ทางเดิน (16 พ.ย. 2569 แบบ Knowa): สร้างชุด (เลือกใครเห็น) → คัดลอกลิงก์ของชุดส่ง → คนทำกรอกข้อมูล+ยินยอม PDPA
+ * → ทำ → AI ร่าง → เจ้าหน้าที่ตรวจ → บันทึกและโหลดรูป · ลิงก์ละคน (ใส่ชื่อพนักงาน) ถอดแล้ว
  */
 import { useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
@@ -9,10 +10,6 @@ import { Plus } from 'lucide-react';
 import PageHeader from '@/components/shared/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
@@ -30,18 +27,26 @@ import { CONVEYOR_VAULT } from '@/lib/soRecruitNav';
 import { TONE } from '@/lib/designTokens';
 import { cn } from '@/lib/utils';
 import { QUIZ_STATUS_LABEL, type QuizAttemptStatus } from '@/lib/skillQuiz';
+import { quizViewerMode } from '@/lib/skillQuizTaker';
 import {
   archiveQuizAttempt,
   archiveQuizSet,
-  createQuizLink,
   fetchQuizAttempts,
   fetchQuizSets,
-  quizLinkUrl,
+  quizSetLinkUrl,
   type QuizAttemptItem,
   type QuizSetItem,
 } from '@/lib/skillQuizApi';
 
 const STATUS_TONE: Record<QuizAttemptStatus, string> = { waiting: TONE.neutral.value, review: TONE.warn.value, ready: TONE.success.value };
+/** ทุกคน · BU LBD, LBA · 3 คน (คนสร้างกับ Admin เห็นเสมอ) */
+function viewersLabel(s: QuizSetItem): string {
+  const mode = quizViewerMode({ bus: s.viewer_bus, userIds: s.viewer_user_ids });
+  if (mode === 'bu') return `BU ${s.viewer_bus.join(', ')}`;
+  if (mode === 'people') return `${s.viewer_user_ids.length} คน`;
+  return 'ทุกคน';
+}
+
 const dateTh = (iso: string) => new Date(iso).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit', timeZone: 'Asia/Bangkok' });
 
 async function copyText(text: string): Promise<boolean> {
@@ -61,7 +66,6 @@ export default function SkillQuizPage() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [editing, setEditing] = useState<{ id: string | null; item: QuizSetItem | null } | null>(null);
-  const [linkOpen, setLinkOpen] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<{ kind: 'set' | 'attempt'; id: string; label: string } | null>(null);
 
@@ -78,9 +82,11 @@ export default function SkillQuizPage() {
 
   const title = CONVEYOR_VAULT.find((v) => v.key === 'skill-test')?.label ?? 'แบบทดสอบพนักงาน';
 
-  const copyLink = async (a: { token: string; person_name: string }) => {
-    const ok = await copyText(quizLinkUrl(a.token));
-    setNotice(ok ? `คัดลอกลิงก์ของ ${a.person_name} แล้ว` : quizLinkUrl(a.token));
+  const copyLink = async (s: QuizSetItem) => {
+    if (!s.public_token) return;
+    const url = quizSetLinkUrl(s.public_token);
+    const ok = await copyText(url);
+    setNotice(ok ? `คัดลอกลิงก์ชุด ${s.content.title} แล้ว` : url);
   };
 
   const doArchive = async () => {
@@ -103,15 +109,9 @@ export default function SkillQuizPage() {
         title={title}
         subtitle=""
         actions={
-          tab === 'sets' ? (
-            <Button type="button" onClick={() => setEditing({ id: null, item: null })}>
-              <Plus /> สร้างชุดข้อสอบ
-            </Button>
-          ) : (
-            <Button type="button" onClick={() => setLinkOpen(true)} disabled={!sets || sets.length === 0}>
-              <Plus /> สร้างลิงก์
-            </Button>
-          )
+          <Button type="button" onClick={() => setEditing({ id: null, item: null })}>
+            <Plus /> สร้างชุดข้อสอบ
+          </Button>
         }
       />
       <div className="space-y-4 px-4 pb-8 md:px-6">
@@ -130,11 +130,11 @@ export default function SkillQuizPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>เลขที่</TableHead>
-                  <TableHead>พนักงาน</TableHead>
+                  <TableHead>คนทำ</TableHead>
                   <TableHead>ชุดข้อสอบ</TableHead>
                   <TableHead>สถานะ</TableHead>
                   <TableHead className="text-right">คะแนน</TableHead>
-                  <TableHead>สร้างลิงก์</TableHead>
+                  <TableHead>เริ่มทำ</TableHead>
                   <TableHead />
                 </TableRow>
               </TableHeader>
@@ -148,7 +148,7 @@ export default function SkillQuizPage() {
                 ) : attempts.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={7} className="text-muted-foreground">
-                      ยังไม่มีลิงก์
+                      ยังไม่มีคนทำ
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -157,7 +157,7 @@ export default function SkillQuizPage() {
                       <TableCell className="whitespace-nowrap tabular-nums">{a.doc_no}</TableCell>
                       <TableCell className="min-w-40">
                         <div>{a.person_name}</div>
-                        {a.person_role ? <div className="text-xs text-muted-foreground">{a.person_role}</div> : null}
+                        {a.phone ? <div className="text-xs tabular-nums text-muted-foreground">{a.phone}</div> : null}
                       </TableCell>
                       <TableCell className="min-w-48">{a.title}</TableCell>
                       <TableCell className={cn('whitespace-nowrap', STATUS_TONE[a.status])}>
@@ -167,16 +167,10 @@ export default function SkillQuizPage() {
                       <TableCell className="whitespace-nowrap text-right tabular-nums">{a.score === null ? '—' : `${a.score} · ${a.grade}`}</TableCell>
                       <TableCell className="whitespace-nowrap tabular-nums">{dateTh(a.created_at)}</TableCell>
                       <TableCell className="whitespace-nowrap text-right">
-                        {a.status === 'waiting' ? (
-                          <Button type="button" variant="outline" size="sm" onClick={() => void copyLink(a)}>
-                            คัดลอกลิงก์
-                          </Button>
-                        ) : (
-                          <Button type="button" variant="outline" size="sm" onClick={() => setOpenId(a.id)}>
-                            ดูผล
-                          </Button>
-                        )}
-                        <Button type="button" variant="ghost" size="sm" onClick={() => setConfirm({ kind: 'attempt', id: a.id, label: `ลิงก์ของ ${a.person_name}` })}>
+                        <Button type="button" variant="outline" size="sm" onClick={() => setOpenId(a.id)}>
+                          ดูผล
+                        </Button>
+                        <Button type="button" variant="ghost" size="sm" onClick={() => setConfirm({ kind: 'attempt', id: a.id, label: `ผลของ ${a.person_name}` })}>
                           ลบ
                         </Button>
                       </TableCell>
@@ -195,20 +189,21 @@ export default function SkillQuizPage() {
                   <TableHead>ตำแหน่ง</TableHead>
                   <TableHead className="text-right">ทักษะ</TableHead>
                   <TableHead className="text-right">ข้อ</TableHead>
-                  <TableHead className="text-right">ส่งไปแล้ว</TableHead>
+                  <TableHead>ใครเห็น</TableHead>
+                  <TableHead className="text-right">คนทำ</TableHead>
                   <TableHead />
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {sets === null ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-muted-foreground">
+                    <TableCell colSpan={7} className="text-muted-foreground">
                       กำลังโหลด…
                     </TableCell>
                   </TableRow>
                 ) : sets.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-muted-foreground">
+                    <TableCell colSpan={7} className="text-muted-foreground">
                       ยังไม่มีชุดข้อสอบ
                     </TableCell>
                   </TableRow>
@@ -219,9 +214,13 @@ export default function SkillQuizPage() {
                       <TableCell>{s.content.roleLabel || '—'}</TableCell>
                       <TableCell className="text-right tabular-nums">{s.content.skills.length}</TableCell>
                       <TableCell className="text-right tabular-nums">{s.content.questions.length}</TableCell>
+                      <TableCell className="whitespace-nowrap">{viewersLabel(s)}</TableCell>
                       <TableCell className="text-right tabular-nums">{s.attempts} คน</TableCell>
                       <TableCell className="whitespace-nowrap text-right">
-                        <Button type="button" variant="outline" size="sm" onClick={() => setEditing({ id: s.id, item: s })}>
+                        <Button type="button" variant="outline" size="sm" disabled={!s.public_token} onClick={() => void copyLink(s)}>
+                          คัดลอกลิงก์
+                        </Button>
+                        <Button type="button" variant="ghost" size="sm" onClick={() => setEditing({ id: s.id, item: s })}>
                           แก้
                         </Button>
                         <Button type="button" variant="ghost" size="sm" onClick={() => setConfirm({ kind: 'set', id: s.id, label: `ชุด ${s.content.title}` })}>
@@ -241,19 +240,10 @@ export default function SkillQuizPage() {
         open={editing !== null}
         onOpenChange={(v) => !v && setEditing(null)}
         setId={editing?.id ?? null}
-        initial={editing?.item?.content ?? null}
+        initial={editing?.item ?? null}
         onSaved={() => {
           setNotice('บันทึกชุดข้อสอบแล้ว');
           load();
-        }}
-      />
-      <QuizLinkDialog
-        open={linkOpen}
-        onOpenChange={setLinkOpen}
-        sets={sets ?? []}
-        onCreated={(a) => {
-          load();
-          void copyLink(a);
         }}
       />
       <QuizResultDialog attemptId={openId} onOpenChange={(v) => !v && setOpenId(null)} onChanged={load} />
@@ -269,99 +259,5 @@ export default function SkillQuizPage() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
-  );
-}
-
-/** ป๊อปสร้างลิงก์ — เลือกชุด + ชื่อพนักงาน · สร้างแล้วคัดลอกลิงก์ให้เลย */
-function QuizLinkDialog({
-  open,
-  onOpenChange,
-  sets,
-  onCreated,
-}: {
-  open: boolean;
-  onOpenChange: (v: boolean) => void;
-  sets: QuizSetItem[];
-  onCreated: (a: { token: string; person_name: string }) => void;
-}) {
-  const [setId, setSetId] = useState('');
-  const [name, setName] = useState('');
-  const [role, setRole] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const first = sets[0];
-    setSetId(first?.id ?? '');
-    setRole(first?.content.roleLabel ?? '');
-    setName('');
-    setError(null);
-  }, [open, sets]);
-
-  const create = async () => {
-    if (!setId) return setError('เลือกชุดข้อสอบ');
-    if (!name.trim()) return setError('ใส่ชื่อพนักงาน');
-    setBusy(true);
-    setError(null);
-    try {
-      const a = await createQuizLink(setId, name.trim(), role.trim());
-      onCreated({ token: a.token, person_name: name.trim() });
-      onOpenChange(false);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'สร้างลิงก์ไม่สำเร็จ');
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>สร้างลิงก์ให้พนักงาน</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-3">
-          <div className="space-y-1.5">
-            <Label>ชุดข้อสอบ</Label>
-            <Select
-              value={setId}
-              onValueChange={(v) => {
-                setSetId(v);
-                setRole(sets.find((s) => s.id === v)?.content.roleLabel ?? '');
-              }}
-            >
-              <SelectTrigger aria-label="ชุดข้อสอบ">
-                <SelectValue placeholder="เลือกชุดข้อสอบ" />
-              </SelectTrigger>
-              <SelectContent>
-                {sets.map((s) => (
-                  <SelectItem key={s.id} value={s.id}>
-                    {s.content.title}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="quiz-person">ชื่อพนักงาน</Label>
-            <Input id="quiz-person" value={name} onChange={(e) => setName(e.target.value)} placeholder="นายสมชาย ใจดี" />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="quiz-person-role">ตำแหน่ง</Label>
-            <Input id="quiz-person-role" value={role} onChange={(e) => setRole(e.target.value)} />
-          </div>
-          {error ? <p className="text-sm text-destructive">{error}</p> : null}
-        </div>
-        <DialogFooter>
-          <Button type="button" variant="outline" disabled={busy} onClick={() => onOpenChange(false)}>
-            ยกเลิก
-          </Button>
-          <Button type="button" disabled={busy} onClick={() => void create()}>
-            สร้างและคัดลอกลิงก์
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
   );
 }

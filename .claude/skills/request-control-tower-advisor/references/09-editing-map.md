@@ -995,6 +995,7 @@ Lumos ส่งกลับได้จริง (funnel นับผลขอ�
 - AI: งาน `skill_report` ใน `src/lib/aiSettings.ts` (เลือกเจ้าได้ที่ ตั้งค่า › AI ที่ใช้คิดงาน) · prompt ไม่มีชื่อพนักงาน
 - จอ: `src/pages/skill-quiz/SkillQuizPage.tsx` (`/skill-test` เมนูคลังข้อมูล) · `src/components/skill-quiz/*` · พนักงาน `src/pages/public/PublicSkillQuizPage.tsx` (`/quiz/:token`)
 - รูป PNG: `src/lib/skillQuizReportImage.ts` (canvas พื้นขาว สีจาก designTokens)
+- 🔴 16 พ.ย. 2569 ลิงก์เดียวต่อชุด (แบบ Knowa · migration 180): `src/lib/skillQuizTaker.ts` (ตรวจฟอร์มคนทำ · เลขบัตร+หลักตรวจสอบ · ปิดเลขบัตร · ใครเห็นชุด `canSeeQuizSet`) · เข้ารหัสเลขบัตร `api/_lib/piiCipher.ts` (เก็บ enc + แฮชไว้ค้น ห้ามเก็บเลขตรง) · หน้าเข้า `src/pages/public/PublicSkillQuizEntryPage.tsx` (`/quiz/s/:setToken` กรอกข้อมูล+PDPA / เคยกรอกแล้ว) → ใบของคนทำ `/quiz/:token` เดิม · ทำชุดเดิมได้ครั้งเดียว (unique index set+แฮชเลขบัตร) · ลิงก์ละคน (`create_link`) ถอดแล้ว · เทสต์ `tests/api/skillQuizTaker.test.ts` · `PublicSkillQuizEntryPage.test.tsx`
 - นำเข้าข้อสอบจากไฟล์แบบ KNOWA (15 พ.ย. 2569): ตัวอ่านตัวเดียว `src/lib/quizImport.ts` (จับคอลัมน์จากหัวตาราง · ไม่มีหัว = ทักษะ คำถาม ก–ง เฉลย คะแนน · ปรนัยตอบได้ข้อเดียว · ไม่มีตัวเลือก = เขียนตอบ เฉลย = แนวคำตอบ) · อ่าน .xlsx/.docx/CSV ในเบราว์เซอร์ `src/lib/officeTable.ts` · แบบฟอร์ม Excel/Word `src/lib/officeTemplate.ts` · แผงในป๊อปชุดข้อสอบ `QuizImportPanel.tsx` (ยังไม่บันทึกจนกดบันทึกชุด) · เทสต์ `quizImport2569-11-15.test.ts`
 
 ## การ implement อย่างปลอดภัย / feature flag

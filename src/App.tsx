@@ -22,6 +22,7 @@ const PublicJobBoardPage = lazyPage(() => import("@/pages/public/PublicJobBoardP
 const PublicPostingApplyPage = lazyPage(() => import("@/pages/public/PublicPostingApplyPage"));
 const PrivacyRequestPage = lazyPage(() => import("@/pages/public/PrivacyRequestPage"));
 const PublicSkillQuizPage = lazyPage(() => import("@/pages/public/PublicSkillQuizPage"));
+const PublicSkillQuizEntryPage = lazyPage(() => import("@/pages/public/PublicSkillQuizEntryPage"));
 const ShortLinkRedirectPage = lazyPage(() => import("@/pages/public/ShortLinkRedirectPage"));
 // ผู้ช่วย AI มุมขวาล่าง (13 พ.ย. 2569) — admin + supervisor · ทุกหน้าหลังล็อกอิน · โหลดแยก ไม่ถ่วงหน้าแรก
 const AiChat = lazyPage(() => import("@/components/ai/AiChat"));
@@ -250,7 +251,16 @@ const App = () => (
                       </PublicApplyLayout>
                     }
                   />
-                  {/* แบบทดสอบพนักงาน — ลิงก์ละคน ไม่ต้องล็อกอิน (12 พ.ย. 2569) */}
+                  {/* แบบทดสอบพนักงาน — ลิงก์เดียวต่อชุด กรอกข้อมูล+ยินยอม PDPA แล้วได้ใบของตัวเอง (16 พ.ย. 2569) */}
+                  <Route
+                    path="/quiz/s/:setToken"
+                    element={
+                      <PublicApplyLayout kicker="แบบทดสอบพนักงาน" hideFooter>
+                        <PublicSkillQuizEntryPage />
+                      </PublicApplyLayout>
+                    }
+                  />
+                  {/* ใบของคนทำแต่ละคน ไม่ต้องล็อกอิน (12 พ.ย. 2569) */}
                   <Route
                     path="/quiz/:token"
                     element={

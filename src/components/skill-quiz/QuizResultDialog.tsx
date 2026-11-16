@@ -15,6 +15,8 @@ import { QUIZ_STATUS_LABEL, quizAttemptStatus, quizSkillTone, scoreQuiz, type Qu
 import { draftQuizWithAi, fetchQuizAttempt, saveQuizReview, type QuizAttemptDetail } from '@/lib/skillQuizApi';
 import { downloadQuizReportPng } from '@/lib/skillQuizReportImage';
 
+const BIRTH_TH = new Intl.DateTimeFormat('th-TH', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
+
 type Props = { attemptId: string | null; onOpenChange: (v: boolean) => void; onChanged: () => void };
 
 const EMPTY: QuizAnalysis = { strengths: '', gap: '', advice: '' };
@@ -109,6 +111,26 @@ export default function QuizResultDialog({ attemptId, onOpenChange, onChanged }:
         <DialogHeader>
           <DialogTitle>{a ? `${a.person_name} · ${a.doc_no}` : 'ผลแบบทดสอบ'}</DialogTitle>
         </DialogHeader>
+        {a?.first_name ? (
+          <dl className="grid grid-cols-2 gap-x-4 gap-y-1 rounded-xl border border-border p-4 text-sm sm:grid-cols-4" data-testid="quiz-taker">
+            <div>
+              <dt className="text-muted-foreground">เบอร์โทร</dt>
+              <dd className="tabular-nums">{a.phone ?? '—'}</dd>
+            </div>
+            <div>
+              <dt className="text-muted-foreground">อายุ</dt>
+              <dd className="tabular-nums">{a.age === null ? '—' : `${a.age} ปี`}</dd>
+            </div>
+            <div>
+              <dt className="text-muted-foreground">วันเกิด</dt>
+              <dd className="tabular-nums">{a.birth_date ? BIRTH_TH.format(new Date(`${a.birth_date}T00:00:00Z`)) : '—'}</dd>
+            </div>
+            <div>
+              <dt className="text-muted-foreground">เลขบัตร</dt>
+              <dd className="tabular-nums">{a.citizen_id_masked ?? '—'}</dd>
+            </div>
+          </dl>
+        ) : null}
         {!a ? (
           <p className="text-sm text-muted-foreground">{notice ?? 'กำลังโหลด…'}</p>
         ) : !a.answers || !r ? (

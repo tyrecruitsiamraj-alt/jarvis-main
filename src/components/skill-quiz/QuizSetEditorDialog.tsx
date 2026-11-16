@@ -1,9 +1,10 @@
 /**
  * ป๊อปสร้าง/แก้ชุดข้อสอบ (เจ้าของ 12 พ.ย. 2569) — ทักษะ + ข้อ ในฟอร์มเดียว
  * มีแต่ข้อปรนัย ติ๊กคำตอบที่ถูก (เจ้าของ 16 พ.ย. 2569 ถอดข้อเขียนตอบออกทั้งระบบ)
- * ตรวจฟอร์มด้วย `parseQuizSetInput` ตัวเดียวกับ server · แก้ชุดแล้วลิงก์ที่สร้างไปแล้วไม่เปลี่ยน
+ * ตรวจฟอร์มด้วย `parseQuizSetInput` ตัวเดียวกับ server · แก้ชุดแล้วใบที่คนทำเริ่มไปแล้วไม่เปลี่ยน
+ * "ใครเห็นชุดนี้" (16 พ.ย. 2569 แบบ Knowa): ทุกคน · ทั้ง BU · รายคน — คนสร้างกับ Admin เห็นเสมอ · ผลของคนทำเห็นตามชุด
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { FileUp, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -12,6 +13,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   QUIZ_DEFAULT_HEADER,
   QUIZ_DEFAULT_PASS,
@@ -21,10 +23,17 @@ import {
   type QuizQuestion,
   type QuizSetContent,
 } from '@/lib/skillQuiz';
-import { saveQuizSet } from '@/lib/skillQuizApi';
+import { quizViewerMode, type QuizViewerMode } from '@/lib/skillQuizTaker';
+import { fetchQuizPeople, saveQuizSet, type QuizPerson, type QuizSetItem, type QuizViewersInput } from '@/lib/skillQuizApi';
 import QuizImportPanel from './QuizImportPanel';
 
-type Props = { open: boolean; onOpenChange: (v: boolean) => void; setId: string | null; initial: QuizSetContent | null; onSaved: () => void };
+type Props = { open: boolean; onOpenChange: (v: boolean) => void; setId: string | null; initial: QuizSetItem | null; onSaved: () => void };
+
+const VIEWER_MODES: { value: QuizViewerMode; label: string }[] = [
+  { value: 'all', label: 'ทุกคน' },
+  { value: 'bu', label: 'ทั้ง BU' },
+  { value: 'people', label: 'เลือกเป็นรายคน' },
+];
 
 function blankContent(): QuizSetContent {
   const skillId = quizLocalId('s');
@@ -43,18 +52,46 @@ function blankQuestion(skillId: string): QuizQuestion {
 }
 
 export default function QuizSetEditorDialog({ open, onOpenChange, setId, initial, onSaved }: Props) {
-  const [c, setC] = useState<QuizSetContent>(() => initial ?? blankContent());
+  const [c, setC] = useState<QuizSetContent>(() => (initial ? initial.content : blankContent()));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
+  const [viewers, setViewers] = useState<QuizViewersInput>({ mode: 'all', bus: [], userIds: [] });
+  const [people, setPeople] = useState<{ people: QuizPerson[]; bus: string[]; myId: string } | null>(null);
+  const [personQuery, setPersonQuery] = useState('');
 
   useEffect(() => {
-    if (open) {
-      setC(initial ? structuredClone(initial) : blankContent());
-      setError(null);
-      setImporting(false);
-    }
+    if (!open) return;
+    setC(initial ? structuredClone(initial.content) : blankContent());
+    setError(null);
+    setImporting(false);
+    setPersonQuery('');
+    setViewers(
+      initial
+        ? { mode: quizViewerMode({ bus: initial.viewer_bus, userIds: initial.viewer_user_ids }), bus: initial.viewer_bus, userIds: initial.viewer_user_ids }
+        : { mode: 'all', bus: [], userIds: [] },
+    );
+    let live = true;
+    fetchQuizPeople()
+      .then((p) => {
+        if (!live) return;
+        setPeople(p);
+        // ชุดใหม่: ค่าเริ่ม = BU ของคนสร้าง (ไม่มี BU = ทุกคน)
+        const myBu = p.people.find((x) => x.id === p.myId)?.bu;
+        if (!initial && myBu && p.bus.includes(myBu)) setViewers({ mode: 'bu', bus: [myBu], userIds: [] });
+      })
+      .catch(() => live && setPeople({ people: [], bus: [], myId: '' }));
+    return () => {
+      live = false;
+    };
   }, [open, initial]);
+
+  const shownPeople = useMemo(() => {
+    const q = personQuery.trim().toLowerCase();
+    const list = (people?.people ?? []).filter((p) => p.id !== people?.myId);
+    return q ? list.filter((p) => p.name.toLowerCase().includes(q) || (p.bu ?? '').toLowerCase().includes(q)) : list;
+  }, [people, personQuery]);
+  const toggle = (list: string[], v: string, on: boolean) => (on ? [...list, v] : list.filter((x) => x !== v));
 
   const patchQ = (id: string, p: Partial<QuizQuestion>) => setC((s) => ({ ...s, questions: s.questions.map((q) => (q.id === id ? { ...q, ...p } : q)) }));
 
@@ -64,7 +101,9 @@ export default function QuizSetEditorDialog({ open, onOpenChange, setId, initial
     setBusy(true);
     setError(null);
     try {
-      await saveQuizSet(setId, parsed.value);
+      if (viewers.mode === 'bu' && viewers.bus.length === 0) throw new Error('เลือก BU ที่เห็นชุดนี้');
+      if (viewers.mode === 'people' && viewers.userIds.length === 0) throw new Error('เลือกคนที่เห็นชุดนี้');
+      await saveQuizSet(setId, parsed.value, viewers);
       onSaved();
       onOpenChange(false);
     } catch (e) {
@@ -101,6 +140,52 @@ export default function QuizSetEditorDialog({ open, onOpenChange, setId, initial
             <Input id="quiz-header" value={c.headerLine} onChange={(e) => setC({ ...c, headerLine: e.target.value })} />
           </div>
         </div>
+
+        <section className="space-y-2" data-testid="quiz-viewers">
+          <h3 className="text-sm font-medium text-foreground">ใครเห็นชุดนี้</h3>
+          <RadioGroup value={viewers.mode} onValueChange={(v) => setViewers((x) => ({ ...x, mode: v as QuizViewerMode }))} className="flex flex-wrap gap-4">
+            {VIEWER_MODES.map((m) => (
+              <Label key={m.value} htmlFor={`quiz-viewer-${m.value}`} className="flex cursor-pointer items-center gap-2 text-sm font-normal">
+                <RadioGroupItem id={`quiz-viewer-${m.value}`} value={m.value} />
+                {m.label}
+              </Label>
+            ))}
+          </RadioGroup>
+          {viewers.mode === 'bu' ? (
+            <div className="flex flex-wrap gap-4 rounded-xl border border-border p-3">
+              {(people?.bus ?? []).map((bu) => (
+                <Label key={bu} className="flex cursor-pointer items-center gap-2 text-sm font-normal">
+                  <Checkbox checked={viewers.bus.includes(bu)} onCheckedChange={(v) => setViewers((x) => ({ ...x, bus: toggle(x.bus, bu, v === true) }))} />
+                  {bu}
+                </Label>
+              ))}
+            </div>
+          ) : null}
+          {viewers.mode === 'people' ? (
+            <div className="space-y-2 rounded-xl border border-border p-3">
+              <Input aria-label="ค้นหาชื่อ" placeholder="ค้นหาชื่อหรือ BU" value={personQuery} onChange={(e) => setPersonQuery(e.target.value)} />
+              <p className="text-xs tabular-nums text-muted-foreground">เลือกแล้ว {viewers.userIds.length} คน</p>
+              <div className="max-h-56 space-y-1 overflow-y-auto">
+                {people === null ? (
+                  <p className="text-sm text-muted-foreground">กำลังโหลด…</p>
+                ) : shownPeople.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">ไม่พบชื่อ</p>
+                ) : (
+                  shownPeople.map((p) => (
+                    <Label key={p.id} className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm font-normal hover:bg-muted/50">
+                      <Checkbox
+                        checked={viewers.userIds.includes(p.id)}
+                        onCheckedChange={(v) => setViewers((x) => ({ ...x, userIds: toggle(x.userIds, p.id, v === true) }))}
+                      />
+                      <span className="min-w-0 flex-1 truncate">{p.name}</span>
+                      <span className="text-xs text-muted-foreground">{p.bu ?? '—'}</span>
+                    </Label>
+                  ))
+                )}
+              </div>
+            </div>
+          ) : null}
+        </section>
 
         <section className="space-y-2">
           <h3 className="text-sm font-medium text-foreground">ทักษะ</h3>

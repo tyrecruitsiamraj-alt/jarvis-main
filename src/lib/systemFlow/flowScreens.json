@@ -807,12 +807,12 @@
    "title": "แบบทดสอบพนักงาน",
    "route": "/skill-test",
    "parent": null,
-   "src": "src/App.tsx:169 → src/pages/skill-quiz/SkillQuizPage.tsx:100",
+   "src": "src/App.tsx:169 → src/pages/skill-quiz/SkillQuizPage.tsx:61",
    "controls": [
     {
      "label": "ผลแบบทดสอบ",
      "action": "inline",
-     "target": "รายการลิงก์ (ค่าเริ่ม)",
+     "target": "รายการคนที่ทำ (ค่าเริ่ม)",
      "api": "GET /api/skill-quiz",
      "effects": [],
      "when": null,
@@ -828,31 +828,22 @@
      "src": "src/pages/skill-quiz/SkillQuizPage.tsx:121"
     },
     {
-     "label": "สร้างลิงก์",
-     "action": "popup",
-     "target": "quiz-link-dialog",
-     "api": null,
-     "effects": [],
-     "when": "แท็บผลแบบทดสอบ · มีชุดข้อสอบ",
-     "src": "src/pages/skill-quiz/SkillQuizPage.tsx:111"
-    },
-    {
      "label": "สร้างชุดข้อสอบ",
      "action": "popup",
      "target": "quiz-set-editor (สร้าง)",
      "api": null,
      "effects": [],
-     "when": "แท็บชุดข้อสอบ",
-     "src": "src/pages/skill-quiz/SkillQuizPage.tsx:107"
+     "when": null,
+     "src": "src/pages/skill-quiz/SkillQuizPage.tsx:113"
     },
     {
      "label": "คัดลอกลิงก์",
      "action": "external",
-     "target": "คลิปบอร์ด: {origin}/quiz/:token",
+     "target": "คลิปบอร์ด: {origin}/quiz/s/:setToken (ลิงก์เดียวของชุด)",
      "api": null,
      "effects": [],
-     "when": "สถานะรอทำ",
-     "src": "src/pages/skill-quiz/SkillQuizPage.tsx:171"
+     "when": "แท็บชุดข้อสอบ",
+     "src": "src/pages/skill-quiz/SkillQuizPage.tsx:221"
     },
     {
      "label": "ดูผล",
@@ -860,17 +851,17 @@
      "target": "quiz-result-dialog",
      "api": "GET /api/skill-quiz?id=",
      "effects": [],
-     "when": "ส่งคำตอบแล้ว",
+     "when": null,
      "src": "src/pages/skill-quiz/SkillQuizPage.tsx:175"
     },
     {
-     "label": "ลบ (ลิงก์)",
+     "label": "ลบ (ผล)",
      "action": "popup",
      "target": "quiz-archive-confirm",
      "api": null,
      "effects": [],
      "when": null,
-     "src": "src/pages/skill-quiz/SkillQuizPage.tsx:179"
+     "src": "src/pages/skill-quiz/SkillQuizPage.tsx:173"
     },
     {
      "label": "แก้ (ชุด)",
@@ -879,7 +870,7 @@
      "api": null,
      "effects": [],
      "when": "แท็บชุดข้อสอบ",
-     "src": "src/pages/skill-quiz/SkillQuizPage.tsx:224"
+     "src": "src/pages/skill-quiz/SkillQuizPage.tsx:223"
     },
     {
      "label": "ลบ (ชุด)",
@@ -11979,45 +11970,6 @@
    ]
   },
   {
-   "id": "quiz-link-dialog",
-   "kind": "popup",
-   "title": "สร้างลิงก์ให้พนักงาน",
-   "route": null,
-   "parent": "skill-test",
-   "src": "src/pages/skill-quiz/SkillQuizPage.tsx:322",
-   "controls": [
-    {
-     "label": "ชุดข้อสอบ / ชื่อพนักงาน / ตำแหน่ง",
-     "action": "filter",
-     "target": "ฟอร์ม",
-     "api": null,
-     "effects": [],
-     "when": null,
-     "src": "src/pages/skill-quiz/SkillQuizPage.tsx:327"
-    },
-    {
-     "label": "ยกเลิก",
-     "action": "inline",
-     "target": "ปิด",
-     "api": null,
-     "effects": [],
-     "when": null,
-     "src": "src/pages/skill-quiz/SkillQuizPage.tsx:357"
-    },
-    {
-     "label": "สร้างและคัดลอกลิงก์",
-     "action": "api",
-     "target": "สร้างลิงก์ละคน + คัดลอก",
-     "api": "POST /api/skill-quiz {action:'create_link'}",
-     "effects": [
-      "เขียนฐาน"
-     ],
-     "when": null,
-     "src": "src/pages/skill-quiz/SkillQuizPage.tsx:360"
-    }
-   ]
-  },
-  {
    "id": "quiz-result-dialog",
    "kind": "popup",
    "title": "{ชื่อพนักงาน} · {เลขที่} (ผลแบบทดสอบ)",
@@ -12076,7 +12028,7 @@
    "title": "สร้างชุดข้อสอบ / แก้ชุดข้อสอบ",
    "route": null,
    "parent": "skill-test",
-   "src": "src/components/skill-quiz/QuizSetEditorDialog.tsx:81",
+   "src": "src/components/skill-quiz/QuizSetEditorDialog.tsx:119",
    "controls": [
     {
      "label": "ชื่อชุดข้อสอบ / ตำแหน่ง / เกณฑ์ผ่านรายทักษะ / หัวรายงาน",
@@ -12088,6 +12040,15 @@
      "src": "src/components/skill-quiz/QuizSetEditorDialog.tsx:86"
     },
     {
+     "label": "ใครเห็นชุดนี้: ทุกคน / ทั้ง BU / เลือกเป็นรายคน (ค้นหาชื่อ)",
+     "action": "filter",
+     "target": "viewers",
+     "api": "GET /api/skill-quiz?view=people",
+     "effects": [],
+     "when": null,
+     "src": "src/components/skill-quiz/QuizSetEditorDialog.tsx:145"
+    },
+    {
      "label": "ทักษะ: ลบ / เพิ่มทักษะ",
      "action": "filter",
      "target": "skills",
@@ -12097,7 +12058,7 @@
      "src": "src/components/skill-quiz/QuizSetEditorDialog.tsx:127"
     },
     {
-     "label": "ข้อ: ทักษะของข้อนี้ / ชนิดข้อ / คะแนน / คำถาม / ตัวเลือก (เลือกถูก, ลบ, เพิ่มตัวเลือก) / แนวคำตอบ / ลบข้อ",
+     "label": "ข้อ: ทักษะของข้อนี้ / คะแนน / คำถาม / ตัวเลือก (เลือกถูก, ลบ, เพิ่มตัวเลือก) / ลบข้อ",
      "action": "filter",
      "target": "questions",
      "api": null,
@@ -12854,9 +12815,75 @@
    ]
   },
   {
+   "id": "public-quiz-entry",
+   "kind": "page",
+   "title": "แบบทดสอบพนักงาน (ลิงก์ของชุด)",
+   "route": "/quiz/s/:setToken",
+   "parent": "skill-test",
+   "src": "src/App.tsx:259 → src/pages/public/PublicSkillQuizEntryPage.tsx:81",
+   "controls": [
+    {
+     "label": "(เปิดลิงก์)",
+     "action": "api",
+     "target": "ชื่อชุด + จำนวนข้อ",
+     "api": "GET /api/public/skill-quiz?set=",
+     "effects": [],
+     "when": "อัตโนมัติ",
+     "src": "src/lib/skillQuizApi.ts:131"
+    },
+    {
+     "label": "ทำครั้งแรก / เคยกรอกแล้ว",
+     "action": "tab",
+     "target": "ฟอร์มเต็ม / เลขบัตร+วันเกิด",
+     "api": null,
+     "effects": [],
+     "when": null,
+     "src": "src/pages/public/PublicSkillQuizEntryPage.tsx:149"
+    },
+    {
+     "label": "ชื่อ / นามสกุล / เบอร์โทร / อายุ / เลขบัตรประชาชน / วันเดือนปีเกิด (วัน · เดือน · ปี พ.ศ.)",
+     "action": "filter",
+     "target": "ฟอร์ม",
+     "api": null,
+     "effects": [],
+     "when": null,
+     "src": "src/pages/public/PublicSkillQuizEntryPage.tsx:161"
+    },
+    {
+     "label": "ข้าพเจ้าได้อ่านและยอมรับ ข้อตกลง… (PDPA)",
+     "action": "inline",
+     "target": "กางข้อตกลงฉบับเต็ม",
+     "api": null,
+     "effects": [],
+     "when": "ทำครั้งแรก",
+     "src": "src/pages/public/PublicSkillQuizEntryPage.tsx:199"
+    },
+    {
+     "label": "เริ่มทำแบบทดสอบ",
+     "action": "navigate",
+     "target": "/quiz/:token (ใบของคนนี้) · เลขบัตรนี้ทำชุดนี้แล้ว = แจ้งให้ไปแท็บเคยกรอกแล้ว",
+     "api": "POST /api/public/skill-quiz {action:'start'}",
+     "effects": [
+      "เขียนฐาน"
+     ],
+     "when": "ทำครั้งแรก",
+     "src": "src/pages/public/PublicSkillQuizEntryPage.tsx:202"
+    },
+    {
+     "label": "เข้าแบบทดสอบ",
+     "action": "navigate",
+     "target": "/quiz/:token (ใบเดิม · ส่งแล้วเห็นแค่ส่งคำตอบแล้ว) · ไม่ตรง = ไม่พบข้อมูล",
+     "api": "POST /api/public/skill-quiz {action:'resume'}",
+     "effects": [],
+     "when": "เคยกรอกแล้ว",
+     "src": "src/pages/public/PublicSkillQuizEntryPage.tsx:202"
+    }
+   ]
+  },
+  {
    "id": "public-quiz",
    "kind": "page",
-   "title": "แบบทดสอบพนักงาน (ลิงก์ละคน)",
+   "title": "แบบทดสอบพนักงาน (ใบของคนทำ)",
    "route": "/quiz/:token",
    "parent": "skill-test",
    "src": "src/App.tsx:252 → src/pages/public/PublicSkillQuizPage.tsx:99",
@@ -12873,13 +12900,13 @@
      "src": "src/lib/skillQuizApi.ts:86"
     },
     {
-     "label": "ตัวเลือกคำตอบ / ช่องตอบข้อเขียน",
+     "label": "ตัวเลือกคำตอบ",
      "action": "filter",
      "target": "answers",
      "api": null,
      "effects": [],
      "when": null,
-     "src": "src/pages/public/PublicSkillQuizPage.tsx:128"
+     "src": "src/pages/public/PublicSkillQuizPage.tsx:120"
     },
     {
      "label": "ส่งคำตอบ",

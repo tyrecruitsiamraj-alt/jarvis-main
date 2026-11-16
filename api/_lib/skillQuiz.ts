@@ -2,7 +2,8 @@
  * ═══ แบบทดสอบพนักงาน ฝั่งเซิร์ฟเวอร์ (เจ้าของ 12 พ.ย. 2569 · migration 176) ═══
  * ตรรกะคะแนน/เกรด/ตรวจฟอร์มอยู่ `src/lib/skillQuiz.ts` ที่เดียว
  *
- * ลิงก์ละคน: token สุ่ม 24 ตัว · ส่งคำตอบได้ครั้งเดียว (อัปเดตแบบมีเงื่อนไข `submitted_at is null` — ฐานตัดสิน)
+ * ลิงก์เดียวต่อชุด (16 พ.ย. 2569): คนทำกรอกข้อมูล + ยินยอม PDPA แล้วได้ใบของตัวเอง (token สุ่ม 24 ตัว)
+ * ส่งคำตอบได้ครั้งเดียว (อัปเดตแบบมีเงื่อนไข `submitted_at is null` — ฐานตัดสิน) · ลิงก์ละคนแบบเก่ายังเปิดได้ แต่สร้างใหม่ไม่ได้แล้ว
  * ส่งแล้ว AI ร่างบทวิเคราะห์ต่อเบื้องหลัง · AI ล้ม = เก็บเหตุไว้ เจ้าหน้าที่เขียนเองได้
  */
 import { randomBytes } from 'node:crypto';
@@ -18,12 +19,25 @@ import {
   type QuizAnswers,
   type QuizSetContent,
 } from '../../src/lib/skillQuiz.js';
+import type { QuizTakerInput, QuizViewers } from '../../src/lib/skillQuizTaker.js';
 
 const SETS = tableInAppSchema('skill_quiz_sets');
 const ATTEMPTS = tableInAppSchema('skill_quiz_attempts');
 const DOC_SEQ = tableInAppSchema('skill_quiz_doc_seq');
 
-export type QuizSetRow = { id: string; content: QuizSetContent; created_by_name: string | null; created_at: string; updated_at: string; attempts: number };
+export type QuizSetRow = {
+  id: string;
+  content: QuizSetContent;
+  created_by_name: string | null;
+  created_by_user_id: string | null;
+  created_at: string;
+  updated_at: string;
+  attempts: number;
+  /** ลิงก์เดียวของชุด (16 พ.ย. 2569) */
+  public_token: string | null;
+  viewer_bus: string[];
+  viewer_user_ids: string[];
+};
 
 export type QuizAttemptRow = {
   id: string;
@@ -43,32 +57,66 @@ export type QuizAttemptRow = {
   submitted_at: string | null;
   reviewed_at: string | null;
   reviewed_by_name: string | null;
+  /** คนทำกรอกเอง (ลิงก์ของชุด · 16 พ.ย. 2569) — ลิงก์ละคนแบบเก่าเป็น null */
+  first_name: string | null;
+  last_name: string | null;
+  phone: string | null;
+  age: number | null;
+  birth_date: string | null;
+  /** เข้ารหัสแล้ว — ห้ามส่งออกจาก server (handler แปลงเป็นเลขปิดท้ายบัตร) */
+  citizen_id_enc: string | null;
+  consented_at: string | null;
 };
 
 const ATTEMPT_COLUMNS = `id::text, set_id::text, token, doc_no, person_name, person_role, content, answers, analysis, analysis_by,
-  ai_error, created_by_name, created_at, opened_at, submitted_at, reviewed_at, reviewed_by_name`;
+  ai_error, created_by_name, created_at, opened_at, submitted_at, reviewed_at, reviewed_by_name,
+  first_name, last_name, phone, age, to_char(birth_date, 'YYYY-MM-DD') as birth_date, citizen_id_enc, consented_at`;
+
+const SET_COLUMNS = `s.id::text, s.content, s.created_by_name, s.created_by_user_id, s.created_at, s.updated_at, s.public_token, s.viewer_bus, s.viewer_user_ids`;
+
+const newToken = () => randomBytes(18).toString('base64url');
 
 export async function listQuizSets(): Promise<QuizSetRow[]> {
-  const { rows } = await dbQuery<QuizSetRow>(
-    `select s.id::text, s.content, s.created_by_name, s.created_at, s.updated_at,
-       (select count(*)::int from ${ATTEMPTS} a where a.set_id = s.id and a.archived_at is null) as attempts
-     from ${SETS} s where s.archived_at is null order by s.updated_at desc`,
-  );
+  const read = () =>
+    dbQuery<QuizSetRow>(
+      `select ${SET_COLUMNS},
+         (select count(*)::int from ${ATTEMPTS} a where a.set_id = s.id and a.archived_at is null) as attempts
+       from ${SETS} s where s.archived_at is null order by s.updated_at desc`,
+    );
+  let { rows } = await read();
+  // ชุดที่สร้างก่อน 16 พ.ย. ยังไม่มีลิงก์ของชุด — ออกให้ครั้งแรกที่เปิดหน้า
+  const missing = rows.filter((r) => !r.public_token);
+  if (missing.length > 0) {
+    for (const r of missing) await dbQuery(`update ${SETS} set public_token = $2 where id = $1::uuid and public_token is null`, [r.id, newToken()]);
+    ({ rows } = await read());
+  }
   return rows;
 }
 
-export async function createQuizSet(content: QuizSetContent, byName: string | null): Promise<string> {
+export async function getQuizSet(id: string): Promise<QuizSetRow | null> {
+  const { rows } = await dbQuery<QuizSetRow>(`select ${SET_COLUMNS}, 0 as attempts from ${SETS} s where s.id = $1::uuid and s.archived_at is null`, [id]);
+  return rows[0] ?? null;
+}
+
+export async function getQuizSetByToken(token: string): Promise<QuizSetRow | null> {
+  const { rows } = await dbQuery<QuizSetRow>(`select ${SET_COLUMNS}, 0 as attempts from ${SETS} s where s.public_token = $1 and s.archived_at is null`, [token]);
+  return rows[0] ?? null;
+}
+
+export async function createQuizSet(content: QuizSetContent, viewers: QuizViewers, by: { name: string | null; userId: string | null }): Promise<string> {
   const { rows } = await dbQuery<{ id: string }>(
-    `insert into ${SETS} (content, created_by_name, updated_by_name) values ($1::jsonb, $2, $2) returning id::text`,
-    [JSON.stringify(content), byName],
+    `insert into ${SETS} (content, created_by_name, updated_by_name, created_by_user_id, public_token, viewer_bus, viewer_user_ids)
+     values ($1::jsonb, $2, $2, $3, $4, $5::text[], $6::text[]) returning id::text`,
+    [JSON.stringify(content), by.name, by.userId, newToken(), viewers.bus, viewers.userIds],
   );
   return rows[0].id;
 }
 
-export async function updateQuizSet(id: string, content: QuizSetContent, byName: string | null): Promise<boolean> {
+export async function updateQuizSet(id: string, content: QuizSetContent, viewers: QuizViewers, byName: string | null): Promise<boolean> {
   const { rows } = await dbQuery<{ id: string }>(
-    `update ${SETS} set content = $2::jsonb, updated_by_name = $3, updated_at = now() where id = $1::uuid and archived_at is null returning id::text`,
-    [id, JSON.stringify(content), byName],
+    `update ${SETS} set content = $2::jsonb, updated_by_name = $3, updated_at = now(), viewer_bus = $4::text[], viewer_user_ids = $5::text[]
+      where id = $1::uuid and archived_at is null returning id::text`,
+    [id, JSON.stringify(content), byName, viewers.bus, viewers.userIds],
   );
   return rows.length > 0;
 }
@@ -78,17 +126,41 @@ export async function archiveQuizSet(id: string): Promise<boolean> {
   return rows.length > 0;
 }
 
-/** สร้างลิงก์ของพนักงานหนึ่งคน — เก็บสำเนาชุดข้อสอบ ณ ตอนนี้ */
-export async function createQuizAttempt(setId: string, person: { name: string; role: string }, byName: string | null): Promise<QuizAttemptRow | null> {
-  const token = randomBytes(18).toString('base64url');
+/**
+ * คนทำกรอกข้อมูลแล้วกดเริ่ม — สร้างใบของคนนี้จากลิงก์ของชุด
+ * คนหนึ่งทำชุดเดิมได้ครั้งเดียว: unique index (set_id, citizen_id_hash) ตัดสิน · ชน = `exists`
+ */
+export async function startQuizAttemptFromSet(
+  setId: string,
+  t: QuizTakerInput,
+  citizen: { hash: string; enc: string },
+  consentVersion: string,
+): Promise<{ ok: true; token: string } | { ok: false; reason: 'exists' | 'no_set' }> {
+  const token = newToken();
   const seq = await dbQuery<{ seq: string }>(`select nextval('${DOC_SEQ}')::text as seq`);
-  const { rows } = await dbQuery<QuizAttemptRow>(
-    `insert into ${ATTEMPTS} (set_id, token, doc_no, person_name, person_role, content, created_by_name)
-     select id, $2, $3, $4, $5, content, $6 from ${SETS} where id = $1::uuid and archived_at is null
-     returning ${ATTEMPT_COLUMNS}`,
-    [setId, token, quizDocNo(Number(seq.rows[0].seq)), person.name, person.role, byName],
+  try {
+    const { rows } = await dbQuery<{ token: string }>(
+      `insert into ${ATTEMPTS} (set_id, token, doc_no, person_name, person_role, content, first_name, last_name, phone, age, birth_date,
+         citizen_id_hash, citizen_id_enc, consent_version, consented_at)
+       select id, $2, $3, $4, coalesce(content->>'roleLabel', ''), content, $5, $6, $7, $8, $9::date, $10, $11, $12, now()
+         from ${SETS} where id = $1::uuid and archived_at is null
+       returning token`,
+      [setId, token, quizDocNo(Number(seq.rows[0].seq)), `${t.firstName} ${t.lastName}`, t.firstName, t.lastName, t.phone, t.age, t.birthDate, citizen.hash, citizen.enc, consentVersion],
+    );
+    return rows[0] ? { ok: true, token: rows[0].token } : { ok: false, reason: 'no_set' };
+  } catch (e) {
+    if ((e as { code?: string })?.code === '23505') return { ok: false, reason: 'exists' };
+    throw e;
+  }
+}
+
+/** เข้าซ้ำด้วยเลขบัตร + วันเกิด — ต้องตรงทั้งคู่ (ไม่บอกว่าผิดช่องไหน) */
+export async function findQuizAttemptForResume(setId: string, citizenHash: string, birthDate: string): Promise<string | null> {
+  const { rows } = await dbQuery<{ token: string }>(
+    `select token from ${ATTEMPTS} where set_id = $1::uuid and citizen_id_hash = $2 and birth_date = $3::date and archived_at is null limit 1`,
+    [setId, citizenHash, birthDate],
   );
-  return rows[0] ?? null;
+  return rows[0]?.token ?? null;
 }
 
 export async function listQuizAttempts(): Promise<QuizAttemptRow[]> {
