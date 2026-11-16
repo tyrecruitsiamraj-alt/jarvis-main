@@ -187,7 +187,7 @@ describe('หน้าเว็บ: ปุ่ม ของฉัน / ทุก�
     expect(code).toContain('fetchAllJobApplications(leadView, bucket, cancelledView, everyoneAppointments, everyoneContact)');
     expect(code).toMatch(/const everyoneAppointments =\s*tab === 'appointments' &&\s*appointmentScope === 'all' &&\s*canSeeEveryoneAppointments\(user\?\.role\)/);
     // ชุดที่โหลด (ของฉัน · นัดทุกคน · การติดต่อทุกคน) ตัดสินจาก everyoneAppointments ตัวเดิม
-    expect(code).toContain("const rowsScope = everyoneAppointments ? 'appointments' : everyoneContact ? 'contact' : 'mine';");
+    expect(code).toContain("const rowsScope = jobAll ? `job:${jobAll}` : everyoneAppointments ? 'appointments' : everyoneContact ? 'contact' : 'mine';");
     expect(code).toMatch(/useEffect\(load, \[[^\]]*rowsScope\]\)/);
   });
 

@@ -230,6 +230,14 @@ export const applicantWorkLink = (id: string) => `/jobs/board?view=list&list=all
 /** มุมมองตอนเปิดแท็บผู้สมัคร (ไม่มี ?list=) — เจ้าของสั่ง 14 ต.ค. 2569 */
 export const RM_LIST_VIEW_DEFAULT = 'interested' as const satisfies RmListView;
 
+/**
+ * "ดูรายชื่อ" จากการ์ดกล่องงาน = ทุกคนของใบนั้น (เจ้าของ 16 พ.ย. 2569 Choice "เห็นทุกคนของใบนั้น อยู่ในกล่องงาน")
+ * เลขบนการ์ดนับทุกคนของใบ (ไม่นับ Lead) แต่แท็บผู้สมัครปกติซ่อนคนที่มีคนเก็บไปแล้ว → OPL6808001 ขึ้น 3 กดแล้วเห็น 1
+ * มีพารามิเตอร์นี้ + ติ๊กใบเดียวกันอยู่ = โหลดรายชื่อของใบนั้นทั้งใบ (เส้น job_id ตัวเดียวกับป๊อปใบขอ) ไม่แบ่งแท็บ ·
+ * เอาตัวกรองใบออก = กลับเป็นแท็บผู้สมัครปกติ
+ */
+export const RM_JOB_ALL_PARAM = 'joball';
+
 export function isShownRmListView(v: string | null | undefined): v is (typeof RM_LIST_VIEWS_SHOWN)[number] {
   return !!v && (RM_LIST_VIEWS_SHOWN as readonly string[]).includes(v);
 }
@@ -520,10 +528,12 @@ export function filterApplications(
   keyword: string,
   /** แท็บการติดต่อปุ่ม "ทุกคน" — ส่งเฉพาะตอนแถวมาจากเส้น `view=contact&scope=all` */
   everyone = false,
+  /** ทุกคนของใบขอเดียว (`RM_JOB_ALL_PARAM`) — ไม่แบ่งแท็บ (คนที่มีคนเก็บไปแล้วยังขึ้น) */
+  skipTab = false,
 ): PublicApplication[] {
   const kw = keyword.trim().toLowerCase();
   return rows.filter((r) => {
-    if (!isInRmTab(r, tab, everyone)) return false;
+    if (!skipTab && !isInRmTab(r, tab, everyone)) return false;
     if (filters.statuses.length > 0 && !filters.statuses.includes(r.status)) return false;
     if (filters.channels.length > 0) {
       if (!r.referral_source || !filters.channels.includes(r.referral_source)) return false;

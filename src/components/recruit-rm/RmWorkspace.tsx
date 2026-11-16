@@ -40,6 +40,7 @@ import {
 import {
   chooseApplicationCall,
   fetchAllJobApplications,
+  fetchJobApplications,
   markApplicationDialed,
   recordAppointmentAttendance,
   setApplicationCancelled,
@@ -75,7 +76,7 @@ import { appointmentTimeOf } from '@/lib/appointmentTime';
 import { RM_BUCKET_LABEL, isRmBucket } from '@/lib/recruitRmOverviewApi';
 import { LEAD_VIEW_LABEL } from '@/lib/recruitLead';
 import { fetchCallHoldsByPhones, type CallHold } from '@/lib/callHoldsApi';
-import { RM_OPEN_PARAM, canHoldApplication } from '@/lib/recruitRm';
+import { RM_JOB_ALL_PARAM, RM_OPEN_PARAM, canHoldApplication } from '@/lib/recruitRm';
 import { choiceCountdown } from '@/lib/callChoiceGuard';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRolePermissions } from '@/contexts/RolePermissionsContext';
@@ -96,6 +97,7 @@ import { publicJobPositionLabel } from '@/lib/unitRequestDisplay';
 import {
   APPLICANT_FACET_ATTACH,
   applicantPrimaryFacets,
+  APPLICANT_FILTER_PARAM_PREFIX,
   EMPTY_APPLICANT_FILTER_STATE,
   applyApplicantFilters,
   buildApplicantFacets,
@@ -340,8 +342,17 @@ const RmWorkspace: React.FC<{
     !cancelledView;
   /** การติดต่อของทุกคน — ได้แต่ใบที่มีคนเก็บ (เก็บไปโทร/Lead) พร้อมชื่อคนเก็บ ⇒ ห้ามนับให้แท็บอื่นเหมือนนัดของทุกคน */
   const everyoneContact = canSeeEveryoneContact && tab === 'contact' && contactScope === 'all' && !bucket && !leadView && !cancelledView;
-  /** ชุดที่โหลด: ของฉัน · นัดทุกคน · การติดต่อทุกคน */
-  const rowsScope = everyoneAppointments ? 'appointments' : everyoneContact ? 'contact' : 'mine';
+  /**
+   * ทุกคนของใบเดียว ("ดูรายชื่อ" จากการ์ดกล่องงาน · `RM_JOB_ALL_PARAM`) — ใช้เมื่อยังติ๊กใบเดียวกันอยู่ในแท็บผู้สมัคร
+   * เอาตัวกรองใบออก = กลับเป็นรายชื่อปกติเอง
+   */
+  const jobAllParam = searchParams.get(RM_JOB_ALL_PARAM);
+  const jobAll =
+    tab === 'candidates' && !bucket && !leadView && !cancelledView && jobAllParam && searchParams.getAll(`${APPLICANT_FILTER_PARAM_PREFIX}job`).includes(jobAllParam)
+      ? jobAllParam
+      : null;
+  /** ชุดที่โหลด: ของฉัน · นัดทุกคน · การติดต่อทุกคน · ทุกคนของใบเดียว */
+  const rowsScope = jobAll ? `job:${jobAll}` : everyoneAppointments ? 'appointments' : everyoneContact ? 'contact' : 'mine';
   const everyoneView = rowsScope !== 'mine';
 
   /** ลำดับคำขอ — สลับของฉัน/ทุกคนเร็ว ๆ แล้วคำตอบเก่ามาทีหลัง ต้องไม่ทับรายชื่อที่เลือกอยู่ */
@@ -353,7 +364,7 @@ const RmWorkspace: React.FC<{
     setLoading(true);
     setLoadError(null);
     if (rowsScopeRef.current !== null && rowsScopeRef.current !== rowsScope) setRows([]);
-    fetchAllJobApplications(leadView, bucket, cancelledView, everyoneAppointments, everyoneContact)
+    (jobAll ? fetchJobApplications(jobAll) : fetchAllJobApplications(leadView, bucket, cancelledView, everyoneAppointments, everyoneContact))
       .then((next) => {
         if (seq === loadSeq.current) {
           setRows(next);
@@ -583,11 +594,11 @@ const RmWorkspace: React.FC<{
     // โหมด drill-down: server กรองด้วยนิยามเดียวกับกล่องแล้ว — แสดงตามนั้นตรง ๆ
     // (หั่นต่อด้วยแท็บ/ตัวกรอง = เลขไม่ตรงกล่อง)
     if (bucket) return rows;
-    const base = filterApplications(rows, tab, rmFilters, keyword, everyoneContact);
+    const base = filterApplications(rows, tab, rmFilters, keyword, everyoneContact, Boolean(jobAll));
     // มุมมองย่อยใช้เฉพาะแท็บรายชื่อผู้สมัคร — แท็บอื่นมีความหมายของตัวเองอยู่แล้ว
     if (tab !== 'candidates') return base;
     return base.filter((r) => isInRmListView(r, listView));
-  }, [rows, tab, keyword, listView, bucket, rmFilters, everyoneContact]);
+  }, [rows, tab, keyword, listView, bucket, rmFilters, everyoneContact, jobAll]);
 
   const filtered = useMemo(
     () => (bucket ? baseFiltered : applyApplicantFilters(baseFiltered, applicantFilterState, applicantFacts)),
@@ -667,14 +678,14 @@ const RmWorkspace: React.FC<{
   const listViewCounts = useMemo(() => {
     // แถบซ้ายกรองก่อนนับด้วย — เลขบนปุ่มมุมมองย่อยต้องตรงกับที่เห็นเมื่อกดเข้าไป
     const base = applyApplicantFilters(
-      filterApplications(rows, 'candidates', rmFilters, keyword),
+      filterApplications(rows, 'candidates', rmFilters, keyword, false, Boolean(jobAll)),
       applicantFilterState,
       applicantFacts,
     );
     const out = {} as Record<RmListView, number>;
     for (const v of RM_LIST_VIEWS) out[v] = base.filter((r) => isInRmListView(r, v)).length;
     return out;
-  }, [rows, keyword, rmFilters, applicantFilterState, applicantFacts]);
+  }, [rows, keyword, rmFilters, applicantFilterState, applicantFacts, jobAll]);
 
   const setListView = (next: RmListView) => {
     const params = new URLSearchParams(searchParams);

@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { RM_JOB_ALL_PARAM } from '@/lib/recruitRm';
 import { fetchSoPostSummary } from '@/lib/soPostGroupsApi';
 import type { SoPostSummary } from '@/lib/soPostGroups';
 import { lazyPage } from '@/lib/staleChunkReload';
@@ -682,6 +683,8 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
       // รายชื่อทั้งหมด (16 พ.ย. 2569) — ค่าเริ่มของแท็บผู้สมัครเป็น "รายชื่อคนที่สนใจ" ตั้งแต่ 14 ต.ค. ทำให้ใบที่ยังไม่มีคนสนใจกดแล้วขึ้น 0
       params.set('list', 'all');
       params.append(`${APPLICANT_FILTER_PARAM_PREFIX}job`, key);
+      // ทุกคนของใบนั้น รวมคนที่มีคนเก็บไปแล้ว — เลขตรงกับการ์ด (16 พ.ย. 2569)
+      params.set(RM_JOB_ALL_PARAM, key);
       setSearchParams(params);
     },
     [applicationJobKeyIdx, searchParams, setSearchParams],
@@ -697,6 +700,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
       params.delete('tab');
       params.set('list', 'all');
       params.append(`${APPLICANT_FILTER_PARAM_PREFIX}job`, standaloneJobValue(kind));
+      params.delete(RM_JOB_ALL_PARAM);
       setSearchParams(params);
     },
     [searchParams, setSearchParams],
