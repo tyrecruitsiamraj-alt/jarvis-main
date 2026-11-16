@@ -138,9 +138,9 @@ const RecruitOverview: React.FC<{
    */
   published?: BoardPublishedTotals | null;
 }> = () => {
-  const [searchParams] = useSearchParams();
-  /** null = เดือนนี้ (ให้เส้นตัดสินจากวันไทยของ server) */
-  const [month, setMonthState] = useState<string | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  /** null = เดือนนี้ (ให้เส้นตัดสินจากวันไทยของ server) · `?month=` = เปิดที่เดือนนั้น */
+  const [month, setMonthState] = useState<string | null>(() => (/^\d{4}-\d{2}$/.test(searchParams.get('month') ?? '') ? searchParams.get('month') : null));
   /**
    * ช่วงที่เลือกเอง — รายวันหรือช่วง (เจ้าของสั่ง 5 ต.ค. 2569: *"อยากดูแบบรายวันหรือ ช่วงได้ด้วย"*)
    * มีค่า = ไม่ใช้เดือน · เลือกเดือนจากปุ่มเดือน = กลับแบบเดือน
@@ -161,6 +161,31 @@ const RecruitOverview: React.FC<{
   const [rev, setRev] = useState(0);
   /** BU ที่เลือก — เฉพาะผู้ใช้ที่ดูได้หลาย BU (26 ต.ค. 2569) · null = ผลรวมทุก BU ในสิทธิ์ (เจ้าของ 29 ต.ค. 2569) */
   const [pickedBu, setPickedBu] = useState<string | null>(() => searchParams.get('bu') || null);
+  /**
+   * ช่วงที่ดู + BU ลง URL (QA 15 พ.ย. 2569: เลือก LBD แล้วรีเฟรชกลับเป็นทุก BU · ส่งลิงก์ให้คนอื่นไม่เห็นช่วงเดียวกัน)
+   * แทนที่ประวัติ (replace) ไม่เพิ่มประวัติทุกครั้งที่กด · เดือนนี้/ทั้งหมด = ไม่ใส่ค่า
+   */
+  useEffect(() => {
+    setSearchParams(
+      (prev) => {
+        const p = new URLSearchParams(prev);
+        const r = range && !range.all ? range : null;
+        if (r) {
+          p.set('from', r.from);
+          p.set('to', r.to);
+        } else {
+          p.delete('from');
+          p.delete('to');
+        }
+        if (!r && month) p.set('month', month);
+        else p.delete('month');
+        if (pickedBu) p.set('bu', pickedBu);
+        else p.delete('bu');
+        return p.toString() === prev.toString() ? prev : p;
+      },
+      { replace: true },
+    );
+  }, [range, month, pickedBu, setSearchParams]);
   const [state, setState] = useState<Load>({ data: null, loading: true, error: null });
 
   /**

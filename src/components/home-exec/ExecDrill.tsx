@@ -21,6 +21,8 @@ import { cn } from '@/lib/utils';
 
 const NUM = new Intl.NumberFormat('th-TH');
 const BAHT = new Intl.NumberFormat('th-TH', { maximumFractionDigits: 0 });
+/** ยอดในช่วงเป็นสตางค์ ตรงกับการ์ดหน้าหลัก (470,782.19) — แถวไล่บวกกลับได้ลงตัว */
+const BAHT2 = new Intl.NumberFormat('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const MONTH = new Intl.DateTimeFormat('th-TH', { month: 'long', year: 'numeric', timeZone: 'UTC' });
 
 export type DrillLevel = {
@@ -80,9 +82,12 @@ export default function ExecDrill({
   }
   const rows = lv?.rows ?? [];
   const shown = drillRowsOf(rows, q, sort, today);
-  const sumPerDay = rows.reduce((a, r) => a + (chargesToday(r, today) ? perDayOf(r) : 0), 0);
+  // รวมจากเลขที่แถวโชว์ (ปัดทีละใบ) — เดิมรวมก่อนปัด หัวกับผลบวกแถวต่างกัน 2 บาท (QA 15 พ.ย. 2569)
+  const sumPerDay = rows.reduce((a, r) => a + (chargesToday(r, today) ? Math.round(perDayOf(r)) : 0), 0);
   const sameUnit = rows.length > 1 && rows.every((r) => r.unit === rows[0].unit);
-  const sumMoney = rows.reduce((a, r) => a + r.amount.need.fine + r.amount.need.deduct, 0);
+  /** ยอดในช่วงของใบ — แถวโชว์เลขนี้ด้วย ไล่บวกกลับเป็นยอดบนหัวได้ (QA 15 พ.ย. 2569: เดิมแถวมีแค่เสียวันละ) */
+  const moneyOf = (r: (typeof rows)[number]) => Math.round((r.amount.need.fine + r.amount.need.deduct) * 100) / 100;
+  const sumMoney = rows.reduce((a, r) => a + moneyOf(r), 0);
 
   return (
     <Sheet open={drill.stack.length > 0} onOpenChange={(o) => !o && drill.close()}>
@@ -97,7 +102,7 @@ export default function ExecDrill({
           <SheetDescription className="tabular-nums">
             {lv?.months
               ? `${NUM.format(lv.months.length)} เดือน`
-              : `${NUM.format(rows.length)} ใบ · เสียวันละ ${BAHT.format(sumPerDay)} บาท · ยอดในช่วง ${BAHT.format(sumMoney)} บาท`}
+              : `${NUM.format(rows.length)} ใบ · เสียวันละ ${BAHT.format(sumPerDay)} บาท · ยอดในช่วง ${BAHT2.format(sumMoney)} บาท`}
             {lv?.sub ? ` · ${lv.sub}` : ''}
           </SheetDescription>
         </SheetHeader>
@@ -204,12 +209,13 @@ export default function ExecDrill({
                   <TableHead className="hidden whitespace-nowrap text-xs sm:table-cell">เจ้าหน้าที่</TableHead>
                   <TableHead className="hidden whitespace-nowrap text-right text-xs sm:table-cell">ขาด (คน)</TableHead>
                   <TableHead className="hidden whitespace-nowrap text-right text-xs sm:table-cell">เสียวันละ (บาท)</TableHead>
+                  <TableHead className="hidden whitespace-nowrap text-right text-xs sm:table-cell">ยอดในช่วง (บาท)</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {shown.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={4} className="text-center text-sm text-muted-foreground">
+                    <TableCell colSpan={5} className="text-center text-sm text-muted-foreground">
                       {rows.length === 0 ? 'ไม่มีใบ' : 'ไม่เจอใบที่ค้นหา'}
                     </TableCell>
                   </TableRow>
@@ -244,6 +250,7 @@ export default function ExecDrill({
                               <span className="block text-xs tabular-nums text-muted-foreground sm:hidden">
                                 {r.owner ?? '—'} · ขาด {r.open ? NUM.format(missing) : '0'} คน ·{' '}
                                 <span className={late ? TONE.danger.value : undefined}>เสียวันละ {late ? BAHT.format(perDayOf(r)) : '0'}</span>
+                                {' · '}ในช่วง {BAHT2.format(moneyOf(r))}
                               </span>
                             </span>
                           </span>
@@ -253,13 +260,16 @@ export default function ExecDrill({
                         <TableCell className={cn('hidden text-right tabular-nums sm:table-cell', late ? TONE.danger.value : 'text-muted-foreground')}>
                           {late ? BAHT.format(perDayOf(r)) : '0'}
                         </TableCell>
+                        <TableCell className="hidden text-right tabular-nums sm:table-cell" data-testid="exec-drill-money">
+                          {BAHT2.format(moneyOf(r))}
+                        </TableCell>
                       </TableRow>,
                     ];
                     if (isOpen) {
                       const a = r.amount.need;
                       out.push(
                         <TableRow key={`${r.requestNo}-d`} data-testid="exec-drill-detail">
-                          <TableCell colSpan={4} className="bg-muted/40">
+                          <TableCell colSpan={5} className="bg-muted/40">
                             <div className="space-y-3 p-1 text-xs text-muted-foreground">
                               <div className="grid grid-cols-1 gap-x-6 gap-y-1 tabular-nums sm:grid-cols-3">
                                 <span>วันคีย์ {thaiDate(r.keyYmd)}</span>

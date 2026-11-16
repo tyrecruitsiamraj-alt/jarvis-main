@@ -83,6 +83,10 @@ const DashboardSlaByLeadKind: React.FC<Props> = ({
             <span className={DASH.cellStrong}>{row.label}</span>
           </button>
         )}
+        {/* มือถือ: % กับรวมอยู่นอกจอ ต้องปัดข้าง (QA 15 พ.ย. 2569) ⇒ บอกใต้ชื่อแถวด้วย */}
+        <span className={cn('block text-[11px] tabular-nums sm:hidden', DASH.cellMuted)}>
+          {num(row.total)} ใบ · ปิดทัน {row.onTimeRatePercent === null ? '—' : `${row.onTimeRatePercent}%`}
+        </span>
       </th>
 
       {cells.map((c) => {

@@ -40,7 +40,7 @@ export type ChannelFunnelRow = { channel: string } & Record<FunnelCellKey, Funne
 export const FUNNEL_COLUMNS: ReadonlyArray<{ key: FunnelCellKey; label: string }> = [
   { key: 'names', label: 'รายชื่อ' },
   { key: 'aiYes', label: 'AI สนใจ' },
-  { key: 'staffOk', label: 'คนโทรต่อสำเร็จ' },
+  { key: 'staffOk', label: 'คนโทรต่อ ติดต่อได้' },
   { key: 'booked', label: 'นัดได้' },
   { key: 'showed', label: 'มา' },
   { key: 'informed', label: 'แจ้งเข้า' },

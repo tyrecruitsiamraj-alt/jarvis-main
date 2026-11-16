@@ -142,7 +142,8 @@ export default function AiChat() {
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
-        <Button className="fixed bottom-24 right-4 z-40 h-12 rounded-full px-5 shadow-md lg:bottom-6 lg:right-6 print:hidden" data-testid="ai-chat-open">
+        {/* มือถือปุ่มเล็กลง (QA 15 พ.ย. 2569: 111×54 บังเลข/ปุ่มหลายหน้า) · หน้าเว้นที่ท้ายให้พ้นปุ่มที่ AppLayout */}
+        <Button className="fixed bottom-24 right-4 z-40 h-10 rounded-full px-4 shadow-md lg:bottom-6 lg:right-6 lg:h-12 lg:px-5 print:hidden" data-testid="ai-chat-open">
           <Bot aria-hidden />
           ผู้ช่วย
         </Button>

@@ -131,7 +131,7 @@ describe('แท็บ = สถานะใบสมัคร (ข้อมู�
   });
 
   it('สำเร็จ / ไม่สำเร็จ เติมต่อท้าย (8 ต.ค. 2569) — ลงผลแล้วนับเป็นโทรแล้วเสมอ', () => {
-    expect(CONTACT_CHIPS.map((c) => c.label)).toEqual(['ทั้งหมด', 'ยังไม่โทร', 'โทรแล้ว', 'สำเร็จ', 'ไม่สำเร็จ']);
+    expect(CONTACT_CHIPS.map((c) => c.label)).toEqual(['ทั้งหมด', 'ยังไม่โทร', 'โทรแล้ว', 'ติดต่อได้', 'ติดต่อไม่ได้']);
     const rows = [{ last_contact_ok: true }, { last_contact_ok: false }, { dialed_last_at: '2026-10-01T07:00:00Z' }, {}];
     expect(rows.filter((r) => isInContactChip(r, 'ok'))).toHaveLength(1);
     expect(rows.filter((r) => isInContactChip(r, 'fail'))).toHaveLength(1);

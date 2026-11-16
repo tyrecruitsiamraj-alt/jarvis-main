@@ -327,8 +327,9 @@ export const CONTACT_CHIPS: readonly { id: ContactChip; label: string }[] = [
   { id: 'all', label: 'ทั้งหมด' },
   { id: 'uncalled', label: 'ยังไม่โทร' },
   { id: 'called', label: 'โทรแล้ว' },
-  { id: 'ok', label: 'สำเร็จ' },
-  { id: 'fail', label: 'ไม่สำเร็จ' },
+  // คำกลาง ติดต่อได้ / ติดต่อไม่ได้ (uiWords 31 ต.ค. 2569 — QA 15 พ.ย. ยังเจอ สำเร็จ/ไม่สำเร็จ ที่ชิปนี้)
+  { id: 'ok', label: 'ติดต่อได้' },
+  { id: 'fail', label: 'ติดต่อไม่ได้' },
 ];
 
 export function isInContactChip(

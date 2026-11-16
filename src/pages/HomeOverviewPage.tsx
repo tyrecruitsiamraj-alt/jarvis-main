@@ -373,7 +373,7 @@ const HomeOverviewPage: React.FC<{
                       type="button"
                       variant="ghost"
                       className="h-auto w-full justify-between gap-3 whitespace-normal rounded-none px-3 py-2 text-left text-sm font-normal"
-                      onClick={() => openList(`เสียเงิน ${k === 'ไม่ระบุ BU' ? k : trendBuLabel(k)}`, [...v.rows].sort((a, b) => amountOf(b) - amountOf(a)), `${BAHT.format(v.amount)} บาท ตามสัญญาในช่วง`)}
+                      onClick={() => openList(`เสียเงิน ${k === 'ไม่ระบุ BU' ? k : trendBuLabel(k)}`, [...v.rows].sort((a, b) => amountOf(b) - amountOf(a)))}
                       data-testid="overview-money-bu-row"
                     >
                       <span>{k === 'ไม่ระบุ BU' ? k : trendBuLabel(k)}</span>
@@ -414,7 +414,7 @@ const HomeOverviewPage: React.FC<{
               </li>
             ))}
           </ul>
-          <Button type="button" variant="outline" className="w-full" onClick={() => openList('ใบที่เสียเงิน', chargedRows, `${BAHT.format(contract ?? 0)} บาท ตามสัญญาในช่วง`)} data-testid="overview-money-all">
+          <Button type="button" variant="outline" className="w-full" onClick={() => openList('ใบที่เสียเงิน', chargedRows)} data-testid="overview-money-all">
             ดูทุกใบ {NUM.format(chargedRows.length)} ใบ
           </Button>
         </div>
@@ -984,7 +984,8 @@ const HomeOverviewPage: React.FC<{
                   {/* กดเลข = รายชื่อจริง (H09) · ลิงก์ล่าง = ไปทำงานที่หน้าเต็ม */}
                   <div className="grid grid-cols-2 gap-3 border-t border-border pt-3">
                     {([
-                      { block: 'aftercare', label: 'ดูแลหลังเริ่มงาน', value: aiV5?.aftercare?.total, to: PAGE.aftercare.to },
+                      // เลขนี้ = รายชื่อที่มีสายดูแลในช่วง ไม่ใช่คนที่กำลังดูแล (QA 15 พ.ย. 2569: หน้าหลัก 0 แต่หน้าดูแลมี 11 คนเลยรอบ — คนละเรื่อง ป้ายต้องบอก)
+                      { block: 'aftercare', label: 'โทรดูแลหลังเริ่มงาน', value: aiV5?.aftercare?.total, to: PAGE.aftercare.to },
                       { block: 'matching', label: 'จับคู่งาน', value: aiV5?.matching?.total, to: '/jobs/board?view=match' },
                     ] as const).map((b) => (
                       <div key={b.block} className="space-y-1 p-2">
@@ -1000,7 +1001,7 @@ const HomeOverviewPage: React.FC<{
                           {v5Num(b.value)} <span className="text-xs font-normal text-muted-foreground">รายชื่อ</span>
                         </Button>
                         <Button type="button" variant="link" size="xs" className="h-auto p-0 text-xs" onClick={() => navigate(b.to)} data-testid={`v5-${b.block}-page`}>
-                          ไปหน้า{b.label} ›
+                          ไปหน้า{b.block === 'aftercare' ? 'ดูแลหลังเริ่มงาน' : b.label} ›
                         </Button>
                       </div>
                     ))}

@@ -33,6 +33,14 @@ export const SO_POST_STATUS_TONE: Record<string, keyof typeof TONE> = {
   not_tried_unknown: 'danger',
 };
 
+/**
+ * ป้ายช่อง: ไม่ได้โพสต์ 3 แบบ ขึ้นต้น "ไม่ได้โพสต์ ·" (QA 15 พ.ย. 2569 — คนอ่านคิดว่าเครื่อง/บัญชี/ไม่ทราบสาเหตุเป็นเหตุของ "ไม่สำเร็จ 166"
+ * ทั้งที่เป็นของที่ So Scraping ไม่ได้ลองโพสต์ · ไม่สำเร็จ = ลองแล้วพัง) · ป้ายที่ So Scraping มีคำนี้อยู่แล้วไม่เติมซ้ำ
+ */
+export function soPostCellLabel(st: { key: string; label: string }): string {
+  return st.key.startsWith('not_tried') && !st.label.includes('ไม่ได้โพสต์') ? `ไม่ได้โพสต์ · ${st.label}` : st.label;
+}
+
 export default function SoPostGroupsCard({ from, to, bu }: { from: string; to: string; bu: string | null }) {
   const [page, setPage] = React.useState(1);
   const [rev, setRev] = React.useState(0);
@@ -57,7 +65,7 @@ export default function SoPostGroupsCard({ from, to, bu }: { from: string; to: s
   const d = state.data;
   const sub = `${formatYmdTh(from)} – ${formatYmdTh(to)} · ${bu ?? 'ทุก BU'}`;
   const cells: Array<{ key: string; label: string; n: number | null; tone?: keyof typeof TONE }> = d
-    ? [{ key: 'total', label: 'สั่งทั้งหมด', n: d.total }, ...d.statuses.map((st) => ({ key: st.key, label: st.label, n: d.counts[st.key] ?? 0, tone: SO_POST_STATUS_TONE[st.key] }))]
+    ? [{ key: 'total', label: 'สั่งทั้งหมด', n: d.total }, ...d.statuses.map((st) => ({ key: st.key, label: soPostCellLabel(st), n: d.counts[st.key] ?? 0, tone: SO_POST_STATUS_TONE[st.key] }))]
     : [];
   /**
    * สั่ง + 7 สถานะ = 8 ช่อง (มือถือ 2 · กลาง 4 · กว้าง 8 ต่อแถว) · สั่ง + 9 สถานะ = 10 ช่อง แถวละ 5 (So Scraping แยกไม่ได้โพสต์เป็น

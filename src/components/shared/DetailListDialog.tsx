@@ -1,3 +1,4 @@
+import { Button } from '@/components/ui/button';
 import React from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
@@ -9,6 +10,8 @@ interface DetailItem {
   badge?: string;
   badgeVariant?: 'default' | 'success' | 'warning' | 'destructive' | 'info';
   onClick?: () => void;
+  /** คำบนปุ่มของแถวที่กดได้ (ค่าเริ่ม "เปิดใบขอ") — หน้าที่เปิดอย่างอื่นตั้งเอง */
+  openLabel?: string;
   extra?: React.ReactNode;
 }
 
@@ -85,6 +88,12 @@ const DetailListDialog: React.FC<DetailListDialogProps> = ({
                       </div>
                     ) : null}
                     {item.extra}
+                    {/* กดได้ต้องมีคำบอก (QA 15 พ.ย. 2569: แถวกดเปิดใบขอได้แต่ไม่มีอะไรบอก ผู้ทดสอบเห็นแค่ปุ่มปิดหน้าต่าง) */}
+                    {item.onClick ? (
+                      <Button type="button" variant="link" size="xs" className="mt-1 h-auto px-0" onClick={(e) => { e.stopPropagation(); item.onClick?.(); }}>
+                        {item.openLabel ?? 'เปิดใบขอ'} ›
+                      </Button>
+                    ) : null}
                   </div>
                   {item.badge ? (
                     <span

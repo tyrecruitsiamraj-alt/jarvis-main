@@ -613,8 +613,17 @@ const JobListPage: React.FC = () => {
             value={filter}
             onChange={(v) => updateListState({ filter: v as typeof filter })}
           >
-            <option value="all">ทั้งหมด</option>
-            <option value="active">ยังดำเนินการอยู่</option>
+            {/* ใบขอ ERP: ค่าเริ่ม (all) โหลดเฉพาะใบที่ยังเปิด — เดิมเขียน "ทั้งหมด" ทั้งที่ใบปิด 30 วันไม่อยู่ในนั้น (QA 15 พ.ย. 2569)
+                ⇒ เขียนตามของจริง · ตัวเลือก active ซ้ำกับค่าเริ่ม จึงไม่ขึ้น (ลิงก์เก่า ?f=active ยังเปิดได้) */}
+            {siamrajPrimary ? (
+              <option value="all">ยังเปิดอยู่</option>
+            ) : (
+              <>
+                <option value="all">ทั้งหมด</option>
+                <option value="active">ยังดำเนินการอยู่</option>
+              </>
+            )}
+            {siamrajPrimary && filter === 'active' ? <option value="active">ยังเปิดอยู่</option> : null}
             <option value="closed">ปิดแล้ว (30 วันล่าสุด)</option>
           </FilterSelect>
 

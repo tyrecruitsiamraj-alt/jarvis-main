@@ -112,7 +112,10 @@ export type SlaByLeadKind = {
   rows: SlaLeadKindRow[];
   /** แถวรวมทุกชนิด */
   totalRow: SlaLeadKindRow;
-  /** ช่องที่มีของจริงอย่างน้อย 1 ใบ — ใช้ตัดคอลัมน์ที่ว่างทั้งตารางออก (กันตารางโล่ง) */
+  /**
+   * คอลัมน์ที่โชว์ = ทุกช่องเสมอ (QA 15 พ.ย. 2569 · กติกา "ว่างแล้วห้ามหาย" 1 ต.ค. 2569)
+   * เดิมตัดช่องที่เป็น 0 ทั้งตาราง ⇒ ปี 2569 ไม่มี "ปิดไม่ทัน" แต่สูตรใต้ตารางอ้างถึง · เปลี่ยนปีแล้วชุดคอลัมน์เปลี่ยน
+   */
   visibleCells: SlaCellKey[];
 };
 
@@ -201,7 +204,7 @@ export function buildSlaByLeadKind(
   return {
     rows,
     totalRow,
-    visibleCells: SLA_CELL_ORDER.filter((k) => totalCells[k] > 0),
+    visibleCells: [...SLA_CELL_ORDER],
   };
 }
 

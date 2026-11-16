@@ -260,7 +260,8 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         และปุ่ม burger มีอยู่บนหัวทั้งสองขนาดจอ ⇒ ไม่มีอะไรหาย ได้พื้นที่คืน 240px
         ⚠️ ระยะขอบ lg กลับไป px-8 ตามเดิม (ที่หด px-6 ไว้เพราะแถบเมนูกินที่)
       */}
-      <main className="relative min-w-0 flex-1 w-full max-w-[1920px] mx-auto px-4 sm:px-5 md:px-6 lg:px-8 pb-8 pt-3 overflow-x-clip">
+      {/* pb เว้นที่ท้ายหน้าให้พ้นปุ่ม "ผู้ช่วย" ที่ลอยมุมขวาล่าง (QA 15 พ.ย. 2569 เลื่อนสุดหน้าแล้วยังบังช่องสุดท้าย) */}
+      <main className="relative min-w-0 flex-1 w-full max-w-[1920px] mx-auto px-4 sm:px-5 md:px-6 lg:px-8 pb-24 lg:pb-20 pt-3 overflow-x-clip">
         <StageBanner />
         {children}
       </main>

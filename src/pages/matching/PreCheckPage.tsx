@@ -737,7 +737,6 @@ const PreCheckPage: React.FC<{ embedded?: boolean }> = ({ embedded = false }) =>
               </div>
               <div>
                 <h3 className="text-sm font-medium text-foreground">ค้นหาตำแหน่งผู้สมัคร</h3>
-                <p className="text-xs text-muted-foreground">เลือกงานจาก ERP ได้เลย หรือพิมพ์ที่อยู่ผู้สมัครเพื่อเรียงงานใกล้สุดก่อน</p>
               </div>
             </div>
 
@@ -823,7 +822,6 @@ const PreCheckPage: React.FC<{ embedded?: boolean }> = ({ embedded = false }) =>
               </div>
               <div>
                 <h3 className="text-sm font-medium text-foreground">แผนที่</h3>
-                <p className="text-xs text-muted-foreground">ตำแหน่งที่ใช้ค้นหางานใกล้เคียง</p>
               </div>
             </div>
             {appliedCenter ? (
@@ -843,7 +841,6 @@ const PreCheckPage: React.FC<{ embedded?: boolean }> = ({ embedded = false }) =>
               <div className="rounded-2xl border border-dashed border-white/70 bg-white/30 dark:border-slate-700/60 dark:bg-slate-800/40 p-8 text-center">
                 <MapPin className="w-8 h-8 text-blue-400/50 mx-auto mb-2" />
                 <p className="text-sm font-medium text-foreground">ยังไม่มีตำแหน่งบนแผนที่</p>
-                <p className="mt-1 text-xs text-muted-foreground">พิมพ์ที่อยู่ผู้สมัครแล้วกดค้นหา</p>
               </div>
             )}
           </section>
@@ -880,10 +877,7 @@ const PreCheckPage: React.FC<{ embedded?: boolean }> = ({ embedded = false }) =>
         <div className="space-y-3">
           {!appliedCenter && !appliedTextQuery && filteredRows.length > 0 && (
             <div className="glass-card rounded-3xl p-4 border border-white/70">
-              <p className="text-sm font-medium text-foreground">รายการด้านล่างคือใบงานเปิดจาก ERP</p>
-              <p className="text-xs text-muted-foreground mt-1">
-                เรียงงานด่วนขึ้นก่อน กดเข้าไปดูรายละเอียดและผู้สมัครที่ AI แนะนำได้
-              </p>
+              <p className="text-sm font-medium text-foreground">ใบงานเปิดจาก ERP</p>
             </div>
           )}
 
@@ -891,7 +885,6 @@ const PreCheckPage: React.FC<{ embedded?: boolean }> = ({ embedded = false }) =>
             <div className="glass-card rounded-3xl p-8 border border-white/70 text-center">
               <ClipboardCheck className="w-8 h-8 text-amber-500/50 mx-auto mb-2" />
               <p className="text-sm font-medium text-foreground">ยังไม่พบใบงาน</p>
-              <p className="text-xs text-muted-foreground mt-1">ลองค้นหาด้วย site, หน่วยงาน หรือสถานที่ทำงานจาก ERP</p>
             </div>
           )}
 
@@ -1438,9 +1431,7 @@ const PreCheckPage: React.FC<{ embedded?: boolean }> = ({ embedded = false }) =>
                               <p className="text-xs text-muted-foreground">
                                 ไม่พบผู้สมัครที่ใกล้เคียงในฐาน iRecruit สำหรับใบขอนี้
                               </p>
-                            ) : (
-                              <p className="text-xs text-muted-foreground">กดดูงานเพื่อค้นหาผู้สมัคร</p>
-                            )}
+                            ) : null}
                           </div>
                         )}
                       </div>

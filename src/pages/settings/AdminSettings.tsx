@@ -751,12 +751,15 @@ const AdminSettings: React.FC = () => {
                         />
                       </td>
                       <td className="px-4 py-3 text-center">
-                        <button
+                        {/* shadcn Button สูงพอนิ้วมือ (QA 15 พ.ย. 2569: ปุ่มเขียนเอง 55×23 อยู่ติดปุ่มลบ ปัดตารางบนมือถือพลาดโดนได้) */}
+                        <Button
                           type="button"
+                          variant="ghost"
+                          size="sm"
                           disabled={savingUserId === u.id}
                           onClick={() => void updateUser(u.id, { is_active: !u.is_active })}
                           className={cn(
-                            'text-xs px-2 py-0.5 rounded-full transition-colors',
+                            'rounded-full text-xs',
                             u.is_active
                               ? 'bg-success/15 text-success hover:bg-success/25'
                               : 'bg-muted text-muted-foreground hover:bg-muted/80',
@@ -764,7 +767,7 @@ const AdminSettings: React.FC = () => {
                           )}
                         >
                           {u.is_active ? 'Active' : 'Inactive'}
-                        </button>
+                        </Button>
                       </td>
                       <td className="px-4 py-3 text-center text-[11px] text-muted-foreground">
                         {user?.id === u.id ? (
@@ -776,7 +779,7 @@ const AdminSettings: React.FC = () => {
                           <Button
                             type="button"
                             variant="ghost"
-                            size="xs"
+                            size="sm"
                             aria-label={`ลบบัญชี ${u.full_name}`}
                             className={TONE.danger.value}
                             onClick={() => {

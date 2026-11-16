@@ -65,9 +65,9 @@ describe('slaByLeadKind — โครงตาราง', () => {
     expect(t.rows.map((r) => r.label)).toEqual(['ฉุกเฉิน/ย้อนหลัง', 'ฉุกเฉิน', 'ล่วงหน้า']);
   });
 
-  it('ไม่มีข้อมูล → ทุกช่อง 0 · ไม่มีคอลัมน์ไหนโชว์ (กันตารางโล่ง)', () => {
+  it('ไม่มีข้อมูล → ทุกช่อง 0 · คอลัมน์ยังอยู่ครบ (ว่างแล้วห้ามหาย · QA 15 พ.ย. 2569)', () => {
     const t = buildSlaByLeadKind([], TODAY);
-    expect(t.visibleCells).toEqual([]);
+    expect(t.visibleCells).toEqual([...SLA_CELL_ORDER]);
     expect(t.totalRow.total).toBe(0);
     expect(t.totalRow.onTimeRatePercent).toBeNull();
   });

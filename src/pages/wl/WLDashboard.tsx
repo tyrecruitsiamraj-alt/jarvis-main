@@ -223,7 +223,7 @@ const WLDashboard: React.FC = () => {
           ))}
         </div>
       </div>
-      <DetailListDialog open={dialogOpen} onOpenChange={setDialogOpen} title={dialogTitle} items={dialogItems} />
+      <DetailListDialog open={dialogOpen} onOpenChange={setDialogOpen} title={dialogTitle} items={dialogItems.map((it) => ({ ...it, openLabel: 'ดูประวัติพนักงาน' }))} />
     </div>
   );
 };

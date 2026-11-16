@@ -175,13 +175,13 @@ export default function RecruitStuckBody({
         )}
         {stuck.data?.requests ? (
           <div ref={phasesRef} className="scroll-mt-20">
-            <OverviewCard icon={ListChecks} title="1. ใครต้องทำอะไร" sub={`${rows.length.toLocaleString('th-TH')} ใบที่ยังเปิด แยกตามเจ้าหน้าที่สรรหาของใบ · กดเลขดูใบ`}>
+            <OverviewCard icon={ListChecks} title="1. ใครต้องทำอะไร" sub={`${rows.length.toLocaleString('th-TH')} ใบที่ยังเปิด`}>
               <StuckTodoTable rows={rows} onPick={pick} />
               {picked ? <StuckPickedList list={picked} onClose={() => setPicked(null)} onOpenRequest={openRequest} /> : null}
             </OverviewCard>
           </div>
         ) : null}
-        <OverviewCard icon={PhoneCall} title="2. ทำแล้วเป็นไง" sub={`${cohortSub} · ตัวแดง = ยังไม่ทำ กดดูชื่อไปทำต่อ`}>
+        <OverviewCard icon={PhoneCall} title="2. ทำแล้วเป็นไง" sub={cohortSub}>
           {appsUnknown ? appsError : <CallerResultsTable cohort={cohort} onOpen={onOpenNames} />}
           {appsUnknown ? null : <PersonJourneyCard embedded list={cohort} sub={cohortSub} onOpenNames={onOpenNames} />}
         </OverviewCard>

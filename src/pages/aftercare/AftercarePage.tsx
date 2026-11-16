@@ -425,7 +425,8 @@ const AftercarePage: React.FC = () => {
                         </span>
                       </span>
                       {!p.closed_at ? (
-                        <span className="flex shrink-0 flex-wrap items-center gap-1.5">
+                        <span className="flex min-w-0 flex-wrap items-center gap-1.5 sm:shrink-0">
+                          {/* มือถือห้าม shrink-0 — ปุ่มที่สองล้นขอบจอ 11px ตัวหนังสือขาด (QA 15 พ.ย. 2569) · ให้ขึ้นบรรทัดใหม่ได้ */}
                           {/* shadcn Button (QA 17 ต.ค. 2569: เดิมปุ่มเขียนเอง) */}
                           {/* หน้าต่างแบบป๊อปย้าย แก้รอบที่ตั้งไว้ได้ (เจ้าของ 19 ต.ค. 2569 · เดิมพาไปฟอร์มหน้าติดตาม) */}
                           <Button type="button" size="sm" variant="outline" disabled={busy} onClick={() => setScheduling(p)}>

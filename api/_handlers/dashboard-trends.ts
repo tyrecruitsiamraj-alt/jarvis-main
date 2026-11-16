@@ -14,6 +14,7 @@
  *    ⚠️ ติดตามไม่ล็อก BU — หน้าติดตามเดิมให้ทุกคนเห็นทุกแถว (ห้ามทำ Dashboard แคบกว่าหน้าที่มันสรุป)
  * 5. ใบขอ (ERP) อ่านผ่านสำเนาในฐาน (`trendSnapshots`) — คิวรีช่วงยาวใช้ ~24 วิ ถามสดทุกครั้งไม่ได้
  */
+import { STAFF_NAME_SQL } from '../_lib/staffNameSql.js';
 import { sendError, withAuth, handleApiError, type ApiRes, type AuthedReq } from '../_lib/http.js';
 import { checkApiAccess, type ApiResource } from '../_lib/rbac.js';
 import { dbQuery } from '../_lib/postgres.js';
@@ -108,14 +109,20 @@ async function loadFollow(from: string, to: string): Promise<FollowTrendRow[]> {
             right(regexp_replace(coalesce(f.recipient_phone, ''), '\\D', '', 'g'), 9) as phone_key,
             f.staff_call_outcome, f.staff_called_at,
             f.topic, f.unit_name, f.site_code,
-            f.created_by::text as staff_id,
-            coalesce(nullif(btrim(u.nickname), ''), f.created_by_name) as staff_name,
+            u.id::text as staff_id,
+            ${STAFF_NAME_SQL('u', 'f.created_by_name')} as staff_name,
             coalesce(u.department_code, ${SITE_BU('f.site_code')}) as bu,
             case when ${outcome} is not null then coalesce(q.first_result_at, q.updated_at) end as result_at,
             f.follow_team, f.group_id::text as group_id, f.recipient_name, f.recipient_phone, f.source_ref,
             ${FOLLOW_QUEUE_CALL_COLS}
        from ${FOLLOW} f
-       left join ${USERS} u on u.id = f.created_by
+       /* 🔴 QA 15 พ.ย. 2569: คนเดียวแตกสองแถว (Nutsara.s@… กับ "นุศรา สงค์จันทร์") — แถวเก่าไม่มี created_by จดแต่ชื่อ/อีเมล
+          ⇒ ไม่มีรหัสให้จับบัญชีจากอีเมลหรือชื่อเต็ม (join ธรรมดา 0.2 วิ · lateral ใช้ 2 วิ) · ชื่อบนจอใช้กติกาเดียว STAFF_NAME_SQL */
+       left join ${USERS} ue on f.created_by is null and lower(ue.email) = lower(btrim(f.created_by_name))
+       left join (select distinct on (btrim(full_name)) btrim(full_name) as fn, id
+                    from ${USERS} where nullif(btrim(full_name), '') is not null order by btrim(full_name), id) un
+              on f.created_by is null and un.fn = btrim(f.created_by_name)
+       left join ${USERS} u on u.id = coalesce(f.created_by, ue.id, un.id)
        left join ${QUEUE} q
               on q.channel = 'reminder' and q.job_ref = 'follow' and q.person_ref = 'follow-' || f.id::text
       where f.created_at < ($2::date + 1)

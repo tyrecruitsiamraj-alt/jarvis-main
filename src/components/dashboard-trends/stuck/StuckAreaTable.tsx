@@ -66,7 +66,7 @@ export default function StuckAreaTable({
     </TableRow>
   );
   return (
-    <OverviewCard icon={MapPin} title={title} sub="กดจังหวัดดูอำเภอ · กดเลขดูใบ">
+    <OverviewCard icon={MapPin} title={title}>
       <div className="overflow-x-auto" data-testid="stuck-area">
         <Table className="min-w-[48rem]">
           <TableHeader>

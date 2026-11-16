@@ -180,7 +180,8 @@ const ErpBoardCardDialog: React.FC<{
                         </span>
                       </p>
                       {g.items.map((it) => (
-                        <label key={it.itemId} className="flex items-center gap-2 text-sm">
+                        // ทั้งแถวกดติ๊กได้ สูงพอนิ้วมือ (QA 15 พ.ย. 2569: ช่องติ๊ก 17px ห่างกัน 28px กดพลาดข้อข้าง ๆ)
+                        <label key={it.itemId} className="flex min-h-10 cursor-pointer items-center gap-2 text-sm">
                           <Checkbox
                             checked={it.checked}
                             disabled={busy}
