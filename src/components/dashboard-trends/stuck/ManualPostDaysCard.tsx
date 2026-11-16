@@ -12,7 +12,7 @@ import { requestPathOfJobId } from '@/lib/jobNavigation';
 import { fetchManualPostDays } from '@/lib/jobPostActionsApi';
 import type { ManualPostDays } from '@/lib/jobPostActions';
 import { OverviewCard } from '../RecruitOverviewParts';
-import { LINK_CLICKS_SINCE, MANUAL_POSTED_SINCE, comparableSince } from '@/lib/recruitScale';
+import { LINK_CLICKS_SINCE, MANUAL_POSTED_SINCE, comparableSince, manualPostSplit } from '@/lib/recruitScale';
 import TrendDelta from './TrendDelta';
 
 /**
@@ -60,12 +60,18 @@ export default function ManualPostDaysCard({
 
   const d = state.data;
   const picked = pick && d ? (d.days.find((x) => x.day === pick) ?? null) : null;
-  /** โพสต์แล้ว = มีลิงก์โพสต์วางกลับมา · Gen link = ยังไม่มี (เจ้าของ 13 พ.ย. 2569) · สองช่องรวม = กลุ่ม/ช่องทางทั้งหมด */
+  /**
+   * โพสต์แล้ว = มีลิงก์โพสต์วางกลับมา · Gen link = ยังไม่มี (เจ้าของ 13 พ.ย. 2569) · สองช่องรวม = ทั้งหมด (กลุ่ม/ช่องทางที่ปล่อยลิงก์)
+   * 16 พ.ย. 2569 เจ้าของ "อยากรู้ว่าโพสต์เองมันทำเท่าไหร่ … จะได้รู้สัดส่วน" → ช่องทั้งหมด + % ของโพสต์แล้ว/Gen link (`manualPostSplit`)
+   * ทั้งหมดนับวันที่กดคัดลอกข้อความด้วยตั้งแต่ 13 พ.ย. = ช่วงก่อนหน้านั้นเทียบไม่ได้
+   */
   const since = (ymd: string) => (prevFrom && !comparableSince(prevFrom, ymd) ? ymd : null);
-  const cells: Array<{ key: string; label: string; n: number | null; tone?: keyof typeof TONE; before: number | null; since?: string | null }> = [
+  const split = d ? manualPostSplit(d.total.places, d.total.posted) : null;
+  const cells: Array<{ key: string; label: string; n: number | null; pct?: number | null; tone?: keyof typeof TONE; before: number | null; since?: string | null }> = [
     { key: 'jobs', label: 'ใบขอ', n: d ? d.total.jobs : null, before: prev ? prev.jobs : null },
-    { key: 'posted', label: 'โพสต์แล้ว', n: d ? d.total.posted : null, tone: 'success', before: prev ? prev.posted : null, since: since(MANUAL_POSTED_SINCE) },
-    { key: 'genlink', label: 'Gen link', n: d ? d.total.places - d.total.posted : null, before: prev ? prev.places - prev.posted : null, since: since(MANUAL_POSTED_SINCE) },
+    { key: 'places', label: 'ทั้งหมด', n: split ? split.total : null, before: prev ? prev.places : null, since: since(MANUAL_POSTED_SINCE) },
+    { key: 'posted', label: 'โพสต์แล้ว', n: split ? split.posted : null, pct: split?.postedPct, tone: 'success', before: prev ? prev.posted : null, since: since(MANUAL_POSTED_SINCE) },
+    { key: 'genlink', label: 'Gen link', n: split ? split.genlink : null, pct: split?.genlinkPct, before: prev ? prev.places - prev.posted : null, since: since(MANUAL_POSTED_SINCE) },
     { key: 'clicks', label: 'คลิก', n: d ? d.total.clicks : null, before: prev ? prev.clicks : null, since: since(LINK_CLICKS_SINCE) },
     { key: 'applicants', label: 'กรอก', n: d ? d.total.applicants : null, tone: 'success', before: prev ? prev.applicants : null },
   ];
@@ -81,12 +87,15 @@ export default function ManualPostDaysCard({
         </div>
       ) : null}
 
-      <div className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-border bg-border sm:grid-cols-5 [&>*:first-child]:col-span-2 sm:[&>*:first-child]:col-span-1" data-testid="manual-post-days-total">
+      <div className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-border bg-border sm:grid-cols-3 lg:grid-cols-6" data-testid="manual-post-days-total">
         {cells.map((c) => (
           <div key={c.key} className="flex min-w-0 flex-col gap-0.5 bg-card px-3 py-2">
             <span className="text-xs text-muted-foreground">{c.label}</span>
-            <span className={cn('text-xl font-medium tabular-nums', c.n === null || c.n === 0 ? 'text-muted-foreground' : c.tone ? TONE[c.tone].value : 'text-foreground')}>
-              {c.n === null ? '—' : th(c.n)}
+            <span className="flex items-baseline gap-1.5">
+              <span className={cn('text-xl font-medium tabular-nums', c.n === null || c.n === 0 ? 'text-muted-foreground' : c.tone ? TONE[c.tone].value : 'text-foreground')}>
+                {c.n === null ? '—' : th(c.n)}
+              </span>
+              {c.pct === undefined ? null : <span className="text-xs tabular-nums text-muted-foreground">{c.pct === null ? '' : `${c.pct}%`}</span>}
             </span>
             {prev === undefined || c.n === null ? null : c.since ? (
               <span className="text-xs text-muted-foreground">เริ่มนับ {formatYmdTh(c.since)}</span>
@@ -103,6 +112,7 @@ export default function ManualPostDaysCard({
             <TableRow className={DASH.tableHead}>
               <TableHead className="text-xs">วันที่</TableHead>
               <TableHead className="text-right text-xs">ใบขอ</TableHead>
+              <TableHead className="text-right text-xs">ทั้งหมด</TableHead>
               <TableHead className="text-right text-xs">โพสต์แล้ว</TableHead>
               <TableHead className="text-right text-xs">Gen link</TableHead>
               <TableHead className="text-right text-xs">คลิก</TableHead>
@@ -112,7 +122,7 @@ export default function ManualPostDaysCard({
           <TableBody>
             {!d ? (
               <TableRow>
-                <TableCell colSpan={6} className={cn('py-6 text-center text-sm', DASH.sub)}>
+                <TableCell colSpan={7} className={cn('py-6 text-center text-sm', DASH.sub)}>
                   {state.loading ? 'กำลังโหลด…' : 'อ่านไม่ได้'}
                 </TableCell>
               </TableRow>
@@ -134,7 +144,7 @@ export default function ManualPostDaysCard({
                         {formatYmdTh(x.day)}
                       </Button>
                     </TableCell>
-                    {[x.jobs, x.posted, x.places - x.posted, x.clicks, x.applicants].map((n, i) => (
+                    {[x.jobs, x.places, x.posted, x.places - x.posted, x.clicks, x.applicants].map((n, i) => (
                       <TableCell key={i} className={cn('text-right text-sm tabular-nums', n === 0 ? 'text-muted-foreground' : 'text-foreground')}>
                         {th(n)}
                       </TableCell>
@@ -151,7 +161,7 @@ export default function ManualPostDaysCard({
         <div className="space-y-2 rounded-xl border border-border p-3" data-testid="manual-post-day-list">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-sm font-medium text-foreground">
-              {formatYmdTh(picked.day)} · {th(picked.jobs)} ใบขอ · โพสต์แล้ว {th(picked.posted)} · Gen link {th(picked.places - picked.posted)}
+              {formatYmdTh(picked.day)} · {th(picked.jobs)} ใบขอ · ทั้งหมด {th(picked.places)} · โพสต์แล้ว {th(picked.posted)} · Gen link {th(picked.places - picked.posted)}
             </p>
             <Button type="button" size="xs" variant="outline" onClick={() => setPick(null)}>
               ปิด

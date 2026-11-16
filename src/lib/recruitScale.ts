@@ -79,3 +79,14 @@ export function prevCohortOf(
   const list = win.isCurrent ? trimLastDayToNow(apps, win.prevTo, generatedAt) : apps;
   return cohortOf(list, win.prevFrom, win.prevTo);
 }
+
+/**
+ * สัดส่วนโพสต์เอง (เจ้าของ 16 พ.ย. 2569 "โพสต์เองมันทำเท่าไหร่ … แยกเป็น Gen link กับ โพสต์ จะได้รู้สัดส่วน")
+ * ทั้งหมด = โพสต์แล้ว + Gen link (กลุ่ม/ช่องทางที่ปล่อยลิงก์) · % สองส่วนรวมกัน 100 เสมอ · ทั้งหมด 0 = ไม่มี %
+ */
+export function manualPostSplit(places: number, posted: number): { total: number; posted: number; genlink: number; postedPct: number | null; genlinkPct: number | null } {
+  const genlink = Math.max(0, places - posted);
+  if (places <= 0) return { total: 0, posted, genlink, postedPct: null, genlinkPct: null };
+  const postedPct = Math.round((posted / places) * 100);
+  return { total: places, posted, genlink, postedPct, genlinkPct: 100 - postedPct };
+}

@@ -56,3 +56,12 @@ describe('รายชื่อช่วงก่อน', () => {
     expect(prevCohortOf(apps, { ...win, all: true }, '2026-08-20', '2026-11-13T03:00:00.000Z')).toBeNull();
   });
 });
+
+describe('สัดส่วนโพสต์เอง (เจ้าของ 16 พ.ย. 2569 "แยกเป็น Gen link กับ โพสต์ จะได้รู้สัดส่วน")', () => {
+  it('ทั้งหมด = โพสต์แล้ว + Gen link · % รวม 100 · ทั้งหมด 0 = ไม่มี %', async () => {
+    const { manualPostSplit } = await import('../../src/lib/recruitScale');
+    expect(manualPostSplit(1433, 342)).toEqual({ total: 1433, posted: 342, genlink: 1091, postedPct: 24, genlinkPct: 76 });
+    expect(manualPostSplit(3, 1)).toEqual({ total: 3, posted: 1, genlink: 2, postedPct: 33, genlinkPct: 67 });
+    expect(manualPostSplit(0, 0)).toEqual({ total: 0, posted: 0, genlink: 0, postedPct: null, genlinkPct: null });
+  });
+});

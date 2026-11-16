@@ -6,8 +6,8 @@ import { formatTrendNumber as fmt } from '@/lib/trends/format';
 import { SCALE_MORE, SCALE_STRIP, SCALE_TITLES, type ScaleSectionKey, type ScaleStripKey, type TrendSense } from '@/lib/recruitScale';
 import TrendDelta from './TrendDelta';
 
-/** ช่องบนแถบ: เลขช่วงนี้ · หน่วย · เลขช่วงก่อน (null = เทียบไม่ได้) */
-export type ScaleStripCell = { n: number | null; unit: string; prev: number | null; sense?: TrendSense };
+/** ช่องบนแถบ: เลขช่วงนี้ · หน่วย · เลขช่วงก่อน (null = เทียบไม่ได้) · `note` = บรรทัดแยกส่วน (ข้อ 6 โพสต์แล้ว/Gen link · 16 พ.ย. 2569) */
+export type ScaleStripCell = { n: number | null; unit: string; prev: number | null; sense?: TrendSense; note?: string | null };
 
 /**
  * ═══ ภาพรวมงานสรรหา แบบ Scale ลง (เจ้าของ 13 พ.ย. 2569 · แบบร่างรอบ 2 แล้ว "ทำมาก่อนเลย") ═══
@@ -54,6 +54,8 @@ export default function RecruitScaleView({
                   <span className="text-xs text-muted-foreground">{c.unit}</span>
                 </span>
                 <span className="flex min-h-4 items-center">{c.n === null ? null : <TrendDelta cur={c.n} prev={c.prev} sense={c.sense} from />}</span>
+                {/* บรรทัดแยกส่วน — จองที่ทุกช่อง เลขทุกช่องอยู่แนวเดียวกัน */}
+                <span className="min-h-4 text-xs tabular-nums text-muted-foreground">{c.note ?? ''}</span>
               </Button>
             );
           })}

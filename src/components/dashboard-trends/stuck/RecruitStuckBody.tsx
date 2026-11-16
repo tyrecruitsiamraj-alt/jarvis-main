@@ -32,7 +32,7 @@ import RecruitScaleView, { type ScaleStripCell } from './RecruitScaleView';
 import DailyCompareChart from './DailyCompareChart';
 import type { SoPostPrevCounts } from './SoPostGroupsCard';
 import { buildCallerResults } from '@/lib/callerResults';
-import { SCALE_TITLES, SO_POST_SINCE, comparableSince, isScaleSection, prevCohortOf, type ScaleSectionKey } from '@/lib/recruitScale';
+import { MANUAL_POSTED_SINCE, SCALE_TITLES, SO_POST_SINCE, comparableSince, isScaleSection, manualPostSplit, prevCohortOf, type ScaleSectionKey } from '@/lib/recruitScale';
 import { fetchSoPostGroups } from '@/lib/soPostGroupsApi';
 import { fetchManualPostDays } from '@/lib/jobPostActionsApi';
 import type { ManualPostDays } from '@/lib/jobPostActions';
@@ -236,7 +236,17 @@ export default function RecruitStuckBody({
       src: { n: appsUnknown ? null : cohort.length, unit: 'รายชื่อ', prev: appsUnknown ? null : (prevCohort?.length ?? null) },
       ch: { n: appsUnknown ? null : channels.total.booked.value, unit: 'นัดได้', prev: appsUnknown ? null : (prevChannels?.total.booked.value ?? null) },
       fb: { n: posts.so, unit: 'ที่สั่ง', prev: posts.soPrev?.total ?? null, sense: 'plain' },
-      self: { n: posts.manual?.jobs ?? null, unit: 'ใบขอ', prev: posts.manualPrev?.jobs ?? null },
+      // ข้อ 6 = โพสต์เองทั้งหมด แยกโพสต์แล้ว/Gen link + สัดส่วน (เจ้าของ 16 พ.ย. 2569 "โพสต์เองมันทำเท่าไหร่ … จะได้รู้สัดส่วน")
+      self: (() => {
+        const sp = posts.manual ? manualPostSplit(posts.manual.places, posts.manual.posted) : null;
+        const comparable = !win.all && comparableSince(win.prevFrom, MANUAL_POSTED_SINCE);
+        return {
+          n: sp ? sp.total : null,
+          unit: 'ลิงก์',
+          prev: comparable ? (posts.manualPrev?.places ?? null) : null,
+          note: sp && sp.total > 0 ? `โพสต์แล้ว ${sp.posted.toLocaleString('th-TH')} (${sp.postedPct}%) · Gen link ${sp.genlink.toLocaleString('th-TH')} (${sp.genlinkPct}%)` : null,
+        };
+      })(),
     };
     const stuckWait = stuck.error || stuck.data ? null : <Skeleton className="h-64 rounded-2xl" />;
     const pickedList = picked ? (
