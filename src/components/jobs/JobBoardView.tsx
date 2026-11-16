@@ -5,7 +5,8 @@ import type { SoPostSummary } from '@/lib/soPostGroups';
 import { lazyPage } from '@/lib/staleChunkReload';
 import { GlassTabIndicator, glassTabClass, glassTabsListClass } from '@/components/ui/tabs';
 import { trackPublicClick } from '@/lib/publicClickApi';
-import { useSearchParams } from 'react-router-dom';
+import { useLocation, useSearchParams } from 'react-router-dom';
+import { sanitizeUnitReturnTo } from '@/lib/jobUnitSessionState';
 import type { JobRequest } from '@/types';
 import { jobSectorLabel } from '@/lib/unitRequestDisplay';
 import { jobBoardCardTitle, jobBoardCardSubtitle, publicJobCardSubtitle } from '@/lib/unitRequestDisplay';
@@ -310,6 +311,13 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
   onPublishedTotals,
 }) => {
   const [searchParams, setSearchParams] = useSearchParams();
+  /**
+   * ← กลับไปหน้าที่พามา (เจ้าของ 16 พ.ย. 2569 "ทำไมเวลากดย้อนกลับถึงไม่กลับหน้าเดิม") — หน้าใบขอส่ง `state.backTo` มา
+   * จำไว้ตลอดที่อยู่หน้านี้ (สลับแท็บ/ตัวกรองแล้ว state หาย) · ไม่มี = หน้าแรกเหมือนเดิม
+   * ใช้ชื่อ `backTo` ไม่ใช่ `returnTo` — `returnTo` ทำให้ StageBanner ขึ้นเบรดครัมบ์ "ใบนี้" ซึ่งผิดสำหรับกล่องงาน
+   */
+  const location = useLocation();
+  const [backTo] = React.useState(() => sanitizeUnitReturnTo((location.state as { backTo?: unknown } | null)?.backTo) ?? '/');
 
   /**
    * 🔴 **กดอะไรในกล่องงานห้ามเด้งออกไปหน้าจับคู่งานหรือหน้าใบขอ** (เจ้าของสั่ง 27 ก.ย. 2569:
@@ -1468,7 +1476,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
         <PageHeader
           title={staffTitle}
           subtitle={staffSubtitle}
-          backPath="/"
+          backPath={backTo}
           afterTitle={staffTabs}
           /* ชื่อหน้าถอดออก เหลือ ← + แท็บ (เจ้าของสั่ง 4 ต.ค. 2569 "เอาชื่อหน้าออกดีกว่าดูเยอะไป") */
           hideTitle={Boolean(staffTabs)}

@@ -51,7 +51,11 @@ describe('หน้าใบขอ: คนกรอกต่อใบ + ตั�
     expect(q.getAll('a.job')).toEqual(['siamraj-sql:OPL6808001']);
     expect(q.get('joball')).toBe('siamraj-sql:OPL6808001');
     const page = readFileSync('src/pages/jobs/JobListPage.tsx', 'utf8');
-    expect(page).toContain('navigate(boardApplicantsPathOfJob(applicantKeyIdx.get(j.id)?.key ?? j.id))');
+    expect(page).toContain('navigate(boardApplicantsPathOfJob(applicantKeyIdx.get(j.id)?.key ?? j.id), { state: { backTo: returnTo } })');
+    // ← บนกล่องงานกลับหน้าใบขอเดิม (เจ้าของ 16 พ.ย. 2569 "ทำไมเวลากดย้อนกลับถึงไม่กลับหน้าเดิม")
+    const board = readFileSync('src/components/jobs/JobBoardView.tsx', 'utf8');
+    expect(board).toContain('backPath={backTo}');
+    expect(board).toContain("sanitizeUnitReturnTo((location.state as { backTo?: unknown } | null)?.backTo) ?? '/'");
   });
 
   it('หน้าใบขอ: ยอดตัวเดียวกับกล่องงาน · มีตัวกรอง · โหลดไม่ได้บอกบนจอ', () => {

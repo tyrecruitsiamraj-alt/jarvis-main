@@ -235,8 +235,8 @@ const JobListPage: React.FC = () => {
   );
   /** กดเลขคนกรอก = แท็บผู้สมัครของกล่องงาน กรองใบนั้น ขึ้นทุกคน เลขตรงกับคอลัมน์ (16 พ.ย. 2569) */
   const openApplicantsOfJob = useCallback(
-    (j: JobRequest) => navigate(boardApplicantsPathOfJob(applicantKeyIdx.get(j.id)?.key ?? j.id)),
-    [navigate, applicantKeyIdx],
+    (j: JobRequest) => navigate(boardApplicantsPathOfJob(applicantKeyIdx.get(j.id)?.key ?? j.id), { state: { backTo: returnTo } }),
+    [navigate, applicantKeyIdx, returnTo],
   );
 
   /**
