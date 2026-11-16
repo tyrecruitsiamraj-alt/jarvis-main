@@ -62,7 +62,7 @@ describe('การ์ดในภาพรวม', () => {
     expect(body.indexOf('<SoPostGroupsCard from={win.from} to={win.to} bu={data.bu} buChoices={data.buChoices} />')).toBeGreaterThan(body.indexOf('{channelCard}'));
     const card = readFileSync('src/components/dashboard-trends/stuck/SoPostGroupsCard.tsx', 'utf8');
     expect(card).toContain('ดึงผลโพสต์จาก So Scraping ไม่ได้');
-    expect(card).toContain('title="5. โพสต์ลงกลุ่ม Facebook"');
+    expect(card).toContain("title = '5. โพสต์ลงกลุ่ม Facebook'");
     expect(readFileSync('src/lib/soPostGroupsApi.ts', 'utf8')).not.toContain('x-api-key');
   });
 });

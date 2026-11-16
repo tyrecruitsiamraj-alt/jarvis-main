@@ -558,6 +558,14 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
   /** บวกหนึ่งเพื่อสั่งโหลดประกาศใหม่ — ใช้หลังสร้าง/แก้ประกาศ ไม่งั้นชิปช่องทางกับปุ่มแก้ไขไม่อัปเดตจนรีเฟรชหน้า */
   const [postingsRev, setPostingsRev] = useState(0);
   /**
+   * แท็บภาพรวมไม่ใช้ประกาศของกล่องงาน — ยังไม่โหลดจนกว่าจะไปแท็บอื่น (เจ้าของ 16 พ.ย. 2569 "แก้ข้อ 3" หน้าภาพรวมเปิดช้า ·
+   * วัดบนเว็บจริง: ประกาศทั้งก้อน 5 วิ ยิงพร้อมก้อนภาพรวม ⇒ ภาพรวมจาก 2 วิ กลายเป็น 6.4 วิ) · โหลดแล้วไม่ทิ้ง
+   */
+  const [postingsWanted, setPostingsWanted] = useState(view !== 'dashboard');
+  useEffect(() => {
+    if (view !== 'dashboard') setPostingsWanted(true);
+  }, [view]);
+  /**
    * คำขอล่าสุดไป So Scraping ต่อใบ (เจ้าของ 20 ต.ค. 2569: *"สั่งแล้วดูไม่ได้จะตามงานยังไง"*) — ป้ายบนการ์ด + หัวข้อกรอง
    * `null` = ยังโหลดไม่มา/โหลดไม่ได้ (หัวข้อกรองไม่โผล่ · การ์ดไม่มีป้าย) · ปิดป๊อปแล้วโหลดใหม่ (ตาม postingsRev)
    */
@@ -1192,7 +1200,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
   const [deepLinkHandled, setDeepLinkHandled] = useState(false);
 
   useEffect(() => {
-    if (!isStaff) return;
+    if (!isStaff || !postingsWanted) return;
     let cancelled = false;
     setPostingsState('loading');
     fetchRecruitPostings()
@@ -1213,7 +1221,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [isStaff, postingsRev]);
+  }, [isStaff, postingsRev, postingsWanted]);
 
   /** ประเภทกล่องลอย (แก้ได้ที่ ตั้งค่าบอร์ด › ประเภทกล่อง · 14 ต.ค. 2569) — ที่ปิดแล้วยังโชว์ถ้ายังมีประกาศอยู่ */
   const allPostingKinds = useRecruitPostingKinds();

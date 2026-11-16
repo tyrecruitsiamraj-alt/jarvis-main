@@ -389,7 +389,7 @@ export default function RecruitTopicsView({
         );
       }
       case 'fb':
-        return posts ? <SoPostGroupsCard key={`${postKey}:${selBu}`} from={win.from} to={win.to} bu={selBu} initialData={posts[selBu]?.fb ?? undefined} /> : <Skeleton className="h-64 rounded-2xl" />;
+        return posts ? <SoPostGroupsCard key={`${postKey}:${selBu}`} title={TOPIC_TITLES.fb} from={win.from} to={win.to} bu={selBu} initialData={posts[selBu]?.fb ?? undefined} /> : <Skeleton className="h-64 rounded-2xl" />;
       case 'self':
         return posts?.[selBu]?.links === null ? <SectionError message={W.loadFailed} /> : posts ? (
           <SelfLinksPanel rows={posts[selBu]?.links ?? []} onOpenRequest={(jobId) => navigate(requestPathOfJobId(jobId))} />

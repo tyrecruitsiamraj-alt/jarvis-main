@@ -70,8 +70,11 @@ export default function SoPostGroupsCard({
   buChoices,
   prevRange,
   initialData,
+  title = '5. โพสต์ลงกลุ่ม Facebook',
 }: {
   initialData?: SoPostGroups;
+  /** หัวการ์ด — โฉมก่อนหน้าเป็นการ์ดที่ 5 · หน้า 8 เรื่องเป็นเรื่องที่ 3 ใช้ชื่อเรื่องไม่มีเลข (เจ้าของ 16 พ.ย. 2569 "แก้ข้อ 1") */
+  title?: string;
   from: string;
   to: string;
   /** BU ที่ภาพรวมเลือกอยู่ (null = ไม่ได้เลือก) */
@@ -160,7 +163,7 @@ export default function SoPostGroupsCard({
   const n = cells.length || 8;
 
   return (
-    <OverviewCard icon={Send} title="5. โพสต์ลงกลุ่ม Facebook" sub={sub} actions={buSelect}>
+    <OverviewCard icon={Send} title={title} sub={sub} actions={buSelect}>
       {state.error ? (
         <div className={cn('flex flex-wrap items-center justify-between gap-2 rounded-xl border px-3 py-2', TONE.warn.soft)} data-testid="so-post-groups-error">
           <div className="min-w-0">
