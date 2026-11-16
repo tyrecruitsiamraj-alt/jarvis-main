@@ -29,7 +29,7 @@ import JobUrgencyBadge from '@/components/jobs/JobUrgencyBadge';
 import UnitRequestReplacementBadge from '@/components/jobs/UnitRequestReplacementBadge';
 import RequestGapsLine from '@/components/jobs/RequestGapsLine';
 import { matchesRequestGapFilter, REQUEST_GAP_FILTER_OPTIONS } from '@/lib/publishReadiness';
-import { APPLICANT_PRESENCE_FILTER_OPTIONS, applicantsListPathOfJob, matchesApplicantPresenceFilter } from '@/lib/jobListApplicants';
+import { APPLICANT_PRESENCE_FILTER_OPTIONS, matchesApplicantPresenceFilter } from '@/lib/jobListApplicants';
 import { fetchJobApplicationCounts } from '@/lib/publicApplicationsApi';
 import { buildJobKeyIndex } from '@/lib/jobKeyIndex';
 import PrequestBadge from '@/components/jobs/PrequestBadge';
@@ -233,9 +233,13 @@ const JobListPage: React.FC = () => {
     (j: JobRequest): number | null => (applicantCounts ? (applicantKeyIdx.get(j.id)?.n ?? 0) : null),
     [applicantCounts, applicantKeyIdx],
   );
+  /**
+   * กดเลขคนกรอก = แท็บผู้สมัครของหน้ารายละเอียดใบขอ — ขึ้นทุกคนของใบนั้น เลขตรงกับคอลัมน์
+   * (16 พ.ย. 2569 · เดิมพาไปแท็บผู้สมัครของงานสรรหา ซึ่งซ่อนคนที่มีคนเก็บไปแล้ว: OPL6808001 ขึ้น 3 กดเข้าไปเห็น 1)
+   */
   const openApplicantsOfJob = useCallback(
-    (j: JobRequest) => navigate(applicantsListPathOfJob(applicantKeyIdx.get(j.id)?.key ?? j.id)),
-    [navigate, applicantKeyIdx],
+    (j: JobRequest) => navigateToUnitRequest(j, navigate, { returnTo, tab: 'applicants' }),
+    [navigate, returnTo],
   );
 
   /**

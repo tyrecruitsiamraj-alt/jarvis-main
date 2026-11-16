@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { applicantsListPathOfJob, matchesApplicantPresenceFilter } from '../../src/lib/jobListApplicants';
+import { matchesApplicantPresenceFilter } from '../../src/lib/jobListApplicants';
 import { buildJobListSearchParams, parseJobListSearchParams, JOB_LIST_DEFAULTS } from '../../src/lib/jobListPageState';
 import { compareJobsByTableColumn, JOB_LIST_TABLE_COLUMN_LABEL } from '../../src/lib/jobListTableSort';
 import type { JobRequest } from '@/types';
@@ -42,8 +42,10 @@ describe('หน้าใบขอ: คนกรอกต่อใบ + ตั�
     expect(asc.map((j) => j.id)).toEqual(['d', 'a', 'b', 'c']);
   });
 
-  it('กดเลขแล้วไปรายชื่อทั้งหมดของใบนั้น', () => {
-    expect(applicantsListPathOfJob('siamraj-sql:OPL6808001')).toBe('/jobs/board?view=list&list=all&a.job=siamraj-sql%3AOPL6808001');
+  it('กดเลข = แท็บผู้สมัครของหน้ารายละเอียดใบขอ (ขึ้นทุกคน เลขตรงคอลัมน์ · OPL6808001 เคยขึ้น 3 เห็น 1)', () => {
+    const page = readFileSync('src/pages/jobs/JobListPage.tsx', 'utf8');
+    expect(page).toContain("navigateToUnitRequest(j, navigate, { returnTo, tab: 'applicants' })");
+    expect(page).not.toContain('applicantsListPathOfJob');
   });
 
   it('หน้าใบขอ: ยอดตัวเดียวกับกล่องงาน · มีตัวกรอง · โหลดไม่ได้บอกบนจอ', () => {

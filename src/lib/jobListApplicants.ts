@@ -4,8 +4,6 @@
  * ยอดตัวเดียวกับกล่องงาน — `/api/job-applications?counts=1` ผ่านตัวเทียบสองคีย์ (`jobKeyIndex`) ห้ามนับเองอีกที่
  * 🔴 ยังโหลดยอดไม่ได้ = null ห้ามยุบเป็น 0 (ใบจะไปโผล่ใน "ยังไม่มีคนกรอก" ทั้งที่มีคน)
  */
-import { APPLICANT_FILTER_PARAM_PREFIX } from './applicantFilters';
-
 export const APPLICANT_PRESENCE_FILTER_VALUES = ['none', 'some'] as const;
 export type ApplicantPresenceFilter = (typeof APPLICANT_PRESENCE_FILTER_VALUES)[number];
 
@@ -22,11 +20,4 @@ export function matchesApplicantPresenceFilter(
   if (filter.length === 0) return true;
   if (count == null) return false;
   return filter.includes(count > 0 ? 'some' : 'none');
-}
-
-/** กดเลขคนกรอก = แท็บรายชื่อผู้สมัครของใบนั้น (ทุกรายชื่อ) — ทางเดียวกับปุ่ม "ดูรายชื่อ" บนกล่องงาน */
-export function applicantsListPathOfJob(jobKey: string): string {
-  const p = new URLSearchParams({ view: 'list', list: 'all' });
-  p.append(`${APPLICANT_FILTER_PARAM_PREFIX}job`, jobKey);
-  return `/jobs/board?${p.toString()}`;
 }
