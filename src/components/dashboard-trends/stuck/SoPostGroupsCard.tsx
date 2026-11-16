@@ -1,8 +1,10 @@
 import React from 'react';
 import { ChevronDown, ExternalLink, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
+import { APP_DEPARTMENT_CODES } from '@/lib/departmentCodes';
 import { DASH, TONE } from '@/lib/designTokens';
 import { formatDateTimeTh, formatYmdTh } from '@/lib/dateTh';
 import { friendlyErrorText } from '@/lib/friendlyError';
@@ -20,7 +22,23 @@ import TrendDelta from './TrendDelta';
  *   (เผยแพร่แล้ว · รอดำเนินการ · ปฏิเสธแล้ว · ลบออกแล้ว · ไม่สำเร็จ · ไม่ได้โพสต์ · รอคิว) — 🔴 อ่านคำจาก `statuses` เสมอ ห้ามฝังรายการคำใน Jarvis
  * แถวในตาราง: ป้าย = `status_label` · เหตุ = `error` ตรง ๆ · สีป้ายตามรหัส (รหัสที่ไม่รู้จัก = สีกลาง)
  * กดช่องสถานะ (เจ้าของ 12 พ.ย. 2569 "ไม่ได้โพสต์ 909 กดแล้วดูเหตุได้ไหม") = ตารางเหลือสถานะนั้น + เหตุจัดกลุ่มนับ · กดซ้ำ/กดสั่งทั้งหมด = ทุกแถว
+ * BU (16 พ.ย. 2569 · จอเคยบอก "ทุก BU" แต่ได้แค่ SN): ชื่อ BU ใต้หัว = `meta.bu` ที่เซิร์ฟเวอร์ส่งไป So Scraping จริง
+ *   ตัวเลือก BU บนการ์ด: สิทธิ์ครบทุก BU = "ทุก BU" + ทีละ BU · หลาย BU ไม่ครบ = ทีละ BU (ค่าเริ่ม BU แรก) · BU เดียว = ไม่มีตัวเลือก
+ *   ตัวเลือกอยู่ตั้งแต่เปิดการ์ด (รู้จาก `buChoices` ของภาพรวม) · เซิร์ฟเวอร์ยังเช็กสิทธิ์ทุกครั้ง
  */
+
+const ALL_BU = '__all__';
+
+/** ตัวเลือก BU ของการ์ด จากข้อมูลภาพรวม — null = ไม่มีตัวเลือก (BU เดียว) */
+export function soPostBuPicker(overviewBu: string | null, buChoices: string[] | null | undefined): { choices: string[]; allowAll: boolean } | null {
+  if (buChoices && buChoices.length > 1) {
+    const allowAll = APP_DEPARTMENT_CODES.every((c) => buChoices.includes(c));
+    return { choices: buChoices, allowAll };
+  }
+  // ไม่มีชุดตัวเลือกและภาพรวมไม่ได้ล็อก BU = แอดมินที่เห็นทุก BU
+  if (!buChoices && overviewBu === null) return { choices: [...APP_DEPARTMENT_CODES], allowAll: true };
+  return null;
+}
 
 /** ไม่ได้โพสต์ 3 แบบ (เครื่อง/บัญชี/ไม่ทราบสาเหตุ) แดงเหมือน "ไม่สำเร็จ" — เจ้าของสั่ง 12 พ.ย. 2569 */
 export const SO_POST_STATUS_TONE: Record<string, keyof typeof TONE> = {
@@ -49,13 +67,20 @@ export default function SoPostGroupsCard({
   from,
   to,
   bu,
-  prev,
+  buChoices,
+  prevRange,
 }: {
   from: string;
   to: string;
+  /** BU ที่ภาพรวมเลือกอยู่ (null = ไม่ได้เลือก) */
   bu: string | null;
-  /** ยอดช่วงก่อน (13 พ.ย. 2569 เทียบเพิ่มขึ้น/ลดลง) — ไม่ส่ง = ไม่มีป้ายเทียบ · null = ดึงช่วงก่อนไม่ได้ ("เทียบไม่ได้") */
-  prev?: SoPostPrevCounts | null;
+  /** BU ที่ผู้ใช้หลาย BU สลับได้ (จากภาพรวม) — ใช้ตัดสินว่ามีตัวเลือกบนการ์ดไหม */
+  buChoices?: string[] | null;
+  /**
+   * ช่วงก่อน (13 พ.ย. 2569 เทียบเพิ่มขึ้น/ลดลง) — ไม่ส่ง = ไม่มีป้ายเทียบ · null = เทียบไม่ได้ (ก่อนเริ่มสั่ง)
+   * การ์ดดึงยอดช่วงก่อนเองด้วย BU ที่เลือกบนการ์ด (16 พ.ย. 2569 — เลือก LBD ต้องเทียบกับ LBD ช่วงก่อน ไม่ใช่ทุก BU)
+   */
+  prevRange?: { from: string; to: string } | null;
 }) {
   const [page, setPage] = React.useState(1);
   const [rev, setRev] = React.useState(0);
@@ -64,21 +89,59 @@ export default function SoPostGroupsCard({
   const [folded, setFolded] = React.useState<Set<string>>(() => new Set());
   const [state, setState] = React.useState<{ data: (SoPostGroups & Partial<SoPostGroupsFiltered>) | null; error: string | null; loading: boolean }>({ data: null, error: null, loading: true });
 
+  const picker = React.useMemo(() => soPostBuPicker(bu, buChoices), [bu, buChoices]);
+  /** BU ที่เลือกบนการ์ด — ค่าเริ่ม = ที่ภาพรวมเลือก · ไม่ได้เลือก: ครบทุก BU = ทุก BU · ไม่ครบ = BU แรก */
+  const initialBu = bu ?? (picker && !picker.allowAll ? picker.choices[0] : null);
+  const [cardBu, setCardBu] = React.useState<string | null>(initialBu);
+  React.useEffect(() => setCardBu(initialBu), [initialBu]);
+
+  const prevFrom = prevRange?.from ?? null;
+  const prevTo = prevRange?.to ?? null;
+  const [prev, setPrev] = React.useState<SoPostPrevCounts | null | undefined>(prevRange === undefined ? undefined : null);
+  React.useEffect(() => {
+    if (prevRange === undefined) return setPrev(undefined);
+    if (!prevFrom || !prevTo) return setPrev(null);
+    let alive = true;
+    fetchSoPostGroups({ from: prevFrom, to: prevTo, bu: cardBu, page: 1 })
+      .then((p) => alive && setPrev({ total: p.total, counts: p.counts }))
+      .catch(() => alive && setPrev(null));
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- ใช้แค่ว่าส่ง prevRange มาไหม (ค่าวันอยู่ใน prevFrom/prevTo)
+  }, [prevRange === undefined, prevFrom, prevTo, cardBu]);
+
   // เปลี่ยนช่วง/BU/สถานะที่กด = กลับหน้าแรก
-  React.useEffect(() => setPage(1), [from, to, bu, statusPick]);
+  React.useEffect(() => setPage(1), [from, to, cardBu, statusPick]);
   React.useEffect(() => {
     let alive = true;
     setState((s) => ({ ...s, error: null, loading: true }));
-    fetchSoPostGroups({ from, to, bu, page, status: statusPick })
+    fetchSoPostGroups({ from, to, bu: cardBu, page, status: statusPick })
       .then((data) => alive && setState({ data, error: null, loading: false }))
       .catch((e: unknown) => alive && setState({ data: null, error: friendlyErrorText(e, 'ติดต่อ So Scraping ไม่ได้'), loading: false }));
     return () => {
       alive = false;
     };
-  }, [from, to, bu, page, rev, statusPick]);
+  }, [from, to, cardBu, page, rev, statusPick]);
 
   const d = state.data;
-  const sub = `${formatYmdTh(from)} – ${formatYmdTh(to)} · ${bu ?? 'ทุก BU'}`;
+  // ชื่อ BU = ที่เซิร์ฟเวอร์ส่งไป So Scraping จริง · ยังไม่ได้คำตอบ = ยังไม่บอก BU
+  const sub = `${formatYmdTh(from)} – ${formatYmdTh(to)}${d?.meta ? ` · ${d.meta.bu ?? 'ทุก BU'}` : ''}`;
+  const buSelect = picker ? (
+    <Select value={cardBu ?? ALL_BU} onValueChange={(v) => setCardBu(v === ALL_BU ? null : v)}>
+      <SelectTrigger className="h-9 w-32 text-sm" aria-label="BU" data-testid="so-post-bu">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        {picker.allowAll ? <SelectItem value={ALL_BU}>ทุก BU</SelectItem> : null}
+        {picker.choices.map((c) => (
+          <SelectItem key={c} value={c}>
+            {c}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  ) : null;
   const cells: Array<{ key: string; label: string; n: number | null; tone?: keyof typeof TONE }> = d
     ? [{ key: 'total', label: 'สั่งทั้งหมด', n: d.total }, ...d.statuses.map((st) => ({ key: st.key, label: soPostCellLabel(st), n: d.counts[st.key] ?? 0, tone: SO_POST_STATUS_TONE[st.key] }))]
     : [];
@@ -89,7 +152,7 @@ export default function SoPostGroupsCard({
   const n = cells.length || 8;
 
   return (
-    <OverviewCard icon={Send} title="5. โพสต์ลงกลุ่ม Facebook" sub={sub}>
+    <OverviewCard icon={Send} title="5. โพสต์ลงกลุ่ม Facebook" sub={sub} actions={buSelect}>
       {state.error ? (
         <div className={cn('flex flex-wrap items-center justify-between gap-2 rounded-xl border px-3 py-2', TONE.warn.soft)} data-testid="so-post-groups-error">
           <div className="min-w-0">

@@ -59,7 +59,7 @@ describe('เรียก So Scraping จาก server', () => {
 describe('การ์ดในภาพรวม', () => {
   it('ต่อจากข้อ 4 · ช่วง/BU ตามภาพรวม · ดึงไม่ได้ = การ์ดยังอยู่ + ลองใหม่ · key ไม่ออกหน้าจอ', () => {
     const body = readFileSync('src/components/dashboard-trends/stuck/RecruitStuckBody.tsx', 'utf8');
-    expect(body.indexOf('<SoPostGroupsCard from={win.from} to={win.to} bu={data.bu} />')).toBeGreaterThan(body.indexOf('{channelCard}'));
+    expect(body.indexOf('<SoPostGroupsCard from={win.from} to={win.to} bu={data.bu} buChoices={data.buChoices} />')).toBeGreaterThan(body.indexOf('{channelCard}'));
     const card = readFileSync('src/components/dashboard-trends/stuck/SoPostGroupsCard.tsx', 'utf8');
     expect(card).toContain('ดึงผลโพสต์จาก So Scraping ไม่ได้');
     expect(card).toContain('title="5. โพสต์ลงกลุ่ม Facebook"');

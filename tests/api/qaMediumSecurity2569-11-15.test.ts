@@ -14,8 +14,9 @@ const read = (p: string) => readFileSync(p, 'utf8');
 describe('ผลโพสต์กลุ่ม Facebook เห็นเฉพาะ BU ในสิทธิ์', () => {
   it('so-post-groups ใช้ BU จากสิทธิ์ · so-post-summary กรองใบขอตามสิทธิ์', () => {
     const g = read('api/_handlers/so-post-groups.ts');
-    expect(g).toContain('pickDashboardBuSet(await loadMatchingBuScope(req.user), buRaw || null)');
-    expect(g).toContain('bu: buSet === null ? buRaw || null : bu ?? buSet[0]');
+    // 16 พ.ย. 2569: ตัวเลือก BU ย้ายไป soPostBuOf (เทสต์ handler ครบ 3 แบบสิทธิ์อยู่ soPostGroupsBu2569-11-16)
+    expect(g).toContain('soPostBuOf(await loadMatchingBuScope(req.user), buRaw || null)');
+    expect(g).toContain('pickDashboardBuSet(scope, raw)');
     const s = read('api/_handlers/so-post-summary.ts');
     expect(s).toContain('loadScopedRequestNoSet(req.user)');
     expect(s).toContain('all.rows.filter((r) => r.requestNo && scoped.has(r.requestNo))');

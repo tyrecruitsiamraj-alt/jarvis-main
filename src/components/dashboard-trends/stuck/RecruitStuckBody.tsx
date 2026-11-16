@@ -280,7 +280,15 @@ export default function RecruitStuckBody({
             </OverviewCard>
           );
         case 'fb':
-          return <SoPostGroupsCard from={win.from} to={win.to} bu={data.bu} prev={posts.soPrev} />;
+          return (
+            <SoPostGroupsCard
+              from={win.from}
+              to={win.to}
+              bu={data.bu}
+              buChoices={data.buChoices}
+              prevRange={!win.all && comparableSince(win.prevFrom, SO_POST_SINCE) ? { from: win.prevFrom, to: win.prevTo } : null}
+            />
+          );
         case 'self':
           return <ManualPostDaysCard from={win.from} to={win.to} bu={data.bu} prev={posts.manualPrev} prevFrom={win.prevFrom} />;
         case 'area':
@@ -368,7 +376,7 @@ export default function RecruitStuckBody({
         {bringerCard}
         {channelCard}
         {/* 5. โพสต์ลงกลุ่ม Facebook จาก So Scraping (เจ้าของ 11 พ.ย. 2569) — ช่วง/BU ตามภาพรวม ไม่ตามตัวกรองย่อย (ข้อมูลอยู่ฝั่ง So Scraping) */}
-        <SoPostGroupsCard from={win.from} to={win.to} bu={data.bu} />
+        <SoPostGroupsCard from={win.from} to={win.to} bu={data.bu} buChoices={data.buChoices} />
         {/* 6. โพสต์เอง รายวัน (เจ้าของ 13 พ.ย. 2569) — ช่วง/BU ตามภาพรวม */}
         <ManualPostDaysCard from={win.from} to={win.to} bu={data.bu} />
         {stuck.data?.requests ? (

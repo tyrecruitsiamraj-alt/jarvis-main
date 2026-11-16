@@ -37,6 +37,11 @@ export type SoPostGroups = {
   reasonGroups: SoPostGroupStatus[];
   counts: Record<string, number>;
   rows: SoPostGroupRow[];
+  /**
+   * BU ที่เซิร์ฟเวอร์ Jarvis ส่งไป So Scraping จริง (16 พ.ย. 2569) — จอเขียนชื่อ BU จากตรงนี้ ไม่ใช่จากที่ขอ
+   * `bu` null = ทุก BU · `choices` null = ล็อก BU เดียว · `allowAll` = มีตัวเลือก "ทุก BU"
+   */
+  meta?: { bu: string | null; choices: string[] | null; allowAll: boolean };
 };
 
 export const SO_POST_GROUPS_PAGE_SIZE = 10;
