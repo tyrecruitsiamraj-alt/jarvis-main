@@ -43,6 +43,8 @@ describe('การ์ดกล่องลอย', () => {
   it('มีปุ่มดูรายชื่อจริง + กล่องโพสต์เองกล่องเดียว · ไม่มีกล่อง Autopost/Scrap', () => {
     const v = readFileSync('src/components/jobs/JobBoardView.tsx', 'utf8');
     expect(v).toContain('openApplicantsOfKind(k.code)');
+    // ดูรายชื่อ = รายชื่อทั้งหมด (ทั้งการ์ดใบขอและกล่องลอย) ไม่ใช่ค่าเริ่ม "รายชื่อคนที่สนใจ"
+    expect(v.match(/params\.set\('list', 'all'\);/g)).toHaveLength(2);
     expect(v).toMatch(/<BoardCardActions\s+manualOnly/);
     const d = readFileSync('src/components/jobs/JobPostActionsDialog.tsx', 'utf8');
     expect(d).toContain(".filter((x) => !standalone || x.key === 'manual')");

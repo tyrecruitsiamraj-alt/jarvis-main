@@ -674,6 +674,8 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
       }
       params.set('view', 'list');
       params.delete('tab');
+      // รายชื่อทั้งหมด (16 พ.ย. 2569) — ค่าเริ่มของแท็บผู้สมัครเป็น "รายชื่อคนที่สนใจ" ตั้งแต่ 14 ต.ค. ทำให้ใบที่ยังไม่มีคนสนใจกดแล้วขึ้น 0
+      params.set('list', 'all');
       params.append(`${APPLICANT_FILTER_PARAM_PREFIX}job`, key);
       setSearchParams(params);
     },
@@ -688,6 +690,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
       }
       params.set('view', 'list');
       params.delete('tab');
+      params.set('list', 'all');
       params.append(`${APPLICANT_FILTER_PARAM_PREFIX}job`, standaloneJobValue(kind));
       setSearchParams(params);
     },
