@@ -30,6 +30,7 @@ export const JOB_LIST_TABLE_COLUMNS = [
   'submitted',
   'required',
   'remaining',
+  'applicants',
   'request_type',
   'position',
   'subtype',
@@ -51,6 +52,7 @@ export const JOB_LIST_TABLE_COLUMN_LABEL: Record<JobListTableColumn, string> = {
   submitted: 'วันที่กรอก',
   required: 'วันที่ต้องการ',
   remaining: 'เหลือหา',
+  applicants: 'คนกรอก',
   request_type: 'ประเภทใบขอ',
   position: 'ตำแหน่ง',
   subtype: 'ลักษณะงานย่อย',
@@ -72,6 +74,7 @@ export function defaultDirForColumn(column: JobListTableColumn): JobListTableSor
     case 'submitted':
     case 'required':
     case 'remaining':
+    case 'applicants':
     case 'send_replacement':
       return 'desc';
     default:
@@ -117,12 +120,20 @@ function ymdVal(v: string | null | undefined): SortValue {
 }
 
 /** ค่าที่ใช้เทียบของแต่ละคอลัมน์ — ว่าง = `{}` (ตกท้ายเสมอ) */
+/** ค่าที่อยู่นอกใบขอ — ยอดคนกรอกมาจาก API แยก (null = ยังไม่รู้ ตกท้าย) */
+export type JobListSortContext = { applicantCount?: (job: JobRequest) => number | null };
+
 export function tableSortValue(
   job: JobRequest,
   column: JobListTableColumn,
   today = new Date(),
+  ctx: JobListSortContext = {},
 ): SortValue {
   switch (column) {
+    case 'applicants': {
+      const n = ctx.applicantCount?.(job);
+      return n == null ? {} : { num: n };
+    }
     case 'request_no':
       return textVal(job.request_no);
     case 'age': {
@@ -200,9 +211,10 @@ export function compareJobsByTableColumn(
   b: JobRequest,
   sort: JobListTableSort,
   today = new Date(),
+  ctx: JobListSortContext = {},
 ): number {
-  const va = tableSortValue(a, sort.column, today);
-  const vb = tableSortValue(b, sort.column, today);
+  const va = tableSortValue(a, sort.column, today, ctx);
+  const vb = tableSortValue(b, sort.column, today, ctx);
   const aEmpty = va.num == null && va.text == null;
   const bEmpty = vb.num == null && vb.text == null;
   if (aEmpty && bEmpty) return tieBreak(a, b);

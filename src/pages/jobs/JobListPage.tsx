@@ -29,6 +29,9 @@ import JobUrgencyBadge from '@/components/jobs/JobUrgencyBadge';
 import UnitRequestReplacementBadge from '@/components/jobs/UnitRequestReplacementBadge';
 import RequestGapsLine from '@/components/jobs/RequestGapsLine';
 import { matchesRequestGapFilter, REQUEST_GAP_FILTER_OPTIONS } from '@/lib/publishReadiness';
+import { APPLICANT_PRESENCE_FILTER_OPTIONS, applicantsListPathOfJob, matchesApplicantPresenceFilter } from '@/lib/jobListApplicants';
+import { fetchJobApplicationCounts } from '@/lib/publicApplicationsApi';
+import { buildJobKeyIndex } from '@/lib/jobKeyIndex';
 import PrequestBadge from '@/components/jobs/PrequestBadge';
 import { UnitRequestNotePreview } from '@/components/jobs/UnitRequestNoteField';
 import { UnitRequestWorkStatusBadge } from '@/components/jobs/UnitRequestWorkStatusField';
@@ -81,6 +84,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { fetchSiamrajClosedRequests, fetchSiamrajUnitRequest } from '@/lib/siamrajUnitRequestsApi';
 import { friendlyErrorText } from '@/lib/friendlyError';
 import LoadErrorNotice from '@/components/shared/LoadErrorNotice';
+import { Button } from '@/components/ui/button';
 import { requestNoMatchesSearch } from '@/lib/siamrajRequestNo';
 import { getTotalPages } from '@/lib/pagination';
 import {
@@ -158,6 +162,7 @@ const JobListPage: React.FC = () => {
     sectorFilter,
     ageDaysFilter,
     gapFilter,
+    applicantFilter,
     sort,
     tableSort,
     page,
@@ -199,6 +204,41 @@ const JobListPage: React.FC = () => {
   });
 
   /**
+   * ยอดคนกรอกต่อใบ (เจ้าของ 16 พ.ย. 2569) — ตัวเดียวกับกล่องงาน · null = ยังโหลดไม่เสร็จ/โหลดไม่ได้ (ห้ามขึ้น 0)
+   * คีย์ของยอดเป็น job_id ฝั่งเรา (`sql:`) ⇒ เทียบสองคีย์ผ่าน jobKeyIndex เหมือนกล่องงาน
+   */
+  const [applicantCounts, setApplicantCounts] = useState<Record<string, number> | null>(null);
+  const [applicantCountsFailed, setApplicantCountsFailed] = useState(false);
+  const [applicantCountsRev, setApplicantCountsRev] = useState(0);
+  useEffect(() => {
+    let cancelled = false;
+    fetchJobApplicationCounts()
+      .then((c) => {
+        if (cancelled) return;
+        setApplicantCounts(c);
+        setApplicantCountsFailed(false);
+      })
+      .catch(() => {
+        if (!cancelled) setApplicantCountsFailed(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [applicantCountsRev]);
+  const applicantKeyIdx = useMemo(
+    () => buildJobKeyIndex(Object.entries(applicantCounts ?? {}).map(([k, n]) => [k, { key: k, n }] as const)),
+    [applicantCounts],
+  );
+  const applicantCountOf = useCallback(
+    (j: JobRequest): number | null => (applicantCounts ? (applicantKeyIdx.get(j.id)?.n ?? 0) : null),
+    [applicantCounts, applicantKeyIdx],
+  );
+  const openApplicantsOfJob = useCallback(
+    (j: JobRequest) => navigate(applicantsListPathOfJob(applicantKeyIdx.get(j.id)?.key ?? j.id)),
+    [navigate, applicantKeyIdx],
+  );
+
+  /**
    * จำนวนตัวกรองที่ถูกเลือกอยู่จริง — ใช้ทั้งป้ายบนหัวและตัดสินว่าจะกางกล่องไหม
    * ⚠️ `filter` (ใบขอเปิด/ปิด) ค่าตั้งต้นคือ 'active' จึงนับเฉพาะตอนถูกเปลี่ยน
    * ⚠️ แผนกที่ถูก**ล็อกด้วยสิทธิ์**ไม่นับ — ผู้ใช้ไม่ได้เลือกเอง และปลดไม่ได้
@@ -218,6 +258,7 @@ const JobListPage: React.FC = () => {
       sectorFilter,
       ageDaysFilter,
       gapFilter,
+      applicantFilter,
     ];
     let n = lists.reduce((acc, v) => acc + (Array.isArray(v) ? v.length : v ? 1 : 0), 0);
     /**
@@ -242,6 +283,7 @@ const JobListPage: React.FC = () => {
     sectorFilter,
     ageDaysFilter,
     gapFilter,
+    applicantFilter,
     filter,
   ]);
 
@@ -466,6 +508,7 @@ const JobListPage: React.FC = () => {
       if (!matchesAnyUnitSectorFilter(j.unit_sector, sectorFilter)) return false;
       if (!matchesAnyAgeDaysFilter(j, ageDaysFilter)) return false;
       if (!matchesRequestGapFilter(j, gapFilter)) return false;
+      if (!matchesApplicantPresenceFilter(applicantCountOf(j), applicantFilter)) return false;
         if (filter === 'all') return true;
         if (filter === 'closed') return j.status === 'closed';
         return j.status !== 'closed';
@@ -480,10 +523,10 @@ const JobListPage: React.FC = () => {
       // กดหัวคอลัมน์แล้วใช้อันนั้น (ทับ dropdown) — ไม่มีค่าก็ใช้ dropdown ตามเดิม
       .sort((a, b) =>
         tableSort
-          ? compareJobsByTableColumn(a, b, tableSort)
+          ? compareJobsByTableColumn(a, b, tableSort, undefined, { applicantCount: applicantCountOf })
           : compareJobsForListSort(a, b, sort),
       );
-  }, [scopedJobs, filter, search, unitFilter, recruiterFilter, screenerFilter, oplFilter, urgencyFilter, workStatusFilter, noteFilter, replacementFilter, sectorFilter, ageDaysFilter, gapFilter, sort, tableSort, unitScopeNames, lookupJob]);
+  }, [scopedJobs, filter, search, unitFilter, recruiterFilter, screenerFilter, oplFilter, urgencyFilter, workStatusFilter, noteFilter, replacementFilter, sectorFilter, ageDaysFilter, gapFilter, applicantFilter, applicantCountOf, sort, tableSort, unitScopeNames, lookupJob]);
 
   const totalPages = getTotalPages(filtered.length, pageSize);
 
@@ -566,6 +609,7 @@ const JobListPage: React.FC = () => {
       <div className="px-4 md:px-6 space-y-4">
         {wantClosed && closedLoading ? <p className="text-sm text-muted-foreground">กำลังโหลดใบที่ปิดแล้ว…</p> : null}
         {wantClosed && closedError ? <LoadErrorNotice message={closedError} onRetry={() => setClosedRev((n) => n + 1)} /> : null}
+        {applicantCountsFailed ? <LoadErrorNotice message="โหลดยอดคนกรอกไม่ได้" onRetry={() => setApplicantCountsRev((n) => n + 1)} /> : null}
         {loadError && (
           <div className="text-sm text-destructive rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2">
             {loadError}
@@ -774,6 +818,15 @@ const JobListPage: React.FC = () => {
             options={REQUEST_GAP_FILTER_OPTIONS}
           />
 
+          <FilterMultiSelect
+            id="job-list-applicants"
+            label="คนกรอก"
+            summaryNoun="แบบ"
+            values={applicantFilter}
+            onChange={(v) => updateListState({ applicantFilter: v as typeof applicantFilter })}
+            options={APPLICANT_PRESENCE_FILTER_OPTIONS}
+          />
+
           {/* dropdown กับการกดหัวคอลัมน์เป็นตัวเรียง**คนละตัว** — เลือก dropdown = ล้าง
               การเรียงจากคอลัมน์ทิ้ง เพื่อให้มีตัวที่มีผลจริงทีละหนึ่งตัวเท่านั้น */}
           <FilterSelect
@@ -849,6 +902,7 @@ const JobListPage: React.FC = () => {
                       <td className="px-1.5 py-3"><Skeleton className="h-3 w-20" /></td>
                       <td className="px-1.5 py-3"><Skeleton className="h-3 w-20" /></td>
                       <td className="px-1.5 py-3 text-center"><Skeleton className="h-3 w-6 mx-auto" /></td>
+                      <td className="px-1.5 py-3 text-center"><Skeleton className="h-3 w-6 mx-auto" /></td>
                       <td className="px-1.5 py-3"><Skeleton className="h-3 w-24" /></td>
                       <td className="px-1.5 py-3"><Skeleton className="h-3 w-24" /></td>
                       <td className="px-1.5 py-3"><Skeleton className="h-3 w-20" /></td>
@@ -911,6 +965,7 @@ const JobListPage: React.FC = () => {
                       {j.filled_positions != null ? ` · หาได้ ${j.filled_positions}` : ''}
                       {' · เหลือหา '}
                       {remainingPositionsOf(j)}
+                      {` · คนกรอก ${applicantCountOf(j) ?? '—'}`}
                     </span>
                   </div>
                   <RequestGapsLine job={j} className="mt-1" />
@@ -1004,6 +1059,7 @@ const JobListPage: React.FC = () => {
                       ['submitted', 'left'],
                       ['required', 'left'],
                       ['remaining', 'center'],
+                      ['applicants', 'center'],
                       ['request_type', 'left'],
                       ['position', 'left'],
                       ['subtype', 'left'],
@@ -1108,6 +1164,27 @@ const JobListPage: React.FC = () => {
                     <td className={cn('px-1.5 py-3 text-xs whitespace-nowrap', DASH.cellMuted)}>{formatYmdDmyBe(j.required_date)}</td>
                     <td className={cn('px-1.5 py-3 text-center text-xs tabular-nums whitespace-nowrap', DASH.cellStrong)}>
                       {remainingPositionsOf(j)}
+                    </td>
+                    {/* คนกรอก (16 พ.ย. 2569) — กดเลขไปรายชื่อของใบนั้น · ยังไม่รู้ยอด = ขีด ไม่ใช่ 0 */}
+                    <td className="px-1.5 py-3 text-center text-xs tabular-nums whitespace-nowrap">
+                      {(() => {
+                        const n = applicantCountOf(j);
+                        if (n == null) return <span className={DASH.cellMuted}>—</span>;
+                        return (
+                          <Button
+                            type="button"
+                            variant="link"
+                            size="sm"
+                            className="h-auto p-0 text-xs tabular-nums"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openApplicantsOfJob(j);
+                            }}
+                          >
+                            {n.toLocaleString('en-US')}
+                          </Button>
+                        );
+                      })()}
                     </td>
                     <td className={cn('px-1.5 py-3 text-xs', DASH.cellMuted)}>{requestActionOrTypeLabel(j)}</td>
                     <td className={cn('px-1.5 py-3 text-xs', DASH.cellMuted)}>{j.job_description_code_1 || '—'}</td>

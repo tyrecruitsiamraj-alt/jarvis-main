@@ -7,6 +7,7 @@ import {
   type JobListTableSort,
 } from '@/lib/jobListTableSort';
 import { REQUEST_GAP_FILTER_VALUES, type RequestGapFilterValue } from '@/lib/publishReadiness';
+import { APPLICANT_PRESENCE_FILTER_VALUES, type ApplicantPresenceFilter } from '@/lib/jobListApplicants';
 import {
   isUnitRequestWorkStatus,
   type UnitRequestWorkStatus,
@@ -38,6 +39,8 @@ export type JobListPageState = {
   ageDaysFilter: JobListAgeDaysFilter;
   /** ข้อมูลใบขอครบ/ขาดอะไร (เจ้าของ 3 พ.ย. 2569) — [] = ทั้งหมด */
   gapFilter: RequestGapFilterValue[];
+  /** ยังไม่มีคนกรอก / มีคนกรอกแล้ว (เจ้าของ 16 พ.ย. 2569) — [] = ทั้งหมด */
+  applicantFilter: ApplicantPresenceFilter[];
   sort: JobListSort;
   /**
    * เรียงจาก**การกดหัวคอลัมน์** — null = ใช้ `sort` (dropdown) ตามเดิม
@@ -65,6 +68,7 @@ export const JOB_LIST_DEFAULTS: JobListPageState = {
   sectorFilter: [],
   ageDaysFilter: [],
   gapFilter: [],
+  applicantFilter: [],
   sort: 'assignee_age',
   tableSort: null,
   page: 1,
@@ -155,6 +159,7 @@ export function parseJobListSearchParams(params: URLSearchParams): JobListPageSt
       normalize: normalizeAgeToken,
     }) as JobListAgeDaysFilter,
     gapFilter: parseMulti(params.get('gap'), { allowed: new Set<string>(REQUEST_GAP_FILTER_VALUES) }) as RequestGapFilterValue[],
+    applicantFilter: parseMulti(params.get('ap'), { allowed: new Set<string>(APPLICANT_PRESENCE_FILTER_VALUES) }) as ApplicantPresenceFilter[],
     sort: SORT_VALUES.has(sortRaw) ? sortRaw : JOB_LIST_DEFAULTS.sort,
     // `tsort=<column>:<dir>` — ค่าที่ parse ไม่ผ่านคืน null (กลับไปใช้ dropdown) ไม่ throw
     tableSort: parseTableSort(params.get('tsort')),
@@ -184,6 +189,7 @@ export function buildJobListSearchParams(state: JobListPageState): URLSearchPara
   setMulti('sec', state.sectorFilter);
   setMulti('ag', state.ageDaysFilter);
   setMulti('gap', state.gapFilter);
+  setMulti('ap', state.applicantFilter);
   if (state.sort !== JOB_LIST_DEFAULTS.sort) params.set('sort', state.sort);
   const tsort = serializeTableSort(state.tableSort);
   if (tsort) params.set('tsort', tsort);
@@ -212,6 +218,7 @@ const FILTER_RESET_KEYS: (keyof JobListPageState)[] = [
   'sectorFilter',
   'ageDaysFilter',
   'gapFilter',
+  'applicantFilter',
   'pageSize',
 ];
 
