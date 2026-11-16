@@ -39,7 +39,7 @@ import {
 } from '@/lib/unitRequestWorkStatus';
 import { formatYmdDmyBe, toYmdBangkok } from '@/lib/dateTh';
 import { DASH } from '@/lib/designTokens';
-import { jobPositionUnits } from '@/lib/jobPositionUnits';
+import { jobPositionUnits, remainingPositionsOf } from '@/lib/jobPositionUnits';
 import {
   AGE_DAYS_MULTI_OPTIONS,
   compareJobsForListSort,
@@ -910,9 +910,7 @@ const JobListPage: React.FC = () => {
                       ตำแหน่ง: ขอ {j.request_positions ?? jobPositionUnits(j)}
                       {j.filled_positions != null ? ` · หาได้ ${j.filled_positions}` : ''}
                       {' · เหลือหา '}
-                      {/* ใบปิดแล้ว = เหลือหา 0 (QA 15 พ.ย. 2569: ERP ส่งเหลือหา 0 มาเป็นค่าว่าง ⇒ jobPositionUnits ถอยไป 1
-                          จอขึ้น "ขอ 1 · หาได้ 1 · เหลือหา 1" ทั้งที่ปิดไปแล้ว) */}
-                      {j.status === 'closed' ? 0 : jobPositionUnits(j)}
+                      {remainingPositionsOf(j)}
                     </span>
                   </div>
                   <RequestGapsLine job={j} className="mt-1" />
@@ -1109,7 +1107,7 @@ const JobListPage: React.FC = () => {
                     <td className={cn('px-1.5 py-3 text-xs whitespace-nowrap', DASH.cellMuted)}>{formatSubmittedDate(j)}</td>
                     <td className={cn('px-1.5 py-3 text-xs whitespace-nowrap', DASH.cellMuted)}>{formatYmdDmyBe(j.required_date)}</td>
                     <td className={cn('px-1.5 py-3 text-center text-xs tabular-nums whitespace-nowrap', DASH.cellStrong)}>
-                      {jobPositionUnits(j)}
+                      {remainingPositionsOf(j)}
                     </td>
                     <td className={cn('px-1.5 py-3 text-xs', DASH.cellMuted)}>{requestActionOrTypeLabel(j)}</td>
                     <td className={cn('px-1.5 py-3 text-xs', DASH.cellMuted)}>{j.job_description_code_1 || '—'}</td>

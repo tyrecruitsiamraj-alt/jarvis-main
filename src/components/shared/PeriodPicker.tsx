@@ -77,9 +77,14 @@ const PeriodPicker: React.FC<{
   onChange: (next: PeriodWindow) => void;
   /** วันนี้ (YYYY-MM-DD เวลาไทย) — เทสต์ส่งเองได้ */
   today?: string;
-}> = ({ value, onChange, today: todayProp }) => {
+  /** วันแรกที่เลือกได้ (YYYY-MM-DD) — ก่อนนั้นกดไม่ได้ · ไม่ส่ง = ไม่จำกัด */
+  minYmd?: string;
+}> = ({ value, onChange, today: todayProp, minYmd }) => {
   const today = todayProp ?? toYmdBangkok(new Date());
   const todayDate = toDate(today)!;
+  const minDate = minYmd ? toDate(minYmd) : null;
+  const minYear = minYmd ? Number(minYmd.slice(0, 4)) : null;
+  const minMonth = minYmd ? `${minYmd.slice(0, 7)}-01` : null;
   const thisYear = Number(today.slice(0, 4));
   const [open, setOpen] = useState(false);
   const [unit, setUnit] = useState<PeriodUnit>(() => unitOf(value));
@@ -160,7 +165,7 @@ const PeriodPicker: React.FC<{
             locale={th}
             weekStartsOn={1}
             formatters={formatters}
-            disabled={{ after: todayDate }}
+            disabled={minDate ? [{ after: todayDate }, { before: minDate }] : { after: todayDate }}
             defaultMonth={toDate(draft.to) ?? todayDate}
             toDate={todayDate}
             mode="range"
@@ -175,7 +180,14 @@ const PeriodPicker: React.FC<{
         {unit === 'month' ? (
           <div className="w-64 space-y-2">
             <div className="flex items-center justify-between">
-              <Button type="button" size="iconXs" variant="outline" aria-label="ปีก่อน" onClick={() => setViewYear((y) => y - 1)}>
+              <Button
+                type="button"
+                size="iconXs"
+                variant="outline"
+                aria-label="ปีก่อน"
+                disabled={minYear !== null && viewYear <= minYear}
+                onClick={() => setViewYear((y) => y - 1)}
+              >
                 <ChevronLeft aria-hidden />
               </Button>
               <span className="text-sm font-medium tabular-nums text-foreground">พ.ศ. {viewYear + 543}</span>
@@ -201,7 +213,7 @@ const PeriodPicker: React.FC<{
                     size="xs"
                     variant={on ? 'default' : 'outline'}
                     aria-pressed={on}
-                    disabled={first > today}
+                    disabled={first > today || (minMonth !== null && first < minMonth)}
                     aria-label={`${TH_MONTH_FULL[i]} ${viewYear + 543}`}
                     onClick={() => pickPoint('month', first)}
                   >
@@ -225,6 +237,7 @@ const PeriodPicker: React.FC<{
                   variant={on ? 'default' : 'outline'}
                   aria-pressed={on}
                   aria-label={`ปี ${y + 543}`}
+                  disabled={minYear !== null && y < minYear}
                   onClick={() => pickPoint('year', `${y}-01-01`)}
                 >
                   {y + 543}

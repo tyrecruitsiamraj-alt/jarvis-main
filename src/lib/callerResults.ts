@@ -50,6 +50,12 @@ const emptyRow = (who: string): CallerResultRow => ({
 
 function place(row: CallerResultRow, f: RecruitAppFact, id: string) {
   row.kept.push(id);
+  // บันทึกก่อนคนนี้เก็บไป = ของคนก่อน ⇒ คนที่ถืออยู่ยังไม่ได้โทร (เจ้าของ 15 พ.ย. 2569 Choice "อ้นยังไม่โทร"
+  // · ตัวเดียวกับป๊อปรายชื่อ `holderStateOf` ที่เคาะ 11 พ.ย. — เดิมตารางนี้นับว่าโทรแล้วเพราะคนก่อนเคยโทร)
+  if (f.claimedAt && f.logAt && Date.parse(f.logAt) < Date.parse(f.claimedAt)) {
+    row.notLogged.push(id);
+    return;
+  }
   if (f.logOk === true) {
     row.ok.push(id);
     if (!f.appointmentAt) {

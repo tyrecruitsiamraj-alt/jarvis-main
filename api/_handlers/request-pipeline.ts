@@ -30,6 +30,7 @@ import { pickDashboardBu } from "../_lib/homeBuSql.js";
 import { logError } from "../_lib/logger.js";
 import { readUnitRequestListThroughCache } from "./siamraj-unit-requests.js";
 import { loadFactsForJobs } from "./recruit-overview.js";
+import { loadReleaseMatches } from "../_lib/homeOnlineSql.js";
 import { loadChannelPlacement } from "../_lib/channelPlacementSql.js";
 import { AFTERCARE_TOPIC } from "../../src/lib/aftercareRounds.js";
 import { replaceWorkYmd } from "../../src/lib/irecruitReplaceSync.js";
@@ -37,7 +38,6 @@ import { FOLLOW_TEAM_REPLACEMENT } from "../../src/lib/followReplacement.js";
 import type { RequestPipelineResponse } from "../../src/lib/requestPipelineTypes.js";
 
 const FOLLOW = tableInAppSchema("follow_entries");
-const RELEASES = tableInAppSchema("job_public_releases");
 
 const YMD = /^\d{4}-\d{2}-\d{2}$/;
 const BKK_YMD = new Intl.DateTimeFormat("en-CA", {
@@ -159,12 +159,8 @@ export async function buildRequestPipeline(
     step(errors, "releases", "การประกาศ", async () =>
       jobIds.length === 0
         ? []
-        : (
-            await dbQuery<{ job_id: string }>(
-              `select distinct job_id from ${RELEASES} where job_id = any($1::text[])`,
-              [jobIds],
-            )
-          ).rows.map((r) => r.job_id),
+        : // จับคู่ทะเบียนประกาศตัวเดียวกับกล่องงาน (QA 15 พ.ย. 2569)
+          [...(await loadReleaseMatches(jobIds)).keys()],
     ),
     step(errors, "replacement", "ส่งคนแทน", async () =>
       sites.length === 0

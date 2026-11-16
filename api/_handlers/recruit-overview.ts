@@ -186,7 +186,8 @@ export function factsSql(
          ${attendance} as attendance,
          ${screening} as screening,
          -- คนที่เก็บไปหน้าการติดต่อ (4 พ.ย. 2569 "แบงค์เก็บไปหน้าการติดต่อ 30 …") — อีเมลแปลงเป็นชื่อเล่นฝั่ง Node
-         case when a.claimed_by is not null then coalesce(nullif(btrim(a.claimed_by_name), ''), 'ไม่ระบุชื่อ') end as claimed_by
+         case when a.claimed_by is not null then coalesce(nullif(btrim(a.claimed_by_name), ''), 'ไม่ระบุชื่อ') end as claimed_by,
+         case when a.claimed_by is not null then a.claimed_at end as claimed_at
     from ${APPS} a
     ${appBuJoin('a')}
     ${LATEST_AI_RESULT_LATERAL}
@@ -389,6 +390,7 @@ export function toFact(r: Row, boardPhones: Set<string> | null, sources?: AppSou
     appointmentFailed: r.log_ok === true && Boolean(text(r.log_reason)) && !r.log_appointment_at,
     screening: r.screening === 'passed' || r.screening === 'not_passed' ? r.screening : null,
     claimedBy: text(r.claimed_by),
+    claimedAt: iso(r.claimed_at),
     overAge: isOverAge(r.age as number | string | null),
     aiOutOfArea: Boolean(r.ai_outcome) && isOutOfAreaAnswer(text(r.ai_summary), text(r.ai_reply)),
     onBoard: boardPhones ? Boolean(phone && boardPhones.has(phone)) : null,
