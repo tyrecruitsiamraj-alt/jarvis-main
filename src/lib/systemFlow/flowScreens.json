@@ -3601,13 +3601,31 @@
    "src": "src/components/jobs/JobBoardView.tsx:2179",
    "controls": [
     {
-     "label": "การ์ดประเภทกล่องลอย (เช่น นายไทย/นายต่างชาติ/ส่วนกลาง/Valet/ราชการ — ชื่อจากตั้งค่าประเภทกล่อง) · ป้าย โพสต์เอง ท้ายการ์ด",
+     "label": "การ์ดประเภทกล่องลอย (เช่น นายไทย/นายต่างชาติ/ส่วนกลาง/Valet/ราชการ — ชื่อจากตั้งค่าประเภทกล่อง)",
      "action": "popup",
      "target": "Gen link รับสมัคร (ประกาศลอย ประเภทนั้น · BU = BU แรกของประกาศเดิม หรือ LBD)",
      "api": null,
      "effects": [],
-     "when": "แถวนี้ขึ้นเมื่อมีประกาศลอยอย่างน้อย 1 · ป้าย 'โพสต์เอง' เป็นแค่ป้าย กดแล้วเท่ากับกดการ์ด",
+     "when": "แถวนี้ขึ้นเมื่อมีประกาศลอยอย่างน้อย 1",
      "src": "src/components/jobs/JobBoardView.tsx:2197 / :2409"
+    },
+    {
+     "label": "กล่อง โพสต์เอง (ทำอะไรไปแล้ว · โพสต์แล้ว / Gen link / กรอก · คลิก)",
+     "action": "popup",
+     "target": "ทำอะไรไปแล้ว ของกล่องลอย (แท็บโพสต์เองแท็บเดียว · ไม่มี Autopost/Scrap)",
+     "api": "GET /api/job-post-actions?job=standalone:<ประเภท>",
+     "effects": [],
+     "when": null,
+     "src": "src/components/jobs/JobBoardView.tsx:2279"
+    },
+    {
+     "label": "ดูรายชื่อ",
+     "action": "tab",
+     "target": "แท็บรายชื่อผู้สมัคร ติ๊ก ใบขอที่สมัคร = กล่องลอย · ประเภทนั้น",
+     "api": null,
+     "effects": [],
+     "when": null,
+     "src": "src/components/jobs/JobBoardView.tsx:2301"
     }
    ]
   },

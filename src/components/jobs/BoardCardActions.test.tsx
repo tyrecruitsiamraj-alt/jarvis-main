@@ -25,4 +25,10 @@ describe('BoardCardActions', () => {
     expect(auto.children).toHaveLength(3);
     expect(auto.textContent).toContain('—เผยแพร่แล้ว');
   });
+  it('กล่องลอย (16 พ.ย. 2569): เหลือกล่องโพสต์เองกล่องเดียว ไม่มี Autopost/Scrap', () => {
+    render(<BoardCardActions manualOnly actions={structuredClone(EMPTY_JOB_POST_ACTIONS)} postGroups={null} so={null} onOpen={() => {}} />);
+    expect(screen.getByTestId('board-action-manual')).toBeTruthy();
+    expect(screen.queryByTestId('board-action-autopost')).toBeNull();
+    expect(screen.queryByTestId('board-action-scrap')).toBeNull();
+  });
 });

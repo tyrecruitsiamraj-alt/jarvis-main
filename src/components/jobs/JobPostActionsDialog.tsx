@@ -93,6 +93,8 @@ export function JobPostActionsPanel({
   const manualPosted = useMemo(() => manualAll.filter((l) => l.post_url), [manualAll]);
   const manualLinks = manualPick === 'posted' ? manualPosted : manualGen;
   const scrapOrders = useMemo(() => (d?.orders ?? []).filter((o) => o.request_type === 'scraping'), [d]);
+  /** กล่องลอย (`standalone:<ประเภท>` · 16 พ.ย. 2569) มีแต่โพสต์เอง — ไม่มีกล่อง Autopost/Scrap */
+  const standalone = jobId.startsWith('standalone:');
   const list = tab === 'autopost' ? groupRows : tab === 'manual' ? manualLinks : scrapOrders;
   const pages = Math.max(1, Math.ceil(list.length / PAGE));
   const slice = <T,>(xs: readonly T[]) => xs.slice((page - 1) * PAGE, page * PAGE);
@@ -101,7 +103,7 @@ export function JobPostActionsPanel({
   const b = d ? postGroupBuckets(groups?.rows.length ?? 0, counts) : null;
   /** 3 กล่องสรุป = แท็บ · กดกล่องไหนตารางข้างล่างเป็นของกล่องนั้น */
   const boxes: Array<{ key: BoardActionTab; title: string; right: string; sub: string }> = d
-    ? [
+    ? ([
         {
           key: 'autopost',
           title: 'Autopost',
@@ -121,12 +123,12 @@ export function JobPostActionsPanel({
           right: d.summary.scrap.orders === 0 ? 'ยังไม่สั่ง' : `สั่ง ${th(d.summary.scrap.orders)} ครั้ง`,
           sub: latestScrap ? `ล่าสุด ${latestScrap.label}` : '',
         },
-      ]
+      ] satisfies Array<{ key: BoardActionTab; title: string; right: string; sub: string }>).filter((x) => !standalone || x.key === 'manual')
     : [];
 
   return (
     <div className="space-y-3">
-        <div className="grid gap-2 sm:grid-cols-3" role="tablist" data-testid="job-actions-boxes">
+        <div className={cn('grid gap-2', standalone ? 'sm:grid-cols-1' : 'sm:grid-cols-3')} role="tablist" data-testid="job-actions-boxes">
           {boxes.map((x) => (
             <Button
               key={x.key}

@@ -1010,7 +1010,7 @@ export const API_CATALOG: ApiCatalogEntry[] = [
    "GET",
    "POST"
   ],
-  "doc": "GET /api/job-post-actions            → ยอด \"ทำอะไรไปแล้ว\" ทุกใบ (การ์ดหน้าโพสต์ประกาศ · เจ้าของ 13 พ.ย. 2569)\nGET /api/job-post-actions?job=<id>   → รายละเอียดใบเดียว (ป๊อป: Autopost รายกลุ่ม · ลิงก์โพสต์เอง · คำสั่ง Scrap)\nGET /api/job-post-actions?days=1&from=&to=&bu= → โพสต์เองรายวัน (การ์ด 6 หน้าภาพรวม · BU แบบหน้าภาพรวม)\nPOST /api/job-post-actions { link_id, post_url? } → จดว่าโพสต์เองแล้ววันนี้ (กดคัดลอกข้อความ / วางลิงก์โพสต์ในหน้าโพสต์เอง · 13 พ.ย. 2569)\nอ่านอย่างเดียว · สิทธิ์เดียวกับหน้าโพสต์ประกาศ (`job-applications`) · จำกัด BU ตามเลขใบขอแบบเส้น board ของ So Scraping",
+  "doc": "GET /api/job-post-actions            → ยอด \"ทำอะไรไปแล้ว\" ทุกใบ (การ์ดหน้าโพสต์ประกาศ · เจ้าของ 13 พ.ย. 2569)\nGET /api/job-post-actions?job=<id>   → รายละเอียดใบเดียว (ป๊อป: Autopost รายกลุ่ม · ลิงก์โพสต์เอง · คำสั่ง Scrap)\n  job=standalone:<ประเภท> = กล่องลอย (16 พ.ย. 2569 · มีแต่ลิงก์โพสต์เอง) · ยอดทุกใบคืน `byKind` ของกล่องลอยด้วย\nGET /api/job-post-actions?days=1&from=&to=&bu= → โพสต์เองรายวัน (การ์ด 6 หน้าภาพรวม · BU แบบหน้าภาพรวม)\nPOST /api/job-post-actions { link_id, post_url? } → จดว่าโพสต์เองแล้ววันนี้ (กดคัดลอกข้อความ / วางลิงก์โพสต์ในหน้าโพสต์เอง · 13 พ.ย. 2569)\nอ่านอย่างเดียว · สิทธิ์เดียวกับหน้าโพสต์ประกาศ (`job-applications`) · จำกัด BU ตามเลขใบขอแบบเส้น board ของ So Scraping",
   "query": [
    "days",
    "from",

@@ -72,7 +72,10 @@ export default function BoardCardActions({
   postGroups,
   so,
   onOpen,
+  manualOnly = false,
 }: {
+  /** กล่องลอย (16 พ.ย. 2569) — สั่ง Autopost/Scrap ไม่ได้ เหลือกล่องโพสต์เองกล่องเดียว */
+  manualOnly?: boolean;
   /** null = ยังโหลดไม่มา/โหลดไม่ได้ (ขึ้นขีด ไม่ขึ้น 0 ปลอม) */
   actions: JobPostActionsSummary | null;
   /** ผลรายกลุ่มจาก So Scraping ของใบนี้ (ตัวเดียวกับหน้าภาพรวม) · null = ยังไม่มี/อ่านไม่ได้ */
@@ -93,6 +96,7 @@ export default function BoardCardActions({
   return (
     <div className="space-y-1.5" data-testid="board-card-actions">
       <p className="text-xs text-muted-foreground">ทำอะไรไปแล้ว</p>
+      {manualOnly ? null : (
       <Box
         testId="board-action-autopost"
         title="Autopost"
@@ -112,6 +116,7 @@ export default function BoardCardActions({
           <Foot text={dash ? null : `คลิก ${th(a!.autopost.clicks)} · กรอก ${th(a!.autopost.applicants)}`} />
         )}
       </Box>
+      )}
       {/* โพสต์แล้ว = มีลิงก์โพสต์วางกลับมา · Gen link = ยังไม่มี (เจ้าของ 13 พ.ย. 2569) · สองช่องรวม = ลิงก์ทั้งหมด */}
       <Box testId="board-action-manual" title="โพสต์เอง" right={dash ? '—' : a!.manual.links === 0 ? 'ยังไม่มีลิงก์' : `${th(a!.manual.links)} ลิงก์`} onClick={() => onOpen('manual')}>
         <Cells
@@ -123,10 +128,12 @@ export default function BoardCardActions({
         />
         <Foot text={dash ? null : `คลิก ${th(a!.manual.clicks)}`} />
       </Box>
+      {manualOnly ? null : (
       <Box testId="board-action-scrap" title="Scrap" right={dash ? '—' : a!.scrap.orders === 0 ? 'ยังไม่สั่ง' : `สั่ง ${th(a!.scrap.orders)} ครั้ง`} onClick={() => onOpen('scrap')}>
         <StatusCell label={scrapView ? scrapView.label : dash ? '—' : 'ยังไม่สั่ง'} toneClass={scrapView ? TONE[scrapView.tone].value : 'text-muted-foreground'} />
         <Foot text={scrapWhy} className={scrap?.status === 'rejected' ? TONE.danger.value : TONE.warn.value} />
       </Box>
+      )}
     </div>
   );
 }

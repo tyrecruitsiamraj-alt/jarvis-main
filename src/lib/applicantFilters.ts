@@ -383,10 +383,17 @@ export function applyApplicantFilters(
   return applyFacetDefs(rows, FACETS, state, facts);
 }
 
-/** ค่าของหัวข้อ "ใบขอที่สมัคร" — `job_id` ก่อน · ไม่มีค่อยใช้ชื่องาน */
+/** ค่าหัวข้อ "ใบขอที่สมัคร" ของใบที่มาจากกล่องลอย — ปุ่ม "ดูรายชื่อ" บนการ์ดกล่องลอยติ๊กค่านี้ */
+export const standaloneJobValue = (kind: string) => `standalone:${kind}`;
+
+/**
+ * ค่าของหัวข้อ "ใบขอที่สมัคร" — `job_id` ก่อน · กล่องลอย = ประเภทกล่อง (16 พ.ย. 2569) · ไม่มีทั้งคู่ค่อยใช้ชื่องาน
+ */
 export function applicantJobValue(r: PublicApplication): string {
   const id = (r.job_id ?? '').trim();
-  return id || trimOr(r.job_title || r.unit_name);
+  if (id) return id;
+  const kind = (r.standalone_kind ?? '').trim();
+  return kind ? standaloneJobValue(kind) : trimOr(r.job_title || r.unit_name);
 }
 
 /**
@@ -398,7 +405,11 @@ export function applicantJobLabels(
   opts: { byUnit?: boolean } = {},
 ): (value: string) => string {
   const titleById = new Map<string, string>();
+  const kindLabel = new Map<string, string>();
   for (const r of rows) {
+    if (!r.job_id && r.standalone_kind && !kindLabel.has(standaloneJobValue(r.standalone_kind))) {
+      kindLabel.set(standaloneJobValue(r.standalone_kind), `กล่องลอย · ${r.standalone_kind_label || r.standalone_kind}`);
+    }
     const id = (r.job_id ?? '').trim();
     // byUnit = หัวข้อ "หน่วยงาน" (15 ต.ค. 2569) — ชื่อหน่วยงานก่อน ไม่มีค่อยชื่องาน (ประกาศลอยไม่มีหน่วยงาน)
     const name = opts.byUnit ? r.unit_name?.replace(/\s+/g, ' ') || r.job_title : r.job_title || r.unit_name;
@@ -408,6 +419,9 @@ export function applicantJobLabels(
   for (const t of titleById.values()) idsPerTitle.set(t, (idsPerTitle.get(t) ?? 0) + 1);
   const requestNo = (id: string) => id.slice(id.lastIndexOf(':') + 1);
   return (value) => {
+    const kind = kindLabel.get(value);
+    if (kind) return kind;
+    if (value.startsWith('standalone:')) return `กล่องลอย · ${value.slice('standalone:'.length)}`;
     const title = titleById.get(value);
     if (title) return (idsPerTitle.get(title) ?? 0) > 1 ? `${title} · ${requestNo(value)}` : title;
     if (value.includes(':')) return `ใบขอ ${requestNo(value)}`;

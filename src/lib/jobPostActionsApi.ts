@@ -8,10 +8,12 @@ async function readError(r: Response): Promise<never> {
   throw new Error(data.message || `ระบบตอบ ${r.status}`);
 }
 
-export async function fetchJobPostActions(): Promise<Record<string, JobPostActionsSummary>> {
+/** `byKind` = กล่องลอยต่อประเภท (16 พ.ย. 2569 · มีแต่โพสต์เอง) */
+export async function fetchJobPostActions(): Promise<{ byJob: Record<string, JobPostActionsSummary>; byKind: Record<string, JobPostActionsSummary> }> {
   const r = await apiFetch('/api/job-post-actions');
   if (!r.ok) return readError(r);
-  return ((await r.json()) as { byJob: Record<string, JobPostActionsSummary> }).byJob;
+  const d = (await r.json()) as { byJob: Record<string, JobPostActionsSummary>; byKind?: Record<string, JobPostActionsSummary> };
+  return { byJob: d.byJob, byKind: d.byKind ?? {} };
 }
 
 export type JobPostActionsDetail = {

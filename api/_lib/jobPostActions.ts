@@ -37,16 +37,23 @@ const USERS = tableInAppSchema('users');
 /** ช่วงที่ So Scraping มีผลรายกลุ่ม (เส้น post-groups เริ่ม 1 ต.ค. 2569 — ตัวเดียวกับ so-post-summary) */
 const SO_POST_FROM = '2026-10-01';
 
+/**
+ * กล่องลอย (ประกาศไม่ผูกใบขอ · เจ้าของ 16 พ.ย. 2569 "ทำกล่องลอยให้เหมือนการ์ดใบขอ") ใช้ตัวนับเดียวกับใบขอ
+ * โดยแทน job_id ด้วย `standalone:<ประเภท>` · กล่องลอยสั่ง Autopost/Scrap ไม่ได้ = มีแต่โพสต์เอง
+ */
+export const STANDALONE_KEY_PREFIX = 'standalone:';
+
 async function loadLinks(jobId?: string) {
+  const standalone = jobId?.startsWith(STANDALONE_KEY_PREFIX) ? jobId.slice(STANDALONE_KEY_PREFIX.length) : null;
   const { rows } = await dbQuery<JobPostLinkInput & { id: string; code: string; channel_label: string | null; fb_group_id: string | null; created_by_name: string | null; post_url: string | null }>(
-    `select l.id::text, p.job_id, l.note, l.created_at, l.hit_count, l.code, l.channel_label, l.fb_group_id, p.created_by_name,
+    `select l.id::text, coalesce(p.job_id, '${STANDALONE_KEY_PREFIX}' || p.standalone_kind) as job_id, l.note, l.created_at, l.hit_count, l.code, l.channel_label, l.fb_group_id, p.created_by_name,
        (select x.post_url from ${POSTS} x where x.link_id = l.id and x.post_url is not null order by x.day desc limit 1) as post_url,
        coalesce(a.n, 0)::int as applicants
      from ${LINKS} l join ${POSTINGS} p on p.id = l.posting_id
      left join (select link_id, count(*) as n from ${APPS} where link_id is not null group by link_id) a on a.link_id = l.id
-     where p.job_id is not null ${jobId ? 'and p.job_id = $1' : ''}
+     where ${standalone !== null ? 'p.job_id is null and p.standalone_kind = $1' : jobId ? 'p.job_id = $1' : '(p.job_id is not null or p.standalone_kind is not null)'}
      order by l.created_at`,
-    jobId ? [jobId] : [],
+    standalone !== null ? [standalone] : jobId ? [jobId] : [],
   );
   return rows;
 }
@@ -62,13 +69,20 @@ async function loadOrders(jobId?: string) {
   return rows;
 }
 
-/** ยอดทุกใบ (การ์ด) — `allowJob` = สิทธิ์ BU ของคนดู */
-export async function listJobPostActions(allowJob: (jobId: string) => boolean): Promise<Record<string, JobPostActionsSummary>> {
+/**
+ * ยอดทุกใบ (การ์ด) — `allowJob` = สิทธิ์ BU ของคนดู
+ * `byKind` = กล่องลอยต่อประเภท (มีแต่โพสต์เอง) · ไม่กรอง BU เหมือนตัวเลขบนการ์ดกล่องลอยเดิม (ผู้สมัคร · ประกาศ)
+ */
+export async function listJobPostActions(allowJob: (jobId: string) => boolean): Promise<{ byJob: Record<string, JobPostActionsSummary>; byKind: Record<string, JobPostActionsSummary> }> {
   const [links, orders] = await Promise.all([loadLinks(), loadOrders()]);
-  return summarizeJobPostActions(
-    links.filter((l) => allowJob(l.job_id)),
+  const isKind = (id: string) => id.startsWith(STANDALONE_KEY_PREFIX);
+  const byJob = summarizeJobPostActions(
+    links.filter((l) => !isKind(l.job_id) && allowJob(l.job_id)),
     orders.filter((o) => allowJob(o.job_id)),
   );
+  const byKind: Record<string, JobPostActionsSummary> = {};
+  for (const [k, v] of Object.entries(summarizeJobPostActions(links.filter((l) => isKind(l.job_id)), []))) byKind[k.slice(STANDALONE_KEY_PREFIX.length)] = v;
+  return { byJob, byKind };
 }
 
 export type JobPostActionsDetail = {
@@ -80,10 +94,12 @@ export type JobPostActionsDetail = {
 
 /** รายละเอียดของใบเดียว (ป๊อป) — So Scraping อ่านไม่ได้ = บอกเหตุในแท็บ Autopost ส่วนอื่นยังขึ้น */
 export async function getJobPostActions(jobId: string, requestNo: string): Promise<JobPostActionsDetail> {
-  const [links, orders] = await Promise.all([loadLinks(jobId), loadOrders(jobId)]);
+  const standalone = jobId.startsWith(STANDALONE_KEY_PREFIX);
+  const [links, orders] = await Promise.all([loadLinks(jobId), standalone ? Promise.resolve([]) : loadOrders(jobId)]);
   const autopostTimes = orders.filter((o) => o.request_type === 'content').map((o) => new Date(o.created_at).getTime());
   let groups: JobPostActionsDetail['groups'] = { statuses: [], rows: [], error: null };
-  try {
+  // กล่องลอยไม่มีเลขใบขอ = ไม่มีผลรายกลุ่มจาก So Scraping
+  if (!standalone) try {
     const all = await fetchAllSoPostGroupRows({ from: SO_POST_FROM, to: toBangkokYmd(new Date()), bu: null });
     groups = { statuses: all.statuses, rows: all.rows.filter((r) => r.requestNo === requestNo), error: null };
   } catch (e) {
@@ -116,8 +132,9 @@ export async function getJobPostActions(jobId: string, requestNo: string): Promi
  * คืน job_id ของลิงก์ (ให้เส้นเช็กสิทธิ์ BU) · ไม่มีลิงก์ = null
  */
 export async function linkJobId(linkId: string): Promise<string | null> {
+  // ลิงก์ของกล่องลอย = `standalone:<ประเภท>` (ไม่มีใบขอ ไม่มีเลขใบให้เช็ก BU)
   const { rows } = await dbQuery<{ job_id: string | null }>(
-    `select p.job_id from ${LINKS} l join ${POSTINGS} p on p.id = l.posting_id where l.id = $1::uuid`,
+    `select coalesce(p.job_id, '${STANDALONE_KEY_PREFIX}' || p.standalone_kind) as job_id from ${LINKS} l join ${POSTINGS} p on p.id = l.posting_id where l.id = $1::uuid`,
     [linkId],
   );
   return rows[0]?.job_id ?? null;

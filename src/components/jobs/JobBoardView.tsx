@@ -96,7 +96,7 @@ import { buildSkipIndex, type JobReleaseSkip } from '@/lib/jobReleaseSkips';
 import { boardPostingPath } from '@/lib/jobNavigation';
 import { useHeaderSearch } from '@/hooks/useHeaderSearch';
 import { scrollIntoViewX } from '@/lib/scrollIntoViewX';
-import { APPLICANT_FILTER_PARAM_PREFIX } from '@/lib/applicantFilters';
+import { APPLICANT_FILTER_PARAM_PREFIX, standaloneJobValue } from '@/lib/applicantFilters';
 import { postingLinkCreator, type RecruitPosting } from '@/lib/recruitPostings';
 import { formatYmdTh, toYmdBangkok } from '@/lib/dateTh';
 import { useRecruitPostingKinds } from '@/lib/recruitPostingKindsApi';
@@ -158,7 +158,7 @@ import { cn } from '@/lib/utils';
 import { fetchBoardJobPostings, type JobPostingRequest } from '@/lib/jobPostingRequestsApi';
 import AutopostDialog from '@/components/jobs/AutopostDialog';
 import JobPostActionsDialog from '@/components/jobs/JobPostActionsDialog';
-import type { BoardActionTab } from '@/components/jobs/BoardCardActions';
+import BoardCardActions, { type BoardActionTab } from '@/components/jobs/BoardCardActions';
 import { fetchJobPostActions } from '@/lib/jobPostActionsApi';
 import { EMPTY_JOB_POST_ACTIONS, type JobPostActionsSummary } from '@/lib/jobPostActions';
 import { SEARCH_ALL_POOLS_AND_CALL } from '@/lib/candidateSearchLabels';
@@ -585,13 +585,19 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
    * null = ยังโหลดไม่มา (กล่องขึ้นขีด ไม่ขึ้น 0 ปลอม) · โหลดใหม่ทุก 5 นาที และหลังสั่งงาน (postingsRev)
    */
   const [jobActions, setJobActions] = useState<Record<string, JobPostActionsSummary> | null>(null);
+  /** กล่องลอยต่อประเภท (16 พ.ย. 2569 "ทำกล่องลอยให้เหมือนการ์ดใบขอ") — มีแต่โพสต์เอง · null = ยังโหลดไม่มา */
+  const [kindActions, setKindActions] = useState<Record<string, JobPostActionsSummary> | null>(null);
   const [actionsOf, setActionsOf] = useState<{ job: { id: string; title: string }; tab: BoardActionTab } | null>(null);
   useEffect(() => {
     if (!isStaff) return;
     let alive = true;
     const load = () =>
       fetchJobPostActions()
-        .then((v) => alive && setJobActions(v))
+        .then((v) => {
+          if (!alive) return;
+          setJobActions(v.byJob);
+          setKindActions(v.byKind);
+        })
         .catch(() => {
           /* โหลดไม่ได้ = กล่องขึ้นขีด (ป๊อปของใบยังลองโหลดเองได้) */
         });
@@ -672,6 +678,20 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
       setSearchParams(params);
     },
     [applicationJobKeyIdx, searchParams, setSearchParams],
+  );
+  /** "ดูรายชื่อ" ของกล่องลอย — ติ๊กประเภทกล่องในหัวข้อ "ใบขอที่สมัคร" (ใบสมัครจากประกาศกล่องลอยคีย์ด้วยประเภท · 16 พ.ย. 2569) */
+  const openApplicantsOfKind = React.useCallback(
+    (kind: string) => {
+      const params = new URLSearchParams(searchParams);
+      for (const k of [...params.keys()]) {
+        if (k.startsWith(APPLICANT_FILTER_PARAM_PREFIX)) params.delete(k);
+      }
+      params.set('view', 'list');
+      params.delete('tab');
+      params.append(`${APPLICANT_FILTER_PARAM_PREFIX}job`, standaloneJobValue(kind));
+      setSearchParams(params);
+    },
+    [searchParams, setSearchParams],
   );
   const leadIdx = useMemo(() => buildCountIndex(leadCounts), [leadCounts]);
   const originIdx = useMemo(
@@ -2158,9 +2178,9 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
           (เดิมอยู่เหนือตัวกรอง ดันใบขอจริงตกจอ) · ทรงการ์ดเดียวกับการ์ดใบขอ (11 ส.ค. 2569)
           (`jarvis-interactive-card` · หัวข้อ → ชิป → เนื้อ → แถบล่าง) แทนกล่องเล็กแบน ๆ เดิม
 
-          ⚠️ ไม่มีลิงก์ "ดูรายชื่อ →" เหมือนการ์ดใบขอ — ใบสมัครฝั่งเราผูกกับ `job_id`
-          ไม่ได้ผูกกับประกาศ จึงยังกรองรายชื่อ "เฉพาะกล่องลอยประเภทนี้" ไม่ได้จริง
-          ใส่ปุ่มไปก็เป็นปุ่มหลอก · การกดการ์ด = สร้างลิงก์ของประเภทนั้น ซึ่งทำได้จริง
+          16 พ.ย. 2569 เจ้าของ "ทำกล่องลอยให้เหมือนการ์ดใบขอ" + "Autopost / Scrap มันต้องสั่งไม่ได้จากกล่องพวกนั้น":
+          ส่วน "ทำอะไรไปแล้ว" มีแต่กล่องโพสต์เอง (กดแล้วเปิดป๊อปลิงก์โพสต์เองของประเภทนั้น) + ปุ่ม "ดูรายชื่อ" จริง
+          (ใบสมัครที่มาจากประกาศกล่องลอยรู้ประเภทผ่าน `posting_id` แล้ว) · การกดการ์ด = Gen link ของประเภทนั้นเหมือนเดิม
         */}
         {isStaff && postings.some((p) => p.standaloneKind) ? (
           /**
@@ -2255,24 +2275,34 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                       ) : null}
                     </CardContent>
                     <CardFooter className="mt-auto flex-col items-stretch gap-2 border-t border-border/60 bg-muted/20 pt-3">
-                      {/* แถวล่างจัดแบบเดียวกับการ์ดใบขอ: "ผู้สมัคร N คน" ซ้าย · ปุ่มขวา
-                          ⚠️ ไม่มีปุ่ม "ดูรายชื่อ" เพราะใบสมัครผูกกับ `job_id` ไม่ได้ผูกกับ
-                          ประกาศ — กรองรายชื่อ "เฉพาะกล่องลอยประเภทนี้" ยังทำไม่ได้จริง
-                          ใส่ไปก็เป็นปุ่มหลอก */}
+                      {/* ทำอะไรไปแล้ว = กล่องโพสต์เองกล่องเดียว (กล่องลอยสั่ง Autopost/Scrap ไม่ได้) · กล่องเดียวกับการ์ดใบขอ */}
+                      <BoardCardActions
+                        manualOnly
+                        actions={kindActions ? kindActions[k.code] ?? EMPTY_JOB_POST_ACTIONS : null}
+                        postGroups={null}
+                        so={null}
+                        onOpen={(tab) => setActionsOf({ job: { id: `standalone:${k.code}`, title: `กล่องลอย ${k.label}` }, tab })}
+                      />
+                      {/* แถวล่างแบบเดียวกับการ์ดใบขอ: "ผู้สมัคร N คน" ซ้าย · "ดูรายชื่อ" ขวา */}
                       <div className="flex w-full flex-wrap items-center justify-between gap-1.5">
                         <span className="inline-flex flex-wrap items-center gap-x-1.5 text-xs font-medium text-foreground">
                           <Users className={cn('h-3.5 w-3.5', TONE.info.value)} />
                           ผู้สมัคร {s.applicants.toLocaleString('th-TH')} คน
                         </span>
-                        <span
-                          className={cn(
-                            'inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-xs font-medium',
-                            TONE.violet.outline,
-                          )}
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openApplicantsOfKind(k.code);
+                          }}
+                          className={cn('min-h-9 sm:min-h-0 h-7 rounded-lg px-2 text-xs', TONE.info.outline)}
+                          data-testid="standalone-open-applicants"
                         >
-                          <Link2 className="h-3.5 w-3.5" />
-                          โพสต์เอง
-                        </span>
+                          <Users aria-hidden />
+                          ดูรายชื่อ
+                        </Button>
                       </div>
                     </CardFooter>
                   </Card>

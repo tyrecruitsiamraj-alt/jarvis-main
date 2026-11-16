@@ -1,13 +1,14 @@
 /**
  * GET /api/job-post-actions            → ยอด "ทำอะไรไปแล้ว" ทุกใบ (การ์ดหน้าโพสต์ประกาศ · เจ้าของ 13 พ.ย. 2569)
  * GET /api/job-post-actions?job=<id>   → รายละเอียดใบเดียว (ป๊อป: Autopost รายกลุ่ม · ลิงก์โพสต์เอง · คำสั่ง Scrap)
+ *   job=standalone:<ประเภท> = กล่องลอย (16 พ.ย. 2569 · มีแต่ลิงก์โพสต์เอง) · ยอดทุกใบคืน `byKind` ของกล่องลอยด้วย
  * GET /api/job-post-actions?days=1&from=&to=&bu= → โพสต์เองรายวัน (การ์ด 6 หน้าภาพรวม · BU แบบหน้าภาพรวม)
  * POST /api/job-post-actions { link_id, post_url? } → จดว่าโพสต์เองแล้ววันนี้ (กดคัดลอกข้อความ / วางลิงก์โพสต์ในหน้าโพสต์เอง · 13 พ.ย. 2569)
  * อ่านอย่างเดียว · สิทธิ์เดียวกับหน้าโพสต์ประกาศ (`job-applications`) · จำกัด BU ตามเลขใบขอแบบเส้น board ของ So Scraping
  */
 import { withRbac, sendError, handleApiError, type ApiRes, type AuthedReq } from '../_lib/http.js';
 import { loadScopedRequestNoSet } from '../_lib/siamrajUnitRequests.js';
-import { getJobPostActions, linkJobId, listJobPostActions, loadManualPostDays, recordManualPost } from '../_lib/jobPostActions.js';
+import { getJobPostActions, linkJobId, listJobPostActions, loadManualPostDays, recordManualPost, STANDALONE_KEY_PREFIX } from '../_lib/jobPostActions.js';
 import { loadMatchingBuScope } from '../_lib/departmentScope.js';
 import { pickDashboardBuSet } from '../_lib/homeBuSql.js';
 import { requestNoOf } from '../../src/lib/jobKeyIndex.js';
@@ -30,7 +31,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
       const jobId = await linkJobId(linkId);
       if (!jobId) return sendError(res, 404, 'not_found', 'ไม่พบลิงก์นี้');
       const scoped = await loadScopedRequestNoSet(req.user);
-      if (scoped !== null && !scoped.has(requestNoOf(jobId))) return sendError(res, 403, 'Forbidden', OUT_OF_SCOPE);
+      if (!jobId.startsWith(STANDALONE_KEY_PREFIX) && scoped !== null && !scoped.has(requestNoOf(jobId))) return sendError(res, 403, 'Forbidden', OUT_OF_SCOPE);
       await recordManualPost(linkId, { id: req.user?.sub ?? null, name: req.user?.email ?? null }, postUrl);
       return res.status(200).json({ ok: true });
     } catch (e) {
@@ -51,10 +52,11 @@ async function handler(req: AuthedReq, res: ApiRes) {
       return res.status(200).json(await loadManualPostDays({ from, to, buSet }));
     }
     const scoped = await loadScopedRequestNoSet(req.user);
-    const allow = (jobId: string) => scoped === null || scoped.has(requestNoOf(jobId));
+    // กล่องลอยไม่มีเลขใบขอ — เห็นได้ทุกคนที่เข้าหน้าโพสต์ประกาศ (เหมือนการ์ดกล่องลอยเดิม)
+    const allow = (jobId: string) => jobId.startsWith(STANDALONE_KEY_PREFIX) || scoped === null || scoped.has(requestNoOf(jobId));
     res.setHeader?.('Cache-Control', 'no-store');
     const job = String(one(req.query?.job) ?? '').trim();
-    if (!job) return res.status(200).json({ byJob: await listJobPostActions(allow) });
+    if (!job) return res.status(200).json(await listJobPostActions(allow));
     if (job.length > 120) return sendError(res, 400, 'bad_request', 'job ไม่ถูกต้อง');
     if (!allow(job)) return sendError(res, 403, 'Forbidden', OUT_OF_SCOPE);
     return res.status(200).json(await getJobPostActions(job, requestNoOf(job)));

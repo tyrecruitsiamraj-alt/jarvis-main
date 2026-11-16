@@ -120,6 +120,8 @@ type Row = {
   responsible_name: string | null;
   /** ผู้รับผิดชอบของลิงก์ที่สมัครเข้ามา (ทีม Online · `POSTING_OWNER_SQL`) · schema เก่า = undefined */
   posting_owner_name?: string | null;
+  standalone_kind?: string | null;
+  standalone_kind_label?: string | null;
   channel_label: string | null;
   license_types: string[] | null;
   created_by_name: string | null;
@@ -218,6 +220,8 @@ function toApplication(r: Row, viewerId?: string, showClaimer = false) {
     specific_type: r.specific_type || undefined,
     responsible_name: r.responsible_name || undefined,
     posting_owner_name: r.posting_owner_name || undefined,
+    standalone_kind: r.standalone_kind || undefined,
+    standalone_kind_label: r.standalone_kind_label || undefined,
     channel_label: r.channel_label || undefined,
     license_types: r.license_types && r.license_types.length > 0 ? r.license_types : undefined,
     created_by_name: r.created_by_name || undefined,
@@ -287,6 +291,15 @@ const POSTING_OWNER_SQL = `coalesce(
       where a.posting_id is null and r.job_id = a.job_id)
   ) as posting_owner_name`;
 
+/**
+ * ประเภทกล่องลอยของประกาศที่คนนี้สมัครเข้ามา (เจ้าของ 16 พ.ย. 2569 "ทำกล่องลอยให้เหมือนการ์ดใบขอ")
+ * — ปุ่ม "ดูรายชื่อ" บนการ์ดกล่องลอยกรองด้วยค่านี้ · ประกาศผูกใบขอ = null · ⚠️ อ้าง `a.posting_id` (มีตั้งแต่ 063)
+ */
+const STANDALONE_KIND_SQL = `(select p.standalone_kind from ${tableInAppSchema('recruit_postings')} p where p.id = a.posting_id and p.job_id is null) as standalone_kind,
+  (select coalesce(k.label, p.standalone_kind) from ${tableInAppSchema('recruit_postings')} p
+     left join ${tableInAppSchema('recruit_posting_kinds')} k on k.code = p.standalone_kind
+    where p.id = a.posting_id and p.job_id is null) as standalone_kind_label`;
+
 const LIST_COLUMNS = `
   id, full_name, title_prefix, first_name, last_name, phone, age, gender,
   province, district, subdistrict, postal_code,
@@ -301,6 +314,7 @@ const LIST_COLUMNS = `
   dialed_first_at, dialed_last_at, dial_count,
   unclaimed_at, unclaimed_from_name, call_choice, call_choice_at, call_choice_by_name,
   ${POSTING_OWNER_SQL},
+  ${STANDALONE_KIND_SQL},
   ${applicationOriginColumn('a')}
 `;
 
@@ -326,6 +340,7 @@ const LIST_COLUMNS_NO_CHOICE = `
   null::text as call_choice, null::timestamptz as call_choice_at,
   null::text as call_choice_by_name,
   ${POSTING_OWNER_SQL},
+  ${STANDALONE_KIND_SQL},
   ${applicationOriginColumn('a')}
 `;
 
@@ -345,7 +360,8 @@ const LIST_COLUMNS_NO_LEAD = `
   line_id, specific_type, responsible_name, channel_label, license_types, created_by_name,
   created_at,
   claimed_by, claimed_by_name, claimed_at,
-  false as is_lead, null::text as lead_by, null::text as lead_by_name, null::timestamptz as lead_at
+  false as is_lead, null::text as lead_by, null::text as lead_by_name, null::timestamptz as lead_at,
+  null::text as standalone_kind, null::text as standalone_kind_label
 `;
 
 /**
@@ -362,7 +378,8 @@ const LIST_COLUMNS_NO_CLAIM = `
   line_id, specific_type, responsible_name, channel_label, license_types, created_by_name,
   created_at,
   null::uuid as claimed_by, null::text as claimed_by_name, null::timestamptz as claimed_at,
-  false as is_lead, null::text as lead_by, null::text as lead_by_name, null::timestamptz as lead_at
+  false as is_lead, null::text as lead_by, null::text as lead_by_name, null::timestamptz as lead_at,
+  null::text as standalone_kind, null::text as standalone_kind_label
 `;
 
 /**
@@ -383,7 +400,8 @@ const LIST_COLUMNS_LEGACY = `
   null::text as channel_label, null::text[] as license_types, null::text as created_by_name,
   created_at,
   null::uuid as claimed_by, null::text as claimed_by_name, null::timestamptz as claimed_at,
-  false as is_lead, null::text as lead_by, null::text as lead_by_name, null::timestamptz as lead_at
+  false as is_lead, null::text as lead_by, null::text as lead_by_name, null::timestamptz as lead_at,
+  null::text as standalone_kind, null::text as standalone_kind_label
 `;
 
 /** 42703 undefined_column — โค้ดใหม่ขึ้นก่อน migration 074 */

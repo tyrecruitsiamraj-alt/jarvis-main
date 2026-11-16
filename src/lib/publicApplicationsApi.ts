@@ -119,6 +119,9 @@ export type PublicApplication = {
   recruiter_name?: string;
   /** ผู้รับผิดชอบของลิงก์ที่สมัครเข้ามา (ทีม Online · server `POSTING_OWNER_SQL` · 16 ต.ค. 2569) */
   posting_owner_name?: string;
+  /** สมัครผ่านประกาศกล่องลอย (ไม่ผูกใบขอ) = รหัส/ชื่อประเภทกล่อง (16 พ.ย. 2569 · ปุ่ม "ดูรายชื่อ" บนการ์ดกล่องลอย) */
+  standalone_kind?: string;
+  standalone_kind_label?: string;
   /** ช่องทางจาก master recruit_channels — แม่นกว่า referral_source ที่ผู้สมัครเลือกเอง */
   channel_label?: string;
   /** ยกเลิกข้อมูลผู้สมัคร (135 · 4 ต.ค. 2569) — มีค่า = ซ่อนจากรายชื่อหลัก (มาเฉพาะมุมมอง "ที่ยกเลิก") */
