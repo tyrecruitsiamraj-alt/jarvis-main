@@ -52,6 +52,20 @@ export const API_CATALOG: ApiCatalogEntry[] = [
   "reachesPeople": true
  },
  {
+  "path": "/api/ai/unanswered",
+  "file": "api/_handlers/ai-unanswered.ts",
+  "methods": [
+   "GET",
+   "PATCH"
+  ],
+  "doc": "═══ GET/PATCH /api/ai/unanswered — คำถามที่ผู้ช่วย AI ตอบไม่ได้ (เจ้าของ 16 พ.ย. 2569) ═══\nGET → `{ items }` ที่ยังไม่ได้กด \"ดูแล้ว\" · PATCH `{ id }` → กด \"ดูแล้ว\" (ใส่เวลา ไม่ลบแถว)\nadmin เท่านั้น — กล่องอยู่ ตั้งค่า › AI ที่ใช้คิดงาน · ตัวจด `api/_lib/aiAssistant/unanswered.ts`",
+  "query": [],
+  "body": [
+   "js"
+  ],
+  "reachesPeople": true
+ },
+ {
   "path": "/api/app-nav-preferences",
   "file": "api/_handlers/app-nav-preferences.ts",
   "methods": [
@@ -871,7 +885,7 @@ export const API_CATALOG: ApiCatalogEntry[] = [
    "PUT",
    "DELETE"
   ],
-  "doc": "═══ GET/POST/DELETE /api/integration-keys — key ของระบบภายนอก (หน้า ตั้งค่า › เชื่อมระบบภายนอก) ═══\nเจ้าของ 22 ต.ค. 2569 \"ทุกอย่างต้องทำผ่าน UI ได้นะ\" — เดิมออก key ได้ทางสคริปต์อย่างเดียว\n- GET: สถานะ key + ยอดคอมเมนต์ที่ So Scraping ส่งมา\n- POST {name}: ออก key ใหม่ (ตัวเก่าใช้ไม่ได้ทันที) — ตอบ key จริงครั้งเดียว เก็บแค่ sha256\n- DELETE ?name=: ยกเลิก key\nแอดมินเท่านั้น · จดบันทึกการใช้งานทุกครั้ง (ไม่จดตัว key)\n\nkey ขาออก (ที่ So Scraping ออกให้ Jarvis เรียก options API · 26 ต.ค. 2569):\n- GET คืน `outbound` (มี key ไหม · 4 ตัวท้าย · URL) — ไม่คืนตัว key\n- PUT {outbound:'so-scraping', key?, base_url, clear?}: บันทึกแบบเข้ารหัส\n- POST {outbound:'so-scraping', test:true, key?, base_url}: ลองเรียกจริง (ไม่ใส่ key = ใช้ตัวที่บันทึกไว้) ตอบจำนวนที่ได้\n- PUT {outbound:'line-bot-sowork', key?, base_url, clear?} (28 ต.ค. 2569): secret ร่วมกับ LINE Bot So Work (`lineBotSoWork.ts`)",
+  "doc": "═══ GET/POST/DELETE /api/integration-keys — key ของระบบภายนอก (หน้า ตั้งค่า › เชื่อมระบบภายนอก) ═══\nเจ้าของ 22 ต.ค. 2569 \"ทุกอย่างต้องทำผ่าน UI ได้นะ\" — เดิมออก key ได้ทางสคริปต์อย่างเดียว\n- GET: สถานะ key + ยอดคอมเมนต์ที่ So Scraping ส่งมา\n- POST {name}: ออก key ใหม่ (ตัวเก่าใช้ไม่ได้ทันที) — ตอบ key จริงครั้งเดียว เก็บแค่ sha256\n- DELETE ?name=: ยกเลิก key\nแอดมินเท่านั้น · จดบันทึกการใช้งานทุกครั้ง (ไม่จดตัว key)\n\nkey ขาออก (ที่ So Scraping ออกให้ Jarvis เรียก options API · 26 ต.ค. 2569):\n- GET คืน `outbound` (มี key ไหม · 4 ตัวท้าย · URL) — ไม่คืนตัว key\n- PUT {outbound:'so-scraping', key?, base_url, clear?}: บันทึกแบบเข้ารหัส\n- POST {outbound:'so-scraping', test:true, key?, base_url}: ลองเรียกจริง (ไม่ใส่ key = ใช้ตัวที่บันทึกไว้) ตอบจำนวนที่ได้\n- PUT {outbound:'line-bot-sowork', key?, base_url, clear?} (28 ต.ค. 2569): secret ร่วมกับ LINE Bot So Work (`lineBotSoWork.ts`)\n- PUT/POST {outbound:'phone-box', …} (16 พ.ย. 2569): กุญแจมือถือโพสต์กลุ่ม · ทดสอบ = อ่านสถานะเครื่อง/บัญชี (`phoneBox.ts`)",
   "query": [
    "name"
   ],
@@ -1010,12 +1024,13 @@ export const API_CATALOG: ApiCatalogEntry[] = [
    "GET",
    "POST"
   ],
-  "doc": "GET /api/job-post-actions            → ยอด \"ทำอะไรไปแล้ว\" ทุกใบ (การ์ดหน้าโพสต์ประกาศ · เจ้าของ 13 พ.ย. 2569)\nGET /api/job-post-actions?job=<id>   → รายละเอียดใบเดียว (ป๊อป: Autopost รายกลุ่ม · ลิงก์โพสต์เอง · คำสั่ง Scrap)\n  job=standalone:<ประเภท> = กล่องลอย (16 พ.ย. 2569 · มีแต่ลิงก์โพสต์เอง) · ยอดทุกใบคืน `byKind` ของกล่องลอยด้วย\nGET /api/job-post-actions?days=1&from=&to=&bu= → โพสต์เองรายวัน (การ์ด 6 หน้าภาพรวม · BU แบบหน้าภาพรวม)\nPOST /api/job-post-actions { link_id, post_url? } → จดว่าโพสต์เองแล้ววันนี้ (กดคัดลอกข้อความ / วางลิงก์โพสต์ในหน้าโพสต์เอง · 13 พ.ย. 2569)\nอ่านอย่างเดียว · สิทธิ์เดียวกับหน้าโพสต์ประกาศ (`job-applications`) · จำกัด BU ตามเลขใบขอแบบเส้น board ของ So Scraping",
+  "doc": "GET /api/job-post-actions            → ยอด \"ทำอะไรไปแล้ว\" ทุกใบ (การ์ดหน้าโพสต์ประกาศ · เจ้าของ 13 พ.ย. 2569)\nGET /api/job-post-actions?job=<id>   → รายละเอียดใบเดียว (ป๊อป: Autopost รายกลุ่ม · ลิงก์โพสต์เอง · คำสั่ง Scrap)\n  job=standalone:<ประเภท> = กล่องลอย (16 พ.ย. 2569 · มีแต่ลิงก์โพสต์เอง) · ยอดทุกใบคืน `byKind` ของกล่องลอยด้วย\nGET /api/job-post-actions?days=1&from=&to=&bu= → โพสต์เองรายวัน (การ์ด 6 หน้าภาพรวม · BU แบบหน้าภาพรวม)\nGET /api/job-post-actions?links=1&from=&to=&bu= → โพสต์เองรายลิงก์ (ภาพรวม 8 เรื่อง · 16 พ.ย. 2569)\nPOST /api/job-post-actions { link_id, post_url? } → จดว่าโพสต์เองแล้ววันนี้ (กดคัดลอกข้อความ / วางลิงก์โพสต์ในหน้าโพสต์เอง · 13 พ.ย. 2569)\nอ่านอย่างเดียว · สิทธิ์เดียวกับหน้าโพสต์ประกาศ (`job-applications`) · จำกัด BU ตามเลขใบขอแบบเส้น board ของ So Scraping",
   "query": [
-   "days",
+   "links",
    "from",
    "to",
    "bu",
+   "days",
    "job"
   ],
   "body": [],
@@ -1906,15 +1921,16 @@ export const API_CATALOG: ApiCatalogEntry[] = [
   ],
   "doc": "═══ GET /api/recruit-stuck — ใบขอที่เหลือหา ติดตรงไหน + เทียบเดือน (หน้าภาพรวมงานสรรหาโฉมใหม่ · เจ้าของ 4 พ.ย. 2569) ═══\n\n> *\"ใบขอมา มาแล้วไปประกาศแล้ว แต่ปิดไม่ได้เพราะไม่มีคนนะ หรือ มีคนแต่คนไม่โทรนะ หรือ ปิดไม่ได้เพราะไม่ได้โพสต์ด้วยซ้ำ\n> แล้วต้องบอกเลยว่า อ้อใบนี้ของใครรับผิดชอบบ้าง ช้าที่ใครเท่าไหร่\"*\n\nอ่านอย่างเดียว · ส่งข้อเท็จจริงต่อใบ (`StuckRequest`) ตัวตัดสินเหตุอยู่ที่เดียว `src/lib/recruitStuck.ts`\n- ใบขอ = ใบที่ยังเปิดชุดเดียวกับเมนูใบขอ (`readUnitRequestListThroughCache` · ขอบเขตแผนก + BU เดียวกับภาพรวม)\n- คน = `loadFactsForJobs` ทุกช่วงเวลาของใบ (นิยามเดียวกับภาพรวม/เส้น 12 ขั้น) · ประกาศ = `job_public_releases` · ลิงก์ = `recruit_posting_links`\n- โพสต์ = คำสั่ง Autopost ล่าสุดของใบ (`listLatestJobPostingsForBoard`)\n- เทียบเดือน = ต่อ (เดือน, ใบขอ) ย้อน 6 เดือน ให้หน้าเว็บรวมเฉพาะใบที่ผ่านตัวกรอง (รวมทุกใบ = ยอดเดิม)\nก้อนไหนอ่านไม่ได้ = null + เหตุ (ห้ามส่ง 0 แทน)",
   "query": [
+   "part",
    "bu",
    "from",
-   "to",
-   "part"
+   "to"
   ],
   "body": [
+   "daily",
+   "errors",
    "today",
    "requests",
-   "errors",
    "monthly"
   ],
   "reachesPeople": true
@@ -2321,7 +2337,8 @@ export const API_CATALOG: ApiCatalogEntry[] = [
    "to",
    "bu",
    "page",
-   "status"
+   "status",
+   "compare"
   ],
   "body": [],
   "reachesPeople": true

@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { FieldSelect } from '@/components/shared/FieldSelect';
 import AssistantAiCard from '@/pages/settings/AssistantAiCard';
+import AssistantUnansweredCard from '@/pages/settings/AssistantUnansweredCard';
 import { DASH, TONE } from '@/lib/designTokens';
 import { cn } from '@/lib/utils';
 import {
@@ -222,6 +223,7 @@ const AiSettingsTab: React.FC = () => {
 
       {/* ── ผู้ช่วย AI (13 พ.ย. 2569) — กุญแจ + รุ่น จบในกล่องเดียวแบบ KNOWA ── */}
       <AssistantAiCard view={view} onSaved={apply} />
+      <AssistantUnansweredCard />
 
       {/* ── งานไหนใช้ AI ตัวไหน ── */}
       <section className={cn('space-y-3 rounded-2xl border p-4', DASH.card)}>

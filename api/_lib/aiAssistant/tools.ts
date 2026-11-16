@@ -240,4 +240,17 @@ export const AI_TOOLS: ToolSpec[] = [
       },
     },
   },
+  {
+    type: 'function',
+    function: {
+      name: 'note_unanswered',
+      description:
+        'จดคำถามที่ตอบไม่ได้ให้ผู้ดูแลระบบดูทีหลัง — เรียกเมื่อระบบไม่มีข้อมูลหรือช่องที่ตรงกับคำถาม หรือมีตัวเลขหลายตัวที่อาจใช่จนต้องให้ผู้ใช้เลือก · เรียกครั้งเดียวต่อคำถาม',
+      parameters: {
+        type: 'object',
+        properties: { missing: { type: 'string', description: 'ขาดอะไร สั้น ๆ เช่น "ไม่มีช่องผู้สมัครใหม่ทั้งหมดในสรุปวันนี้"' } },
+        required: ['missing'],
+      },
+    },
+  },
 ];

@@ -41,3 +41,17 @@ export async function testAiConnection(
 export async function listAiModels(input: { connection: AiConnectionInput } | { connection_id: string }): Promise<string[]> {
   return (await post<{ models: string[] }>({ action: 'models', ...input }, 'ดึงรายชื่อโมเดลไม่สำเร็จ')).models;
 }
+
+/** คำถามที่ผู้ช่วย AI ตอบไม่ได้ (16 พ.ย. 2569) — `/api/ai/unanswered` (admin) */
+export type AiUnanswered = { id: string; askedBy: string | null; question: string; missing: string | null; createdAt: string };
+
+export async function fetchAiUnanswered(): Promise<AiUnanswered[]> {
+  const r = await apiFetch('/api/ai/unanswered', { cache: 'no-store' });
+  if (!r.ok) throw new Error(await readErrorMessage(r, 'โหลดคำถามที่ตอบไม่ได้ไม่สำเร็จ'));
+  return ((await r.json()) as { items: AiUnanswered[] }).items;
+}
+
+export async function clearAiUnanswered(id: string): Promise<void> {
+  const r = await apiFetch('/api/ai/unanswered', { method: 'PATCH', body: JSON.stringify({ id }) });
+  if (!r.ok) throw new Error(await readErrorMessage(r, 'บันทึกไม่สำเร็จ'));
+}
