@@ -11,6 +11,7 @@ import {
   publicQuestions,
   quizAttemptStatus,
   quizDocNo,
+  parseQuizGrades,
   quizGrade,
   quizSkillTone,
   scoreQuiz,
@@ -105,5 +106,19 @@ describe('AI ร่าง', () => {
     expect(r?.analysis).toEqual({ strengths: 'ไฟฟ้าดี', gap: 'แอร์ 33', advice: 'งาน PM ได้' });
     expect(parseQuizAiReply('ไม่ใช่ JSON')).toBeNull();
     expect(parseQuizAiReply('{"x":1}')).toBeNull();
+  });
+});
+
+describe('เกรดตั้งต่อชุด (17 พ.ย. 2569)', () => {
+  it('ใช้เกณฑ์ของชุด · ไม่มี = 85/70/60', () => {
+    const g = { a: 90, b: 80, c: 50 };
+    expect([quizGrade(90, g), quizGrade(89, g), quizGrade(50, g), quizGrade(49, g)]).toEqual(['A', 'B', 'C', 'D']);
+    expect(quizGrade(85)).toBe('A');
+  });
+  it('ตรวจค่า: 1–100 และเรียง A > B > C', () => {
+    expect(parseQuizGrades(undefined)).toEqual({ ok: true, value: { a: 85, b: 70, c: 60 } });
+    expect(parseQuizGrades({ a: 80, b: 80, c: 60 }).ok).toBe(false);
+    expect(parseQuizGrades({ a: 101, b: 70, c: 60 }).ok).toBe(false);
+    expect(parseQuizGrades({ a: '90', b: 75, c: 55 })).toEqual({ ok: true, value: { a: 90, b: 75, c: 55 } });
   });
 });

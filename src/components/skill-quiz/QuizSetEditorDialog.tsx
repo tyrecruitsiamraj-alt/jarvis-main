@@ -16,6 +16,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
+  QUIZ_DEFAULT_GRADES,
   QUIZ_DEFAULT_HEADER,
   QUIZ_DEFAULT_PASS,
   QUIZ_MAX_CHOICES,
@@ -44,6 +45,7 @@ function blankContent(): QuizSetContent {
     roleLabel: '',
     headerLine: QUIZ_DEFAULT_HEADER,
     passScore: QUIZ_DEFAULT_PASS,
+    grades: { ...QUIZ_DEFAULT_GRADES },
     skills: [{ id: skillId, name: '' }],
     questions: [blankQuestion(skillId)],
   };
@@ -172,6 +174,28 @@ export default function QuizSetEditorDialog({ open, onOpenChange, setId, initial
           <div className="space-y-1.5">
             <Label htmlFor="quiz-pass">เกณฑ์ผ่านรายทักษะ (คะแนน)</Label>
             <Input id="quiz-pass" type="number" min={1} max={100} value={c.passScore} onChange={(e) => setC({ ...c, passScore: Number(e.target.value) })} />
+          </div>
+          {/* เกณฑ์เกรดต่อชุด (เจ้าของ 17 พ.ย. 2569) — ชุดเก่าที่ยังไม่ตั้ง = 85/70/60 */}
+          <div className="space-y-1.5 sm:col-span-2">
+            <Label>เกรด (คะแนนรวมตั้งแต่)</Label>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {(['a', 'b', 'c'] as const).map((k) => (
+                <div key={k} className="flex items-center gap-2">
+                  <Label htmlFor={`quiz-grade-${k}`} className="w-4 shrink-0">
+                    {k.toUpperCase()}
+                  </Label>
+                  <Input
+                    id={`quiz-grade-${k}`}
+                    type="number"
+                    min={1}
+                    max={100}
+                    value={(c.grades ?? QUIZ_DEFAULT_GRADES)[k]}
+                    onChange={(e) => setC({ ...c, grades: { ...(c.grades ?? QUIZ_DEFAULT_GRADES), [k]: Number(e.target.value) } })}
+                  />
+                </div>
+              ))}
+              <p className="flex items-center text-sm text-muted-foreground">D ต่ำกว่า {(c.grades ?? QUIZ_DEFAULT_GRADES).c}</p>
+            </div>
           </div>
           <div className="space-y-1.5 sm:col-span-2">
             <Label htmlFor="quiz-header">หัวรายงาน</Label>

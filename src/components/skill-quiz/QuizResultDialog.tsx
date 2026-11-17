@@ -13,7 +13,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useBranding } from '@/contexts/BrandingContext';
 import { TONE } from '@/lib/designTokens';
 import { cn } from '@/lib/utils';
-import { QUIZ_STATUS_LABEL, quizAttemptStatus, quizChoiceImage, quizChoiceLabel, quizSkillTone, scoreQuiz, type QuizAnalysis } from '@/lib/skillQuiz';
+import { QUIZ_STATUS_LABEL, quizAttemptStatus, quizGradeScale, quizChoiceImage, quizChoiceLabel, quizSkillTone, scoreQuiz, type QuizAnalysis } from '@/lib/skillQuiz';
 import { draftQuizWithAi, fetchQuizAttempt, quizImageUrl, saveQuizReview, type QuizAttemptDetail } from '@/lib/skillQuizApi';
 import { downloadQuizReportPng } from '@/lib/skillQuizReportImage';
 
@@ -160,6 +160,7 @@ export default function QuizResultDialog({ attemptId, onOpenChange, onChanged }:
                   <span className="text-base text-muted-foreground"> /100</span>
                 </p>
                 <p className="text-sm">Grade {r.grade}</p>
+                <p className="text-xs text-muted-foreground">{quizGradeScale(a.content.grades)}</p>
               </div>
               <div className="rounded-xl border border-border p-4 text-center">
                 <p className="text-sm text-muted-foreground">ทักษะผ่านเกณฑ์</p>

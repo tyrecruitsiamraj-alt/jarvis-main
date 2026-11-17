@@ -39,9 +39,14 @@ export type QuizSetContent = {
   roleLabel: string;
   headerLine: string;
   passScore: number;
+  /** เกณฑ์เกรดของชุด (17 พ.ย. 2569 เจ้าของตั้งเองต่อชุด) — ไม่มี = 85/70/60 · ผลที่ทำไปแล้วใช้ค่าตอนทำ */
+  grades?: QuizGrades;
   skills: QuizSkill[];
   questions: QuizQuestion[];
 };
+
+/** คะแนนรวมขั้นต่ำของเกรด A/B/C · ต่ำกว่า c = D */
+export type QuizGrades = { a: number; b: number; c: number };
 
 export type QuizAnalysis = { strengths: string; gap: string; advice: string };
 
@@ -49,15 +54,31 @@ export type QuizAnswers = Record<string, number>;
 
 export const QUIZ_DEFAULT_HEADER = 'SO PEOPLE | TECHNICAL SKILL HEALTH CHECK';
 export const QUIZ_DEFAULT_PASS = 70;
+export const QUIZ_DEFAULT_GRADES: QuizGrades = { a: 85, b: 70, c: 60 };
 export const QUIZ_MAX_QUESTIONS = 200;
 export const QUIZ_MAX_CHOICES = 8;
 
-/** เกรดจากคะแนนรวม (A ≥ 85 · B ≥ 70 · C ≥ 60 · D ต่ำกว่า) */
-export function quizGrade(score: number): 'A' | 'B' | 'C' | 'D' {
-  if (score >= 85) return 'A';
-  if (score >= 70) return 'B';
-  if (score >= 60) return 'C';
+/** เกรดจากคะแนนรวม — ค่าเริ่ม A ≥ 85 · B ≥ 70 · C ≥ 60 · D ต่ำกว่า · ชุดตั้งเองได้ (`content.grades`) */
+export function quizGrade(score: number, grades: QuizGrades = QUIZ_DEFAULT_GRADES): 'A' | 'B' | 'C' | 'D' {
+  if (score >= grades.a) return 'A';
+  if (score >= grades.b) return 'B';
+  if (score >= grades.c) return 'C';
   return 'D';
+}
+
+/** "A 85 · B 70 · C 60" — บอกเกณฑ์ข้างเกรดในผล/รูป */
+export function quizGradeScale(grades: QuizGrades = QUIZ_DEFAULT_GRADES): string {
+  return `A ${grades.a} · B ${grades.b} · C ${grades.c}`;
+}
+
+/** ตรวจเกณฑ์เกรด — ต้องเป็นเลข 1–100 เรียง A > B > C */
+export function parseQuizGrades(raw: unknown): { ok: true; value: QuizGrades } | { ok: false; message: string } {
+  if (raw === undefined || raw === null) return { ok: true, value: { ...QUIZ_DEFAULT_GRADES } };
+  const o = (typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
+  const [a, b, c] = [o.a, o.b, o.c].map((v) => Math.round(Number(v)));
+  if (![a, b, c].every((v) => Number.isFinite(v) && v >= 1 && v <= 100)) return { ok: false, message: 'เกรดต้องเป็นคะแนน 1–100' };
+  if (!(a > b && b > c)) return { ok: false, message: 'เกรดต้องเรียง A มากกว่า B มากกว่า C' };
+  return { ok: true, value: { a, b, c } };
 }
 
 /** สีแท่งรายทักษะ — สีที่มีความหมาย: ดีมาก = เขียว · ผ่าน = ฟ้า · ไม่ผ่าน = แดง */
@@ -81,6 +102,8 @@ export function parseQuizSetInput(raw: unknown): { ok: true; value: QuizSetConte
   if (!title) return { ok: false, message: 'ใส่ชื่อชุดข้อสอบ' };
   const passScore = Math.round(Number(o.passScore ?? QUIZ_DEFAULT_PASS));
   if (!Number.isFinite(passScore) || passScore < 1 || passScore > 100) return { ok: false, message: 'เกณฑ์ผ่านต้องอยู่ระหว่าง 1–100' };
+  const grades = parseQuizGrades(o.grades);
+  if ('message' in grades) return { ok: false, message: grades.message };
   const skillsRaw = Array.isArray(o.skills) ? o.skills : [];
   const skills: QuizSkill[] = [];
   for (const s of skillsRaw) {
@@ -127,7 +150,7 @@ export function parseQuizSetInput(raw: unknown): { ok: true; value: QuizSetConte
   if (unused) return { ok: false, message: `ทักษะ "${unused.name}" ยังไม่มีข้อ` };
   return {
     ok: true,
-    value: { title, roleLabel: clean(o.roleLabel, 200), headerLine: clean(o.headerLine, 120) || QUIZ_DEFAULT_HEADER, passScore, skills, questions },
+    value: { title, roleLabel: clean(o.roleLabel, 200), headerLine: clean(o.headerLine, 120) || QUIZ_DEFAULT_HEADER, passScore, grades: grades.value, skills, questions },
   };
 }
 
@@ -195,7 +218,7 @@ export function scoreQuiz(content: QuizSetContent, answers: QuizAnswers): QuizRe
   const earned = skills.reduce((a, s) => a + s.earned, 0);
   const full = skills.reduce((a, s) => a + s.full, 0);
   const score = full === 0 ? 0 : Math.round((earned / full) * 100);
-  return { skills, earned, full, score, grade: quizGrade(score), passedSkills: skills.filter((s) => s.passed).length };
+  return { skills, earned, full, score, grade: quizGrade(score, content.grades), passedSkills: skills.filter((s) => s.passed).length };
 }
 
 export type QuizAttemptStatus = 'waiting' | 'review' | 'ready';

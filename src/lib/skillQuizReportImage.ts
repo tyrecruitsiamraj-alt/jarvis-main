@@ -7,7 +7,7 @@
  */
 import { LOGIN_SCENE, TONE } from '@/lib/designTokens';
 import { downloadCanvas } from '@/lib/followDayReportImage';
-import { quizSkillTone, scoreQuiz, type QuizAnalysis, type QuizAnswers, type QuizSetContent } from '@/lib/skillQuiz';
+import { quizGradeScale, quizSkillTone, scoreQuiz, type QuizAnalysis, type QuizAnswers, type QuizSetContent } from '@/lib/skillQuiz';
 
 export type QuizReportInput = {
   content: QuizSetContent;
@@ -227,7 +227,7 @@ export function drawQuizReport(input: QuizReportInput, logo?: HTMLImageElement |
   const qCount = input.content.questions.length;
   ctx.fillStyle = LOGIN_SCENE.muted;
   ctx.font = font(14);
-  ctx.fillText(`คะแนนจากแบบทดสอบ ${qCount} ข้อ · ${r.skills.length} ทักษะ · เกณฑ์ผ่านรายทักษะ ${input.content.passScore} คะแนน`, PAD, footTop + 24);
+  ctx.fillText(`คะแนนจากแบบทดสอบ ${qCount} ข้อ · ${r.skills.length} ทักษะ · เกณฑ์ผ่านรายทักษะ ${input.content.passScore} คะแนน · เกรด ${quizGradeScale(input.content.grades)}`, PAD, footTop + 24);
   return canvas;
 }
 
