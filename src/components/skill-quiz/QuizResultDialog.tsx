@@ -7,6 +7,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+import { Pagination, PaginationContent, PaginationItem } from '@/components/ui/pagination';
 import { Progress } from '@/components/ui/progress';
 import { Textarea } from '@/components/ui/textarea';
 import { useBranding } from '@/contexts/BrandingContext';
@@ -27,12 +28,16 @@ const SECTIONS: { key: keyof QuizAnalysis; label: string }[] = [
   { key: 'advice', label: 'ข้อเสนอแนะต่อ Operation' },
 ];
 
+/** คำตอบหน้าละ 10 ข้อ — เจ้าของ 17 พ.ย. 2569 "ทำเป็น Pagination ให้หน่อย" (เดิมยาวลงทีเดียวทุกข้อ) */
+const ANSWER_PAGE = 10;
+
 export default function QuizResultDialog({ attemptId, onOpenChange, onChanged }: Props) {
   const { config: branding } = useBranding();
   const [a, setA] = useState<QuizAttemptDetail | null>(null);
   const [analysis, setAnalysis] = useState<QuizAnalysis>(EMPTY);
   const [busy, setBusy] = useState<null | 'save' | 'png' | 'ai'>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [answerPage, setAnswerPage] = useState(0);
 
   const adopt = useCallback((d: QuizAttemptDetail) => {
     setA(d);
@@ -42,11 +47,15 @@ export default function QuizResultDialog({ attemptId, onOpenChange, onChanged }:
   useEffect(() => {
     setA(null);
     setNotice(null);
+    setAnswerPage(0);
     if (!attemptId) return;
     fetchQuizAttempt(attemptId)
       .then(adopt)
       .catch((e: unknown) => setNotice(e instanceof Error ? e.message : 'เปิดผลไม่ได้'));
   }, [attemptId, adopt]);
+
+  const answerPages = Math.max(1, Math.ceil((a?.content.questions.length ?? 0) / ANSWER_PAGE));
+  const answerCur = Math.min(answerPage, answerPages - 1);
 
   // ส่งมาไม่ถึง 3 นาที ยังไม่มีบทวิเคราะห์ = AI กำลังร่างอยู่เบื้องหลัง → ถามซ้ำทุก 5 วิ
   const aiRunning = Boolean(a?.submitted_at && !a.analysis && !a.ai_error && Date.now() - new Date(a.submitted_at).getTime() < 3 * 60_000);
@@ -192,8 +201,33 @@ export default function QuizResultDialog({ attemptId, onOpenChange, onChanged }:
             </section>
 
             <section className="space-y-2">
-              <h3 className="text-sm font-medium">คำตอบ</h3>
-              {a.content.questions.map((q, i) => {
+              {/* ปุ่มเปลี่ยนหน้าอยู่แถวหัวข้อ — ความยาวรายการเปลี่ยนแล้วปุ่มไม่ขยับ */}
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="text-sm font-medium">คำตอบ</h3>
+                {answerPages > 1 ? (
+                  <Pagination className="mx-0 w-auto justify-end">
+                    <PaginationContent>
+                      <PaginationItem>
+                        <Button type="button" size="xs" variant="outline" disabled={answerCur === 0} onClick={() => setAnswerPage(answerCur - 1)}>
+                          ก่อนหน้า
+                        </Button>
+                      </PaginationItem>
+                      <PaginationItem>
+                        <span className="px-2 text-xs tabular-nums text-muted-foreground">
+                          หน้า {answerCur + 1} / {answerPages}
+                        </span>
+                      </PaginationItem>
+                      <PaginationItem>
+                        <Button type="button" size="xs" variant="outline" disabled={answerCur >= answerPages - 1} onClick={() => setAnswerPage(answerCur + 1)}>
+                          ถัดไป
+                        </Button>
+                      </PaginationItem>
+                    </PaginationContent>
+                  </Pagination>
+                ) : null}
+              </div>
+              {a.content.questions.slice(answerCur * ANSWER_PAGE, (answerCur + 1) * ANSWER_PAGE).map((q, k) => {
+                const i = answerCur * ANSWER_PAGE + k;
                 const ans = a.answers?.[q.id];
                 const skill = a.content.skills.find((s) => s.id === q.skillId)?.name ?? '';
                 const right = ans === q.answer;
