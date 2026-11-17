@@ -200,8 +200,12 @@ const RecruitOverview: React.FC<{
    * โฉมก่อนหน้า (4 พ.ย. 2569) เปิดได้ที่ `&dash=prev` · การ์ดเดิม `&dash=cards` — ทางถอย ห้ามลบจนกว่าเจ้าของสั่ง
    */
   const v5 = !legacyCards && searchParams.get('dash') !== 'prev';
-  /** ภาพรวม v2 หน้าเดียว (เจ้าของ 17 พ.ย. 2569 · แบบ ZIP v2) — ทดสอบที่ `&dash=v2` จนผ่านด่าน ACCEPTANCE */
-  const dashV2 = searchParams.get('dash') === 'v2';
+  /**
+   * ภาพรวม v2 หน้าเดียว (แบบ ZIP v2) = ค่าเริ่ม — เจ้าของเทสบนเว็บจริงผ่านแล้ว "สลับเป็นค่าเริ่มเลย" (17 พ.ย. 2569)
+   * ทางถอย ห้ามลบจนกว่าเจ้าของสั่ง: 8 เรื่อง `&dash=topics` · แถบ 6 ช่อง `&dash=scale` · หน้าเดียวเลื่อนลง `&dash=list` · `&dash=prev` · การ์ด `&dash=cards`
+   */
+  const dashParam = searchParams.get('dash');
+  const dashV2 = !legacyCards && (dashParam === null || dashParam === 'v2');
   const v5Style = useV5ThemeStyle();
 
   useEffect(() => {

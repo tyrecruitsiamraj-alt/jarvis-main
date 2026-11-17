@@ -247,7 +247,7 @@ export default function RecruitStuckBody({
   }, [scale, data.bu, win.from, win.to, win.prevFrom, win.prevTo, win.all]);
 
   /**
-   * ═══ 8 เรื่อง เทียบ BU (เจ้าของ 16 พ.ย. 2569 "ทำมาก่อน") = ค่าเริ่ม ═══ ทางถอย: `&dash=scale` (แถบ 6 ช่อง) · `&dash=list`
+   * ═══ 8 เรื่อง เทียบ BU (เจ้าของ 16 พ.ย. 2569 "ทำมาก่อน") — ทางถอย `&dash=topics` (ค่าเริ่มเป็นภาพรวม v2 ตั้งแต่ 17 พ.ย. 2569) ═══ ทางถอย: `&dash=scale` (แถบ 6 ช่อง) · `&dash=list`
    * ตัวกรองบนสุดชุดเดิมคุมทุกเรื่อง · ใบขอ = ใบที่ผ่านตัวกรอง · รายชื่อ = cohort ชุดเดียวกับข้อ 2–4 เดิม
    */
   if (topics) {
