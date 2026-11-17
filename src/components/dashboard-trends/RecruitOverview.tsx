@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { Suspense, lazy, useEffect, useMemo, useState } from 'react';
 import BuChoiceSelect from '@/components/shared/BuChoiceSelect';
 import { AlertCircle, BarChart3, Briefcase, CalendarDays, ChevronDown, ChevronLeft, ChevronRight, ClipboardList, Megaphone, Timer, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -63,6 +63,9 @@ import { drillTreeOf } from '@/lib/recruitDrill';
 import { aiOfJobs, backlogOfJobs, staffOfJobs } from '@/lib/recruitOverviewScope';
 import { placementOfRequests } from '@/lib/channelPlacement';
 import { toYmdBangkok } from '@/lib/dateTh';
+
+/** ภาพรวม v2 (17 พ.ย. 2569) — โหลดเมื่อเปิด `&dash=v2` เท่านั้น */
+const RecruitOverviewV2 = lazy(() => import('./v2/RecruitOverviewV2'));
 
 /**
  * ═══ แท็บ "ภาพรวม" ของกล่องงาน = ภาพรวมงานสรรหาแบบ iRecruit (เจ้าของสั่ง 30 ก.ย. 2569) ═══
@@ -197,6 +200,8 @@ const RecruitOverview: React.FC<{
    * โฉมก่อนหน้า (4 พ.ย. 2569) เปิดได้ที่ `&dash=prev` · การ์ดเดิม `&dash=cards` — ทางถอย ห้ามลบจนกว่าเจ้าของสั่ง
    */
   const v5 = !legacyCards && searchParams.get('dash') !== 'prev';
+  /** ภาพรวม v2 หน้าเดียว (เจ้าของ 17 พ.ย. 2569 · แบบ ZIP v2) — ทดสอบที่ `&dash=v2` จนผ่านด่าน ACCEPTANCE */
+  const dashV2 = searchParams.get('dash') === 'v2';
   const v5Style = useV5ThemeStyle();
 
   useEffect(() => {
@@ -208,14 +213,14 @@ const RecruitOverview: React.FC<{
       const w = (range ? rangeWindow(range.from, range.to, today, range.all === true) : null) ?? monthWindow(month, today);
       prefetchRecruitStuck(pickedBu, { from: w.from, to: w.to });
     }
-    fetchRecruitOverview(month, range, pickedBu)
+    fetchRecruitOverview(month, range, pickedBu, { asOf: dashV2 })
       .then((data) => !cancelled && setState({ data, loading: false, error: null }))
       // ล้มแล้วห้ามค้างเลขรอบก่อนพร้อม "ข้อมูล ณ …" (QA 18 ต.ค. 2569) ⇒ ล้างแล้วขึ้นกล่องล้ม + ลองใหม่
       .catch((e: unknown) => !cancelled && setState({ data: null, loading: false, error: friendlyErrorText(e, 'โหลดภาพรวมไม่ได้') }));
     return () => {
       cancelled = true;
     };
-  }, [month, range, rev, pickedBu, legacyCards]);
+  }, [month, range, rev, pickedBu, legacyCards, dashV2]);
 
   const data = state.data;
   const win = data?.window ?? null;
@@ -443,7 +448,11 @@ const RecruitOverview: React.FC<{
        * ตัวกรองบนสุด (รวมเจ้าหน้าที่สรรหา) คุมทุกการ์ด · การติดต่อ / นัดหมาย เรียงต่อท้าย พับไว้ กดกางค่อยโชว์
        * การ์ดที่นับฝั่งเซิร์ฟเวอร์ (งานค้างตอนนี้ · ผลงานรายคน · คนแจ้งเข้า) ตามตัวกรองด้วย — เซิร์ฟเวอร์ส่งแยกต่อใบขอ (`recruitOverviewScope.ts`)
        */}
-      {legacyCards ? null : (
+      {legacyCards ? null : dashV2 ? (
+        <Suspense fallback={<Skeleton className="h-72 rounded-2xl" />}>
+          <RecruitOverviewV2 data={data} />
+        </Suspense>
+      ) : (
         <RecruitStuckBody
           // 13 พ.ย. 2569 ค่าเริ่ม = แบบ Scale ลง (เจ้าของ "ทำมาก่อนเลย") · หน้าเดียวเลื่อนลง 11 พ.ย. เปิดได้ที่ `&dash=list` (ทางถอย)
           layout={v5 ? (searchParams.get('dash') === 'list' ? 'v5' : searchParams.get('dash') === 'scale' ? 'scale' : 'topics') : undefined}

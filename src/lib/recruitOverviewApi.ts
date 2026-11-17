@@ -8,9 +8,12 @@ export async function fetchRecruitOverview(
   range?: { from: string; to: string; all?: boolean } | null,
   /** ผู้ใช้หลาย BU เลือกทีละ BU (26 ต.ค. 2569) · null = ผลรวมทุก BU ในสิทธิ์ (29 ต.ค. 2569) */
   bu?: string | null,
+  /** ผล ณ วันสิ้นสุด (ภาพรวม v2 · 17 พ.ย. 2569) — หน้าเดิมไม่ส่ง */
+  opts: { asOf?: boolean } = {},
 ): Promise<RecruitOverviewResponse> {
   const p = new URLSearchParams();
   if (bu) p.set('bu', bu);
+  if (opts.asOf) p.set('asof', '1');
   if (range) {
     p.set('from', range.from);
     p.set('to', range.to);

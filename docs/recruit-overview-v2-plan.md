@@ -23,6 +23,15 @@
 - อายุ = `public_job_applications.age` (ค่าปัจจุบัน — บอกข้อจำกัด) · จังหวัดที่อยู่ = `public_job_applications.province` (ไม่ใช่จังหวัดงาน)
 - หน้าใหม่อยู่หลัง `&dash=v2` จนผ่านด่าน แล้วค่อยสลับเป็นค่าเริ่ม (หน้าเดิมเข้าได้ผ่าน `&dash=topics`)
 
+## สถานะ (อัปเดต 17 พ.ย. 2569 ค่ำ)
+- ✅ ข้อมูล: `api/_lib/overviewAsOf.ts` (ผล ณ วันสิ้นสุด · ?asof=1) · age/homeProvince ต่อใบ — commit 9dc843e2
+- ✅ ตัวคำนวณ: `src/lib/recruitAudience.ts` (+เทสต์ 8) · `v2/v2Model.ts`
+- ✅ จอแรก: `src/components/dashboard-trends/v2/` RecruitOverviewV2 · V2Drawer · V2Parts — เปิด `&dash=v2`
+  ทดสอบจริง: Facebook 1,027 → 36–45 ปี 404 → กรุงเทพ 216 · % รวม 44/1,027 = 4.3% · Back คืนชั้นเดิม
+- ⏳ ต่อไป: ผู้นัด (ต้องเติม field ผู้บันทึกนัด) · 9 สถานะการประกาศรายใบ · ใบขอใหม่ตามวันคีย์ ERP (record_date — adapter แยก)
+  · กดแท่งกราฟเวลาในแผง · เทียบ BU ในแผง metric แบบ % · เบอร์ไม่ซ้ำ · ประวัติผลตามวัน · คลิกฟอร์ม · จอแคบ · ด่าน ACCEPTANCE A–G
+- ยังไม่ push (ทำบน branch `recruit-overview-v2`)
+
 ## ตาราง no-loss (เติมระหว่างทำ)
 | ของเดิม (โฉม topics/scale/list) | อยู่ที่ไหนใน v2 | สถานะ |
 |---|---|---|
