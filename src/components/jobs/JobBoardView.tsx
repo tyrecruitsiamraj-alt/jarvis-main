@@ -246,7 +246,7 @@ export type JobBoardViewProps = {
  * **กล่องบนหน้ากล่องงาน** ที่กดแล้วกรองในหน้าเดิม เหมือนกล่องอื่นทุกกล่อง
  * ลิงก์เก่า `?view=closed` / `?view=cancelled` ถูกแปลงเป็นกล่องที่ `StaffJobBoardPage`
  */
-export type BoardViewId = 'board' | 'match' | 'list' | 'contact' | 'appointments' | 'dashboard' | 'precheck';
+export type BoardViewId = 'board' | 'match' | 'list' | 'scrap' | 'contact' | 'appointments' | 'dashboard' | 'precheck';
 
 /**
  * แท็บแรก "โพสต์ประกาศ ▾" เลือกได้สองงาน (เจ้าของ 11 พ.ย. 2569 "จับคู่งานย้ายไปไว้กับ โพสต์ประกาศ แบบกดแล้วมีลูกศรให้เลือก"
@@ -255,6 +255,15 @@ export type BoardViewId = 'board' | 'match' | 'list' | 'contact' | 'appointments
 export const POSTING_PICKS: ReadonlyArray<{ id: BoardViewId; label: string }> = [
   { id: 'board', label: 'โพสต์ประกาศ' },
   { id: 'match', label: 'จับคู่งาน' },
+];
+
+/**
+ * แท็บ "ผู้สมัคร ▾" เลือกได้สองรายชื่อ (เจ้าของ 17 พ.ย. 2569 "แท็บผู้สมัครทำเป็นลูกศรกดลงจะเจอ Scrap") —
+ * Scrap = รายชื่อที่ So Scraping ดึงจาก JobBKK/JobThai ทุกใบขอ (`ScrapCandidatesPanel` · ยังไม่ใช่ใบสมัคร)
+ */
+export const APPLICANT_PICKS: ReadonlyArray<{ id: BoardViewId; label: string }> = [
+  { id: 'list', label: 'ผู้สมัคร' },
+  { id: 'scrap', label: 'Scrap' },
 ];
 
 /**
@@ -1388,7 +1397,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
    * ⇒ ถอดการ์ดกรมท่าทึบ (PageHeroStrip) · ถอดพื้นไล่สี + กรอบกว้าง max-w-6xl ของฝั่งเจ้าหน้าที่
    * (หน้าสมัครสาธารณะยังเป็นหัวแบบหน้าปกนิตยสารเหมือนเดิม — คนละกลุ่มคนดู)
    */
-  const staffTitle = [...POSTING_PICKS, ...BOARD_VIEW_TABS].find((t) => t.id === view)?.label ?? 'งานสรรหา';
+  const staffTitle = [...POSTING_PICKS, ...APPLICANT_PICKS, ...BOARD_VIEW_TABS].find((t) => t.id === view)?.label ?? 'งานสรรหา';
   /** แถบแท็บล้นบนมือถือ — เลื่อนให้เห็นแท็บที่เปิดอยู่ (QA รอบ 2 ข้อ 32) */
   const staffTabsRef = React.useRef<HTMLDivElement | null>(null);
   useEffect(() => {
@@ -1430,20 +1439,22 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
       <div ref={staffTabsRef} className={cn(glassTabsListClass, 'max-w-full justify-start overflow-x-auto')} role="tablist" aria-label="มุมมองหน้างานสรรหา">
         <GlassTabIndicator />
         {BOARD_VIEW_TABS.map((v) => {
-          // แท็บแรก = ลูกศรเลือก โพสต์ประกาศ / จับคู่งาน (11 พ.ย. 2569)
-          if (v.id === 'board') {
-            const picked = POSTING_PICKS.find((p) => p.id === view) ?? null;
+          // แท็บลูกศร: โพสต์ประกาศ / จับคู่งาน (11 พ.ย. 2569) · ผู้สมัคร / Scrap (17 พ.ย. 2569)
+          const picks = v.id === 'board' ? POSTING_PICKS : v.id === 'list' ? APPLICANT_PICKS : null;
+          if (picks) {
+            const testId = v.id === 'board' ? 'posting-pick' : 'applicant-pick';
+            const picked = picks.find((p) => p.id === view) ?? null;
             return (
-              <DropdownMenu key="posting-pick">
+              <DropdownMenu key={testId}>
                 <DropdownMenuTrigger asChild>
-                  <button type="button" aria-current={picked ? 'page' : undefined} className={cn(glassTabClass(Boolean(picked)), 'gap-1')} data-testid="posting-pick">
+                  <button type="button" aria-current={picked ? 'page' : undefined} className={cn(glassTabClass(Boolean(picked)), 'gap-1')} data-testid={testId}>
                     {/* ชื่อทุกตัวซ้อนกันในช่องเดียว โชว์ตัวที่เลือก — ปุ่มกว้างเท่าชื่อยาวสุดเสมอ แท็บข้าง ๆ ไม่เลื่อนตอนสลับ (11 พ.ย. 2569) */}
                     <span className="grid">
-                      {POSTING_PICKS.map((p) => (
+                      {picks.map((p) => (
                         <span
                           key={p.id}
-                          className={cn('col-start-1 row-start-1', p.id !== (picked ?? POSTING_PICKS[0]).id && 'invisible')}
-                          aria-hidden={p.id !== (picked ?? POSTING_PICKS[0]).id}
+                          className={cn('col-start-1 row-start-1', p.id !== (picked ?? picks[0]).id && 'invisible')}
+                          aria-hidden={p.id !== (picked ?? picks[0]).id}
                         >
                           {p.label}
                         </span>
@@ -1453,8 +1464,8 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start">
-                  {POSTING_PICKS.map((p) => (
-                    <DropdownMenuItem key={p.id} onSelect={() => onViewChange(p.id)} data-testid={`posting-pick-${p.id}`}>
+                  {picks.map((p) => (
+                    <DropdownMenuItem key={p.id} onSelect={() => onViewChange(p.id)} data-testid={`${testId}-${p.id}`}>
                       {p.label}
                     </DropdownMenuItem>
                   ))}

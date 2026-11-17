@@ -575,13 +575,22 @@
      "src": "src/components/jobs/JobBoardView.tsx:1410"
     },
     {
-     "label": "ผู้สมัคร",
+     "label": "ผู้สมัคร ▾ (ปุ่มลูกศรเลือก: ผู้สมัคร / Scrap)",
      "action": "tab",
      "target": "?view=list",
      "api": null,
      "effects": [],
      "when": null,
      "src": "src/components/jobs/JobBoardView.tsx:1420"
+    },
+    {
+     "label": "Scrap (ในเมนู ▾)",
+     "action": "tab",
+     "target": "?view=scrap (ScrapCandidatesPanel ทุกใบขอ)",
+     "api": "GET /api/scrap-candidates?all=1",
+     "effects": [],
+     "when": null,
+     "src": "src/pages/jobs/StaffJobBoardPage.tsx:194"
     },
     {
      "label": "การติดต่อ",
@@ -1270,13 +1279,22 @@
      "src": "src/components/jobs/JobBoardView.tsx:1410"
     },
     {
-     "label": "ผู้สมัคร",
+     "label": "ผู้สมัคร ▾ (ปุ่มลูกศรเลือก: ผู้สมัคร / Scrap)",
      "action": "tab",
      "target": "?view=list (RmWorkspace tab candidates)",
      "api": null,
      "effects": [],
      "when": null,
      "src": "src/components/jobs/JobBoardView.tsx:1420"
+    },
+    {
+     "label": "Scrap (ในเมนู ▾)",
+     "action": "tab",
+     "target": "?view=scrap (ScrapCandidatesPanel ทุกใบขอ)",
+     "api": "GET /api/scrap-candidates?all=1",
+     "effects": [],
+     "when": null,
+     "src": "src/pages/jobs/StaffJobBoardPage.tsx:194"
     },
     {
      "label": "การติดต่อ",
@@ -4068,6 +4086,55 @@
      "effects": [],
      "when": "มีผู้สมัคร",
      "src": "src/pages/jobs/UnitRequestTabPage.tsx:126"
+    }
+   ]
+  },
+  {
+   "id": "unit-request-scrap",
+   "kind": "tab",
+   "title": "Scrap",
+   "route": "/jobs/siamraj/:id/scrap",
+   "parent": "unit-request-detail",
+   "src": "src/pages/jobs/UnitRequestTabPage.tsx:272",
+   "controls": [
+    {
+     "label": "ชิป ทั้งหมด / ผ่านเกณฑ์ / ต้องดูเพิ่ม / ไม่ผ่าน / ยังไม่ประเมิน",
+     "action": "filter",
+     "target": "หน้านี้",
+     "api": null,
+     "effects": [],
+     "when": null,
+     "src": "src/components/jobs/ScrapCandidatesPanel.tsx:155"
+    },
+    {
+     "label": "ติ๊กชื่อ (ไม่มีเบอร์/อยู่ในการติดต่อแล้ว ติ๊กไม่ได้)",
+     "action": "inline",
+     "target": "หน้านี้",
+     "api": null,
+     "effects": [],
+     "when": null,
+     "src": "src/components/jobs/ScrapCandidatesPanel.tsx:237"
+    },
+    {
+     "label": "เก็บเข้าการติดต่อ",
+     "action": "api",
+     "target": "หน้านี้ (ข้อความผล + ปุ่มไปหน้าการติดต่อ)",
+     "api": "POST /api/scrap-candidates",
+     "effects": [
+      "สร้างใบสมัครป้าย Scrap · JobBKK/JobThai (เบอร์ซ้ำ 14 วัน = ใช้ใบเดิม)",
+      "เก็บเป็น Lead ของคนกด · AI ไม่โทรเอง"
+     ],
+     "when": "ติ๊กอย่างน้อย 1 คน",
+     "src": "src/components/jobs/ScrapCandidatesPanel.tsx:172"
+    },
+    {
+     "label": "ไปหน้าการติดต่อ",
+     "action": "navigate",
+     "target": "/jobs/board?view=contact",
+     "api": null,
+     "effects": [],
+     "when": "หลังเก็บสำเร็จ",
+     "src": "src/components/jobs/ScrapCandidatesPanel.tsx:177"
     }
    ]
   },

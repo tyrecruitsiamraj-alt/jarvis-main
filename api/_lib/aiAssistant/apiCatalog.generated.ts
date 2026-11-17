@@ -1834,8 +1834,9 @@ export const API_CATALOG: ApiCatalogEntry[] = [
    "GET",
    "POST"
   ],
-  "doc": "/api/public/skill-quiz — พนักงานทำแบบทดสอบจากลิงก์ (ไม่ต้องล็อกอิน · เจ้าของ 12 พ.ย. 2569)\nGET ?token=   → ชื่อชุด/ชื่อพนักงาน/ข้อสอบที่ตัดเฉลยแล้ว · ส่งแล้ว = บอกว่าส่งแล้ว ไม่ส่งข้อสอบ\nPOST { token, answers } → ส่งได้ครั้งเดียว · ส่งแล้ว AI ร่างผลต่อเบื้องหลัง\n🔴 ไม่ส่งคะแนนกลับให้พนักงาน — ผลผ่านเจ้าหน้าที่ตรวจก่อนถึงลูกค้า\n\nลิงก์ของชุด (16 พ.ย. 2569 · แบบ Knowa):\nGET ?set=                       → ชื่อชุด · ตำแหน่ง · จำนวนข้อ (ไม่ส่งข้อสอบ)\nPOST { action: 'start', set, firstName, lastName, phone, age, citizenId, birthDate, consent } → token ใบของคนนี้\nPOST { action: 'resume', set, citizenId, birthDate } → token ใบเดิม (ตรงทั้งคู่เท่านั้น)\nเลขบัตรเก็บแบบเข้ารหัส + แฮชไว้ค้น · ทำชุดเดิมได้ครั้งเดียว (ฐานตัดสิน)",
+  "doc": "/api/public/skill-quiz — พนักงานทำแบบทดสอบจากลิงก์ (ไม่ต้องล็อกอิน · เจ้าของ 12 พ.ย. 2569)\nGET ?token=   → ชื่อชุด/ชื่อพนักงาน/ข้อสอบที่ตัดเฉลยแล้ว · ส่งแล้ว = บอกว่าส่งแล้ว ไม่ส่งข้อสอบ\nPOST { token, answers } → ส่งได้ครั้งเดียว · ส่งแล้ว AI ร่างผลต่อเบื้องหลัง\n🔴 ไม่ส่งคะแนนกลับให้พนักงาน — ผลผ่านเจ้าหน้าที่ตรวจก่อนถึงลูกค้า\n\nลิงก์ของชุด (16 พ.ย. 2569 · แบบ Knowa):\nGET ?set=                       → ชื่อชุด · ตำแหน่ง · จำนวนข้อ (ไม่ส่งข้อสอบ)\nPOST { action: 'start', set, firstName, lastName, phone, age, citizenId, birthDate, consent } → token ใบของคนนี้\nPOST { action: 'resume', set, citizenId, birthDate } → token ใบเดิม (ตรงทั้งคู่เท่านั้น)\nเลขบัตรเก็บแบบเข้ารหัส + แฮชไว้ค้น · ทำชุดเดิมได้ครั้งเดียว (ฐานตัดสิน)\n\nGET ?image=<uuid> → ตัวรูปของคำถาม/ตัวเลือก (17 พ.ย. 2569) · รหัสสุ่มเดาไม่ได้ · รูปไม่เปลี่ยนจึงเก็บแคชได้ยาว",
   "query": [
+   "image",
    "set",
    "token"
   ],
@@ -2134,6 +2135,26 @@ export const API_CATALOG: ApiCatalogEntry[] = [
   "reachesPeople": false
  },
  {
+  "path": "/api/scrap-candidates",
+  "file": "api/_handlers/scrap-candidates.ts",
+  "methods": [
+   "GET",
+   "POST"
+  ],
+  "doc": "/api/scrap-candidates — รายชื่อจาก Scrap (So Scraping) ของใบขอ (เจ้าของ 17 พ.ย. 2569 · ตรรกะ `api/_lib/scrapCandidates.ts`)\nGET ?job=<job id หรือเลขใบขอ> → รายชื่อของใบนั้น (แท็บ Scrap ในหน้าใบขอ)\nGET ?all=1                    → ทุกใบที่เห็นได้ (แท็บผู้สมัคร ▾ Scrap ของหน้างานสรรหา)\nPOST { action: 'to_contact', job_id, candidate_ids } → สร้าง/ใช้ใบสมัครเดิม แล้วเก็บเข้าการติดต่อ (Lead) ของคนกด\nสิทธิ์ resource เดียวกับผู้สมัคร (`job-applications`) · ผู้ใช้ที่ล็อก BU เห็นเฉพาะใบขอใน BU ตัวเอง (`loadScopedJobIdSet`)\nAI ไม่โทรเอง: ใบสร้างในชื่อ So Scraping + เป็น Lead — ตัวส่งอัตโนมัติข้ามทั้งสองแบบ",
+  "query": [
+   "all",
+   "job"
+  ],
+  "body": [
+   "js",
+   "action",
+   "job_id",
+   "candidate_ids"
+  ],
+  "reachesPeople": true
+ },
+ {
   "path": "/api/selection-progress",
   "file": "api/_handlers/selection-progress.ts",
   "methods": [
@@ -2309,7 +2330,7 @@ export const API_CATALOG: ApiCatalogEntry[] = [
    "GET",
    "POST"
   ],
-  "doc": "/api/skill-quiz — หน้าแบบทดสอบพนักงานของเจ้าหน้าที่ (เจ้าของ 12 พ.ย. 2569)\nGET              → รายการผล (สรุปคะแนนจากตัวตัดสินเดียว `scoreQuiz`)\nGET ?view=sets   → ชุดข้อสอบ (+ ลิงก์ของชุด + ใครเห็น)\nGET ?view=people → รายชื่อผู้ใช้ไว้เลือก \"ใครเห็นชุดนี้\"\nGET ?id=         → ผลของคนหนึ่งคน (มีเฉลย/คำตอบ/บทวิเคราะห์)\nPOST { action }  → create_set · update_set · archive_set · save_review · ai_draft · archive_attempt\n🔴 16 พ.ย. 2569 เห็นเฉพาะชุดที่ตั้งให้เห็น (ทั้ง BU / รายคน · `canSeeQuizSet`) — ผลของคนทำเห็นตามชุด\n   ลิงก์ละคน (create_link) ถอดแล้ว เหลือลิงก์เดียวต่อชุด · เลขบัตรส่งออกเป็นเลขปิดท้ายเท่านั้น",
+  "doc": "/api/skill-quiz — หน้าแบบทดสอบพนักงานของเจ้าหน้าที่ (เจ้าของ 12 พ.ย. 2569)\nGET              → รายการผล (สรุปคะแนนจากตัวตัดสินเดียว `scoreQuiz`)\nGET ?view=sets   → ชุดข้อสอบ (+ ลิงก์ของชุด + ใครเห็น)\nGET ?view=people → รายชื่อผู้ใช้ไว้เลือก \"ใครเห็นชุดนี้\"\nGET ?id=         → ผลของคนหนึ่งคน (มีเฉลย/คำตอบ/บทวิเคราะห์)\nPOST { action }  → create_set · update_set · archive_set · save_review · ai_draft · archive_attempt\nPOST { action: 'upload_image', data } → { id } รูปของคำถาม/ตัวเลือก (17 พ.ย. 2569) · รูปเปิดดูที่ /api/public/skill-quiz?image=\n🔴 16 พ.ย. 2569 เห็นเฉพาะชุดที่ตั้งให้เห็น (ทั้ง BU / รายคน · `canSeeQuizSet`) — ผลของคนทำเห็นตามชุด\n   ลิงก์ละคน (create_link) ถอดแล้ว เหลือลิงก์เดียวต่อชุด · เลขบัตรส่งออกเป็นเลขปิดท้ายเท่านั้น",
   "query": [
    "view",
    "id"
@@ -2320,6 +2341,7 @@ export const API_CATALOG: ApiCatalogEntry[] = [
    "id",
    "content",
    "viewers",
+   "data",
    "reviewed",
    "analysis"
   ],

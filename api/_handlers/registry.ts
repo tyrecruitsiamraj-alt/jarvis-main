@@ -64,6 +64,7 @@ import soPostGroupsHandler from './so-post-groups.js';
 import soPostSummaryHandler from './so-post-summary.js';
 import requestPipelineHandler from './request-pipeline.js';
 import { soScrapingAiCallHandler, soScrapingLeadsHandler } from './so-scraping-integration.js';
+import scrapCandidatesHandler from './scrap-candidates.js';
 import integrationKeysHandler from './integration-keys.js';
 import followOldIdRepushHandler from './follow-oldid-repush.js';
 import homeMoneyHandler from './home-money.js';
@@ -277,6 +278,7 @@ export const apiRoutes: Record<string, ApiHandler> = {
   '/api/request-pipeline': requestPipelineHandler as ApiHandler,
   '/api/integrations/so-scraping/leads': soScrapingLeadsHandler as ApiHandler,
   '/api/integrations/so-scraping/ai-call': soScrapingAiCallHandler as ApiHandler,
+  '/api/scrap-candidates': scrapCandidatesHandler as ApiHandler,
   '/api/integration-keys': integrationKeysHandler as ApiHandler,
   '/api/follow-oldid-repush': followOldIdRepushHandler as ApiHandler,
   '/api/home-money': homeMoneyHandler as ApiHandler,

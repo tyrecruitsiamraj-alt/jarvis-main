@@ -1,7 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { useLocation, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import ScrapCandidatesPanel from '@/components/jobs/ScrapCandidatesPanel';
+import { fetchScrapCandidatesOfJob } from '@/lib/scrapCandidatesApi';
 import { resolveUnitDetailBackPath } from '@/lib/jobUnitSessionState';
 import { backLabelFor } from '@/lib/stageOrigin';
 import UnitRequestTabs, { type UnitRequestTabId } from '@/components/jobs/UnitRequestTabs';
@@ -9,7 +12,7 @@ import OrderPostButton from '@/components/jobs/OrderPostButton';
 import { JobPostActionsPanel } from '@/components/jobs/JobPostActionsDialog';
 import type { BoardActionTab } from '@/components/jobs/BoardCardActions';
 import { applicationsJobKey, fetchSiamrajUnitRequest } from '@/lib/siamrajUnitRequestsApi';
-import { fetchJobApplications, type PublicApplication } from '@/lib/publicApplicationsApi';
+import { fetchJobApplications, setJobApplicationLead, type PublicApplication } from '@/lib/publicApplicationsApi';
 import {
   groupApplicationsByOrigin,
   summarizeUnitMatches,
@@ -23,7 +26,7 @@ import {
 import { jobBoardCardTitle } from '@/lib/unitRequestDisplay';
 import { EM_DASH } from '@/lib/displayFallback';
 import type { JobRequest } from '@/types';
-import { LoaderCircle, Users } from 'lucide-react';
+import { LoaderCircle, PhoneCall, Users } from 'lucide-react';
 
 const STATUS_CLASS: Record<string, string> = {
   success: 'jarvis-chip jarvis-chip-success',
@@ -37,6 +40,7 @@ export type UnitRequestSubTab = Exclude<UnitRequestTabId, 'detail' | 'posting'>;
 
 const TAB_TITLE: Record<UnitRequestSubTab, string> = {
   applicants: 'ผู้สมัคร',
+  scrap: 'Scrap',
   actions: 'Autopost / Scrap / โพสต์เอง',
 };
 
@@ -64,6 +68,13 @@ const UnitRequestTabPage: React.FC<{ tab: UnitRequestSubTab }> = ({ tab }) => {
   /** แท็บ Autopost / Scrap / โพสต์เอง — กล่องที่เลือก + โหลดใหม่หลังสั่งงาน */
   const [actionsTab, setActionsTab] = useState<BoardActionTab>('autopost');
   const [actionsRev, setActionsRev] = useState(0);
+  /** ยอดรายชื่อจาก Scrap ของใบนี้ (เลขบนแท็บ · 17 พ.ย. 2569) — undefined = ยังโหลดไม่เสร็จ */
+  const [scrapTotal, setScrapTotal] = useState<number | undefined>(undefined);
+  const navigate = useNavigate();
+  /** แท็บผู้สมัคร: ติ๊กแล้ว "เก็บเข้าการติดต่อ" (เจ้าของ 17 พ.ย. 2569 — ใบงานทั้งผู้สมัครและ Scrap กดเลือกเก็บได้) */
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [leadBusy, setLeadBusy] = useState(false);
+  const [leadNotice, setLeadNotice] = useState<{ text: string; ok: boolean } | null>(null);
 
   const reload = useCallback(async () => {
     setError(null);
@@ -74,6 +85,9 @@ const UnitRequestTabPage: React.FC<{ tab: UnitRequestSubTab }> = ({ tab }) => {
       const apps = await fetchJobApplications(applicationsJobKey(id, j?.id));
       setJob((j as JobRequest | null) ?? null);
       setItems(apps);
+      void fetchScrapCandidatesOfJob(j?.id ?? id)
+        .then((d) => setScrapTotal(d.counts.total))
+        .catch(() => setScrapTotal(undefined));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'โหลดรายชื่อไม่สำเร็จ');
     }
@@ -92,6 +106,38 @@ const UnitRequestTabPage: React.FC<{ tab: UnitRequestSubTab }> = ({ tab }) => {
     [items, statusPick],
   );
 
+  const togglePick = (appId: string, on: boolean) =>
+    setPicked((cur) => {
+      const next = new Set(cur);
+      if (on) next.add(appId);
+      else next.delete(appId);
+      return next;
+    });
+
+  /** เก็บคนที่ติ๊กเข้าการติดต่อ (Lead ของฉัน) — คำสั่งเดียวกับปุ่ม "เก็บเข้า Lead" ของแท็บผู้สมัครหน้างานสรรหา */
+  const keepPicked = async () => {
+    const ids = [...picked];
+    if (ids.length === 0) return;
+    setLeadBusy(true);
+    setLeadNotice(null);
+    const failed: string[] = [];
+    for (const appId of ids) {
+      try {
+        await setJobApplicationLead(appId, true);
+      } catch (e) {
+        failed.push(e instanceof Error ? e.message : 'เก็บไม่สำเร็จ');
+      }
+    }
+    const done = ids.length - failed.length;
+    setLeadNotice({
+      text: `เก็บเข้าการติดต่อแล้ว ${done} คน${failed.length ? ` · ไม่สำเร็จ ${failed.length} คน (${[...new Set(failed)].join(' · ')})` : ''}`,
+      ok: done > 0,
+    });
+    setPicked(new Set());
+    setLeadBusy(false);
+    await reload();
+  };
+
   return (
     <div className="relative">
       <PageHeader
@@ -106,7 +152,7 @@ const UnitRequestTabPage: React.FC<{ tab: UnitRequestSubTab }> = ({ tab }) => {
         <UnitRequestTabs
           jobId={id}
           active={tab}
-          counts={{ applicants: items?.length }}
+          counts={{ applicants: items?.length, scrap: scrapTotal }}
         />
 
         {error ? <p className="text-sm text-destructive">{error}</p> : null}
@@ -142,6 +188,20 @@ const UnitRequestTabPage: React.FC<{ tab: UnitRequestSubTab }> = ({ tab }) => {
               ))}
             </div>
 
+            <div className="flex flex-wrap items-center gap-2 text-sm">
+              <span className="tabular-nums text-muted-foreground">เลือก {picked.size} คน</span>
+              <Button type="button" size="sm" disabled={picked.size === 0 || leadBusy} onClick={() => void keepPicked()} data-testid="applicants-to-contact">
+                {leadBusy ? <LoaderCircle className="animate-spin" aria-hidden /> : <PhoneCall aria-hidden />}
+                เก็บเข้าการติดต่อ
+              </Button>
+              {leadNotice?.ok ? (
+                <Button type="button" size="sm" variant="outline" onClick={() => navigate('/jobs/board?view=contact')}>
+                  ไปหน้าการติดต่อ
+                </Button>
+              ) : null}
+              {leadNotice ? <span className={leadNotice.ok ? 'text-foreground' : 'text-destructive'}>{leadNotice.text}</span> : null}
+            </div>
+
             {!items && !error ? (
               <p className="flex items-center gap-2 py-10 text-sm text-muted-foreground">
                 <LoaderCircle className="h-4 w-4 animate-spin text-blue-500" /> กำลังโหลด…
@@ -174,10 +234,18 @@ const UnitRequestTabPage: React.FC<{ tab: UnitRequestSubTab }> = ({ tab }) => {
                     return (
                       <li
                         key={a.id}
-                        className="grid gap-x-3 gap-y-1 rounded-xl border border-border/70 bg-card px-3 py-2 text-sm sm:grid-cols-[1.4fr_1.2fr_auto] sm:items-center"
+                        className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 rounded-xl border border-border/70 bg-card px-3 py-2 text-sm sm:grid-cols-[auto_1.4fr_1.2fr_auto] sm:items-center"
                       >
+                        <Checkbox
+                          aria-label={`เลือก ${a.full_name}`}
+                          checked={picked.has(a.id)}
+                          disabled={Boolean(a.is_lead)}
+                          onCheckedChange={(v) => togglePick(a.id, v === true)}
+                          className="row-span-3 mt-0.5 sm:row-span-1 sm:mt-0"
+                        />
                         <span className="flex flex-wrap items-center gap-1.5">
                           <b className="font-medium text-foreground">{a.full_name}</b>
+                          {a.is_lead ? <span className="text-xs text-muted-foreground">อยู่ในการติดต่อ{a.lead_by_name ? `ของ ${a.lead_by_name}` : 'แล้ว'}</span> : null}
                           {originLabel ? (
                             <span className="jarvis-chip jarvis-chip-violet">{originLabel}</span>
                           ) : null}
@@ -199,6 +267,9 @@ const UnitRequestTabPage: React.FC<{ tab: UnitRequestSubTab }> = ({ tab }) => {
             ))}
           </>
         ) : null}
+
+        {/* ── Scrap (เจ้าของ 17 พ.ย. 2569 "เปิดใบขอไหนที่มีการสั่ง Scrap ต้องเห็นรายชื่อ") ── */}
+        {tab === 'scrap' ? <ScrapCandidatesPanel jobId={job?.id ?? applicationsJobKey(id, undefined)} onTotal={setScrapTotal} /> : null}
 
         {/* ── Autopost / Scrap / โพสต์เอง (เจ้าของ 13 พ.ย. 2569 "ย้ายไปเป็นอีกแท็บ … เอาทำอะไรไปแล้วโชว์ด้วย") ──
             บน = ทำอะไรไปแล้ว (ตัวเดียวกับป๊อปบนการ์ด) · ล่าง = ฟอร์มสั่งตัวเดียวกับป๊อปประกาศ (`OrderPostButton`) กางไว้เลย */}

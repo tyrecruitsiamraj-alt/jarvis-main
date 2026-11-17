@@ -25,12 +25,14 @@ import { cn } from '@/lib/utils';
 // 🔴 แท็บ "การติดต่อ" ถอดแล้ว (เจ้าของ 11 พ.ย. 2569 "เอาออกจากหน้านี้") — ลิงก์เก่า /contact พาไปแท็บผู้สมัคร (App.tsx)
 // 🔴 13 พ.ย. 2569 เจ้าของ: แท็บ AI Match ถอด ("ถูกย้ายไปหน้างานสรรหาแล้ว" — ลิงก์เก่าพาไปจับคู่งานใน App.tsx)
 //    + แท็บใหม่ Autopost / Scrap / โพสต์เอง (ย้ายกล่องสั่งงานจากหน้ารายละเอียด + โชว์ทำอะไรไปแล้ว)
-export const UNIT_TAB_IDS = ['detail', 'applicants', 'actions'] as const;
+// 🔴 17 พ.ย. 2569 เจ้าของ: แท็บ "Scrap" — ใบนี้ Scrap มาทั้งหมดกี่คน ใครผ่าน/ไม่ผ่าน (`ScrapCandidatesPanel`)
+export const UNIT_TAB_IDS = ['detail', 'applicants', 'scrap', 'actions'] as const;
 export type UnitRequestTabId = (typeof UNIT_TAB_IDS)[number];
 
 const TAB_LABEL: Record<UnitRequestTabId, string> = {
   detail: 'รายละเอียดงาน',
   applicants: 'ผู้สมัคร',
+  scrap: 'Scrap',
   actions: 'Autopost / Scrap / โพสต์เอง',
 };
 

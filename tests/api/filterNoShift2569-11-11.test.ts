@@ -41,7 +41,7 @@ describe('ทั้งระบบ: กดแล้วปุ่มอยู่�
     expect(getVisiblePageNumbers(3, 5)).toEqual([1, 2, 3, 4, 5]);
   });
   it('หน้างานสรรหา: แท็บแรกกว้างเท่าชื่อยาวสุด · ไม่มีแถบขั้นงานดันแท็บลง', () => {
-    expect(read('src/components/jobs/JobBoardView.tsx')).toContain("className={cn('col-start-1 row-start-1', p.id !== (picked ?? POSTING_PICKS[0]).id && 'invisible')}");
+    expect(read('src/components/jobs/JobBoardView.tsx')).toContain("className={cn('col-start-1 row-start-1', p.id !== (picked ?? picks[0]).id && 'invisible')}");
     expect(read('src/components/layout/StageBanner.tsx')).toContain("if (!step || pathname === '/jobs/board') return null;");
   });
   it('ตัวกรอง: ปุ่มพับอยู่จุดเดียวกับปุ่มกาง', () => {
