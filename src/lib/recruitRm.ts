@@ -75,6 +75,27 @@ export function claimerOf(r: Pick<PublicApplication, 'claimed_by_me' | 'claimed_
   return name?.trim() || null;
 }
 
+/**
+ * แท็บผู้สมัคร: คนนี้มีคนเก็บไปโทรแล้วหรือยัง (เจ้าของ 17 พ.ย. 2569 "LBM6903002 … จะรู้ได้ไงว่าเขาเก็บไปโทรหรือยังไม่เก็บ")
+ * ทุกแถวมีบรรทัดนี้เสมอ (ยังไม่มีคนเก็บก็บอก) — ป้ายไม่โผล่/หายตามสถานะ แถวไม่กระโดด
+ * ถือสาย (hold/claim) มาก่อน Lead · ของฉันเขียน "ฉัน"
+ * ชื่อคนเก็บของคนอื่นไม่ส่งมาที่ลิสต์นี้ (เจ้าของ 13 ส.ค. 2569 "คนอื่นจะไม่เห็นชื่อคนที่เก็บไป") ⇒ ไม่มีชื่อ = "มีคนเก็บไปโทรแล้ว"
+ */
+export function rmKeptLine(
+  r: Pick<PublicApplication, 'claimed' | 'claimed_by_me' | 'claimed_by_name' | 'is_lead' | 'lead_by_me' | 'lead_by_name'>,
+  hold?: { heldByName: string | null; mine: boolean } | null,
+): { kept: boolean; text: string } {
+  const who = (mine: boolean | undefined, name: string | null | undefined) => (mine ? 'ฉัน' : name?.trim() || null);
+  const claimText = (n: string | null) => (n ? `เก็บไปโทรแล้ว · ${n}` : 'มีคนเก็บไปโทรแล้ว');
+  if (hold) return { kept: true, text: claimText(who(hold.mine, hold.heldByName)) };
+  if (r.claimed) return { kept: true, text: claimText(who(r.claimed_by_me, r.claimed_by_name)) };
+  if (r.is_lead) {
+    const n = who(r.lead_by_me, r.lead_by_name);
+    return { kept: true, text: n ? `อยู่ในการติดต่อ · ${n}` : 'อยู่ในการติดต่อแล้ว' };
+  }
+  return { kept: false, text: 'ยังไม่มีคนเก็บ' };
+}
+
 export const RM_APPOINTMENT_SCOPE_LABEL: Record<RmAppointmentScope, string> = {
   mine: 'ของฉัน',
   all: 'ทุกคน',

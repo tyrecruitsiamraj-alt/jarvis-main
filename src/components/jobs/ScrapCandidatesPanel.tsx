@@ -40,18 +40,20 @@ type Props = {
   requestTitle?: (requestNo: string) => string | null;
   /** ยอดทั้งหมดหลังโหลด (แท็บของใบขอใช้โชว์เลข) */
   onTotal?: (n: number) => void;
+  /** แท็บรวม: เลือกใบขอนี้ไว้ตั้งแต่เปิด (กดเลข Scrap จากตารางใบขอ) */
+  initialRequest?: string | null;
 };
 
 /** ติ๊กได้ไหม — ไม่มีเบอร์/อยู่ในการติดต่อแล้ว = ไม่ได้ */
 const pickable = (r: ScrapCandidateRow) => Boolean(r.phone) && !r.in_jarvis?.is_lead;
 
-export default function ScrapCandidatesPanel({ jobId = null, requestTitle, onTotal }: Props) {
+export default function ScrapCandidatesPanel({ jobId = null, requestTitle, onTotal, initialRequest = null }: Props) {
   const navigate = useNavigate();
   const [rows, setRows] = useState<ScrapCandidateRow[] | null>(null);
   const [requests, setRequests] = useState<Array<{ request_no: string; total: number }>>([]);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ScrapResult | null>(null);
-  const [requestPick, setRequestPick] = useState<string>(ALL);
+  const [requestPick, setRequestPick] = useState<string>(initialRequest?.toUpperCase() || ALL);
   const [page, setPage] = useState(0);
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);

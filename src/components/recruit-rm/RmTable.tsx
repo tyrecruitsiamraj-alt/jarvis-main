@@ -29,6 +29,7 @@ import {
   canHoldApplication,
   claimerOf,
   daysSinceApplied,
+  rmKeptLine,
   splitApplicantName,
   type RmRowAction,
   type RmTab,
@@ -369,6 +370,15 @@ const RmTable: React.FC<{
                           >
                             <span className="line-clamp-2 min-w-14 break-words font-medium">{dashIfEmpty(firstName)}</span>
                           </Button>
+                          {(() => {
+                            // เก็บไปโทรแล้วหรือยัง — ทุกแถวมีเสมอ (17 พ.ย. 2569)
+                            const kept = rmKeptLine(r, holdByRef[r.id]);
+                            return (
+                              <span className={cn('text-xs', kept.kept ? 'font-medium text-foreground' : 'text-muted-foreground')} data-testid="rm-kept">
+                                {kept.text}
+                              </span>
+                            );
+                          })()}
                           <ChoiceCountdownChip r={r} now={now} />
                         </span>
                       </td>

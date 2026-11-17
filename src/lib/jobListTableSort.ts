@@ -31,6 +31,7 @@ export const JOB_LIST_TABLE_COLUMNS = [
   'required',
   'remaining',
   'applicants',
+  'scrap',
   'request_type',
   'position',
   'subtype',
@@ -53,6 +54,7 @@ export const JOB_LIST_TABLE_COLUMN_LABEL: Record<JobListTableColumn, string> = {
   required: 'วันที่ต้องการ',
   remaining: 'เหลือหา',
   applicants: 'คนกรอก',
+  scrap: 'Scrap',
   request_type: 'ประเภทใบขอ',
   position: 'ตำแหน่ง',
   subtype: 'ลักษณะงานย่อย',
@@ -75,6 +77,7 @@ export function defaultDirForColumn(column: JobListTableColumn): JobListTableSor
     case 'required':
     case 'remaining':
     case 'applicants':
+    case 'scrap':
     case 'send_replacement':
       return 'desc';
     default:
@@ -121,7 +124,11 @@ function ymdVal(v: string | null | undefined): SortValue {
 
 /** ค่าที่ใช้เทียบของแต่ละคอลัมน์ — ว่าง = `{}` (ตกท้ายเสมอ) */
 /** ค่าที่อยู่นอกใบขอ — ยอดคนกรอกมาจาก API แยก (null = ยังไม่รู้ ตกท้าย) */
-export type JobListSortContext = { applicantCount?: (job: JobRequest) => number | null };
+export type JobListSortContext = {
+  applicantCount?: (job: JobRequest) => number | null;
+  /** รายชื่อจาก Scrap ต่อใบ (17 พ.ย. 2569) */
+  scrapCount?: (job: JobRequest) => number | null;
+};
 
 export function tableSortValue(
   job: JobRequest,
@@ -132,6 +139,10 @@ export function tableSortValue(
   switch (column) {
     case 'applicants': {
       const n = ctx.applicantCount?.(job);
+      return n == null ? {} : { num: n };
+    }
+    case 'scrap': {
+      const n = ctx.scrapCount?.(job);
       return n == null ? {} : { num: n };
     }
     case 'request_no':

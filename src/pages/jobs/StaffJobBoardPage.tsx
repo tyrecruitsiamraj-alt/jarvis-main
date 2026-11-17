@@ -3,6 +3,7 @@ import { lazyPage } from '@/lib/staleChunkReload';
 import { useSearchParams } from 'react-router-dom';
 import JobBoardView, { APPLICANT_PICKS, BOARD_VIEW_TABS, POSTING_PICKS, type BoardViewId } from '@/components/jobs/JobBoardView';
 import ScrapCandidatesPanel from '@/components/jobs/ScrapCandidatesPanel';
+import { SCRAP_REQUEST_PARAM } from '@/lib/scrapCandidatesApi';
 import { usePageTitle } from '@/hooks/usePageTitle';
 import RmWorkspace from '@/components/recruit-rm/RmWorkspace';
 import ImportApplicantsDialog from '@/components/recruit-rm/ImportApplicantsDialog';
@@ -192,7 +193,11 @@ const StaffJobBoardPage: React.FC = () => {
         }
         listContent={
           view === 'board' ? null : view === 'scrap' ? (
-            <ScrapCandidatesPanel key={listRev} requestTitle={(no) => requestTitleByNo.get(no) ?? null} />
+            <ScrapCandidatesPanel
+              key={listRev}
+              requestTitle={(no) => requestTitleByNo.get(no) ?? null}
+              initialRequest={searchParams.get(SCRAP_REQUEST_PARAM)}
+            />
           ) : view === 'match' ? (
             <Suspense fallback={<p className="py-6 text-sm text-muted-foreground">กำลังเปิดจับคู่งาน…</p>}>
               <MatchingPage embedded />

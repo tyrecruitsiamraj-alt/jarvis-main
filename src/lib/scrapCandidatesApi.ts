@@ -22,6 +22,19 @@ export async function fetchScrapCandidatesAll(): Promise<ScrapCandidatesAll> {
   return (await r.json()) as ScrapCandidatesAll;
 }
 
+/** ยอดรายชื่อ Scrap ต่อเลขใบขอ — ใบที่ไม่มีในนี้ = 0 */
+export async function fetchScrapCountsByRequest(): Promise<Record<string, number>> {
+  const r = await apiFetch('/api/scrap-candidates?counts=1');
+  if (!r.ok) return readError(r);
+  return ((await r.json()) as { counts: Record<string, number> }).counts;
+}
+
+/** ลิงก์แท็บผู้สมัคร ▾ Scrap ของหน้างานสรรหา เลือกใบขอไว้ให้ */
+export const SCRAP_REQUEST_PARAM = 'scrap_req';
+export function boardScrapPathOfRequest(requestNo: string): string {
+  return `/jobs/board?view=scrap&${SCRAP_REQUEST_PARAM}=${encodeURIComponent(requestNo)}`;
+}
+
 export async function addScrapCandidatesToContact(jobId: string, candidateIds: string[]): Promise<ScrapToContactResult[]> {
   const r = await apiFetch('/api/scrap-candidates', {
     method: 'POST',

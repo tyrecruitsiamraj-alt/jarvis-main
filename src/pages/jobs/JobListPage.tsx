@@ -84,6 +84,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { fetchSiamrajClosedRequests, fetchSiamrajUnitRequest } from '@/lib/siamrajUnitRequestsApi';
 import { friendlyErrorText } from '@/lib/friendlyError';
 import LoadErrorNotice from '@/components/shared/LoadErrorNotice';
+import { boardScrapPathOfRequest, fetchScrapCountsByRequest } from '@/lib/scrapCandidatesApi';
 import { Button } from '@/components/ui/button';
 import { requestNoMatchesSearch } from '@/lib/siamrajRequestNo';
 import { getTotalPages } from '@/lib/pagination';
@@ -233,6 +234,29 @@ const JobListPage: React.FC = () => {
     (j: JobRequest): number | null => (applicantCounts ? (applicantKeyIdx.get(j.id)?.n ?? 0) : null),
     [applicantCounts, applicantKeyIdx],
   );
+  /**
+   * รายชื่อจาก Scrap ต่อใบ (เจ้าของ 17 พ.ย. 2569 รูปตารางใบขอ "เพิ่ม Scrap มาด้วย") — ผูกด้วยเลขใบขอจริงใน ERP
+   * null = ยังโหลดไม่เสร็จ/โหลดไม่ได้ (ขีด ไม่ใช่ 0) · ใบขอล่วงหน้าสั่ง Scrap ไม่ได้ = ขีด
+   */
+  const [scrapCounts, setScrapCounts] = useState<Record<string, number> | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    fetchScrapCountsByRequest()
+      .then((c) => !cancelled && setScrapCounts(c))
+      .catch(() => !cancelled && setScrapCounts(null));
+    return () => {
+      cancelled = true;
+    };
+  }, [applicantCountsRev]);
+  const scrapCountOf = useCallback(
+    (j: JobRequest): number | null => {
+      const no = /^siamraj-sql:(.+)$/.exec(j.id)?.[1]?.toUpperCase();
+      if (!scrapCounts || !no) return null;
+      return scrapCounts[no] ?? 0;
+    },
+    [scrapCounts],
+  );
+
   /** กดเลขคนกรอก = แท็บผู้สมัครของกล่องงาน กรองใบนั้น ขึ้นทุกคน เลขตรงกับคอลัมน์ (16 พ.ย. 2569) */
   const openApplicantsOfJob = useCallback(
     (j: JobRequest) => navigate(boardApplicantsPathOfJob(applicantKeyIdx.get(j.id)?.key ?? j.id), { state: { backTo: returnTo } }),
@@ -524,10 +548,10 @@ const JobListPage: React.FC = () => {
       // กดหัวคอลัมน์แล้วใช้อันนั้น (ทับ dropdown) — ไม่มีค่าก็ใช้ dropdown ตามเดิม
       .sort((a, b) =>
         tableSort
-          ? compareJobsByTableColumn(a, b, tableSort, undefined, { applicantCount: applicantCountOf })
+          ? compareJobsByTableColumn(a, b, tableSort, undefined, { applicantCount: applicantCountOf, scrapCount: scrapCountOf })
           : compareJobsForListSort(a, b, sort),
       );
-  }, [scopedJobs, filter, search, unitFilter, recruiterFilter, screenerFilter, oplFilter, urgencyFilter, workStatusFilter, noteFilter, replacementFilter, sectorFilter, ageDaysFilter, gapFilter, applicantFilter, applicantCountOf, sort, tableSort, unitScopeNames, lookupJob]);
+  }, [scopedJobs, filter, search, unitFilter, recruiterFilter, screenerFilter, oplFilter, urgencyFilter, workStatusFilter, noteFilter, replacementFilter, sectorFilter, ageDaysFilter, gapFilter, applicantFilter, applicantCountOf, scrapCountOf, sort, tableSort, unitScopeNames, lookupJob]);
 
   const totalPages = getTotalPages(filtered.length, pageSize);
 
@@ -967,6 +991,7 @@ const JobListPage: React.FC = () => {
                       {' · เหลือหา '}
                       {remainingPositionsOf(j)}
                       {` · คนกรอก ${applicantCountOf(j) ?? '—'}`}
+                      {` · Scrap ${scrapCountOf(j) ?? '—'}`}
                     </span>
                   </div>
                   <RequestGapsLine job={j} className="mt-1" />
@@ -1061,6 +1086,7 @@ const JobListPage: React.FC = () => {
                       ['required', 'left'],
                       ['remaining', 'center'],
                       ['applicants', 'center'],
+                      ['scrap', 'center'],
                       ['request_type', 'left'],
                       ['position', 'left'],
                       ['subtype', 'left'],
@@ -1180,6 +1206,28 @@ const JobListPage: React.FC = () => {
                             onClick={(e) => {
                               e.stopPropagation();
                               openApplicantsOfJob(j);
+                            }}
+                          >
+                            {n.toLocaleString('en-US')}
+                          </Button>
+                        );
+                      })()}
+                    </td>
+                    {/* Scrap (17 พ.ย. 2569) — กดเลขไปแท็บผู้สมัคร ▾ Scrap เลือกใบนี้ไว้ · 0 = ยังไม่มีรายชื่อ (ไม่ใช่ลิงก์) */}
+                    <td className="px-1.5 py-3 text-center text-xs tabular-nums whitespace-nowrap">
+                      {(() => {
+                        const n = scrapCountOf(j);
+                        if (n == null) return <span className={DASH.cellMuted}>—</span>;
+                        if (n === 0) return <span className={DASH.cellMuted}>0</span>;
+                        return (
+                          <Button
+                            type="button"
+                            variant="link"
+                            size="sm"
+                            className="h-auto p-0 text-xs tabular-nums"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigate(boardScrapPathOfRequest(j.id.replace(/^siamraj-sql:/, '')), { state: { backTo: returnTo } });
                             }}
                           >
                             {n.toLocaleString('en-US')}

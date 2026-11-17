@@ -2,6 +2,7 @@
  * /api/scrap-candidates — รายชื่อจาก Scrap (So Scraping) ของใบขอ (เจ้าของ 17 พ.ย. 2569 · ตรรกะ `api/_lib/scrapCandidates.ts`)
  * GET ?job=<job id หรือเลขใบขอ> → รายชื่อของใบนั้น (แท็บ Scrap ในหน้าใบขอ)
  * GET ?all=1                    → ทุกใบที่เห็นได้ (แท็บผู้สมัคร ▾ Scrap ของหน้างานสรรหา)
+ * GET ?counts=1                 → ยอดต่อเลขใบขอ (คอลัมน์ Scrap ของตารางใบขอ · 17 พ.ย. 2569)
  * POST { action: 'to_contact', job_id, candidate_ids } → สร้าง/ใช้ใบสมัครเดิม แล้วเก็บเข้าการติดต่อ (Lead) ของคนกด
  * สิทธิ์ resource เดียวกับผู้สมัคร (`job-applications`) · ผู้ใช้ที่ล็อก BU เห็นเฉพาะใบขอใน BU ตัวเอง (`loadScopedJobIdSet`)
  * AI ไม่โทรเอง: ใบสร้างในชื่อ So Scraping + เป็น Lead — ตัวส่งอัตโนมัติข้ามทั้งสองแบบ
@@ -37,6 +38,10 @@ async function handler(req: AuthedReq, res: ApiRes) {
 
     if (method === 'GET') {
       res.setHeader?.('Cache-Control', 'no-store');
+      if (one(req.query?.counts) === '1') {
+        const reqs = (await listScrapRequestNos()).filter((r) => canSee(r.request_no));
+        return res.status(200).json({ counts: Object.fromEntries(reqs.map((r) => [r.request_no, r.total])) });
+      }
       if (one(req.query?.all) === '1') {
         const reqs = (await listScrapRequestNos()).filter((r) => canSee(r.request_no));
         const rows = await listScrapCandidates(reqs.map((r) => r.request_no));
