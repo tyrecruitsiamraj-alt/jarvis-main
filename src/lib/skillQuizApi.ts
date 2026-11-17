@@ -35,6 +35,8 @@ export type QuizTakerInfo = {
 
 export type QuizAttemptItem = {
   id: string;
+  /** ชุดที่ทำ — หน้าผลจัดกลุ่มตามชุดก่อน (17 พ.ย. 2569) */
+  set_id: string;
   token: string;
   doc_no: string;
   person_name: string;

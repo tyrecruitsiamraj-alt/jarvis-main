@@ -821,11 +821,11 @@
     {
      "label": "ผลแบบทดสอบ",
      "action": "inline",
-     "target": "รายการคนที่ทำ (ค่าเริ่ม)",
+     "target": "รายชื่อชุด + ยอดคนทำแยกสถานะ (ค่าเริ่ม)",
      "api": "GET /api/skill-quiz",
      "effects": [],
      "when": null,
-     "src": "src/pages/skill-quiz/SkillQuizPage.tsx:120"
+     "src": "src/pages/skill-quiz/SkillQuizPage.tsx:163"
     },
     {
      "label": "ชุดข้อสอบ",
@@ -834,7 +834,7 @@
      "api": "GET /api/skill-quiz?view=sets",
      "effects": [],
      "when": null,
-     "src": "src/pages/skill-quiz/SkillQuizPage.tsx:121"
+     "src": "src/pages/skill-quiz/SkillQuizPage.tsx:162"
     },
     {
      "label": "สร้างชุดข้อสอบ",
@@ -843,7 +843,16 @@
      "api": null,
      "effects": [],
      "when": null,
-     "src": "src/pages/skill-quiz/SkillQuizPage.tsx:113"
+     "src": "src/pages/skill-quiz/SkillQuizPage.tsx:154"
+    },
+    {
+     "label": "ส่งลิงก์",
+     "action": "popup",
+     "target": "quiz-share-dialog",
+     "api": null,
+     "effects": [],
+     "when": "แท็บชุดข้อสอบ ชุดที่มีลิงก์",
+     "src": "src/pages/skill-quiz/SkillQuizPage.tsx:321"
     },
     {
      "label": "คัดลอกลิงก์",
@@ -852,7 +861,25 @@
      "api": null,
      "effects": [],
      "when": "แท็บชุดข้อสอบ",
-     "src": "src/pages/skill-quiz/SkillQuizPage.tsx:221"
+     "src": "src/pages/skill-quiz/SkillQuizPage.tsx:324"
+    },
+    {
+     "label": "ดูคนทำ (แถวชุดในแท็บผล)",
+     "action": "filter",
+     "target": "?set=:setId — รายชื่อคนทำชุดนั้น",
+     "api": null,
+     "effects": [],
+     "when": "แท็บผลแบบทดสอบ หน้ารายชื่อชุด (กดทั้งแถวได้)",
+     "src": "src/pages/skill-quiz/SkillQuizPage.tsx:207"
+    },
+    {
+     "label": "ทุกชุด",
+     "action": "filter",
+     "target": "กลับรายชื่อชุด",
+     "api": null,
+     "effects": [],
+     "when": "อยู่ในชุดที่กดเข้าไป",
+     "src": "src/pages/skill-quiz/SkillQuizPage.tsx:220"
     },
     {
      "label": "ดูผล",
@@ -860,8 +887,8 @@
      "target": "quiz-result-dialog",
      "api": "GET /api/skill-quiz?id=",
      "effects": [],
-     "when": null,
-     "src": "src/pages/skill-quiz/SkillQuizPage.tsx:175"
+     "when": "อยู่ในชุดที่กดเข้าไป (?set=)",
+     "src": "src/pages/skill-quiz/SkillQuizPage.tsx:265"
     },
     {
      "label": "ลบ (ผล)",
@@ -870,7 +897,7 @@
      "api": null,
      "effects": [],
      "when": null,
-     "src": "src/pages/skill-quiz/SkillQuizPage.tsx:173"
+     "src": "src/pages/skill-quiz/SkillQuizPage.tsx:267"
     },
     {
      "label": "แก้ (ชุด)",
@@ -879,7 +906,7 @@
      "api": null,
      "effects": [],
      "when": "แท็บชุดข้อสอบ",
-     "src": "src/pages/skill-quiz/SkillQuizPage.tsx:223"
+     "src": "src/pages/skill-quiz/SkillQuizPage.tsx:326"
     },
     {
      "label": "ลบ (ชุด)",
@@ -888,7 +915,7 @@
      "api": null,
      "effects": [],
      "when": "แท็บชุดข้อสอบ",
-     "src": "src/pages/skill-quiz/SkillQuizPage.tsx:227"
+     "src": "src/pages/skill-quiz/SkillQuizPage.tsx:329"
     }
    ]
   },
@@ -12102,6 +12129,43 @@
      ],
      "when": "มีคำตอบ",
      "src": "src/components/skill-quiz/QuizResultDialog.tsx:244"
+    }
+   ]
+  },
+  {
+   "id": "quiz-share-dialog",
+   "kind": "popup",
+   "title": "ส่งลิงก์ชุดข้อสอบ",
+   "route": null,
+   "parent": "skill-test",
+   "src": "src/components/skill-quiz/QuizShareDialog.tsx:17",
+   "controls": [
+    {
+     "label": "ส่งทาง LINE",
+     "action": "external",
+     "target": "line.me/R/share (ชื่อชุด + ลิงก์)",
+     "api": null,
+     "effects": [],
+     "when": "",
+     "src": "src/components/skill-quiz/QuizShareDialog.tsx:59"
+    },
+    {
+     "label": "คัดลอกลิงก์",
+     "action": "external",
+     "target": "คลิปบอร์ด: {origin}/quiz/s/:setToken",
+     "api": null,
+     "effects": [],
+     "when": "",
+     "src": "src/components/skill-quiz/QuizShareDialog.tsx:63"
+    },
+    {
+     "label": "โหลดรูป QR",
+     "action": "external",
+     "target": "ดาวน์โหลดไฟล์ QR {ชื่อชุด}.png",
+     "api": null,
+     "effects": [],
+     "when": "",
+     "src": "src/components/skill-quiz/QuizShareDialog.tsx:66"
     }
    ]
   },

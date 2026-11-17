@@ -4,11 +4,12 @@
  * ทางเดิน (16 พ.ย. 2569 แบบ Knowa): สร้างชุด (เลือกใครเห็น) → คัดลอกลิงก์ของชุดส่ง → คนทำกรอกข้อมูล+ยินยอม PDPA
  * (17 พ.ย. 2569) ปุ่ม "ส่งลิงก์" เปิดป๊อป QR + ส่งทาง LINE + โหลดรูป QR · ปุ่มคัดลอกลิงก์บนแถวยังอยู่
  * (17 พ.ย. 2569) ช่องค้นหาบนแถบบน — ผล: เลขที่/ชื่อ/เบอร์/ชุด · ชุด: ชื่อชุด/ตำแหน่ง · คำค้นใช้ร่วมทั้งสองแท็บ
+ * (17 พ.ย. 2569) แท็บผล = รายชื่อชุดก่อน กดชุดแล้วค่อยเห็นคนทำ (`?set=`) — เจ้าของ "ไม่งั้นมันจะปนกันไปหมด"
  * → ทำ → AI ร่าง → เจ้าหน้าที่ตรวจ → บันทึกและโหลดรูป · ลิงก์ละคน (ใส่ชื่อพนักงาน) ถอดแล้ว
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Plus } from 'lucide-react';
+import { ChevronLeft, Plus } from 'lucide-react';
 import PageHeader from '@/components/shared/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -74,6 +75,8 @@ async function copyText(text: string): Promise<boolean> {
 export default function SkillQuizPage() {
   const [params, setParams] = useSearchParams();
   const tab = params.get('tab') === 'sets' ? 'sets' : 'results';
+  /** แท็บผล: ชุดที่กดเข้าไปดูคนทำ · null = รายชื่อชุด */
+  const openSetId = tab === 'results' ? params.get('set') : null;
   const [sets, setSets] = useState<QuizSetItem[] | null>(null);
   const [attempts, setAttempts] = useState<QuizAttemptItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -85,9 +88,23 @@ export default function SkillQuizPage() {
   useHeaderSearch({ value: search, onChange: setSearch, placeholder: 'ค้นหาชื่อ เลขที่ ชุดข้อสอบ' });
   const q = search.trim().toLowerCase();
   const shownAttempts = useMemo(
-    () => (attempts && q ? attempts.filter((a) => matches(q, [a.doc_no, a.person_name, a.phone, a.title])) : attempts),
-    [attempts, q],
+    () => attempts?.filter((a) => a.set_id === openSetId && (!q || matches(q, [a.doc_no, a.person_name, a.phone, a.title]))) ?? null,
+    [attempts, openSetId, q],
   );
+  /** แท็บผลหน้าแรก: ทุกชุดที่เห็นได้ + ยอดคนทำแยกสถานะ · ค้นหาเจอชื่อชุดหรือคนทำในชุดนั้น */
+  const resultSets = useMemo(() => {
+    if (!sets || !attempts) return null;
+    return sets
+      .map((s) => {
+        const mine = attempts.filter((a) => a.set_id === s.id);
+        const count = (st: QuizAttemptStatus) => mine.filter((a) => a.status === st).length;
+        const last = mine.reduce<string | null>((m, a) => (m && m > a.created_at ? m : a.created_at), null);
+        const hit = !q || matches(q, [s.content.title, s.content.roleLabel]) || mine.some((a) => matches(q, [a.doc_no, a.person_name, a.phone]));
+        return { set: s, total: mine.length, waiting: count('waiting'), review: count('review'), ready: count('ready'), last, hit };
+      })
+      .filter((r) => r.hit);
+  }, [sets, attempts, q]);
+  const openSetTitle = openSetId ? (sets?.find((s) => s.id === openSetId)?.content.title ?? attempts?.find((a) => a.set_id === openSetId)?.title ?? '') : '';
   const shownSets = useMemo(() => (sets && q ? sets.filter((s) => matches(q, [s.content.title, s.content.roleLabel])) : sets), [sets, q]);
   const [confirm, setConfirm] = useState<{ kind: 'set' | 'attempt'; id: string; label: string } | null>(null);
 
@@ -108,7 +125,9 @@ export default function SkillQuizPage() {
     if (!s.public_token) return;
     const url = quizSetLinkUrl(s.public_token);
     const ok = await copyText(url);
-    setNotice(ok ? `คัดลอกลิงก์ชุด ${s.content.title} แล้ว` : url);
+    // คัดลอกไม่ได้ = เปิดป๊อปส่งลิงก์แทน (เจ้าของ 17 พ.ย. 2569: ลิงก์ไม่ต้องโชว์บนหน้า)
+    if (ok) setNotice(`คัดลอกลิงก์ชุด ${s.content.title} แล้ว`);
+    else setShare({ title: s.content.title, url });
   };
 
   const doArchive = async () => {
@@ -139,61 +158,53 @@ export default function SkillQuizPage() {
       <div className="space-y-4 px-4 pb-8 md:px-6">
         <Tabs value={tab} onValueChange={(v) => setParams(v === 'sets' ? { tab: 'sets' } : {}, { replace: true })}>
           <TabsList>
-            <TabsTrigger value="results">ผลแบบทดสอบ</TabsTrigger>
+            {/* ชุดข้อสอบไว้หน้า (เจ้าของ 17 พ.ย. 2569 "สลับตำแหน่งกัน") — เปิดหน้ายังอยู่ผลแบบทดสอบเหมือนเดิม */}
             <TabsTrigger value="sets">ชุดข้อสอบ</TabsTrigger>
+            <TabsTrigger value="results">ผลแบบทดสอบ</TabsTrigger>
           </TabsList>
         </Tabs>
         {error ? <p className="text-sm text-destructive">{error}</p> : null}
         {notice ? <p className="break-all text-sm text-muted-foreground">{notice}</p> : null}
 
-        {tab === 'results' ? (
+        {tab === 'results' && !openSetId ? (
           <Card className="overflow-x-auto rounded-2xl">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>เลขที่</TableHead>
-                  <TableHead>คนทำ</TableHead>
                   <TableHead>ชุดข้อสอบ</TableHead>
-                  <TableHead>สถานะ</TableHead>
-                  <TableHead className="text-right">คะแนน</TableHead>
-                  <TableHead>เริ่มทำ</TableHead>
+                  <TableHead className="text-right">คนทำ</TableHead>
+                  <TableHead className="whitespace-nowrap text-right">{QUIZ_STATUS_LABEL.waiting}</TableHead>
+                  <TableHead className="whitespace-nowrap text-right">{QUIZ_STATUS_LABEL.review}</TableHead>
+                  <TableHead className="whitespace-nowrap text-right">{QUIZ_STATUS_LABEL.ready}</TableHead>
+                  <TableHead>ล่าสุด</TableHead>
                   <TableHead />
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {shownAttempts === null ? (
+                {resultSets === null ? (
                   <TableRow>
                     <TableCell colSpan={7} className="text-muted-foreground">
                       กำลังโหลด…
                     </TableCell>
                   </TableRow>
-                ) : shownAttempts.length === 0 ? (
+                ) : resultSets.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={7} className="text-muted-foreground">
-                      {q ? `ไม่พบ "${search.trim()}"` : 'ยังไม่มีคนทำ'}
+                      {q ? `ไม่พบ "${search.trim()}"` : 'ยังไม่มีชุดข้อสอบ'}
                     </TableCell>
                   </TableRow>
                 ) : (
-                  shownAttempts.map((a) => (
-                    <TableRow key={a.id}>
-                      <TableCell className="whitespace-nowrap tabular-nums">{a.doc_no}</TableCell>
-                      <TableCell className="min-w-40">
-                        <div>{a.person_name}</div>
-                        {a.phone ? <div className="text-xs tabular-nums text-muted-foreground">{a.phone}</div> : null}
-                      </TableCell>
-                      <TableCell className="min-w-48">{a.title}</TableCell>
-                      <TableCell className={cn('whitespace-nowrap', STATUS_TONE[a.status])}>
-                        {QUIZ_STATUS_LABEL[a.status]}
-                        {a.status === 'waiting' && a.opened_at ? ' · เปิดแล้ว' : ''}
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap text-right tabular-nums">{a.score === null ? '—' : `${a.score} · ${a.grade}`}</TableCell>
-                      <TableCell className="whitespace-nowrap tabular-nums">{dateTh(a.created_at)}</TableCell>
+                  resultSets.map((r) => (
+                    <TableRow key={r.set.id} className="cursor-pointer" onClick={() => setParams({ set: r.set.id })}>
+                      <TableCell className="min-w-48 font-medium">{r.set.content.title}</TableCell>
+                      <TableCell className="text-right tabular-nums">{r.total} คน</TableCell>
+                      <TableCell className="text-right tabular-nums">{r.waiting}</TableCell>
+                      <TableCell className={cn('text-right tabular-nums', r.review > 0 && STATUS_TONE.review)}>{r.review}</TableCell>
+                      <TableCell className="text-right tabular-nums">{r.ready}</TableCell>
+                      <TableCell className="whitespace-nowrap tabular-nums">{r.last ? dateTh(r.last) : '—'}</TableCell>
                       <TableCell className="whitespace-nowrap text-right">
-                        <Button type="button" variant="outline" size="sm" onClick={() => setOpenId(a.id)}>
-                          ดูผล
-                        </Button>
-                        <Button type="button" variant="ghost" size="sm" onClick={() => setConfirm({ kind: 'attempt', id: a.id, label: `ผลของ ${a.person_name}` })}>
-                          ลบ
+                        <Button type="button" variant="outline" size="sm" onClick={() => setParams({ set: r.set.id })}>
+                          ดูคนทำ
                         </Button>
                       </TableCell>
                     </TableRow>
@@ -202,6 +213,68 @@ export default function SkillQuizPage() {
               </TableBody>
             </Table>
           </Card>
+        ) : tab === 'results' ? (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Button type="button" variant="ghost" size="sm" onClick={() => setParams({})}>
+                <ChevronLeft /> ทุกชุด
+              </Button>
+              <h2 className="text-base font-medium">{openSetTitle}</h2>
+            </div>
+            <Card className="overflow-x-auto rounded-2xl">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>เลขที่</TableHead>
+                    <TableHead>คนทำ</TableHead>
+                    <TableHead>สถานะ</TableHead>
+                    <TableHead className="text-right">คะแนน</TableHead>
+                    <TableHead>เริ่มทำ</TableHead>
+                    <TableHead />
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {shownAttempts === null ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-muted-foreground">
+                        กำลังโหลด…
+                      </TableCell>
+                    </TableRow>
+                  ) : shownAttempts.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-muted-foreground">
+                        {q ? `ไม่พบ "${search.trim()}"` : 'ยังไม่มีคนทำ'}
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    shownAttempts.map((a) => (
+                      <TableRow key={a.id}>
+                        <TableCell className="whitespace-nowrap tabular-nums">{a.doc_no}</TableCell>
+                        <TableCell className="min-w-40">
+                          <div>{a.person_name}</div>
+                          {a.phone ? <div className="text-xs tabular-nums text-muted-foreground">{a.phone}</div> : null}
+                        </TableCell>
+                        <TableCell className={cn('whitespace-nowrap', STATUS_TONE[a.status])}>
+                          {QUIZ_STATUS_LABEL[a.status]}
+                          {a.status === 'waiting' && a.opened_at ? ' · เปิดแล้ว' : ''}
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap text-right tabular-nums">{a.score === null ? '—' : `${a.score} · ${a.grade}`}</TableCell>
+                        <TableCell className="whitespace-nowrap tabular-nums">{dateTh(a.created_at)}</TableCell>
+                        <TableCell className="whitespace-nowrap text-right">
+                          <Button type="button" variant="outline" size="sm" onClick={() => setOpenId(a.id)}>
+                            ดูผล
+                          </Button>
+                          <Button type="button" variant="ghost" size="sm" onClick={() => setConfirm({ kind: 'attempt', id: a.id, label: `ผลของ ${a.person_name}` })}>
+                            ลบ
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </Card>
+          </div>
         ) : (
           <Card className="overflow-x-auto rounded-2xl">
             <Table>

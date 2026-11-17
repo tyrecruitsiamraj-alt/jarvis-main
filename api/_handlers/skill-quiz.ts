@@ -97,6 +97,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
           const r = a.answers ? scoreQuiz(a.content, a.answers) : null;
           return {
             id: a.id,
+            set_id: a.set_id,
             token: a.token,
             doc_no: a.doc_no,
             person_name: a.person_name,
