@@ -19,8 +19,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { fetchPublicQuiz, submitPublicQuiz, type PublicQuiz } from '@/lib/skillQuizApi';
-import type { QuizAnswers } from '@/lib/skillQuiz';
+import { fetchPublicQuiz, quizImageUrl, submitPublicQuiz, type PublicQuiz } from '@/lib/skillQuizApi';
+import { quizChoiceImage, type QuizAnswers } from '@/lib/skillQuiz';
 
 const draftKey = (token: string) => `jarvis:quiz-draft:${token}`;
 
@@ -117,6 +117,7 @@ export default function PublicSkillQuizPage() {
                 </p>
                 <span className="shrink-0 text-xs tabular-nums text-muted-foreground">{q.points} คะแนน</span>
               </div>
+              {q.image ? <img src={quizImageUrl(q.image)} alt={`รูปข้อ ${i + 1}`} loading="lazy" className="max-h-72 w-auto max-w-full rounded-xl border border-border" /> : null}
               <RadioGroup
                 value={typeof answers[q.id] === 'number' ? String(answers[q.id]) : ''}
                 onValueChange={(v) => setAnswers((a) => ({ ...a, [q.id]: Number(v) }))}
@@ -125,7 +126,12 @@ export default function PublicSkillQuizPage() {
                 {q.choices.map((c, ci) => (
                   <Label key={ci} htmlFor={`${q.id}-${ci}`} className="flex cursor-pointer items-start gap-3 rounded-xl border border-border p-3 text-sm font-normal hover:bg-muted/50">
                     <RadioGroupItem id={`${q.id}-${ci}`} value={String(ci)} className="mt-0.5" />
-                    <span className="whitespace-pre-wrap">{c}</span>
+                    <span className="min-w-0 space-y-2">
+                      {quizChoiceImage(q, ci) ? (
+                        <img src={quizImageUrl(quizChoiceImage(q, ci))} alt={`รูปตัวเลือก ${ci + 1}`} loading="lazy" className="max-h-40 w-auto max-w-full rounded-lg border border-border" />
+                      ) : null}
+                      {c ? <span className="block whitespace-pre-wrap">{c}</span> : null}
+                    </span>
                   </Label>
                 ))}
               </RadioGroup>

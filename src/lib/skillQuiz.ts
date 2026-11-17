@@ -11,6 +11,8 @@
  *   คะแนนรายทักษะ = คะแนนที่ได้ ÷ คะแนนเต็มของข้อในทักษะนั้น × 100 (ปัดเศษ)
  *   คะแนนรวม = คะแนนที่ได้ทั้งชุด ÷ คะแนนเต็มทั้งชุด × 100 → ทักษะที่มีข้อมาก/คะแนนต่อข้อสูงมีน้ำหนักมากกว่าเอง
  *   ผ่านเกณฑ์ = คะแนนรายทักษะ ≥ เกณฑ์ของชุด
+ * 🔴 17 พ.ย. 2569 เจ้าของ "ข้อสอบ และ Choice ใส่รูปได้ไหม" → Choice "คำถาม+ตัวเลือก": คำถามมีรูปได้ 1 รูป ตัวเลือกมีรูปได้ตัวละ 1 รูป
+ *   เก็บแค่รหัสรูป (uuid ตาราง skill_quiz_images) · ตัวเลือกที่มีรูปไม่ต้องมีคำ
  */
 
 export type QuizQuestionKind = 'choice';
@@ -26,6 +28,10 @@ export type QuizQuestion = {
   /** ลำดับคำตอบที่ถูก */
   answer: number;
   points: number;
+  /** รหัสรูปของคำถาม — ไม่มี = ไม่มีรูป */
+  image?: string;
+  /** รหัสรูปของตัวเลือก ตรงลำดับกับ `choices` · '' = ตัวนั้นไม่มีรูป */
+  choiceImages?: string[];
 };
 
 export type QuizSetContent = {
@@ -63,6 +69,11 @@ export function quizSkillTone(score: number, passScore: number): 'success' | 'in
 
 const clean = (v: unknown, max: number) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
 
+const IMAGE_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+export const isQuizImageId = (v: unknown): v is string => typeof v === 'string' && IMAGE_ID.test(v);
+/** รหัสรูปของตัวเลือกลำดับ i ('' = ไม่มี) */
+export const quizChoiceImage = (q: Pick<QuizQuestion, 'choiceImages'>, i: number): string => q.choiceImages?.[i] ?? '';
+
 /** ตรวจชุดข้อสอบที่ส่งมาจากหน้าจอ — ผิดตรงไหนบอกเป็นคำ */
 export function parseQuizSetInput(raw: unknown): { ok: true; value: QuizSetContent } | { ok: false; message: string } {
   const o = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
@@ -99,11 +110,18 @@ export function parseQuizSetInput(raw: unknown): { ok: true; value: QuizSetConte
     const points = Math.round(Number(r.points ?? 1));
     if (!Number.isFinite(points) || points < 1 || points > 100) return { ok: false, message: `ข้อ ${n}: คะแนนต้องอยู่ระหว่าง 1–100` };
     const choices = (Array.isArray(r.choices) ? r.choices : []).map((c) => clean(c, 500));
-    if (choices.length < 2 || choices.some((c) => !c)) return { ok: false, message: `ข้อ ${n}: ตัวเลือกต้องมีอย่างน้อย 2 ข้อ และไม่ว่าง` };
+    const imgRaw = Array.isArray(r.choiceImages) ? r.choiceImages : [];
+    if (imgRaw.some((x) => x !== '' && x != null && !isQuizImageId(x))) return { ok: false, message: `ข้อ ${n}: รูปของตัวเลือกไม่ถูกต้อง อัปโหลดใหม่` };
+    const choiceImages = choices.map((_, ci) => (isQuizImageId(imgRaw[ci]) ? imgRaw[ci] : ''));
+    if (choices.length < 2 || choices.some((c, ci) => !c && !choiceImages[ci])) return { ok: false, message: `ข้อ ${n}: ตัวเลือกต้องมีอย่างน้อย 2 ข้อ และแต่ละข้อต้องมีคำหรือรูป` };
     if (choices.length > QUIZ_MAX_CHOICES) return { ok: false, message: `ข้อ ${n}: ตัวเลือกได้ไม่เกิน ${QUIZ_MAX_CHOICES} ข้อ` };
     const answer = Number(r.answer);
     if (!Number.isInteger(answer) || answer < 0 || answer >= choices.length) return { ok: false, message: `ข้อ ${n}: เลือกคำตอบที่ถูก` };
-    questions.push({ id, skillId, kind, prompt, choices, answer, points });
+    if (r.image != null && r.image !== '' && !isQuizImageId(r.image)) return { ok: false, message: `ข้อ ${n}: รูปของคำถามไม่ถูกต้อง อัปโหลดใหม่` };
+    const out: QuizQuestion = { id, skillId, kind, prompt, choices, answer, points };
+    if (isQuizImageId(r.image)) out.image = r.image;
+    if (choiceImages.some(Boolean)) out.choiceImages = choiceImages;
+    questions.push(out);
   }
   const unused = skills.find((s) => !questions.some((q) => q.skillId === s.id));
   if (unused) return { ok: false, message: `ทักษะ "${unused.name}" ยังไม่มีข้อ` };
@@ -114,9 +132,24 @@ export function parseQuizSetInput(raw: unknown): { ok: true; value: QuizSetConte
 }
 
 /** ข้อสอบที่ส่งให้พนักงาน — ตัดเฉลยออก */
-export type PublicQuizQuestion = Pick<QuizQuestion, 'id' | 'kind' | 'prompt' | 'choices' | 'points'>;
+export type PublicQuizQuestion = Pick<QuizQuestion, 'id' | 'kind' | 'prompt' | 'choices' | 'points' | 'image' | 'choiceImages'>;
 export function publicQuestions(content: QuizSetContent): PublicQuizQuestion[] {
-  return content.questions.map((q) => ({ id: q.id, kind: q.kind, prompt: q.prompt, choices: q.choices, points: q.points }));
+  return content.questions.map((q) => ({
+    id: q.id,
+    kind: q.kind,
+    prompt: q.prompt,
+    choices: q.choices,
+    points: q.points,
+    ...(q.image ? { image: q.image } : {}),
+    ...(q.choiceImages?.some(Boolean) ? { choiceImages: q.choiceImages } : {}),
+  }));
+}
+
+/** ชื่อของตัวเลือกไว้โชว์ในผลตรวจ/ส่ง AI — ตัวเลือกที่เป็นรูปล้วนเรียก "รูปตัวเลือก N" */
+export function quizChoiceLabel(q: Pick<QuizQuestion, 'choices' | 'choiceImages'>, i: number): string {
+  const text = q.choices[i] ?? '';
+  if (text) return quizChoiceImage(q, i) ? `${text} (มีรูป)` : text;
+  return quizChoiceImage(q, i) ? `รูปตัวเลือก ${i + 1}` : '';
 }
 
 /** คำตอบที่พนักงานส่ง — ต้องตอบครบทุกข้อ */
@@ -188,7 +221,8 @@ export function buildQuizAiPrompt(content: QuizSetContent, answers: QuizAnswers)
   const wrong = content.questions.filter((q) => answers[q.id] !== q.answer);
   if (wrong.length > 0) {
     lines.push('ข้อที่ตอบผิด:');
-    for (const q of wrong.slice(0, 40)) lines.push(`- [${skillName(q.skillId)}] ${q.prompt} · ตอบ "${q.choices[Number(answers[q.id])] ?? ''}" · ที่ถูกคือ "${q.choices[q.answer] ?? ''}"`);
+    for (const q of wrong.slice(0, 40))
+      lines.push(`- [${skillName(q.skillId)}] ${q.prompt}${q.image ? ' (มีรูปประกอบ)' : ''} · ตอบ "${quizChoiceLabel(q, Number(answers[q.id]))}" · ที่ถูกคือ "${quizChoiceLabel(q, q.answer)}"`);
   }
   lines.push('');
   lines.push('ตอบเป็น JSON เท่านั้น รูปแบบ:');

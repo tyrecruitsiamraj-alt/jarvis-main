@@ -9,6 +9,8 @@
  * POST { action: 'start', set, firstName, lastName, phone, age, citizenId, birthDate, consent } → token ใบของคนนี้
  * POST { action: 'resume', set, citizenId, birthDate } → token ใบเดิม (ตรงทั้งคู่เท่านั้น)
  * เลขบัตรเก็บแบบเข้ารหัส + แฮชไว้ค้น · ทำชุดเดิมได้ครั้งเดียว (ฐานตัดสิน)
+ *
+ * GET ?image=<uuid> → ตัวรูปของคำถาม/ตัวเลือก (17 พ.ย. 2569) · รหัสสุ่มเดาไม่ได้ · รูปไม่เปลี่ยนจึงเก็บแคชได้ยาว
  */
 import { sendError, handleApiError, type ApiReq, type ApiRes } from '../../_lib/http.js';
 import { readJsonBody } from '../../_lib/body.js';
@@ -17,13 +19,14 @@ import {
   draftQuizWithAi,
   findQuizAttemptForResume,
   getQuizAttemptByToken,
+  getQuizImage,
   getQuizSetByToken,
   markQuizOpened,
   startQuizAttemptFromSet,
   submitQuizAnswers,
 } from '../../_lib/skillQuiz.js';
 import { encryptPii, hashPii } from '../../_lib/piiCipher.js';
-import { parseQuizAnswers, publicQuestions } from '../../../src/lib/skillQuiz.js';
+import { isQuizImageId, parseQuizAnswers, publicQuestions } from '../../../src/lib/skillQuiz.js';
 import { parseQuizResumeInput, parseQuizTakerInput } from '../../../src/lib/skillQuizTaker.js';
 import { PDPA_CONSENT_REQUIRED_MESSAGE, PDPA_CONSENT_VERSION } from '../../../src/lib/pdpaConsent.js';
 
@@ -37,6 +40,17 @@ const RESUME_MISS = 'ไม่พบข้อมูล ตรวจเลขบ�
 export default async function handler(req: ApiReq, res: ApiRes) {
   const method = (req.method || 'GET').toUpperCase();
   try {
+    if (method === 'GET' && one(req.query?.image) !== undefined) {
+      // ทั้งห้องเปิดชุดที่มีรูปหลายสิบรูปพร้อมกันจาก IP เดียวได้ — เพดานสูง
+      if (!rateLimitOrReject(req, res, 'public-skill-quiz-image', 3000, 10 * 60 * 1000)) return;
+      const id = String(one(req.query?.image) ?? '');
+      const img = isQuizImageId(id) ? await getQuizImage(id) : null;
+      if (!img) return sendError(res, 404, 'not_found', 'ไม่พบรูป');
+      res.setHeader?.('Content-Type', img.mime);
+      res.setHeader?.('Cache-Control', 'public, max-age=31536000, immutable');
+      res.setHeader?.('X-Content-Type-Options', 'nosniff');
+      return res.status(200).end?.(img.bytes);
+    }
     if (method === 'GET' && one(req.query?.set) !== undefined) {
       if (!rateLimitOrReject(req, res, 'public-skill-quiz-get', 60, 10 * 60 * 1000)) return;
       const setToken = String(one(req.query?.set) ?? '');

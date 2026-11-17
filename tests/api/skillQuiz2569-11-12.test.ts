@@ -49,7 +49,7 @@ describe('ตรวจชุดข้อสอบจากหน้าจอ', (
   it('ข้อเขียนตอบไม่รับ (16 พ.ย. 2569) · ไม่มีตัวเลือกไม่รับ', () => {
     const text = { id: 'q5', skillId: 'sAir', kind: 'text', prompt: 'อธิบาย', choices: [], answer: null, points: 1 };
     expect(parseQuizSetInput({ ...SET, questions: [...SET.questions, text] })).toEqual({ ok: false, message: 'ข้อ 5: แบบทดสอบนี้มีแต่ข้อปรนัย' });
-    expect(parseQuizSetInput({ ...SET, questions: [...SET.questions, { ...text, kind: 'choice' }] })).toEqual({ ok: false, message: 'ข้อ 5: ตัวเลือกต้องมีอย่างน้อย 2 ข้อ และไม่ว่าง' });
+    expect(parseQuizSetInput({ ...SET, questions: [...SET.questions, { ...text, kind: 'choice' }] })).toEqual({ ok: false, message: 'ข้อ 5: ตัวเลือกต้องมีอย่างน้อย 2 ข้อ และแต่ละข้อต้องมีคำหรือรูป' });
   });
 });
 

@@ -5,6 +5,7 @@
  * GET ?view=people → รายชื่อผู้ใช้ไว้เลือก "ใครเห็นชุดนี้"
  * GET ?id=         → ผลของคนหนึ่งคน (มีเฉลย/คำตอบ/บทวิเคราะห์)
  * POST { action }  → create_set · update_set · archive_set · save_review · ai_draft · archive_attempt
+ * POST { action: 'upload_image', data } → { id } รูปของคำถาม/ตัวเลือก (17 พ.ย. 2569) · รูปเปิดดูที่ /api/public/skill-quiz?image=
  * 🔴 16 พ.ย. 2569 เห็นเฉพาะชุดที่ตั้งให้เห็น (ทั้ง BU / รายคน · `canSeeQuizSet`) — ผลของคนทำเห็นตามชุด
  *    ลิงก์ละคน (create_link) ถอดแล้ว เหลือลิงก์เดียวต่อชุด · เลขบัตรส่งออกเป็นเลขปิดท้ายเท่านั้น
  */
@@ -24,6 +25,7 @@ import {
   getQuizSet,
   listQuizAttempts,
   listQuizSets,
+  saveQuizImage,
   saveQuizReview,
   updateQuizSet,
   type QuizAttemptRow,
@@ -132,6 +134,11 @@ async function handler(req: AuthedReq, res: ApiRes) {
       if (!(await canSeeSetId(id)) || !(await updateQuizSet(id, parsed.value, viewers.value, byName))) return sendError(res, 404, 'not_found', 'ไม่พบชุดข้อสอบนี้');
       void auditFromAuthed(req, { action: 'skill_quiz.set_update', entityType: 'skill_quiz_set', entityId: id, after: { title: parsed.value.title } }).catch(() => {});
       return res.status(200).json({ id });
+    }
+    if (action === 'upload_image') {
+      const saved = await saveQuizImage(typeof body.data === 'string' ? body.data : '', byName);
+      if (!saved.ok) return sendError(res, 400, 'bad_request', saved.message);
+      return res.status(201).json({ id: saved.id });
     }
     if (action === 'archive_set') {
       if (!UUID.test(id)) return sendError(res, 400, 'bad_request', 'id ไม่ถูกต้อง');

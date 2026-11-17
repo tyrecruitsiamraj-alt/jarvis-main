@@ -3,9 +3,10 @@
  * มีแต่ข้อปรนัย ติ๊กคำตอบที่ถูก (เจ้าของ 16 พ.ย. 2569 ถอดข้อเขียนตอบออกทั้งระบบ)
  * ตรวจฟอร์มด้วย `parseQuizSetInput` ตัวเดียวกับ server · แก้ชุดแล้วใบที่คนทำเริ่มไปแล้วไม่เปลี่ยน
  * "ใครเห็นชุดนี้" (16 พ.ย. 2569 แบบ Knowa): ทุกคน · ทั้ง BU · รายคน — คนสร้างกับ Admin เห็นเสมอ · ผลของคนทำเห็นตามชุด
+ * รูป (17 พ.ย. 2569): คำถามใส่ได้ 1 รูป · ตัวเลือกใส่ได้ตัวละ 1 รูป — อัปโหลดทันทีที่เลือก ชุดเก็บแค่รหัสรูป
  */
-import { useEffect, useMemo, useState } from 'react';
-import { FileUp, Plus, Trash2 } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { FileUp, ImagePlus, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -19,12 +20,13 @@ import {
   QUIZ_DEFAULT_PASS,
   QUIZ_MAX_CHOICES,
   parseQuizSetInput,
+  quizChoiceImage,
   quizLocalId,
   type QuizQuestion,
   type QuizSetContent,
 } from '@/lib/skillQuiz';
 import { quizViewerMode, type QuizViewerMode } from '@/lib/skillQuizTaker';
-import { fetchQuizPeople, saveQuizSet, type QuizPerson, type QuizSetItem, type QuizViewersInput } from '@/lib/skillQuizApi';
+import { fetchQuizPeople, quizImageUrl, saveQuizSet, uploadQuizImage, type QuizPerson, type QuizSetItem, type QuizViewersInput } from '@/lib/skillQuizApi';
 import QuizImportPanel from './QuizImportPanel';
 
 type Props = { open: boolean; onOpenChange: (v: boolean) => void; setId: string | null; initial: QuizSetItem | null; onSaved: () => void };
@@ -59,6 +61,10 @@ export default function QuizSetEditorDialog({ open, onOpenChange, setId, initial
   const [viewers, setViewers] = useState<QuizViewersInput>({ mode: 'all', bus: [], userIds: [] });
   const [people, setPeople] = useState<{ people: QuizPerson[]; bus: string[]; myId: string } | null>(null);
   const [personQuery, setPersonQuery] = useState('');
+  /** รูปกำลังขึ้นของช่องไหน — `${ข้อ}:q` คำถาม · `${ข้อ}:${ลำดับ}` ตัวเลือก */
+  const [uploading, setUploading] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const imageTarget = useRef<{ qid: string; ci: number | null } | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -95,6 +101,37 @@ export default function QuizSetEditorDialog({ open, onOpenChange, setId, initial
 
   const patchQ = (id: string, p: Partial<QuizQuestion>) => setC((s) => ({ ...s, questions: s.questions.map((q) => (q.id === id ? { ...q, ...p } : q)) }));
 
+  /** ตั้ง/ถอดรูป — ci null = รูปคำถาม · id '' = ถอด */
+  const setImage = (qid: string, ci: number | null, id: string) =>
+    setC((s) => ({
+      ...s,
+      questions: s.questions.map((q) => {
+        if (q.id !== qid) return q;
+        if (ci === null) return { ...q, image: id || undefined };
+        const choiceImages = q.choices.map((_, i) => (i === ci ? id : quizChoiceImage(q, i)));
+        return { ...q, choiceImages: choiceImages.some(Boolean) ? choiceImages : undefined };
+      }),
+    }));
+
+  const pickImage = (qid: string, ci: number | null) => {
+    imageTarget.current = { qid, ci };
+    fileRef.current?.click();
+  };
+
+  const onImageFile = async (file: File | undefined) => {
+    const t = imageTarget.current;
+    if (!file || !t) return;
+    setUploading(`${t.qid}:${t.ci ?? 'q'}`);
+    setError(null);
+    try {
+      setImage(t.qid, t.ci, await uploadQuizImage(file));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'ใส่รูปไม่สำเร็จ');
+    } finally {
+      setUploading(null);
+    }
+  };
+
   const save = async () => {
     const parsed = parseQuizSetInput(c);
     if ('message' in parsed) return setError(parsed.message);
@@ -103,6 +140,7 @@ export default function QuizSetEditorDialog({ open, onOpenChange, setId, initial
     try {
       if (viewers.mode === 'bu' && viewers.bus.length === 0) throw new Error('เลือก BU ที่เห็นชุดนี้');
       if (viewers.mode === 'people' && viewers.userIds.length === 0) throw new Error('เลือกคนที่เห็นชุดนี้');
+      if (uploading) throw new Error('รอรูปขึ้นเสร็จก่อน');
       await saveQuizSet(setId, parsed.value, viewers);
       onSaved();
       onOpenChange(false);
@@ -261,17 +299,41 @@ export default function QuizSetEditorDialog({ open, onOpenChange, setId, initial
                 </Button>
               </div>
               <Textarea aria-label="คำถาม" rows={2} value={q.prompt} onChange={(e) => patchQ(q.id, { prompt: e.target.value })} placeholder="คำถาม" />
+              <div className="flex flex-wrap items-end gap-3">
+                {q.image ? <img src={quizImageUrl(q.image)} alt={`รูปข้อ ${i + 1}`} className="max-h-40 w-auto max-w-full rounded-lg border border-border" /> : null}
+                {q.image ? (
+                  <Button type="button" variant="ghost" size="sm" onClick={() => setImage(q.id, null, '')}>
+                    <Trash2 /> ลบรูปคำถาม
+                  </Button>
+                ) : (
+                  <Button type="button" variant="outline" size="sm" disabled={uploading !== null} onClick={() => pickImage(q.id, null)}>
+                    <ImagePlus /> {uploading === `${q.id}:q` ? 'กำลังใส่รูป…' : 'ใส่รูปคำถาม'}
+                  </Button>
+                )}
+              </div>
               <div className="space-y-2">
                 <RadioGroup value={String(q.answer)} onValueChange={(v) => patchQ(q.id, { answer: Number(v) })} className="gap-2">
                   {q.choices.map((ch, ci) => (
                     <div key={ci} className="flex items-center gap-2">
                       <RadioGroupItem value={String(ci)} id={`${q.id}-ans-${ci}`} aria-label={`ตัวเลือก ${ci + 1} ถูก`} />
+                      {quizChoiceImage(q, ci) ? (
+                        <img src={quizImageUrl(quizChoiceImage(q, ci))} alt={`รูปตัวเลือก ${ci + 1}`} className="h-12 w-auto max-w-24 shrink-0 rounded-lg border border-border object-contain" />
+                      ) : null}
                       <Input
                         aria-label={`ตัวเลือก ${ci + 1}`}
                         value={ch}
                         onChange={(e) => patchQ(q.id, { choices: q.choices.map((x, xi) => (xi === ci ? e.target.value : x)) })}
-                        placeholder={`ตัวเลือก ${ci + 1}`}
+                        placeholder={quizChoiceImage(q, ci) ? 'คำใต้รูป (ไม่ใส่ก็ได้)' : `ตัวเลือก ${ci + 1}`}
                       />
+                      {quizChoiceImage(q, ci) ? (
+                        <Button type="button" variant="ghost" size="sm" onClick={() => setImage(q.id, ci, '')}>
+                          ลบรูป
+                        </Button>
+                      ) : (
+                        <Button type="button" variant="outline" size="sm" disabled={uploading !== null} onClick={() => pickImage(q.id, ci)}>
+                          <ImagePlus /> {uploading === `${q.id}:${ci}` ? 'กำลังใส่…' : 'ใส่รูป'}
+                        </Button>
+                      )}
                       <Button
                         type="button"
                         variant="ghost"
@@ -279,8 +341,9 @@ export default function QuizSetEditorDialog({ open, onOpenChange, setId, initial
                         disabled={q.choices.length <= 2}
                         onClick={() => {
                           const choices = q.choices.filter((_, xi) => xi !== ci);
+                          const imgs = q.choiceImages?.filter((_, xi) => xi !== ci);
                           const answer = q.answer === ci ? 0 : q.answer > ci ? q.answer - 1 : q.answer;
-                          patchQ(q.id, { choices, answer });
+                          patchQ(q.id, { choices, answer, choiceImages: imgs?.some(Boolean) ? imgs : undefined });
                         }}
                       >
                         ลบ
@@ -290,7 +353,7 @@ export default function QuizSetEditorDialog({ open, onOpenChange, setId, initial
                 </RadioGroup>
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-xs text-muted-foreground">วงกลมที่เลือก = คำตอบที่ถูก</span>
-                  <Button type="button" variant="outline" size="sm" disabled={q.choices.length >= QUIZ_MAX_CHOICES} onClick={() => patchQ(q.id, { choices: [...q.choices, ''] })}>
+                  <Button type="button" variant="outline" size="sm" disabled={q.choices.length >= QUIZ_MAX_CHOICES} onClick={() => patchQ(q.id, { choices: [...q.choices, ''], ...(q.choiceImages ? { choiceImages: [...q.choiceImages, ''] } : {}) })}>
                     <Plus /> เพิ่มตัวเลือก
                   </Button>
                 </div>
@@ -316,6 +379,18 @@ export default function QuizSetEditorDialog({ open, onOpenChange, setId, initial
           </div>
         </section>
 
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          aria-hidden
+          tabIndex={-1}
+          onChange={(e) => {
+            void onImageFile(e.target.files?.[0]);
+            e.target.value = '';
+          }}
+        />
         {error ? <p className="text-sm text-destructive">{error}</p> : null}
         <DialogFooter>
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>

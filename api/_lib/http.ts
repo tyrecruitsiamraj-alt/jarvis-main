@@ -15,7 +15,7 @@ export type ApiRes = {
   setHeader?: (name: string, value: string | string[]) => void;
   status: (code: number) => {
     json: (body: unknown) => void;
-    end?: (chunk?: string) => void;
+    end?: (chunk?: string | Buffer) => void;
   };
 };
 

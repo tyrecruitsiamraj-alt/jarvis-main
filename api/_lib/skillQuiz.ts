@@ -24,6 +24,38 @@ import type { QuizTakerInput, QuizViewers } from '../../src/lib/skillQuizTaker.j
 const SETS = tableInAppSchema('skill_quiz_sets');
 const ATTEMPTS = tableInAppSchema('skill_quiz_attempts');
 const DOC_SEQ = tableInAppSchema('skill_quiz_doc_seq');
+const IMAGES = tableInAppSchema('skill_quiz_images');
+
+/** รูปของคำถาม/ตัวเลือก (17 พ.ย. 2569 · migration 183) — หน้าจอย่อรูปก่อนส่ง เพดานนี้กันของหลุด */
+export const QUIZ_IMAGE_MAX_BYTES = 1_500_000;
+type QuizImageMime = 'image/jpeg' | 'image/png' | 'image/webp';
+
+/** ดูชนิดรูปจากไบต์จริง ไม่เชื่อชนิดที่หน้าจอบอก — ไม่ใช่ JPEG/PNG/WebP = null */
+export function sniffQuizImage(b: Buffer): QuizImageMime | null {
+  if (b.length > 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return 'image/jpeg';
+  if (b.length > 8 && b.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return 'image/png';
+  if (b.length > 12 && b.toString('latin1', 0, 4) === 'RIFF' && b.toString('latin1', 8, 12) === 'WEBP') return 'image/webp';
+  return null;
+}
+
+/** รับรูปจาก base64 → ตรวจ → เก็บ · ได้รหัสรูปกลับ */
+export async function saveQuizImage(base64: string, byName: string | null): Promise<{ ok: true; id: string } | { ok: false; message: string }> {
+  const bytes = Buffer.from(base64.replace(/^data:[^,]*,/, ''), 'base64');
+  if (bytes.length === 0) return { ok: false, message: 'ไม่พบรูป' };
+  if (bytes.length > QUIZ_IMAGE_MAX_BYTES) return { ok: false, message: 'รูปใหญ่เกินไป' };
+  const mime = sniffQuizImage(bytes);
+  if (!mime) return { ok: false, message: 'ใช้ได้เฉพาะรูป JPG PNG หรือ WebP' };
+  const { rows } = await dbQuery<{ id: string }>(
+    `insert into ${IMAGES} (mime, size_bytes, bytes, created_by_name) values ($1, $2, $3, $4) returning id::text`,
+    [mime, bytes.length, bytes, byName],
+  );
+  return { ok: true, id: rows[0].id };
+}
+
+export async function getQuizImage(id: string): Promise<{ mime: string; bytes: Buffer } | null> {
+  const { rows } = await dbQuery<{ mime: string; bytes: Buffer }>(`select mime, bytes from ${IMAGES} where id = $1 limit 1`, [id]);
+  return rows[0] ?? null;
+}
 
 export type QuizSetRow = {
   id: string;

@@ -12,8 +12,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { useBranding } from '@/contexts/BrandingContext';
 import { TONE } from '@/lib/designTokens';
 import { cn } from '@/lib/utils';
-import { QUIZ_STATUS_LABEL, quizAttemptStatus, quizSkillTone, scoreQuiz, type QuizAnalysis } from '@/lib/skillQuiz';
-import { draftQuizWithAi, fetchQuizAttempt, saveQuizReview, type QuizAttemptDetail } from '@/lib/skillQuizApi';
+import { QUIZ_STATUS_LABEL, quizAttemptStatus, quizChoiceImage, quizChoiceLabel, quizSkillTone, scoreQuiz, type QuizAnalysis } from '@/lib/skillQuiz';
+import { draftQuizWithAi, fetchQuizAttempt, quizImageUrl, saveQuizReview, type QuizAttemptDetail } from '@/lib/skillQuizApi';
 import { downloadQuizReportPng } from '@/lib/skillQuizReportImage';
 
 const BIRTH_TH = new Intl.DateTimeFormat('th-TH', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
@@ -203,10 +203,24 @@ export default function QuizResultDialog({ attemptId, onOpenChange, onChanged }:
                       ข้อ {i + 1} · {skill} · {q.points} คะแนน
                     </p>
                     <p className="whitespace-pre-wrap">{q.prompt}</p>
+                    {q.image ? <img src={quizImageUrl(q.image)} alt={`รูปข้อ ${i + 1}`} loading="lazy" className="my-2 max-h-32 w-auto max-w-full rounded-lg border border-border" /> : null}
                     <p className={right ? TONE.success.value : TONE.danger.value}>
-                      {right ? 'ถูก' : 'ผิด'} · ตอบ {q.choices[Number(ans)] ?? '—'}
-                      {right ? '' : ` · ที่ถูก ${q.choices[q.answer] ?? ''}`}
+                      {right ? 'ถูก' : 'ผิด'} · ตอบ {quizChoiceLabel(q, Number(ans)) || '—'}
+                      {right ? '' : ` · ที่ถูก ${quizChoiceLabel(q, q.answer)}`}
                     </p>
+                    {/* ตัวเลือกเป็นรูป: วางรูปที่ตอบ (และที่ถูก ถ้าตอบผิด) ให้เทียบได้ */}
+                    {[Number(ans), ...(right ? [] : [q.answer])].some((ci) => quizChoiceImage(q, ci)) ? (
+                      <div className="mt-2 flex flex-wrap gap-3">
+                        {[Number(ans), ...(right ? [] : [q.answer])].map((ci, k) =>
+                          quizChoiceImage(q, ci) ? (
+                            <figure key={k} className="space-y-1">
+                              <img src={quizImageUrl(quizChoiceImage(q, ci))} alt={quizChoiceLabel(q, ci)} loading="lazy" className="max-h-24 w-auto rounded-lg border border-border" />
+                              <figcaption className="text-xs text-muted-foreground">{k === 0 ? 'ที่ตอบ' : 'ที่ถูก'}</figcaption>
+                            </figure>
+                          ) : null,
+                        )}
+                      </div>
+                    ) : null}
                   </div>
                 );
               })}
