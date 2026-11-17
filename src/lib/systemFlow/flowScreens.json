@@ -6178,8 +6178,8 @@
      "effects": [
       "เขียนฐาน"
      ],
-     "when": "มีใบที่ถูกถอด claim เพราะเกิน 1 วัน (ไม่ใช่มุมมองทุกคน) — แสดงทั้ง 3 แท็บ",
-     "src": "src/components/recruit-rm/RmWorkspace.tsx:1479"
+     "when": "มีใบที่ถูกถอด claim เพราะเกิน 1 วัน (ไม่ใช่มุมมองทุกคน) — แท็บผู้สมัคร + ตอนดูกองรอเลือกวิธีโทร",
+     "src": "src/components/recruit-rm/RmWorkspace.tsx:1481"
     },
     {
      "label": "ส่ง AI โทรทั้งหมด",
@@ -6188,7 +6188,7 @@
      "api": null,
      "effects": [],
      "when": "มีกอง 'ต้องเลือกวิธีโทร'",
-     "src": "src/components/recruit-rm/RmWorkspace.tsx:1482"
+     "src": "src/components/recruit-rm/RmWorkspace.tsx:1484"
     },
     {
      "label": "ดูรายชื่อ (กอง 'ต้องเลือกวิธีโทร')",
@@ -6197,7 +6197,7 @@
      "api": null,
      "effects": [],
      "when": "มีกอง 'ต้องเลือกวิธีโทร' · ปิดเมื่อดูกองนี้อยู่แล้ว",
-     "src": "src/components/recruit-rm/RmWorkspace.tsx:1476"
+     "src": "src/components/recruit-rm/RmWorkspace.tsx:1478"
     },
     {
      "label": "{ชื่อแท็บ} N คน (แถบ 'ผู้สมัครตามตัวกรองนี้อยู่แท็บ')",
@@ -6206,7 +6206,7 @@
      "api": null,
      "effects": [],
      "when": "ตัวกรองได้ 0 คนในแท็บนี้แต่มีในแท็บอื่น",
-     "src": "src/components/recruit-rm/RmWorkspace.tsx:1490"
+     "src": "src/components/recruit-rm/RmWorkspace.tsx:1492"
     },
     {
      "label": "เลือกทั้งหมดในหน้านี้ (checkbox)",
@@ -6293,7 +6293,7 @@
      "api": null,
      "effects": [],
      "when": null,
-     "src": "src/components/recruit-rm/RmWorkspace.tsx:1528"
+     "src": "src/components/recruit-rm/RmWorkspace.tsx:1530"
     }
    ]
   },
@@ -6701,7 +6701,7 @@
      "api": null,
      "effects": [],
      "when": "มีคนในรายชื่อที่ยังไม่มีใบขอหรือใบขอปิดแล้ว (บังคับเลือกก่อนส่ง)",
-     "src": "src/components/recruit-rm/RmWorkspace.tsx:1601"
+     "src": "src/components/recruit-rm/RmWorkspace.tsx:1603"
     },
     {
      "label": "ยกเลิก",

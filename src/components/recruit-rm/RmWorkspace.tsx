@@ -1454,7 +1454,9 @@ const RmWorkspace: React.FC<{
                   ทุกวันด้วยเลข 0 คือขยะ (เจ้าของ: "ของน้อยคือสัญญาณ ของเยอะคือพื้นหลัง")
                   17 พ.ย. 2569 เจ้าของ "วางกองไว้แบบนี้มันไม่สวย" — เหลือแถวเดียว · รายชื่อดูในตารางผ่าน ?bucket=awaiting_call_choice
                   (เลือกทีละคนด้วย checkbox + ปุ่มบนตาราง) */}
-              {awaitingChoiceRows.length > 0 ? (
+              {/* 17 พ.ย. 2569 เจ้าของ (หน้าการติดต่อของอ้น "มันปน") — กองนี้เป็นของกองกลาง ไม่ใช่ของฉัน
+                  ⇒ ขึ้นเฉพาะแท็บผู้สมัคร (+ ตอนดูกองนี้จากกล่อง/ดูรายชื่อ) · แท็บการติดต่อ/นัดหมายเหลือแค่คนที่ตัวเองเก็บ */}
+              {awaitingChoiceRows.length > 0 && (tab === 'candidates' || bucket === 'awaiting_call_choice') ? (
                 <div className={cn('flex flex-wrap items-center justify-between gap-2 rounded-xl border px-3 py-2', TONE.warn.soft)}>
                   <p className={cn('text-sm font-medium', TONE.warn.value)}>
                     ต้องเลือกวิธีโทร <span className="tabular-nums">{awaitingChoiceRows.length.toLocaleString('th-TH')}</span> คน
