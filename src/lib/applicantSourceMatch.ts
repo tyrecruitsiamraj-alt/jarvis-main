@@ -16,13 +16,28 @@ const bkkYmd = (iso: string) => {
   return Number.isNaN(t) ? null : BKK_YMD.format(new Date(t));
 };
 
-/** มีใบแจ้งเข้า (YYYY-MM-DD) ตั้งแต่วันกรอกใบไหม · `informDays` null = อ่าน ERP ไม่ได้ */
-export function informedSince(informDays: ReadonlyMap<string, readonly string[]> | null, phone9: string | null, createdAt: string): boolean | null {
+/**
+ * "พบรายการแจ้งเข้า ERP" = เบอร์ในใบสมัครเคยถูกแจ้งเข้า (ใบแจ้งเข้าที่ไม่ยกเลิก) ไม่ดูวันที่
+ * เจ้าของ 17 พ.ย. 2569: "ถ้ามีเบอร์โทรบนระบบ และ มีเบอร์ที่ถูกแจ้งเข้าเอายอดมาเลย" (เดิมนับเฉพาะแจ้งเข้าตั้งแต่วันกรอก —
+ * เดือน พ.ย. ได้ 0 ทั้งที่เบอร์เจอใน ERP 28 คน เพราะถูกแจ้งเข้าก่อนมาสมัคร) · ไม่มีเลขบัตรให้จับคู่ — วิธีใหม่เจ้าของจะบอกเอง
+ * `informDays` โหลดตั้งแต่ `ERP_INFORM_SINCE` (ต้นปีนี้) · null = อ่าน ERP ไม่ได้
+ */
+export function informedByPhone(informDays: ReadonlyMap<string, readonly string[]> | null, phone9: string | null): boolean | null {
   if (!informDays) return null;
-  const day = bkkYmd(createdAt);
-  if (!phone9 || !day) return false;
-  return (informDays.get(phone9) ?? []).some((d) => d >= day);
+  if (!phone9) return false;
+  return (informDays.get(phone9) ?? []).length > 0;
 }
+
+/** วันแจ้งเข้าแรกของเบอร์ (ตั้งแต่ต้นปีนี้) — ผล ณ วันสิ้นสุดใช้ตัดแจ้งเข้าที่เกิดหลังวันนั้น · undefined = อ่าน ERP ไม่ได้ */
+export function firstInformDay(informDays: ReadonlyMap<string, readonly string[]> | null, phone9: string | null): string | null | undefined {
+  if (!informDays) return undefined;
+  if (!phone9) return null;
+  const days = [...(informDays.get(phone9) ?? [])].sort();
+  return days[0] ?? null;
+}
+
+/** แจ้งเข้า ERP ที่นับ = ตั้งแต่ต้นปีนี้ (เจ้าของ 17 พ.ย. 2569 "เอาแจ้งเข้าแค่ปีนี้ก็พอ" — ย้อนถึง 2559 เยอะเกิน) */
+export const ERP_INFORM_SINCE = '2026-01-01';
 
 /** iRecruit ลงทะเบียนห่างจากวันดึงเข้าระบบเราได้ไม่เกิน 60 วัน */
 const IRECRUIT_LOOKBACK_MS = 60 * 86_400_000;

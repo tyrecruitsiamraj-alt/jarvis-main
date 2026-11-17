@@ -148,7 +148,7 @@ export function TrendBars({
             disabled={!onPick}
             onClick={() => onPick?.(p.key)}
             aria-label={`${labelOf(p.key)} ${fmt(p.n)} รายการ`}
-            className="group flex h-full min-w-5 flex-1 flex-col items-center justify-end gap-1 focus-visible:outline-none"
+            className="group flex h-full min-w-5 max-w-16 flex-1 flex-col items-center justify-end gap-1 focus-visible:outline-none"
           >
             <span className="text-xs tabular-nums text-muted-foreground">{fmt(p.n)}</span>
             <span className="w-full rounded-t-md bg-primary/80 group-hover:bg-primary group-focus-visible:ring-2 group-focus-visible:ring-ring" style={{ height: `${((p.n ?? 0) / max) * 100}%`, minHeight: p.n ? 2 : 0 }} />

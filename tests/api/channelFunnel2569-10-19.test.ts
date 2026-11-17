@@ -6,7 +6,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { buildChannelFunnel, buildChannelFunnelTree, funnelChannelOf, funnelGroupOf, IRECRUIT_UNKNOWN_CHANNEL, NO_SUB } from '../../src/lib/channelFunnel';
-import { informedSince, irecruitChannelAt, phone9Of } from '../../src/lib/applicantSourceMatch';
+import { firstInformDay, informedByPhone, irecruitChannelAt, phone9Of } from '../../src/lib/applicantSourceMatch';
 import { buildRecruitJourney } from '../../src/lib/recruitJourney';
 import type { RecruitAppFact } from '../../src/lib/recruitOverviewTypes';
 
@@ -81,13 +81,19 @@ describe('buildChannelFunnel', () => {
 });
 
 describe('จับคู่ฝั่ง API', () => {
-  it('เบอร์ 9 ตัวท้าย · แจ้งเข้าวันเดียวกับวันกรอก (เวลาไทย) นับ · ก่อนวันกรอกไม่นับ', () => {
+  it('เบอร์ 9 ตัวท้าย · เบอร์เคยถูกแจ้งเข้า = นับ ไม่ดูวันที่ (เจ้าของ 17 พ.ย. 2569) · อ่าน ERP ไม่ได้ = null', () => {
     expect(phone9Of('+66812345678')).toBe('812345678');
     expect(phone9Of('081-234-5678')).toBe('812345678');
-    const days = new Map([['812345678', ['2026-10-04', '2026-10-06']]]);
-    expect(informedSince(days, '812345678', '2026-10-05T20:00:00.000Z')).toBe(true); // 6 ต.ค. เวลาไทย
-    expect(informedSince(new Map([['812345678', ['2026-10-04']]]), '812345678', '2026-10-05T03:00:00.000Z')).toBe(false);
-    expect(informedSince(null, '812345678', '2026-10-05T03:00:00.000Z')).toBeNull();
+    const days = new Map([['812345678', ['2026-10-06', '2026-10-04']]]);
+    expect(informedByPhone(days, '812345678')).toBe(true);
+    // แจ้งเข้าก่อนวันกรอก (คนเก่ากลับมาสมัคร) ก็นับ
+    expect(informedByPhone(new Map([['812345678', ['2026-01-04']]]), '812345678')).toBe(true);
+    expect(informedByPhone(days, '899999999')).toBe(false);
+    expect(informedByPhone(days, null)).toBe(false);
+    expect(informedByPhone(null, '812345678')).toBeNull();
+    expect(firstInformDay(days, '812345678')).toBe('2026-10-04');
+    expect(firstInformDay(days, '899999999')).toBeNull();
+    expect(firstInformDay(null, '812345678')).toBeUndefined();
   });
   it('ช่องทาง iRecruit = ลงทะเบียนล่าสุดก่อนใบเข้าระบบเรา (ย้อนไม่เกิน 60 วัน)', () => {
     const regs = new Map([

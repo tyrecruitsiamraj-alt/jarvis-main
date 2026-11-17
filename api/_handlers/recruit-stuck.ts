@@ -22,7 +22,7 @@ import { attachRequestRecruiters, loadFactsForJobs, toRequestRows } from './recr
 import { listLatestJobPostingsForBoard } from '../_lib/jobPostingRequests.js';
 import { loadErpExtras, loadOnlineRequestRows, loadReleaseMatches, type ErpExtra } from '../_lib/homeOnlineSql.js';
 import { loadInformDaysByPhone } from '../_lib/applicantSourceSql.js';
-import { informedSince, phone9Of } from '../../src/lib/applicantSourceMatch.js';
+import { ERP_INFORM_SINCE, informedByPhone, phone9Of } from '../../src/lib/applicantSourceMatch.js';
 import { countsOf } from '../../src/lib/requestPipeline.js';
 import { getJobRequestAgeDays } from '../../src/lib/jobUrgency.js';
 import { boardProvinceOf, drivingSubtypeOf, UNSPECIFIED } from '../../src/lib/boardFilters.js';
@@ -378,7 +378,7 @@ async function loadMonthly(departmentScope: Scope, buSet: readonly string[] | nu
           and ${buMatchSql(appBuSql('a'), '$2')}`,
       [from, buSet],
     ).then((r) => r.rows),
-    loadInformDaysByPhone(from).catch((e) => {
+    loadInformDaysByPhone(ERP_INFORM_SINCE).catch((e) => {
       logError('recruit-stuck: informs', e);
       return null;
     }),
@@ -388,7 +388,7 @@ async function loadMonthly(departmentScope: Scope, buSet: readonly string[] | nu
     const r = row(monthOf(a.day), a.job_id ?? '');
     r.apps += 1;
     if (a.booked) r.booked += 1;
-    if (informs && r.informed !== null && informedSince(informs, phone9Of(a.phone), `${a.day}T00:00:00+07:00`) === true) r.informed += 1;
+    if (informs && r.informed !== null && informedByPhone(informs, phone9Of(a.phone)) === true) r.informed += 1;
   }
   return [...acc.values()].sort((a, b) => a.month.localeCompare(b.month) || a.jobId.localeCompare(b.jobId));
 }

@@ -64,6 +64,9 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
   const [metric, setMetric] = React.useState<V2Metric>('apps');
   const [trendMonth, setTrendMonth] = React.useState<string | null>(null);
   const [trendUnit, setTrendUnit] = React.useState<'month' | 'day'>('month');
+  /** ช่วงอยู่ในเดือนเดียว = รายวันเสมอ (แบบเดือนเหลือแท่งเดียว · เจ้าของ 17 พ.ย. 2569 "บ้านนอกมาก") · ปุ่ม "เดือน" ปิดไว้ ไม่ซ่อน (ของบนจอไม่ขยับ) */
+  const multiMonth = win.from.slice(0, 7) !== win.to.slice(0, 7);
+  const shownUnit: 'month' | 'day' = multiMonth ? trendUnit : 'day';
   const [holder, setHolder] = React.useState<Holder>('holder');
   const [holderPage, setHolderPage] = React.useState(1);
   const [chPage, setChPage] = React.useState(1);
@@ -139,7 +142,7 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
     })
     .sort((a, b) => (b.value ?? -1) - (a.value ?? -1));
   const trendPoints = (() => {
-    const unit = trendMonth ? 'day' : trendUnit;
+    const unit = trendMonth ? 'day' : shownUnit;
     const keys: string[] = [];
     const days: string[] = [];
     for (let d = trendMonth ? (trendMonth + '-01' > win.from ? trendMonth + '-01' : win.from) : win.from; d <= win.to; d = bkkDay(new Date(Date.parse(`${d}T12:00:00+07:00`) + 86_400_000).toISOString())) {
@@ -442,10 +445,10 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
                     </Button>
                   ) : (
                     <>
-                      <Button type="button" size="xs" variant={trendUnit === 'month' ? 'default' : 'outline'} onClick={() => setTrendUnit('month')}>
+                      <Button type="button" size="xs" variant={shownUnit === 'month' ? 'default' : 'outline'} disabled={!multiMonth} onClick={() => setTrendUnit('month')}>
                         เดือน
                       </Button>
-                      <Button type="button" size="xs" variant={trendUnit === 'day' ? 'default' : 'outline'} onClick={() => setTrendUnit('day')}>
+                      <Button type="button" size="xs" variant={shownUnit === 'day' ? 'default' : 'outline'} onClick={() => setTrendUnit('day')}>
                         วัน
                       </Button>
                     </>

@@ -72,7 +72,7 @@ import { requestSectorOf, type RecruitRequestRow } from '../../src/lib/recruitRe
 import { onlineRequestStateOf, type OnlineRequestRow } from '../../src/lib/homeOnline.js';
 import { loadChannelPlacement } from '../_lib/channelPlacementSql.js';
 import { loadInformDaysByPhone, loadIrecruitApplicantDays, loadIrecruitRegsByPhone } from '../_lib/applicantSourceSql.js';
-import { firstDaySince, informedSince, irecruitSourceAt, phone9Of } from '../../src/lib/applicantSourceMatch.js';
+import { ERP_INFORM_SINCE, firstDaySince, firstInformDay, informedByPhone, irecruitSourceAt, phone9Of } from '../../src/lib/applicantSourceMatch.js';
 import { SO_LINK_NOTE } from '../../src/lib/soScraping.js';
 import type {
   RecruitAiRow,
@@ -434,11 +434,11 @@ export function toFact(
     ...aiBlockOf(text(r.ai_block_reason)),
     aiOutOfArea: Boolean(r.ai_outcome) && isOutOfAreaAnswer(text(r.ai_summary), text(r.ai_reply)),
     onBoard: boardPhones ? Boolean(phone && boardPhones.has(phone)) : null,
-    informed: sources ? informedAsOf(informedSince(sources.informDays, p9, createdAt), firstDaySince(sources.informDays, p9, createdAt), asOf) : null,
+    informed: sources ? informedAsOf(informedByPhone(sources.informDays, p9), firstInformDay(sources.informDays, p9), asOf) : null,
     sourceChannel: irec?.channel ?? null,
     sourceSub: irec?.sub ?? null,
     irecruitAt: sources ? firstDaySince(sources.irecruitApplicants ?? null, p9, createdAt) : undefined,
-    informedAt: sources ? capDay(firstDaySince(sources.informDays, p9, createdAt), asOf) : undefined,
+    informedAt: sources ? capDay(firstInformDay(sources.informDays, p9), asOf) : undefined,
     postSource: sources ? postSourceOf(text(r.link_code), text(r.link_note), sources.autopostCodes) : undefined,
     bringer: sources ? text(r.bringer) : undefined,
     age: ageOf(r.age),
@@ -936,7 +936,7 @@ export async function buildRecruitOverview(
     // ใบขอช่วงก่อน + ช่วงนี้ อ่านทีเดียว แล้วแบ่ง (เจ้าของ 21 ต.ค. 2569 "อยากได้เป็นกราฟเชิงเปรียบเทียบว่า เพิ่มขึ้นลดลง")
     settle('ใบขอ', () => loadOnlineRequestRows({ from: window.prevFrom, to: window.to, bu: buSet, departmentScope: scope })),
     // ช่องทาง → แจ้งเข้า (เจ้าของ 19 ต.ค. 2569 "จับได้ถึงแจ้งเข้า") — แจ้งเข้าตั้งแต่ต้นช่วงเทียบ · iRecruit ย้อน 60 วัน
-    settle('ใบแจ้งเข้า ERP', () => loadInformDaysByPhone(window.prevFrom)),
+    settle('ใบแจ้งเข้า ERP', () => loadInformDaysByPhone(ERP_INFORM_SINCE)),
     settle('ช่องทาง iRecruit', () => loadIrecruitRegsByPhone(window.prevFrom, window.to)),
     // ผู้สมัครใน iRecruit (ขั้นคีย์เข้า iRecruit หลังมาตามนัด · 20 ต.ค. 2569)
     settle('ผู้สมัคร iRecruit', () => loadIrecruitApplicantDays(window.prevFrom)),
