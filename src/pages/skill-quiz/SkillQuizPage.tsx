@@ -2,6 +2,7 @@
  * /skill-test — แบบทดสอบพนักงาน (เจ้าของ 12 พ.ย. 2569)
  * แท็บ "ผลแบบทดสอบ" = คนที่กรอกเข้ามา + สถานะ + คะแนน · แท็บ "ชุดข้อสอบ" = สร้าง/แก้ชุด + ลิงก์ของชุด
  * ทางเดิน (16 พ.ย. 2569 แบบ Knowa): สร้างชุด (เลือกใครเห็น) → คัดลอกลิงก์ของชุดส่ง → คนทำกรอกข้อมูล+ยินยอม PDPA
+ * (17 พ.ย. 2569) ปุ่ม "ส่งลิงก์" เปิดป๊อป QR + ส่งทาง LINE + โหลดรูป QR · ปุ่มคัดลอกลิงก์บนแถวยังอยู่
  * → ทำ → AI ร่าง → เจ้าหน้าที่ตรวจ → บันทึกและโหลดรูป · ลิงก์ละคน (ใส่ชื่อพนักงาน) ถอดแล้ว
  */
 import { useCallback, useEffect, useState } from 'react';
@@ -23,6 +24,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import QuizSetEditorDialog from '@/components/skill-quiz/QuizSetEditorDialog';
 import QuizResultDialog from '@/components/skill-quiz/QuizResultDialog';
+import QuizShareDialog from '@/components/skill-quiz/QuizShareDialog';
 import { CONVEYOR_VAULT } from '@/lib/soRecruitNav';
 import { TONE } from '@/lib/designTokens';
 import { cn } from '@/lib/utils';
@@ -67,6 +69,7 @@ export default function SkillQuizPage() {
   const [notice, setNotice] = useState<string | null>(null);
   const [editing, setEditing] = useState<{ id: string | null; item: QuizSetItem | null } | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
+  const [share, setShare] = useState<{ title: string; url: string } | null>(null);
   const [confirm, setConfirm] = useState<{ kind: 'set' | 'attempt'; id: string; label: string } | null>(null);
 
   const load = useCallback(() => {
@@ -217,6 +220,14 @@ export default function SkillQuizPage() {
                       <TableCell className="whitespace-nowrap">{viewersLabel(s)}</TableCell>
                       <TableCell className="text-right tabular-nums">{s.attempts} คน</TableCell>
                       <TableCell className="whitespace-nowrap text-right">
+                        <Button
+                          type="button"
+                          size="sm"
+                          disabled={!s.public_token}
+                          onClick={() => s.public_token && setShare({ title: s.content.title, url: quizSetLinkUrl(s.public_token) })}
+                        >
+                          ส่งลิงก์
+                        </Button>
                         <Button type="button" variant="outline" size="sm" disabled={!s.public_token} onClick={() => void copyLink(s)}>
                           คัดลอกลิงก์
                         </Button>
@@ -246,6 +257,7 @@ export default function SkillQuizPage() {
           load();
         }}
       />
+      <QuizShareDialog share={share} onOpenChange={(v) => !v && setShare(null)} />
       <QuizResultDialog attemptId={openId} onOpenChange={(v) => !v && setOpenId(null)} onChanged={load} />
       <AlertDialog open={confirm !== null} onOpenChange={(v) => !v && setConfirm(null)}>
         <AlertDialogContent>
