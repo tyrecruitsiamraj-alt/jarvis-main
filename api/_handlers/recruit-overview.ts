@@ -64,6 +64,7 @@ import { isOutOfAreaAnswer } from '../../src/lib/outOfAreaAnswer.js';
 import { loadOnlineRequestRows } from '../_lib/homeOnlineSql.js';
 import { getUnitNotesMap } from '../_lib/siamrajUnitNotes.js';
 import { canonProvinceName } from '../../src/lib/thaiProvinces.js';
+import { asOfCutoff, asOfSql } from '../_lib/overviewAsOf.js';
 import { parseThaiAddressParts } from '../../src/lib/parseThaiJobAddress.js';
 import { getDistrictOptionsForProvince } from '../../src/lib/thaiDistricts.js';
 import { requestSectorOf, type RecruitRequestRow } from '../../src/lib/recruitRequestTab.js';
@@ -173,6 +174,8 @@ export function factsSql(
          else nullif(btrim(a.created_by_name), '') end as bringer,
          nullif(btrim(a.position_interest), '') as position,
          a.phone_e164, a.age,
+         -- จังหวัดที่อยู่ที่ผู้สมัครกรอก (ไม่ใช่จังหวัดของงาน) — ภาพรวม v2 ตารางจังหวัด (17 พ.ย. 2569)
+         nullif(btrim(a.province), '') as home_province,
          -- เหตุที่ระบบไม่ส่ง AI (ภาพรวม 8 เรื่อง 16 พ.ย. 2569 "ยังไม่ส่ง Ai เพราะอะไร") — คิดเป็นกองฝั่ง Node (aiBlockOf)
          a.ai_block_reason,
          ${CALLED_BY_AI_SQL} as by_ai,
@@ -361,7 +364,22 @@ export function aiBlockOf(reason: string | null): { aiBlock?: 'income' | 'paused
   return { aiBlock: /รายได้/.test(reason) ? 'income' : /พัก/.test(reason) ? 'paused' : 'other' };
 }
 
-export function toFact(r: Row, boardPhones: Set<string> | null, sources?: AppSourceMaps): RecruitAppFact {
+/** อายุที่กรอก — ตัวเลข 1–99 เท่านั้น · อย่างอื่น = ไม่ระบุ (ห้ามนับเป็น 0 ปี) */
+export function ageOf(v: unknown): number | null {
+  const n = typeof v === 'number' ? v : typeof v === 'string' && v.trim() ? Number(v.trim()) : NaN;
+  return Number.isInteger(n) && n >= 1 && n <= 99 ? n : null;
+}
+
+/**
+ * `asOf` = ผล ณ วันสิ้นสุดที่เป็นอดีต (ภาพรวม v2 · 17 พ.ย. 2569) — `day` = วันสิ้นสุด (ไทย) · `cutoff` = ต้นวันถัดไป (ISO)
+ * แถวผลถูกตัดในคิวรีแล้ว (`asOfSql`) · ตรงนี้ตัดที่มาจาก Node: แจ้งเข้า ERP หลังวันนั้น · คนเก็บรายชื่อหลังวันนั้น
+ */
+export function toFact(
+  r: Row,
+  boardPhones: Set<string> | null,
+  sources?: AppSourceMaps,
+  asOf?: { day: string; cutoff: string } | null,
+): RecruitAppFact {
   const phone = text(r.phone_e164);
   const p9 = phone9Of(phone);
   const createdAt = iso(r.created_at) ?? '';
@@ -400,20 +418,32 @@ export function toFact(r: Row, boardPhones: Set<string> | null, sources?: AppSou
     // นัดไม่สำเร็จ = บันทึกติดต่อสำเร็จ + เหตุผล + ไม่มีวันนัด (ตัวเดียวกับ `isAppointmentFailedLog`)
     appointmentFailed: r.log_ok === true && Boolean(text(r.log_reason)) && !r.log_appointment_at,
     screening: r.screening === 'passed' || r.screening === 'not_passed' ? r.screening : null,
-    claimedBy: text(r.claimed_by),
-    claimedAt: iso(r.claimed_at),
+    claimedBy: asOf && iso(r.claimed_at) && String(iso(r.claimed_at)) >= asOf.cutoff ? null : text(r.claimed_by),
+    claimedAt: asOf && iso(r.claimed_at) && String(iso(r.claimed_at)) >= asOf.cutoff ? null : iso(r.claimed_at),
     overAge: isOverAge(r.age as number | string | null),
     ...aiBlockOf(text(r.ai_block_reason)),
     aiOutOfArea: Boolean(r.ai_outcome) && isOutOfAreaAnswer(text(r.ai_summary), text(r.ai_reply)),
     onBoard: boardPhones ? Boolean(phone && boardPhones.has(phone)) : null,
-    informed: sources ? informedSince(sources.informDays, p9, createdAt) : null,
+    informed: sources ? informedAsOf(informedSince(sources.informDays, p9, createdAt), firstDaySince(sources.informDays, p9, createdAt), asOf) : null,
     sourceChannel: irec?.channel ?? null,
     sourceSub: irec?.sub ?? null,
     irecruitAt: sources ? firstDaySince(sources.irecruitApplicants ?? null, p9, createdAt) : undefined,
-    informedAt: sources ? firstDaySince(sources.informDays, p9, createdAt) : undefined,
+    informedAt: sources ? capDay(firstDaySince(sources.informDays, p9, createdAt), asOf) : undefined,
     postSource: sources ? postSourceOf(text(r.link_code), text(r.link_note), sources.autopostCodes) : undefined,
     bringer: sources ? text(r.bringer) : undefined,
+    age: ageOf(r.age),
+    homeProvince: text(r.home_province) ? canonProvinceName(String(text(r.home_province))) || text(r.home_province) : null,
   };
+}
+
+/** วันแจ้งเข้าหลังวันสิ้นสุด = ณ วันนั้นยังไม่แจ้ง · อ่านไม่ได้ (undefined) คงเดิม */
+function capDay(day: string | null | undefined, asOf?: { day: string } | null): string | null | undefined {
+  if (!asOf || !day) return day;
+  return day <= asOf.day ? day : null;
+}
+function informedAsOf(informed: boolean | null, day: string | null | undefined, asOf?: { day: string } | null): boolean | null {
+  if (!asOf || informed !== true) return informed;
+  return Boolean(day && day <= asOf.day);
 }
 
 /** ใบยังเปิด (`onlineRequestStateOf`) — แถวที่ไม่มีช่องอัตรา (เทสต์/ข้อมูลเก่า) = ถือว่าเปิด */
@@ -781,17 +811,20 @@ async function settle<T>(what: string, run: () => Promise<T>): Promise<Settled<T
 }
 
 /** ผลนัดยังไม่ migrate (089) = อ่านต่อได้ แค่ไม่มีผลนัด */
-async function loadFacts(params: unknown[], byJobs = false): Promise<Row[]> {
+async function loadFacts(params: unknown[], byJobs = false, cutoff: string | null = null): Promise<Row[]> {
+  // ผล ณ วันสิ้นสุด (ภาพรวม v2) — cutoff เป็นพารามิเตอร์ตัวสุดท้าย
+  const p = cutoff ? [...params, cutoff] : params;
+  const sql = (q: string) => (cutoff ? asOfSql(q, `$${p.length}::timestamptz`) : q);
   try {
-    return (await dbQuery<Row>(factsSql(LATEST_ATTENDANCE_SQL, LATEST_SCREENING_SQL, byJobs), params)).rows;
+    return (await dbQuery<Row>(sql(factsSql(LATEST_ATTENDANCE_SQL, LATEST_SCREENING_SQL, byJobs)), p)).rows;
   } catch (e) {
     if (!isPgUndefinedTable(e)) throw e;
     // ผลนัด (089) หรือผ่าน/ไม่ผ่าน (151) ยังไม่ migrate — ลองตัดทีละอย่าง
     try {
-      return (await dbQuery<Row>(factsSql(LATEST_ATTENDANCE_SQL, 'null::text', byJobs), params)).rows;
+      return (await dbQuery<Row>(sql(factsSql(LATEST_ATTENDANCE_SQL, 'null::text', byJobs)), p)).rows;
     } catch (e2) {
       if (!isPgUndefinedTable(e2)) throw e2;
-      return (await dbQuery<Row>(factsSql('null::text', 'null::text', byJobs), params)).rows;
+      return (await dbQuery<Row>(sql(factsSql('null::text', 'null::text', byJobs)), p)).rows;
     }
   }
 }
@@ -811,6 +844,8 @@ export async function buildRecruitOverview(
   range?: { from: unknown; to: unknown; all?: boolean },
   /** BU ที่ขอ — ผู้ใช้หลาย BU สลับได้ทีละ BU (26 ต.ค. 2569) · แอดมิน/BU เดียวไม่ใช้ */
   requestedBu?: unknown,
+  /** ผล ณ วันสิ้นสุด (`?asof=1` · ภาพรวม v2 17 พ.ย. 2569) — หน้าเดิมไม่ส่ง = ผลล่าสุดแบบเดิม */
+  opts: { asOf?: boolean } = {},
 ): Promise<RecruitOverviewResponse> {
   const today = toBangkokYmd(now);
   const window = (range ? rangeWindow(range.from, range.to, today, range.all === true) : null) ?? monthWindow(monthParam, today);
@@ -841,6 +876,10 @@ export async function buildRecruitOverview(
   if (scope.mode === 'none') return body;
 
   const bothRange = [startOfBkk(window.prevFrom), startOfBkk(addDays(window.to, 1)), buSet];
+  // วันสิ้นสุดเป็นอดีต = ผล ณ วันนั้น (ภาพรวม v2 · 17 พ.ย. 2569 "ห้ามใช้ผลล่าสุดแทนย้อนหลัง") · วันนี้ = ผลล่าสุด
+  const cutoffIso = opts.asOf ? asOfCutoff(window.to, today) : null;
+  const asOf = cutoffIso ? { day: window.to, cutoff: cutoffIso } : null;
+  body.window.asOf = asOf ? window.to : null;
   const monthRange = [startOfBkk(window.from), startOfBkk(addDays(window.to, 1)), buSet];
   const nowMs = now.getTime();
 
@@ -848,7 +887,7 @@ export async function buildRecruitOverview(
   const jobIndexP = loadJobIndex();
   const [boardR, factsR, backlogR, apptR, staffR, showedR, aiR, firstR, everR, chR, reqR, informR, irecR, irAppR, apCodesR, clicksR] = await Promise.all([
     settle('รายชื่อบนบอร์ด', loadBoardPhoneSet),
-    settle('ใบสมัคร', () => loadFacts(bothRange)),
+    settle('ใบสมัคร', () => loadFacts(bothRange, false, asOf?.cutoff ?? null)),
     settle('งานค้าง', async () => (await dbQuery<Row>(backlogSql(), [buSet])).rows),
     settle('นัดที่รอผล', async () => {
       try {
@@ -917,7 +956,7 @@ export async function buildRecruitOverview(
   };
   if (!informR.ok) body.errors.informs = informR.error;
   if (factsR.ok) {
-    const apps = factsR.value.map((r) => toFact(r, boardPhones, sources));
+    const apps = factsR.value.map((r) => toFact(r, boardPhones, sources, asOf));
     // ชื่อคนเก็บที่เป็นอีเมล → ชื่อเล่น (กติกาเดียวกับตารางผลงานรายคน)
     if (apps.some((a) => a.claimedBy?.includes('@') || a.bringer?.includes('@'))) {
       const displayOf = await loadStaffDisplay();
@@ -1061,7 +1100,9 @@ async function handler(req: AuthedReq, res: ApiRes) {
     const month = typeof req.query?.month === 'string' ? req.query.month.trim() : undefined;
     const from = typeof req.query?.from === 'string' ? req.query.from.trim() : undefined;
     const to = typeof req.query?.to === 'string' ? req.query.to.trim() : undefined;
-    const body = await buildRecruitOverview(month, scope, new Date(), from && to ? { from, to, all: req.query?.all === '1' } : undefined, req.query?.bu);
+    const body = await buildRecruitOverview(month, scope, new Date(), from && to ? { from, to, all: req.query?.all === '1' } : undefined, req.query?.bu, {
+      asOf: req.query?.asof === '1',
+    });
     res.setHeader?.('Cache-Control', 'no-store');
     return res.status(200).json(body);
   } catch (e) {

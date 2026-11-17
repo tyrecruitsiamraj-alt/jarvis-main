@@ -121,7 +121,8 @@ describe('เส้นอ่านอย่างเดียว + ขอบเ�
       if (text.includes('siamraj_unit_assignments')) continue;
       // รหัสลิงก์ของใบสั่ง Autopost (9 พ.ย. 2569) — ใช้แยกว่ามาจาก Autopost หรือโพสต์เอง ไม่ใช่ข้อมูลใบสมัคร
       if (text.includes('group_links')) continue;
-      expect(params?.[params.length - 1], text.slice(0, 60)).toEqual(['LBD']);
+      // ช่วงย้อนหลังมี cutoff ต่อท้าย (ผล ณ วันสิ้นสุด · ภาพรวม v2 17 พ.ย. 2569) — BU ต้องอยู่ในพารามิเตอร์เสมอ
+      expect(params, text.slice(0, 60)).toContainEqual(['LBD']);
     }
   });
 
@@ -135,7 +136,8 @@ describe('เส้นอ่านอย่างเดียว + ขอบเ�
       const sent = (dbQuery.mock.calls as [string, unknown[] | undefined][])
         // group_links = รหัสลิงก์ของใบสั่ง Autopost (9 พ.ย. 2569) ไม่ใช่ข้อมูลใบสมัคร
         .filter(([text]) => !text.includes('any_row') && !text.includes('nickname') && !text.includes('siamraj_unit_assignments') && !text.includes('group_links'))
-        .map(([, params]) => params?.[params.length - 1]);
+        // ช่วงย้อนหลังมี cutoff (timestamp) ต่อท้าย — เอาพารามิเตอร์ BU (array) ตัวท้ายสุด
+        .map(([, params]) => [...(params ?? [])].reverse().find((p) => Array.isArray(p) || p === null));
       return { body, sent };
     };
     const all = await run();
