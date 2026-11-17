@@ -65,6 +65,7 @@ import { loadOnlineRequestRows } from '../_lib/homeOnlineSql.js';
 import { getUnitNotesMap } from '../_lib/siamrajUnitNotes.js';
 import { canonProvinceName } from '../../src/lib/thaiProvinces.js';
 import { asOfCutoff, asOfSql } from '../_lib/overviewAsOf.js';
+import { createHash } from 'node:crypto';
 import { parseThaiAddressParts } from '../../src/lib/parseThaiJobAddress.js';
 import { getDistrictOptionsForProvince } from '../../src/lib/thaiDistricts.js';
 import { requestSectorOf, type RecruitRequestRow } from '../../src/lib/recruitRequestTab.js';
@@ -190,6 +191,15 @@ export function factsSql(
          lcl.appointment_at as log_appointment_at,
          ${IN_QUEUE_SQL} as in_queue,
          ${APPOINTMENT_AT_SQL} as appointment_at,
+         -- ใครเป็นคนนัด (ภาพรวม v2 "ผู้นัด" · 17 พ.ย. 2569) — คนบันทึกติดต่อที่ลงวันนัดล่าสุด › คนถือเบอร์ที่ลงนัด (ลำดับเดียวกับ APPOINTMENT_AT_SQL)
+         coalesce(
+           (select nullif(btrim(c.created_by_name), '') from ${CONTACTS} c
+             where c.application_id = a.id and c.appointment_at is not null order by c.created_at desc limit 1),
+           (select nullif(btrim(h.held_by_name), '') from ${HOLDS} h
+             where a.phone_e164 is not null and h.phone_e164 = a.phone_e164 and h.appointment_at is not null
+               and coalesce(h.result_at, h.updated_at, h.released_at, h.held_at) >= a.created_at
+             order by coalesce(h.result_at, h.updated_at, h.released_at, h.held_at) desc limit 1)
+         ) as booked_by,
          ${attendance} as attendance,
          ${screening} as screening,
          -- คนที่เก็บไปหน้าการติดต่อ (4 พ.ย. 2569 "แบงค์เก็บไปหน้าการติดต่อ 30 …") — อีเมลแปลงเป็นชื่อเล่นฝั่ง Node
@@ -432,6 +442,9 @@ export function toFact(
     postSource: sources ? postSourceOf(text(r.link_code), text(r.link_note), sources.autopostCodes) : undefined,
     bringer: sources ? text(r.bringer) : undefined,
     age: ageOf(r.age),
+    bookedBy: r.appointment_at ? text(r.booked_by) : null,
+    // เบอร์ไม่ซ้ำ (ภาพรวม v2) — ส่งเป็นรหัสย่อของเบอร์ ไม่ส่งเบอร์จริงออกหน้าเว็บ · ไม่ใช่คนไม่ซ้ำที่ยืนยันตัว
+    phoneKey: phone ? createHash('sha256').update(`jarvis-ov2:${phone}`).digest('base64url').slice(0, 12) : null,
     homeProvince: text(r.home_province) ? canonProvinceName(String(text(r.home_province))) || text(r.home_province) : null,
   };
 }
@@ -958,11 +971,12 @@ export async function buildRecruitOverview(
   if (factsR.ok) {
     const apps = factsR.value.map((r) => toFact(r, boardPhones, sources, asOf));
     // ชื่อคนเก็บที่เป็นอีเมล → ชื่อเล่น (กติกาเดียวกับตารางผลงานรายคน)
-    if (apps.some((a) => a.claimedBy?.includes('@') || a.bringer?.includes('@'))) {
+    if (apps.some((a) => a.claimedBy?.includes('@') || a.bringer?.includes('@') || a.bookedBy?.includes('@'))) {
       const displayOf = await loadStaffDisplay();
       for (const a of apps) {
         if (a.claimedBy?.includes('@')) a.claimedBy = displayOf(a.claimedBy.toLowerCase()) ?? a.claimedBy;
         if (a.bringer?.includes('@')) a.bringer = displayOf(a.bringer.toLowerCase()) ?? a.bringer;
+        if (a.bookedBy?.includes('@')) a.bookedBy = displayOf(a.bookedBy.toLowerCase()) ?? a.bookedBy;
       }
     }
     body.apps = apps;

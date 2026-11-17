@@ -17,7 +17,7 @@ import { DASH, TONE } from '@/lib/designTokens';
 import type { RecruitOverviewResponse } from '@/lib/recruitOverviewTypes';
 import { fetchRecruitStuck, type RecruitStuckResponse } from '@/lib/recruitStuckApi';
 import { stuckEquation, type StuckRequest } from '@/lib/recruitStuck';
-import { isStartedRequest } from '@/lib/recruitTopics';
+import { POSTING_STATES, POSTING_STATE_LABEL, isPostingStarted, postingStateOf } from '@/lib/recruitPostingState';
 import { fetchSoPostGroups } from '@/lib/soPostGroupsApi';
 import { fetchManualLinks } from '@/lib/jobPostActionsApi';
 import { requestPathOfJobId } from '@/lib/jobNavigation';
@@ -34,8 +34,9 @@ const TH_MONTH = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค
 const dayText = (ymd: string) => `${Number(ymd.slice(8, 10))} ${TH_MONTH[Number(ymd.slice(5, 7)) - 1]} ${Number(ymd.slice(0, 4)) + 543}`;
 const monthText = (ym: string) => `${TH_MONTH[Number(ym.slice(5, 7)) - 1]} ${String(Number(ym.slice(0, 4)) + 543).slice(2)}`;
 
-type Holder = 'holder' | 'bringer';
-const HOLDER_LABEL: Record<Holder, string> = { holder: 'ผู้รับรายชื่อ', bringer: 'ผู้พารายชื่อเข้ามา' };
+type Holder = 'holder' | 'bringer' | 'booker';
+const HOLDER_LABEL: Record<Holder, string> = { holder: 'ผู้รับรายชื่อ', bringer: 'ผู้พารายชื่อเข้ามา', booker: 'ผู้นัด' };
+const BOOKER_UNKNOWN = 'ไม่ทราบผู้นัด';
 
 export default function RecruitOverviewV2({ data }: { data: RecruitOverviewResponse }) {
   const navigate = useNavigate();
@@ -59,6 +60,7 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
   const [holderPage, setHolderPage] = React.useState(1);
   const [chPage, setChPage] = React.useState(1);
   const [workPage, setWorkPage] = React.useState(1);
+  const [clickPage, setClickPage] = React.useState(1);
   // เปลี่ยนวัน/BU = ล้างรายละเอียด + กลับหน้า 1 ทุกตาราง (ห้ามค้างข้อมูลช่วงเดิม)
   React.useEffect(() => {
     setStack([]);
@@ -66,6 +68,7 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
     setHolderPage(1);
     setChPage(1);
     setWorkPage(1);
+    setClickPage(1);
   }, [filterKey]);
 
   // ใบขอ + การประกาศ (เส้นเดิม) — ทิ้งคำตอบที่ไม่ใช่ตัวกรองปัจจุบัน
@@ -90,8 +93,8 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
   const reqRows = stuck.key === filterKey ? stuck.data?.requests ?? null : null;
   const eq = reqRows ? stuckEquation(reqRows) : null;
   const openRows = eq?.remaining ?? [];
-  const started = openRows.filter(isStartedRequest);
-  const notStarted = openRows.filter((r) => !isStartedRequest(r));
+  const started = openRows.filter(isPostingStarted);
+  const notStarted = openRows.filter((r) => !isPostingStarted(r));
 
   const push = (p: V2Pane) => setStack([p]);
   const openRequests = (title: string, rows: StuckRequest[]) => push({ kind: 'requests', title, rows, page: 1 });
@@ -139,8 +142,9 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
   // ── รายชื่ออยู่กับใคร ──
   const holderRows = (() => {
     const m = new Map<string, string[]>();
-    for (const f of model.cohort) {
-      const k = holder === 'holder' ? holderOf(f) : bringerOf(f);
+    // ผู้นัด = เฉพาะรายการที่นัดได้ (คนบันทึกนัด) · อื่น = ทุกรายการ
+    for (const f of holder === 'booker' ? model.cohort.filter((x) => x.appointmentAt) : model.cohort) {
+      const k = holder === 'holder' ? holderOf(f) : holder === 'bringer' ? bringerOf(f) : f.bookedBy?.trim() || BOOKER_UNKNOWN;
       m.set(k, [...(m.get(k) ?? []), f.id ?? '']);
     }
     return [...m.entries()]
@@ -170,7 +174,100 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
   const age = ageStats(model.cohort);
   const unlinked = model.cohort.filter((f) => !f.jobId);
 
+  /** สถานะการออกหาคนรายใบ 9 แบบ (ใบขอที่ดำเนินการ) — กดสถานะ = รายการใบ */
+  const stateGroups = POSTING_STATES.map((k) => ({ k, rows: openRows.filter((r) => postingStateOf(r) === k) }));
+  /** เบอร์ไม่ซ้ำต่อ BU — เบอร์เดียวสมัครหลาย BU นับ BU ละครั้ง (ผลรวม BU จึงไม่บังคับเท่ายอดรวม) */
+  const distinct = [...bus, null].map((bu) => {
+    const list = bu === null ? model.cohort : model.cohort.filter((f) => buOfFact(f) === bu);
+    return { bu: bu ?? 'รวมทุก BU', apps: list.length, phones: new Set(list.map((f) => f.phoneKey).filter(Boolean)).size, noPhone: list.filter((f) => !f.phoneKey).length };
+  });
+  const clickRows = [...(data.linkClicks ?? [])].sort((a, b) => b.clicks - a.clicks || a.label.localeCompare(b.label, 'th'));
+  const clickPg = pageOf(clickRows, clickPage);
   const embeds: Record<string, React.ReactNode> = {
+    distinct: (
+      <div className="space-y-2" data-testid="v2-distinct">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>BU</TableHead>
+              <TableHead className="text-right">รายการสมัคร</TableHead>
+              <TableHead className="text-right">เบอร์ไม่ซ้ำ</TableHead>
+              <TableHead className="text-right">ไม่มีเบอร์ที่ใช้ได้</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {distinct.map((r) => (
+              <TableRow key={r.bu}>
+                <TableCell className={r.bu === 'รวมทุก BU' ? 'font-medium' : undefined}>{r.bu}</TableCell>
+                <TableCell className="text-right tabular-nums">{fmt(r.apps)}</TableCell>
+                <TableCell className="text-right tabular-nums">{fmt(r.phones)}</TableCell>
+                <TableCell className="text-right tabular-nums">{fmt(r.noPhone)}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+        <p className={cn('text-xs', DASH.sub)}>
+          ฐานหลักของหน้านี้คือรายการสมัคร · เบอร์ไม่ซ้ำเป็นตัวแทนคน ไม่ใช่คนไม่ซ้ำที่ยืนยันตัวแล้ว · เบอร์เดียวสมัครหลาย BU นับ BU ละครั้ง ผลรวมของ BU จึงอาจมากกว่ารวมทุก BU
+        </p>
+      </div>
+    ),
+    clicks: (
+      <div className="space-y-2" data-testid="v2-clicks">
+        {data.linkClicks === null || data.linkClicks === undefined ? (
+          <p className={cn('text-sm', DASH.muted)}>อ่านยอดคลิกไม่ได้ในช่วงนี้</p>
+        ) : (
+          <>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>ลิงก์ / กลุ่ม</TableHead>
+                  <TableHead className="text-right">คลิก</TableHead>
+                  <TableHead className="text-right">กดสมัคร</TableHead>
+                  <TableHead className="text-right">ส่งใบสมัคร</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {clickPg.slice.map((r) => (
+                  <TableRow key={`${r.label}:${r.fbGroupId ?? ''}`}>
+                    <TableCell className="max-w-64 break-words">{r.label}</TableCell>
+                    <TableCell className="text-right tabular-nums">{fmt(r.clicks)}</TableCell>
+                    <TableCell className="text-right tabular-nums">{fmt(r.applyPresses ?? null)}</TableCell>
+                    <TableCell className="text-right">
+                      <button type="button" className="rounded px-1 tabular-nums hover:bg-muted/60" onClick={() => setStack((cur) => [...cur, { kind: 'names', title: `ส่งใบสมัคร · ${r.label}`, ids: r.appIds, page: 1 }])}>
+                        {fmt(r.appIds.length)}
+                      </button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+            <Pager {...clickPg} onPage={setClickPage} />
+          </>
+        )}
+        <p className={cn('text-xs', DASH.sub)}>คลิกเป็นจำนวนครั้ง ยอดตั้งแต่สร้างลิงก์ · ยังนับคนที่เปิดฟอร์มแล้วไม่กรอกไม่ได้ (ไม่มีรหัสครั้งเปิดที่ผูกกับใบสมัคร)</p>
+      </div>
+    ),
+    states: (
+      <div className="space-y-2" data-testid="v2-posting-states">
+        <ul className="divide-y rounded-xl border">
+          {stateGroups.map((g) => (
+            <li key={g.k}>
+              <button
+                type="button"
+                className="flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-muted/60"
+                onClick={() => setStack((cur) => [...cur, { kind: 'requests', title: POSTING_STATE_LABEL[g.k], rows: g.rows, page: 1 }])}
+              >
+                <span>{POSTING_STATE_LABEL[g.k]}</span>
+                <span className="font-medium tabular-nums">{fmt(g.rows.length)} ›</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+        <p className={cn('text-xs', DASH.sub)}>
+          ใบขอที่ดำเนินการ {fmt(openRows.length)} ใบ แยกตามหลักฐานล่าสุด ใบละสถานะเดียว · ยังไม่เริ่มหา = ไม่พบหลักฐาน + เตรียมไว้ · ไม่พบหลักฐาน ไม่ได้ยืนยันว่าไม่มีใครทำนอกระบบ
+        </p>
+      </div>
+    ),
     posts: <SoPostGroupsCard from={win.from} to={win.to} bu={data.bu} title="Autopost · รายการโพสต์" />,
     self: links.rows ? <SelfLinksPanel rows={links.rows} onOpenRequest={(jobId) => navigate(requestPathOfJobId(jobId))} /> : <Skeleton className="h-40 rounded-xl" />,
   };
@@ -190,7 +287,7 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
             <Kpi label="ยกเลิกใบขอ" value={loadingReq ? undefined : eq ? eq.cancelled.length : null} onClick={eq ? () => openRequests('ยกเลิกใบขอ', eq.cancelled) : undefined} tone="danger" />
           </div>
           <p className={cn('text-xs', DASH.sub)}>
-            ทั้งหมดในรายงานนี้ {fmt(reqRows?.length ?? null)} ใบ · สถานะ ณ {dayText(win.to)} · ใบขอใหม่นับตามวันที่ใบเข้ามา
+            ทั้งหมดในรายงานนี้ {fmt(reqRows?.length ?? null)} ใบ · สถานะ ณ {dayText(win.to)} · ใบขอใหม่นับตามวันคีย์ใน ERP
           </p>
           <div className="space-y-2 border-t pt-4">
             <h3 className="text-sm font-medium">รายชื่อรอติดต่อ</h3>
@@ -218,8 +315,11 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
             <Button type="button" size="sm" variant="outline" onClick={() => push({ kind: 'embed', title: 'โพสต์เอง / สร้างลิงก์', embed: 'self' })}>
               โพสต์เอง / สร้างลิงก์
             </Button>
-            <Button type="button" size="sm" variant="outline" disabled={!eq} onClick={() => eq && openRequests('สถานะและหลักฐานรายใบ', eq.remaining)}>
+            <Button type="button" size="sm" variant="outline" disabled={!eq} onClick={() => push({ kind: 'embed', title: 'สถานะและหลักฐานรายใบ', embed: 'states' })}>
               สถานะและหลักฐานรายใบ
+            </Button>
+            <Button type="button" size="sm" variant="outline" onClick={() => push({ kind: 'embed', title: 'เปิดฟอร์ม / ส่งใบสมัคร', embed: 'clicks' })}>
+              เปิดฟอร์ม / ส่งใบสมัคร
             </Button>
           </div>
         </section>
@@ -252,6 +352,9 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
           </Button>
           <Button type="button" size="sm" variant="ghost" onClick={() => openMetric('reached')}>
             ผลโทรต่อของเจ้าหน้าที่
+          </Button>
+          <Button type="button" size="sm" variant="ghost" onClick={() => push({ kind: 'embed', title: 'เบอร์ไม่ซ้ำ / คนไม่ซ้ำ', embed: 'distinct' })}>
+            เบอร์ไม่ซ้ำ / คนไม่ซ้ำ
           </Button>
           <Button type="button" size="sm" variant="ghost" onClick={() => openNames('ยังไม่ผูกใบขอ', unlinked.map((f) => f.id ?? ''))}>
             ยังไม่ผูกใบขอ {fmt(unlinked.length)}
@@ -376,7 +479,7 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>{holder === 'holder' ? 'เจ้าหน้าที่' : 'ผู้พารายชื่อ'}</TableHead>
+                  <TableHead>{holder === 'holder' ? 'เจ้าหน้าที่' : holder === 'bringer' ? 'ผู้พารายชื่อ' : 'ผู้นัด'}</TableHead>
                   <TableHead className="text-right">รายการ</TableHead>
                   <TableHead className="text-right">เกิน 24 ชม.</TableHead>
                   <TableHead className="text-right">นัดได้</TableHead>
@@ -387,7 +490,7 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
               <TableBody>
                 {holderPg.slice.map((r) => (
                   <TableRow key={r.name}>
-                    <TableCell className="font-medium">{r.name === BRINGER_UNKNOWN ? <span className={DASH.muted}>{r.name}</span> : r.name}</TableCell>
+                    <TableCell className="font-medium">{r.name === BRINGER_UNKNOWN || r.name === BOOKER_UNKNOWN ? <span className={DASH.muted}>{r.name}</span> : r.name}</TableCell>
                     {(
                       [
                         ['ids', r.ids],

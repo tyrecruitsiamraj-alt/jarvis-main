@@ -17,6 +17,7 @@ import { fetchApplicantNames, type ApplicantNameRow } from '@/lib/recruitOvervie
 import type { RecruitAppFact } from '@/lib/recruitOverviewTypes';
 import type { StuckRequest } from '@/lib/recruitStuck';
 import { requestPathOfJobId } from '@/lib/jobNavigation';
+import { POSTING_STATE_LABEL, postingStateOf } from '@/lib/recruitPostingState';
 import {
   AUDIENCE_DIM_LABEL,
   AUDIENCE_MEASURES,
@@ -427,6 +428,7 @@ function RequestList({ rows, page, onPage }: { rows: readonly StuckRequest[]; pa
                   r.position || null,
                   r.recruiter?.trim() ? `ผู้รับผิดชอบ ${r.recruiter}` : 'ยังไม่ตั้งผู้รับผิดชอบ',
                   STATE_LABEL[r.state ?? 'open'] ?? r.state,
+                  POSTING_STATE_LABEL[postingStateOf(r)],
                   r.ageDays === null ? null : `ค้าง ${fmt(r.ageDays)} วัน`,
                   `ขอ ${fmt(r.requested)} · หาได้ ${fmt(r.filled)} · ยกเลิก ${fmt(r.cancelled)} · เหลือหา ${fmt(r.remaining)} อัตรา`,
                 ]
