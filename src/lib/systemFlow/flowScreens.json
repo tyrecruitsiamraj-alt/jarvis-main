@@ -644,7 +644,7 @@
      "api": null,
      "effects": [],
      "when": "แท็บ ผู้สมัคร/การติดต่อ/ติดตามนัดหมาย",
-     "src": "src/components/recruit-rm/RmWorkspace.tsx:220"
+     "src": "src/components/recruit-rm/RmWorkspace.tsx:217"
     },
     {
      "label": "ช่องค้นหาแถบบน (ค้นหา site / หน่วยงาน / ตำแหน่ง / สถานที่)",
@@ -5980,7 +5980,7 @@
    "title": "ผู้สมัคร",
    "route": "/jobs/board?view=list",
    "parent": "jobs-board-header",
-   "src": "src/components/recruit-rm/RmWorkspace.tsx:169",
+   "src": "src/components/recruit-rm/RmWorkspace.tsx:166",
    "controls": [
     {
      "label": "มุมมองผู้สมัคร ▾ (รายชื่อทั้งหมด · รอโทร · ไม่รับสาย · รายชื่อคนที่สนใจ[ค่าเริ่ม] · รายชื่อคนที่ไม่สนใจ · คุยแล้วไม่ได้คำตอบ · ไม่ได้ส่ง AI · iRecruit · ไม่ผูกใบขอ)",
@@ -5989,7 +5989,7 @@
      "api": null,
      "effects": [],
      "when": "ไม่อยู่โหมด ?bucket=",
-     "src": "src/components/recruit-rm/RmWorkspace.tsx:1045"
+     "src": "src/components/recruit-rm/RmWorkspace.tsx:1042"
     },
     {
      "label": "กางตัวกรอง (ไอคอน)",
@@ -5998,7 +5998,7 @@
      "api": null,
      "effects": [],
      "when": "จอ sm ขึ้นไป · แถบพับอยู่ · ไม่อยู่ ?bucket=",
-     "src": "src/components/recruit-rm/RmWorkspace.tsx:1194"
+     "src": "src/components/recruit-rm/RmWorkspace.tsx:1191"
     },
     {
      "label": "ตัวกรอง (ไอคอน)",
@@ -6007,7 +6007,7 @@
      "api": null,
      "effects": [],
      "when": "จอมือถือ · ไม่อยู่ ?bucket=",
-     "src": "src/components/recruit-rm/RmWorkspace.tsx:1170"
+     "src": "src/components/recruit-rm/RmWorkspace.tsx:1167"
     },
     {
      "label": "ล้าง",
@@ -6016,7 +6016,7 @@
      "api": null,
      "effects": [],
      "when": "จอมือถือ · มีตัวกรองติ๊กอยู่",
-     "src": "src/components/recruit-rm/RmWorkspace.tsx:1181"
+     "src": "src/components/recruit-rm/RmWorkspace.tsx:1178"
     },
     {
      "label": "นำเข้า Excel",
@@ -6025,7 +6025,7 @@
      "api": null,
      "effects": [],
      "when": "แท็บผู้สมัคร (วางบนแถวหัวข้างปุ่มวันที่)",
-     "src": "src/components/recruit-rm/RmWorkspace.tsx:1241"
+     "src": "src/components/recruit-rm/RmWorkspace.tsx:1238"
     },
     {
      "label": "รายงาน",
@@ -6034,7 +6034,7 @@
      "api": null,
      "effects": [],
      "when": "แท็บผู้สมัคร · มีแถว",
-     "src": "src/components/recruit-rm/RmWorkspace.tsx:1244"
+     "src": "src/components/recruit-rm/RmWorkspace.tsx:1241"
     },
     {
      "label": "เพิ่มข้อมูลผู้สมัคร",
@@ -6072,7 +6072,7 @@
      "api": null,
      "effects": [],
      "when": "หลังกด เก็บไปโทรเอง / เก็บเข้า Lead สำเร็จ",
-     "src": "src/components/recruit-rm/RmWorkspace.tsx:1270"
+     "src": "src/components/recruit-rm/RmWorkspace.tsx:1267"
     },
     {
      "label": "กลับไปรายชื่อทำงาน",
@@ -6081,7 +6081,7 @@
      "api": null,
      "effects": [],
      "when": "เปิดด้วยลิงก์ ?lead=1 (คลังสำรอง (Lead)) หรือ ?cancelled=1 (ใบที่ยกเลิกข้อมูล)",
-     "src": "src/components/recruit-rm/RmWorkspace.tsx:1285"
+     "src": "src/components/recruit-rm/RmWorkspace.tsx:1282"
     },
     {
      "label": "ล้าง (แถบ 'กำลังดูจากกล่อง: …')",
@@ -6090,7 +6090,7 @@
      "api": null,
      "effects": [],
      "when": "เปิดมาด้วย ?bucket= (drill-down จากภาพรวมแบบ classic)",
-     "src": "src/components/recruit-rm/RmWorkspace.tsx:1439"
+     "src": "src/components/recruit-rm/RmWorkspace.tsx:1436"
     },
     {
      "label": "ลองใหม่",
@@ -6101,7 +6101,7 @@
       "อ่าน ERP"
      ],
      "when": "โหลดล้ม",
-     "src": "src/components/recruit-rm/RmWorkspace.tsx:1417"
+     "src": "src/components/recruit-rm/RmWorkspace.tsx:1414"
     },
     {
      "label": "เก็บไปโทรเองทั้งหมด",
@@ -6112,7 +6112,7 @@
       "เขียนฐาน"
      ],
      "when": "มีใบที่ถูกถอด claim เพราะเกิน 1 วัน (ไม่ใช่มุมมองทุกคน) — แสดงทั้ง 3 แท็บ",
-     "src": "src/components/recruit-rm/RmWorkspace.tsx:1455"
+     "src": "src/components/recruit-rm/RmWorkspace.tsx:1479"
     },
     {
      "label": "ส่ง AI โทรทั้งหมด",
@@ -6121,27 +6121,16 @@
      "api": null,
      "effects": [],
      "when": "มีกอง 'ต้องเลือกวิธีโทร'",
-     "src": "src/components/recruit-rm/RmWorkspace.tsx:1461"
+     "src": "src/components/recruit-rm/RmWorkspace.tsx:1482"
     },
     {
-     "label": "โทรเอง (รายแถวในกอง)",
-     "action": "api",
-     "target": "เก็บไปโทรเองคนเดียว",
-     "api": "POST /api/application-call-choice (choice=manual)",
-     "effects": [
-      "เขียนฐาน"
-     ],
-     "when": "มีกอง 'ต้องเลือกวิธีโทร' (โชว์ 5 แถวแรก)",
-     "src": "src/components/recruit-rm/RmWorkspace.tsx:1490"
-    },
-    {
-     "label": "ส่ง AI โทร (ยิงสายจริง) (รายแถวในกอง)",
-     "action": "popup",
-     "target": "popup-ai-call-confirm",
+     "label": "ดูรายชื่อ (กอง 'ต้องเลือกวิธีโทร')",
+     "action": "filter",
+     "target": "?bucket=awaiting_call_choice",
      "api": null,
      "effects": [],
-     "when": "มีกอง 'ต้องเลือกวิธีโทร'",
-     "src": "src/components/recruit-rm/RmWorkspace.tsx:1501"
+     "when": "มีกอง 'ต้องเลือกวิธีโทร' · ปิดเมื่อดูกองนี้อยู่แล้ว",
+     "src": "src/components/recruit-rm/RmWorkspace.tsx:1476"
     },
     {
      "label": "{ชื่อแท็บ} N คน (แถบ 'ผู้สมัครตามตัวกรองนี้อยู่แท็บ')",
@@ -6150,7 +6139,7 @@
      "api": null,
      "effects": [],
      "when": "ตัวกรองได้ 0 คนในแท็บนี้แต่มีในแท็บอื่น",
-     "src": "src/components/recruit-rm/RmWorkspace.tsx:1531"
+     "src": "src/components/recruit-rm/RmWorkspace.tsx:1490"
     },
     {
      "label": "เลือกทั้งหมดในหน้านี้ (checkbox)",
@@ -6228,7 +6217,7 @@
       "เขียนฐาน"
      ],
      "when": "เฉพาะมุมมอง ?cancelled=1 (แถวเหลือ ดูรายละเอียด + กู้คืน)",
-     "src": "src/components/recruit-rm/RmWorkspace.tsx:883"
+     "src": "src/components/recruit-rm/RmWorkspace.tsx:880"
     },
     {
      "label": "‹ 1/N › + จำนวนต่อหน้า",
@@ -6237,7 +6226,7 @@
      "api": null,
      "effects": [],
      "when": null,
-     "src": "src/components/recruit-rm/RmWorkspace.tsx:1569"
+     "src": "src/components/recruit-rm/RmWorkspace.tsx:1528"
     }
    ]
   },
@@ -6645,7 +6634,7 @@
      "api": null,
      "effects": [],
      "when": "มีคนในรายชื่อที่ยังไม่มีใบขอหรือใบขอปิดแล้ว (บังคับเลือกก่อนส่ง)",
-     "src": "src/components/recruit-rm/RmWorkspace.tsx:1642"
+     "src": "src/components/recruit-rm/RmWorkspace.tsx:1601"
     },
     {
      "label": "ยกเลิก",
@@ -6677,7 +6666,7 @@
    "title": "การติดต่อ",
    "route": "/jobs/board?view=contact",
    "parent": "jobs-board-header",
-   "src": "src/components/recruit-rm/RmWorkspace.tsx:1058",
+   "src": "src/components/recruit-rm/RmWorkspace.tsx:1055",
    "controls": [
     {
      "label": "ของฉัน / ทุกคน",
@@ -6688,7 +6677,7 @@
       "อ่าน ERP"
      ],
      "when": "เฉพาะ role ที่เปิดสิทธิ์ฟังก์ชัน contact_view_all (ค่าเริ่ม Admin+Supervisor) · ไม่อยู่ ?lead/?cancelled · ?scope=all เปิดทุกคน",
-     "src": "src/components/recruit-rm/RmWorkspace.tsx:1062"
+     "src": "src/components/recruit-rm/RmWorkspace.tsx:1059"
     },
     {
      "label": "ชิป ทั้งหมด / ยังไม่โทร / โทรแล้ว / สำเร็จ / ไม่สำเร็จ",
@@ -6697,7 +6686,7 @@
      "api": null,
      "effects": [],
      "when": "ไม่อยู่ ?bucket=",
-     "src": "src/components/recruit-rm/RmWorkspace.tsx:1084"
+     "src": "src/components/recruit-rm/RmWorkspace.tsx:1081"
     },
     {
      "label": "กางตัวกรอง / ตัวกรอง / ล้าง",
@@ -6706,7 +6695,7 @@
      "api": null,
      "effects": [],
      "when": null,
-     "src": "src/components/recruit-rm/RmWorkspace.tsx:1194"
+     "src": "src/components/recruit-rm/RmWorkspace.tsx:1191"
     },
     {
      "label": "ส่ง AI โทร (N)",
@@ -6836,7 +6825,7 @@
       "อ่าน ERP"
      ],
      "when": "โหลดล้ม",
-     "src": "src/components/recruit-rm/RmWorkspace.tsx:1409"
+     "src": "src/components/recruit-rm/RmWorkspace.tsx:1406"
     },
     {
      "label": "ชื่อผู้สมัคร (ลิงก์)",
@@ -6856,7 +6845,7 @@
       "เขียนฐาน"
      ],
      "when": null,
-     "src": "src/components/recruit-rm/RmWorkspace.tsx:919"
+     "src": "src/components/recruit-rm/RmWorkspace.tsx:916"
     },
     {
      "label": "ดำเนินการ (ไอคอนแถว)",
@@ -6876,10 +6865,10 @@
       "เขียนฐาน"
      ],
      "when": null,
-     "src": "src/components/recruit-rm/RmWorkspace.tsx:967"
+     "src": "src/components/recruit-rm/RmWorkspace.tsx:964"
     },
     {
-     "label": "กอง 'ต้องเลือกวิธีโทร' (เก็บไปโทรเองทั้งหมด / ส่ง AI โทรทั้งหมด / โทรเอง / ส่ง AI โทร (ยิงสายจริง)) + checkbox + เพจเจอร์ + ลองใหม่",
+     "label": "กอง 'ต้องเลือกวิธีโทร' (ดูรายชื่อ / เก็บไปโทรเองทั้งหมด / ส่ง AI โทรทั้งหมด) + checkbox + เพจเจอร์ + ลองใหม่",
      "action": "popup",
      "target": "เหมือนแท็บผู้สมัคร",
      "api": "POST /api/application-call-choice",
@@ -6887,7 +6876,7 @@
       "เขียนฐาน"
      ],
      "when": "เหมือนแท็บผู้สมัคร",
-     "src": "src/components/recruit-rm/RmWorkspace.tsx:1447"
+     "src": "src/components/recruit-rm/RmWorkspace.tsx:1444"
     }
    ]
   },
@@ -7066,7 +7055,7 @@
    "title": "ติดตามนัดหมาย",
    "route": "/jobs/board?view=appointments",
    "parent": "jobs-board-header",
-   "src": "src/components/recruit-rm/RmWorkspace.tsx:1096",
+   "src": "src/components/recruit-rm/RmWorkspace.tsx:1093",
    "controls": [
     {
      "label": "ของฉัน / ทุกคน (ค่าเริ่ม = ทุกคน)",
@@ -7077,7 +7066,7 @@
       "อ่าน ERP"
      ],
      "when": "ทุกบัญชีที่ล็อกอิน · ไม่อยู่ ?lead/?cancelled",
-     "src": "src/components/recruit-rm/RmWorkspace.tsx:1101"
+     "src": "src/components/recruit-rm/RmWorkspace.tsx:1098"
     },
     {
      "label": "ชิป นัดทั้งหมด / นัดวันนี้ / มา / ไม่มา / รอผล / เลยวันนัด / ผ่าน / ไม่ผ่าน",
@@ -7086,7 +7075,7 @@
      "api": null,
      "effects": [],
      "when": "ไม่อยู่ ?bucket=",
-     "src": "src/components/recruit-rm/RmWorkspace.tsx:1123"
+     "src": "src/components/recruit-rm/RmWorkspace.tsx:1120"
     },
     {
      "label": "รายวัน ▾",
@@ -7095,7 +7084,7 @@
      "api": null,
      "effects": [],
      "when": null,
-     "src": "src/components/recruit-rm/RmWorkspace.tsx:1139"
+     "src": "src/components/recruit-rm/RmWorkspace.tsx:1136"
     },
     {
      "label": "วันก่อน (ไอคอน)",
@@ -7167,7 +7156,7 @@
      "api": null,
      "effects": [],
      "when": null,
-     "src": "src/components/recruit-rm/RmWorkspace.tsx:1194"
+     "src": "src/components/recruit-rm/RmWorkspace.tsx:1191"
     },
     {
      "label": "ชื่อผู้สมัคร (ลิงก์)",
@@ -7218,7 +7207,7 @@
       "เขียนฐาน"
      ],
      "when": "เหมือนแท็บผู้สมัคร (ไม่โชว์ในมุมมองทุกคน)",
-     "src": "src/components/recruit-rm/RmWorkspace.tsx:1447"
+     "src": "src/components/recruit-rm/RmWorkspace.tsx:1444"
     }
    ]
   },

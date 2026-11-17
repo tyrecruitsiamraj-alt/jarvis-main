@@ -161,9 +161,6 @@ function writeFilterOpen(open: boolean): void {
 
 const PAGE_SIZE_DEFAULT: PageSizeOption = 20;
 
-/** แถวที่โชว์ในแถบ "เลือกวิธีโทร" ก่อนยุบ — เกินนี้ใช้ปุ่มทั้งหมด/กล่องบนแดชบอร์ด */
-const AWAITING_ROWS_SHOWN = 5;
-
 function isRmTab(v: string | null): v is RmTab {
   return !!v && (RM_TABS as readonly string[]).includes(v);
 }
@@ -1454,75 +1451,37 @@ const RmWorkspace: React.FC<{
               ) : null}
               {/* กอง "เลือกวิธีโทร" (Phase 5.9) — ใบที่ worker ถอด claim เพราะดองเกิน 1 วัน
                   🔴 ซ่อนตัวเองเมื่อไม่มีของ (แพตเทิร์นเดียวกับ MyCallsSection) — แถบที่ขึ้น
-                  ทุกวันด้วยเลข 0 คือขยะ (เจ้าของ: "ของน้อยคือสัญญาณ ของเยอะคือพื้นหลัง") */}
+                  ทุกวันด้วยเลข 0 คือขยะ (เจ้าของ: "ของน้อยคือสัญญาณ ของเยอะคือพื้นหลัง")
+                  17 พ.ย. 2569 เจ้าของ "วางกองไว้แบบนี้มันไม่สวย" — เหลือแถวเดียว · รายชื่อดูในตารางผ่าน ?bucket=awaiting_call_choice
+                  (เลือกทีละคนด้วย checkbox + ปุ่มบนตาราง) */}
               {awaitingChoiceRows.length > 0 ? (
-                <div className={cn('space-y-2 rounded-xl border px-3 py-2.5', TONE.warn.soft)}>
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className={cn('text-xs font-medium', TONE.warn.value)}>
-                      ต้องเลือกวิธีโทร {awaitingChoiceRows.length.toLocaleString('th-TH')} คน —
-                      ถูกถอดจากคนที่เก็บไว้แล้วไม่โทรเกิน 1 วัน
-                    </p>
-                    <div className="flex shrink-0 flex-wrap items-center gap-1.5">
-                      <Button variant="secondary" size="sm"
-                        type="button"
-                        onClick={() => void keepForSelf(awaitingChoiceRows.map((r) => r.id))}
-                        >
-                        เก็บไปโทรเองทั้งหมด
-                      </Button>
-                      <Button size="sm"
-                        type="button"
-                        onClick={() => askSendAi(awaitingChoiceRows.map((r) => r.id))}
-                        >
-                        ส่ง AI โทรทั้งหมด
-                      </Button>
-                    </div>
+                <div className={cn('flex flex-wrap items-center justify-between gap-2 rounded-xl border px-3 py-2', TONE.warn.soft)}>
+                  <p className={cn('text-sm font-medium', TONE.warn.value)}>
+                    ต้องเลือกวิธีโทร <span className="tabular-nums">{awaitingChoiceRows.length.toLocaleString('th-TH')}</span> คน
+                  </p>
+                  <div className="flex shrink-0 flex-wrap items-center gap-1.5">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      type="button"
+                      disabled={bucket === 'awaiting_call_choice'}
+                      onClick={() => {
+                        const params = new URLSearchParams(searchParams);
+                        params.set('bucket', 'awaiting_call_choice');
+                        setSearchParams(params);
+                        setSelectedIds([]);
+                        setPage(1);
+                      }}
+                    >
+                      ดูรายชื่อ
+                    </Button>
+                    <Button variant="secondary" size="sm" type="button" onClick={() => void keepForSelf(awaitingChoiceRows.map((r) => r.id))}>
+                      เก็บไปโทรเองทั้งหมด
+                    </Button>
+                    <Button size="sm" type="button" onClick={() => askSendAi(awaitingChoiceRows.map((r) => r.id))}>
+                      ส่ง AI โทรทั้งหมด
+                    </Button>
                   </div>
-                  <ul className="space-y-1">
-                    {awaitingChoiceRows.slice(0, AWAITING_ROWS_SHOWN).map((r) => {
-                      return (
-                        <li
-                          key={r.id}
-                          className="flex flex-wrap items-center justify-between gap-2 border-t border-border/40 pt-1 text-xs first:border-0 first:pt-0"
-                        >
-                          <span className="min-w-0">
-                            <b className={DASH.cellStrong}>{r.full_name}</b>
-                            {r.unclaimed_from_name ? (
-                              <span className={DASH.muted}> · เดิม {r.unclaimed_from_name} เก็บไว้</span>
-                            ) : null}
-                          </span>
-                          <span className="flex shrink-0 items-center gap-1">
-                            <button
-                              type="button"
-                              onClick={() => void keepForSelf([r.id])}
-                              className={cn(
-                                // min-h-9 = 36px กดโดนด้วยนิ้วบนมือถือ (เกณฑ์ของ panel เอกสาร)
-                                'inline-flex min-h-9 items-center rounded-full border px-3 font-medium',
-                                TONE.primary.outline,
-                              )}
-                            >
-                              โทรเอง
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => askSendAi([r.id])}
-                              className={cn(
-                                'inline-flex min-h-9 items-center rounded-full border px-3 font-medium',
-                                TONE.violet.outline,
-                              )}
-                            >
-                              ส่ง AI โทร (ยิงสายจริง)
-                            </button>
-                          </span>
-                        </li>
-                      );
-                    })}
-                    {awaitingChoiceRows.length > AWAITING_ROWS_SHOWN ? (
-                      <li className={cn('pt-1 text-xs', DASH.muted)}>
-                        และอีก {awaitingChoiceRows.length - AWAITING_ROWS_SHOWN} คน — ใช้ปุ่ม
-                        "ทั้งหมด" ด้านบน หรือกดกล่อง "รอเลือกวิธีโทร" บนแดชบอร์ดเพื่อดูครบ
-                      </li>
-                    ) : null}
-                  </ul>
                 </div>
               ) : null}
 
