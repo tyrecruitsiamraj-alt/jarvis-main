@@ -28,11 +28,11 @@ import { BU_UNKNOWN, buOfFact, pageOf, bkkDay } from '@/lib/recruitAudience';
 import SoPostGroupsCard from '../stuck/SoPostGroupsCard';
 import SelfLinksPanel from '../topics/SelfLinksPanel';
 import StuckFilterBar from '../stuck/StuckFilterBar';
-import StuckTodoTable from '../stuck/StuckTodoTable';
 import StuckAreaTable from '../stuck/StuckAreaTable';
 import CallerResultsTable from '../stuck/CallerResultsTable';
 import V2Drawer, { type V2Pane } from './V2Drawer';
 import ApplicantStory from './ApplicantStory';
+import PostingProgress from './PostingProgress';
 import { Kpi, Pager, SectionTitle, fmt, fmtPct } from './V2Parts';
 import { MonthCompareBars } from './MonthCompareBars';
 import { V2_METRICS, V2_METRIC_LABEL, buildV2Model, type V2Metric } from './v2Model';
@@ -61,6 +61,8 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
 
   const [stack, setStack] = React.useState<V2Pane[]>([]);
   const [metric, setMetric] = React.useState<V2Metric>('apps');
+  /** ไส้ในของการประกาศ — กดยอดไหนเห็นอันนั้น (ค่าเริ่ม = เริ่มหาแล้ว) */
+  const [postView, setPostView] = React.useState<'notStarted' | 'started'>('started');
   /** BU ที่กดแท่ง — เรื่องเล่ารายชื่อใต้กราฟ (null = ทุก BU) */
   const [storyBu, setStoryBu] = React.useState<string | null>(null);
   const [workPage, setWorkPage] = React.useState(1);
@@ -276,21 +278,32 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
           <Kpi label="ปิดใบขอ (ใบ)" emphasis value={loadingReq ? undefined : eq ? eq.filled.length : null} sub={rateText(eq?.filled, 'หาได้', 'filled')} onClick={eq ? () => openRequests('ปิดใบขอ', eq.filled) : undefined} />
           <Kpi label="ยกเลิกใบขอ (ใบ)" emphasis value={loadingReq ? undefined : eq ? eq.cancelled.length : null} sub={rateText(eq?.cancelled, 'ยกเลิก', 'cancelled')} onClick={eq ? () => openRequests('ยกเลิกใบขอ', eq.cancelled) : undefined} tone="danger" />
         </div>
-        <section className="min-w-0 space-y-2 border-t pt-4" data-testid="v2-todo">
-          <h3 className="text-sm font-medium">ใครต้องทำอะไร</h3>
-          {eq ? <StuckTodoTable rows={openRows} onPick={(title, rows) => openRequests(title, rows)} /> : <Skeleton className="h-32 rounded-xl" />}
-        </section>
       </Card>
 
       {/* ── การประกาศรับสมัคร ── */}
       <Card className="min-w-0 space-y-4 rounded-2xl p-5" data-testid="v2-posting">
         <SectionTitle title="การประกาศรับสมัคร" right="นับใบขอที่ดำเนินการ · Autopost นับรายการโพสต์" />
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <Kpi label="ยังไม่เริ่มหา (ใบ)" emphasis value={loadingReq ? undefined : eq ? notStarted.length : null} onClick={eq ? () => openRequests('ยังไม่เริ่มหา', notStarted) : undefined} />
-          <Kpi label="เริ่มหาคนแล้ว (ใบ)" emphasis value={loadingReq ? undefined : eq ? started.length : null} onClick={eq ? () => openRequests('เริ่มหาคนแล้ว', started) : undefined} />
+          <Kpi label="ยังไม่เริ่มหา (ใบ)" emphasis active={postView === 'notStarted'} value={loadingReq ? undefined : eq ? notStarted.length : null} onClick={eq ? () => setPostView('notStarted') : undefined} testId="v2-post-not-started" />
+          <Kpi label="เริ่มหาคนแล้ว (ใบ)" emphasis active={postView === 'started'} value={loadingReq ? undefined : eq ? started.length : null} onClick={eq ? () => setPostView('started') : undefined} testId="v2-post-started" />
           <Kpi label="Autopost · รายการโพสต์" emphasis value={posts.key === filterKey ? posts.total : undefined} onClick={() => push({ kind: 'embed', title: 'Autopost · รายการโพสต์', embed: 'posts' })} />
         </div>
         {posts.error && posts.key === filterKey ? <p className="text-xs text-destructive">{posts.error}</p> : null}
+        {/* ไส้ใน: กดยังไม่เริ่มหา = ใครถือกี่ใบ · กดเริ่มหาแล้ว = มีชื่อ/ไม่มีชื่อ + ใบที่มีชื่อติดขั้นไหน (เจ้าของ 17 พ.ย. 2569) */}
+        <div className="border-t pt-4">
+          {eq ? (
+            <PostingProgress
+              view={postView}
+              started={started}
+              notStarted={notStarted}
+              onRequests={openRequests}
+              onNames={(title, ids, labels) => push({ kind: 'names', title, ids: [...ids], page: 1, labels })}
+              resetKey={viewKey}
+            />
+          ) : (
+            <Skeleton className="h-40 rounded-xl" />
+          )}
+        </div>
         <div className="flex flex-wrap gap-2">
           <Button type="button" size="sm" variant="outline" onClick={() => push({ kind: 'embed', title: 'โพสต์เอง / สร้างลิงก์', embed: 'self' })}>
             โพสต์เอง / สร้างลิงก์

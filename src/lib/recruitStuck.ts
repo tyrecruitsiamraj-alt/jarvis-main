@@ -8,6 +8,7 @@
  * ฐาน = ใบที่ยังเปิดอยู่ทุกใบ (ไม่ขึ้นกับช่วงวัน) · คนนับทุกช่วงเวลาของใบนั้น (`countsOf` ตัวเดียวกับเส้น 12 ขั้นหน้าหลัก)
  * 🔴 เหตุของใบมีที่เดียว (`stuckReasonOf`) · ทุกใบอยู่ 1 เหตุ · 4 ช่วงรวมกันเท่าใบที่ต้องหา (มีเทสต์)
  */
+import type { PersonStageKey } from './personStage';
 import type { ToneKey } from './designTokens';
 import type { PipelineCounts } from './requestPipeline';
 import type { RecruitRequestRow } from './recruitRequestTab';
@@ -120,6 +121,8 @@ export type StuckRequest = RecruitRequestRow & {
   /** วันที่ประกาศครั้งแรก + ใคร */
   releasedAt: string | null;
   releasedBy: string | null;
+  /** id ผู้สมัครทุกช่วงเวลาของใบ แยกสถานะ (`personStagesOf`) — เฉพาะใบที่ยังเปิด · ไม่มี = เส้นรุ่นเก่า */
+  people?: Partial<Record<PersonStageKey, string[]>>;
 };
 
 /* ═══ สมการบนสุด (เจ้าของ 4 พ.ย. 2569 "กรองแค่ใบที่ไม่มีคน … มันต้อง Fil ดูได้หมดเลย") ═══

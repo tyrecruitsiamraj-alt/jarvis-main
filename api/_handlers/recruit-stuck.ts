@@ -19,6 +19,7 @@ import { pickDashboardBuSet, appBuJoin, buMatchSql, appBuSql, inBuSet } from '..
 import { logError } from '../_lib/logger.js';
 import { readUnitRequestListThroughCache } from './siamraj-unit-requests.js';
 import { attachRequestRecruiters, loadFactsForJobs, toRequestRows } from './recruit-overview.js';
+import { personStagesOf } from '../../src/lib/personStage.js';
 import { listLatestJobPostingsForBoard } from '../_lib/jobPostingRequests.js';
 import { loadErpExtras, loadOnlineRequestRows, loadReleaseMatches, type ErpExtra } from '../_lib/homeOnlineSql.js';
 import { loadInformDaysByPhone } from '../_lib/applicantSourceSql.js';
@@ -338,6 +339,8 @@ async function loadStuckRequests(departmentScope: Scope, buSet: readonly string[
       reason: stuckReasonOf(signals),
       releasedAt: rel ? rel.firstAt : null,
       releasedBy: rel ? rel.by : null,
+      // ผู้สมัครแต่ละคนอยู่สถานะไหน (เจ้าของ 17 พ.ย. 2569 "ใบที่มีชื่อปิดไม่ได้เพราะติดที่ไหน") — เฉพาะใบที่ยังเปิด
+      ...(state === 'open' && fs.length ? { people: personStagesOf(fs, new Date()) } : {}),
       state,
       inRange: b.inRange,
     } satisfies StuckRequest;

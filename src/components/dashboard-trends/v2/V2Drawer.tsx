@@ -40,7 +40,7 @@ import { V2_METRIC_LABEL, type V2Metric, type V2Model } from './v2Model';
 export type V2Pane =
   | { kind: 'metric'; metric: V2Metric; bu?: string; page: number }
   | { kind: 'audience'; view: AudienceDim | 'records'; filter: AudienceFilter; measure: AudienceMeasure; display: AudienceDisplay; page: number; title: string }
-  | { kind: 'names'; title: string; ids: string[]; page: number }
+  | { kind: 'names'; title: string; ids: string[]; page: number; /** สถานะของแต่ละชื่อ (ใบขอที่กดจากการประกาศ) */ labels?: Record<string, string> }
   | { kind: 'requests'; title: string; rows: StuckRequest[]; page: number }
   /** ส่วนเดิมของระบบที่ฝังในแผง (รายการโพสต์ So Scraping · ลิงก์โพสต์เอง · คลิกฟอร์ม) — ไม่เขียนใหม่ */
   | { kind: 'embed'; title: string; embed: string };
@@ -100,7 +100,7 @@ export default function V2Drawer({
             <div className="space-y-5 px-5 py-4">
               {pane.kind === 'metric' ? <MetricPane pane={pane} model={model} bus={bus} push={push} replace={replace} /> : null}
               {pane.kind === 'audience' ? <AudiencePane pane={pane} model={model} bus={bus} push={push} replace={replace} /> : null}
-              {pane.kind === 'names' ? <NamesList ids={pane.ids} page={pane.page} onPage={(page) => replace({ ...pane, page })} model={model} /> : null}
+              {pane.kind === 'names' ? <NamesList ids={pane.ids} page={pane.page} onPage={(page) => replace({ ...pane, page })} model={model} labels={pane.labels} /> : null}
               {pane.kind === 'requests' ? <RequestList rows={pane.rows} page={pane.page} onPage={(page) => replace({ ...pane, page })} /> : null}
               {pane.kind === 'embed' ? (embeds[pane.embed] ?? null) : null}
             </div>
@@ -370,7 +370,7 @@ export function AudiencePane({
 }
 
 /** รายชื่อทีละ 10 — ดึงชื่อเฉพาะหน้าที่เปิด (เส้นตรวจสิทธิ์ BU ฝั่ง server) · ไม่มีข้อมูลบอกว่าไม่มี */
-export function NamesList({ ids, page, onPage, model }: { ids: readonly string[]; page: number; onPage: (p: number) => void; model: V2Model }) {
+export function NamesList({ ids, page, onPage, model, labels }: { ids: readonly string[]; page: number; onPage: (p: number) => void; model: V2Model; labels?: Record<string, string> }) {
   const sorted = React.useMemo(() => {
     const fact = (id: string) => model.byId.get(id);
     // ลำดับแน่นอน: ใบใหม่ก่อน · เวลาเท่ากันเรียงด้วย id
@@ -402,6 +402,7 @@ export function NamesList({ ids, page, onPage, model }: { ids: readonly string[]
             <li key={id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2">
               <div className="min-w-0 text-sm">
                 <div className="font-medium">{rows.key !== key ? 'กำลังโหลด…' : r?.full_name || 'ไม่พบชื่อ'}</div>
+                {labels?.[id] ? <div className="text-xs font-medium text-primary">{labels[id]}</div> : null}
                 <div className={cn('text-xs', DASH.sub)}>
                   {[f?.bu || 'ไม่ระบุ BU', r?.unit_name || r?.job_title || 'ยังไม่ผูกใบขอ', f ? dimValueOf(f, 'sub') : null, r?.claimed_by ? `อยู่กับ ${r.claimed_by}` : 'ยังไม่มีคนเก็บ']
                     .filter(Boolean)
