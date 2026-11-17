@@ -105,7 +105,7 @@ describe('จับคู่ฝั่ง API', () => {
     expect(sql).toContain("activeInformWhereSql('IH')");
     expect(sql).toContain('FROM recruit_register r');
     const h = readFileSync('api/_handlers/recruit-overview.ts', 'utf8');
-    expect(h).toContain('toFact(r, boardPhones, sources)');
+    expect(h).toContain('toFact(r, boardPhones, sources, asOf)');
     expect(readFileSync('src/components/dashboard-trends/RecruitOverview.tsx', 'utf8')).toContain('<ChannelFunnelTable');
   });
 });

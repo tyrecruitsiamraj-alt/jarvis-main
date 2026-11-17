@@ -121,7 +121,8 @@ describe('ต่อสาย', () => {
     const api = readFileSync('api/_handlers/recruit-overview.ts', 'utf8');
     expect(api).toContain('body.appJobs = await loadAppJobs(');
     expect(api).toContain("end as claimed_by");
-    expect(api).toContain('claimedBy: text(r.claimed_by),');
+    // ผล ณ วันสิ้นสุด (17 พ.ย. 2569): เก็บหลัง cutoff = ยังไม่มีคนเก็บ ณ วันนั้น
+    expect(api).toMatch(/claimedBy: asOf && .*claimed_at.*cutoff \? null : text\(r\.claimed_by\),/);
     expect(api).toContain('const assigned = await getUnitAssignmentsMap(');
     expect(readFileSync('src/components/dashboard-trends/RecruitOverview.tsx', 'utf8')).toContain('<RecruiterAppsCard');
     expect(readFileSync('src/components/dashboard-trends/ContactTab.tsx', 'utf8')).toContain('<ClaimCard total={claims.total} people={claims.people}');
