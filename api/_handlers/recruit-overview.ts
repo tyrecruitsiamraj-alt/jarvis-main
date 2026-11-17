@@ -76,6 +76,7 @@ import { ERP_INFORM_SINCE, firstDaySince, firstInformDay, informedByPhone, irecr
 import { SO_LINK_NOTE } from '../../src/lib/soScraping.js';
 import type {
   RecruitAiRow,
+  AppMethod,
   RecruitAppFact,
   RecruitAppJob,
   RecruitAttendance,
@@ -177,6 +178,8 @@ export function factsSql(
          a.phone_e164, a.age,
          -- จังหวัดที่อยู่ที่ผู้สมัครกรอก (ไม่ใช่จังหวัดของงาน) — ภาพรวม v2 ตารางจังหวัด (17 พ.ย. 2569)
          nullif(btrim(a.province), '') as home_province,
+         -- เพศ · ทางเข้า (apply_page / irecruit) · คนคีย์ใบ — วิธีที่รายชื่อเข้ามา (ภาพรวม 17 พ.ย. 2569 · methodOf)
+         a.gender, a.source as entry_source, nullif(btrim(a.created_by_name), '') as keyed_by,
          -- เหตุที่ระบบไม่ส่ง AI (ภาพรวม 8 เรื่อง 16 พ.ย. 2569 "ยังไม่ส่ง Ai เพราะอะไร") — คิดเป็นกองฝั่ง Node (aiBlockOf)
          a.ai_block_reason,
          ${CALLED_BY_AI_SQL} as by_ai,
@@ -366,6 +369,16 @@ export function postSourceOf(code: string | null, note: string | null, autopostC
   return autopostCodes ? 'manual' : null;
 }
 
+/**
+ * วิธีที่รายชื่อเข้ามา (เจ้าของ 17 พ.ย. 2569) — ลิงก์ก่อน (Autopost / โพสต์เอง / ไม่รู้แบบ) › iRecruit › มีคนคีย์ = เจ้าหน้าที่คีย์/นำเข้า › กรอกเอง
+ * ข้อมูลจริง 17 พ.ย.: ลิงก์ 1,240 · คีย์/นำเข้า 2,792 · iRecruit 730 · กรอกเองหน้าประกาศ 276
+ */
+export function methodOf(source: string | null, linkCode: string | null, post: 'autopost' | 'manual' | null, keyedBy: string | null): AppMethod {
+  if (linkCode) return post ?? 'link';
+  if (source === 'irecruit') return 'irecruit';
+  return keyedBy ? 'staff' : 'self';
+}
+
 const IRECRUIT_LABEL = /^irecruit/i;
 
 /** เหตุที่ไม่ส่ง AI → กอง · ไม่มีเหตุ = ไม่ใส่ช่อง */
@@ -446,6 +459,8 @@ export function toFact(
     // เบอร์ไม่ซ้ำ (ภาพรวม v2) — ส่งเป็นรหัสย่อของเบอร์ ไม่ส่งเบอร์จริงออกหน้าเว็บ · ไม่ใช่คนไม่ซ้ำที่ยืนยันตัว
     phoneKey: phone ? createHash('sha256').update(`jarvis-ov2:${phone}`).digest('base64url').slice(0, 12) : null,
     homeProvince: text(r.home_province) ? canonProvinceName(String(text(r.home_province))) || text(r.home_province) : null,
+    gender: r.gender === 'male' || r.gender === 'female' || r.gender === 'other' ? r.gender : null,
+    method: methodOf(text(r.entry_source), text(r.link_code), sources ? postSourceOf(text(r.link_code), text(r.link_note), sources.autopostCodes) : null, text(r.keyed_by)),
   };
 }
 

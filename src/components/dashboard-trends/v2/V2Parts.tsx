@@ -43,6 +43,7 @@ export function Kpi({
   testId,
   prev,
   sense = 'good',
+  sub,
 }: {
   label: string;
   value: number | null | undefined;
@@ -54,11 +55,14 @@ export function Kpi({
   /** ยอดช่วงก่อน (ช่วงวันเท่ากัน) — ไม่ส่ง = ไม่มีป้ายเทียบ · null = "เทียบไม่ได้" */
   prev?: number | null;
   sense?: TrendSense;
+  /** บรรทัดรองใต้ตัวเลข เช่น "เหลือหา 376 อัตรา" (ใบ ≠ อัตรา) */
+  sub?: string;
 }) {
   const body = (
     <>
       <span className={cn('text-xs', tone ? TONE[tone].value : DASH.sub)}>{label}</span>
       <span className={cn('font-medium tabular-nums text-foreground', emphasis ? 'text-4xl' : 'text-2xl', tone && TONE[tone].value)}>{fmt(value)}</span>
+      {sub ? <span className="text-xs tabular-nums text-muted-foreground">{sub}</span> : null}
       {prev !== undefined ? <TrendDelta cur={value} prev={prev} sense={sense} /> : null}
     </>
   );

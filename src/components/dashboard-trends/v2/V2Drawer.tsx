@@ -48,7 +48,7 @@ export type V2Pane =
 const sortBars = <T extends { value: number | null }>(bars: T[]) => [...bars].sort((a, b) => (b.value ?? -1) - (a.value ?? -1));
 
 /** ชั้นถัดไปของการเจาะ: อายุ → จังหวัด → ช่องทาง → ช่องทางรอง → กลุ่ม/เพจ → รายชื่อ */
-const NEXT_DIM: Record<AudienceDim, AudienceDim | 'records'> = { age: 'home', home: 'ch', ch: 'sub', sub: 'group', group: 'records' };
+const NEXT_DIM: Record<AudienceDim, AudienceDim | 'records'> = { age: 'home', home: 'ch', ch: 'sub', sub: 'group', group: 'records', bringer: 'method', method: 'home', gender: 'records' };
 
 function filterLabel(f: AudienceFilter): string {
   const dims = (Object.entries(f.dims) as Array<[AudienceDim, string]>).map(([k, v]) => `${AUDIENCE_DIM_LABEL[k]} ${v}`);

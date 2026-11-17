@@ -2,6 +2,10 @@ import { describe, expect, it } from 'vitest';
 import type { RecruitAppFact } from '@/lib/recruitOverviewTypes';
 import {
   AGE_UNKNOWN,
+  BRINGER_NONE,
+  GENDER_UNKNOWN,
+  METHOD_UNKNOWN,
+  dimValueOf,
   HOME_UNKNOWN,
   ageBucketOf,
   ageStats,
@@ -146,5 +150,23 @@ describe('ผู้สมัครกลุ่มไหน ได้ผลแค
     // 2 พ.ย. 20:00 UTC = 3 พ.ย. ไทย
     expect([...t.entries()].map(([k, v]) => [k, v.n])).toEqual([['2026-11-01', 1], ['2026-11-02', 0], ['2026-11-03', 1]]);
     expect([...t.values()].reduce((s, v) => s + (v.n ?? 0), 0)).toBe(countOf(list, 'allBooked', sets));
+  });
+});
+
+describe('เล่าเรื่องรายชื่อ: ใครเอาเข้ามา · วิธี · เพศ (เจ้าของ 17 พ.ย. 2569)', () => {
+  it('ค่าของมิติใหม่ + ไม่ทราบมีช่องของตัวเอง', () => {
+    expect(dimValueOf(app({ bringer: 'เจมส์' }), 'bringer')).toBe('เจมส์');
+    expect(dimValueOf(app({ bringer: null }), 'bringer')).toBe(BRINGER_NONE);
+    expect(dimValueOf(app({ method: 'autopost' }), 'method')).toBe('Autopost');
+    expect(dimValueOf(app({ method: 'staff' }), 'method')).toBe('เจ้าหน้าที่คีย์ / นำเข้า');
+    expect(dimValueOf(app({}), 'method')).toBe(METHOD_UNKNOWN);
+    expect(dimValueOf(app({ gender: 'female' }), 'gender')).toBe('หญิง');
+    expect(dimValueOf(app({ gender: null }), 'gender')).toBe(GENDER_UNKNOWN);
+  });
+  it('แต่ละชั้นแบ่งแล้วรวมกันเท่ายอดชั้นก่อน · ไม่ทราบอยู่ท้าย', () => {
+    const list = [app({ method: 'staff' }), app({ method: 'staff' }), app({ method: 'manual' }), app({})];
+    const rows = audienceRows(list, 'method', outcomeSetsOf(list, NOW), 'apps', 'count');
+    expect(rows.reduce((n, r) => n + r.apps, 0)).toBe(list.length);
+    expect(rows.map((r) => r.key)).toEqual(['เจ้าหน้าที่คีย์ / นำเข้า', 'โพสต์เอง', METHOD_UNKNOWN]);
   });
 });

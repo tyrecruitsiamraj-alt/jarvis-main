@@ -10,7 +10,7 @@
  * ไม่ทราบ = null ("—") ห้ามเป็น 0 · ตัวหาร 0 = null
  * ไฟล์นี้ pure — เทสต์ `tests/api/recruitAudience2569-11-17.test.ts`
  */
-import type { RecruitAppFact } from '@/lib/recruitOverviewTypes';
+import type { AppMethod, RecruitAppFact } from '@/lib/recruitOverviewTypes';
 import { buildPersonJourney } from '@/lib/recruitPersonJourney';
 import { FUNNEL_GROUP_LABEL, funnelPlaceOf, funnelSubOf } from '@/lib/channelFunnel';
 
@@ -40,14 +40,31 @@ export function ageBucketOf(age: number | null | undefined): string {
   return AGE_BUCKETS[5];
 }
 
-export type AudienceDim = 'age' | 'home' | 'ch' | 'sub' | 'group';
+export type AudienceDim = 'age' | 'home' | 'ch' | 'sub' | 'group' | 'bringer' | 'method' | 'gender';
 export const AUDIENCE_DIM_LABEL: Record<AudienceDim, string> = {
   age: 'ช่วงอายุ',
   home: 'จังหวัดที่อยู่',
   ch: 'ช่องทาง',
   sub: 'ช่องทางรอง',
   group: 'กลุ่ม / เพจ / ที่มา',
+  bringer: 'ใครเอาเข้ามา',
+  method: 'วิธีที่เข้ามา',
+  gender: 'เพศ',
 };
+
+/** วิธีที่รายชื่อเข้ามา — ชื่อบนจอ (ค่ามาจาก API `methodOf`) */
+export const APP_METHOD_LABEL: Record<AppMethod, string> = {
+  autopost: 'Autopost',
+  manual: 'โพสต์เอง',
+  link: 'ลิงก์ (ไม่ทราบแบบโพสต์)',
+  staff: 'เจ้าหน้าที่คีย์ / นำเข้า',
+  self: 'กรอกเองที่หน้าประกาศ',
+  irecruit: 'ดึงจาก iRecruit',
+};
+export const METHOD_UNKNOWN = 'ไม่ทราบวิธี';
+export const BRINGER_NONE = 'ไม่ทราบคนพามา';
+export const GENDER_LABEL = { male: 'ชาย', female: 'หญิง', other: 'อื่น ๆ' } as const;
+export const GENDER_UNKNOWN = 'ไม่ระบุเพศ';
 
 /** ค่าของใบในแต่ละมิติ — ช่องทางใช้ตัวตัดสินเดิม (`funnelPlaceOf` / `funnelSubOf`) */
 export function dimValueOf(f: RecruitAppFact, dim: AudienceDim): string {
@@ -55,6 +72,9 @@ export function dimValueOf(f: RecruitAppFact, dim: AudienceDim): string {
   if (dim === 'home') return f.homeProvince?.trim() || HOME_UNKNOWN;
   if (dim === 'ch') return FUNNEL_GROUP_LABEL[funnelPlaceOf(f).group];
   if (dim === 'sub') return funnelPlaceOf(f).channel;
+  if (dim === 'bringer') return f.bringer?.trim() || BRINGER_NONE;
+  if (dim === 'method') return f.method ? APP_METHOD_LABEL[f.method] : METHOD_UNKNOWN;
+  if (dim === 'gender') return f.gender ? GENDER_LABEL[f.gender] : GENDER_UNKNOWN;
   return funnelSubOf(f);
 }
 
@@ -144,7 +164,7 @@ export type AudienceRow = {
 };
 
 /** ค่าไม่ทราบอยู่ท้ายเสมอ (ห้ามยกเป็นผู้ชนะด้วย 0 ปลอม) · เท่ากัน = เรียงชื่อ (ลำดับแน่นอนก่อนแบ่งหน้า) */
-const UNKNOWN_KEYS = new Set<string>([AGE_UNKNOWN, HOME_UNKNOWN, FUNNEL_GROUP_LABEL.unknown]);
+const UNKNOWN_KEYS = new Set<string>([AGE_UNKNOWN, HOME_UNKNOWN, FUNNEL_GROUP_LABEL.unknown, BRINGER_NONE, METHOD_UNKNOWN, GENDER_UNKNOWN]);
 
 export function audienceRows(
   list: readonly RecruitAppFact[],

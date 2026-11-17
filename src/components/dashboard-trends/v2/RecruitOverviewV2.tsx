@@ -10,7 +10,6 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
@@ -25,25 +24,23 @@ import { legacyReportsPath, requestPathOfJobId } from '@/lib/jobNavigation';
 import { EMPTY_REQUEST_FILTER, filterRequestRows, isRequestFilterActive, jobFilterOf, requestFilterToParams, type RequestTabFilter } from '@/lib/recruitRequestTab';
 import { prevCohortOf } from '@/lib/recruitScale';
 import { friendlyErrorText } from '@/lib/friendlyError';
-import { AUDIENCE_MEASURE_LABEL, BU_UNKNOWN, ageStats, audienceRows, buOfFact, pageOf, bkkDay } from '@/lib/recruitAudience';
+import { BU_UNKNOWN, buOfFact, pageOf, bkkDay } from '@/lib/recruitAudience';
 import SoPostGroupsCard from '../stuck/SoPostGroupsCard';
 import SelfLinksPanel from '../topics/SelfLinksPanel';
 import StuckFilterBar from '../stuck/StuckFilterBar';
 import StuckTodoTable from '../stuck/StuckTodoTable';
 import StuckAreaTable from '../stuck/StuckAreaTable';
 import CallerResultsTable from '../stuck/CallerResultsTable';
-import V2Drawer, { AudiencePane, type V2Pane } from './V2Drawer';
+import V2Drawer, { type V2Pane } from './V2Drawer';
+import ApplicantStory from './ApplicantStory';
 import { BuBars, Kpi, Pager, SectionTitle, TrendBars, fmt, fmtPct } from './V2Parts';
-import { BRINGER_UNKNOWN, V2_METRICS, V2_METRIC_LABEL, buildV2Model, bringerOf, holderOf, type V2Metric } from './v2Model';
+import { V2_METRICS, V2_METRIC_LABEL, buildV2Model, type V2Metric } from './v2Model';
 
 const ALL_BUS = ['LBD', 'LBA', 'LM', 'DS', 'SN'];
 const TH_MONTH = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
 const dayText = (ymd: string) => `${Number(ymd.slice(8, 10))} ${TH_MONTH[Number(ymd.slice(5, 7)) - 1]} ${Number(ymd.slice(0, 4)) + 543}`;
 const monthText = (ym: string) => `${TH_MONTH[Number(ym.slice(5, 7)) - 1]} ${String(Number(ym.slice(0, 4)) + 543).slice(2)}`;
 
-type Holder = 'holder' | 'bringer' | 'booker';
-const HOLDER_LABEL: Record<Holder, string> = { holder: 'ผู้รับรายชื่อ', bringer: 'ผู้พารายชื่อเข้ามา', booker: 'ผู้นัด' };
-const BOOKER_UNKNOWN = 'ไม่ทราบผู้นัด';
 
 export default function RecruitOverviewV2({ data }: { data: RecruitOverviewResponse }) {
   const navigate = useNavigate();
@@ -68,25 +65,17 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
   /** ช่วงอยู่ในเดือนเดียว = รายวันเสมอ (แบบเดือนเหลือแท่งเดียว · เจ้าของ 17 พ.ย. 2569 "บ้านนอกมาก") · ปุ่ม "เดือน" ปิดไว้ ไม่ซ่อน (ของบนจอไม่ขยับ) */
   const multiMonth = win.from.slice(0, 7) !== win.to.slice(0, 7);
   const shownUnit: 'month' | 'day' = multiMonth ? trendUnit : 'day';
-  const [holder, setHolder] = React.useState<Holder>('holder');
-  const [holderPage, setHolderPage] = React.useState(1);
-  const [chPage, setChPage] = React.useState(1);
+  /** BU ที่กดแท่ง — เรื่องเล่ารายชื่อใต้กราฟ (null = ทุก BU) */
+  const [storyBu, setStoryBu] = React.useState<string | null>(null);
   const [workPage, setWorkPage] = React.useState(1);
   const [clickPage, setClickPage] = React.useState(1);
-  type AudienceState = Extract<V2Pane, { kind: 'audience' }>;
-  const audienceStart = (view: 'home' | 'age', title: string): AudienceState => ({ kind: 'audience', view, filter: { dims: {}, results: [] }, measure: 'apps', display: 'count', page: 1, title });
-  const [homePane, setHomePane] = React.useState<AudienceState>(() => audienceStart('home', 'ผู้สมัครอยู่จังหวัดไหน'));
-  const [agePane, setAgePane] = React.useState<AudienceState>(() => audienceStart('age', 'อายุผู้สมัคร'));
   // เปลี่ยนวัน/BU = ล้างรายละเอียด + กลับหน้า 1 ทุกตาราง (ห้ามค้างข้อมูลช่วงเดิม)
   React.useEffect(() => {
     setStack([]);
     setTrendMonth(null);
-    setHolderPage(1);
-    setChPage(1);
+    setStoryBu(null);
     setWorkPage(1);
     setClickPage(1);
-    setHomePane((p) => ({ ...p, page: 1 }));
-    setAgePane((p) => ({ ...p, page: 1 }));
   }, [viewKey]);
 
   // ใบขอ + การประกาศ (เส้นเดิม) — ทิ้งคำตอบที่ไม่ใช่ตัวกรองปัจจุบัน
@@ -169,31 +158,6 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
     });
   })();
 
-  // ── ผู้สมัครมาจากไหน (ช่องทางหลัก) — 5 ยอด เรียงตาม % นัดได้ ──
-  const chRows = audienceRows(model.cohort, 'ch', model.sets, 'apps', 'count');
-  const chPg = pageOf(chRows, chPage);
-
-  // ── รายชื่ออยู่กับใคร ──
-  const holderRows = (() => {
-    const m = new Map<string, string[]>();
-    // ผู้นัด = เฉพาะรายการที่นัดได้ (คนบันทึกนัด) · อื่น = ทุกรายการ
-    for (const f of holder === 'booker' ? model.cohort.filter((x) => x.appointmentAt) : model.cohort) {
-      const k = holder === 'holder' ? holderOf(f) : holder === 'bringer' ? bringerOf(f) : f.bookedBy?.trim() || BOOKER_UNKNOWN;
-      m.set(k, [...(m.get(k) ?? []), f.id ?? '']);
-    }
-    return [...m.entries()]
-      .map(([name, ids]) => ({
-        name,
-        ids,
-        late: ids.filter((id) => model.late.has(id)),
-        booked: ids.filter((id) => model.sets.allBooked.has(id)),
-        showed: ids.filter((id) => model.sets.showed.has(id)),
-        erp: ids.every((id) => model.sets.erpUnknown.has(id)) ? null : ids.filter((id) => model.sets.erp.has(id)),
-      }))
-      .sort((a, b) => b.ids.length - a.ids.length || a.name.localeCompare(b.name, 'th'));
-  })();
-  const holderPg = pageOf(holderRows, holderPage);
-
   // ── คนสมัครงานที่ไหน (จังหวัดของงานที่สมัคร — ใบขอในรายการของช่วง) ──
   const jobProvince = new Map((reqRows ?? []).filter((r) => r.jobId).map((r) => [r.jobId as string, r.province?.trim() || null]));
   const workRows = (() => {
@@ -205,7 +169,6 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
     return [...m.entries()].map(([k, ids]) => ({ k, ids })).sort((a, b) => (a.k === 'ไม่ทราบพื้นที่งาน' ? 1 : 0) - (b.k === 'ไม่ทราบพื้นที่งาน' ? 1 : 0) || b.ids.length - a.ids.length || a.k.localeCompare(b.k, 'th'));
   })();
   const workPg = pageOf(workRows, workPage);
-  const age = ageStats(model.cohort);
   const unlinked = model.cohort.filter((f) => !f.jobId);
 
   /** สถานะการออกหาคนรายใบ 9 แบบ (ใบขอที่ดำเนินการ) — กดสถานะ = รายการใบ */
@@ -302,87 +265,67 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
         </p>
       </div>
     ),
-    todo: <StuckTodoTable rows={openRows} onPick={(title, rows) => setStack((cur) => [...cur, { kind: 'requests', title, rows, page: 1 }])} />,
-    area: (
-      <StuckAreaTable
-        rows={openRows.filter((r) => (r.remaining ?? 0) > 0)}
-        title="งานที่ยังขาดคน"
-        onPick={(title, rows) => setStack((cur) => [...cur, { kind: 'requests', title, rows, page: 1 }])}
-      />
-    ),
-    callers: (
-      <CallerResultsTable
-        cohort={model.cohort}
-        prev={prevModel?.cohort ?? null}
-        onOpen={(title, ids) => setStack((cur) => [...cur, { kind: 'names', title, ids: [...ids], page: 1 }])}
-      />
-    ),
     posts: <SoPostGroupsCard from={win.from} to={win.to} bu={data.bu} title="Autopost · รายการโพสต์" />,
     self: links.rows ? <SelfLinksPanel rows={links.rows} onOpenRequest={(jobId) => navigate(requestPathOfJobId(jobId))} /> : <Skeleton className="h-40 rounded-xl" />,
   };
 
   const loadingReq = stuck.key !== filterKey;
+  /** อัตราของใบชุดนั้น (ใบ ≠ อัตรา · เจ้าของ 17 พ.ย. 2569 "322 ใบ กี่อัตรา") */
+  const sumOf = (rows: readonly StuckRequest[], k: 'requested' | 'filled' | 'cancelled' | 'remaining') => rows.reduce((n, r) => n + (Number(r[k]) || 0), 0);
+  const rateText = (rows: readonly StuckRequest[] | undefined, label: string, k: 'requested' | 'filled' | 'cancelled' | 'remaining') =>
+    rows ? `${label} ${fmt(sumOf(rows, k))} อัตรา` : undefined;
+  /** เรื่องเล่ารายชื่อ = รายชื่อของยอดที่เลือก (ERP อ่านไม่ได้ = รายชื่อทั้งหมด) */
+  const storyCohort = idSet ? model.cohort.filter((f) => inMetric(f.id)) : model.cohort;
   return (
     <div className="space-y-8" data-testid="recruit-overview-v2">
       <StuckFilterBar rows={allRows ?? []} appRecruiters={appRecruiters} value={reqFilter} onChange={setReqFilter} />
-      {/* ── ใบขอ + รายชื่อรอติดต่อ | การประกาศรับสมัคร ── */}
-      <Card className="grid gap-6 rounded-2xl p-5 lg:grid-cols-2">
-        <section className="min-w-0 space-y-4">
-          <SectionTitle title="ใบขอ" right="หน่วย: ใบ" />
-          {stuck.error && stuck.key === filterKey ? <p className="text-sm text-destructive">{stuck.error}</p> : null}
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <Kpi label="ดำเนินการ" emphasis value={loadingReq ? undefined : eq ? eq.remaining.length : null} onClick={eq ? () => openRequests('ดำเนินการ', eq.remaining) : undefined} testId="v2-req-open" />
-            <Kpi label="ใบขอใหม่" value={loadingReq ? undefined : eq ? eq.new.length : null} onClick={eq ? () => openRequests('ใบขอใหม่', eq.new) : undefined} />
-            <Kpi label="ปิดใบขอ" value={loadingReq ? undefined : eq ? eq.filled.length : null} onClick={eq ? () => openRequests('ปิดใบขอ', eq.filled) : undefined} />
-            <Kpi label="ยกเลิกใบขอ" value={loadingReq ? undefined : eq ? eq.cancelled.length : null} onClick={eq ? () => openRequests('ยกเลิกใบขอ', eq.cancelled) : undefined} tone="danger" />
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button type="button" size="sm" variant="outline" disabled={!eq} onClick={() => push({ kind: 'embed', title: 'ใครต้องทำอะไร', embed: 'todo' })}>
-              ใครต้องทำอะไร
-            </Button>
-          </div>
-          <p className={cn('text-xs', DASH.sub)}>
-            ทั้งหมดในรายงานนี้ {fmt(reqRows?.length ?? null)} ใบ · สถานะ ณ {dayText(win.to)} · ใบขอใหม่นับตามวันคีย์ใน ERP
-          </p>
-          <div className="space-y-2 border-t pt-4">
-            <h3 className="text-sm font-medium">รายชื่อรอติดต่อ</h3>
-            <div className="grid grid-cols-2 gap-3">
-              <Kpi label="รอโทรเกิน 24 ชม." emphasis tone="danger" value={model.late.size} onClick={() => openNames('สนใจแล้ว รอโทรเกิน 24 ชม.', [...model.late])} testId="v2-late" />
-              <Kpi
-                label="สนใจแล้ว รอเจ้าหน้าที่โทร"
-                emphasis
-                value={model.stages.follow.parts.find((p) => p.key === 'waiting')?.ids.length ?? 0}
-                onClick={() => openNames('สนใจแล้ว รอเจ้าหน้าที่โทร', model.stages.follow.parts.find((p) => p.key === 'waiting')?.ids ?? [])}
-              />
-            </div>
-          </div>
+
+      {/* ── ใบขอ (ใบ + อัตรา) · ใครต้องทำอะไร · งานที่ยังขาดคน — กางไว้ (เจ้าของ 17 พ.ย. 2569 "ซ่อนไว้ทำไม") ── */}
+      <Card className="min-w-0 space-y-5 rounded-2xl p-5" data-testid="v2-requests">
+        <SectionTitle title="ใบขอ" right={`สถานะ ณ ${dayText(win.to)} · ใบขอใหม่นับตามวันคีย์ใน ERP`} />
+        {stuck.error && stuck.key === filterKey ? <p className="text-sm text-destructive">{stuck.error}</p> : null}
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <Kpi label="ดำเนินการ (ใบ)" emphasis value={loadingReq ? undefined : eq ? eq.remaining.length : null} sub={rateText(eq?.remaining, 'เหลือหา', 'remaining')} onClick={eq ? () => openRequests('ดำเนินการ', eq.remaining) : undefined} testId="v2-req-open" />
+          <Kpi label="ใบขอใหม่ (ใบ)" emphasis value={loadingReq ? undefined : eq ? eq.new.length : null} sub={rateText(eq?.new, 'ขอมา', 'requested')} onClick={eq ? () => openRequests('ใบขอใหม่', eq.new) : undefined} />
+          <Kpi label="ปิดใบขอ (ใบ)" emphasis value={loadingReq ? undefined : eq ? eq.filled.length : null} sub={rateText(eq?.filled, 'หาได้', 'filled')} onClick={eq ? () => openRequests('ปิดใบขอ', eq.filled) : undefined} />
+          <Kpi label="ยกเลิกใบขอ (ใบ)" emphasis value={loadingReq ? undefined : eq ? eq.cancelled.length : null} sub={rateText(eq?.cancelled, 'ยกเลิก', 'cancelled')} onClick={eq ? () => openRequests('ยกเลิกใบขอ', eq.cancelled) : undefined} tone="danger" />
+        </div>
+        <section className="min-w-0 space-y-2 border-t pt-4" data-testid="v2-todo">
+          <h3 className="text-sm font-medium">ใครต้องทำอะไร</h3>
+          {eq ? <StuckTodoTable rows={openRows} onPick={(title, rows) => openRequests(title, rows)} /> : <Skeleton className="h-32 rounded-xl" />}
         </section>
-        <section className="min-w-0 space-y-4 border-t pt-6 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
-          <SectionTitle title="การประกาศรับสมัคร" />
-          <div className="grid grid-cols-3 gap-3">
-            <Kpi label="ยังไม่เริ่มหา" emphasis value={loadingReq ? undefined : eq ? notStarted.length : null} onClick={eq ? () => openRequests('ยังไม่เริ่มหา', notStarted) : undefined} />
-            <Kpi label="เริ่มหาคนแล้ว" emphasis value={loadingReq ? undefined : eq ? started.length : null} onClick={eq ? () => openRequests('เริ่มหาคนแล้ว', started) : undefined} />
-            <Kpi label="Autopost · รายการโพสต์" emphasis value={posts.key === filterKey ? posts.total : undefined} onClick={() => push({ kind: 'embed', title: 'Autopost · รายการโพสต์', embed: 'posts' })} />
-          </div>
-          {posts.error && posts.key === filterKey ? <p className="text-xs text-destructive">{posts.error}</p> : null}
-          <p className={cn('text-xs', DASH.sub)}>ยังไม่เริ่มหา / เริ่มหาคนแล้ว นับใบขอที่ดำเนินการ · Autopost นับรายการโพสต์</p>
-          <div className="flex flex-wrap gap-2">
-            <Button type="button" size="sm" variant="outline" onClick={() => push({ kind: 'embed', title: 'โพสต์เอง / สร้างลิงก์', embed: 'self' })}>
-              โพสต์เอง / สร้างลิงก์
-            </Button>
-            <Button type="button" size="sm" variant="outline" disabled={!eq} onClick={() => push({ kind: 'embed', title: 'สถานะและหลักฐานรายใบ', embed: 'states' })}>
-              สถานะและหลักฐานรายใบ
-            </Button>
-            <Button type="button" size="sm" variant="outline" onClick={() => push({ kind: 'embed', title: 'เปิดฟอร์ม / ส่งใบสมัคร', embed: 'clicks' })}>
-              เปิดฟอร์ม / ส่งใบสมัคร
-            </Button>
-          </div>
+        <section className="min-w-0 space-y-2 border-t pt-4" data-testid="v2-area">
+          <h3 className="text-sm font-medium">งานที่ยังขาดคน · แยกจังหวัด / อำเภอ</h3>
+          {eq ? <StuckAreaTable bare rows={openRows.filter((r) => (r.remaining ?? 0) > 0)} onPick={(title, rows) => openRequests(title, rows)} /> : <Skeleton className="h-32 rounded-xl" />}
         </section>
       </Card>
 
+      {/* ── การประกาศรับสมัคร ── */}
+      <Card className="min-w-0 space-y-4 rounded-2xl p-5" data-testid="v2-posting">
+        <SectionTitle title="การประกาศรับสมัคร" right="นับใบขอที่ดำเนินการ · Autopost นับรายการโพสต์" />
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <Kpi label="ยังไม่เริ่มหา (ใบ)" emphasis value={loadingReq ? undefined : eq ? notStarted.length : null} onClick={eq ? () => openRequests('ยังไม่เริ่มหา', notStarted) : undefined} />
+          <Kpi label="เริ่มหาคนแล้ว (ใบ)" emphasis value={loadingReq ? undefined : eq ? started.length : null} onClick={eq ? () => openRequests('เริ่มหาคนแล้ว', started) : undefined} />
+          <Kpi label="Autopost · รายการโพสต์" emphasis value={posts.key === filterKey ? posts.total : undefined} onClick={() => push({ kind: 'embed', title: 'Autopost · รายการโพสต์', embed: 'posts' })} />
+        </div>
+        {posts.error && posts.key === filterKey ? <p className="text-xs text-destructive">{posts.error}</p> : null}
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" size="sm" variant="outline" onClick={() => push({ kind: 'embed', title: 'โพสต์เอง / สร้างลิงก์', embed: 'self' })}>
+            โพสต์เอง / สร้างลิงก์
+          </Button>
+          <Button type="button" size="sm" variant="outline" disabled={!eq} onClick={() => push({ kind: 'embed', title: 'สถานะและหลักฐานรายใบ', embed: 'states' })}>
+            สถานะและหลักฐานรายใบ
+          </Button>
+          <Button type="button" size="sm" variant="outline" onClick={() => push({ kind: 'embed', title: 'เปิดฟอร์ม / ส่งใบสมัคร', embed: 'clicks' })}>
+            เปิดฟอร์ม / ส่งใบสมัคร
+          </Button>
+        </div>
+      </Card>
+
       <Separator />
-      {/* ── ผู้สมัครและผลการติดต่อ ── */}
-      <Card className="space-y-4 rounded-2xl p-5">
+
+      {/* ── ผู้สมัครและผลการติดต่อ — ทุกเรื่องของรายชื่ออยู่ในส่วนนี้ (เจ้าของ 17 พ.ย. 2569) ── */}
+      <Card className="min-w-0 space-y-5 rounded-2xl p-5" data-testid="v2-applicants">
         <SectionTitle title="ผู้สมัครและผลการติดต่อ" right={`รายการสมัคร${win.asOf ? ` · ผล ณ ${dayText(win.asOf)}` : ''}`} />
         {data.errors.apps ? <p className="text-sm text-destructive">{data.errors.apps}</p> : null}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-7">
@@ -424,235 +367,128 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
             ยังไม่ผูกใบขอ {fmt(unlinked.length)}
           </Button>
         </div>
-      </Card>
 
-      {/* ── เปรียบเทียบ BU และช่วงเวลา ── */}
-      <Card className="space-y-4 rounded-2xl p-5" data-testid="v2-compare">
-        <div>
-          <SectionTitle title={`เปรียบเทียบ BU และช่วงเวลา · ${V2_METRIC_LABEL[metric]}`} right={buText} />
-        </div>
-        {st.ids === null ? (
-          <p className={cn('text-sm', DASH.muted)}>อ่านข้อมูลแจ้งเข้า ERP ไม่ได้ในช่วงนี้ — ไม่ทราบผล</p>
-        ) : (
-          <div className="grid gap-6 lg:grid-cols-2">
-            <section className="min-w-0 space-y-2">
-              <h3 className="text-sm font-medium">แยกตาม BU</h3>
-              <BuBars bars={buBars} unit="รายการ" onPick={(bu) => push({ kind: 'metric', metric, bu, page: 1 })} />
-            </section>
-            <section className="min-w-0 space-y-2">
-              <div className="flex flex-wrap items-center justify-between gap-2">
+        <section className="space-y-2 border-t pt-4">
+          <h3 className="text-sm font-medium">รายชื่อรอติดต่อ</h3>
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <Kpi label="รอโทรเกิน 24 ชม." tone="danger" value={model.late.size} onClick={() => openNames('สนใจแล้ว รอโทรเกิน 24 ชม.', [...model.late])} testId="v2-late" />
+            <Kpi
+              label="สนใจแล้ว รอเจ้าหน้าที่โทร"
+              value={model.stages.follow.parts.find((p) => p.key === 'waiting')?.ids.length ?? 0}
+              onClick={() => openNames('สนใจแล้ว รอเจ้าหน้าที่โทร', model.stages.follow.parts.find((p) => p.key === 'waiting')?.ids ?? [])}
+            />
+          </div>
+        </section>
+
+        {/* กราฟแท่ง BU ของยอดที่เลือก → กดแท่ง = เล่าเรื่องรายชื่อใต้กราฟ (ช่องทาง › ใครเอาเข้ามา › วิธี › จังหวัด › อายุ/เพศ) */}
+        <section className="space-y-4 border-t pt-4" data-testid="v2-compare">
+          {st.ids === null ? (
+            <p className={cn('text-sm', DASH.muted)}>อ่านข้อมูลแจ้งเข้า ERP ไม่ได้ในช่วงนี้ ไม่ทราบผล</p>
+          ) : (
+            <div className="grid gap-6 lg:grid-cols-2">
+              <section className="min-w-0 space-y-2">
                 <h3 className="text-sm font-medium">
-                  ตามวันที่สมัคร · {V2_METRIC_LABEL[metric]} (รายการ){trendMonth ? ` · ${monthText(trendMonth)}` : ''}
+                  {V2_METRIC_LABEL[metric]} {fmt(st.ids.length)} · แยกตาม BU
                 </h3>
-                <div className="flex gap-1">
-                  {trendMonth ? (
-                    <Button type="button" size="xs" variant="outline" onClick={() => setTrendMonth(null)}>
-                      ทุกเดือน
-                    </Button>
-                  ) : (
-                    <>
-                      <Button type="button" size="xs" variant={shownUnit === 'month' ? 'default' : 'outline'} disabled={!multiMonth} onClick={() => setTrendUnit('month')}>
-                        เดือน
+                <BuBars bars={buBars} unit="รายการ" onPick={(bu) => setStoryBu(bu)} />
+              </section>
+              <section className="min-w-0 space-y-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h3 className="text-sm font-medium">
+                    ตามวันที่สมัคร · {V2_METRIC_LABEL[metric]}{trendMonth ? ` · ${monthText(trendMonth)}` : ''}
+                  </h3>
+                  <div className="flex gap-1">
+                    {trendMonth ? (
+                      <Button type="button" size="xs" variant="outline" onClick={() => setTrendMonth(null)}>
+                        ทุกเดือน
                       </Button>
-                      <Button type="button" size="xs" variant={shownUnit === 'day' ? 'default' : 'outline'} onClick={() => setTrendUnit('day')}>
-                        วัน
-                      </Button>
-                    </>
-                  )}
+                    ) : (
+                      <>
+                        <Button type="button" size="xs" variant={shownUnit === 'month' ? 'default' : 'outline'} disabled={!multiMonth} onClick={() => setTrendUnit('month')}>
+                          เดือน
+                        </Button>
+                        <Button type="button" size="xs" variant={shownUnit === 'day' ? 'default' : 'outline'} onClick={() => setTrendUnit('day')}>
+                          วัน
+                        </Button>
+                      </>
+                    )}
+                  </div>
                 </div>
-              </div>
-              <TrendBars
-                points={trendPoints}
-                labelOf={(k) => (k.length === 7 ? monthText(k) : String(Number(k.slice(8, 10))))}
-                onPick={(k) => {
-                  if (k.length === 7) setTrendMonth(k);
-                  else openNames(`${V2_METRIC_LABEL[metric]} · สมัคร ${dayText(k)}`, trendPoints.find((p) => p.key === k)?.ids ?? []);
-                }}
-              />
-              <p className={cn('text-xs', DASH.sub)}>แบ่งตามวันที่สมัคร ผลถึงวันที่เลือก · แท่งรวมตรงกับยอดที่เลือก ไม่ใช่จำนวนครั้งที่โทรในวันนั้น</p>
-            </section>
-          </div>
-        )}
-      </Card>
-
-      <Separator />
-      {/* ── ผู้สมัครมาจากไหน | รายชื่ออยู่กับใคร ── */}
-      <div className="grid gap-6 xl:grid-cols-2">
-        <Card className="min-w-0 space-y-3 rounded-2xl p-5" data-testid="v2-channels">
-          <SectionTitle title="ผู้สมัครมาจากไหน" right="% นัดได้ / รายการสมัคร" />
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>ช่องทาง / ที่มา</TableHead>
-                  <TableHead className="text-right">สมัคร</TableHead>
-                  <TableHead className="text-right">{AUDIENCE_MEASURE_LABEL.follow}</TableHead>
-                  <TableHead className="text-right">นัดได้</TableHead>
-                  <TableHead className="text-right">มา</TableHead>
-                  <TableHead className="text-right">นัดได้ %</TableHead>
-                  <TableHead className="text-right">ERP / สมัคร %</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {chPg.slice.map((r) => (
-                  <TableRow key={r.key} className="cursor-pointer" onClick={() => push({ kind: 'audience', view: 'sub', filter: { dims: { ch: r.key }, results: [] }, measure: 'apps', display: 'count', page: 1, title: r.key })}>
-                    <TableCell className="font-medium">{r.key}</TableCell>
-                    <TableCell className="text-right tabular-nums">{fmt(r.counts.apps)}</TableCell>
-                    <TableCell className="text-right tabular-nums">{fmt(r.counts.follow)}</TableCell>
-                    <TableCell className="text-right tabular-nums">{fmt(r.counts.allBooked)}</TableCell>
-                    <TableCell className="text-right tabular-nums">{fmt(r.counts.showed)}</TableCell>
-                    <TableCell className="text-right tabular-nums">{fmtPct(r.rates.allBooked)}</TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {fmt(r.counts.erp)} · {fmtPct(r.rates.erp)}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-          <Pager {...chPg} onPage={setChPage} />
-          <p className={cn('text-xs', DASH.sub)}>เลือกช่องทางเพื่อดูช่องทางรอง กลุ่ม เพจ อายุ จังหวัด และรายชื่อ · ERP จับคู่จากเบอร์โทร</p>
-        </Card>
-
-        <Card className="min-w-0 space-y-3 rounded-2xl p-5" data-testid="v2-holders">
-          <SectionTitle
-            title="รายชื่ออยู่กับใคร"
-            right={
-              <Select
-                value={holder}
-                onValueChange={(v) => {
-                  setHolder(v as Holder);
-                  setHolderPage(1);
-                }}
-              >
-                <SelectTrigger className="h-8 w-44" aria-label="ดูตาม">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {(Object.keys(HOLDER_LABEL) as Holder[]).map((h) => (
-                    <SelectItem key={h} value={h}>
-                      {HOLDER_LABEL[h]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            }
+                <TrendBars
+                  points={trendPoints}
+                  labelOf={(k) => (k.length === 7 ? monthText(k) : String(Number(k.slice(8, 10))))}
+                  onPick={(k) => {
+                    if (k.length === 7) setTrendMonth(k);
+                    else openNames(`${V2_METRIC_LABEL[metric]} · สมัคร ${dayText(k)}`, trendPoints.find((p) => p.key === k)?.ids ?? []);
+                  }}
+                />
+              </section>
+            </div>
+          )}
+          <ApplicantStory
+            cohort={storyCohort}
+            sets={model.sets}
+            bu={storyBu}
+            onBu={setStoryBu}
+            scopeLabel={V2_METRIC_LABEL[metric]}
+            onNames={openNames}
+            resetKey={`${viewKey}:${metric}`}
           />
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>{holder === 'holder' ? 'เจ้าหน้าที่' : holder === 'bringer' ? 'ผู้พารายชื่อ' : 'ผู้นัด'}</TableHead>
-                  <TableHead className="text-right">รายการ</TableHead>
-                  <TableHead className="text-right">เกิน 24 ชม.</TableHead>
-                  <TableHead className="text-right">นัดได้</TableHead>
-                  <TableHead className="text-right">มา</TableHead>
-                  <TableHead className="text-right">ERP</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {holderPg.slice.map((r) => (
-                  <TableRow key={r.name}>
-                    <TableCell className="font-medium">{r.name === BRINGER_UNKNOWN || r.name === BOOKER_UNKNOWN ? <span className={DASH.muted}>{r.name}</span> : r.name}</TableCell>
-                    {(
-                      [
-                        ['ids', r.ids],
-                        ['late', r.late],
-                        ['booked', r.booked],
-                        ['showed', r.showed],
-                        ['erp', r.erp],
-                      ] as const
-                    ).map(([k, ids]) => (
-                      <TableCell key={k} className="text-right">
-                        <button type="button" disabled={ids === null} className="rounded px-1 tabular-nums hover:bg-muted/60" onClick={() => ids && openNames(`${r.name} · ${k === 'ids' ? 'รายการ' : k === 'late' ? 'เกิน 24 ชม.' : k === 'booked' ? 'นัดได้' : k === 'showed' ? 'มา' : 'ERP'}`, ids)}>
-                          {fmt(ids?.length ?? null)}
-                        </button>
-                      </TableCell>
-                    ))}
+        </section>
+
+        {/* รายชื่ออยู่กับใคร = ทีมสรรหาแต่ละคน เก็บไป → โทร → นัด → ผลนัด → แจ้งเข้า บวกลบลงตัวในแถว (เจ้าของ 17 พ.ย. 2569) */}
+        <section className="min-w-0 space-y-2 border-t pt-4" data-testid="v2-holders">
+          <h3 className="text-sm font-medium">รายชื่ออยู่กับใคร</h3>
+          <CallerResultsTable cohort={model.cohort} prev={prevModel?.cohort ?? null} onOpen={(title, ids) => openNames(title, ids)} />
+        </section>
+
+        <div className="grid gap-6 border-t pt-4 xl:grid-cols-2">
+          <section className="min-w-0 space-y-2" data-testid="v2-why">
+            <h3 className="text-sm font-medium">เหตุผลที่ยังไม่ได้คน</h3>
+            <ul className="space-y-1">
+              {model.why.map((p) => {
+                const max = Math.max(1, ...model.why.map((x) => x.ids.length));
+                return (
+                  <li key={p.key}>
+                    <button type="button" onClick={() => openNames(p.label, p.ids)} className="flex w-full items-center gap-3 rounded-lg px-1 py-1 text-left text-sm hover:bg-muted/60">
+                      <span className="w-48 shrink-0">{p.label}</span>
+                      <span className="relative h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-muted">
+                        <span className={cn('absolute inset-y-0 left-0 rounded-full', TONE.primary.dot)} style={{ width: `${(p.ids.length / max) * 100}%` }} />
+                      </span>
+                      <span className="w-14 shrink-0 text-right font-medium tabular-nums">{fmt(p.ids.length)}</span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+            <p className={cn('text-xs', DASH.sub)}>คนเดียวอาจมีเหตุหลายขั้น ยอดแต่ละแถวรวมกันเป็นจำนวนคนไม่ได้</p>
+          </section>
+          <section className="min-w-0 space-y-2" data-testid="v2-work">
+            <h3 className="text-sm font-medium">สมัครงานจังหวัดไหน · จังหวัดของงานที่เลือกสมัคร</h3>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>จังหวัดของงาน</TableHead>
+                    <TableHead className="text-right">รายการสมัคร</TableHead>
+                    <TableHead className="text-right">สัดส่วน</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-          <Pager {...holderPg} onPage={setHolderPage} />
-          <div className="border-t pt-3">
-            <Button type="button" size="sm" variant="outline" onClick={() => push({ kind: 'embed', title: 'ผลงานรายคน', embed: 'callers' })}>
-              ผลงานรายคน
-            </Button>
-          </div>
-        </Card>
-      </div>
-
-      {/* ── เหตุผลที่ยังไม่ได้คน | คนสมัครงานที่ไหน ── */}
-      <div className="grid gap-6 xl:grid-cols-2">
-        <Card className="min-w-0 space-y-3 rounded-2xl p-5" data-testid="v2-why">
-          <SectionTitle title="เหตุผลที่ยังไม่ได้คน" />
-          <ul className="space-y-1">
-            {model.why.map((p) => {
-              const max = Math.max(1, ...model.why.map((x) => x.ids.length));
-              return (
-                <li key={p.key}>
-                  <button type="button" onClick={() => openNames(p.label, p.ids)} className="flex w-full items-center gap-3 rounded-lg px-1 py-1 text-left text-sm hover:bg-muted/60">
-                    <span className="w-48 shrink-0">{p.label}</span>
-                    <span className="relative h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-muted">
-                      <span className={cn('absolute inset-y-0 left-0 rounded-full', TONE.primary.dot)} style={{ width: `${(p.ids.length / max) * 100}%` }} />
-                    </span>
-                    <span className="w-14 shrink-0 text-right font-medium tabular-nums">{fmt(p.ids.length)}</span>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-          <p className={cn('text-xs', DASH.sub)}>ผู้สมัครคนเดียวอาจมีเหตุไม่สำเร็จหลายขั้น ยอดแต่ละแถวจึงรวมกันเป็นจำนวนคนไม่ได้</p>
-        </Card>
-
-        <Card className="min-w-0 space-y-3 rounded-2xl p-5" data-testid="v2-work">
-          <SectionTitle title="คนสมัครงานที่ไหน" />
-          <p className={cn('text-xs', DASH.sub)}>จังหวัดของงานที่เลือกสมัคร แยกจากจังหวัดที่ผู้สมัครอยู่</p>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>จังหวัดของงาน</TableHead>
-                  <TableHead className="text-right">รายการสมัคร</TableHead>
-                  <TableHead className="text-right">สัดส่วน</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {workPg.slice.map((r) => (
-                  <TableRow key={r.k} className="cursor-pointer" onClick={() => openNames(`สมัครงาน ${r.k}`, r.ids)}>
-                    <TableCell className="font-medium">{r.k}</TableCell>
-                    <TableCell className="text-right tabular-nums">{fmt(r.ids.length)}</TableCell>
-                    <TableCell className="text-right tabular-nums">{fmtPct(model.cohort.length ? (r.ids.length / model.cohort.length) * 100 : null)}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-          <Pager {...workPg} onPage={setWorkPage} />
-        </Card>
-      </div>
-
-      {/* ── กางไว้บนหน้า (เจ้าของ 17 พ.ย. 2569 "ทำไมไม่กางไว้เอามาซ่อนไว้ทำไม") — ตัวเดียวกับแผงข้าง กดลงลึกค่อยเปิดแผงข้าง ── */}
-      <Card className="min-w-0 space-y-3 rounded-2xl p-5" data-testid="v2-area">
-        <SectionTitle title="งานที่ยังขาดคน" right="ใบขอที่ยังเหลือหา แยกจังหวัด / อำเภอ" />
-        {eq ? (
-          <StuckAreaTable bare rows={openRows.filter((r) => (r.remaining ?? 0) > 0)} onPick={(title, rows) => openRequests(title, rows)} />
-        ) : (
-          <Skeleton className="h-40 rounded-xl" />
-        )}
+                </TableHeader>
+                <TableBody>
+                  {workPg.slice.map((r) => (
+                    <TableRow key={r.k} className="cursor-pointer" onClick={() => openNames(`สมัครงาน ${r.k}`, r.ids)}>
+                      <TableCell className="font-medium">{r.k}</TableCell>
+                      <TableCell className="text-right tabular-nums">{fmt(r.ids.length)}</TableCell>
+                      <TableCell className="text-right tabular-nums">{fmtPct(model.cohort.length ? (r.ids.length / model.cohort.length) * 100 : null)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+            <Pager {...workPg} onPage={setWorkPage} />
+          </section>
+        </div>
       </Card>
-
-      <div className="grid gap-6 xl:grid-cols-2">
-        <Card className="min-w-0 space-y-4 rounded-2xl p-5" data-testid="v2-home">
-          <SectionTitle title="ผู้สมัครอยู่จังหวัดไหน" right="จังหวัดที่ผู้สมัครกรอก" />
-          <AudiencePane compact pane={homePane} model={model} bus={bus} push={push} replace={(p) => p.kind === 'audience' && setHomePane(p)} />
-        </Card>
-        <Card className="min-w-0 space-y-4 rounded-2xl p-5" data-testid="v2-age">
-          <SectionTitle title="อายุผู้สมัคร" right={`เฉลี่ย ${age.average === null ? '—' : age.average.toFixed(1)} ปี · จาก ${fmt(age.known)} รายการที่มีอายุ`} />
-          <AudiencePane compact pane={agePane} model={model} bus={bus} push={push} replace={(p) => p.kind === 'audience' && setAgePane(p)} />
-        </Card>
-      </div>
 
       <div className="flex justify-end">
         <Button

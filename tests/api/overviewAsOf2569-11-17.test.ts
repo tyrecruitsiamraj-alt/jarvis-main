@@ -30,3 +30,15 @@ describe('ผล ณ วันสิ้นสุด (ภาพรวม v2 · 17
     expect([ageOf(38), ageOf('41'), ageOf(null), ageOf(''), ageOf('abc'), ageOf(0), ageOf(120)]).toEqual([38, 41, null, null, null, null, null]);
   });
 });
+
+describe('วิธีที่รายชื่อเข้ามา (methodOf · 17 พ.ย. 2569)', () => {
+  it('ลิงก์ก่อน › iRecruit › มีคนคีย์ › กรอกเอง', async () => {
+    const { methodOf } = await import('../../api/_handlers/recruit-overview');
+    expect(methodOf('apply_page', 'ABC123', 'autopost', null)).toBe('autopost');
+    expect(methodOf('apply_page', 'ABC123', 'manual', 'pakkorn.k@siamraj.com')).toBe('manual');
+    expect(methodOf('apply_page', 'ABC123', null, null)).toBe('link');
+    expect(methodOf('irecruit', null, null, 'kanyanat.y@siamraj.com')).toBe('irecruit');
+    expect(methodOf('apply_page', null, null, 'pakkorn.k@siamraj.com')).toBe('staff');
+    expect(methodOf('apply_page', null, null, null)).toBe('self');
+  });
+});

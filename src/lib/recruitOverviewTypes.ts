@@ -14,6 +14,13 @@ export type RecruitSide = 'ai' | 'staff';
 export type RecruitAttendance = 'showed' | 'no_show' | 'rescheduled';
 
 /** ข้อเท็จจริงต่อใบสมัคร (ไม่นับ Lead) — นิยามทุกช่องมาจาก `api/_lib/applicantOverviewSql.ts` */
+/**
+ * วิธีที่รายชื่อเข้ามา (เจ้าของ 17 พ.ย. 2569 "เอาเข้ามาด้วยวิธีไหน Autopost โพสต์มือ Scrap ฯลฯ")
+ * ลิงก์ Autopost · ลิงก์โพสต์เอง · ลิงก์ที่ไม่รู้แบบ · เจ้าหน้าที่คีย์/นำเข้า · กรอกเองหน้าประกาศ · ดึงจาก iRecruit
+ * (Scrap เก็บเข้าเป็น Lead — ไม่อยู่ในรายชื่อที่นับ)
+ */
+export type AppMethod = 'autopost' | 'manual' | 'link' | 'staff' | 'self' | 'irecruit';
+
 export type RecruitAppFact = {
   /** id ใบ (ไม่ใช่ชื่อ/เบอร์) — ใช้เปิดรายชื่อตอนกดเลข (18 ต.ค. 2569) */
   id?: string;
@@ -95,6 +102,10 @@ export type RecruitAppFact = {
   age?: number | null;
   /** จังหวัดที่อยู่ที่ผู้สมัครกรอก (ไม่ใช่จังหวัดของงาน) · null = ไม่ระบุ · ไม่มี = เส้นรุ่นเก่า */
   homeProvince?: string | null;
+  /** เพศที่ผู้สมัครกรอก (ภาพรวม 17 พ.ย. 2569 "อายุเท่าไหร่ เพศอะไร") · null = ไม่ระบุ */
+  gender?: 'male' | 'female' | 'other' | null;
+  /** วิธีที่รายชื่อเข้ามา — คิดฝั่ง API (`methodOf`) · ชื่อบนจอ `APP_METHOD_LABEL` */
+  method?: AppMethod;
   /** คนที่ลงนัด (ชื่อเล่น) — คนบันทึกติดต่อที่ลงวันนัด › คนถือเบอร์ที่ลงนัด · null = ไม่มีนัด/ไม่ทราบ (ภาพรวม v2 "ผู้นัด") */
   bookedBy?: string | null;
   /** รหัสย่อของเบอร์ (ไม่ใช่เบอร์จริง) — นับเบอร์ไม่ซ้ำ · null = ไม่มีเบอร์ที่ใช้ได้ · ไม่ใช่รหัสบุคคล (ภาพรวม v2) */
