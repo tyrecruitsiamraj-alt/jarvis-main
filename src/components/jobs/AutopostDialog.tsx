@@ -1,5 +1,5 @@
 import React from 'react';
-import { LoaderCircle, Send } from 'lucide-react';
+import { ImagePlus, LoaderCircle, Send, Trash2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -63,6 +63,7 @@ import {
   type SoOptions,
   type SoPostMode,
 } from '@/lib/soScraping';
+import { postImageIdFromUrl, postImagePath, postImageUrl, uploadPostImage } from '@/lib/postImagesApi';
 import SoStartLine from '@/components/jobs/SoStartLine';
 import SoStuckPanel from '@/components/jobs/SoStuckPanel';
 import OrderPostButton from '@/components/jobs/OrderPostButton';
@@ -143,6 +144,12 @@ export function AutopostBody({
   const [loadError, setLoadError] = React.useState<string | null>(null);
 
   const [mode, setMode] = React.useState<SoPostMode>('caption_only');
+  /** รูปแนบโพสต์ (17 พ.ย. 2569 "คนอยากโพสต์พร้อมรูป") — ใช้เมื่อเลือก ข้อความ + รูป / รูปอย่างเดียว */
+  const [imageId, setImageId] = React.useState<string | null>(null);
+  const [imageBusy, setImageBusy] = React.useState(false);
+  const [imageError, setImageError] = React.useState<string | null>(null);
+  const imageInputRef = React.useRef<HTMLInputElement>(null);
+  const withImage = mode !== 'caption_only';
   const [accountId, setAccountId] = React.useState('');
   const [picked, setPicked] = React.useState<string[]>([]);
   /** กล่องเตือนในป๊อป — block = บัญชีที่เลือกไม่ได้ · info = เครื่องหลักออฟไลน์ · confirm = ถามก่อนส่ง */
@@ -268,6 +275,7 @@ export function AutopostBody({
     ...(account && !soAccountSelectable(account.status) ? [soWarningText(account.name, account.status, account.warning)] : []),
     ...(picked.length === 0 ? ['เลือกกลุ่มอย่างน้อย 1 กลุ่ม'] : []),
     ...(cap !== null && picked.length > cap ? [`เลือกกลุ่มได้ไม่เกิน ${NUM.format(cap)} กลุ่ม (โพสต์ที่บัญชีนี้เหลือวันนี้)`] : []),
+    ...(withImage && !imageId ? ['แนบรูป'] : []),
     ...(mode !== 'image_only' && !caption.trim() ? ['ใส่ข้อความประกาศ'] : []),
     ...(mode !== 'image_only' && !caption.includes(captionLink) ? [`ข้อความต้องมี ${AUTOPOST_LINK_PLACEHOLDER}`] : []),
     ...leaks.map((l) => `ข้อความมี${l} — ลบออกก่อน`),
@@ -315,6 +323,9 @@ export function AutopostBody({
       setCaptionEdited(true);
     }
     if (snap.post_mode === 'caption_only' || snap.post_mode === 'caption_image' || snap.post_mode === 'image_only') setMode(snap.post_mode);
+    // รูปของใบสั่งก่อน — เปิดป๊อปสั่งซ้ำแล้วรูปเดิมยังอยู่
+    const prevImage = postImageIdFromUrl(snap.image_url);
+    if (prevImage) setImageId(prevImage);
     const prevAccount = typeof snap.account_id === 'string' ? snap.account_id : null;
     const acc = soDefaultAccount(
       opts.accounts.filter((a) => a.id !== prevAccount),
@@ -368,6 +379,8 @@ export function AutopostBody({
           apply_link: applyLink,
           link_code: code,
           channel_label: link?.channelLabel ?? null,
+          // รูปแนบ (17 พ.ย. 2569) — ลิงก์เต็มให้บอท So Scraping ดาวน์โหลดตอนโพสต์
+          ...(withImage && imageId ? { image_url: postImageUrl(imageId), image_id: imageId } : {}),
           // ลิงก์กลุ่มละอัน — So Scraping แทน apply_link ใน caption ด้วยลิงก์ของกลุ่มตอนโพสต์ (เจ้าของ 2 พ.ย. 2569 "รอทำพร้อมกันทีเดียว")
           group_links: groupLinks,
         },
@@ -627,6 +640,43 @@ export function AutopostBody({
                 </div>
               ))}
             </RadioGroup>
+            {withImage ? (
+              <div className="flex flex-wrap items-end gap-3" data-testid="autopost-image">
+                {imageId ? (
+                  <img src={postImagePath(imageId)} alt="รูปที่จะโพสต์" className="max-h-48 w-auto max-w-full rounded-lg border border-border" />
+                ) : null}
+                {imageId ? (
+                  <Button type="button" variant="ghost" size="sm" onClick={() => setImageId(null)}>
+                    <Trash2 aria-hidden /> ลบรูป
+                  </Button>
+                ) : (
+                  <Button type="button" variant="outline" size="sm" disabled={imageBusy} onClick={() => imageInputRef.current?.click()} data-testid="autopost-image-pick">
+                    {imageBusy ? <LoaderCircle className="animate-spin" aria-hidden /> : <ImagePlus aria-hidden />}
+                    {imageBusy ? 'กำลังใส่รูป…' : 'แนบรูป'}
+                  </Button>
+                )}
+                {imageError ? <span className={cn('text-xs', TONE.danger.value)}>{imageError}</span> : null}
+                <input
+                  ref={imageInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  aria-hidden
+                  tabIndex={-1}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    e.target.value = '';
+                    if (!file) return;
+                    setImageBusy(true);
+                    setImageError(null);
+                    uploadPostImage(file, job.id)
+                      .then(setImageId)
+                      .catch((err: unknown) => setImageError(err instanceof Error ? err.message : 'แนบรูปไม่สำเร็จ'))
+                      .finally(() => setImageBusy(false));
+                  }}
+                />
+              </div>
+            ) : null}
           </section>
 
           {problems.length > 0 ? (

@@ -131,7 +131,9 @@ describe('ผลแมทที่คิดจากกองเดิม (To do
   it('ก่อนเวลาเปลี่ยนกอง / อ่านเวลาไม่ได้ = เก่า · หลังจากนั้น = ใช้ได้', () => {
     expect(isBoardMatchFromOldPool('2026-10-16T09:00:00Z')).toBe(true);
     expect(isBoardMatchFromOldPool(null)).toBe(true);
-    expect(isBoardMatchFromOldPool('2026-10-17T11:00:00Z')).toBe(false);
+    // 17 พ.ย. 2569 เลื่อนเวลาตัด (วิธีจับคู่เปลี่ยน — เรียงตามความใกล้ · matchProximity)
+    expect(isBoardMatchFromOldPool('2026-11-17T03:00:00Z')).toBe(true);
+    expect(isBoardMatchFromOldPool('2026-11-17T05:00:00Z')).toBe(false);
   });
 
   it('worker สแกนเจอผลเก่า = เข้าคิวแมทใหม่ (ไม่วิเคราะห์สเปคซ้ำ) · เปิดใบดู = ดันหัวคิว โชว์ผลเดิมระหว่างรอ', () => {

@@ -15,6 +15,7 @@ import {
 } from '@/lib/candidatePriority';
 import type { BoardCandidateMatch } from '@/lib/boardCandidateTypes';
 import type { JobRequest } from '@/types';
+import { areaRankOf, jobAreaOf } from '@/lib/matchProximity';
 
 export type CheckVerdict = 'pass' | 'warn' | 'fail' | 'unknown';
 
@@ -44,7 +45,19 @@ export function ageVerdict(job: JobRequest, age: number | null | undefined): Che
   return 'pass';
 }
 
+/**
+ * ที่อยู่ — `parts` = [อำเภอ/เขต, จังหวัด, ...] ของผู้สมัคร
+ * 🔴 17 พ.ย. 2569 (เจ้าของ "match ไม่ตรงเลย"): เดิมเทียบข้อความดิบ ("กรุงเทพฯ" ≠ "กรุงเทพมหานคร") ได้แค่ผ่าน/เตือน ไม่เคยตก
+ * และคนไม่มีที่อยู่ไม่ถูกนับ ⇒ ขึ้นนำคนที่อยู่ใกล้ · ตอนนี้ใช้ความใกล้ชุดเดียวกับตัวจับคู่ (`matchProximity`):
+ * อำเภอ/จังหวัดเดียวกัน = ผ่าน · ภาคเดียวกัน = เตือน · ไม่มีที่อยู่ = เตือน · คนละภาค = ไม่ผ่าน
+ * งานอ่านจังหวัดไม่ออก = ใช้การเทียบข้อความแบบเดิม
+ */
 export function areaVerdict(job: JobRequest, parts: Array<string | null | undefined>): CheckVerdict {
+  const area = jobAreaOf(job);
+  if (area.province) {
+    const rank = areaRankOf(area, { amphur_name: parts[0] ?? null, province_name: parts[1] ?? null });
+    return rank <= 1 ? 'pass' : rank === 4 ? 'fail' : 'warn';
+  }
   const candidateParts = parts.map(normText).filter(Boolean);
   if (candidateParts.length === 0) return 'unknown';
   const jobArea = normText(`${job.location_address} ${job.unit_name}`);

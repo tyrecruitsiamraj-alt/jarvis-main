@@ -15,6 +15,13 @@ import { isJobFamilyCode, classifyJobFamily, selectShortlist } from './jobFamily
 import { saveBoardMatchResult } from './boardMatchStore.js';
 import { enqueueLumosReminderForBoardMatch } from './lumosDispatch.js';
 import { isAutoDispatchEnabled } from './lumosDispatchMode.js';
+import {
+  AREA_RANK_LABEL,
+  jobAreaOf,
+  orderPoolForShortlist,
+  requiredGenderLabel,
+  type AreaRank,
+} from '../../src/lib/matchProximity.js';
 
 /**
  * แมท "คนของเรา" (ผ่านสัมภาษณ์ รอลงงาน จาก board) กับใบขอ
@@ -25,6 +32,9 @@ export type BoardCandidateMatch = BoardReadyCandidate & {
   tier: 'green' | 'yellow' | 'red';
   reason: string;
   prescore: number;
+  /** ความใกล้กับงาน (ระบบคิด ไม่ใช่ AI · 17 พ.ย. 2569) — ผลเก่าไม่มี */
+  area_rank?: AreaRank;
+  area_label?: string;
 };
 
 export type BoardMatchResult = {
@@ -51,6 +61,15 @@ const RECOMMEND_MULTIPLIER = 3;
 export function recommendedCount(matches: Array<{ tier: 'green' | 'yellow' | 'red' }>): number {
   return matches.filter((m) => m.tier === 'green' || m.tier === 'yellow').length;
 }
+
+/**
+ * ตัดสินว่าถังนี้ "พอ" หรือยัง — นับเฉพาะเขียว (17 พ.ย. 2569)
+ * เดิมนับเหลืองด้วย ⇒ คนไกลที่ได้เหลืองนับเข้าเป้าจนไม่เคยค้น Re Use / Drop
+ */
+export function greenCount(matches: Array<{ tier: 'green' | 'yellow' | 'red' }>): number {
+  return matches.filter((m) => m.tier === 'green').length;
+}
+
 
 /**
  * เป้าจำนวนคนแนะนำต่อใบขอ = อัตราที่ขอ × 3 (ขอ 3 ต้องมีอย่างน้อย 9)
@@ -134,19 +153,22 @@ function buildMatchPrompt(
   jobTitle: string,
   job: Record<string, unknown>,
   shortlist: BoardReadyCandidate[],
+  areaOf: (c: BoardReadyCandidate) => AreaRank | null,
 ): { system: string; user: string } {
   const adjacent = spec.adjacent_positions
     .map((a) => `- [${a.tier}] ${a.title}${a.note ? ` (${a.note})` : ''}`)
     .join('\n');
 
+  // 17 พ.ย. 2569: พื้นที่และเงินเดือน ระบบคิดเองแล้วบอก AI (เดิม AI เทียบเงินผิด "15,000 ต่ำกว่างบ 12,500" และเดาพื้นที่ให้คนที่ไม่มีที่อยู่)
   const system = `คุณคือผู้ช่วยจับคู่ "คนของเรา" (ผู้สมัครบนบอร์ดที่ยังไม่มีงานลง) กับใบขอกำลังคน (Outsource Service).
-คนกลุ่มนี้เคยผ่านการคัดเลือกแล้ว — สกิล/ตำแหน่ง (job1/job2) เชื่อถือได้ ให้น้ำหนักการแมทสกิลเป็นหลัก รองลงมาคือพื้นที่และเงินเดือนที่ขอ
+คนกลุ่มนี้เคยผ่านการคัดเลือกแล้ว — สกิล/ตำแหน่ง (job1/job2) เชื่อถือได้ ให้น้ำหนักการแมทสกิลเป็นหลัก รองลงมาคือความใกล้งาน
+แต่ละคนมี "ใกล้งาน" ที่ระบบคำนวณจากจังหวัด/อำเภอแล้ว (อำเภอเดียวกับงาน > จังหวัดเดียวกับงาน > ภาคเดียวกับงาน > ไม่มีที่อยู่ > คนละภาคกับงาน) ใช้ค่านี้ตามที่ให้ ห้ามเดาพื้นที่เอง
 เกณฑ์ tier:
-- green = สกิลตรงหรือใกล้มาก ลงงานได้ทันที
-- yellow = พอเป็นไปได้ ต้องเช็ค (สกิลข้างเคียง/พื้นที่ไกล/เงินเดือนขอสูงกว่า)
-- red = ห่างไกล — ใส่เฉพาะถ้าจำเป็น
+- green = สกิลตรงหรือใกล้มาก และอยู่จังหวัดเดียวกับงานหรือใกล้กว่า
+- yellow = พอเป็นไปได้ ต้องเช็ค (สกิลข้างเคียง / อยู่ภาคเดียวกันแต่คนละจังหวัด / ไม่มีที่อยู่)
+- red = ห่างไกล — คนละภาคกับงาน หรือสกิลห่าง ใส่เฉพาะถ้าจำเป็น
 ถ้าคนในรายชื่อสกิลคนละสายงานกับใบขอชัดเจน (เช่น คนขับรถ กับ งานอ่านมาตร/ธุรการ/ช่างเทคนิค) ห้ามฝืนให้ tier green/yellow เด็ดขาด ต้องให้เป็น red หรือไม่ใส่ในผลลัพธ์เลย
-ในเหตุผล (reason) ห้ามระบุรายละเอียดที่ไม่ได้อยู่ในข้อมูลที่ให้มา (เช่น ประเภทรถ ยี่ห้อ รุ่น ใบรับรอง) ใช้ได้เฉพาะฟิลด์ที่ให้จริง: สกิล/เพศ/อายุ/เงินเดือนขอ/พื้นที่ ตอบ JSON เท่านั้น`;
+เหตุผล (reason) เขียนเฉพาะเรื่องสกิล/ประสบการณ์ ห้ามเขียนเรื่องเงินเดือนและพื้นที่ (ระบบแสดงให้เองแล้ว) ห้ามระบุรายละเอียดที่ไม่ได้อยู่ในข้อมูล (เช่น ประเภทรถ ยี่ห้อ รุ่น ใบรับรอง) ตอบ JSON เท่านั้น`;
 
   const income = job.total_income != null ? Number(job.total_income) : null;
   const cand = shortlist
@@ -156,14 +178,18 @@ function buildMatchPrompt(
         `สกิล: ${[c.job1_name, c.job2_name].filter(Boolean).join(' / ') || 'ไม่ระบุ'}`,
         c.sex_code ? `เพศ:${c.sex_code}` : '',
         c.age ? `อายุ:${c.age}` : '',
-        c.required_salary ? `เงินเดือนขอ:${c.required_salary}` : '',
         [c.amphur_name, c.province_name].filter(Boolean).join(' ') || '',
+        areaOf(c) != null ? `ใกล้งาน:${AREA_RANK_LABEL[areaOf(c)!]}` : '',
       ].filter(Boolean);
       return parts.join(' | ');
     })
     .join('\n');
 
+  const gender = requiredGenderLabel(job.gender_requirement);
+  const ageMin = Number(job.age_range_min) || null;
+  const ageMax = Number(job.age_range_max) || null;
   const user = `ใบขอต้องการตำแหน่ง: ${jobTitle}
+เงื่อนไขที่ระบบกรองให้แล้ว: เพศ ${gender ?? 'ไม่ระบุ'} · อายุ ${ageMin ?? '-'}–${ageMax ?? '-'} ปี
 Job Family: ${spec.job_family_code} ${spec.job_family_label}
 สรุปสเปค: ${spec.summary}
 คุณสมบัติต้องมี: ${spec.must_have.join(', ') || '-'}
@@ -213,9 +239,12 @@ async function rankPool(
   pool: BoardReadyCandidate[],
 ): Promise<{ matches: BoardCandidateMatch[]; shortlisted: number }> {
   const terms = seedTerms(spec, jobTitle);
-  const scored = pool
-    .map((c) => ({ c, s: prescore(c, terms, jobTitle) }))
-    .sort((a, b) => b.s - a.s);
+  // 17 พ.ย. 2569: ตัดเพศ/อายุผิดเงื่อนไข แล้วเรียงตามความใกล้ก่อนตัด shortlist (เดิมคะแนนสกิลเท่ากันหมด ได้ 20 คนล่าสุดทั้งประเทศ)
+  const area = jobAreaOf(job as Parameters<typeof jobAreaOf>[0]);
+  const ordered = orderPoolForShortlist(job, area, pool, (c) => prescore(c, terms, jobTitle));
+  const scored = ordered.scored;
+  const areaById = new Map(scored.map((x) => [x.c.card_id, x.a]));
+  if (ordered.gatedOut.gender || ordered.gatedOut.age) logInfo('board-match.gated', { jobId, ...ordered.gatedOut });
 
   // family ของใบขอ (จาก AI candidate-spec ถ้ามี ไม่งั้น classify จากชื่อตำแหน่ง) — กันเติม shortlist ข้าม family
   // เช่น pool เป็นคนขับรถทั้งหมด แต่ใบขอเป็นงานอ่านมาตร/ธุรการ ต้องไม่ฝืนส่งคนขับรถให้ AI เลือก
@@ -226,7 +255,9 @@ async function rankPool(
 
   if (shortlist.length === 0) return { matches: [], shortlisted: 0 };
 
-  const { system, user } = buildMatchPrompt(spec, jobTitle, job, shortlist);
+  // อ่านที่ตั้งงานไม่ออก = เทียบไม่ได้ (null) — ไม่ลดใคร ไม่บอก AI
+  const areaOf = (c: BoardReadyCandidate): AreaRank | null => (area.province ? (areaById.get(c.card_id) ?? 3) : null);
+  const { system, user } = buildMatchPrompt(spec, jobTitle, job, shortlist, areaOf);
   let ranked: Array<{ id: number; tier: string; reason: string }> = [];
   let lastError: unknown = null;
   for (let attempt = 1; attempt <= 1; attempt++) {
@@ -266,12 +297,16 @@ async function rankPool(
     const c = byId.get(r.id);
     if (!c || seen.has(r.id)) continue;
     seen.add(r.id);
+    const a = areaOf(c);
+    const aiTier = r.tier === 'green' || r.tier === 'red' ? r.tier : 'yellow';
     matches.push({
       ...c,
       full_name: fullName(c),
-      tier: r.tier === 'green' || r.tier === 'red' ? r.tier : 'yellow',
+      // ไม่มีที่อยู่ / คนละภาค ห้ามเขียว (ระบบตัดสิน ไม่ใช่ AI)
+      tier: aiTier === 'green' && a != null && a >= 3 ? 'yellow' : aiTier,
       reason: r.reason,
       prescore: scoreById.get(c.card_id) ?? 0,
+      ...(a != null ? { area_rank: a, area_label: AREA_RANK_LABEL[a] } : {}),
     });
   }
   return { matches, shortlisted: shortlist.length };
@@ -302,7 +337,7 @@ export async function matchBoardCandidatesForJob(
   let fallbackPoolSize = 0;
 
   for (const [i, columnId] of boardMatchColumnIds().entries()) {
-    if (i > 0 && recommendedCount(matches) >= target) break;
+    if (i > 0 && greenCount(matches) >= target) break;
     // ถังแรกพัง = พังทั้งรอบ (เหมือนเดิม) · ถังถัดไปพังไม่ทำให้ผลถังก่อนหาย
     try {
       const pool = await listBoardReadyCandidates({ columnId, excludeInformed: true, limit: 1000 });

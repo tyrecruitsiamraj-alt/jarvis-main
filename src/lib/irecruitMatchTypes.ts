@@ -19,6 +19,9 @@ export type IrecruitCandidateMatch = {
   tier: 'green' | 'yellow' | 'red';
   reason: string;
   prescore: number;
+  /** ความใกล้กับงาน (ระบบคิด · 17 พ.ย. 2569) — ผลเก่าไม่มี */
+  area_rank?: 0 | 1 | 2 | 3 | 4;
+  area_label?: string;
 };
 
 import type { CandidateSpecAnalysis } from '@/lib/candidateSpecTypes';

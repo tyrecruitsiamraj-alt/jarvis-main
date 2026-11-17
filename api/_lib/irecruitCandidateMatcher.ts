@@ -12,6 +12,7 @@ import {
   type CandidateSpecAnalysis,
 } from './candidateSpecAnalyzer.js';
 import { isJobFamilyCode, classifyJobFamily, selectShortlist } from './jobFamilyLexicon.js';
+import { AREA_RANK_LABEL, jobAreaOf, orderPoolForShortlist, requiredGenderLabel, type AreaRank } from '../../src/lib/matchProximity.js';
 
 export type IrecruitCandidateMatch = {
   id: number;
@@ -36,6 +37,9 @@ export type IrecruitCandidateMatch = {
   reason: string;
   /** คะแนน pre-rank (ก่อน AI) ใช้ debug */
   prescore: number;
+  /** ความใกล้กับงาน (ระบบคิด · 17 พ.ย. 2569) — ผลเก่าไม่มี */
+  area_rank?: 0 | 1 | 2 | 3 | 4;
+  area_label?: string;
 };
 
 export type IrecruitMatchResult = {
@@ -128,6 +132,8 @@ function buildMatchPrompt(
   spec: CandidateSpecAnalysis,
   jobTitle: string,
   shortlist: RecruitCandidateForMatch[],
+  areaOf: (c: RecruitCandidateForMatch) => AreaRank | null = () => null,
+  job: Record<string, unknown> = {},
 ): { system: string; user: string } {
   const adjacent = spec.adjacent_positions
     .map((a) => `- [${a.tier}] ${a.title}${a.note ? ` (${a.note})` : ''}`)
@@ -140,7 +146,8 @@ function buildMatchPrompt(
 - yellow = พอเป็นไปได้ แต่ต้องเช็ค/เทรนเพิ่ม (adjacent เหลือง)
 - red = ห่างไกล คนละสายงาน — ใส่เฉพาะถ้าจำเป็น
 ถ้าผู้สมัครสกิลคนละสายงานกับใบขอชัดเจน (เช่น คนขับรถ กับ งานอ่านมาตร/ธุรการ/ช่างเทคนิค) ห้ามฝืนให้ tier green/yellow เด็ดขาด ต้องให้เป็น red หรือไม่ใส่ในผลลัพธ์เลย
-ในเหตุผล (reason) ห้ามระบุรายละเอียดที่ไม่ได้อยู่ในข้อมูลที่ให้มา (เช่น ประเภทรถ ยี่ห้อ รุ่น ใบรับรอง) ใช้ได้เฉพาะฟิลด์ที่ให้จริง: ตำแหน่งที่สมัคร/เพศ/อายุ/ใบขับขี่/พื้นที่ ตอบ JSON เท่านั้น`;
+แต่ละคนมี "ใกล้งาน" ที่ระบบคำนวณจากจังหวัด/อำเภอแล้ว ใช้ตามที่ให้ ห้ามเดาพื้นที่เอง · คนละภาคกับงานให้ไม่เกิน yellow
+เหตุผล (reason) เขียนเฉพาะเรื่องตำแหน่ง/ประสบการณ์/ใบขับขี่ ห้ามเขียนเรื่องพื้นที่และเงินเดือน (ระบบแสดงให้เอง) ห้ามระบุรายละเอียดที่ไม่ได้อยู่ในข้อมูล (เช่น ประเภทรถ ยี่ห้อ รุ่น ใบรับรอง) ตอบ JSON เท่านั้น`;
 
   const cand = shortlist
     .map((c, i) => {
@@ -151,12 +158,14 @@ function buildMatchPrompt(
         c.age ? `อายุ:${c.age}` : '',
         c.driving_licenses.length ? `ใบขับขี่:${c.driving_licenses.join(',')}` : '',
         c.location_label ? `พื้นที่:${c.location_label}` : '',
+        areaOf(c) != null ? `ใกล้งาน:${AREA_RANK_LABEL[areaOf(c)!]}` : '',
       ].filter(Boolean);
       return parts.join(' | ');
     })
     .join('\n');
 
   const user = `ใบขอต้องการตำแหน่ง: ${jobTitle}
+เงื่อนไขที่ระบบกรองให้แล้ว: เพศ ${requiredGenderLabel(job.gender_requirement) ?? 'ไม่ระบุ'} · อายุ ${Number(job.age_range_min) || '-'}–${Number(job.age_range_max) || '-'} ปี
 Job Family: ${spec.job_family_code} ${spec.job_family_label}
 สรุปสเปค: ${spec.summary}
 คุณสมบัติต้องมี: ${spec.must_have.join(', ') || '-'}
@@ -222,10 +231,16 @@ export async function matchIrecruitCandidatesForJob(
     searchScope = 'recent';
   }
 
-  // 3) pre-rank + คัด shortlist
-  const scored = pool
-    .map((c) => ({ c, s: prescore(c, terms, jobTitle) }))
-    .sort((a, b) => b.s - a.s);
+  // 3) pre-rank + คัด shortlist — 17 พ.ย. 2569: ตัดเพศ/อายุผิดเงื่อนไข · เรียงตามความใกล้ก่อนตัด (เดิมได้คนล่าสุดทั้งประเทศ)
+  const area = jobAreaOf(job as Parameters<typeof jobAreaOf>[0]);
+  const ordered = orderPoolForShortlist(
+    job,
+    area,
+    pool.map((c) => ({ ...c, sex_code: c.sex, amphur_name: c.district_name })),
+    (c) => prescore(c, terms, jobTitle),
+  );
+  const scored = ordered.scored;
+  const areaById = new Map(scored.map((x) => [x.c.id, x.a]));
 
   // family ของใบขอ (จาก AI candidate-spec ถ้ามี ไม่งั้น classify จากชื่อตำแหน่ง) — กันเติม shortlist ข้าม family
   // เช่น ค้นด้วยคีย์เวิร์ดไม่เจอใครเลย fallback เป็นคนล่าสุด ต้องไม่ฝืนส่งคนละสายงานให้ AI เลือก
@@ -249,7 +264,9 @@ export async function matchIrecruitCandidatesForJob(
   }
 
   // 4) AI จัดอันดับ shortlist (retry เพราะโมเดลตอบไม่เหมือนกันทุกรอบ)
-  const { system, user } = buildMatchPrompt(spec, jobTitle, shortlist);
+  // อ่านที่ตั้งงานไม่ออก = เทียบไม่ได้ (null) — ไม่ลดใคร ไม่บอก AI
+  const areaOf = (c: RecruitCandidateForMatch): AreaRank | null => (area.province ? (areaById.get(c.id) ?? 3) : null);
+  const { system, user } = buildMatchPrompt(spec, jobTitle, shortlist, areaOf, job);
   let ranked: Array<{ id: number; tier: string; reason: string }> = [];
   let lastError: unknown = null;
   for (let attempt = 1; attempt <= 2; attempt++) {
@@ -291,7 +308,10 @@ export async function matchIrecruitCandidatesForJob(
     const c = byId.get(r.id);
     if (!c || seen.has(r.id)) continue;
     seen.add(r.id);
-    const tier = r.tier === 'green' || r.tier === 'red' ? r.tier : 'yellow';
+    const a = areaOf(c);
+    const aiTier = r.tier === 'green' || r.tier === 'red' ? r.tier : 'yellow';
+    // ไม่มีที่อยู่ / คนละภาค ห้ามเขียว (ระบบตัดสิน)
+    const tier = aiTier === 'green' && a != null && a >= 3 ? 'yellow' : aiTier;
     matches.push({
       id: c.id,
       full_name: fullName(c),
@@ -313,6 +333,7 @@ export async function matchIrecruitCandidatesForJob(
       tier,
       reason: r.reason,
       prescore: scoreById.get(c.id) ?? 0,
+      ...(a != null ? { area_rank: a, area_label: AREA_RANK_LABEL[a] } : {}),
     });
   }
 

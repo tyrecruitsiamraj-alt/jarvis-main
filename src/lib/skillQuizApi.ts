@@ -1,4 +1,5 @@
 import { apiFetch } from './apiFetch';
+import { shrinkImageToJpeg } from './imageShrink';
 import type { PublicQuizQuestion, QuizAnalysis, QuizAnswers, QuizAttemptStatus, QuizSetContent } from './skillQuiz';
 import type { QuizViewerMode } from './skillQuizTaker';
 
@@ -99,30 +100,8 @@ export async function fetchQuizAttempt(id: string): Promise<QuizAttemptDetail> {
 /** ลิงก์ตัวรูปของคำถาม/ตัวเลือก — ใช้ทั้งจอเจ้าหน้าที่และหน้าคนทำ (ไม่ต้องล็อกอิน) */
 export const quizImageUrl = (id: string) => `/api/public/skill-quiz?image=${encodeURIComponent(id)}`;
 
-const QUIZ_IMAGE_SIDE = 1280;
-
-/** ย่อรูปในเครื่องให้ด้านยาวไม่เกิน 1280 px เป็น JPEG ก่อนส่ง — รูปจากมือถือ 5 MB เหลือราว 200 KB */
-async function shrinkQuizImage(file: File): Promise<string> {
-  if (!file.type.startsWith('image/')) throw new Error('เลือกไฟล์รูปเท่านั้น');
-  const bitmap = await createImageBitmap(file).catch(() => {
-    throw new Error('เปิดรูปนี้ไม่ได้ ลองรูป JPG หรือ PNG');
-  });
-  const scale = Math.min(1, QUIZ_IMAGE_SIDE / Math.max(bitmap.width, bitmap.height));
-  const canvas = document.createElement('canvas');
-  canvas.width = Math.max(1, Math.round(bitmap.width * scale));
-  canvas.height = Math.max(1, Math.round(bitmap.height * scale));
-  const ctx = canvas.getContext('2d');
-  if (!ctx) throw new Error('เปิดรูปนี้ไม่ได้');
-  // รูปพื้นโปร่ง (PNG) ให้พื้นขาว ไม่กลายเป็นดำตอนแปลงเป็น JPEG
-  ctx.fillStyle = 'white';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-  bitmap.close();
-  return canvas.toDataURL('image/jpeg', 0.85);
-}
-
 export async function uploadQuizImage(file: File): Promise<string> {
-  const data = await shrinkQuizImage(file);
+  const data = await shrinkImageToJpeg(file);
   return (await post<{ id: string }>({ action: 'upload_image', data })).id;
 }
 

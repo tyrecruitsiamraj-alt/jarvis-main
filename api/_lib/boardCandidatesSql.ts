@@ -203,8 +203,10 @@ export function listBoardMatchPool(limit = 5000): Promise<BoardReadyCandidate[]>
  * ผลแมทที่คิด **ก่อนเปลี่ยนกอง** (ยังเป็นคน To do) = ถือว่าเก่า ให้ worker แมทใหม่ 1 รอบ
  * ไม่งั้นผลเดิมโดนกรองคน To do ออกจนเหลือ "ดูคน 0" ทั้งที่กองใหม่มีคนตรง
  * เปลี่ยนชุดถังใน `boardMatchColumnIds` อีกเมื่อไหร่ ให้เลื่อนเวลานี้ตาม
+ * 🔴 17 พ.ย. 2569 เลื่อนอีกครั้ง: วิธีจับคู่เปลี่ยน (เรียงตามความใกล้ · ตัดเพศ/อายุ · `matchProximity`) — ผลเก่าทุกใบแมทใหม่ 1 รอบ
+ * ⚠️ ห้ามตั้งเวลาในอนาคต — ผลที่คิดใหม่ก่อนถึงเวลานี้จะถูกนับว่าเก่าแล้วแมทซ้ำวนทุกรอบสแกนจนเลยเวลา
  */
-export const BOARD_MATCH_POOL_SINCE = '2026-10-17T17:00:00+07:00';
+export const BOARD_MATCH_POOL_SINCE = '2026-11-17T11:20:00+07:00';
 
 export function isBoardMatchFromOldPool(computedAt: string | null | undefined): boolean {
   const t = new Date(String(computedAt ?? '')).getTime();

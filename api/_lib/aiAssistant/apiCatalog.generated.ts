@@ -1727,6 +1727,22 @@ export const API_CATALOG: ApiCatalogEntry[] = [
   "reachesPeople": true
  },
  {
+  "path": "/api/post-images",
+  "file": "api/_handlers/post-images.ts",
+  "methods": [
+   "GET",
+   "POST"
+  ],
+  "doc": "POST /api/post-images { data, job_id? } → { id } — รูปแนบโพสต์ของป๊อป Autopost (เจ้าของ 17 พ.ย. 2569)\nสิทธิ์เดียวกับการสั่งโพสต์ (`matching-job-postings`) · ตัวรูปเปิดที่ /api/public/post-image?id= (ให้บอท So Scraping ดาวน์โหลด)",
+  "query": [],
+  "body": [
+   "js",
+   "job_id",
+   "data"
+  ],
+  "reachesPeople": false
+ },
+ {
   "path": "/api/public-click-stats",
   "file": "api/_handlers/public-click-stats.ts",
   "methods": [
@@ -1812,6 +1828,19 @@ export const API_CATALOG: ApiCatalogEntry[] = [
    "js"
   ],
   "reachesPeople": true
+ },
+ {
+  "path": "/api/public/post-image",
+  "file": "api/_handlers/public/post-image.ts",
+  "methods": [
+   "GET"
+  ],
+  "doc": "GET /api/public/post-image?id=<uuid> — ตัวรูปแนบโพสต์ (ไม่ต้องล็อกอิน · เจ้าของ 17 พ.ย. 2569)\nบอท So Scraping ดาวน์โหลดตอนโพสต์ลงกลุ่ม · รหัสสุ่มเดาไม่ได้ · รูปไม่เปลี่ยนจึงเก็บแคชได้ยาว",
+  "query": [
+   "id"
+  ],
+  "body": [],
+  "reachesPeople": false
  },
  {
   "path": "/api/public/privacy-request",
@@ -2141,8 +2170,9 @@ export const API_CATALOG: ApiCatalogEntry[] = [
    "GET",
    "POST"
   ],
-  "doc": "/api/scrap-candidates — รายชื่อจาก Scrap (So Scraping) ของใบขอ (เจ้าของ 17 พ.ย. 2569 · ตรรกะ `api/_lib/scrapCandidates.ts`)\nGET ?job=<job id หรือเลขใบขอ> → รายชื่อของใบนั้น (แท็บ Scrap ในหน้าใบขอ)\nGET ?all=1                    → ทุกใบที่เห็นได้ (แท็บผู้สมัคร ▾ Scrap ของหน้างานสรรหา)\nPOST { action: 'to_contact', job_id, candidate_ids } → สร้าง/ใช้ใบสมัครเดิม แล้วเก็บเข้าการติดต่อ (Lead) ของคนกด\nสิทธิ์ resource เดียวกับผู้สมัคร (`job-applications`) · ผู้ใช้ที่ล็อก BU เห็นเฉพาะใบขอใน BU ตัวเอง (`loadScopedJobIdSet`)\nAI ไม่โทรเอง: ใบสร้างในชื่อ So Scraping + เป็น Lead — ตัวส่งอัตโนมัติข้ามทั้งสองแบบ",
+  "doc": "/api/scrap-candidates — รายชื่อจาก Scrap (So Scraping) ของใบขอ (เจ้าของ 17 พ.ย. 2569 · ตรรกะ `api/_lib/scrapCandidates.ts`)\nGET ?job=<job id หรือเลขใบขอ> → รายชื่อของใบนั้น (แท็บ Scrap ในหน้าใบขอ)\nGET ?all=1                    → ทุกใบที่เห็นได้ (แท็บผู้สมัคร ▾ Scrap ของหน้างานสรรหา)\nGET ?counts=1                 → ยอดต่อเลขใบขอ (คอลัมน์ Scrap ของตารางใบขอ · 17 พ.ย. 2569)\nPOST { action: 'to_contact', job_id, candidate_ids } → สร้าง/ใช้ใบสมัครเดิม แล้วเก็บเข้าการติดต่อ (Lead) ของคนกด\nสิทธิ์ resource เดียวกับผู้สมัคร (`job-applications`) · ผู้ใช้ที่ล็อก BU เห็นเฉพาะใบขอใน BU ตัวเอง (`loadScopedJobIdSet`)\nAI ไม่โทรเอง: ใบสร้างในชื่อ So Scraping + เป็น Lead — ตัวส่งอัตโนมัติข้ามทั้งสองแบบ",
   "query": [
+   "counts",
    "all",
    "job"
   ],
