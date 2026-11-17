@@ -280,10 +280,6 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
           <h3 className="text-sm font-medium">ใครต้องทำอะไร</h3>
           {eq ? <StuckTodoTable rows={openRows} onPick={(title, rows) => openRequests(title, rows)} /> : <Skeleton className="h-32 rounded-xl" />}
         </section>
-        <section className="min-w-0 space-y-2 border-t pt-4" data-testid="v2-area">
-          <h3 className="text-sm font-medium">งานที่ยังขาดคน · แยกจังหวัด / อำเภอ</h3>
-          {eq ? <StuckAreaTable bare rows={openRows.filter((r) => (r.remaining ?? 0) > 0)} onPick={(title, rows) => openRequests(title, rows)} /> : <Skeleton className="h-32 rounded-xl" />}
-        </section>
       </Card>
 
       {/* ── การประกาศรับสมัคร ── */}
@@ -442,6 +438,12 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
             <Pager {...workPg} onPage={setWorkPage} />
           </section>
         </div>
+      </Card>
+
+      {/* งานที่ยังขาดคน ย้ายลงล่างสุด (เจ้าของ 17 พ.ย. 2569 "เอาไปไว้ด้านล่างเถอะตรงนี้เกะกะ") */}
+      <Card className="min-w-0 space-y-3 rounded-2xl p-5" data-testid="v2-area">
+        <SectionTitle title="งานที่ยังขาดคน" right="ใบขอที่ยังเหลือหา แยกจังหวัด / อำเภอ" />
+        {eq ? <StuckAreaTable bare rows={openRows.filter((r) => (r.remaining ?? 0) > 0)} onPick={(title, rows) => openRequests(title, rows)} /> : <Skeleton className="h-32 rounded-xl" />}
       </Card>
 
       <div className="flex justify-end">

@@ -48,34 +48,35 @@ export default function StuckTodoTable({ rows, onPick }: { rows: readonly StuckR
         <TableHeader>
           <TableRow>
             <TableHead className="text-xs">เจ้าหน้าที่</TableHead>
+            {/* ใบค้างทั้งหมดอยู่ติดชื่อ — อ่านซ้ายไปขวาเห็นยอดรวมก่อน แล้วค่อยแยกขั้น (เจ้าของ 17 พ.ย. 2569 "คิวมี 22 งานหรือมีกี่งาน งง") */}
+            <TableHead className="whitespace-nowrap text-right text-xs">ใบค้างทั้งหมด</TableHead>
             {STUCK_TODO_COLUMNS.map((c) => (
               <TableHead key={c.key} className="whitespace-nowrap text-right text-xs">
                 {c.label}
               </TableHead>
             ))}
-            <TableHead className="text-right text-xs">รวม</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {owners.map((o) => (
             <TableRow key={o.owner}>
               <TableCell className="whitespace-nowrap text-sm">{o.owner}</TableCell>
+              <TableCell className="border-r text-right text-sm tabular-nums">{cell(o.owner, 'ใบค้างทั้งหมด', null, STUCK_TODO_COLUMNS.flatMap((c) => o.cells[c.key]), true)}</TableCell>
               {STUCK_TODO_COLUMNS.map((c) => (
                 <TableCell key={c.key} className="text-right text-sm tabular-nums">
                   {cell(o.owner, c.label, c.peopleLabel, o.cells[c.key], false)}
                 </TableCell>
               ))}
-              <TableCell className="text-right text-sm tabular-nums">{fmt(o.total)} ใบ</TableCell>
             </TableRow>
           ))}
           <TableRow>
             <TableCell className="text-sm font-medium">รวม</TableCell>
+            <TableCell className="border-r text-right text-sm font-medium tabular-nums">{cell('ทุกคน', 'ใบค้างทั้งหมด', null, [...rows], true)}</TableCell>
             {STUCK_TODO_COLUMNS.map((c) => (
               <TableCell key={c.key} className="text-right text-sm font-medium tabular-nums">
                 {cell('ทุกคน', c.label, c.peopleLabel, totals[c.key], true)}
               </TableCell>
             ))}
-            <TableCell className="text-right text-sm font-medium tabular-nums">{fmt(rows.length)} ใบ</TableCell>
           </TableRow>
         </TableBody>
       </Table>
