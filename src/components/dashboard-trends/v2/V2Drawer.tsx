@@ -211,7 +211,23 @@ function AudienceSummary({ facts, onView }: { facts: readonly RecruitAppFact[]; 
   );
 }
 
-function AudiencePane({ pane, model, bus, push, replace }: { pane: Extract<V2Pane, { kind: 'audience' }>; model: V2Model; bus: readonly string[]; push: (p: V2Pane) => void; replace: (p: V2Pane) => void }) {
+/** ตารางกลุ่มผู้สมัคร (อายุ · จังหวัดที่อยู่ · ช่องทาง) × 5 ยอด — ใช้ทั้งในแผงข้างและกางบนหน้า (`RecruitOverviewV2`) */
+export function AudiencePane({
+  pane,
+  model,
+  bus,
+  push,
+  replace,
+  compact = false,
+}: {
+  pane: Extract<V2Pane, { kind: 'audience' }>;
+  model: V2Model;
+  bus: readonly string[];
+  push: (p: V2Pane) => void;
+  replace: (p: V2Pane) => void;
+  /** กางบนหน้า — ไม่ซ้ำยอดรวม/กราฟเทียบ BU ที่หน้ามีแล้ว · เหลือตัวเลือก + ตาราง */
+  compact?: boolean;
+}) {
   const facts = applyAudience(model.cohort, pane.filter, model.sets);
   const cmp = buCompare(facts, pane.filter.bu ? [pane.filter.bu] : bus, pane.measure, pane.display, model.sets);
   const rate = pane.display === 'rate';
@@ -224,7 +240,7 @@ function AudiencePane({ pane, model, bus, push, replace }: { pane: Extract<V2Pan
     <>
       <div className="flex flex-wrap gap-3" data-testid="v2-audience-controls">
         <label className="space-y-1 text-xs">
-          <span className={DASH.sub}>ดูผลและเทียบ BU</span>
+          <span className={DASH.sub}>{compact ? 'เรียงตาม' : 'ดูผลและเทียบ BU'}</span>
           <Select value={pane.measure} onValueChange={(v) => replace({ ...pane, measure: v as AudienceMeasure, page: 1 })}>
             <SelectTrigger className="h-9 w-44" aria-label="ยอดที่ใช้เปรียบเทียบ BU">
               <SelectValue />
@@ -251,6 +267,8 @@ function AudiencePane({ pane, model, bus, push, replace }: { pane: Extract<V2Pan
           </Select>
         </label>
       </div>
+      {compact ? null : (
+      <>
       <div className="flex items-baseline justify-between">
         <span className={cn('text-sm', DASH.muted)}>รวมทั้งหมด</span>
         <span className="text-3xl font-medium tabular-nums" data-testid="v2-audience-total">
@@ -273,6 +291,8 @@ function AudiencePane({ pane, model, bus, push, replace }: { pane: Extract<V2Pan
         </p>
       </section>
       <AudienceSummary facts={facts} onView={(v) => push({ ...pane, view: v, page: 1 })} />
+      </>
+      )}
       {view === 'records' ? (
         <NamesList ids={facts.map((f) => f.id ?? '')} page={pane.page} onPage={(page) => replace({ ...pane, page })} model={model} />
       ) : (
@@ -341,7 +361,7 @@ function AudiencePane({ pane, model, bus, push, replace }: { pane: Extract<V2Pan
           </div>
           <Pager {...pg} onPage={(page) => replace({ ...pane, page })} testId="v2-audience-pager" />
           <p className={cn('text-xs', DASH.sub)}>
-            เรียงตาม{AUDIENCE_MEASURE_LABEL[pane.measure]} {rate ? '%' : 'จำนวน'}มากไปน้อย · % แต่ละช่อง = ผลนั้น / รายการสมัครของแถวนั้น · สนใจ = ผลหลัง AI โทร · ERP = จับคู่เบอร์และใบขอ
+            เรียงตาม{AUDIENCE_MEASURE_LABEL[pane.measure]} {rate ? '%' : 'จำนวน'}มากไปน้อย · % แต่ละช่อง = ผลนั้น / รายการสมัครของแถวนั้น · สนใจ = ผลหลัง AI โทร · ERP = เบอร์ที่ถูกแจ้งเข้าปีนี้
           </p>
         </section>
       )}

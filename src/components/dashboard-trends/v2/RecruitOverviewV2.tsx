@@ -32,7 +32,7 @@ import StuckFilterBar from '../stuck/StuckFilterBar';
 import StuckTodoTable from '../stuck/StuckTodoTable';
 import StuckAreaTable from '../stuck/StuckAreaTable';
 import CallerResultsTable from '../stuck/CallerResultsTable';
-import V2Drawer, { type V2Pane } from './V2Drawer';
+import V2Drawer, { AudiencePane, type V2Pane } from './V2Drawer';
 import { BuBars, Kpi, Pager, SectionTitle, TrendBars, fmt, fmtPct } from './V2Parts';
 import { BRINGER_UNKNOWN, V2_METRICS, V2_METRIC_LABEL, buildV2Model, bringerOf, holderOf, type V2Metric } from './v2Model';
 
@@ -73,6 +73,10 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
   const [chPage, setChPage] = React.useState(1);
   const [workPage, setWorkPage] = React.useState(1);
   const [clickPage, setClickPage] = React.useState(1);
+  type AudienceState = Extract<V2Pane, { kind: 'audience' }>;
+  const audienceStart = (view: 'home' | 'age', title: string): AudienceState => ({ kind: 'audience', view, filter: { dims: {}, results: [] }, measure: 'apps', display: 'count', page: 1, title });
+  const [homePane, setHomePane] = React.useState<AudienceState>(() => audienceStart('home', 'ผู้สมัครอยู่จังหวัดไหน'));
+  const [agePane, setAgePane] = React.useState<AudienceState>(() => audienceStart('age', 'อายุผู้สมัคร'));
   // เปลี่ยนวัน/BU = ล้างรายละเอียด + กลับหน้า 1 ทุกตาราง (ห้ามค้างข้อมูลช่วงเดิม)
   React.useEffect(() => {
     setStack([]);
@@ -81,6 +85,8 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
     setChPage(1);
     setWorkPage(1);
     setClickPage(1);
+    setHomePane((p) => ({ ...p, page: 1 }));
+    setAgePane((p) => ({ ...p, page: 1 }));
   }, [viewKey]);
 
   // ใบขอ + การประกาศ (เส้นเดิม) — ทิ้งคำตอบที่ไม่ใช่ตัวกรองปัจจุบัน
@@ -624,17 +630,27 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
             </Table>
           </div>
           <Pager {...workPg} onPage={setWorkPage} />
-          <div className="flex flex-wrap gap-2 border-t pt-3">
-            <Button type="button" size="sm" variant="outline" onClick={() => push({ kind: 'audience', view: 'home', filter: { dims: {}, results: [] }, measure: 'apps', display: 'count', page: 1, title: 'ผู้สมัครอยู่จังหวัดไหน' })}>
-              ผู้สมัครอยู่จังหวัดไหน
-            </Button>
-            <Button type="button" size="sm" variant="outline" disabled={!eq} onClick={() => push({ kind: 'embed', title: 'งานที่ยังขาดคน', embed: 'area' })}>
-              งานที่ยังขาดคน
-            </Button>
-            <Button type="button" size="sm" variant="outline" onClick={() => push({ kind: 'audience', view: 'age', filter: { dims: {}, results: [] }, measure: 'apps', display: 'count', page: 1, title: 'อายุผู้สมัคร' })} data-testid="v2-age">
-              อายุผู้สมัคร · เฉลี่ย {age.average === null ? '—' : age.average.toFixed(1)} ปี
-            </Button>
-          </div>
+        </Card>
+      </div>
+
+      {/* ── กางไว้บนหน้า (เจ้าของ 17 พ.ย. 2569 "ทำไมไม่กางไว้เอามาซ่อนไว้ทำไม") — ตัวเดียวกับแผงข้าง กดลงลึกค่อยเปิดแผงข้าง ── */}
+      <Card className="min-w-0 space-y-3 rounded-2xl p-5" data-testid="v2-area">
+        <SectionTitle title="งานที่ยังขาดคน" right="ใบขอที่ยังเหลือหา แยกจังหวัด / อำเภอ" />
+        {eq ? (
+          <StuckAreaTable bare rows={openRows.filter((r) => (r.remaining ?? 0) > 0)} onPick={(title, rows) => openRequests(title, rows)} />
+        ) : (
+          <Skeleton className="h-40 rounded-xl" />
+        )}
+      </Card>
+
+      <div className="grid gap-6 xl:grid-cols-2">
+        <Card className="min-w-0 space-y-4 rounded-2xl p-5" data-testid="v2-home">
+          <SectionTitle title="ผู้สมัครอยู่จังหวัดไหน" right="จังหวัดที่ผู้สมัครกรอก" />
+          <AudiencePane compact pane={homePane} model={model} bus={bus} push={push} replace={(p) => p.kind === 'audience' && setHomePane(p)} />
+        </Card>
+        <Card className="min-w-0 space-y-4 rounded-2xl p-5" data-testid="v2-age">
+          <SectionTitle title="อายุผู้สมัคร" right={`เฉลี่ย ${age.average === null ? '—' : age.average.toFixed(1)} ปี · จาก ${fmt(age.known)} รายการที่มีอายุ`} />
+          <AudiencePane compact pane={agePane} model={model} bus={bus} push={push} replace={(p) => p.kind === 'audience' && setAgePane(p)} />
         </Card>
       </div>
 

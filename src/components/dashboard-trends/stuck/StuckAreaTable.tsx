@@ -18,11 +18,14 @@ export default function StuckAreaTable({
   onPick,
   title = 'พื้นที่ที่เหลือหา',
   countLabel = 'ใบที่ต้องหา',
+  bare = false,
 }: {
   rows: readonly StuckRequest[];
   onPick: (title: string, list: StuckRequest[]) => void;
   title?: string;
   countLabel?: string;
+  /** ไม่ห่อการ์ด — ผู้เรียกวางในการ์ดของตัวเอง (ภาพรวม v2 กางไว้บนหน้า · 17 พ.ย. 2569) */
+  bare?: boolean;
 }) {
   const places = React.useMemo(() => stuckByPlace(rows), [rows]);
   const [open, setOpen] = React.useState<Set<string>>(() => new Set());
@@ -65,8 +68,7 @@ export default function StuckAreaTable({
       ))}
     </TableRow>
   );
-  return (
-    <OverviewCard icon={MapPin} title={title}>
+  const body = (
       <div className="overflow-x-auto" data-testid="stuck-area">
         <Table className="min-w-[48rem]">
           <TableHeader>
@@ -99,6 +101,10 @@ export default function StuckAreaTable({
           </TableBody>
         </Table>
       </div>
+  );
+  return bare ? body : (
+    <OverviewCard icon={MapPin} title={title}>
+      {body}
     </OverviewCard>
   );
 }
