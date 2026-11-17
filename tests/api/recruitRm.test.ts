@@ -110,11 +110,14 @@ describe('แท็บ = สถานะใบสมัคร (ข้อมู�
     expect(rows.filter((r) => isInContactChip(r, 'all'))).toHaveLength(4);
   });
 
-  it('🔴 นัดไม่สำเร็จ (ติดต่อได้ + เหตุผล) = ไม่สำเร็จ ไม่ใช่สำเร็จ (เจ้าของ 14 ต.ค. 2569)', () => {
+  it('🔴 นัดไม่สำเร็จ (ติดต่อได้ + เหตุผล) = ติดต่อได้ ไม่ใช่ติดต่อไม่ได้ (เจ้าของ 17 พ.ย. 2569 เคสแบงค์ · แทนกติกา 14 ต.ค.)', () => {
     const apptFailed = { last_contact_ok: true, last_appointment_failed: true };
     const booked = { last_contact_ok: true };
-    expect(isInContactChip(apptFailed, 'ok')).toBe(false);
-    expect(isInContactChip(apptFailed, 'fail')).toBe(true);
+    const unreached = { last_contact_ok: false };
+    expect(isInContactChip(apptFailed, 'ok')).toBe(true);
+    expect(isInContactChip(apptFailed, 'fail')).toBe(false);
+    expect(isInContactChip(unreached, 'fail')).toBe(true);
+    expect(isInContactChip(unreached, 'ok')).toBe(false);
     expect(isInContactChip(apptFailed, 'called')).toBe(true);
     expect(isInContactChip(booked, 'ok')).toBe(true);
     expect(isInContactChip(booked, 'fail')).toBe(false);

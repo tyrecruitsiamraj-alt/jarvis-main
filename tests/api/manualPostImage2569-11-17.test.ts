@@ -15,7 +15,12 @@ describe('โพสต์เองพร้อมรูป (17 พ.ย. 2569)', 
 
   it('ป๊อปโพสต์เองมีรูปทั้งตอนเลือกและหลังเตรียมโพสต์ · Autopost หยิบรูปล่าสุดของใบขอ', () => {
     const panel = readFileSync('src/components/jobs/ManualPostPanel.tsx', 'utf8');
-    expect(panel.match(/<PostImageField job=\{job\} \/>/g)?.length).toBe(2);
+    expect(panel.match(/<PostImageField job=\{job\} attach=\{attachImage\} onAttachChange=\{setAttachImage\} \/>/g)?.length).toBe(2);
+    // เลือกก่อน ไม่แนบรูป/แนบรูป (17 พ.ย. 2569) · ค่าเริ่ม ไม่แนบ
+    expect(panel).toContain('React.useState(false)');
+    const field = readFileSync('src/components/jobs/PostImageField.tsx', 'utf8');
+    expect(field).toContain("'ไม่แนบรูป'");
+    expect(field).toMatch(/\{attach \? \(/);
     const auto = readFileSync('src/components/jobs/AutopostDialog.tsx', 'utf8');
     expect(auto).toContain('fetchLatestPostImage(job.id)');
   });

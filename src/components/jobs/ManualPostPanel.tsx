@@ -50,6 +50,8 @@ export default function ManualPostPanel({ job, onChanged }: { job: JobRequest; o
    * (`post_caption` ของใบขอ) แก้ที่ไหนก็ใช้ทั้งสองทาง · แก้แล้วบันทึกเองหลังหยุดพิมพ์ · ไม่แก้ = ข้อความที่ระบบร่าง
    */
   const lineId = useBuLineId(jobBuOf(job));
+  /** แนบรูปไหม — เลือกก่อน (ค่าเริ่ม ไม่แนบ · 17 พ.ย. 2569) · ถือไว้ที่นี่ ตอนเลือกกับหลังเตรียมโพสต์จึงตรงกัน */
+  const [attachImage, setAttachImage] = React.useState(false);
   const draft = React.useMemo(() => buildAutopostCaption(job, { contact, link: AUTOPOST_LINK_PLACEHOLDER, lineId }), [job, contact, lineId]);
   const saved = job.public_post_text?.trim() || null;
   const [caption, setCaption] = React.useState(saved ?? '');
@@ -199,7 +201,7 @@ export default function ManualPostPanel({ job, onChanged }: { job: JobRequest; o
             เลือกใหม่
           </Button>
         </div>
-        <PostImageField job={job} />
+        <PostImageField job={job} attach={attachImage} onAttachChange={setAttachImage} />
         <ul className="divide-y divide-border rounded-xl border border-border">
           {rows.map((r) => {
             const done = copied.has(r.key);
@@ -306,7 +308,7 @@ export default function ManualPostPanel({ job, onChanged }: { job: JobRequest; o
           </span>
         </p>
       </section>
-      <PostImageField job={job} />
+      <PostImageField job={job} attach={attachImage} onAttachChange={setAttachImage} />
       {error ? <p className={cn('text-sm', TONE.danger.value)}>{error}</p> : null}
       <Button
         type="button"

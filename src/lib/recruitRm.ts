@@ -373,10 +373,11 @@ export function isInContactChip(
   chip: ContactChip,
 ): boolean {
   if (chip === 'all') return true;
-  // 🔴 14 ต.ค. 2569 เจ้าของ: "2 คนล่างนัดไม่สำเร็จแต่ขึ้นสำเร็จ" — นัดไม่สำเร็จเก็บเป็น ok=true + เหตุผล (`last_appointment_failed`)
-  //    ⇒ สำเร็จ = ติดต่อได้และไม่ใช่นัดไม่สำเร็จ · ไม่สำเร็จ = ติดต่อไม่ได้ หรือ นัดไม่สำเร็จ (ตรงกับขั้นใน `applicantProcess.ts`)
-  if (chip === 'ok') return r.last_contact_ok === true && r.last_appointment_failed !== true;
-  if (chip === 'fail') return r.last_contact_ok === false || (r.last_contact_ok === true && r.last_appointment_failed === true);
+  // 🔴 17 พ.ย. 2569 เจ้าของ (เคสแบงค์ "ติดต่อได้ นัดไม่ได้ ดันไปอยู่ที่ติดต่อไม่ได้") · Choice "นับเป็นติดต่อได้"
+  //    ชิปเปลี่ยนคำเป็น ติดต่อได้/ติดต่อไม่ได้ ตั้งแต่ 31 ต.ค. — นัดไม่สำเร็จ = คุยถึงตัวแล้ว ⇒ ติดต่อได้ · ติดต่อไม่ได้ = คุยไม่ถึงตัวเท่านั้น
+  //    (14 ต.ค. เคยนับนัดไม่สำเร็จเป็น "ไม่สำเร็จ" ตอนชิปชื่อ สำเร็จ/ไม่สำเร็จ — ยกเลิกแล้ว)
+  if (chip === 'ok') return r.last_contact_ok === true;
+  if (chip === 'fail') return r.last_contact_ok === false;
   return chip === 'called' ? isContactCalledByStaff(r) : !isContactCalledByStaff(r);
 }
 
