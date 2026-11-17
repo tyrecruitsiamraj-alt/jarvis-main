@@ -41,6 +41,8 @@ export type QuizSetContent = {
   passScore: number;
   /** เกณฑ์เกรดของชุด (17 พ.ย. 2569 เจ้าของตั้งเองต่อชุด) — ไม่มี = 85/70/60 · ผลที่ทำไปแล้วใช้ค่าตอนทำ */
   grades?: QuizGrades;
+  /** ความรู้/หลักคิดของผู้เชี่ยวชาญที่ให้ AI ใช้ตอนร่างผลวิเคราะห์ (เจ้าของ 17 พ.ย. 2569 "เพิ่ม Skill ให้ทีผ่านหน้า ui") · ไม่มี = บทบาทหัวหน้าช่างทั่วไป */
+  aiSkill?: string;
   skills: QuizSkill[];
   questions: QuizQuestion[];
 };
@@ -55,6 +57,7 @@ export type QuizAnswers = Record<string, number>;
 export const QUIZ_DEFAULT_HEADER = 'SO PEOPLE | TECHNICAL SKILL HEALTH CHECK';
 export const QUIZ_DEFAULT_PASS = 70;
 export const QUIZ_DEFAULT_GRADES: QuizGrades = { a: 85, b: 70, c: 60 };
+export const QUIZ_AI_SKILL_MAX = 20_000;
 export const QUIZ_MAX_QUESTIONS = 200;
 export const QUIZ_MAX_CHOICES = 8;
 
@@ -104,6 +107,8 @@ export function parseQuizSetInput(raw: unknown): { ok: true; value: QuizSetConte
   if (!Number.isFinite(passScore) || passScore < 1 || passScore > 100) return { ok: false, message: 'เกณฑ์ผ่านต้องอยู่ระหว่าง 1–100' };
   const grades = parseQuizGrades(o.grades);
   if ('message' in grades) return { ok: false, message: grades.message };
+  const aiSkill = typeof o.aiSkill === 'string' ? o.aiSkill.trim() : '';
+  if (aiSkill.length > QUIZ_AI_SKILL_MAX) return { ok: false, message: `Skill ของ AI ยาวเกิน ${QUIZ_AI_SKILL_MAX.toLocaleString('th-TH')} ตัวอักษร` };
   const skillsRaw = Array.isArray(o.skills) ? o.skills : [];
   const skills: QuizSkill[] = [];
   for (const s of skillsRaw) {
@@ -150,7 +155,7 @@ export function parseQuizSetInput(raw: unknown): { ok: true; value: QuizSetConte
   if (unused) return { ok: false, message: `ทักษะ "${unused.name}" ยังไม่มีข้อ` };
   return {
     ok: true,
-    value: { title, roleLabel: clean(o.roleLabel, 200), headerLine: clean(o.headerLine, 120) || QUIZ_DEFAULT_HEADER, passScore, grades: grades.value, skills, questions },
+    value: { title, roleLabel: clean(o.roleLabel, 200), headerLine: clean(o.headerLine, 120) || QUIZ_DEFAULT_HEADER, passScore, grades: grades.value, ...(aiSkill ? { aiSkill } : {}), skills, questions },
   };
 }
 
@@ -231,6 +236,25 @@ export function quizAttemptStatus(a: { submitted_at: string | null; reviewed_at:
 /** เลขที่เอกสาร SO-TECH-00125 */
 export function quizDocNo(seq: number): string {
   return `SO-TECH-${String(seq).padStart(5, '0')}`;
+}
+
+/**
+ * บทบาทของ AI ตอนร่างผลวิเคราะห์ — มี Skill ของชุด = ใช้เป็นความรู้/มุมมอง แต่รูปแบบคำตอบยังเป็น JSON 3 ช่องเสมอ
+ * (Skill ที่วางมามักมีรูปแบบคำตอบของตัวเอง เช่น 18 หัวข้อ — ห้ามให้มันทับ ไม่งั้นอ่านคำตอบไม่ได้)
+ */
+export function buildQuizAiSystem(aiSkill?: string | null): string {
+  const base = 'คุณเป็นหัวหน้าช่างที่ประเมินผลแบบทดสอบของพนักงาน ตอบเป็น JSON ตามที่ขอเท่านั้น';
+  const skill = (aiSkill ?? '').trim();
+  if (!skill) return base;
+  return [
+    base,
+    '',
+    'ใช้ความรู้และหลักคิดของผู้เชี่ยวชาญด้านล่างเป็นมุมมองตอนประเมินว่าพนักงานเข้าใจงานแค่ไหน ควรฝึกอะไร และควรมอบหมายงานแบบไหน',
+    'รูปแบบคำตอบในความรู้นี้ไม่ต้องใช้ ตอบเป็น JSON 3 ช่องตามที่ขอเท่านั้น',
+    '--- ความรู้ของผู้เชี่ยวชาญ ---',
+    skill,
+    '--- จบความรู้ ---',
+  ].join('\n');
 }
 
 /** ข้อความให้ AI — ไม่มีชื่อพนักงาน (ข้อมูลออกไปนอกเครื่องได้ถ้าตั้งเป็นเจ้าภายนอก) */

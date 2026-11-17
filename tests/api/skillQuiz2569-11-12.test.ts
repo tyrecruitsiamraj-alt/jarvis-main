@@ -12,6 +12,7 @@ import {
   quizAttemptStatus,
   quizDocNo,
   parseQuizGrades,
+  buildQuizAiSystem,
   quizGrade,
   quizSkillTone,
   scoreQuiz,
@@ -120,5 +121,14 @@ describe('เกรดตั้งต่อชุด (17 พ.ย. 2569)', () => 
     expect(parseQuizGrades({ a: 80, b: 80, c: 60 }).ok).toBe(false);
     expect(parseQuizGrades({ a: 101, b: 70, c: 60 }).ok).toBe(false);
     expect(parseQuizGrades({ a: '90', b: 75, c: 55 })).toEqual({ ok: true, value: { a: 90, b: 75, c: 55 } });
+  });
+});
+
+describe('Skill ของ AI ต่อชุด (17 พ.ย. 2569)', () => {
+  it('ไม่มี Skill = บทบาทเดิม · มี Skill = ใส่เป็นความรู้ แต่ยังสั่งตอบ JSON 3 ช่อง', () => {
+    expect(buildQuizAiSystem(undefined)).toBe('คุณเป็นหัวหน้าช่างที่ประเมินผลแบบทดสอบของพนักงาน ตอบเป็น JSON ตามที่ขอเท่านั้น');
+    const sys = buildQuizAiSystem('คุณคือผู้เชี่ยวชาญด้านวิศวกรรมอาคาร\n## รูปแบบคำตอบ\n1. Executive Summary');
+    expect(sys).toContain('คุณคือผู้เชี่ยวชาญด้านวิศวกรรมอาคาร');
+    expect(sys).toContain('ตอบเป็น JSON 3 ช่องตามที่ขอเท่านั้น');
   });
 });

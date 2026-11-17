@@ -12,10 +12,13 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { TONE } from '@/lib/designTokens';
+import { cn } from '@/lib/utils';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
+  QUIZ_AI_SKILL_MAX,
   QUIZ_DEFAULT_GRADES,
   QUIZ_DEFAULT_HEADER,
   QUIZ_DEFAULT_PASS,
@@ -200,6 +203,20 @@ export default function QuizSetEditorDialog({ open, onOpenChange, setId, initial
           <div className="space-y-1.5 sm:col-span-2">
             <Label htmlFor="quiz-header">หัวรายงาน</Label>
             <Input id="quiz-header" value={c.headerLine} onChange={(e) => setC({ ...c, headerLine: e.target.value })} />
+          </div>
+          {/* Skill ของ AI (เจ้าของ 17 พ.ย. 2569) — AI ใช้ตอนร่างผลวิเคราะห์ของชุดนี้ · แก้แล้วกด "ให้ AI ร่างใหม่" ที่ใบผลได้เลย */}
+          <div className="space-y-1.5 sm:col-span-2">
+            <Label htmlFor="quiz-ai-skill">Skill ของ AI</Label>
+            <Textarea
+              id="quiz-ai-skill"
+              value={c.aiSkill ?? ''}
+              onChange={(e) => setC({ ...c, aiSkill: e.target.value })}
+              rows={6}
+              placeholder="วางความรู้และหลักคิดของผู้เชี่ยวชาญที่ให้ AI ใช้วิเคราะห์ผล"
+            />
+            <p className={cn('text-right text-xs tabular-nums', (c.aiSkill ?? '').length > QUIZ_AI_SKILL_MAX ? TONE.danger.value : 'text-muted-foreground')}>
+              {(c.aiSkill ?? '').length.toLocaleString('th-TH')}/{QUIZ_AI_SKILL_MAX.toLocaleString('th-TH')}
+            </p>
           </div>
         </div>
 

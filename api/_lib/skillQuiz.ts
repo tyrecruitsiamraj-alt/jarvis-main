@@ -13,6 +13,7 @@ import { aiChat, isAiConfigured } from './aiClient.js';
 import { logError } from './logger.js';
 import {
   buildQuizAiPrompt,
+  buildQuizAiSystem,
   parseQuizAiReply,
   quizDocNo,
   type QuizAnalysis,
@@ -264,7 +265,8 @@ export async function draftQuizWithAi(id: string, opts: { manual?: boolean } = {
     reply = await aiChat({
       task: 'skill_report',
       messages: [
-        { role: 'system', content: 'คุณเป็นหัวหน้าช่างที่ประเมินผลแบบทดสอบของพนักงาน ตอบเป็น JSON ตามที่ขอเท่านั้น' },
+        // Skill ของชุดตอนนี้ (แก้ที่ป๊อปชุดแล้วกดร่างใหม่ใช้ได้เลย) · ชุดถูกลบ = ของในใบผล
+        { role: 'system', content: buildQuizAiSystem((await getQuizSet(a.set_id))?.content.aiSkill ?? a.content.aiSkill) },
         { role: 'user', content: buildQuizAiPrompt(a.content, a.answers) },
       ],
       format: 'json',
