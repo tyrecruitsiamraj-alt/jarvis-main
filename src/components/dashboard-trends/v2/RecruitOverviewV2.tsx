@@ -20,11 +20,17 @@ import { stuckEquation, type StuckRequest } from '@/lib/recruitStuck';
 import { POSTING_STATES, POSTING_STATE_LABEL, isPostingStarted, postingStateOf } from '@/lib/recruitPostingState';
 import { fetchSoPostGroups } from '@/lib/soPostGroupsApi';
 import { fetchManualLinks } from '@/lib/jobPostActionsApi';
-import { requestPathOfJobId } from '@/lib/jobNavigation';
+import { legacyReportsPath, requestPathOfJobId } from '@/lib/jobNavigation';
+import { EMPTY_REQUEST_FILTER, filterRequestRows, isRequestFilterActive, jobFilterOf, requestFilterToParams, type RequestTabFilter } from '@/lib/recruitRequestTab';
+import { prevCohortOf } from '@/lib/recruitScale';
 import { friendlyErrorText } from '@/lib/friendlyError';
 import { AUDIENCE_MEASURE_LABEL, BU_UNKNOWN, ageStats, audienceRows, buOfFact, pageOf, bkkDay } from '@/lib/recruitAudience';
 import SoPostGroupsCard from '../stuck/SoPostGroupsCard';
 import SelfLinksPanel from '../topics/SelfLinksPanel';
+import StuckFilterBar from '../stuck/StuckFilterBar';
+import StuckTodoTable from '../stuck/StuckTodoTable';
+import StuckAreaTable from '../stuck/StuckAreaTable';
+import CallerResultsTable from '../stuck/CallerResultsTable';
 import V2Drawer, { type V2Pane } from './V2Drawer';
 import { BuBars, Kpi, Pager, SectionTitle, TrendBars, fmt, fmtPct } from './V2Parts';
 import { BRINGER_UNKNOWN, V2_METRICS, V2_METRIC_LABEL, buildV2Model, bringerOf, holderOf, type V2Metric } from './v2Model';
@@ -41,7 +47,6 @@ const BOOKER_UNKNOWN = 'ไม่ทราบผู้นัด';
 export default function RecruitOverviewV2({ data }: { data: RecruitOverviewResponse }) {
   const navigate = useNavigate();
   const win = data.window;
-  const model = React.useMemo(() => buildV2Model(data), [data]);
   /** BU ที่เทียบ — ล็อก BU เดียว = BU นั้นอย่างเดียว (ไม่ดึง BU นอกสิทธิ์มาเทียบ) */
   const bus = React.useMemo(() => {
     if (data.bu) return [data.bu];
@@ -51,6 +56,9 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
   const periodText = win.all ? 'ทั้งหมด' : win.from === win.to ? dayText(win.from) : `${dayText(win.from)} – ${dayText(win.to)}`;
   const buText = data.bu ?? 'ทุก BU';
   const filterKey = `${data.bu ?? 'all'}:${win.from}:${win.to}:${data.generatedAt}`;
+  /** ตัวกรองบนสุดชุดเดียวกับหน้าเดิม (เจ้าหน้าที่ · ประเภทงาน · งานย่อย · Code Site · จังหวัด · อำเภอ · ตำบล) — คุมใบขอ + รายชื่อทุกส่วน */
+  const [reqFilter, setReqFilter] = React.useState<RequestTabFilter>(EMPTY_REQUEST_FILTER);
+  const viewKey = `${filterKey}:${JSON.stringify(reqFilter)}`;
 
   const [stack, setStack] = React.useState<V2Pane[]>([]);
   const [metric, setMetric] = React.useState<V2Metric>('apps');
@@ -69,7 +77,7 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
     setChPage(1);
     setWorkPage(1);
     setClickPage(1);
-  }, [filterKey]);
+  }, [viewKey]);
 
   // ใบขอ + การประกาศ (เส้นเดิม) — ทิ้งคำตอบที่ไม่ใช่ตัวกรองปัจจุบัน
   const [stuck, setStuck] = React.useState<{ key: string; data: RecruitStuckResponse | null; error: string | null }>({ key: '', data: null, error: null });
@@ -90,7 +98,23 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
       alive = false;
     };
   }, [filterKey, data.bu, win.from, win.to]);
-  const reqRows = stuck.key === filterKey ? stuck.data?.requests ?? null : null;
+  const allRows = stuck.key === filterKey ? stuck.data?.requests ?? null : null;
+  const reqRows = React.useMemo(() => (allRows ? (filterRequestRows(allRows, reqFilter) as StuckRequest[]) : null), [allRows, reqFilter]);
+  const filterOn = isRequestFilterActive(reqFilter);
+  // รายชื่อตามตัวกรองบนสุด — ตัวตัดสินเดียวกับหน้าเดิม (`jobFilterOf`) · รายชื่อที่ไม่ผูกใบขอหลุดตอนกรอง (ตั้งใจ เหมือนหน้าเดิม)
+  const keep = React.useMemo(() => {
+    if (!filterOn || !reqRows) return undefined;
+    const ok = jobFilterOf(reqFilter, reqRows, (jobId) => data.appJobs?.[jobId]?.recruiter ?? null);
+    return (f: { jobId?: string | null }) => ok(f.jobId ?? null);
+  }, [filterOn, reqFilter, reqRows, data.appJobs]);
+  const model = React.useMemo(() => buildV2Model(data, keep), [data, keep]);
+  /** ช่วงก่อน (ช่วงวันเท่ากัน · ตัวกรองชุดเดียวกัน) — เทียบไม่ได้ = null */
+  const prevModel = React.useMemo(() => {
+    const prev = prevCohortOf(data.apps ?? [], win, data.firstDay, data.generatedAt);
+    return prev ? buildV2Model(data, keep, prev) : null;
+  }, [data, win, keep]);
+  const prevOf = (m: V2Metric): number | null => (prevModel ? (prevModel.stages[m].ids?.length ?? null) : null);
+  const appRecruiters = React.useMemo(() => Object.values(data.appJobs ?? {}).map((j) => j.recruiter), [data.appJobs]);
   const eq = reqRows ? stuckEquation(reqRows) : null;
   const openRows = eq?.remaining ?? [];
   const started = openRows.filter(isPostingStarted);
@@ -268,6 +292,21 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
         </p>
       </div>
     ),
+    todo: <StuckTodoTable rows={openRows} onPick={(title, rows) => setStack((cur) => [...cur, { kind: 'requests', title, rows, page: 1 }])} />,
+    area: (
+      <StuckAreaTable
+        rows={openRows.filter((r) => (r.remaining ?? 0) > 0)}
+        title="งานที่ยังขาดคน"
+        onPick={(title, rows) => setStack((cur) => [...cur, { kind: 'requests', title, rows, page: 1 }])}
+      />
+    ),
+    callers: (
+      <CallerResultsTable
+        cohort={model.cohort}
+        prev={prevModel?.cohort ?? null}
+        onOpen={(title, ids) => setStack((cur) => [...cur, { kind: 'names', title, ids: [...ids], page: 1 }])}
+      />
+    ),
     posts: <SoPostGroupsCard from={win.from} to={win.to} bu={data.bu} title="Autopost · รายการโพสต์" />,
     self: links.rows ? <SelfLinksPanel rows={links.rows} onOpenRequest={(jobId) => navigate(requestPathOfJobId(jobId))} /> : <Skeleton className="h-40 rounded-xl" />,
   };
@@ -275,9 +314,10 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
   const loadingReq = stuck.key !== filterKey;
   return (
     <div className="space-y-6" data-testid="recruit-overview-v2">
+      <StuckFilterBar rows={allRows ?? []} appRecruiters={appRecruiters} value={reqFilter} onChange={setReqFilter} />
       {/* ── ใบขอ + รายชื่อรอติดต่อ | การประกาศรับสมัคร ── */}
       <Card className="grid gap-6 rounded-2xl p-5 lg:grid-cols-2">
-        <section className="space-y-4">
+        <section className="min-w-0 space-y-4">
           <SectionTitle title="ใบขอ" right="หน่วย: ใบ" />
           {stuck.error && stuck.key === filterKey ? <p className="text-sm text-destructive">{stuck.error}</p> : null}
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -285,6 +325,11 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
             <Kpi label="ใบขอใหม่" value={loadingReq ? undefined : eq ? eq.new.length : null} onClick={eq ? () => openRequests('ใบขอใหม่', eq.new) : undefined} />
             <Kpi label="ปิดใบขอ" value={loadingReq ? undefined : eq ? eq.filled.length : null} onClick={eq ? () => openRequests('ปิดใบขอ', eq.filled) : undefined} />
             <Kpi label="ยกเลิกใบขอ" value={loadingReq ? undefined : eq ? eq.cancelled.length : null} onClick={eq ? () => openRequests('ยกเลิกใบขอ', eq.cancelled) : undefined} tone="danger" />
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" size="sm" variant="outline" disabled={!eq} onClick={() => push({ kind: 'embed', title: 'ใครต้องทำอะไร', embed: 'todo' })}>
+              ใครต้องทำอะไร
+            </Button>
           </div>
           <p className={cn('text-xs', DASH.sub)}>
             ทั้งหมดในรายงานนี้ {fmt(reqRows?.length ?? null)} ใบ · สถานะ ณ {dayText(win.to)} · ใบขอใหม่นับตามวันคีย์ใน ERP
@@ -302,7 +347,7 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
             </div>
           </div>
         </section>
-        <section className="space-y-4">
+        <section className="min-w-0 space-y-4">
           <SectionTitle title="การประกาศรับสมัคร" />
           <div className="grid grid-cols-3 gap-3">
             <Kpi label="ยังไม่เริ่มหา" emphasis value={loadingReq ? undefined : eq ? notStarted.length : null} onClick={eq ? () => openRequests('ยังไม่เริ่มหา', notStarted) : undefined} />
@@ -331,7 +376,15 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
         {data.errors.apps ? <p className="text-sm text-destructive">{data.errors.apps}</p> : null}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-7">
           {V2_METRICS.map((m) => (
-            <Kpi key={m} label={V2_METRIC_LABEL[m]} value={model.stages[m].ids === null ? null : model.stages[m].ids?.length} active={metric === m} onClick={() => openMetric(m)} testId={`v2-kpi-${m}`} />
+            <Kpi
+              key={m}
+              label={V2_METRIC_LABEL[m]}
+              value={model.stages[m].ids === null ? null : model.stages[m].ids?.length}
+              prev={win.all ? undefined : prevOf(m)}
+              active={metric === m}
+              onClick={() => openMetric(m)}
+              testId={`v2-kpi-${m}`}
+            />
           ))}
         </div>
         <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm" data-testid="v2-equation">
@@ -415,7 +468,7 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
 
       {/* ── ผู้สมัครมาจากไหน | รายชื่ออยู่กับใคร ── */}
       <div className="grid gap-6 xl:grid-cols-2">
-        <Card className="space-y-3 rounded-2xl p-5" data-testid="v2-channels">
+        <Card className="min-w-0 space-y-3 rounded-2xl p-5" data-testid="v2-channels">
           <SectionTitle title="ผู้สมัครมาจากไหน" right="% นัดได้ / รายการสมัคร" />
           <div className="overflow-x-auto">
             <Table>
@@ -451,7 +504,7 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
           <p className={cn('text-xs', DASH.sub)}>เลือกช่องทางเพื่อดูช่องทางรอง กลุ่ม เพจ อายุ จังหวัด และรายชื่อ · ERP จับคู่จากเบอร์โทร</p>
         </Card>
 
-        <Card className="space-y-3 rounded-2xl p-5" data-testid="v2-holders">
+        <Card className="min-w-0 space-y-3 rounded-2xl p-5" data-testid="v2-holders">
           <SectionTitle
             title="รายชื่ออยู่กับใคร"
             right={
@@ -512,12 +565,17 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
             </Table>
           </div>
           <Pager {...holderPg} onPage={setHolderPage} />
+          <div className="border-t pt-3">
+            <Button type="button" size="sm" variant="outline" onClick={() => push({ kind: 'embed', title: 'ผลงานรายคน', embed: 'callers' })}>
+              ผลงานรายคน
+            </Button>
+          </div>
         </Card>
       </div>
 
       {/* ── เหตุผลที่ยังไม่ได้คน | คนสมัครงานที่ไหน ── */}
       <div className="grid gap-6 xl:grid-cols-2">
-        <Card className="space-y-3 rounded-2xl p-5" data-testid="v2-why">
+        <Card className="min-w-0 space-y-3 rounded-2xl p-5" data-testid="v2-why">
           <SectionTitle title="เหตุผลที่ยังไม่ได้คน" />
           <ul className="space-y-1">
             {model.why.map((p) => {
@@ -538,7 +596,7 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
           <p className={cn('text-xs', DASH.sub)}>ผู้สมัครคนเดียวอาจมีเหตุไม่สำเร็จหลายขั้น ยอดแต่ละแถวจึงรวมกันเป็นจำนวนคนไม่ได้</p>
         </Card>
 
-        <Card className="space-y-3 rounded-2xl p-5" data-testid="v2-work">
+        <Card className="min-w-0 space-y-3 rounded-2xl p-5" data-testid="v2-work">
           <SectionTitle title="คนสมัครงานที่ไหน" />
           <p className={cn('text-xs', DASH.sub)}>จังหวัดของงานที่เลือกสมัคร แยกจากจังหวัดที่ผู้สมัครอยู่</p>
           <div className="overflow-x-auto">
@@ -566,7 +624,7 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
             <Button type="button" size="sm" variant="outline" onClick={() => push({ kind: 'audience', view: 'home', filter: { dims: {}, results: [] }, measure: 'apps', display: 'count', page: 1, title: 'ผู้สมัครอยู่จังหวัดไหน' })}>
               ผู้สมัครอยู่จังหวัดไหน
             </Button>
-            <Button type="button" size="sm" variant="outline" disabled={!eq} onClick={() => eq && openRequests('งานที่ยังขาดคน', eq.remaining.filter((r) => r.remaining > 0))}>
+            <Button type="button" size="sm" variant="outline" disabled={!eq} onClick={() => push({ kind: 'embed', title: 'งานที่ยังขาดคน', embed: 'area' })}>
               งานที่ยังขาดคน
             </Button>
             <Button type="button" size="sm" variant="outline" onClick={() => push({ kind: 'audience', view: 'age', filter: { dims: {}, results: [] }, measure: 'apps', display: 'count', page: 1, title: 'อายุผู้สมัคร' })} data-testid="v2-age">
@@ -574,6 +632,19 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
             </Button>
           </div>
         </Card>
+      </div>
+
+      <div className="flex justify-end">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => {
+            navigate(legacyReportsPath(win, data.bu, requestFilterToParams(reqFilter)));
+            window.scrollTo({ top: 0 });
+          }}
+        >
+          รายงานเพิ่มเติม (แบบเดิม)
+        </Button>
       </div>
 
       <V2Drawer stack={stack} onStack={setStack} model={model} bus={bus} periodText={periodText} buText={buText} embeds={embeds} />

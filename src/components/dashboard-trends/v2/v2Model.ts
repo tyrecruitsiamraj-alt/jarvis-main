@@ -52,8 +52,12 @@ export type V2Model = {
   why: V2Part[];
 };
 
-export function buildV2Model(data: RecruitOverviewResponse): V2Model {
-  const cohort = cohortOf(data);
+/**
+ * `keep` = ตัวกรองบนสุด (เจ้าหน้าที่ · ประเภทงาน · ไซต์ · พื้นที่ — ตัวตัดสินเดียวกับหน้าเดิม `jobFilterOf`)
+ * `base` = รายชื่อชุดอื่นแทนช่วงที่เลือก (ช่วงก่อน — `prevCohortOf`)
+ */
+export function buildV2Model(data: RecruitOverviewResponse, keep?: (f: RecruitAppFact) => boolean, base?: readonly RecruitAppFact[]): V2Model {
+  const cohort = (base ?? cohortOf(data)).filter((f) => !keep || keep(f));
   const now = refNowOf(data);
   const sets = outcomeSetsOf(cohort, now);
   const journey = buildPersonJourney(cohort, now);
@@ -62,6 +66,8 @@ export function buildV2Model(data: RecruitOverviewResponse): V2Model {
   const step = (k: string) => steps.find((s) => s.key === k);
   const parts = (p: ReadonlyArray<{ key: string; label: string; ids?: string[] }> | undefined): V2Part[] => (p ?? []).map((x) => ({ key: x.key, label: x.label, ids: x.ids ?? [] }));
   const showedIds = idsOf(cohort.filter((f) => f.appointmentAt && f.attendance === 'showed'));
+  const idIndex = new Map(cohort.map((f) => [f.id ?? '', f]));
+  const byIds = (ids: readonly string[]) => ids.map((id) => idIndex.get(id)).filter((f): f is RecruitAppFact => Boolean(f));
   const erpAll = cohort.length > 0 && cohort.every((f) => f.informed == null) ? null : idsOf(cohort.filter((f) => f.informed === true));
   const stages: Record<V2Metric, V2Stage> = {
     apps: { key: 'apps', label: V2_METRIC_LABEL.apps, ids: idsOf(cohort), parts: parts(j('apps')?.parts) },
@@ -72,13 +78,14 @@ export function buildV2Model(data: RecruitOverviewResponse): V2Model {
       key: 'allBooked',
       label: V2_METRIC_LABEL.allBooked,
       ids: step('allBooked')?.ids ?? [],
-      parts: [...parts(step('allBooked')?.parts), ...parts(j('attend')?.parts).map((p) => ({ ...p, key: `attend:${p.key}`, label: `ผลนัด · ${p.label}` }))],
+      // ผลนัดคิดจากนัดได้ทั้งหมด (ทุกทาง) — กติกาเดียวกับ `buildPersonJourney` ขั้น attend ซึ่งนับเฉพาะสาย AI → คนโทรต่อ
+      parts: [...parts(step('allBooked')?.parts), ...attendParts(byIds(step('allBooked')?.ids ?? []), now)],
     },
     showed: {
       key: 'showed',
       label: V2_METRIC_LABEL.showed,
       ids: showedIds,
-      parts: parts(j('pass')?.parts).map((p) => ({ ...p, label: p.key === 'passed' ? 'ผ่านคัดเลือก' : p.key === 'notPassed' ? 'ไม่ผ่านคัดเลือก' : 'ยังไม่บันทึกผลคัดเลือก' })),
+      parts: screeningParts(cohort.filter((f) => f.appointmentAt && f.attendance === 'showed')),
     },
     erp: { key: 'erp', label: V2_METRIC_LABEL.erp, ids: erpAll, parts: [] },
   };
@@ -92,6 +99,27 @@ export function buildV2Model(data: RecruitOverviewResponse): V2Model {
     late,
     why: whyParts(cohort).map((p) => ({ key: p.key, label: p.label, ids: p.ids ?? [] })),
   };
+}
+
+/** ผลนัดของรายการที่นัดได้ — มา · ไม่มา · ยังไม่ถึงวันนัด · เลยวันนัดยังไม่ลงผล (ใบละผลเดียว รวมกัน = นัดได้) */
+function attendParts(booked: readonly RecruitAppFact[], now: Date): V2Part[] {
+  const noResult = booked.filter((f) => f.attendance !== 'showed' && f.attendance !== 'no_show');
+  const future = (f: RecruitAppFact) => Date.parse(f.appointmentAt ?? '') > now.getTime();
+  return [
+    { key: 'attend:showed', label: 'ผลนัด · มา', ids: idsOf(booked.filter((f) => f.attendance === 'showed')) },
+    { key: 'attend:noShow', label: 'ผลนัด · ไม่มา', ids: idsOf(booked.filter((f) => f.attendance === 'no_show')) },
+    { key: 'attend:upcoming', label: 'ผลนัด · ยังไม่ถึงวันนัด', ids: idsOf(noResult.filter(future)) },
+    { key: 'attend:overdue', label: 'ผลนัด · เลยวันนัด ยังไม่ลงผล', ids: idsOf(noResult.filter((f) => !future(f))) },
+  ];
+}
+
+/** ผลคัดเลือกของคนที่มาตามนัด — กติกาเดียวกับ `buildPersonJourney` ขั้น pass */
+function screeningParts(showed: readonly RecruitAppFact[]): V2Part[] {
+  return [
+    { key: 'passed', label: 'ผ่านคัดเลือก', ids: idsOf(showed.filter((f) => f.screening === 'passed')) },
+    { key: 'notPassed', label: 'ไม่ผ่านคัดเลือก', ids: idsOf(showed.filter((f) => f.screening === 'not_passed')) },
+    { key: 'pending', label: 'ยังไม่บันทึกผลคัดเลือก', ids: idsOf(showed.filter((f) => f.screening !== 'passed' && f.screening !== 'not_passed')) },
+  ];
 }
 
 /** ผู้รับรายชื่อของใบ (ไม่มีคนเก็บ = ยังไม่มีคนเก็บ) · ผู้พารายชื่อเข้ามา (ไม่ทราบ = ไม่ทราบคนพามา) */

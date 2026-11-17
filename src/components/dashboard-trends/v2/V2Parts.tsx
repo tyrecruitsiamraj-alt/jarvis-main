@@ -10,6 +10,8 @@ import { cn } from '@/lib/utils';
 import { DASH, TONE, type ToneKey } from '@/lib/designTokens';
 import { formatTrendNumber } from '@/lib/trends/format';
 import type { BuBarValue } from '@/lib/recruitAudience';
+import type { TrendSense } from '@/lib/recruitScale';
+import TrendDelta from '../stuck/TrendDelta';
 
 export const fmt = (n: number | null | undefined): string => (n === null || n === undefined ? '—' : formatTrendNumber(n));
 export const fmtPct = (n: number | null | undefined): string => (n === null || n === undefined ? '—' : `${n.toFixed(1)}%`);
@@ -38,6 +40,8 @@ export function Kpi({
   tone,
   active = false,
   testId,
+  prev,
+  sense = 'good',
 }: {
   label: string;
   value: number | null | undefined;
@@ -46,11 +50,15 @@ export function Kpi({
   tone?: ToneKey;
   active?: boolean;
   testId?: string;
+  /** ยอดช่วงก่อน (ช่วงวันเท่ากัน) — ไม่ส่ง = ไม่มีป้ายเทียบ · null = "เทียบไม่ได้" */
+  prev?: number | null;
+  sense?: TrendSense;
 }) {
   const body = (
     <>
       <span className={cn('text-xs', tone ? TONE[tone].value : DASH.sub)}>{label}</span>
       <span className={cn('font-medium tabular-nums text-foreground', emphasis ? 'text-4xl' : 'text-2xl', tone && TONE[tone].value)}>{fmt(value)}</span>
+      {prev !== undefined ? <TrendDelta cur={value} prev={prev} sense={sense} /> : null}
     </>
   );
   if (!onClick) return <div className="flex min-w-0 flex-col gap-1">{body}</div>;
