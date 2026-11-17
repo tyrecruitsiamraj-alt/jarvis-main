@@ -33,7 +33,8 @@ import StuckAreaTable from '../stuck/StuckAreaTable';
 import CallerResultsTable from '../stuck/CallerResultsTable';
 import V2Drawer, { type V2Pane } from './V2Drawer';
 import ApplicantStory from './ApplicantStory';
-import { BuBars, Kpi, Pager, SectionTitle, TrendBars, fmt, fmtPct } from './V2Parts';
+import { Kpi, Pager, SectionTitle, fmt, fmtPct } from './V2Parts';
+import { MonthCompareBars } from './MonthCompareBars';
 import { V2_METRICS, V2_METRIC_LABEL, buildV2Model, type V2Metric } from './v2Model';
 
 const ALL_BUS = ['LBD', 'LBA', 'LM', 'DS', 'SN'];
@@ -60,11 +61,6 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
 
   const [stack, setStack] = React.useState<V2Pane[]>([]);
   const [metric, setMetric] = React.useState<V2Metric>('apps');
-  const [trendMonth, setTrendMonth] = React.useState<string | null>(null);
-  const [trendUnit, setTrendUnit] = React.useState<'month' | 'day'>('month');
-  /** ช่วงอยู่ในเดือนเดียว = รายวันเสมอ (แบบเดือนเหลือแท่งเดียว · เจ้าของ 17 พ.ย. 2569 "บ้านนอกมาก") · ปุ่ม "เดือน" ปิดไว้ ไม่ซ่อน (ของบนจอไม่ขยับ) */
-  const multiMonth = win.from.slice(0, 7) !== win.to.slice(0, 7);
-  const shownUnit: 'month' | 'day' = multiMonth ? trendUnit : 'day';
   /** BU ที่กดแท่ง — เรื่องเล่ารายชื่อใต้กราฟ (null = ทุก BU) */
   const [storyBu, setStoryBu] = React.useState<string | null>(null);
   const [workPage, setWorkPage] = React.useState(1);
@@ -72,7 +68,6 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
   // เปลี่ยนวัน/BU = ล้างรายละเอียด + กลับหน้า 1 ทุกตาราง (ห้ามค้างข้อมูลช่วงเดิม)
   React.useEffect(() => {
     setStack([]);
-    setTrendMonth(null);
     setStoryBu(null);
     setWorkPage(1);
     setClickPage(1);
@@ -131,32 +126,23 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
   const st = model.stages[metric];
   const idSet = st.ids ? new Set(st.ids) : null;
   const inMetric = (id: string | undefined) => Boolean(id && idSet?.has(id));
-  const buBars = bus
-    .map((bu) => {
-      const n = idSet ? model.cohort.filter((f) => buOfFact(f) === bu && inMetric(f.id)).length : null;
-      return { bu, value: n, result: n, sample: n ?? 0 };
-    })
-    .sort((a, b) => (b.value ?? -1) - (a.value ?? -1));
-  const trendPoints = (() => {
-    const unit = trendMonth ? 'day' : shownUnit;
-    const keys: string[] = [];
-    const days: string[] = [];
-    for (let d = trendMonth ? (trendMonth + '-01' > win.from ? trendMonth + '-01' : win.from) : win.from; d <= win.to; d = bkkDay(new Date(Date.parse(`${d}T12:00:00+07:00`) + 86_400_000).toISOString())) {
-      if (trendMonth && !d.startsWith(trendMonth)) break;
-      days.push(d);
+  /** เดือนในช่วงที่เลือก (กราฟแท่งตั้งเทียบรายเดือน · เจ้าของ 17 พ.ย. 2569) */
+  const months = (() => {
+    const out: string[] = [];
+    for (let y = Number(win.from.slice(0, 4)), m = Number(win.from.slice(5, 7)); `${y}-${String(m).padStart(2, '0')}` <= win.to.slice(0, 7); m === 12 ? ((m = 1), (y += 1)) : (m += 1)) {
+      out.push(`${y}-${String(m).padStart(2, '0')}`);
     }
-    for (const d of days) {
-      const k = unit === 'month' ? d.slice(0, 7) : d;
-      if (!keys.includes(k)) keys.push(k);
-    }
-    return keys.map((k) => {
-      const list = model.cohort.filter((f) => {
-        const d = bkkDay(f.createdAt);
-        return unit === 'month' ? d.startsWith(k) : d === k;
-      });
-      return { key: k, n: idSet ? list.filter((f) => inMetric(f.id)).length : null, ids: list.filter((f) => inMetric(f.id)).map((f) => f.id ?? '') };
-    });
+    return out;
   })();
+  /** BU × เดือน ของยอดที่เลือก — BU ที่ไม่มีรายการเลยไม่ขึ้นแท่ง ("ไม่ระบุ BU" ขึ้นเมื่อมีจริง) */
+  const buGroups = bus
+    .map((bu) => {
+      const byMonth: Record<string, number> = {};
+      for (const f of model.cohort) if (buOfFact(f) === bu && inMetric(f.id)) byMonth[bkkDay(f.createdAt).slice(0, 7)] = (byMonth[bkkDay(f.createdAt).slice(0, 7)] ?? 0) + 1;
+      return { key: bu, byMonth, total: Object.values(byMonth).reduce((a, b) => a + b, 0) };
+    })
+    .filter((g) => g.total > 0 || g.key !== BU_UNKNOWN)
+    .sort((a, b) => b.total - a.total);
 
   // ── คนสมัครงานที่ไหน (จังหวัดของงานที่สมัคร — ใบขอในรายการของช่วง) ──
   const jobProvince = new Map((reqRows ?? []).filter((r) => r.jobId).map((r) => [r.jobId as string, r.province?.trim() || null]));
@@ -385,47 +371,15 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
           {st.ids === null ? (
             <p className={cn('text-sm', DASH.muted)}>อ่านข้อมูลแจ้งเข้า ERP ไม่ได้ในช่วงนี้ ไม่ทราบผล</p>
           ) : (
-            <div className="grid gap-6 lg:grid-cols-2">
-              <section className="min-w-0 space-y-2">
-                <h3 className="text-sm font-medium">
-                  {V2_METRIC_LABEL[metric]} {fmt(st.ids.length)} · แยกตาม BU
-                </h3>
-                <BuBars bars={buBars} unit="รายการ" onPick={(bu) => setStoryBu(bu)} />
-              </section>
-              <section className="min-w-0 space-y-2">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <h3 className="text-sm font-medium">
-                    ตามวันที่สมัคร · {V2_METRIC_LABEL[metric]}{trendMonth ? ` · ${monthText(trendMonth)}` : ''}
-                  </h3>
-                  <div className="flex gap-1">
-                    {trendMonth ? (
-                      <Button type="button" size="xs" variant="outline" onClick={() => setTrendMonth(null)}>
-                        ทุกเดือน
-                      </Button>
-                    ) : (
-                      <>
-                        <Button type="button" size="xs" variant={shownUnit === 'month' ? 'default' : 'outline'} disabled={!multiMonth} onClick={() => setTrendUnit('month')}>
-                          เดือน
-                        </Button>
-                        <Button type="button" size="xs" variant={shownUnit === 'day' ? 'default' : 'outline'} onClick={() => setTrendUnit('day')}>
-                          วัน
-                        </Button>
-                      </>
-                    )}
-                  </div>
-                </div>
-                <TrendBars
-                  points={trendPoints}
-                  labelOf={(k) => (k.length === 7 ? monthText(k) : String(Number(k.slice(8, 10))))}
-                  onPick={(k) => {
-                    if (k.length === 7) setTrendMonth(k);
-                    else openNames(`${V2_METRIC_LABEL[metric]} · สมัคร ${dayText(k)}`, trendPoints.find((p) => p.key === k)?.ids ?? []);
-                  }}
-                />
-              </section>
-            </div>
+            <section className="min-w-0 space-y-2">
+              <h3 className="text-sm font-medium">
+                {V2_METRIC_LABEL[metric]} {fmt(st.ids.length)} · แยกตาม BU
+              </h3>
+              <MonthCompareBars groups={buGroups} months={months} onPick={(bu) => setStoryBu(bu)} testId="v2-bu-chart" />
+            </section>
           )}
           <ApplicantStory
+            months={months}
             cohort={storyCohort}
             sets={model.sets}
             bu={storyBu}
