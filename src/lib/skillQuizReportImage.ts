@@ -1,6 +1,7 @@
 /**
  * ═══ รายงานผลแบบทดสอบเป็นรูป PNG ส่งลูกค้า (เจ้าของ 12 พ.ย. 2569: *"เราจะโหลดสรุปแบบรูปส่งลูกค้า"*) ═══
  * หน้าตาตามแบบที่เจ้าของส่งมา: หัวรายงาน · ชื่อ/ตำแหน่ง/เลขที่ · คะแนนรวม+เกรด · ทักษะผ่านเกณฑ์ · แท่งรายทักษะ · บทวิเคราะห์ 3 หัว
+ * โลโก้มุมขวาบน = โลโก้ระบบตัวเดียวกับแถบบน (เจ้าของ 17 พ.ย. 2569 เลือก "ใช้โลโก้ระบบ") · โหลดไม่ได้ก็วาดใบต่อโดยไม่มีโลโก้
  * พื้นขาวเสมอ (รูปไปอยู่ในแชต/อีเมลลูกค้า ไม่ตามธีมเครื่องเรา) · ฟอนต์ Kanit · สีจาก designTokens เท่านั้น
  * ตัวเลขทุกตัวมาจาก `scoreQuiz` ตัวเดียวกับหน้าจอ
  */
@@ -16,12 +17,15 @@ export type QuizReportInput = {
   personRole: string;
   docNo: string;
   submittedAt: string;
+  /** โลโก้จาก Branding (`config.logoDataUrl`) */
+  logoSrc?: string | null;
 };
 
 const FONT_FAMILY = 'Kanit, sans-serif';
 const font = (px: number, weight = 400) => `${weight} ${px}px ${FONT_FAMILY}`;
 
 const W = 1000;
+const LOGO = 88;
 const PAD = 48;
 const INNER = W - PAD * 2;
 
@@ -56,7 +60,7 @@ const SECTIONS: { key: keyof QuizAnalysis; label: string; tone: 'success' | 'war
   { key: 'advice', label: 'ข้อเสนอแนะต่อ Operation', tone: 'primary' },
 ];
 
-export function drawQuizReport(input: QuizReportInput): HTMLCanvasElement {
+export function drawQuizReport(input: QuizReportInput, logo?: HTMLImageElement | null): HTMLCanvasElement {
   const r = scoreQuiz(input.content, input.answers);
   const measurer = document.createElement('canvas').getContext('2d');
   const analysisLines = SECTIONS.map((s) => {
@@ -89,12 +93,22 @@ export function drawQuizReport(input: QuizReportInput): HTMLCanvasElement {
   // หัวรายงาน — แถบเบอร์กันดีบาง ๆ ด้านบน
   ctx.fillStyle = LOGIN_SCENE.burgundy;
   ctx.fillRect(0, 0, W, 6);
+  // ตัวหนังสือหัวใบห้ามวิ่งเข้าใต้โลโก้
+  const headTextW = logo ? INNER - LOGO - 24 : INNER;
+  if (logo) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.roundRect(W - PAD - LOGO, headTop, LOGO, LOGO, 16);
+    ctx.clip();
+    ctx.drawImage(logo, W - PAD - LOGO, headTop, LOGO, LOGO);
+    ctx.restore();
+  }
   ctx.fillStyle = LOGIN_SCENE.muted;
   ctx.font = font(15, 500);
-  ctx.fillText(input.content.headerLine, PAD, headTop + 18);
+  ctx.fillText(input.content.headerLine, PAD, headTop + 18, headTextW);
   ctx.fillStyle = LOGIN_SCENE.ink;
   ctx.font = font(30, 600);
-  ctx.fillText(input.content.title, PAD, headTop + 60);
+  ctx.fillText(input.content.title, PAD, headTop + 60, headTextW);
 
   ctx.font = font(26, 600);
   ctx.fillText(input.personName, PAD, headTop + 118);
@@ -217,6 +231,18 @@ export function drawQuizReport(input: QuizReportInput): HTMLCanvasElement {
   return canvas;
 }
 
+function loadLogo(src: string | null | undefined): Promise<HTMLImageElement | null> {
+  if (!src?.trim()) return Promise.resolve(null);
+  return new Promise((resolve) => {
+    const img = new Image();
+    // โลโก้ข้ามโดเมนที่ไม่เปิด CORS จะทำให้ canvas เซฟไม่ได้ — โหลดไม่ผ่านก็ข้ามโลโก้
+    img.crossOrigin = 'anonymous';
+    img.onload = () => resolve(img);
+    img.onerror = () => resolve(null);
+    img.src = src;
+  });
+}
+
 /** โหลดรูป — false = เซฟไม่ได้ ให้จอบอก */
 export async function downloadQuizReportPng(input: QuizReportInput): Promise<boolean> {
   try {
@@ -225,5 +251,5 @@ export async function downloadQuizReportPng(input: QuizReportInput): Promise<boo
     /* โหลดฟอนต์ไม่ได้ก็วาดต่อ */
   }
   const name = input.personName.replace(/[\\/:*?"<>|]/g, '').trim() || 'ผลแบบทดสอบ';
-  return downloadCanvas(drawQuizReport(input), `${input.docNo} ${name}.png`);
+  return downloadCanvas(drawQuizReport(input, await loadLogo(input.logoSrc)), `${input.docNo} ${name}.png`);
 }

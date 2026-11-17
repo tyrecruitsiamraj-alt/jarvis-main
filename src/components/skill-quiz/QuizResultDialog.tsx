@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
 import { Textarea } from '@/components/ui/textarea';
+import { useBranding } from '@/contexts/BrandingContext';
 import { TONE } from '@/lib/designTokens';
 import { cn } from '@/lib/utils';
 import { QUIZ_STATUS_LABEL, quizAttemptStatus, quizSkillTone, scoreQuiz, type QuizAnalysis } from '@/lib/skillQuiz';
@@ -27,6 +28,7 @@ const SECTIONS: { key: keyof QuizAnalysis; label: string }[] = [
 ];
 
 export default function QuizResultDialog({ attemptId, onOpenChange, onChanged }: Props) {
+  const { config: branding } = useBranding();
   const [a, setA] = useState<QuizAttemptDetail | null>(null);
   const [analysis, setAnalysis] = useState<QuizAnalysis>(EMPTY);
   const [busy, setBusy] = useState<null | 'save' | 'png' | 'ai'>(null);
@@ -79,6 +81,7 @@ export default function QuizResultDialog({ attemptId, onOpenChange, onChanged }:
           personRole: d.person_role,
           docNo: d.doc_no,
           submittedAt: d.submitted_at ?? d.created_at,
+          logoSrc: branding.logoDataUrl,
         });
         setNotice(ok ? 'บันทึกและโหลดรูปแล้ว' : 'บันทึกแล้ว แต่เซฟรูปไม่ได้ ลองอีกครั้ง');
       } else setNotice('บันทึกแล้ว');
