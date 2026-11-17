@@ -3,9 +3,10 @@
  * แท็บ "ผลแบบทดสอบ" = คนที่กรอกเข้ามา + สถานะ + คะแนน · แท็บ "ชุดข้อสอบ" = สร้าง/แก้ชุด + ลิงก์ของชุด
  * ทางเดิน (16 พ.ย. 2569 แบบ Knowa): สร้างชุด (เลือกใครเห็น) → คัดลอกลิงก์ของชุดส่ง → คนทำกรอกข้อมูล+ยินยอม PDPA
  * (17 พ.ย. 2569) ปุ่ม "ส่งลิงก์" เปิดป๊อป QR + ส่งทาง LINE + โหลดรูป QR · ปุ่มคัดลอกลิงก์บนแถวยังอยู่
+ * (17 พ.ย. 2569) ช่องค้นหาบนแถบบน — ผล: เลขที่/ชื่อ/เบอร์/ชุด · ชุด: ชื่อชุด/ตำแหน่ง · คำค้นใช้ร่วมทั้งสองแท็บ
  * → ทำ → AI ร่าง → เจ้าหน้าที่ตรวจ → บันทึกและโหลดรูป · ลิงก์ละคน (ใส่ชื่อพนักงาน) ถอดแล้ว
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Plus } from 'lucide-react';
 import PageHeader from '@/components/shared/PageHeader';
@@ -25,6 +26,7 @@ import {
 import QuizSetEditorDialog from '@/components/skill-quiz/QuizSetEditorDialog';
 import QuizResultDialog from '@/components/skill-quiz/QuizResultDialog';
 import QuizShareDialog from '@/components/skill-quiz/QuizShareDialog';
+import { useHeaderSearch } from '@/hooks/useHeaderSearch';
 import { CONVEYOR_VAULT } from '@/lib/soRecruitNav';
 import { TONE } from '@/lib/designTokens';
 import { cn } from '@/lib/utils';
@@ -51,6 +53,15 @@ function viewersLabel(s: QuizSetItem): string {
 
 const dateTh = (iso: string) => new Date(iso).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit', timeZone: 'Asia/Bangkok' });
 
+/** คำค้นตรงกับข้อความไหนก็ได้ (ไม่สนตัวพิมพ์ · เบอร์พิมพ์มีขีดก็เจอ) */
+function matches(q: string, fields: (string | null | undefined)[]): boolean {
+  const digits = q.replace(/\D/g, '');
+  return fields.some((f) => {
+    const v = (f ?? '').toLowerCase();
+    return v.includes(q) || (digits.length >= 3 && v.replace(/\D/g, '').includes(digits));
+  });
+}
+
 async function copyText(text: string): Promise<boolean> {
   try {
     await navigator.clipboard.writeText(text);
@@ -70,6 +81,14 @@ export default function SkillQuizPage() {
   const [editing, setEditing] = useState<{ id: string | null; item: QuizSetItem | null } | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
   const [share, setShare] = useState<{ title: string; url: string } | null>(null);
+  const [search, setSearch] = useState('');
+  useHeaderSearch({ value: search, onChange: setSearch, placeholder: 'ค้นหาชื่อ เลขที่ ชุดข้อสอบ' });
+  const q = search.trim().toLowerCase();
+  const shownAttempts = useMemo(
+    () => (attempts && q ? attempts.filter((a) => matches(q, [a.doc_no, a.person_name, a.phone, a.title])) : attempts),
+    [attempts, q],
+  );
+  const shownSets = useMemo(() => (sets && q ? sets.filter((s) => matches(q, [s.content.title, s.content.roleLabel])) : sets), [sets, q]);
   const [confirm, setConfirm] = useState<{ kind: 'set' | 'attempt'; id: string; label: string } | null>(null);
 
   const load = useCallback(() => {
@@ -142,20 +161,20 @@ export default function SkillQuizPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {attempts === null ? (
+                {shownAttempts === null ? (
                   <TableRow>
                     <TableCell colSpan={7} className="text-muted-foreground">
                       กำลังโหลด…
                     </TableCell>
                   </TableRow>
-                ) : attempts.length === 0 ? (
+                ) : shownAttempts.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={7} className="text-muted-foreground">
-                      ยังไม่มีคนทำ
+                      {q ? `ไม่พบ "${search.trim()}"` : 'ยังไม่มีคนทำ'}
                     </TableCell>
                   </TableRow>
                 ) : (
-                  attempts.map((a) => (
+                  shownAttempts.map((a) => (
                     <TableRow key={a.id}>
                       <TableCell className="whitespace-nowrap tabular-nums">{a.doc_no}</TableCell>
                       <TableCell className="min-w-40">
@@ -198,20 +217,20 @@ export default function SkillQuizPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {sets === null ? (
+                {shownSets === null ? (
                   <TableRow>
                     <TableCell colSpan={7} className="text-muted-foreground">
                       กำลังโหลด…
                     </TableCell>
                   </TableRow>
-                ) : sets.length === 0 ? (
+                ) : shownSets.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={7} className="text-muted-foreground">
-                      ยังไม่มีชุดข้อสอบ
+                      {q ? `ไม่พบ "${search.trim()}"` : 'ยังไม่มีชุดข้อสอบ'}
                     </TableCell>
                   </TableRow>
                 ) : (
-                  sets.map((s) => (
+                  shownSets.map((s) => (
                     <TableRow key={s.id}>
                       <TableCell className="min-w-48">{s.content.title}</TableCell>
                       <TableCell>{s.content.roleLabel || '—'}</TableCell>
