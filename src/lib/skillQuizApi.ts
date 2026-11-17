@@ -1,6 +1,6 @@
 import { apiFetch } from './apiFetch';
 import { shrinkImageToJpeg } from './imageShrink';
-import type { PublicQuizQuestion, QuizAnalysis, QuizAnswers, QuizAttemptStatus, QuizSetContent } from './skillQuiz';
+import type { PublicQuizQuestion, QuizAiSkill, QuizAnalysis, QuizAnswers, QuizAttemptStatus, QuizSetContent } from './skillQuiz';
 import type { QuizViewerMode } from './skillQuizTaker';
 
 /** แบบทดสอบพนักงาน (12 พ.ย. 2569) — พังโยนข้อความไทยจาก server */
@@ -121,6 +121,16 @@ export const saveQuizReview = (id: string, v: { analysis: QuizAnalysis; reviewed
   post<{ attempt: QuizAttemptDetail }>({ action: 'save_review', id, ...v }).then((d) => d.attempt);
 export const draftQuizWithAi = (id: string) => post<{ attempt: QuizAttemptDetail }>({ action: 'ai_draft', id }).then((d) => d.attempt);
 export const archiveQuizAttempt = (id: string) => post<{ ok: true }>({ action: 'archive_attempt', id });
+
+/** คลัง Skill ของ AI (17 พ.ย. 2569) — ชุดเลือกด้วย content.aiSkillId */
+export async function fetchAiSkills(): Promise<QuizAiSkill[]> {
+  const r = await apiFetch('/api/skill-quiz?view=ai_skills');
+  if (!r.ok) return readError(r);
+  return ((await r.json()) as { skills: QuizAiSkill[] }).skills;
+}
+export const saveAiSkill = (id: string | null, v: { name: string; body: string }) =>
+  post<{ id: string }>({ action: 'save_ai_skill', ...(id ? { id } : {}), ...v });
+export const archiveAiSkill = (id: string) => post<{ ok: true }>({ action: 'archive_ai_skill', id });
 
 /** หน้าพนักงาน — ไม่ต้องล็อกอิน */
 export type PublicQuiz = { title: string; personName: string; personRole: string; submitted: boolean; questions: PublicQuizQuestion[] };

@@ -2362,7 +2362,7 @@ export const API_CATALOG: ApiCatalogEntry[] = [
    "GET",
    "POST"
   ],
-  "doc": "/api/skill-quiz — หน้าแบบทดสอบพนักงานของเจ้าหน้าที่ (เจ้าของ 12 พ.ย. 2569)\nGET              → รายการผล (สรุปคะแนนจากตัวตัดสินเดียว `scoreQuiz`)\nGET ?view=sets   → ชุดข้อสอบ (+ ลิงก์ของชุด + ใครเห็น)\nGET ?view=people → รายชื่อผู้ใช้ไว้เลือก \"ใครเห็นชุดนี้\"\nGET ?id=         → ผลของคนหนึ่งคน (มีเฉลย/คำตอบ/บทวิเคราะห์)\nPOST { action }  → create_set · update_set · archive_set · save_review · ai_draft · archive_attempt\nPOST { action: 'upload_image', data } → { id } รูปของคำถาม/ตัวเลือก (17 พ.ย. 2569) · รูปเปิดดูที่ /api/public/skill-quiz?image=\n🔴 16 พ.ย. 2569 เห็นเฉพาะชุดที่ตั้งให้เห็น (ทั้ง BU / รายคน · `canSeeQuizSet`) — ผลของคนทำเห็นตามชุด\n   ลิงก์ละคน (create_link) ถอดแล้ว เหลือลิงก์เดียวต่อชุด · เลขบัตรส่งออกเป็นเลขปิดท้ายเท่านั้น",
+  "doc": "/api/skill-quiz — หน้าแบบทดสอบพนักงานของเจ้าหน้าที่ (เจ้าของ 12 พ.ย. 2569)\nGET              → รายการผล (สรุปคะแนนจากตัวตัดสินเดียว `scoreQuiz`)\nGET ?view=sets   → ชุดข้อสอบ (+ ลิงก์ของชุด + ใครเห็น)\nGET ?view=people → รายชื่อผู้ใช้ไว้เลือก \"ใครเห็นชุดนี้\"\nGET ?id=         → ผลของคนหนึ่งคน (มีเฉลย/คำตอบ/บทวิเคราะห์)\nGET ?view=ai_skills → คลัง Skill ของ AI · POST save_ai_skill {id?, name, body} · archive_ai_skill {id} (17 พ.ย. 2569)\nPOST { action }  → create_set · update_set · archive_set · save_review · ai_draft · archive_attempt\nPOST { action: 'upload_image', data } → { id } รูปของคำถาม/ตัวเลือก (17 พ.ย. 2569) · รูปเปิดดูที่ /api/public/skill-quiz?image=\n🔴 16 พ.ย. 2569 เห็นเฉพาะชุดที่ตั้งให้เห็น (ทั้ง BU / รายคน · `canSeeQuizSet`) — ผลของคนทำเห็นตามชุด\n   ลิงก์ละคน (create_link) ถอดแล้ว เหลือลิงก์เดียวต่อชุด · เลขบัตรส่งออกเป็นเลขปิดท้ายเท่านั้น",
   "query": [
    "view",
    "id"

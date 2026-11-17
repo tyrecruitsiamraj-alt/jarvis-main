@@ -27,6 +27,7 @@ import {
 import QuizSetEditorDialog from '@/components/skill-quiz/QuizSetEditorDialog';
 import QuizResultDialog from '@/components/skill-quiz/QuizResultDialog';
 import QuizShareDialog from '@/components/skill-quiz/QuizShareDialog';
+import AiSkillsDialog from '@/components/skill-quiz/AiSkillsDialog';
 import { useHeaderSearch } from '@/hooks/useHeaderSearch';
 import { CONVEYOR_VAULT } from '@/lib/soRecruitNav';
 import { TONE } from '@/lib/designTokens';
@@ -84,6 +85,7 @@ export default function SkillQuizPage() {
   const [editing, setEditing] = useState<{ id: string | null; item: QuizSetItem | null } | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
   const [share, setShare] = useState<{ title: string; url: string } | null>(null);
+  const [skillsOpen, setSkillsOpen] = useState(false);
   const [search, setSearch] = useState('');
   useHeaderSearch({ value: search, onChange: setSearch, placeholder: 'ค้นหาชื่อ เลขที่ ชุดข้อสอบ' });
   const q = search.trim().toLowerCase();
@@ -150,9 +152,15 @@ export default function SkillQuizPage() {
         title={title}
         subtitle=""
         actions={
-          <Button type="button" onClick={() => setEditing({ id: null, item: null })}>
-            <Plus /> สร้างชุดข้อสอบ
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            {/* คลัง Skill ของ AI (17 พ.ย. 2569) — ชุดเลือกในป๊อปสร้าง/แก้ชุด */}
+            <Button type="button" variant="outline" onClick={() => setSkillsOpen(true)}>
+              Skill ของ AI
+            </Button>
+            <Button type="button" onClick={() => setEditing({ id: null, item: null })}>
+              <Plus /> สร้างชุดข้อสอบ
+            </Button>
+          </div>
         }
       />
       <div className="space-y-4 px-4 pb-8 md:px-6">
@@ -349,6 +357,7 @@ export default function SkillQuizPage() {
           load();
         }}
       />
+      <AiSkillsDialog open={skillsOpen} onOpenChange={setSkillsOpen} />
       <QuizShareDialog share={share} onOpenChange={(v) => !v && setShare(null)} />
       <QuizResultDialog attemptId={openId} onOpenChange={(v) => !v && setOpenId(null)} onChanged={load} />
       <AlertDialog open={confirm !== null} onOpenChange={(v) => !v && setConfirm(null)}>

@@ -13,6 +13,7 @@ import {
   quizDocNo,
   parseQuizGrades,
   buildQuizAiSystem,
+  parseQuizAiSkillInput,
   quizGrade,
   quizSkillTone,
   scoreQuiz,
@@ -130,5 +131,22 @@ describe('Skill ของ AI ต่อชุด (17 พ.ย. 2569)', () => {
     const sys = buildQuizAiSystem('คุณคือผู้เชี่ยวชาญด้านวิศวกรรมอาคาร\n## รูปแบบคำตอบ\n1. Executive Summary');
     expect(sys).toContain('คุณคือผู้เชี่ยวชาญด้านวิศวกรรมอาคาร');
     expect(sys).toContain('ตอบเป็น JSON 3 ช่องตามที่ขอเท่านั้น');
+  });
+});
+
+describe('คลัง Skill ของ AI (17 พ.ย. 2569)', () => {
+  it('Skill ต้องมีชื่อและเนื้อหา · ยาวเกินไม่รับ', () => {
+    expect(parseQuizAiSkillInput({ name: ' ช่างอาคาร ', body: ' ความรู้ ' })).toEqual({ ok: true, value: { name: 'ช่างอาคาร', body: 'ความรู้' } });
+    expect(parseQuizAiSkillInput({ name: '', body: 'x' }).ok).toBe(false);
+    expect(parseQuizAiSkillInput({ name: 'x', body: '' }).ok).toBe(false);
+    expect(parseQuizAiSkillInput({ name: 'x', body: 'ก'.repeat(20_001) }).ok).toBe(false);
+  });
+  it('ชุดเก็บแค่รหัส Skill ที่เป็น uuid · ไม่มี = ไม่ใส่ช่อง', () => {
+    const base = { title: 't', skills: [{ id: 's1', name: 'ไฟฟ้า' }], questions: [{ id: 'q1', skillId: 's1', kind: 'choice', prompt: 'p', choices: ['a', 'b'], answer: 0, points: 1 }] };
+    const id = '0f8b6a1e-1c2d-4e5f-8a9b-0c1d2e3f4a5b';
+    const a = parseQuizSetInput({ ...base, aiSkillId: id });
+    expect(a.ok && a.value.aiSkillId).toBe(id);
+    const b = parseQuizSetInput({ ...base, aiSkillId: 'not-a-uuid' });
+    expect(b.ok && 'aiSkillId' in b.value).toBe(false);
   });
 });

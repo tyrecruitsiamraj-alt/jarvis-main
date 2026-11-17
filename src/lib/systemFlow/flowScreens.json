@@ -819,13 +819,22 @@
    "src": "src/App.tsx:169 → src/pages/skill-quiz/SkillQuizPage.tsx:61",
    "controls": [
     {
+     "label": "Skill ของ AI",
+     "action": "popup",
+     "target": "quiz-ai-skills-dialog",
+     "api": null,
+     "effects": [],
+     "when": "",
+     "src": "src/pages/skill-quiz/SkillQuizPage.tsx:158"
+    },
+    {
      "label": "ผลแบบทดสอบ",
      "action": "inline",
      "target": "รายชื่อชุด + ยอดคนทำแยกสถานะ (ค่าเริ่ม)",
      "api": "GET /api/skill-quiz",
      "effects": [],
      "when": null,
-     "src": "src/pages/skill-quiz/SkillQuizPage.tsx:163"
+     "src": "src/pages/skill-quiz/SkillQuizPage.tsx:171"
     },
     {
      "label": "ชุดข้อสอบ",
@@ -834,7 +843,7 @@
      "api": "GET /api/skill-quiz?view=sets",
      "effects": [],
      "when": null,
-     "src": "src/pages/skill-quiz/SkillQuizPage.tsx:162"
+     "src": "src/pages/skill-quiz/SkillQuizPage.tsx:170"
     },
     {
      "label": "สร้างชุดข้อสอบ",
@@ -852,7 +861,7 @@
      "api": null,
      "effects": [],
      "when": "แท็บชุดข้อสอบ ชุดที่มีลิงก์",
-     "src": "src/pages/skill-quiz/SkillQuizPage.tsx:321"
+     "src": "src/pages/skill-quiz/SkillQuizPage.tsx:329"
     },
     {
      "label": "คัดลอกลิงก์",
@@ -861,7 +870,7 @@
      "api": null,
      "effects": [],
      "when": "แท็บชุดข้อสอบ",
-     "src": "src/pages/skill-quiz/SkillQuizPage.tsx:324"
+     "src": "src/pages/skill-quiz/SkillQuizPage.tsx:332"
     },
     {
      "label": "ดูคนทำ (แถวชุดในแท็บผล)",
@@ -870,7 +879,7 @@
      "api": null,
      "effects": [],
      "when": "แท็บผลแบบทดสอบ หน้ารายชื่อชุด (กดทั้งแถวได้)",
-     "src": "src/pages/skill-quiz/SkillQuizPage.tsx:207"
+     "src": "src/pages/skill-quiz/SkillQuizPage.tsx:215"
     },
     {
      "label": "ทุกชุด",
@@ -879,7 +888,7 @@
      "api": null,
      "effects": [],
      "when": "อยู่ในชุดที่กดเข้าไป",
-     "src": "src/pages/skill-quiz/SkillQuizPage.tsx:220"
+     "src": "src/pages/skill-quiz/SkillQuizPage.tsx:228"
     },
     {
      "label": "ดูผล",
@@ -888,7 +897,7 @@
      "api": "GET /api/skill-quiz?id=",
      "effects": [],
      "when": "อยู่ในชุดที่กดเข้าไป (?set=)",
-     "src": "src/pages/skill-quiz/SkillQuizPage.tsx:265"
+     "src": "src/pages/skill-quiz/SkillQuizPage.tsx:273"
     },
     {
      "label": "ลบ (ผล)",
@@ -897,7 +906,7 @@
      "api": null,
      "effects": [],
      "when": null,
-     "src": "src/pages/skill-quiz/SkillQuizPage.tsx:267"
+     "src": "src/pages/skill-quiz/SkillQuizPage.tsx:275"
     },
     {
      "label": "แก้ (ชุด)",
@@ -906,7 +915,7 @@
      "api": null,
      "effects": [],
      "when": "แท็บชุดข้อสอบ",
-     "src": "src/pages/skill-quiz/SkillQuizPage.tsx:326"
+     "src": "src/pages/skill-quiz/SkillQuizPage.tsx:334"
     },
     {
      "label": "ลบ (ชุด)",
@@ -915,7 +924,7 @@
      "api": null,
      "effects": [],
      "when": "แท็บชุดข้อสอบ",
-     "src": "src/pages/skill-quiz/SkillQuizPage.tsx:329"
+     "src": "src/pages/skill-quiz/SkillQuizPage.tsx:337"
     }
    ]
   },
@@ -12206,6 +12215,56 @@
      "effects": [],
      "when": "",
      "src": "src/components/skill-quiz/QuizShareDialog.tsx:66"
+    }
+   ]
+  },
+  {
+   "id": "quiz-ai-skills-dialog",
+   "kind": "popup",
+   "title": "Skill ของ AI",
+   "route": null,
+   "parent": "skill-test",
+   "src": "src/components/skill-quiz/AiSkillsDialog.tsx:21",
+   "controls": [
+    {
+     "label": "เพิ่ม Skill",
+     "action": "inline",
+     "target": "ฟอร์มชื่อ + เนื้อหา (ในป๊อปเดิม)",
+     "api": null,
+     "effects": [],
+     "when": "",
+     "src": "src/components/skill-quiz/AiSkillsDialog.tsx:122"
+    },
+    {
+     "label": "แก้ (Skill)",
+     "action": "inline",
+     "target": "ฟอร์มชื่อ + เนื้อหา (ในป๊อปเดิม)",
+     "api": null,
+     "effects": [],
+     "when": "",
+     "src": "src/components/skill-quiz/AiSkillsDialog.tsx:153"
+    },
+    {
+     "label": "บันทึก Skill",
+     "action": "api",
+     "target": "คลัง Skill · ชุดที่เลือกตัวนี้ใช้ตาม",
+     "api": "POST /api/skill-quiz (save_ai_skill)",
+     "effects": [
+      "เขียนฐาน"
+     ],
+     "when": "ในฟอร์ม",
+     "src": "src/components/skill-quiz/AiSkillsDialog.tsx:114"
+    },
+    {
+     "label": "ลบ (Skill)",
+     "action": "api",
+     "target": "ยืนยันในแถว ไม่ลบ / ลบ",
+     "api": "POST /api/skill-quiz (archive_ai_skill)",
+     "effects": [
+      "เขียนฐาน"
+     ],
+     "when": "กดลบแล้วยืนยันในแถว",
+     "src": "src/components/skill-quiz/AiSkillsDialog.tsx:146"
     }
    ]
   },

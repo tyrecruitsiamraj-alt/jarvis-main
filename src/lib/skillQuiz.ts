@@ -41,8 +41,8 @@ export type QuizSetContent = {
   passScore: number;
   /** เกณฑ์เกรดของชุด (17 พ.ย. 2569 เจ้าของตั้งเองต่อชุด) — ไม่มี = 85/70/60 · ผลที่ทำไปแล้วใช้ค่าตอนทำ */
   grades?: QuizGrades;
-  /** ความรู้/หลักคิดของผู้เชี่ยวชาญที่ให้ AI ใช้ตอนร่างผลวิเคราะห์ (เจ้าของ 17 พ.ย. 2569 "เพิ่ม Skill ให้ทีผ่านหน้า ui") · ไม่มี = บทบาทหัวหน้าช่างทั่วไป */
-  aiSkill?: string;
+  /** Skill ของ AI ที่ชุดนี้เลือกจากคลัง (`skill_quiz_ai_skills` · เจ้าของ 17 พ.ย. 2569) · ไม่มี = บทบาทหัวหน้าช่างทั่วไป */
+  aiSkillId?: string;
   skills: QuizSkill[];
   questions: QuizQuestion[];
 };
@@ -58,6 +58,22 @@ export const QUIZ_DEFAULT_HEADER = 'SO PEOPLE | TECHNICAL SKILL HEALTH CHECK';
 export const QUIZ_DEFAULT_PASS = 70;
 export const QUIZ_DEFAULT_GRADES: QuizGrades = { a: 85, b: 70, c: 60 };
 export const QUIZ_AI_SKILL_MAX = 20_000;
+export const QUIZ_AI_SKILL_NAME_MAX = 80;
+
+/** Skill ในคลัง — ชื่อ + เนื้อหา */
+export type QuizAiSkill = { id: string; name: string; body: string; updated_at: string; updated_by_name: string | null };
+
+/** ตรวจ Skill ที่กรอกจากหน้าจอ */
+export function parseQuizAiSkillInput(raw: unknown): { ok: true; value: { name: string; body: string } } | { ok: false; message: string } {
+  const o = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
+  const name = typeof o.name === 'string' ? o.name.trim() : '';
+  const body = typeof o.body === 'string' ? o.body.trim() : '';
+  if (!name) return { ok: false, message: 'ใส่ชื่อ Skill' };
+  if (name.length > QUIZ_AI_SKILL_NAME_MAX) return { ok: false, message: `ชื่อ Skill ยาวเกิน ${QUIZ_AI_SKILL_NAME_MAX} ตัวอักษร` };
+  if (!body) return { ok: false, message: 'ใส่เนื้อหา Skill' };
+  if (body.length > QUIZ_AI_SKILL_MAX) return { ok: false, message: `Skill ยาวเกิน ${QUIZ_AI_SKILL_MAX.toLocaleString('th-TH')} ตัวอักษร` };
+  return { ok: true, value: { name, body } };
+}
 export const QUIZ_MAX_QUESTIONS = 200;
 export const QUIZ_MAX_CHOICES = 8;
 
@@ -107,8 +123,7 @@ export function parseQuizSetInput(raw: unknown): { ok: true; value: QuizSetConte
   if (!Number.isFinite(passScore) || passScore < 1 || passScore > 100) return { ok: false, message: 'เกณฑ์ผ่านต้องอยู่ระหว่าง 1–100' };
   const grades = parseQuizGrades(o.grades);
   if ('message' in grades) return { ok: false, message: grades.message };
-  const aiSkill = typeof o.aiSkill === 'string' ? o.aiSkill.trim() : '';
-  if (aiSkill.length > QUIZ_AI_SKILL_MAX) return { ok: false, message: `Skill ของ AI ยาวเกิน ${QUIZ_AI_SKILL_MAX.toLocaleString('th-TH')} ตัวอักษร` };
+  const aiSkillId = typeof o.aiSkillId === 'string' && IMAGE_ID.test(o.aiSkillId) ? o.aiSkillId : '';
   const skillsRaw = Array.isArray(o.skills) ? o.skills : [];
   const skills: QuizSkill[] = [];
   for (const s of skillsRaw) {
@@ -155,7 +170,7 @@ export function parseQuizSetInput(raw: unknown): { ok: true; value: QuizSetConte
   if (unused) return { ok: false, message: `ทักษะ "${unused.name}" ยังไม่มีข้อ` };
   return {
     ok: true,
-    value: { title, roleLabel: clean(o.roleLabel, 200), headerLine: clean(o.headerLine, 120) || QUIZ_DEFAULT_HEADER, passScore, grades: grades.value, ...(aiSkill ? { aiSkill } : {}), skills, questions },
+    value: { title, roleLabel: clean(o.roleLabel, 200), headerLine: clean(o.headerLine, 120) || QUIZ_DEFAULT_HEADER, passScore, grades: grades.value, ...(aiSkillId ? { aiSkillId } : {}), skills, questions },
   };
 }
 

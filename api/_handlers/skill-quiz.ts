@@ -4,6 +4,7 @@
  * GET ?view=sets   → ชุดข้อสอบ (+ ลิงก์ของชุด + ใครเห็น)
  * GET ?view=people → รายชื่อผู้ใช้ไว้เลือก "ใครเห็นชุดนี้"
  * GET ?id=         → ผลของคนหนึ่งคน (มีเฉลย/คำตอบ/บทวิเคราะห์)
+ * GET ?view=ai_skills → คลัง Skill ของ AI · POST save_ai_skill {id?, name, body} · archive_ai_skill {id} (17 พ.ย. 2569)
  * POST { action }  → create_set · update_set · archive_set · save_review · ai_draft · archive_attempt
  * POST { action: 'upload_image', data } → { id } รูปของคำถาม/ตัวเลือก (17 พ.ย. 2569) · รูปเปิดดูที่ /api/public/skill-quiz?image=
  * 🔴 16 พ.ย. 2569 เห็นเฉพาะชุดที่ตั้งให้เห็น (ทั้ง BU / รายคน · `canSeeQuizSet`) — ผลของคนทำเห็นตามชุด
@@ -17,8 +18,11 @@ import { tableInAppSchema } from '../_lib/schema.js';
 import { APP_DEPARTMENT_CODES, loadUserDepartmentScope } from '../_lib/departmentScope.js';
 import { decryptPii } from '../_lib/piiCipher.js';
 import {
+  archiveAiSkill,
   archiveQuizAttempt,
   archiveQuizSet,
+  listAiSkills,
+  saveAiSkill,
   createQuizSet,
   draftQuizWithAi,
   getQuizAttempt,
@@ -30,7 +34,7 @@ import {
   updateQuizSet,
   type QuizAttemptRow,
 } from '../_lib/skillQuiz.js';
-import { parseQuizAnalysis, parseQuizSetInput, quizAttemptStatus, scoreQuiz } from '../../src/lib/skillQuiz.js';
+import { parseQuizAiSkillInput, parseQuizAnalysis, parseQuizSetInput, quizAttemptStatus, scoreQuiz } from '../../src/lib/skillQuiz.js';
 import { canSeeQuizSet, maskCitizenId, parseQuizViewers, type QuizViewer } from '../../src/lib/skillQuizTaker.js';
 
 const USERS = tableInAppSchema('users');
@@ -76,6 +80,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
       res.setHeader?.('Cache-Control', 'no-store');
       const view = one(req.query?.view);
       if (view === 'sets') return res.status(200).json({ sets: await visibleSets() });
+      if (view === 'ai_skills') return res.status(200).json({ skills: await listAiSkills() });
       if (view === 'people') {
         const { rows } = await dbQuery<{ id: string; name: string; bu: string | null }>(
           `select id::text, coalesce(nullif(trim(nickname), ''), nullif(trim(full_name), ''), email) as name, department_code as bu
@@ -140,6 +145,21 @@ async function handler(req: AuthedReq, res: ApiRes) {
       const saved = await saveQuizImage(typeof body.data === 'string' ? body.data : '', byName);
       if (!saved.ok) return sendError(res, 400, 'bad_request', saved.message);
       return res.status(201).json({ id: saved.id });
+    }
+    if (action === 'save_ai_skill') {
+      const parsed = parseQuizAiSkillInput(body);
+      if ('message' in parsed) return sendError(res, 400, 'bad_request', parsed.message);
+      if (id && !UUID.test(id)) return sendError(res, 400, 'bad_request', 'id ไม่ถูกต้อง');
+      const saved = await saveAiSkill({ id: id || null, ...parsed.value }, byName);
+      if (!saved) return sendError(res, 404, 'not_found', 'ไม่พบ Skill นี้');
+      void auditFromAuthed(req, { action: id ? 'skill_quiz.ai_skill_update' : 'skill_quiz.ai_skill_create', entityType: 'skill_quiz_ai_skill', entityId: saved, after: { name: parsed.value.name } }).catch(() => {});
+      return res.status(id ? 200 : 201).json({ id: saved });
+    }
+    if (action === 'archive_ai_skill') {
+      if (!UUID.test(id)) return sendError(res, 400, 'bad_request', 'id ไม่ถูกต้อง');
+      if (!(await archiveAiSkill(id))) return sendError(res, 404, 'not_found', 'ไม่พบ Skill นี้');
+      void auditFromAuthed(req, { action: 'skill_quiz.ai_skill_archive', entityType: 'skill_quiz_ai_skill', entityId: id }).catch(() => {});
+      return res.status(200).json({ ok: true });
     }
     if (action === 'archive_set') {
       if (!UUID.test(id)) return sendError(res, 400, 'bad_request', 'id ไม่ถูกต้อง');

@@ -16,6 +16,7 @@ import {
   buildQuizAiSystem,
   parseQuizAiReply,
   quizDocNo,
+  type QuizAiSkill,
   type QuizAnalysis,
   type QuizAnswers,
   type QuizSetContent,
@@ -26,6 +27,7 @@ const SETS = tableInAppSchema('skill_quiz_sets');
 const ATTEMPTS = tableInAppSchema('skill_quiz_attempts');
 const DOC_SEQ = tableInAppSchema('skill_quiz_doc_seq');
 const IMAGES = tableInAppSchema('skill_quiz_images');
+const AI_SKILLS = tableInAppSchema('skill_quiz_ai_skills');
 
 /** รูปของคำถาม/ตัวเลือก (17 พ.ย. 2569 · migration 183) — หน้าจอย่อรูปก่อนส่ง เพดานนี้กันของหลุด */
 export const QUIZ_IMAGE_MAX_BYTES = 1_500_000;
@@ -252,6 +254,46 @@ export async function archiveQuizAttempt(id: string): Promise<boolean> {
  *    - เบื้องหลังหลังพนักงานส่ง (`manual` ไม่ส่ง) = เขียนเฉพาะใบที่ยังไม่ตรวจ (ฐานตัดสินใน where — ตรวจก่อน AI ตอบเสร็จก็ไม่ทับ)
  *    - เจ้าหน้าที่กดให้ AI ร่างใหม่เอง (`manual`) = ทับได้ และล้างสถานะตรวจแล้ว (ต้องตรวจใหม่ก่อนส่งลูกค้า)
  */
+/** คลัง Skill ของ AI (migration 185 · เจ้าของ 17 พ.ย. 2569) — ชุดเลือกด้วย content.aiSkillId */
+export async function listAiSkills(): Promise<QuizAiSkill[]> {
+  const { rows } = await dbQuery<QuizAiSkill>(
+    `select id::text, name, body, updated_at, updated_by_name from ${AI_SKILLS} where archived_at is null order by name`,
+  );
+  return rows;
+}
+
+/** เนื้อหา Skill ที่ยังไม่ถูกลบ · ไม่มี/ลบแล้ว = null (AI ใช้บทบาทเดิม) */
+async function aiSkillBodyOf(id: string | null | undefined): Promise<string | null> {
+  if (!id) return null;
+  const { rows } = await dbQuery<{ body: string }>(`select body from ${AI_SKILLS} where id = $1::uuid and archived_at is null`, [id]);
+  return rows[0]?.body ?? null;
+}
+
+/** เพิ่ม (ไม่มี id) หรือแก้ Skill · คืน id · แก้ตัวที่ไม่มี/ลบแล้ว = null */
+export async function saveAiSkill(input: { id: string | null; name: string; body: string }, byName: string | null): Promise<string | null> {
+  if (!input.id) {
+    const { rows } = await dbQuery<{ id: string }>(
+      `insert into ${AI_SKILLS} (name, body, created_by_name, updated_by_name) values ($1, $2, $3, $3) returning id::text`,
+      [input.name, input.body, byName],
+    );
+    return rows[0].id;
+  }
+  const { rows } = await dbQuery<{ id: string }>(
+    `update ${AI_SKILLS} set name = $2, body = $3, updated_by_name = $4, updated_at = now()
+      where id = $1::uuid and archived_at is null returning id::text`,
+    [input.id, input.name, input.body, byName],
+  );
+  return rows[0]?.id ?? null;
+}
+
+export async function archiveAiSkill(id: string): Promise<boolean> {
+  const { rows } = await dbQuery<{ id: string }>(
+    `update ${AI_SKILLS} set archived_at = now() where id = $1::uuid and archived_at is null returning id::text`,
+    [id],
+  );
+  return rows.length > 0;
+}
+
 export async function draftQuizWithAi(id: string, opts: { manual?: boolean } = {}): Promise<{ ok: true } | { ok: false; message: string }> {
   const a = await getQuizAttempt(id);
   if (!a || !a.answers) return { ok: false, message: 'ยังไม่มีคำตอบ' };
@@ -265,8 +307,8 @@ export async function draftQuizWithAi(id: string, opts: { manual?: boolean } = {
     reply = await aiChat({
       task: 'skill_report',
       messages: [
-        // Skill ของชุดตอนนี้ (แก้ที่ป๊อปชุดแล้วกดร่างใหม่ใช้ได้เลย) · ชุดถูกลบ = ของในใบผล
-        { role: 'system', content: buildQuizAiSystem((await getQuizSet(a.set_id))?.content.aiSkill ?? a.content.aiSkill) },
+        // Skill ที่ชุดเลือกอยู่ตอนนี้ (แก้ในคลังแล้วกดร่างใหม่ใช้ได้เลย) · ชุดถูกลบ = ตัวที่ใบผลสำเนาไว้
+        { role: 'system', content: buildQuizAiSystem(await aiSkillBodyOf((await getQuizSet(a.set_id))?.content.aiSkillId ?? a.content.aiSkillId)) },
         { role: 'user', content: buildQuizAiPrompt(a.content, a.answers) },
       ],
       format: 'json',
