@@ -54,7 +54,7 @@ const ClaimIdleAlertDialog: React.FC = () => {
             {alert.message}
             <br />
             ระบบถอดชื่อออกให้แล้ว — ใบเหล่านี้รออยู่ในกอง <b>"เลือกวิธีโทร"</b> ให้เลือกว่าจะ
-            เก็บไปโทรเองหรือส่ง AI โทร · ถ้าไม่เลือกภายใน 1 วัน AI จะรับไปโทรเอง
+            เก็บไปโทรเองหรือส่ง AI โทร
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

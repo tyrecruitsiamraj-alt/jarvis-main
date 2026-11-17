@@ -127,7 +127,8 @@ export function buildUnclaimNotice(items: UnclaimedItem[], now: Date = new Date(
   void now;
   return {
     title: `ถอดชื่อที่เก็บไว้แล้วไม่โทร ${items.length} ใบ`,
-    body: `${who}${more}${agePart} — ใบเหล่านี้ไปอยู่กอง "เลือกวิธีโทร" ไม่เลือกภายใน 1 วัน AI จะรับไปโทรเอง`,
+    // 17 พ.ย. 2569 ปล่อยแล้วไม่ส่ง AI เอง (เจ้าของ Choice "กลับกองกลาง ไม่ส่ง AI เอง")
+    body: `${who}${more}${agePart} — ใบเหล่านี้ไปอยู่กอง "เลือกวิธีโทร"`,
   };
 }
 

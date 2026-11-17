@@ -5,6 +5,11 @@
  *   ① ถอด claim ของใบที่ดองเกิน 1 วันไม่มี dial stamp → เตือนหัวหน้า (5.7-5.8)
  *   ② ใบที่อยู่กอง "เลือกวิธีโทร" ครบ 1 วันแล้วยังไม่มีใครเลือก → ส่งเข้าคิว AI เอง (5.10)
  *
+ * 🔴 17 พ.ย. 2569 เจ้าของ "คนออกแล้วชื่อที่เก็บไปไหน … ต้องออกมา Auto" · Choice "กลับกองกลาง ไม่ส่ง AI เอง":
+ *   ① ทำเหมือนเดิม + ชื่อของคนที่ปิด/ลบบัญชีแล้ว ปล่อยทันทีไม่รอ 1 วัน (ทั้งที่เก็บไว้และ Lead ในการติดต่อ)
+ *   · ห้ามปล่อย: ได้งานแล้ว / มีนัด / ยกเลิกแล้ว (`CLAIM_KEEP_SQL`)
+ *   ② ส่ง AI เองแยกสวิตช์ `CLAIM_AUTO_AI_ENABLED` **ปิดไว้** — ปล่อยแล้วอยู่กอง "เลือกวิธีโทร" ให้คนเลือกเอง
+ *
  * 🔴 **ปิดโดยค่าเริ่มต้น เปิดที่ deploy เท่านั้น** (`CLAIM_GUARD_ENABLED=true`)
  * ฐาน dev = production — worker บนเครื่องนักพัฒนาจะถอด claim ของคนจริงและยิงสายจริง
  * (บทเรียนเดียวกับยามเฝ้าระบบ 19 ส.ค. 2569 ที่เด้ง "ERP ผิดปกติ" เข้าฐานจริง)
@@ -18,7 +23,7 @@ import { OVER_AGE_MIN } from '../../src/lib/applicantAge.js';
 import { tableInAppSchema } from './schema.js';
 import { logError, logInfo } from './logger.js';
 import { notifyRoles } from './appNotifications.js';
-import { OVERVIEW_BUCKETS } from './applicantOverviewSql.js';
+import { CLAIM_KEEP_SQL, OVERVIEW_BUCKETS } from './applicantOverviewSql.js';
 import { enqueueLumosInterviewForApplications } from './lumosDispatch.js';
 import { autoMoveIntEnv } from '../../src/lib/applicationAutoMoveReport.js';
 import {
@@ -31,6 +36,16 @@ import {
 import { splitIrecruitDuplicates } from './irecruitDuplicates.js';
 
 const APPS = tableInAppSchema('public_job_applications');
+const USERS = tableInAppSchema('users');
+
+/** คนเก็บ/คนถือ Lead ไม่ใช่บัญชีที่ยังใช้งาน (ปิดหรือลบแล้ว) */
+const departedSql = (col: string) => `not exists (select 1 from ${USERS} u where u.id = ${col} and u.is_active)`;
+
+/** ② ส่ง AI เองหลังปล่อย — ปิดเป็นค่าเริ่ม (เจ้าของ 17 พ.ย. 2569 "กลับกองกลาง ไม่ส่ง AI เอง") */
+export function isClaimAutoAiEnabled(): boolean {
+  const raw = String(process.env.CLAIM_AUTO_AI_ENABLED ?? '').trim().toLowerCase();
+  return raw === 'true' || raw === '1' || raw === 'yes' || raw === 'on';
+}
 const IRECRUIT_DUPS = tableInAppSchema('application_irecruit_dups');
 
 const DEFAULT_INTERVAL_MS = 900_000; // 15 นาที — จังหวะเดียวกับตัวย้ายใบสมัคร
@@ -83,8 +98,12 @@ async function unclaimIdle(limit: number, now: Date): Promise<UnclaimedItem[]> {
     claimed_at: string | null;
   }>(
     `with due as (
-       select a.id, a.claimed_at from ${APPS} a
-        where ${OVERVIEW_BUCKETS.claimed_idle}
+       select a.id, a.claimed_at, ${departedSql('a.claimed_by')} as departed from ${APPS} a
+        where (${OVERVIEW_BUCKETS.claimed_idle}
+               -- คนเก็บปิด/ลบบัญชีแล้ว = ปล่อยทันที ไม่รอ 1 วัน
+               or (a.claimed_by is not null and ${departedSql('a.claimed_by')}))
+          -- ได้งานแล้ว / มีนัด / ยกเลิกแล้ว = ไม่ปล่อย (17 พ.ย. 2569)
+          and not ${CLAIM_KEEP_SQL}
         order by a.claimed_at asc
         limit $1
      )
@@ -93,7 +112,7 @@ async function unclaimIdle(limit: number, now: Date): Promise<UnclaimedItem[]> {
             claimed_by_name = null,
             claimed_at = null,
             unclaimed_at = now(),
-            unclaimed_from_name = a.claimed_by_name,
+            unclaimed_from_name = case when due.departed then coalesce(a.claimed_by_name, 'เจ้าหน้าที่') || ' (ปิดบัญชีแล้ว)' else a.claimed_by_name end,
             call_choice = null,
             call_choice_at = null,
             call_choice_by_name = null,
@@ -108,6 +127,25 @@ async function unclaimIdle(limit: number, now: Date): Promise<UnclaimedItem[]> {
     heldByName: r.unclaimed_from_name,
     days: idleDays(r.claimed_at, now),
   }));
+}
+
+/** Lead ในการติดต่อของคนที่ปิด/ลบบัญชีแล้ว → ปล่อยกลับรายชื่อผู้สมัคร (ยกเว้นได้งาน/มีนัด/ยกเลิก) */
+async function releaseDepartedLeads(limit: number): Promise<number> {
+  const { rows } = await dbQuery<{ id: string }>(
+    `with due as (
+       select a.id from ${APPS} a
+        where coalesce(a.is_lead, false) and a.lead_by is not null
+          and ${departedSql('a.lead_by')} and not ${CLAIM_KEEP_SQL}
+        limit $1
+     )
+     update ${APPS} a
+        set is_lead = false, lead_by = null, lead_by_name = null, lead_at = null, updated_at = now()
+       from due
+      where a.id = due.id
+      returning a.id::text as id`,
+    [limit],
+  );
+  return rows.length;
 }
 
 /**
@@ -214,11 +252,16 @@ export async function runClaimGuardOnce(opts?: { limit?: number; now?: Date }): 
       });
     }
 
-    const sent = await autoSendToAi(limit);
-    run.autoQueued = sent.queued;
-    run.autoSkipped = sent.skipped;
+    const leadsReleased = await releaseDepartedLeads(limit);
+
+    if (isClaimAutoAiEnabled()) {
+      const sent = await autoSendToAi(limit);
+      run.autoQueued = sent.queued;
+      run.autoSkipped = sent.skipped;
+    }
     logInfo('claimGuard.run', {
       unclaimed: run.unclaimed,
+      leadsReleased,
       autoQueued: run.autoQueued,
       autoSkipped: run.autoSkipped,
     });

@@ -1479,7 +1479,6 @@ const RmWorkspace: React.FC<{
                   </div>
                   <ul className="space-y-1">
                     {awaitingChoiceRows.slice(0, AWAITING_ROWS_SHOWN).map((r) => {
-                      const cd = choiceCountdown(r.unclaimed_at, now);
                       return (
                         <li
                           key={r.id}
@@ -1489,12 +1488,6 @@ const RmWorkspace: React.FC<{
                             <b className={DASH.cellStrong}>{r.full_name}</b>
                             {r.unclaimed_from_name ? (
                               <span className={DASH.muted}> · เดิม {r.unclaimed_from_name} เก็บไว้</span>
-                            ) : null}
-                            {cd ? (
-                              <span className={cd.overdue ? TONE.danger.value : TONE.warn.value}>
-                                {' '}
-                                · {cd.label}
-                              </span>
                             ) : null}
                           </span>
                           <span className="flex shrink-0 items-center gap-1">

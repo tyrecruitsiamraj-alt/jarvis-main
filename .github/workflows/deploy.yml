@@ -82,6 +82,9 @@ jobs:
                       ./scripts/sync-env.sh .env APPLICATION_AUTO_MOVE_ENABLED "true"
                       ./scripts/sync-env.sh .env APPLICATION_AUTO_MOVE_APPLY "false"
                       ./scripts/sync-env.sh .env MATCH_PRECOMPUTE_ENABLED "true"
+                      # ปล่อยชื่อที่เก็บแล้วดอง/คนออกแล้ว กลับกองกลาง (เจ้าของ 17 พ.ย. 2569 · ไม่ส่ง AI เอง = CLAIM_AUTO_AI_ENABLED ไม่ตั้ง)
+                      ./scripts/sync-env.sh .env CLAIM_GUARD_ENABLED "true"
+                      ./scripts/sync-env.sh .env CLAIM_AUTO_AI_ENABLED "false"
                       docker compose up -d --build
                       docker compose exec -T app npm run db:migrate
                       docker compose exec -T app npx tsx scripts/verify-api-registry.mjs

@@ -273,12 +273,24 @@ const LATEST_CONTACT_APPOINTMENT_AT_SQL = `(
  * มีนัดจริง — บันทึกติดต่อล่าสุดนัดได้ (ดูข้างบน) หรือนัดจากคนถือ (hold 085 คีย์เบอร์ · คงเดิม)
  * contact log ชนะ hold เหมือนเดิม (ลิสต์แนบวันนัดด้วยกติกานี้)
  */
+/**
+ * ชื่อที่ "ห้ามปล่อย" แม้คนเก็บไม่ทำอะไรต่อ/ออกไปแล้ว (เจ้าของ 17 พ.ย. 2569 "ต้องออกมา Auto เว้นเฉพาะคนที่ได้ลงงาน หรืออะไร … คิดต่อหน่อย")
+ * ได้งานแล้ว (converted) · มีนัดแล้ว · ยกเลิกข้อมูลผู้สมัครแล้ว — ปล่อยไปก็ไม่มีอะไรให้โทรต่อ ปล่อยแล้วกองกลางรกเปล่า ๆ
+ * ประกาศหลัง HAS_APPOINTMENT_SQL (ใช้ต่อกัน) — ดู CLAIM_KEEP_SQL ด้านล่าง
+ * ⚠️ ใช้ใน worker ปล่อยชื่อ (callChoiceWorker) เท่านั้น ห้ามใส่ใน OVERVIEW_BUCKETS — ถังภาพรวมห้ามอ่าน status ของใบ (เทสต์คุม)
+ */
 export const HAS_APPOINTMENT_SQL = `(
   ${LATEST_CONTACT_APPOINTMENT_AT_SQL} is not null
   or (a.phone_e164 is not null and exists (
        select 1 from ${HOLDS} h
         where h.phone_e164 = a.phone_e164 and h.appointment_at is not null
           and ${qcol('h', HOLD_EVENT_AT)} >= a.created_at))
+)`;
+
+export const CLAIM_KEEP_SQL = `(
+  a.status = 'converted'
+  or ${HAS_APPOINTMENT_SQL}
+  or exists (select 1 from ${CANCELLATIONS} x where x.application_id = a.id)
 )`;
 
 /** วันนัดของใบ (contact log ล่าสุดชนะ hold — กติกาเดียวกับ HAS_APPOINTMENT_SQL) */

@@ -75,19 +75,16 @@ function ProcessCell({ r }: { r: PublicApplication }) {
  */
 const STICKY_NAME = 'sticky left-0 z-10';
 
-/** ป้ายนับถอยหลังของใบที่รออยู่ในกอง "เลือกวิธีโทร" (Phase 5.9)
- *  ⚠️ เวลาต้องคิดจาก choiceCountdown() ที่เดียว — ป้ายบนจอกับนาทีที่ worker ลงมือต้องเป็นชุดเดียวกัน */
-function ChoiceCountdownChip({ r, now }: { r: PublicApplication; now: Date }) {
+/**
+ * ป้ายของใบที่ถูกปล่อยกลับกอง "เลือกวิธีโทร" (Phase 5.9)
+ * 🔴 17 พ.ย. 2569 เจ้าของ Choice "กลับกองกลาง ไม่ส่ง AI เอง" — ถอดป้ายนับถอยหลังให้ AI (AI ไม่โทรเองแล้ว)
+ * บอกแค่ว่าปล่อยมาจากใคร · คนออกแล้วชื่อลงท้าย "(ปิดบัญชีแล้ว)" จาก worker
+ */
+function ChoiceCountdownChip({ r }: { r: PublicApplication; now: Date }) {
   if (!r.unclaimed_at || r.call_choice || r.claimed) return null;
-  const cd = choiceCountdown(r.unclaimed_at, now);
-  if (!cd) return null;
-  const tone = cd.overdue ? TONE.danger : TONE.warn;
   return (
-    <span
-      title={`ถูกถอดจาก ${r.unclaimed_from_name || 'คนที่เก็บไว้'} เพราะเก็บไว้เกิน 1 วันแล้วยังไม่โทร — ${cd.label}`}
-      className={cn('w-fit rounded-full border px-1.5 py-0.5 text-xs font-medium', tone.soft, tone.value)}
-    >
-      {cd.overdue ? 'ครบกำหนด — AI จะรับไป' : `รอเลือกวิธีโทร · ${cd.hoursLeft} ชม.`}
+    <span className={cn('w-fit rounded-full border px-1.5 py-0.5 text-xs font-medium', TONE.warn.soft, TONE.warn.value)}>
+      ปล่อยจาก {r.unclaimed_from_name || 'คนที่เก็บไว้'}
     </span>
   );
 }

@@ -75,7 +75,7 @@ describe('โครงสร้างโค้ด (กับดักที่�
   });
 
   it('เก็บชื่อคนที่โดนถอดไว้ก่อนล้าง claim (ไม่งั้นชื่อหายไปกับ update)', () => {
-    expect(SRC).toContain('unclaimed_from_name = a.claimed_by_name');
+    expect(SRC).toContain("unclaimed_from_name = case when due.departed then coalesce(a.claimed_by_name, 'เจ้าหน้าที่') || ' (ปิดบัญชีแล้ว)' else a.claimed_by_name end");
   });
 
   it('เตือนหัวหน้าทั้ง admin และ supervisor + มี dedupeKey กันเตือนซ้ำ', () => {
