@@ -5,6 +5,8 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { EMPTY_JOB_POST_ACTIONS } from '@/lib/jobPostActions';
+// โหลดตั้งแต่ต้นไฟล์ (vi.mock ถูกยกขึ้นก่อน import อยู่แล้ว) — เดิม import() ในเทสต์ กินเวลาเทสต์จนเกิน 5 วิ ตอนรันทั้งชุด (17 พ.ย. 2569)
+import { JobPostActionsPanel } from './JobPostActionsDialog';
 
 const link = (id: string, label: string, post_url: string | null) => ({
   id, origin: 'manual' as const, code: `c${id}`, channel_label: `Facebook · Facebook Group · ${label}`, created_at: '2026-11-13T05:56:00Z',
@@ -21,9 +23,8 @@ vi.mock('@/lib/jobPostActionsApi', () => ({
 
 describe('แท็บโพสต์เอง: Gen link / โพสต์', () => {
   it('Gen link = ไม่มีลิงก์โพสต์ · โพสต์ = มีลิงก์โพสต์ กดเปิดดูโพสต์ · สองแท็บรวม = ทั้งหมด', async () => {
-    const { JobPostActionsPanel } = await import('./JobPostActionsDialog');
     render(<JobPostActionsPanel jobId="siamraj-pre:LBM6909002" tab="manual" onTabChange={() => {}} />);
-    await waitFor(() => expect(screen.getByTestId('job-actions-manual-tabs')).toBeTruthy());
+    await waitFor(() => expect(screen.getByTestId('job-actions-manual-tabs')).toBeTruthy(), { timeout: 5000 });
     expect(screen.getByTestId('job-actions-manual-gen').textContent).toContain('2');
     expect(screen.getByTestId('job-actions-manual-posted').textContent).toContain('1');
     expect(screen.getAllByTestId('job-actions-link-row').map((r) => r.textContent)).toEqual([expect.stringContaining('กลุ่ม B'), expect.stringContaining('กลุ่ม C')]);
@@ -32,5 +33,5 @@ describe('แท็บโพสต์เอง: Gen link / โพสต์', () 
     expect(rows).toHaveLength(1);
     expect(rows[0].textContent).toContain('กลุ่ม A');
     expect(rows[0].querySelector('a')?.getAttribute('href')).toBe('https://www.facebook.com/groups/1/posts/2/');
-  });
+  }, 15_000);
 });
