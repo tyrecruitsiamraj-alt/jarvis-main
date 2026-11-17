@@ -23,7 +23,8 @@ export const buDot = (bu: string): string => TONE[BU_TONE[bu] ?? 'neutral'].dot;
 export function SectionTitle({ title, right, id }: { title: string; right?: React.ReactNode; id?: string }) {
   return (
     <div className="flex flex-wrap items-end justify-between gap-2">
-      <h2 id={id} className="text-lg font-medium text-foreground">
+      {/* แถบสีแบรนด์ซ้ายหัวข้อ — แยกส่วนให้เห็นชัด (เจ้าของ 17 พ.ย. 2569 "มันดูกลมกลืนกันไปหมดเลย") */}
+      <h2 id={id} className="border-l-4 border-primary pl-3 text-lg font-medium text-foreground">
         {title}
       </h2>
       {right ? <div className={cn('text-xs', DASH.sub)}>{right}</div> : null}
@@ -61,7 +62,9 @@ export function Kpi({
       {prev !== undefined ? <TrendDelta cur={value} prev={prev} sense={sense} /> : null}
     </>
   );
-  if (!onClick) return <div className="flex min-w-0 flex-col gap-1">{body}</div>;
+  // ทุกยอดอยู่ในกรอบของตัวเอง (ไม่ลอยบนพื้นการ์ด) — ขนาดกรอบเท่ากันทั้งแถว
+  const tile = 'flex min-w-0 flex-col items-start gap-1 rounded-xl border border-border bg-muted/30 px-3 py-2.5 text-left';
+  if (!onClick) return <div className={tile}>{body}</div>;
   return (
     <button
       type="button"
@@ -69,8 +72,9 @@ export function Kpi({
       data-testid={testId}
       aria-pressed={active}
       className={cn(
-        'flex min-w-0 flex-col items-start gap-1 rounded-xl px-2 py-1.5 text-left transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-        active && 'bg-muted',
+        tile,
+        'transition-colors hover:bg-muted/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+        active && 'border-primary bg-primary/5',
       )}
     >
       {body}

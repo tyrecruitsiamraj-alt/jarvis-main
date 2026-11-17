@@ -9,6 +9,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -316,7 +317,7 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
 
   const loadingReq = stuck.key !== filterKey;
   return (
-    <div className="space-y-6" data-testid="recruit-overview-v2">
+    <div className="space-y-8" data-testid="recruit-overview-v2">
       <StuckFilterBar rows={allRows ?? []} appRecruiters={appRecruiters} value={reqFilter} onChange={setReqFilter} />
       {/* ── ใบขอ + รายชื่อรอติดต่อ | การประกาศรับสมัคร ── */}
       <Card className="grid gap-6 rounded-2xl p-5 lg:grid-cols-2">
@@ -350,7 +351,7 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
             </div>
           </div>
         </section>
-        <section className="min-w-0 space-y-4">
+        <section className="min-w-0 space-y-4 border-t pt-6 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
           <SectionTitle title="การประกาศรับสมัคร" />
           <div className="grid grid-cols-3 gap-3">
             <Kpi label="ยังไม่เริ่มหา" emphasis value={loadingReq ? undefined : eq ? notStarted.length : null} onClick={eq ? () => openRequests('ยังไม่เริ่มหา', notStarted) : undefined} />
@@ -373,6 +374,7 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
         </section>
       </Card>
 
+      <Separator />
       {/* ── ผู้สมัครและผลการติดต่อ ── */}
       <Card className="space-y-4 rounded-2xl p-5">
         <SectionTitle title="ผู้สมัครและผลการติดต่อ" right={`รายการสมัคร${win.asOf ? ` · ผล ณ ${dayText(win.asOf)}` : ''}`} />
@@ -421,19 +423,17 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
       {/* ── เปรียบเทียบ BU และช่วงเวลา ── */}
       <Card className="space-y-4 rounded-2xl p-5" data-testid="v2-compare">
         <div>
-          <p className={cn('text-xs', DASH.sub)}>เปรียบเทียบ BU และช่วงเวลา</p>
-          <h2 className="text-lg font-medium">{V2_METRIC_LABEL[metric]}</h2>
-          <p className={cn('text-xs', DASH.sub)}>{buText}</p>
+          <SectionTitle title={`เปรียบเทียบ BU และช่วงเวลา · ${V2_METRIC_LABEL[metric]}`} right={buText} />
         </div>
         {st.ids === null ? (
           <p className={cn('text-sm', DASH.muted)}>อ่านข้อมูลแจ้งเข้า ERP ไม่ได้ในช่วงนี้ — ไม่ทราบผล</p>
         ) : (
           <div className="grid gap-6 lg:grid-cols-2">
-            <section className="space-y-2">
+            <section className="min-w-0 space-y-2">
               <h3 className="text-sm font-medium">แยกตาม BU</h3>
               <BuBars bars={buBars} unit="รายการ" onPick={(bu) => push({ kind: 'metric', metric, bu, page: 1 })} />
             </section>
-            <section className="space-y-2">
+            <section className="min-w-0 space-y-2">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <h3 className="text-sm font-medium">
                   ตามวันที่สมัคร · {V2_METRIC_LABEL[metric]} (รายการ){trendMonth ? ` · ${monthText(trendMonth)}` : ''}
@@ -469,6 +469,7 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
         )}
       </Card>
 
+      <Separator />
       {/* ── ผู้สมัครมาจากไหน | รายชื่ออยู่กับใคร ── */}
       <div className="grid gap-6 xl:grid-cols-2">
         <Card className="min-w-0 space-y-3 rounded-2xl p-5" data-testid="v2-channels">
