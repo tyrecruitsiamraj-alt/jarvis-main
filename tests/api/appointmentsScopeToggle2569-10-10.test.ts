@@ -191,11 +191,12 @@ describe('หน้าเว็บ: ปุ่ม ของฉัน / ทุก�
     expect(code).toMatch(/useEffect\(load, \[[^\]]*rowsScope\]\)/);
   });
 
-  it('🔴 ชุด "ทุกคน" มีแต่แถวนัด — ไม่เอาไปนับให้แท็บอื่น / กองเลือกวิธีโทร', () => {
+  it('🔴 ชุด "ทุกคน" มีแต่แถวนัด — ไม่เอาไปนับให้แท็บอื่น', () => {
     // 10 พ.ย. 2569 ครอบชุดการติดต่อของทุกคนด้วย (everyoneView = นัดทุกคน หรือ การติดต่อทุกคน)
     expect(code).toContain("const everyoneView = rowsScope !== 'mine';");
     expect(code).toMatch(/if \(bucket \|\| everyoneView \|\|/);
-    expect(code).toContain('everyoneView ? [] : rows.filter((r) => r.unclaimed_at');
+    // แถบ "ต้องเลือกวิธีโทร" ถอดแล้ว (เจ้าของ 17 พ.ย. 2569 Choice "ถอดแถบ ชื่ออยู่ชิปเดิม") — ไม่มีตัวนับกองนี้บนหน้าอีก
+    expect(code).not.toContain('awaitingChoiceRows');
   });
 
   it('สลับเร็ว ๆ แล้วคำตอบเก่ามาทีหลัง ต้องไม่ทับ (ลำดับคำขอ)', () => {
