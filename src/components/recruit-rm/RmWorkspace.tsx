@@ -328,7 +328,7 @@ const RmWorkspace: React.FC<{
 
   /**
    * นัดหมายของทุกคน — เฉพาะแท็บนี้ + supervisor ขึ้นไป + ไม่ได้อยู่มุมมองพิเศษ (?bucket/?lead/?cancelled มีเงื่อนไขของตัวเอง)
-   * 🔴 ชุดที่ได้มีแต่แถวนัด ⇒ ห้ามเอาไปนับให้แท็บอื่น (ดู `elsewhere` / `awaitingChoiceRows`)
+   * 🔴 ชุดที่ได้มีแต่แถวนัด ⇒ ห้ามเอาไปนับให้แท็บอื่น (ดู `elsewhere`)
    */
   const everyoneAppointments =
     tab === 'appointments' &&
@@ -654,17 +654,6 @@ const RmWorkspace: React.FC<{
       }));
   }, [appointmentPlaces, filtered, placeDay, placePick]);
 
-  /**
-   * ใบที่รออยู่ในกอง "เลือกวิธีโทร" (Phase 5.9) — คิดจาก **ชุดที่โหลดมาทั้งก้อน** ไม่ใช่
-   * `filtered` เพราะแถบนี้เป็น "งานที่ต้องลงมือ" ระดับหน้า ไม่ใช่ผลของตัวกรอง/คำค้น
-   * (กรองอยู่แล้วเห็นเลขน้อยลง = คนคิดว่างานหมดแล้ว)
-   * ⚠️ ต้องเช็ค `!r.claimed` ด้วย — มีคนกดเก็บใหม่ระหว่างรอ = ไม่ต้องเลือกอีก
-   */
-  const awaitingChoiceRows = useMemo(
-    // มุมมองนัดของทุกคนไม่ได้โหลดกองนี้มา (มีแต่แถวนัด) — กลับ "ของฉัน" แล้วแถบกลับมาเอง
-    () => (everyoneView ? [] : rows.filter((r) => r.unclaimed_at && !r.call_choice && !r.claimed)),
-    [rows, everyoneView],
-  );
   /** หมุดเวลาเดียวต่อการ render — ทุกป้ายนับถอยหลังจึงนับจากจุดเดียวกัน
    *  (แพตเทิร์นเดียวกับ RmTable ที่จับเวลาครั้งเดียวต่อ render ไม่ต้อง memo) */
   const now = new Date();
@@ -1449,43 +1438,8 @@ const RmWorkspace: React.FC<{
                   </Button>
                 </div>
               ) : null}
-              {/* กอง "เลือกวิธีโทร" (Phase 5.9) — ใบที่ worker ถอด claim เพราะดองเกิน 1 วัน
-                  🔴 ซ่อนตัวเองเมื่อไม่มีของ (แพตเทิร์นเดียวกับ MyCallsSection) — แถบที่ขึ้น
-                  ทุกวันด้วยเลข 0 คือขยะ (เจ้าของ: "ของน้อยคือสัญญาณ ของเยอะคือพื้นหลัง")
-                  17 พ.ย. 2569 เจ้าของ "วางกองไว้แบบนี้มันไม่สวย" — เหลือแถวเดียว · รายชื่อดูในตารางผ่าน ?bucket=awaiting_call_choice
-                  (เลือกทีละคนด้วย checkbox + ปุ่มบนตาราง) */}
-              {/* 17 พ.ย. 2569 เจ้าของ (หน้าการติดต่อของอ้น "มันปน") — กองนี้เป็นของกองกลาง ไม่ใช่ของฉัน
-                  ⇒ ขึ้นเฉพาะแท็บผู้สมัคร (+ ตอนดูกองนี้จากกล่อง/ดูรายชื่อ) · แท็บการติดต่อ/นัดหมายเหลือแค่คนที่ตัวเองเก็บ */}
-              {awaitingChoiceRows.length > 0 && (tab === 'candidates' || bucket === 'awaiting_call_choice') ? (
-                <div className={cn('flex flex-wrap items-center justify-between gap-2 rounded-xl border px-3 py-2', TONE.warn.soft)}>
-                  <p className={cn('text-sm font-medium', TONE.warn.value)}>
-                    ต้องเลือกวิธีโทร <span className="tabular-nums">{awaitingChoiceRows.length.toLocaleString('th-TH')}</span> คน
-                  </p>
-                  <div className="flex shrink-0 flex-wrap items-center gap-1.5">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      type="button"
-                      disabled={bucket === 'awaiting_call_choice'}
-                      onClick={() => {
-                        const params = new URLSearchParams(searchParams);
-                        params.set('bucket', 'awaiting_call_choice');
-                        setSearchParams(params);
-                        setSelectedIds([]);
-                        setPage(1);
-                      }}
-                    >
-                      ดูรายชื่อ
-                    </Button>
-                    <Button variant="secondary" size="sm" type="button" onClick={() => void keepForSelf(awaitingChoiceRows.map((r) => r.id))}>
-                      เก็บไปโทรเองทั้งหมด
-                    </Button>
-                    <Button size="sm" type="button" onClick={() => askSendAi(awaitingChoiceRows.map((r) => r.id))}>
-                      ส่ง AI โทรทั้งหมด
-                    </Button>
-                  </div>
-                </div>
-              ) : null}
+              {/* แถบ "ต้องเลือกวิธีโทร" ถอดแล้ว (เจ้าของ 17 พ.ย. 2569 Choice "ถอดแถบ ชื่ออยู่ชิปเดิม") — ชื่อที่ถูกปล่อยอยู่ในชิปของแท็บผู้สมัครตามผลจริง
+                  ใครเห็นก็เก็บไปโทรได้ · แถวบอก "ปล่อยจาก …" · รายชื่อทั้งกองยังเปิดจากแจ้งเตือนได้ที่ ?bucket=awaiting_call_choice */}
 
               {/* rm-print-area: ตอนกด "โหลดเป็น PDF" print CSS จะโชว์เฉพาะก้อนนี้
                   (เฉพาะแท็บนัดหมาย — แท็บอื่นพิมพ์ทั้งหน้าตามปกติ) */}
