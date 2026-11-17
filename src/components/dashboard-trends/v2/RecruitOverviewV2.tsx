@@ -33,7 +33,7 @@ import CallerResultsTable from '../stuck/CallerResultsTable';
 import V2Drawer, { type V2Pane } from './V2Drawer';
 import ApplicantStory from './ApplicantStory';
 import PostingProgress from './PostingProgress';
-import { Kpi, Pager, SectionTitle, fmt, fmtPct } from './V2Parts';
+import { Kpi, Pager, SectionTitle, fmt } from './V2Parts';
 import { MonthCompareBars } from './MonthCompareBars';
 import { V2_METRICS, V2_METRIC_LABEL, buildV2Model, type V2Metric } from './v2Model';
 
@@ -65,13 +65,11 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
   const [postView, setPostView] = React.useState<'notStarted' | 'started'>('started');
   /** BU ที่กดแท่ง — เรื่องเล่ารายชื่อใต้กราฟ (null = ทุก BU) */
   const [storyBu, setStoryBu] = React.useState<string | null>(null);
-  const [workPage, setWorkPage] = React.useState(1);
   const [clickPage, setClickPage] = React.useState(1);
   // เปลี่ยนวัน/BU = ล้างรายละเอียด + กลับหน้า 1 ทุกตาราง (ห้ามค้างข้อมูลช่วงเดิม)
   React.useEffect(() => {
     setStack([]);
     setStoryBu(null);
-    setWorkPage(1);
     setClickPage(1);
   }, [viewKey]);
 
@@ -146,17 +144,6 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
     .filter((g) => g.total > 0 || g.key !== BU_UNKNOWN)
     .sort((a, b) => b.total - a.total);
 
-  // ── คนสมัครงานที่ไหน (จังหวัดของงานที่สมัคร — ใบขอในรายการของช่วง) ──
-  const jobProvince = new Map((reqRows ?? []).filter((r) => r.jobId).map((r) => [r.jobId as string, r.province?.trim() || null]));
-  const workRows = (() => {
-    const m = new Map<string, string[]>();
-    for (const f of model.cohort) {
-      const k = (f.jobId && jobProvince.get(f.jobId)) || 'ไม่ทราบพื้นที่งาน';
-      m.set(k, [...(m.get(k) ?? []), f.id ?? '']);
-    }
-    return [...m.entries()].map(([k, ids]) => ({ k, ids })).sort((a, b) => (a.k === 'ไม่ทราบพื้นที่งาน' ? 1 : 0) - (b.k === 'ไม่ทราบพื้นที่งาน' ? 1 : 0) || b.ids.length - a.ids.length || a.k.localeCompare(b.k, 'th'));
-  })();
-  const workPg = pageOf(workRows, workPage);
   const unlinked = model.cohort.filter((f) => !f.jobId);
 
   /** สถานะการออกหาคนรายใบ 9 แบบ (ใบขอที่ดำเนินการ) — กดสถานะ = รายการใบ */
@@ -388,7 +375,6 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
             </section>
           )}
           <ApplicantStory
-            months={months}
             cohort={storyCohort}
             sets={model.sets}
             bu={storyBu}
@@ -405,7 +391,7 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
           <CallerResultsTable cohort={model.cohort} prev={prevModel?.cohort ?? null} onOpen={(title, ids) => openNames(title, ids)} />
         </section>
 
-        <div className="grid gap-6 border-t pt-4 xl:grid-cols-2">
+        <div className="border-t pt-4">
           <section className="min-w-0 space-y-2" data-testid="v2-why">
             <h3 className="text-sm font-medium">เหตุผลที่ยังไม่ได้คน</h3>
             <ul className="space-y-1">
@@ -425,30 +411,6 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
               })}
             </ul>
             <p className={cn('text-xs', DASH.sub)}>คนเดียวอาจมีเหตุหลายขั้น ยอดแต่ละแถวรวมกันเป็นจำนวนคนไม่ได้</p>
-          </section>
-          <section className="min-w-0 space-y-2" data-testid="v2-work">
-            <h3 className="text-sm font-medium">สมัครงานจังหวัดไหน · จังหวัดของงานที่เลือกสมัคร</h3>
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>จังหวัดของงาน</TableHead>
-                    <TableHead className="text-right">รายการสมัคร</TableHead>
-                    <TableHead className="text-right">สัดส่วน</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {workPg.slice.map((r) => (
-                    <TableRow key={r.k} className="cursor-pointer" onClick={() => openNames(`สมัครงาน ${r.k}`, r.ids)}>
-                      <TableCell className="font-medium">{r.k}</TableCell>
-                      <TableCell className="text-right tabular-nums">{fmt(r.ids.length)}</TableCell>
-                      <TableCell className="text-right tabular-nums">{fmtPct(model.cohort.length ? (r.ids.length / model.cohort.length) * 100 : null)}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-            <Pager {...workPg} onPage={setWorkPage} />
           </section>
         </div>
       </Card>
