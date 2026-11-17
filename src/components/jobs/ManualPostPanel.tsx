@@ -19,6 +19,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { ensureSoGroupLinks } from '@/lib/soGroupLinks';
 import { isFacebookGroupChannel, jobBuOf, SO_LINK_NOTE, soGroupLinkName, type SoOptGroup } from '@/lib/soScraping';
 import SoGroupPicker from '@/components/jobs/SoGroupPicker';
+import PostImageField from '@/components/jobs/PostImageField';
 import MultiChannelPicker from '@/components/shared/MultiChannelPicker';
 import { syncCaptionLink } from '@/components/jobs/AutopostDialog';
 import { copyText } from '@/lib/copyText';
@@ -39,6 +40,7 @@ type Row = { key: string; name: string; group: SoOptGroup | null; link: RecruitP
  * เลือกกลุ่ม → เตรียมโพสต์ → แถวละกลุ่ม: คัดลอกข้อความ (ใส่ลิงก์สมัครของกลุ่มนั้นให้แล้ว) · เปิดกลุ่ม
  * ลิงก์กลุ่มละลิงก์ จด `note` = โพสต์เอง (`ensureSoGroupLinks`) ⇒ ผู้สมัครบอกได้ว่ามาจากกลุ่มไหน และโพสต์เองหรือ Autopost
  * ข้อความ = ที่แก้บันทึกไว้กับใบขอ (ช่อง "ข้อความประกาศ" ของ Autopost) · ไม่เคยแก้ = ข้อความที่ระบบร่าง
+ * รูป (17 พ.ย. 2569 · `PostImageField`): ใส่รูป/โหลดรูป ทั้งตอนเลือกและหลังเตรียมโพสต์ · รูปเดียวกับ Autopost ของใบนี้
  */
 export default function ManualPostPanel({ job, onChanged }: { job: JobRequest; onChanged?: () => void }) {
   const looked = useRecruiterContact(job.recruiter_contact ? null : job.recruiter_name);
@@ -197,6 +199,7 @@ export default function ManualPostPanel({ job, onChanged }: { job: JobRequest; o
             เลือกใหม่
           </Button>
         </div>
+        <PostImageField job={job} />
         <ul className="divide-y divide-border rounded-xl border border-border">
           {rows.map((r) => {
             const done = copied.has(r.key);
@@ -303,6 +306,7 @@ export default function ManualPostPanel({ job, onChanged }: { job: JobRequest; o
           </span>
         </p>
       </section>
+      <PostImageField job={job} />
       {error ? <p className={cn('text-sm', TONE.danger.value)}>{error}</p> : null}
       <Button
         type="button"

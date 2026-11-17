@@ -63,7 +63,7 @@ import {
   type SoOptions,
   type SoPostMode,
 } from '@/lib/soScraping';
-import { postImageIdFromUrl, postImagePath, postImageUrl, uploadPostImage } from '@/lib/postImagesApi';
+import { fetchLatestPostImage, postImageIdFromUrl, postImagePath, postImageUrl, uploadPostImage } from '@/lib/postImagesApi';
 import SoStartLine from '@/components/jobs/SoStartLine';
 import SoStuckPanel from '@/components/jobs/SoStuckPanel';
 import OrderPostButton from '@/components/jobs/OrderPostButton';
@@ -146,6 +146,16 @@ export function AutopostBody({
   const [mode, setMode] = React.useState<SoPostMode>('caption_only');
   /** รูปแนบโพสต์ (17 พ.ย. 2569 "คนอยากโพสต์พร้อมรูป") — ใช้เมื่อเลือก ข้อความ + รูป / รูปอย่างเดียว */
   const [imageId, setImageId] = React.useState<string | null>(null);
+  // รูปล่าสุดของใบขอ (ใส่จากป๊อปโพสต์เองหรือรอบก่อน · 17 พ.ย. 2569) — ยังไม่มีรูปในป๊อปนี้ค่อยหยิบมา
+  React.useEffect(() => {
+    let alive = true;
+    void fetchLatestPostImage(job.id).then((id) => {
+      if (alive && id) setImageId((cur) => cur ?? id);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [job.id]);
   const [imageBusy, setImageBusy] = React.useState(false);
   const [imageError, setImageError] = React.useState<string | null>(null);
   const imageInputRef = React.useRef<HTMLInputElement>(null);

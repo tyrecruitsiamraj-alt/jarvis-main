@@ -2474,7 +2474,7 @@
      "api": "GET /api/recruit/channels",
      "effects": [],
      "when": null,
-     "src": "src/components/jobs/ManualPostPanel.tsx:256"
+     "src": "src/components/jobs/ManualPostPanel.tsx:259"
     },
     {
      "label": "กลุ่ม Facebook: ธุรกิจ / เอกชน-ราชการ / จังหวัด / ติ๊กกลุ่ม",
@@ -2483,7 +2483,7 @@
      "api": null,
      "effects": [],
      "when": "เลือกช่องทาง Facebook Group",
-     "src": "src/components/jobs/ManualPostPanel.tsx:257"
+     "src": "src/components/jobs/ManualPostPanel.tsx:260"
     },
     {
      "label": "ข้อความประกาศ (พิมพ์แก้ · บันทึกเอง)",
@@ -2495,7 +2495,7 @@
       "ส่ง Lumos โทร"
      ],
      "when": "Lumos ตาม gaps #1",
-     "src": "src/components/jobs/ManualPostPanel.tsx:278"
+     "src": "src/components/jobs/ManualPostPanel.tsx:281"
     },
     {
      "label": "ใช้ข้อความที่ระบบร่าง",
@@ -2507,7 +2507,7 @@
       "ส่ง Lumos โทร"
      ],
      "when": "เคยแก้ · Lumos ตาม gaps #1",
-     "src": "src/components/jobs/ManualPostPanel.tsx:264"
+     "src": "src/components/jobs/ManualPostPanel.tsx:267"
     },
     {
      "label": "เตรียมโพสต์ N ลิงก์ / เลือกกลุ่ม Facebook",
@@ -2518,7 +2518,7 @@
       "เขียนฐาน"
      ],
      "when": "เลือกช่องทางแล้ว · ข้อความมีตัวแทนลิงก์",
-     "src": "src/components/jobs/ManualPostPanel.tsx:307 / :112"
+     "src": "src/components/jobs/ManualPostPanel.tsx:311 / :114"
     },
     {
      "label": "เลือกใหม่",
@@ -2527,7 +2527,7 @@
      "api": null,
      "effects": [],
      "when": "หลังเตรียมโพสต์",
-     "src": "src/components/jobs/ManualPostPanel.tsx:196"
+     "src": "src/components/jobs/ManualPostPanel.tsx:198"
     },
     {
      "label": "คัดลอกข้อความ / คัดลอกแล้ว (แต่ละแถว)",
@@ -2538,7 +2538,7 @@
       "เขียนฐาน"
      ],
      "when": "หลังเตรียมโพสต์",
-     "src": "src/components/jobs/ManualPostPanel.tsx:209 / :157"
+     "src": "src/components/jobs/ManualPostPanel.tsx:212 / :159"
     },
     {
      "label": "เปิดกลุ่ม",
@@ -2547,7 +2547,7 @@
      "api": null,
      "effects": [],
      "when": "แถวกลุ่ม FB ที่มี URL (ไม่มี = ปุ่ม ไม่มีลิงก์กลุ่ม กดไม่ได้)",
-     "src": "src/components/jobs/ManualPostPanel.tsx:214"
+     "src": "src/components/jobs/ManualPostPanel.tsx:217"
     },
     {
      "label": "วางลิงก์โพสต์ (ถ้ามี) — บันทึกตอนออกจากช่อง/Enter",
@@ -2558,7 +2558,27 @@
       "เขียนฐาน"
      ],
      "when": "หลังเตรียมโพสต์",
-     "src": "src/components/jobs/ManualPostPanel.tsx:226 / :171"
+     "src": "src/components/jobs/ManualPostPanel.tsx:229 / :173"
+    },
+    {
+     "label": "ใส่รูป / เปลี่ยนรูป",
+     "action": "api",
+     "target": "รูปของใบขอ (ใช้ร่วมกับ Autopost)",
+     "api": "POST /api/post-images",
+     "effects": [
+      "เขียนฐาน"
+     ],
+     "when": "ทั้งตอนเลือกช่องทางและหลังเตรียมโพสต์",
+     "src": "src/components/jobs/PostImageField.tsx:54"
+    },
+    {
+     "label": "โหลดรูป",
+     "action": "external",
+     "target": "ดาวน์โหลดรูปโพสต์ {เลขใบขอ}",
+     "api": null,
+     "effects": [],
+     "when": "มีรูปแล้ว",
+     "src": "src/components/jobs/PostImageField.tsx:58"
     }
    ]
   },
@@ -4658,7 +4678,7 @@
      "api": "GET /api/recruit/postings?group_stats=1",
      "effects": [],
      "when": "เลือกช่องทาง Facebook Group",
-     "src": "src/components/jobs/ManualPostPanel.tsx:257"
+     "src": "src/components/jobs/ManualPostPanel.tsx:260"
     },
     {
      "label": "ข้อความประกาศ (พิมพ์แก้)",
@@ -4672,7 +4692,7 @@
       "อ่าน iRecruit"
      ],
      "when": "ส่ง Lumos ฯลฯ เฉพาะเมื่อใบมีรายได้ที่ตั้งเอง + เปิดสวิตช์ auto dispatch + มีใบสมัครผ่านลิงก์ค้าง",
-     "src": "src/components/jobs/ManualPostPanel.tsx:278"
+     "src": "src/components/jobs/ManualPostPanel.tsx:281"
     },
     {
      "label": "ใช้ข้อความที่ระบบร่าง",
@@ -4684,7 +4704,7 @@
       "ส่ง Lumos โทร"
      ],
      "when": "เคยแก้ข้อความ · ส่ง Lumos เงื่อนไขเดียวกัน",
-     "src": "src/components/jobs/ManualPostPanel.tsx:264"
+     "src": "src/components/jobs/ManualPostPanel.tsx:267"
     },
     {
      "label": "เตรียมโพสต์ N ลิงก์ / เลือกกลุ่ม Facebook",
@@ -4695,7 +4715,27 @@
       "เขียนฐาน"
      ],
      "when": "เลือกช่องทางแล้ว · ข้อความต้องมีตัวแทนลิงก์ · Facebook Group ต้องเลือกกลุ่ม",
-     "src": "src/components/jobs/ManualPostPanel.tsx:307"
+     "src": "src/components/jobs/ManualPostPanel.tsx:311"
+    },
+    {
+     "label": "ใส่รูป / เปลี่ยนรูป",
+     "action": "api",
+     "target": "รูปของใบขอ (ใช้ร่วมกับ Autopost)",
+     "api": "POST /api/post-images",
+     "effects": [
+      "เขียนฐาน"
+     ],
+     "when": "ทั้งตอนเลือกช่องทางและหลังเตรียมโพสต์",
+     "src": "src/components/jobs/PostImageField.tsx:54"
+    },
+    {
+     "label": "โหลดรูป",
+     "action": "external",
+     "target": "ดาวน์โหลดรูปโพสต์ {เลขใบขอ}",
+     "api": null,
+     "effects": [],
+     "when": "มีรูปแล้ว",
+     "src": "src/components/jobs/PostImageField.tsx:58"
     }
    ]
   },
@@ -4714,7 +4754,7 @@
      "api": null,
      "effects": [],
      "when": null,
-     "src": "src/components/jobs/ManualPostPanel.tsx:196"
+     "src": "src/components/jobs/ManualPostPanel.tsx:198"
     },
     {
      "label": "คัดลอกข้อความ / คัดลอกแล้ว",
@@ -4725,7 +4765,7 @@
       "เขียนฐาน"
      ],
      "when": null,
-     "src": "src/components/jobs/ManualPostPanel.tsx:209"
+     "src": "src/components/jobs/ManualPostPanel.tsx:212"
     },
     {
      "label": "เปิดกลุ่ม",
@@ -4734,7 +4774,7 @@
      "api": null,
      "effects": [],
      "when": "แถวกลุ่ม Facebook ที่มีลิงก์กลุ่ม (ไม่มี = ปุ่มเทา 'ไม่มีลิงก์กลุ่ม')",
-     "src": "src/components/jobs/ManualPostPanel.tsx:214"
+     "src": "src/components/jobs/ManualPostPanel.tsx:217"
     },
     {
      "label": "วางลิงก์โพสต์ (ถ้ามี)",
@@ -4745,7 +4785,7 @@
       "เขียนฐาน"
      ],
      "when": null,
-     "src": "src/components/jobs/ManualPostPanel.tsx:226"
+     "src": "src/components/jobs/ManualPostPanel.tsx:229"
     }
    ]
   },

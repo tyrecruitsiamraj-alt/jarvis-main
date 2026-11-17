@@ -16,6 +16,34 @@ export async function uploadPostImage(file: File, jobId: string | null): Promise
   return ((await r.json()) as { id: string }).id;
 }
 
+/** รูปล่าสุดของใบขอ (ป๊อปโพสต์เอง + Autopost ใช้รูปเดียวกัน) · ไม่มี = null */
+export async function fetchLatestPostImage(jobId: string): Promise<string | null> {
+  const r = await apiFetch(`/api/post-images?job=${encodeURIComponent(jobId)}`);
+  if (!r.ok) return null;
+  return ((await r.json()) as { id: string | null }).id ?? null;
+}
+
+/** โหลดรูปลงเครื่อง — คนโพสต์เองเอาไปแนบใน Facebook · `false` = โหลดไม่ได้ */
+export async function downloadPostImage(id: string, filename: string): Promise<boolean> {
+  try {
+    const r = await fetch(postImagePath(id));
+    if (!r.ok) return false;
+    const blob = await r.blob();
+    const ext = blob.type === 'image/png' ? 'png' : blob.type === 'image/webp' ? 'webp' : 'jpg';
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${filename}.${ext}`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 10_000);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** ลิงก์ตัวรูป — ใบสั่งส่งแบบเต็ม (มีโดเมน) ให้บอท So Scraping ดาวน์โหลด · บนจอใช้แบบสั้นได้ */
 export const postImagePath = (id: string) => `/api/public/post-image?id=${encodeURIComponent(id)}`;
 export const postImageUrl = (id: string, origin = typeof window !== 'undefined' ? window.location.origin : '') => `${origin}${postImagePath(id)}`;

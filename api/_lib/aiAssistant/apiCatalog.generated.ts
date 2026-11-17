@@ -1733,8 +1733,10 @@ export const API_CATALOG: ApiCatalogEntry[] = [
    "GET",
    "POST"
   ],
-  "doc": "POST /api/post-images { data, job_id? } → { id } — รูปแนบโพสต์ของป๊อป Autopost (เจ้าของ 17 พ.ย. 2569)\nสิทธิ์เดียวกับการสั่งโพสต์ (`matching-job-postings`) · ตัวรูปเปิดที่ /api/public/post-image?id= (ให้บอท So Scraping ดาวน์โหลด)",
-  "query": [],
+  "doc": "GET /api/post-images?job= → { id | null } — รูปล่าสุดของใบขอ (ป๊อปโพสต์เอง + Autopost ใช้ร่วม · 17 พ.ย. 2569)\nPOST /api/post-images { data, job_id? } → { id } — รูปแนบโพสต์ของป๊อป Autopost (เจ้าของ 17 พ.ย. 2569)\nสิทธิ์เดียวกับการสั่งโพสต์ (`matching-job-postings`) · ตัวรูปเปิดที่ /api/public/post-image?id= (ให้บอท So Scraping ดาวน์โหลด)",
+  "query": [
+   "job"
+  ],
   "body": [
    "js",
    "job_id",

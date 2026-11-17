@@ -24,6 +24,15 @@ export async function savePostImage(
   return { ok: true, id: rows[0].id };
 }
 
+/** รูปล่าสุดของใบขอ — ป๊อปโพสต์เอง/Autopost ใช้รูปเดียวกัน (17 พ.ย. 2569) · ไม่มี = null */
+export async function latestPostImageId(jobId: string): Promise<string | null> {
+  const { rows } = await dbQuery<{ id: string }>(
+    `select id::text from ${IMAGES} where job_id = $1 order by created_at desc limit 1`,
+    [jobId],
+  );
+  return rows[0]?.id ?? null;
+}
+
 export async function getPostImage(id: string): Promise<{ mime: string; bytes: Buffer } | null> {
   const { rows } = await dbQuery<{ mime: string; bytes: Buffer }>(`select mime, bytes from ${IMAGES} where id = $1 limit 1`, [id]);
   return rows[0] ?? null;
