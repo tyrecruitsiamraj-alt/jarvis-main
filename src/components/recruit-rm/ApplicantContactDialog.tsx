@@ -102,6 +102,14 @@ const StepNo: React.FC<{ n: number; done: boolean }> = ({ n, done }) => (
   </span>
 );
 
+/**
+ * หน้าติดตามนัดหมายใช้คำของปุ่มการติดต่อ "ติดต่อสำเร็จ / ติดต่อไม่สำเร็จ" ในตารางการติดต่อ/การโทร
+ * (เจ้าของ 18 พ.ย. 2569 "คำว่าติดต่อไม่ได้แก้เป็นติดต่อไม่สำเร็จ ตามปุ่มการติดต่อเลย" · Choice "เฉพาะหน้าติดตามนัดหมาย") — หน้าอื่นคงคำกลาง
+ */
+const APPOINTMENT_CONTACT_WORDS = { ok: 'ติดต่อสำเร็จ', fail: 'ติดต่อไม่สำเร็จ' } as const;
+const appointmentContactText = (t: string) =>
+  t.replace(/^ติดต่อไม่ได้/, APPOINTMENT_CONTACT_WORDS.fail).replace(/^ติดต่อได้/, APPOINTMENT_CONTACT_WORDS.ok);
+
 const StepHead: React.FC<{ index: 0 | 1 | 2; done: boolean; children?: React.ReactNode }> = ({ index, done, children }) => {
   const s = PROCESS_STEPS[index];
   return (
@@ -812,12 +820,15 @@ export default function ApplicantContactDialog({
         </TabsContent>
         <TabsContent value="calls" className="pt-2">
           <RecordLoadProvider state={recState.extras} onRetry={() => loadRecords(a.id)}>
-            <CallsTable rows={callRows} application={a} />
+            <CallsTable
+              rows={mode === 'appointment' ? callRows.map((r) => ({ ...r, result: appointmentContactText(r.result) })) : callRows}
+              application={a}
+            />
           </RecordLoadProvider>
         </TabsContent>
         <TabsContent value="contacts" className="pt-2">
           <RecordLoadProvider state={recState.logs} onRetry={() => loadRecords(a.id)}>
-            <ContactsTable logs={logs} />
+            <ContactsTable logs={logs} words={mode === 'appointment' ? APPOINTMENT_CONTACT_WORDS : undefined} />
           </RecordLoadProvider>
         </TabsContent>
         <TabsContent value="appointments" className="pt-2">

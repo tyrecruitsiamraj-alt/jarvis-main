@@ -12,6 +12,7 @@
  * - แท็บว่างยังเป็นตาราง (หัวคอลัมน์ + แถว "ไม่มี…")
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { PublicApplication } from '@/lib/publicApplicationsApi';
 
@@ -328,5 +329,27 @@ describe('ผ่าน/ไม่ผ่าน ในป๊อป (QA 18 ต.ค. 
     fireEvent.click(within(step).getByRole('button', { name: 'ผ่าน' }));
     await waitFor(() => expect(recordAppointmentAttendance).toHaveBeenCalledTimes(2));
     expect(recordAppointmentAttendance.mock.calls.map((c) => c[0].result)).toEqual(['showed', 'passed']);
+  });
+});
+
+describe('หน้าติดตามนัดหมายใช้คำของปุ่มการติดต่อ (เจ้าของ 18 พ.ย. 2569 · เฉพาะหน้านี้)', () => {
+  it('ตารางการติดต่อ: ส่งคำมา = ติดต่อสำเร็จ / ติดต่อไม่สำเร็จ · ไม่ส่ง = คำกลาง ติดต่อได้ / ติดต่อไม่ได้', async () => {
+    const { ContactsTable } = await import('./ApplicantRecordTables');
+    const logs = [
+      { id: 'l1', ok: true, reasonLabel: null, note: null, createdByName: 'เล็ก', createdAt: '2026-11-18T03:00:00.000Z', appointmentAt: null },
+      { id: 'l2', ok: false, reasonLabel: 'ไม่รับสาย', note: null, createdByName: 'เล็ก', createdAt: '2026-11-18T02:00:00.000Z', appointmentAt: null },
+    ] as unknown as Parameters<typeof ContactsTable>[0]['logs'];
+    const appt = render(<ContactsTable logs={logs} words={{ ok: 'ติดต่อสำเร็จ', fail: 'ติดต่อไม่สำเร็จ' }} />);
+    expect(appt.container.textContent).toContain('ติดต่อสำเร็จ');
+    expect(appt.container.textContent).toContain('ติดต่อไม่สำเร็จ');
+    appt.unmount();
+    const plain = render(<ContactsTable logs={logs} />);
+    expect(plain.container.textContent).toContain('ติดต่อไม่ได้');
+    expect(plain.container.textContent).not.toContain('สำเร็จ');
+  });
+  it('ป๊อปส่งคำนี้เฉพาะตอนเปิดจากหน้าติดตามนัดหมาย (ตารางการติดต่อ + การโทร)', () => {
+    const src = readFileSync('src/components/recruit-rm/ApplicantContactDialog.tsx', 'utf8');
+    expect(src).toContain("words={mode === 'appointment' ? APPOINTMENT_CONTACT_WORDS : undefined}");
+    expect(src).toContain("rows={mode === 'appointment' ? callRows.map((r) => ({ ...r, result: appointmentContactText(r.result) })) : callRows}");
   });
 });

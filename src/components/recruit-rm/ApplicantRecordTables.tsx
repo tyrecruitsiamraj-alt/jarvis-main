@@ -122,12 +122,14 @@ export const CallsTable: React.FC<{ rows: DetailCallRow[]; application?: PublicA
   </div>
 );
 
-export const ContactsTable: React.FC<{ logs: ContactLog[] }> = ({ logs }) => (
+/** คำผลการติดต่อ — ค่าเริ่มตามกติกาคำกลาง · ป๊อปจากหน้าติดตามนัดหมายส่งคำของปุ่มการติดต่อมาแทน (เจ้าของ 18 พ.ย. 2569) */
+export type ContactWords = { ok: string; fail: string };
+export const ContactsTable: React.FC<{ logs: ContactLog[]; words?: ContactWords }> = ({ logs, words = { ok: 'ติดต่อได้', fail: 'ติดต่อไม่ได้' } }) => (
   <Table head={['ผลการติดต่อ', 'เหตุผล', 'หมายเหตุ', 'บันทึกโดย']} empty="ยังไม่มีการบันทึกผลติดต่อ" isEmpty={logs.length === 0}>
     {logs.map((l) => (
       <tr key={l.id} className="border-b border-border/50 last:border-0">
         <Td className={cn('whitespace-nowrap font-medium', l.ok ? TONE.success.value : TONE.danger.value)}>
-          {l.ok ? 'ติดต่อได้' : 'ติดต่อไม่ได้'}
+          {l.ok ? words.ok : words.fail}
           {isAppointmentFailedContact(l) ? (
             <span className={cn('block text-xs font-normal', TONE.danger.value)}>นัดหมายไม่สำเร็จ</span>
           ) : null}
