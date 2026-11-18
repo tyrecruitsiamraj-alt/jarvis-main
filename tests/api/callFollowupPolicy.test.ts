@@ -99,6 +99,14 @@ describe('ขอเลื่อน → นัดใหม่ตามเวล�
     });
     expect(d.action).toBe('needs_human');
   });
+
+  it('🔴 ไม่รับสาย "สายเดียวจบ" แต่ขอให้โทรกลับ = ยังโทรกลับตามเวลาที่ขอ (เพดานแยกกัน · 18 พ.ย. 2569)', () => {
+    const one = { ...DEFAULT_CALL_FOLLOWUP_POLICY, roundCalls: 1, roundsPerDay: 1, retryDays: 1, maxAttempts: 1 };
+    expect(resolveCallFollowup({ outcome: 'no_answer', attemptCount: 1, now: NOW, policy: one }).action).toBe('needs_human');
+    const d = resolveCallFollowup({ outcome: 'reschedule_requested', attemptCount: 1, now: NOW, policy: one, requestedCallbackAt: '2026-08-06T07:00:00.000Z' });
+    expect(d.action).toBe('retry');
+    expect(d.nextAttemptAt).toBe('2026-08-06T07:00:00.000Z');
+  });
 });
 
 describe('ห้ามโทรช่วงเงียบ 20:00–08:00', () => {

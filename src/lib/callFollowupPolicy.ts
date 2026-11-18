@@ -192,6 +192,8 @@ export function shiftOutOfQuietHours(at: Date, policy: CallFollowupPolicy): Date
 }
 
 export const RETRY_LEAD_MINUTES = 10;
+/** โทรกลับตามเวลาที่ผู้สมัครขอ ได้ถึงกี่ครั้ง (รวมสายแรก) — ค่าเดิมก่อนแยกจากเพดานโทรซ้ำ 18 พ.ย. 2569 */
+export const RESCHEDULE_MAX_ATTEMPTS = 18;
 const THAI_WEEKDAY = ['อาทิตย์', 'จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์', 'เสาร์'];
 const minutesOf = (hhmm: string) => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3, 5));
 const MIN = 60_000;
@@ -302,13 +304,14 @@ export function resolveCallFollowup(input: {
       };
 
     // ── ขอเลื่อน → นัดใหม่ตามเวลาที่เขาบอก ────────────────────────────────
+    // เพดานโทรกลับแยกจากเพดานโทรซ้ำ (เจ้าของ 18 พ.ย. 2569: ไม่รับสาย "สายเดียวจบ" แต่ขอให้โทรกลับ = "โทรกลับตามเวลาที่เขาขอ")
     case 'reschedule_requested': {
-      if (attemptCount >= policy.maxAttempts) {
+      if (attemptCount >= RESCHEDULE_MAX_ATTEMPTS) {
         return {
           action: 'needs_human',
           nextAttemptAt: null,
           suppressUntil: null,
-          reason: `ขอเลื่อนครบ ${policy.maxAttempts} ครั้งแล้ว — ให้คนโทรปิดเอง`,
+          reason: `ขอเลื่อนครบ ${RESCHEDULE_MAX_ATTEMPTS} ครั้งแล้ว — ให้คนโทรปิดเอง`,
         };
       }
       const asked = input.requestedCallbackAt ? new Date(input.requestedCallbackAt) : null;
