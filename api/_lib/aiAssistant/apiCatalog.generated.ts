@@ -892,6 +892,7 @@ export const API_CATALOG: ApiCatalogEntry[] = [
   "body": [
    "js",
    "outbound",
+   "route",
    "base_url",
    "key",
    "clear",
@@ -1479,6 +1480,7 @@ export const API_CATALOG: ApiCatalogEntry[] = [
    "jobId",
    "job_id",
    "groups",
+   "phone_box_status",
    "autopost",
    "options",
    "request_no",
@@ -1894,9 +1896,11 @@ export const API_CATALOG: ApiCatalogEntry[] = [
    "from",
    "to",
    "all",
-   "bu"
+   "bu",
+   "asof"
   ],
   "body": [
+   "window",
    "linkClicks",
    "errors",
    "apps",
@@ -2392,7 +2396,8 @@ export const API_CATALOG: ApiCatalogEntry[] = [
    "bu",
    "page",
    "status",
-   "compare"
+   "compare",
+   "by"
   ],
   "body": [],
   "reachesPeople": true
@@ -2407,6 +2412,25 @@ export const API_CATALOG: ApiCatalogEntry[] = [
   "query": [],
   "body": [],
   "reachesPeople": true
+ },
+ {
+  "path": "/api/staff-activity",
+  "file": "api/_handlers/staff-activity.ts",
+  "methods": [
+   "GET"
+  ],
+  "doc": "GET /api/staff-activity?from=YYYY-MM-DD&to=YYYY-MM-DD&bu=LBD — งานรายคนต่อวัน (เจ้าของ 18 พ.ย. 2569)\nGET ...&detail=1&user=<uuid>&kind=<StaffActivityKind>&day=YYYY-MM-DD(ไม่ส่ง = ทั้งช่วง) — รายการของช่องที่กด\nอ่านอย่างเดียว · สิทธิ์เดียวกับภาพรวม (`job-applications`) · BU = แผนกของผู้ใช้ (ชุดเลือก BU เดียวกับภาพรวม)\nแหล่ง: Autopost/Scrap = job_posting_requests · สร้างลิงก์ = recruit_posting_links · ติ๊กโพสต์เอง = recruit_posting_link_posts\n       ลงผลติดต่อ/นัดได้ = application_contact_logs (วันที่บันทึก)",
+  "query": [
+   "from",
+   "to",
+   "bu",
+   "detail",
+   "user",
+   "kind",
+   "day"
+  ],
+  "body": [],
+  "reachesPeople": false
  },
  {
   "path": "/api/system-health",

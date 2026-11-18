@@ -36,6 +36,7 @@ import V2Drawer, { type V2Pane } from './V2Drawer';
 import ApplicantStory from './ApplicantStory';
 import PostingProgress from './PostingProgress';
 import { Kpi, Pager, SectionTitle, fmt } from './V2Parts';
+import StaffActivityPanel from './StaffActivityPanel';
 import { MonthCompareBars } from './MonthCompareBars';
 import { V2_METRICS, V2_METRIC_LABEL, buildV2Model, type V2Metric } from './v2Model';
 
@@ -332,6 +333,14 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
             เปิดฟอร์ม / ส่งใบสมัคร
           </Button>
         </div>
+      </Card>
+
+      <Separator />
+
+      {/* ── งานรายคน (เจ้าของ 18 พ.ย. 2569 "วันนี้ เมื่อวาน วันก่อน ใหม่ทำอะไรไป" · Choice ภาพรวม + Filter รายคน) ── */}
+      <Card className="min-w-0 space-y-3 rounded-2xl p-5" data-testid="v2-staff-card">
+        <SectionTitle title="งานรายคน" right={`${dayText(win.from)} – ${dayText(win.to)}`} />
+        <StaffActivityPanel from={win.from} to={win.to} bu={data.bu} onNames={openNames} />
       </Card>
 
       <Separator />
