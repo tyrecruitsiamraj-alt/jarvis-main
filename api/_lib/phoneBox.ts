@@ -221,3 +221,22 @@ export async function sendPhoneBoxPost(
   const message = str(json?.message) ?? str(json?.error) ?? `phone-box ตอบ ${res.status}`;
   return { ...base, ok: false, status: res.status, postId: null, message };
 }
+
+export type PhoneBoxPostView = { postId: string; groupName: string | null; status: string; published: boolean | null; reason: string | null };
+
+/** สถานะคำขอโพสต์ (GET /v1/posts/{id}) — อ่านอย่างเดียว */
+export async function readPhoneBoxPost(baseUrl: string, key: string, postId: string, fetchImpl: typeof fetch = fetch): Promise<PhoneBoxPostView> {
+  const b = (await getJson(baseUrl, `/v1/posts/${encodeURIComponent(postId)}`, key, fetchImpl)) as {
+    status?: unknown;
+    group_name?: unknown;
+    published?: unknown;
+    reason?: unknown;
+  } | null;
+  return {
+    postId,
+    groupName: str(b?.group_name),
+    status: str(b?.status) ?? '—',
+    published: typeof b?.published === 'boolean' ? b.published : null,
+    reason: str(b?.reason),
+  };
+}

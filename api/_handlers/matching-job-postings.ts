@@ -15,6 +15,7 @@ import {
   getJobPostingRequestById,
   createJobPostingRequest,
   updateJobPostingRequest,
+  mergeJobPostingSnapshot,
   cancelPendingJobPostingRequest,
   normalizeJobPostingStatus,
   normalizeJobPostingRequestType,
@@ -76,7 +77,25 @@ async function recentGroupsOfJob(jobId: string): Promise<string[]> {
 }
 import { soGroupLinksError, soPickError, soSnapshotError } from '../../src/lib/soScraping.js';
 import { phoneBoxPostsOf } from '../../src/lib/phoneBoxPosts.js';
-import { getPhoneBoxKeyView, listPhoneBoxRoutes, phoneBoxRouteFor, savedPhoneBoxKey, sendPhoneBoxPost, type PhoneBoxPostResult } from '../_lib/phoneBox.js';
+import { getPhoneBoxKeyView, listPhoneBoxRoutes, phoneBoxRouteFor, readPhoneBoxPost, savedPhoneBoxKey, sendPhoneBoxPost, type PhoneBoxPostResult, type PhoneBoxPostView } from '../_lib/phoneBox.js';
+
+/**
+ * เลขคำขอ phone-box ของใบ — จาก job_snapshot (ใบที่ส่งหลัง 18 พ.ย. 2569 ค่ำ) · ใบแรก ๆ ที่ยังไม่เก็บ = อ่านจาก audit ตอนสร้าง
+ */
+async function phoneBoxPostIdsOf(order: { id: string; job_snapshot: Record<string, unknown> | null }): Promise<Array<{ postId: string; groupName: string | null }>> {
+  const snap = order.job_snapshot?.phone_box_posts;
+  if (Array.isArray(snap) && snap.length > 0) {
+    return (snap as Array<{ post_id?: unknown; group_name?: unknown }>)
+      .filter((p) => typeof p.post_id === 'string')
+      .map((p) => ({ postId: p.post_id as string, groupName: typeof p.group_name === 'string' ? p.group_name : null }));
+  }
+  const { rows } = await dbQuery<{ pb: Array<{ postId?: string | null; groupName?: string | null }> | null }>(
+    `select (new_value::jsonb)->'phone_box' as pb from ${tableInAppSchema('audit_logs')}
+      where action = 'job_posting_request.create' and entity_id = $1 order by created_at desc limit 1`,
+    [order.id],
+  );
+  return (rows[0]?.pb ?? []).filter((p) => p.postId).map((p) => ({ postId: p.postId as string, groupName: p.groupName ?? null }));
+}
 
 const OUT_OF_SCOPE = 'ไม่มีสิทธิ์เข้าถึงใบขอของแผนกอื่น';
 
@@ -120,6 +139,27 @@ async function handler(req: AuthedReq, res: ApiRes) {
       // กลุ่ม Facebook ของ So Scraping ทุกกลุ่ม — อ่านอย่างเดียว (20 ต.ค. 2569 · 2 พ.ย. เลิกกรองเฉพาะที่มีบัญชีผูก)
       if (getQuery(req, 'groups') === '1') {
         return res.status(200).json({ groups: await listSoGroups() });
+      }
+      // สถานะที่ phone-box ของใบที่ส่งผ่านมือถือ (18 พ.ย. 2569 "ไม่มีทางดูสถานะจากฝั่ง phone-box") — อ่านอย่างเดียว
+      const pbOf = getQuery(req, 'phone_box_status');
+      if (pbOf) {
+        const order = await getJobPostingRequestById(pbOf);
+        if (!order) return sendError(res, 404, 'Not found', 'ไม่พบคำขอนี้');
+        if (!(await isSiamrajRequestInScope(req.user, order.request_no || order.job_id))) return sendError(res, 403, 'Forbidden', OUT_OF_SCOPE);
+        const key = await savedPhoneBoxKey();
+        if (!key) return sendError(res, 400, 'phone-box', 'ยังไม่ได้ใส่กุญแจ phone-box');
+        const baseUrl = (await getPhoneBoxKeyView()).base_url;
+        const posts = await phoneBoxPostIdsOf(order);
+        const items: PhoneBoxPostView[] = [];
+        for (const p of posts) {
+          try {
+            items.push(await readPhoneBoxPost(baseUrl, key, p.postId));
+          } catch (e) {
+            items.push({ postId: p.postId, groupName: p.groupName, status: 'error', published: null, reason: e instanceof Error ? e.message : 'อ่านไม่ได้' });
+          }
+        }
+        res.setHeader?.('Cache-Control', 'no-store');
+        return res.status(200).json({ items });
       }
       // ป๊อป Autopost / ขอ Scrap: บัญชี · กลุ่ม · เครื่อง · บัญชี JobThai/JobBKK จาก options API ของ So Scraping
       // (26 ต.ค. 2569 · ดึงใหม่ทุกครั้ง ไม่ cache · key อยู่ฝั่ง server) — ยังไม่ใส่ key = อ่านจากฐานแบบเดิม
@@ -297,6 +337,10 @@ async function handler(req: AuthedReq, res: ApiRes) {
               await sendPhoneBoxPost(baseUrl, key, { request_id: `jarvis-${item.id}-${i + 1}`, account_id: route.accountId, group_name: p.groupName, content: p.content }),
             );
           }
+          // เก็บเลขคำขอของ phone-box ไว้กับใบ — ปุ่ม "เช็กสถานะ" อ่านกลับได้ภายหลัง
+          await mergeJobPostingSnapshot(item.id, {
+            phone_box_posts: results.filter((r) => r.postId).map((r) => ({ post_id: r.postId, group_name: r.groupName, request_id: r.requestId })),
+          });
           const sent = results.filter((r) => r.ok).length;
           const failed = results.filter((r) => !r.ok);
           const notes = [

@@ -10,6 +10,8 @@ let scope: DepartmentScope = { mode: 'all' };
 const fetchSoPostGroups = vi.fn();
 const fetchAllSoPostGroupRows = vi.fn();
 const loadManualLinks = vi.fn();
+// ใบที่ส่งผ่าน phone-box (18 พ.ย. 2569) — ไม่มีในเทสต์นี้
+vi.mock('../../api/_lib/postgres.js', () => ({ dbQuery: async () => ({ rows: [] }) }));
 vi.mock('../../api/_lib/jobPostActions.js', () => ({ loadManualLinks: (...a: unknown[]) => loadManualLinks(...a) }));
 
 vi.mock('../../api/_lib/http.js', async (orig) => ({ ...(await orig<typeof import('../../api/_lib/http.js')>()), withRbac: (h: unknown) => h }));
@@ -42,13 +44,14 @@ async function call(query: Record<string, string>) {
     { method: 'GET', query: { from: '2026-11-01', to: '2026-11-16', ...query }, user: { sub: '115ac4b3-df86-4fd0-930e-0213651bd02f', role: 'admin' } } as never,
     res as never,
   );
-  const sent = fetchSoPostGroups.mock.calls.at(-1)?.[0] as { bu: string | null } | undefined;
+  // 18 พ.ย. 2569: การ์ดอ่านทุกแถวของช่วง (ตัวกรองคนสั่ง) — BU ที่ส่งไปดูจาก fetchAll · เส้น compare ยังเป็นหน้าเดียว
+  const sent = (query.compare ? fetchSoPostGroups : fetchAllSoPostGroupRows).mock.calls.at(-1)?.[0] as { bu: string | null } | undefined;
   return { body, status, meta: body.meta, sentBu: sent ? sent.bu : undefined };
 }
 
 beforeEach(() => {
   fetchSoPostGroups.mockReset().mockResolvedValue(EMPTY);
-  fetchAllSoPostGroupRows.mockReset();
+  fetchAllSoPostGroupRows.mockReset().mockResolvedValue({ statuses: [], reasonGroups: [], rows: [] });
   loadManualLinks.mockReset().mockResolvedValue([]);
 });
 

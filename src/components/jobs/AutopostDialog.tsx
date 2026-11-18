@@ -65,6 +65,7 @@ import {
 } from '@/lib/soScraping';
 import { fetchLatestPostImage, postImageIdFromUrl, postImagePath, postImageUrl, uploadPostImage } from '@/lib/postImagesApi';
 import SoStartLine from '@/components/jobs/SoStartLine';
+import PhoneBoxStatusLine from '@/components/jobs/PhoneBoxStatusLine';
 import SoStuckPanel from '@/components/jobs/SoStuckPanel';
 import OrderPostButton from '@/components/jobs/OrderPostButton';
 import { AUTOPOST_CAPTION_MAX, autopostMissing, buildAutopostCaption, captionLeaks } from '@/lib/autopostCaption';
@@ -351,7 +352,8 @@ export function AutopostBody({
 
   const send = async (confirmed = false) => {
     if (busy || problems.length > 0 || !account) return;
-    const confirmLines = soPostConfirmWarnings(account, worker, opts?.workers ?? []);
+    // ส่งผ่าน phone-box = คำเตือนเรื่องเครื่อง/ล็อกอินของ RM009 ไม่เกี่ยว (18 พ.ย. 2569)
+    const confirmLines = account?.phoneBox ? [] : soPostConfirmWarnings(account, worker, opts?.workers ?? []);
     if (!confirmed && confirmLines.length > 0) {
       setWarn({ kind: 'confirm', lines: confirmLines });
       return;
@@ -385,7 +387,7 @@ export function AutopostBody({
           account_id: account.id,
           account_name: account.name,
           // ไม่เปลี่ยนจากเครื่องหลัก = ไม่ส่ง ให้ So Scraping ใช้เครื่องหลักของบัญชี
-          ...(workerName && workerName !== account.worker ? { worker: workerName } : {}),
+          ...(!account.phoneBox && workerName && workerName !== account.worker ? { worker: workerName } : {}),
           apply_link: applyLink,
           link_code: code,
           channel_label: link?.channelLabel ?? null,
@@ -433,6 +435,7 @@ export function AutopostBody({
                     ไม่สำเร็จ {r.groupName}{r.message ? ` · ${r.message}` : ''}
                   </p>
                 ))}
+              <PhoneBoxStatusLine orderId={sent.id} />
             </div>
           ) : (
             <>
@@ -451,6 +454,13 @@ export function AutopostBody({
         </div>
       ) : loading ? null : (
         <>
+          {/* ใบล่าสุดที่ส่งผ่าน phone-box — เปิดป๊อปภายหลังก็เช็กได้ว่ามือถือโพสต์ขึ้นแล้วหรือยัง */}
+          {lastOrder && (lastOrder.job_snapshot as { sent_via?: unknown } | null)?.sent_via === 'phone-box' ? (
+            <div className={cn('space-y-1 rounded-xl border px-3 py-2 text-sm', TONE.info.soft)} data-testid="autopost-last-phone-box">
+              <p className="text-foreground">ใบล่าสุดส่งผ่าน phone-box · {lastOrder.notes ?? ''}</p>
+              <PhoneBoxStatusLine orderId={lastOrder.id} />
+            </div>
+          ) : null}
           {stuckOrder ? (
             <SoStuckPanel
               order={stuckOrder}
@@ -520,7 +530,7 @@ export function AutopostBody({
                   <div className="space-y-0.5 text-xs" data-testid="autopost-account-status">
                     <p className={cn('font-medium', TONE[soAccountStatusText(account).tone].value)}>{soAccountStatusText(account).text}</p>
                     <p className="tabular-nums text-muted-foreground">
-                      {[
+                      {account.phoneBox ? 'ส่งผ่าน phone-box (มือถือ)' : [
                         `วันนี้โพสต์ ${NUM.format(account.postedToday)}${account.dailyCap !== null ? `/${NUM.format(account.dailyCap)}` : ''}`,
                         account.worker ? `เครื่องหลัก ${account.worker} ${account.workerOnline ? 'ออนไลน์' : 'ออฟไลน์'}` : 'ยังไม่ผูกเครื่อง',
                         account.queue.running + account.queue.queued > 0
@@ -579,7 +589,17 @@ export function AutopostBody({
 
           <section className="space-y-2">
             <p className="text-sm font-medium text-foreground">3 · เครื่อง</p>
-            {postWorkers.length === 0 ? (
+            {account?.phoneBox ? (
+              // 4 บัญชีที่ติ๊กไว้ = ล็อกเป็น phone-box เลือกเครื่องอื่นไม่ได้ (เจ้าของ 18 พ.ย. 2569 "ต้องล็อคว่าเป็น Phone box เลยจะได้ไม่งง")
+              <Select value="phone-box" disabled>
+                <SelectTrigger className="h-10 text-sm" aria-label="เครื่อง" data-testid="autopost-worker">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="phone-box">phone-box (มือถือ)</SelectItem>
+                </SelectContent>
+              </Select>
+            ) : postWorkers.length === 0 ? (
               <p className={cn('text-sm', TONE.warn.value)}>ยังไม่มีเครื่องที่รับงานโพสต์</p>
             ) : (
               // สถานะเครื่องเป็นสี + คำเสมอ (So Scraping 28 ต.ค. 2569): ออนไลน์ = จุดเขียว · ออฟไลน์ = จุดเทา เลือกไม่ได้ · API เรียงออนไลน์ไว้บนให้แล้ว

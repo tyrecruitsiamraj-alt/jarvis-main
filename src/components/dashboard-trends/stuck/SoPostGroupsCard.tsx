@@ -90,6 +90,8 @@ export default function SoPostGroupsCard({
   const [page, setPage] = React.useState(1);
   const [rev, setRev] = React.useState(0);
   const [statusPick, setStatusPick] = React.useState<string | null>(null);
+  /** คนสั่งที่เลือก (null = ทุกคน · เจ้าของ 18 พ.ย. 2569 "อยากดูแค่การทำงานของใหม่ ของแบงค์ ควรมี Filter") */
+  const [by, setBy] = React.useState<string | null>(null);
   /** กองเหตุที่พับไว้ (ค่าเริ่ม = กางทุกกอง) */
   const [folded, setFolded] = React.useState<Set<string>>(() => new Set());
   const [state, setState] = React.useState<{ data: (SoPostGroups & Partial<SoPostGroupsFiltered>) | null; error: string | null; loading: boolean }>({ data: null, error: null, loading: true });
@@ -117,20 +119,20 @@ export default function SoPostGroupsCard({
   }, [prevRange === undefined, prevFrom, prevTo, cardBu]);
 
   // เปลี่ยนช่วง/BU/สถานะที่กด = กลับหน้าแรก
-  React.useEffect(() => setPage(1), [from, to, cardBu, statusPick]);
+  React.useEffect(() => setPage(1), [from, to, cardBu, statusPick, by]);
   React.useEffect(() => {
     let alive = true;
     setState((s) => ({ ...s, error: null, loading: true }));
-    const load = initialData && page === 1 && !statusPick && rev === 0 && cardBu === bu
+    const load = initialData && page === 1 && !statusPick && !by && rev === 0 && cardBu === bu
       ? Promise.resolve(initialData)
-      : fetchSoPostGroups({ from, to, bu: cardBu, page, status: statusPick });
+      : fetchSoPostGroups({ from, to, bu: cardBu, page, status: statusPick, by });
     load
       .then((data) => alive && setState({ data, error: null, loading: false }))
       .catch((e: unknown) => alive && setState({ data: null, error: friendlyErrorText(e, 'ติดต่อ So Scraping ไม่ได้'), loading: false }));
     return () => {
       alive = false;
     };
-  }, [from, to, cardBu, page, rev, statusPick, initialData, bu]);
+  }, [from, to, cardBu, page, rev, statusPick, by, initialData, bu]);
 
   const d = state.data;
   // ชื่อ BU = ที่เซิร์ฟเวอร์ส่งไป So Scraping จริง · ยังไม่ได้คำตอบ = ยังไม่บอก BU
@@ -175,6 +177,30 @@ export default function SoPostGroupsCard({
           </Button>
         </div>
       ) : null}
+
+      {/* คนสั่ง + สรุปเป็นงาน (เจ้าของ 18 พ.ย. 2569 "ไม่รู้ว่าโพสต์อย่างเดียวเท่าไหร่") — งาน = เลขใบขอไม่ซ้ำ */}
+      <div className="flex flex-wrap items-center gap-3" data-testid="so-post-by">
+        <span className="block w-56">
+          <Select value={by ?? ALL_BU} onValueChange={(v) => setBy(v === ALL_BU ? null : v)}>
+            <SelectTrigger className="h-9 text-sm" aria-label="คนสั่ง" data-testid="so-post-by-select">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL_BU}>คนสั่ง: ทุกคน</SelectItem>
+              {(d?.people ?? []).map((p) => (
+                <SelectItem key={p.name} value={p.name}>
+                  {p.name} · {p.jobs.toLocaleString('th-TH')} งาน
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </span>
+        <span className="text-sm tabular-nums text-foreground" data-testid="so-post-jobs">
+          {d && d.jobs !== undefined
+            ? `สั่ง ${d.jobs.toLocaleString('th-TH')} งาน · ${d.total.toLocaleString('th-TH')} กลุ่ม · เผยแพร่แล้ว ${(d.counts.posted ?? 0).toLocaleString('th-TH')} กลุ่ม (${(d.postedJobs ?? 0).toLocaleString('th-TH')} งาน)`
+            : ' '}
+        </span>
+      </div>
 
       {/* แถวเลข — สั่งทั้งหมด = ผลรวมทุกสถานะ · ระหว่างโหลดโครงเดิม (ไม่กระโดด) */}
       <div

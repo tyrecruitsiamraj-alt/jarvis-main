@@ -10,10 +10,19 @@ async function readError(r: Response): Promise<never> {
  * การ์ด "5. โพสต์ลงกลุ่ม Facebook" — ช่วง/BU ตามภาพรวม · bu null = ทุก BU · `status` = กดช่องสถานะ (ได้เหตุจัดกลุ่มมาด้วย)
  * พังโยนข้อความไทยจาก server (บอกเหตุ) · server แปลงแล้ว (`parseSoPostGroups`) — ห้ามแปลงซ้ำ
  */
-export async function fetchSoPostGroups(q: { from: string; to: string; bu: string | null; page: number; status?: string | null }): Promise<SoPostGroups & Partial<Pick<SoPostGroupsFiltered, 'status' | 'filteredTotal' | 'reasons'>>> {
+export async function fetchSoPostGroups(q: {
+  from: string;
+  to: string;
+  bu: string | null;
+  page: number;
+  status?: string | null;
+  /** คนสั่ง (ชื่อตามที่ So Scraping ส่งมา) · 18 พ.ย. 2569 */
+  by?: string | null;
+}): Promise<SoPostGroups & Partial<Pick<SoPostGroupsFiltered, 'status' | 'filteredTotal' | 'reasons' | 'by' | 'people' | 'jobs' | 'postedJobs'>>> {
   const p = new URLSearchParams({ from: q.from, to: q.to, page: String(q.page) });
   if (q.bu) p.set('bu', q.bu);
   if (q.status) p.set('status', q.status);
+  if (q.by) p.set('by', q.by);
   const r = await apiFetch(`/api/so-post-groups?${p.toString()}`);
   if (!r.ok) return readError(r);
   return (await r.json()) as SoPostGroups;

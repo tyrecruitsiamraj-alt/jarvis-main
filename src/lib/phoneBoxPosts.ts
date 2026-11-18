@@ -28,3 +28,29 @@ export function phoneBoxPostsOf(snapshot: Snapshot | null | undefined, groups: r
   }
   return out;
 }
+
+/**
+ * คำบนจอของสถานะคำขอที่ phone-box — กติกาเจ้าของ 17 พ.ย. 2569: uncertain = "อนุมัติ" (โพสต์แล้วรอแอดมินกลุ่ม)
+ * published true = ขึ้นกลุ่มแล้ว · ไม่รู้จัก = คำเดิมของ phone-box (ไม่เดา)
+ */
+export function phoneBoxStatusText(v: { status: string; published: boolean | null }): { text: string; tone: 'success' | 'warn' | 'danger' | 'neutral' } {
+  if (v.published === true) return { text: 'ขึ้นกลุ่มแล้ว', tone: 'success' };
+  switch (v.status) {
+    case 'awaiting_executor':
+      return { text: 'รอมือถือโพสต์', tone: 'warn' };
+    case 'queued':
+    case 'running':
+    case 'in_progress':
+      return { text: 'มือถือกำลังโพสต์', tone: 'warn' };
+    case 'uncertain':
+      return { text: 'รอแอดมินกลุ่มอนุมัติ', tone: 'warn' };
+    case 'failed':
+      return { text: 'ไม่สำเร็จ', tone: 'danger' };
+    case 'cancelled':
+      return { text: 'ยกเลิกแล้ว', tone: 'neutral' };
+    case 'error':
+      return { text: 'อ่านสถานะไม่ได้', tone: 'danger' };
+    default:
+      return { text: v.status, tone: 'neutral' };
+  }
+}

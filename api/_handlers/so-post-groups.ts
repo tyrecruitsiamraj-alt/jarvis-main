@@ -12,7 +12,24 @@
  */
 import { withRbac, sendError, handleApiError, type ApiRes, type AuthedReq } from '../_lib/http.js';
 import { fetchAllSoPostGroupRows, fetchSoPostGroups, SoPostGroupsError } from '../_lib/soPostGroups.js';
-import { filterSoPostGroups } from '../../src/lib/soPostGroups.js';
+import { filterSoPostGroups, markPhoneBoxRows, soPostJobCounts, soPostPeople, soPostRowsBy } from '../../src/lib/soPostGroups.js';
+import { dbQuery } from '../_lib/postgres.js';
+import { tableInAppSchema } from '../_lib/schema.js';
+
+/** ใบที่ส่งผ่าน phone-box ในช่วง (วันสั่งตามปฏิทินกรุงเทพ) — อ่านไม่ได้ = ไม่มี (ตารางยังขึ้นตาม So Scraping) */
+async function loadPhoneBoxOrders(from: string, to: string): Promise<Array<{ requestNo: string; account: string }>> {
+  try {
+    const { rows } = await dbQuery<{ request_no: string | null; account: string | null }>(
+      `select request_no, job_snapshot->>'account_name' as account from ${tableInAppSchema('job_posting_requests')}
+        where job_snapshot->>'sent_via' = 'phone-box'
+          and (created_at at time zone 'Asia/Bangkok')::date between $1::date and $2::date`,
+      [from, to],
+    );
+    return rows.filter((r) => r.request_no && r.account).map((r) => ({ requestNo: r.request_no as string, account: r.account as string }));
+  } catch {
+    return [];
+  }
+}
 import { APP_DEPARTMENT_CODES, loadMatchingBuScope, type DepartmentScope } from '../_lib/departmentScope.js';
 import { loadManualLinks } from '../_lib/jobPostActions.js';
 import { MANUAL_POSTED_SINCE } from '../../src/lib/recruitScale.js';
@@ -78,8 +95,17 @@ export async function soPostGroupsHandler(req: AuthedReq, res: ApiRes) {
     res.setHeader?.('Cache-Control', 'no-store');
     if (pick.none) return res.status(200).json({ ...filterSoPostGroups({ statuses: [], rows: [] }, { from, to, bu: null }, status, page), meta });
     const q = { from, to, bu: pick.bu };
-    const body = status ? filterSoPostGroups(await fetchAllSoPostGroupRows(q), q, status, page) : await fetchSoPostGroups({ ...q, page });
-    return res.status(200).json({ ...body, meta });
+    /**
+     * อ่านทุกแถวของช่วงแล้วกรอง/แบ่งหน้าฝั่งเรา (18 พ.ย. 2569) — ตัวกรองคนสั่ง + ยอดต่อคน + ใบที่ส่ง phone-box ต้องเห็นทั้งช่วง
+     * (เดิมไม่กดสถานะ = หน้าเดียวจาก So Scraping) · fetchAll จำผลไว้ 3 นาที
+     */
+    const by = String(one(req.query?.by) ?? '').trim().slice(0, 100) || null;
+    const all = await fetchAllSoPostGroupRows(q);
+    const postedLabel = all.statuses.find((x) => x.key === 'posted')?.label ?? 'เผยแพร่แล้ว';
+    const rows = markPhoneBoxRows(all.rows, await loadPhoneBoxOrders(from, to), postedLabel);
+    const mine = soPostRowsBy(rows, by);
+    const body = filterSoPostGroups({ ...all, rows: mine }, q, status, page);
+    return res.status(200).json({ ...body, by, people: soPostPeople(rows), ...soPostJobCounts(mine), meta });
   } catch (e) {
     if (e instanceof SoPostGroupsError) return sendError(res, e.status, 'so_post_groups', e.message);
     return handleApiError(res, e, 'so-post-groups', { userId: req.user?.sub });

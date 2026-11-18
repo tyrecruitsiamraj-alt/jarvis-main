@@ -261,3 +261,12 @@ export async function startJobPostingRequestWithItem(id: string): Promise<{ star
   const d = (await r.json().catch(() => ({}))) as { so_start?: SoStartView; item?: JobPostingRequest };
   return { start: d.so_start ?? { state: 'skipped' }, item: d.item ?? null };
 }
+
+/** สถานะที่ phone-box ของใบที่ส่งผ่านมือถือ (18 พ.ย. 2569) — อ่านอย่างเดียว */
+export async function fetchPhoneBoxStatus(
+  orderId: string,
+): Promise<Array<{ postId: string; groupName: string | null; status: string; published: boolean | null; reason: string | null }>> {
+  const r = await apiFetch(`/api/matching/job-postings?phone_box_status=${encodeURIComponent(orderId)}`);
+  if (!r.ok) return readError(r, 'อ่านสถานะ phone-box ไม่ได้');
+  return ((await r.json()) as { items: Array<{ postId: string; groupName: string | null; status: string; published: boolean | null; reason: string | null }> }).items;
+}

@@ -114,7 +114,68 @@ export function parseSoPostGroups(body: unknown): SoPostGroups {
  * `reasonTree` = แบ่งกองตาม `reason_group` ที่ So Scraping ส่ง (เจ้าของ 12 พ.ย. 2569 เลือกให้ So Scraping แบ่ง) · ยังไม่ส่ง = [] (จอใช้ `reasons` แบบเดิม)
  */
 export type SoReasonGroup = { key: string; label: string; n: number; items: Array<{ error: string | null; n: number }> };
-export type SoPostGroupsFiltered = SoPostGroups & { status: string | null; filteredTotal: number; reasons: Array<{ error: string | null; n: number }>; reasonTree: SoReasonGroup[] };
+export type SoPostGroupsFiltered = SoPostGroups & {
+  status: string | null;
+  filteredTotal: number;
+  reasons: Array<{ error: string | null; n: number }>;
+  reasonTree: SoReasonGroup[];
+  /** คนสั่งที่เลือก (null = ทุกคน) · ยอดต่อคน · จำนวนงาน (เลขใบขอไม่ซ้ำ) — เจ้าของ 18 พ.ย. 2569 "อยากดูแค่การทำงานของใหม่ ของแบงค์" */
+  by?: string | null;
+  people?: SoPostPerson[];
+  jobs?: number;
+  postedJobs?: number;
+};
+
+export type SoPostPerson = { name: string; jobs: number; groups: number; posted: number };
+
+export const SO_POST_NO_ORDERER = 'ไม่ระบุคนสั่ง';
+const ordererOf = (r: SoPostGroupRow) => r.orderedByName?.trim() || SO_POST_NO_ORDERER;
+
+/** ยอดต่อคนสั่ง — งาน = เลขใบขอไม่ซ้ำ · กลุ่ม = แถว · เผยแพร่แล้ว = สถานะ posted · เรียงตามกลุ่มมากไปน้อย */
+export function soPostPeople(rows: readonly SoPostGroupRow[]): SoPostPerson[] {
+  const m = new Map<string, { jobs: Set<string>; groups: number; posted: number }>();
+  for (const r of rows) {
+    const k = ordererOf(r);
+    const cur = m.get(k) ?? { jobs: new Set<string>(), groups: 0, posted: 0 };
+    if (r.requestNo) cur.jobs.add(r.requestNo);
+    cur.groups += 1;
+    if (r.status === 'posted') cur.posted += 1;
+    m.set(k, cur);
+  }
+  return [...m]
+    .map(([name, v]) => ({ name, jobs: v.jobs.size, groups: v.groups, posted: v.posted }))
+    .sort((a, b) => b.groups - a.groups || a.name.localeCompare(b.name, 'th'));
+}
+
+export function soPostRowsBy(rows: readonly SoPostGroupRow[], by: string | null): SoPostGroupRow[] {
+  return by ? rows.filter((r) => ordererOf(r) === by) : [...rows];
+}
+
+/** งานทั้งหมด / งานที่มีอย่างน้อย 1 กลุ่มเผยแพร่แล้ว (เลขใบขอไม่ซ้ำ) */
+export function soPostJobCounts(rows: readonly SoPostGroupRow[]): { jobs: number; postedJobs: number } {
+  const jobs = new Set(rows.map((r) => r.requestNo).filter(Boolean));
+  const postedJobs = new Set(rows.filter((r) => r.status === 'posted').map((r) => r.requestNo).filter(Boolean));
+  return { jobs: jobs.size, postedJobs: postedJobs.size };
+}
+
+/**
+ * ใบที่ Jarvis ส่งผ่าน phone-box (18 พ.ย. 2569) — So Scraping อ่านใบจากฐานเดียวกันแล้วขึ้นว่า "ไม่ได้โพสต์" เพราะ RM009 ไม่ได้ลอง
+ * ⇒ แถวของบัญชี/ใบขอเดียวกันที่ So Scraping ไม่ได้ลอง = เผยแพร่แล้ว (กติกาเจ้าของ 202 = โพสต์แล้ว) + เหตุ "ส่งผ่าน phone-box"
+ */
+export const SO_POST_VIA_PHONE_BOX = 'ส่งผ่าน phone-box';
+export function markPhoneBoxRows(
+  rows: readonly SoPostGroupRow[],
+  orders: ReadonlyArray<{ requestNo: string; account: string }>,
+  postedLabel: string,
+): SoPostGroupRow[] {
+  if (orders.length === 0) return [...rows];
+  const keys = new Set(orders.map((o) => `${o.requestNo}|${o.account.trim().toLowerCase()}`));
+  return rows.map((r) =>
+    r.requestNo && r.account && keys.has(`${r.requestNo}|${r.account.trim().toLowerCase()}`) && (r.status.startsWith('not_tried') || r.status === 'waiting')
+      ? { ...r, status: 'posted', statusLabel: postedLabel, error: SO_POST_VIA_PHONE_BOX, reasonGroup: null }
+      : r,
+  );
+}
 
 const countErrors = (list: readonly SoPostGroupRow[]) => {
   const byErr = new Map<string | null, number>();
@@ -130,7 +191,8 @@ export function filterSoPostGroups(
 ): SoPostGroupsFiltered {
   const counts = Object.fromEntries(all.statuses.map((s) => [s.key, 0]));
   for (const r of all.rows) counts[r.status] = (counts[r.status] ?? 0) + 1;
-  const picked = all.rows.filter((r) => r.status === status);
+  // ไม่เลือกสถานะ = ทุกแถว (ตัวกรองคนสั่ง 18 พ.ย. 2569 ใช้เส้นนี้แม้ไม่ได้กดสถานะ)
+  const picked = status ? all.rows.filter((r) => r.status === status) : all.rows;
   const pages = Math.max(1, Math.ceil(picked.length / SO_POST_GROUPS_PAGE_SIZE));
   const p = Math.min(pages, Math.max(1, page));
   // กองเหตุ — มีแถวไหนติดกองมาเมื่อไรถึงแบ่ง (แถวที่ไม่มีกองไปรวม "ไม่ระบุกอง") · ผลรวมกอง = จำนวนในสถานะนี้
@@ -152,7 +214,7 @@ export function filterSoPostGroups(
     reasonGroups: all.reasonGroups ?? [],
     counts,
     rows: picked.slice((p - 1) * SO_POST_GROUPS_PAGE_SIZE, p * SO_POST_GROUPS_PAGE_SIZE),
-    status,
+    status: status || null,
     filteredTotal: picked.length,
     reasons: countErrors(picked),
     reasonTree,

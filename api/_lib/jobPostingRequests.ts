@@ -396,3 +396,12 @@ export async function cancelPendingJobPostingRequest(
   return { ok: false, status: cur?.status ?? null };
 }
 
+
+/** เติมค่าเข้า job_snapshot (เช่น เลขคำขอของ phone-box หลังส่ง · 18 พ.ย. 2569) — ค่าเดิมคงไว้ */
+export async function mergeJobPostingSnapshot(id: string, patch: Record<string, unknown>): Promise<void> {
+  if (!uuidRe.test(id.trim())) return;
+  await dbQuery(`update ${table} set job_snapshot = coalesce(job_snapshot, '{}'::jsonb) || $2::jsonb, updated_at = now() where id = $1`, [
+    id.trim(),
+    JSON.stringify(patch),
+  ]);
+}
