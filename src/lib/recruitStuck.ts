@@ -123,6 +123,11 @@ export type StuckRequest = RecruitRequestRow & {
   releasedBy: string | null;
   /** id ผู้สมัครทุกช่วงเวลาของใบ แยกสถานะ (`personStagesOf`) — เฉพาะใบที่ยังเปิด · ไม่มี = เส้นรุ่นเก่า */
   people?: Partial<Record<PersonStageKey, string[]>>;
+  /**
+   * ยังต้องหาคน (true) / เริ่มงานแล้ว (false) — ตัวแบ่งเดียวกับหัวหน้าโพสต์ประกาศ (`stillSourcing` · `openJobBoxOf`)
+   * ใช้แบ่ง "ยังไม่ประกาศ" ให้ตรงกับหน้าโพสต์ประกาศ (เจ้าของ 18 พ.ย. 2569 "ยอดมันไม่ตรงกับหน้าภาพรวมหรอ") · ไม่มี = เส้นรุ่นเก่า
+   */
+  sourcing?: boolean;
 };
 
 /* ═══ สมการบนสุด (เจ้าของ 4 พ.ย. 2569 "กรองแค่ใบที่ไม่มีคน … มันต้อง Fil ดูได้หมดเลย") ═══

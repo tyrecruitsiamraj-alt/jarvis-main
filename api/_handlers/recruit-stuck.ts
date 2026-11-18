@@ -20,6 +20,7 @@ import { logError } from '../_lib/logger.js';
 import { readUnitRequestListThroughCache } from './siamraj-unit-requests.js';
 import { attachRequestRecruiters, loadFactsForJobs, toRequestRows } from './recruit-overview.js';
 import { personStagesOf } from '../../src/lib/personStage.js';
+import { openJobBoxOf } from '../../src/lib/jobBoxGroups.js';
 import { listLatestJobPostingsForBoard } from '../_lib/jobPostingRequests.js';
 import { loadErpExtras, loadOnlineRequestRows, loadReleaseMatches, type ErpExtra } from '../_lib/homeOnlineSql.js';
 import { loadInformDaysByPhone } from '../_lib/applicantSourceSql.js';
@@ -341,6 +342,8 @@ async function loadStuckRequests(departmentScope: Scope, buSet: readonly string[
       releasedBy: rel ? rel.by : null,
       // ผู้สมัครแต่ละคนอยู่สถานะไหน (เจ้าของ 17 พ.ย. 2569 "ใบที่มีชื่อปิดไม่ได้เพราะติดที่ไหน") — เฉพาะใบที่ยังเปิด
       ...(state === 'open' && fs.length ? { people: personStagesOf(fs, new Date()) } : {}),
+      // ยังต้องหาคน / เริ่มงานแล้ว — ตัวแบ่งเดียวกับหัวหน้าโพสต์ประกาศ (ใบที่ไม่มีงานในระบบ = ยังต้องหาคน)
+      sourcing: j ? openJobBoxOf(j) === 'sourcing' : true,
       state,
       inRange: b.inRange,
     } satisfies StuckRequest;

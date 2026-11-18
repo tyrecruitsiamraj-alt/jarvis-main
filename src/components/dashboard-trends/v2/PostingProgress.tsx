@@ -2,7 +2,10 @@
  * ═══ ไส้ในของ "การประกาศรับสมัคร" (เจ้าของ 17 พ.ย. 2569) ═══
  * > *"ใครต้องทำอะไร เอาไปไว้เป็นไส้ในของ การประกาศรับสมัคร … พอกด ยังไม่เริ่มหาก็เห็นเลยว่าเป็นใครบ้าง
  * > กดเริ่มหาแล้วจะได้รู้ว่าเริ่มหาไปแล้วนะใบไหนมีชื่อ ไม่มีชื่อ ใบที่มีชื่อปิดไม่ได้เพราะติดที่ไหน"*
- * ยังไม่เริ่มหา = ใบต่อเจ้าหน้าที่ · เริ่มหาแล้ว = มีชื่อ/ไม่มีชื่อ + รายใบ × 8 ขั้นหลัก (`PERSON_GROUPS`) กดเลข = รายชื่อพร้อมสถานะละเอียด
+ * 18 พ.ย. 2569 "ยอดมันไม่ตรงกับหน้าภาพรวมหรอ" → ใช้ช่องชุดเดียวกับหัวหน้าโพสต์ประกาศ (`RELEASE_LANE_TEXT`)
+ *   ประกาศแล้ว = มีคนกรอก + ยังไม่มีคนกรอก (คนกรอก = `applications` ตัวเดียวกับหัวหน้าโพสต์ประกาศ) → รายใบที่มีคนกรอก × 8 ขั้นหลัก
+ *   ยังไม่ประกาศ = ยังต้องหาคน + เริ่มงานแล้ว (`sourcing`) → ใบต่อเจ้าหน้าที่สรรหา
+ * กดเลข = รายชื่อพร้อมสถานะละเอียด (`PERSON_STAGE_LABEL`)
  */
 import React from 'react';
 import { Button } from '@/components/ui/button';
@@ -12,12 +15,13 @@ import { DASH } from '@/lib/designTokens';
 import { recruiterLabelOf, type StuckRequest } from '@/lib/recruitStuck';
 import { PERSON_GROUPS, PERSON_GROUP_LABEL, PERSON_GROUP_OF, PERSON_STAGE_LABEL, type PersonGroupKey, type PersonStageKey } from '@/lib/personStage';
 import { pageOf } from '@/lib/recruitAudience';
+import { RELEASE_LANE_TEXT } from '@/lib/boardRelease';
 import { Pager, fmt } from './V2Parts';
 
 type Props = {
-  view: 'notStarted' | 'started';
-  started: readonly StuckRequest[];
-  notStarted: readonly StuckRequest[];
+  view: 'released' | 'unreleased';
+  /** ใบที่ยังเปิด — แบ่งประกาศแล้ว/ยังไม่ประกาศในนี้ */
+  open: readonly StuckRequest[];
   onRequests: (title: string, rows: StuckRequest[]) => void;
   onNames: (title: string, ids: readonly string[], labels: Record<string, string>) => void;
   resetKey: string;
@@ -37,24 +41,44 @@ function groupsOf(rows: readonly StuckRequest[]): { ids: Record<PersonGroupKey, 
 }
 const peopleOf = (r: StuckRequest) => Object.values(r.people ?? {}).reduce((n, l) => n + (l?.length ?? 0), 0);
 
-export default function PostingProgress({ view, started, notStarted, onRequests, onNames, resetKey }: Props) {
+const L = (k: keyof typeof RELEASE_LANE_TEXT) => RELEASE_LANE_TEXT[k].label;
+
+export default function PostingProgress({ view, open, onRequests, onNames, resetKey }: Props) {
+  const released = open.filter((r) => r.released);
+  const unreleased = open.filter((r) => !r.released);
   const [page, setPage] = React.useState(1);
   React.useEffect(() => setPage(1), [resetKey, view]);
 
-  if (view === 'notStarted') {
+  if (view === 'unreleased') {
+    const sourcing = unreleased.filter((r) => r.sourcing !== false);
+    const startedWork = unreleased.filter((r) => r.sourcing === false);
     const m = new Map<string, StuckRequest[]>();
-    for (const r of notStarted) m.set(recruiterLabelOf(r), [...(m.get(recruiterLabelOf(r)) ?? []), r]);
+    for (const r of unreleased) m.set(recruiterLabelOf(r), [...(m.get(recruiterLabelOf(r)) ?? []), r]);
     const owners = [...m.entries()].map(([name, rows]) => ({ name, rows })).sort((a, b) => b.rows.length - a.rows.length || a.name.localeCompare(b.name, 'th'));
     const pg = pageOf(owners, page);
     return (
-      <section className="min-w-0 space-y-2" data-testid="v2-not-started">
-        <h3 className="text-sm font-medium">ยังไม่เริ่มหา {fmt(notStarted.length)} ใบ · แยกตามเจ้าหน้าที่สรรหา</h3>
+      <section className="min-w-0 space-y-3" data-testid="v2-not-started">
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <span className="font-medium">
+            {L('unreleased')} {fmt(unreleased.length)} ใบ
+          </span>
+          <span className={DASH.sub}>=</span>
+          <Button type="button" size="xs" variant="outline" onClick={() => onRequests(L('sourcing'), sourcing)}>
+            {L('sourcing')} {fmt(sourcing.length)} ใบ
+          </Button>
+          <span className={DASH.sub}>+</span>
+          <Button type="button" size="xs" variant="outline" onClick={() => onRequests(L('started'), startedWork)}>
+            {L('started')} {fmt(startedWork.length)} ใบ
+          </Button>
+        </div>
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>เจ้าหน้าที่สรรหา</TableHead>
-                <TableHead className="text-right">ใบที่ยังไม่เริ่มหา</TableHead>
+                <TableHead className="text-right">{L('unreleased')}</TableHead>
+                <TableHead className="text-right">{L('sourcing')}</TableHead>
+                <TableHead className="text-right">{L('started')}</TableHead>
                 <TableHead className="text-right">อัตราที่ยังต้องหา</TableHead>
               </TableRow>
             </TableHeader>
@@ -63,10 +87,25 @@ export default function PostingProgress({ view, started, notStarted, onRequests,
                 <TableRow key={o.name}>
                   <TableCell className="font-medium">{o.name}</TableCell>
                   <TableCell className="text-right">
-                    <Button type="button" size="xs" variant="ghost" className="tabular-nums" onClick={() => onRequests(`${o.name} · ยังไม่เริ่มหา`, o.rows)}>
+                    <Button type="button" size="xs" variant="ghost" className="font-medium tabular-nums" onClick={() => onRequests(`${o.name} · ${L('unreleased')}`, o.rows)}>
                       {fmt(o.rows.length)} ใบ
                     </Button>
                   </TableCell>
+                  {([true, false] as const).map((src) => {
+                    const list = o.rows.filter((r) => (r.sourcing !== false) === src);
+                    const label = src ? L('sourcing') : L('started');
+                    return (
+                      <TableCell key={String(src)} className="text-right">
+                        {list.length ? (
+                          <Button type="button" size="xs" variant="ghost" className="tabular-nums" onClick={() => onRequests(`${o.name} · ${label}`, list)}>
+                            {fmt(list.length)} ใบ
+                          </Button>
+                        ) : (
+                          <span className="px-2 tabular-nums text-muted-foreground">0</span>
+                        )}
+                      </TableCell>
+                    );
+                  })}
                   <TableCell className="text-right tabular-nums">{fmt(o.rows.reduce((n, r) => n + (r.remaining ?? 0), 0))} อัตรา</TableCell>
                 </TableRow>
               ))}
@@ -78,29 +117,33 @@ export default function PostingProgress({ view, started, notStarted, onRequests,
     );
   }
 
-  const withNames = started.filter((r) => peopleOf(r) > 0);
-  const noNames = started.filter((r) => peopleOf(r) === 0);
+  // คนกรอก = applications ตัวเดียวกับหัวหน้าโพสต์ประกาศ (มีคนกรอก 150 ใบ · 2,547 คน ต้องเท่ากัน)
+  const withNames = released.filter((r) => (r.applications ?? 0) > 0);
+  const noNames = released.filter((r) => (r.applications ?? 0) === 0);
+  const heads = withNames.reduce((n, r) => n + (r.applications ?? 0), 0);
   const all = groupsOf(withNames);
   const sorted = [...withNames].sort((a, b) => (b.ageDays ?? -1) - (a.ageDays ?? -1) || a.requestNo.localeCompare(b.requestNo));
   const pg = pageOf(sorted, page);
   return (
     <section className="min-w-0 space-y-3" data-testid="v2-started">
       <div className="flex flex-wrap items-center gap-2 text-sm">
-        <span className="font-medium">เริ่มหาแล้ว {fmt(started.length)} ใบ</span>
+        <span className="font-medium">
+          {L('released')} {fmt(released.length)} ใบ
+        </span>
         <span className={DASH.sub}>=</span>
-        <Button type="button" size="xs" variant="outline" onClick={() => onRequests('เริ่มหาแล้ว · มีชื่อ', withNames)}>
-          มีชื่อ {fmt(withNames.length)} ใบ
+        <Button type="button" size="xs" variant="outline" onClick={() => onRequests(L('applied'), withNames)}>
+          {L('applied')} {fmt(withNames.length)} ใบ · {fmt(heads)} คน
         </Button>
         <span className={DASH.sub}>+</span>
-        <Button type="button" size="xs" variant="outline" onClick={() => onRequests('เริ่มหาแล้ว · ยังไม่มีชื่อ', noNames)}>
-          ยังไม่มีชื่อ {fmt(noNames.length)} ใบ
+        <Button type="button" size="xs" variant="outline" onClick={() => onRequests(L('silent'), noNames)}>
+          {L('silent')} {fmt(noNames.length)} ใบ
         </Button>
       </div>
       <div className="overflow-x-auto">
         <Table className="min-w-max">
           <TableHeader>
             <TableRow>
-              <TableHead>ใบขอที่มีชื่อ</TableHead>
+              <TableHead>{L('applied')}</TableHead>
               <TableHead className="text-right">คนสมัคร</TableHead>
               {PERSON_GROUPS.map((g) => (
                 <TableHead key={g} className="text-right">
@@ -115,7 +158,7 @@ export default function PostingProgress({ view, started, notStarted, onRequests,
               <TableCell className="text-right font-medium tabular-nums">{fmt(PERSON_GROUPS.reduce((n, g) => n + all.ids[g].length, 0))} คน</TableCell>
               {PERSON_GROUPS.map((g) => (
                 <TableCell key={g} className="text-right">
-                  <Button type="button" size="xs" variant="ghost" className="font-medium tabular-nums" disabled={!all.ids[g].length} onClick={() => onNames(`ใบที่มีชื่อ · ${PERSON_GROUP_LABEL[g]}`, all.ids[g], all.labels)}>
+                  <Button type="button" size="xs" variant="ghost" className="font-medium tabular-nums" disabled={!all.ids[g].length} onClick={() => onNames(`${L('applied')} · ${PERSON_GROUP_LABEL[g]}`, all.ids[g], all.labels)}>
                     {fmt(all.ids[g].length)}
                   </Button>
                 </TableCell>

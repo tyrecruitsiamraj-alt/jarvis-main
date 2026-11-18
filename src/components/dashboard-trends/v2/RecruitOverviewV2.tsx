@@ -17,10 +17,11 @@ import { DASH, TONE } from '@/lib/designTokens';
 import type { RecruitOverviewResponse } from '@/lib/recruitOverviewTypes';
 import { fetchRecruitStuck, type RecruitStuckResponse } from '@/lib/recruitStuckApi';
 import { stuckEquation, type StuckRequest } from '@/lib/recruitStuck';
-import { POSTING_STATES, POSTING_STATE_LABEL, isPostingStarted, postingStateOf } from '@/lib/recruitPostingState';
+import { POSTING_STATES, POSTING_STATE_LABEL, postingStateOf } from '@/lib/recruitPostingState';
 import { fetchSoPostGroups } from '@/lib/soPostGroupsApi';
 import { fetchManualLinks } from '@/lib/jobPostActionsApi';
 import { legacyReportsPath, requestPathOfJobId } from '@/lib/jobNavigation';
+import { RELEASE_LANE_TEXT } from '@/lib/boardRelease';
 import { EMPTY_REQUEST_FILTER, filterRequestRows, isRequestFilterActive, jobFilterOf, requestFilterToParams, type RequestTabFilter } from '@/lib/recruitRequestTab';
 import { prevCohortOf } from '@/lib/recruitScale';
 import { friendlyErrorText } from '@/lib/friendlyError';
@@ -62,7 +63,7 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
   const [stack, setStack] = React.useState<V2Pane[]>([]);
   const [metric, setMetric] = React.useState<V2Metric>('apps');
   /** ไส้ในของการประกาศ — กดยอดไหนเห็นอันนั้น (ค่าเริ่ม = เริ่มหาแล้ว) */
-  const [postView, setPostView] = React.useState<'notStarted' | 'started'>('started');
+  const [postView, setPostView] = React.useState<'released' | 'unreleased'>('released');
   /** BU ที่กดแท่ง — เรื่องเล่ารายชื่อใต้กราฟ (null = ทุก BU) */
   const [storyBu, setStoryBu] = React.useState<string | null>(null);
   const [clickPage, setClickPage] = React.useState(1);
@@ -111,8 +112,18 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
   const appRecruiters = React.useMemo(() => Object.values(data.appJobs ?? {}).map((j) => j.recruiter), [data.appJobs]);
   const eq = reqRows ? stuckEquation(reqRows) : null;
   const openRows = eq?.remaining ?? [];
-  const started = openRows.filter(isPostingStarted);
-  const notStarted = openRows.filter((r) => !isPostingStarted(r));
+  /** ประกาศแล้ว / ยังไม่ประกาศ — ตัวแบ่งเดียวกับหัวหน้าโพสต์ประกาศ (เจ้าของ 18 พ.ย. 2569 "ยอดมันไม่ตรงกับหน้าภาพรวมหรอ") */
+  const releasedRows = openRows.filter((r) => r.released);
+  const unreleasedRows = openRows.filter((r) => !r.released);
+  const postLanes: Array<{ key: keyof typeof RELEASE_LANE_TEXT; rows: StuckRequest[]; view: 'released' | 'unreleased' | null }> = [
+    { key: 'all', rows: openRows, view: null },
+    { key: 'released', rows: releasedRows, view: 'released' },
+    { key: 'applied', rows: releasedRows.filter((r) => (r.applications ?? 0) > 0), view: 'released' },
+    { key: 'silent', rows: releasedRows.filter((r) => !(r.applications ?? 0)), view: 'released' },
+    { key: 'unreleased', rows: unreleasedRows, view: 'unreleased' },
+    { key: 'sourcing', rows: unreleasedRows.filter((r) => r.sourcing !== false), view: 'unreleased' },
+    { key: 'started', rows: unreleasedRows.filter((r) => r.sourcing === false), view: 'unreleased' },
+  ];
 
   const push = (p: V2Pane) => setStack([p]);
   const openRequests = (title: string, rows: StuckRequest[]) => push({ kind: 'requests', title, rows, page: 1 });
@@ -269,11 +280,30 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
 
       {/* ── การประกาศรับสมัคร ── */}
       <Card className="min-w-0 space-y-4 rounded-2xl p-5" data-testid="v2-posting">
-        <SectionTitle title="การประกาศรับสมัคร" right="นับใบขอที่ดำเนินการ · Autopost นับรายการโพสต์" />
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <Kpi label="ยังไม่เริ่มหา (ใบ)" emphasis active={postView === 'notStarted'} value={loadingReq ? undefined : eq ? notStarted.length : null} onClick={eq ? () => setPostView('notStarted') : undefined} testId="v2-post-not-started" />
-          <Kpi label="เริ่มหาคนแล้ว (ใบ)" emphasis active={postView === 'started'} value={loadingReq ? undefined : eq ? started.length : null} onClick={eq ? () => setPostView('started') : undefined} testId="v2-post-started" />
-          <Kpi label="Autopost · รายการโพสต์" emphasis value={posts.key === filterKey ? posts.total : undefined} onClick={() => push({ kind: 'embed', title: 'Autopost · รายการโพสต์', embed: 'posts' })} />
+        <SectionTitle title="การประกาศรับสมัคร" />
+        {/* 7 ช่องเรียงและใช้คำเดียวกับหัวหน้าโพสต์ประกาศ (เจ้าของ 18 พ.ย. 2569 "ใช้คำให้ตรงกันดิ่") — ยอดชุดเดียวกัน */}
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-7" data-testid="v2-post-lanes">
+          {postLanes.map((c) => (
+            <Kpi
+              key={c.key}
+              label={RELEASE_LANE_TEXT[c.key].label}
+              emphasis={c.key === 'all' || c.key === 'released' || c.key === 'unreleased'}
+              tone={c.key === 'silent' || c.key === 'sourcing' ? 'warn' : undefined}
+              active={c.view === postView && (c.key === 'released' || c.key === 'unreleased')}
+              value={loadingReq ? undefined : eq ? c.rows.length : null}
+              sub={c.key === 'applied' && eq ? `${fmt(c.rows.reduce((n, r) => n + (r.applications ?? 0), 0))} คน` : undefined}
+              onClick={
+                eq
+                  ? () => {
+                      // ประกาศแล้ว/ยังไม่ประกาศ = เปิดไส้ในข้างล่าง · ช่องอื่น = รายการใบของช่องนั้น
+                      if (c.view) setPostView(c.view);
+                      if (c.key !== 'released' && c.key !== 'unreleased') openRequests(RELEASE_LANE_TEXT[c.key].label, c.rows);
+                    }
+                  : undefined
+              }
+              testId={`v2-post-${c.key}`}
+            />
+          ))}
         </div>
         {posts.error && posts.key === filterKey ? <p className="text-xs text-destructive">{posts.error}</p> : null}
         {/* ไส้ใน: กดยังไม่เริ่มหา = ใครถือกี่ใบ · กดเริ่มหาแล้ว = มีชื่อ/ไม่มีชื่อ + ใบที่มีชื่อติดขั้นไหน (เจ้าของ 17 พ.ย. 2569) */}
@@ -281,8 +311,7 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
           {eq ? (
             <PostingProgress
               view={postView}
-              started={started}
-              notStarted={notStarted}
+              open={openRows}
               onRequests={openRequests}
               onNames={(title, ids, labels) => push({ kind: 'names', title, ids: [...ids], page: 1, labels })}
               resetKey={viewKey}
@@ -292,6 +321,9 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
           )}
         </div>
         <div className="flex flex-wrap gap-2">
+          <Button type="button" size="sm" variant="outline" onClick={() => push({ kind: 'embed', title: 'Autopost · รายการโพสต์', embed: 'posts' })}>
+            Autopost · รายการโพสต์ {posts.key === filterKey ? fmt(posts.total) : ''}
+          </Button>
           <Button type="button" size="sm" variant="outline" onClick={() => push({ kind: 'embed', title: 'โพสต์เอง / สร้างลิงก์', embed: 'self' })}>
             โพสต์เอง / สร้างลิงก์
           </Button>
