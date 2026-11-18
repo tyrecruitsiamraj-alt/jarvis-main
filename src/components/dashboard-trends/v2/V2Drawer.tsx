@@ -11,13 +11,15 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
-import { DASH } from '@/lib/designTokens';
+import { DASH, TONE } from '@/lib/designTokens';
 import { applicantWorkLink } from '@/lib/recruitRm';
 import { fetchApplicantNames, type ApplicantNameRow } from '@/lib/recruitOverviewApi';
 import type { RecruitAppFact } from '@/lib/recruitOverviewTypes';
 import type { StuckRequest } from '@/lib/recruitStuck';
 import { requestPathOfJobId } from '@/lib/jobNavigation';
 import { MonthCompareBars } from './MonthCompareBars';
+import DateRangeCalendarPicker, { type DateRangeYmd } from '@/components/shared/DateRangeCalendarPicker';
+import { thaiDate } from '@/lib/periodPick';
 import { POSTING_STATE_LABEL, postingStateOf } from '@/lib/recruitPostingState';
 import {
   AUDIENCE_DIM_LABEL,
@@ -429,85 +431,112 @@ export function NamesList({ ids, page, onPage, model, labels }: { ids: readonly 
 }
 
 /**
- * ใบขอที่กดมา → กราฟแท่งตั้งเทียบ BU ก่อน กดแท่ง BU = รายการใบของ BU นั้น (Back กลับมากราฟ)
- * เจ้าของ 18 พ.ย. 2569 "กดช่องพวกนี้ปุ้บ มันต้องขึ้นกราฟแท่ง ที่เปรียบเทียบของแต่ละ Bu ให้ดูทันที แล้วถ้ากด Bu ไหนค่อยขึ้น(รายการใบ)"
- * มี BU เดียว / กด BU มาแล้ว = รายการใบเลย
+ * ใบขอที่กดมา → กราฟแท่งตั้งเทียบ BU · กรองวันที่ใบเข้ามาได้ · กดแท่ง BU = รายการใบใต้กราฟในหน้าเดิม (ไม่เด้งหน้าใหม่)
+ * เจ้าของ 18 พ.ย. 2569 "กดช่องพวกนี้ปุ้บ มันต้องขึ้นกราฟแท่ง ที่เปรียบเทียบของแต่ละ Bu" + "Fil ดูวันที่ไม่ได้ทำให้ Fil ได้
+ * แล้ว พอกด Bu ไหนก็ไม่ต้องให้มันเด้งไปอีกหน้า เอาชื่อลงมาเลย บอกด้วยว่าค้างมานานแค่ไหนแล้ว โชว์รายละเอียดแบบหน้าใบขอ"
+ * มี BU เดียว / มาจากกด BU แล้ว = รายการใบเลย
  */
-function RequestsByBu({ pane, push, replace }: { pane: Extract<V2Pane, { kind: 'requests' }>; push: (p: V2Pane) => void; replace: (p: V2Pane) => void }) {
+function RequestsByBu({ pane, replace }: { pane: Extract<V2Pane, { kind: 'requests' }>; push: (p: V2Pane) => void; replace: (p: V2Pane) => void }) {
+  const [range, setRange] = React.useState<DateRangeYmd | null>(null);
+  const [bu, setBu] = React.useState<string | null>(null);
+  const inRange = (r: StuckRequest) => !range || !r.day || ((!range.from || r.day >= range.from) && (!range.to || r.day <= range.to));
+  const rows = pane.rows.filter(inRange);
   const byBu = new Map<string, StuckRequest[]>();
-  for (const r of pane.rows) {
+  for (const r of rows) {
     const k = r.bu?.trim() || BU_UNKNOWN;
     byBu.set(k, [...(byBu.get(k) ?? []), r]);
   }
-  if (pane.bu || byBu.size <= 1) return <RequestList rows={pane.rows} page={pane.page} onPage={(page) => replace({ ...pane, page })} />;
-  const groups = [...byBu.entries()].map(([k, rows]) => ({ key: k, byMonth: { all: rows.length } })).sort((a, b) => b.byMonth.all - a.byMonth.all);
-  const remaining = pane.rows.reduce((n, r) => n + (r.remaining ?? 0), 0);
+  const allBus = new Set(pane.rows.map((r) => r.bu?.trim() || BU_UNKNOWN));
+  if (pane.bu || allBus.size <= 1) return <RequestList rows={rows} page={pane.page} onPage={(page) => replace({ ...pane, page })} />;
+  const groups = [...allBus].map((k) => ({ key: k, byMonth: { all: byBu.get(k)?.length ?? 0 } })).sort((x, y) => y.byMonth.all - x.byMonth.all);
+  const shown = bu === null ? [] : bu === 'ทุก BU' ? rows : byBu.get(bu) ?? [];
+  const remaining = rows.reduce((n, r) => n + (r.remaining ?? 0), 0);
   return (
     <section className="space-y-3" data-testid="v2-requests-by-bu">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="text-sm font-medium">
-          {fmt(pane.rows.length)} ใบ · เหลือหา {fmt(remaining)} อัตรา · แยกตาม BU
+          {fmt(rows.length)} ใบ · เหลือหา {fmt(remaining)} อัตรา · แยกตาม BU
         </h3>
-        <Button type="button" size="xs" variant="outline" onClick={() => push({ ...pane, bu: 'ทุก BU', title: `${pane.title} · ทุก BU`, page: 1 })}>
-          ดูรายการทั้งหมด
-        </Button>
+        <DateRangeCalendarPicker triggerVariant="filter" value={range} onChange={setRange} emptyLabel="ทุกวันที่ใบเข้า" />
       </div>
-      <MonthCompareBars
-        groups={groups}
-        months={['all']}
-        unit="ใบ"
-        seriesName={() => 'ใบขอ'}
-        onPick={(bu) => push({ kind: 'requests', title: `${pane.title} · ${bu}`, rows: byBu.get(bu) ?? [], page: 1, bu })}
-        testId="v2-requests-bu-chart"
-      />
+      <MonthCompareBars groups={groups} months={['all']} unit="ใบ" seriesName={() => 'ใบขอ'} onPick={(k) => setBu(k)} testId="v2-requests-bu-chart" />
+      <div className="flex flex-wrap items-center gap-2">
+        <Button type="button" size="xs" variant={bu === 'ทุก BU' ? 'default' : 'outline'} onClick={() => setBu(bu === 'ทุก BU' ? null : 'ทุก BU')}>
+          ทุก BU {fmt(rows.length)}
+        </Button>
+        {groups.map((g) => (
+          <Button key={g.key} type="button" size="xs" variant={bu === g.key ? 'default' : 'outline'} onClick={() => setBu(bu === g.key ? null : g.key)}>
+            {g.key} {fmt(g.byMonth.all)}
+          </Button>
+        ))}
+      </div>
+      {bu !== null ? <RequestList key={`${bu}:${range?.from ?? ''}:${range?.to ?? ''}`} rows={shown} page={1} /> : null}
     </section>
   );
 }
 
-const STATE_LABEL: Record<string, string> = { open: 'ดำเนินการ', filled: 'ปิดใบขอ', cancelled: 'ยกเลิกใบขอ' };
+const STATE_LABEL: Record<string, string> = { open: 'ยังเปิด', filled: 'ปิดใบขอ', cancelled: 'ยกเลิกใบขอ' };
 
-/** ใบขอทีละ 10 — เลขใบ · หน่วยงาน · BU · ผู้รับผิดชอบ · สถานะ · อายุค้าง · อัตรา · ทางไปหน้าใบขอจริง */
-function RequestList({ rows, page, onPage }: { rows: readonly StuckRequest[]; page: number; onPage: (p: number) => void }) {
+/** ใบขอทีละ 10 — รายละเอียดแบบหน้าใบขอ: ค้างกี่วัน · หน่วยงาน · ตำแหน่ง · พื้นที่ · ผู้รับผิดชอบ · ประกาศ · คนสมัคร · อัตรา · ทางไปหน้าใบขอจริง */
+function RequestList({ rows, page, onPage }: { rows: readonly StuckRequest[]; page: number; onPage?: (p: number) => void }) {
+  const [own, setOwn] = React.useState(page);
+  const cur = onPage ? page : own;
   const sorted = React.useMemo(
     () => [...rows].sort((a, b) => (b.ageDays ?? -1) - (a.ageDays ?? -1) || a.requestNo.localeCompare(b.requestNo)),
     [rows],
   );
-  const pg = pageOf(sorted, page);
+  const pg = pageOf(sorted, cur);
   return (
     <div className="space-y-1" data-testid="v2-requests">
       <ul className="divide-y rounded-xl border">
         {pg.slice.length === 0 ? <li className={cn('px-3 py-3 text-sm', DASH.muted)}>ไม่มีรายการ</li> : null}
         {pg.slice.map((r) => (
-          <li key={`${r.jobId ?? ''}:${r.requestNo}`} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2">
-            <div className="min-w-0 text-sm">
-              <div className="font-medium">
-                {r.requestNo} · {r.unitName || 'ไม่พบชื่อหน่วยงาน'}
+          <li key={`${r.jobId ?? ''}:${r.requestNo}`} className="space-y-1.5 px-3 py-2.5">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div className="min-w-0">
+                <div className="text-sm font-medium">
+                  {r.requestNo} · {r.unitName || 'ไม่พบชื่อหน่วยงาน'}
+                </div>
+                <div className={cn('text-xs', DASH.sub)}>{[r.bu || 'ไม่ระบุ BU', r.position || null, r.siteName || null].filter(Boolean).join(' · ')}</div>
               </div>
-              <div className={cn('text-xs', DASH.sub)}>
-                {[
-                  r.bu || 'ไม่ระบุ BU',
-                  r.position || null,
-                  r.recruiter?.trim() ? `ผู้รับผิดชอบ ${r.recruiter}` : 'ยังไม่ตั้งผู้รับผิดชอบ',
-                  STATE_LABEL[r.state ?? 'open'] ?? r.state,
-                  POSTING_STATE_LABEL[postingStateOf(r)],
-                  r.ageDays === null ? null : `ค้าง ${fmt(r.ageDays)} วัน`,
-                  `ขอ ${fmt(r.requested)} · หาได้ ${fmt(r.filled)} · ยกเลิก ${fmt(r.cancelled)} · เหลือหา ${fmt(r.remaining)} อัตรา`,
-                ]
-                  .filter(Boolean)
-                  .join(' · ')}
+              <div className="flex shrink-0 items-center gap-2">
+                {r.ageDays === null ? null : (
+                  <span className={cn('rounded-full border px-2 py-0.5 text-xs font-medium tabular-nums', r.ageDays > 30 ? cn(TONE.warn.soft, TONE.warn.value) : DASH.sub)}>
+                    ค้าง {fmt(r.ageDays)} วัน
+                  </span>
+                )}
+                {r.jobId ? (
+                  <Button asChild size="xs" variant="outline">
+                    <Link to={requestPathOfJobId(r.jobId)}>
+                      <ExternalLink aria-hidden /> เปิด
+                    </Link>
+                  </Button>
+                ) : null}
               </div>
             </div>
-            {r.jobId ? (
-              <Button asChild size="xs" variant="outline">
-                <Link to={requestPathOfJobId(r.jobId)}>
-                  <ExternalLink aria-hidden /> เปิด
-                </Link>
-              </Button>
-            ) : null}
+            <dl className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs sm:grid-cols-3">
+              {(
+                [
+                  ['วันที่ใบเข้า', r.day ? thaiDate(r.day) : '—'],
+                  ['พื้นที่', [r.province, r.district].filter(Boolean).join(' · ') || '—'],
+                  ['ผู้รับผิดชอบ', r.recruiter?.trim() || 'ยังไม่ตั้ง'],
+                  ['สถานะ', STATE_LABEL[r.state ?? 'open'] ?? r.state ?? '—'],
+                  ['การประกาศ', r.released ? 'ประกาศแล้ว' : 'ยังไม่ประกาศ'],
+                  ['หลักฐานการออกหาคน', POSTING_STATE_LABEL[postingStateOf(r)]],
+                  ['คนสมัคร', `${fmt(r.applications ?? 0)} คน`],
+                  ['อัตรา', `ขอ ${fmt(r.requested)} · หาได้ ${fmt(r.filled)} · ยกเลิก ${fmt(r.cancelled)} · เหลือหา ${fmt(r.remaining)}`],
+                ] as const
+              ).map(([k, v]) => (
+                <div key={k} className="flex min-w-0 gap-1">
+                  <dt className={cn('shrink-0', DASH.sub)}>{k}</dt>
+                  <dd className="min-w-0 truncate tabular-nums">{v}</dd>
+                </div>
+              ))}
+            </dl>
           </li>
         ))}
       </ul>
-      <Pager {...pg} onPage={onPage} testId="v2-requests-pager" />
+      <Pager {...pg} onPage={onPage ?? setOwn} testId="v2-requests-pager" />
     </div>
   );
 }

@@ -271,7 +271,7 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
         <SectionTitle title="ใบขอ" right={`สถานะ ณ ${dayText(win.to)} · ใบขอใหม่นับตามวันคีย์ใน ERP`} />
         {stuck.error && stuck.key === filterKey ? <p className="text-sm text-destructive">{stuck.error}</p> : null}
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <Kpi label="ดำเนินการ (ใบ)" emphasis value={loadingReq ? undefined : eq ? eq.remaining.length : null} sub={rateText(eq?.remaining, 'เหลือหา', 'remaining')} onClick={eq ? () => openRequests('ดำเนินการ', eq.remaining) : undefined} testId="v2-req-open" />
+          <Kpi label={`${RELEASE_LANE_TEXT.all.label} (ใบ)`} emphasis value={loadingReq ? undefined : eq ? eq.remaining.length : null} sub={rateText(eq?.remaining, 'เหลือหา', 'remaining')} onClick={eq ? () => openRequests(RELEASE_LANE_TEXT.all.label, eq.remaining) : undefined} testId="v2-req-open" />
           <Kpi label="ใบขอใหม่ (ใบ)" emphasis value={loadingReq ? undefined : eq ? eq.new.length : null} sub={rateText(eq?.new, 'ขอมา', 'requested')} onClick={eq ? () => openRequests('ใบขอใหม่', eq.new) : undefined} />
           <Kpi label="ปิดใบขอ (ใบ)" emphasis value={loadingReq ? undefined : eq ? eq.filled.length : null} sub={rateText(eq?.filled, 'หาได้', 'filled')} onClick={eq ? () => openRequests('ปิดใบขอ', eq.filled) : undefined} />
           <Kpi label="ยกเลิกใบขอ (ใบ)" emphasis value={loadingReq ? undefined : eq ? eq.cancelled.length : null} sub={rateText(eq?.cancelled, 'ยกเลิก', 'cancelled')} onClick={eq ? () => openRequests('ยกเลิกใบขอ', eq.cancelled) : undefined} tone="danger" />
