@@ -73,12 +73,15 @@ export async function isPhoneSuppressed(rawPhone: string | null | undefined): Pr
   }
 }
 
-/** เบอร์ที่ถูกพักทั้งชุด — ใช้กรองตอน enqueue หลายคนพร้อมกัน */
-export async function listSuppressedPhones(): Promise<Set<string>> {
+/**
+ * เบอร์ที่ถูกพักทั้งชุด — ใช้กรองตอน enqueue หลายคนพร้อมกัน
+ * `forFollow` = สายติดตามเริ่มงาน: ไม่นับ "บอก AI ว่าไม่สนใจ" (declined) — ปฏิเสธงานหนึ่งแล้วไปเริ่มงานอื่น ต้องยังได้สายติดตาม (18 พ.ย. 2569)
+ */
+export async function listSuppressedPhones(opts: { forFollow?: boolean } = {}): Promise<Set<string>> {
   const out = new Set<string>();
   try {
     const { rows } = await dbQuery<{ phone_e164: string }>(
-      `select phone_e164 from ${suppressionTable} where suppressed_until > now()`,
+      `select phone_e164 from ${suppressionTable} where suppressed_until > now()${opts.forFollow ? ` and reason is distinct from 'declined'` : ''}`,
     );
     for (const r of rows) out.add(r.phone_e164);
   } catch (e) {

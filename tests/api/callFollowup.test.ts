@@ -460,3 +460,20 @@ describe('รับสายแล้วเงียบ หยุดโทรเ
     expect(d?.action).toBe('retry');
   });
 });
+
+describe('บัญชีห้ามโทรของสายติดตามเริ่มงาน ไม่นับ "บอก AI ว่าไม่สนใจ" (18 พ.ย. 2569)', () => {
+  beforeEach(() => vi.mocked(dbQuery).mockReset());
+  it('forFollow ⇒ ตัดเหตุผล declined · ค่าเริ่ม (สายเสนองาน) นับทุกเหตุผล', async () => {
+    vi.mocked(dbQuery).mockResolvedValue({ rows: [] } as never);
+    await listSuppressedPhones({ forFollow: true });
+    await listSuppressedPhones();
+    expect(sqlOf(0)).toContain("reason is distinct from 'declined'");
+    expect(sqlOf(1)).not.toContain('declined');
+  });
+  it('ตัวเข้าคิวกับตัวกู้สายติดตามส่ง forFollow', async () => {
+    const { readFileSync } = await import('node:fs');
+    const src = readFileSync('api/_lib/lumosDispatch.ts', 'utf8');
+    expect(src).toContain("listSuppressedPhones({ forFollow: jobRef === 'follow' })");
+    expect(src).toContain('const blocked = await listSuppressedPhones({ forFollow: true });');
+  });
+});

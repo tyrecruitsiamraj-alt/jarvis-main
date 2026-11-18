@@ -31,7 +31,7 @@ import { getLumosPushConfig } from './lumosPushClient.js';
 import { queuePending } from './lumosQueueDefs.js';
 import { bangkokIso } from './bangkokIso.js';
 import { getCallFollowupPolicy } from './callFollowupPolicyStore.js';
-import { listSuppressedPhones } from './callFollowup.js';
+import { listSuppressedPhones, stopOpenInterviewCalls } from './callFollowup.js';
 import { listHeldPhones } from './candidateCallHolds.js';
 import { releaseDueCallBatches } from './callBatchStore.js';
 import { pushQueueRowsTracked, type LumosPushChannel } from './lumosPushTracking.js';
@@ -57,6 +57,7 @@ const appsTable = tableInAppSchema('public_job_applications');
 const contactsTable = tableInAppSchema('application_contact_logs');
 const followTable = tableInAppSchema('follow_entries');
 const holdsTable = tableInAppSchema('candidate_call_holds');
+const suppressionTable = tableInAppSchema('candidate_call_suppression');
 
 /** โทรซ้ำที่เลยเวลามาเกินเท่านี้โดยยังไม่เคยลองส่ง (เครื่องหยุด/งานค้างเก่า) ⇒ นัดช่องเวลาถัดไปใหม่ ไม่โทรทันที */
 const RETRY_REPLAN_AFTER_MINUTES = 30;
@@ -90,6 +91,8 @@ export type LumosPushRetryRun = {
   batchesReleased: number;
   /** ถาม Lumos แล้วได้คำตอบว่าไม่รับสาย (failed/discarded) — 14 ต.ค. 2569 */
   notImported?: number;
+  /** สายเสนองานที่ยังรอ ของเบอร์ที่ถูกพัก — ยกเลิกในฐาน + ที่ Lumos (18 พ.ย. 2569) */
+  suppressedCancelled?: number;
 };
 
 let lastRun: LumosPushRetryRun | null = null;
@@ -336,16 +339,20 @@ const toDate = (v: string | Date | null): Date | null => {
   return Number.isNaN(d.getTime()) ? null : d;
 };
 
-type Gates = { suppressed: Set<string> | null; held: Set<string>; policy: CallFollowupPolicy };
+/** `suppressed` = สายเสนองาน (ทุกเหตุผล) · `suppressedFollow` = สายติดตามเริ่มงาน (ไม่นับ "บอก AI ว่าไม่สนใจ") */
+type Gates = { suppressed: Set<string> | null; suppressedFollow: Set<string> | null; held: Set<string>; policy: CallFollowupPolicy };
 
 async function loadGates(): Promise<Gates> {
   const policy = await getCallFollowupPolicy().catch(() => DEFAULT_CALL_FOLLOWUP_POLICY);
   // เบอร์ถูกพัก: อ่านไม่ได้ = รอบนี้ไม่ยิงใครเลย (เผลอโทรคนที่บอกเลิกหางานแล้วกู้คืนไม่ได้)
   let suppressed: Set<string> | null;
+  let suppressedFollow: Set<string> | null;
   try {
     suppressed = await listSuppressedPhones();
+    suppressedFollow = await listSuppressedPhones({ forFollow: true });
   } catch {
     suppressed = null;
+    suppressedFollow = null;
   }
   // เบอร์มีคนถือ: อ่านไม่ได้ = ไม่กรอง (กติกาเดียวกับตอนเข้าคิว `insertQueueItems`)
   let held: Set<string>;
@@ -354,7 +361,7 @@ async function loadGates(): Promise<Gates> {
   } catch {
     held = new Set();
   }
-  return { suppressed, held, policy };
+  return { suppressed, suppressedFollow, held, policy };
 }
 
 /** เหตุที่ใบสมัครนี้ไม่ควรให้ AI โทร (มีเจ้าของแล้ว) · null = โทรได้ */
@@ -391,6 +398,14 @@ export async function runLumosPushRetryOnce(
     return run;
   }
 
+  // ── 0a) เบอร์ถูกพักแต่ยังมีสายเสนองานรออยู่ (รวมที่ส่งถึง Lumos แล้ว) ⇒ ยกเลิกให้เอง ไม่ต้องมีคนกด
+  //     เจ้าของ 18 พ.ย. 2569 "ทำไมต้องมีปุ่มหยุด ทำไมไม่หยุดเองเลย" · เฉพาะแถวที่ยังไม่มีผล (แผนที่จบแล้วห้ามยกเลิกที่ Lumos)
+  try {
+    run.suppressedCancelled = await cancelSuppressedOpenInterviews();
+  } catch (e) {
+    logError('lumos.pushRetry: ยกเลิกสายของเบอร์ที่ถูกพักไม่สำเร็จ', e);
+  }
+
   // ── 0) ชุดโทรที่อนุมัติแล้ว — ปล่อยตามเวลา (เดิมรอคนเปิดแผง/รอ Lumos มาดึงคิวซึ่งไม่มาแล้ว) ──
   try {
     run.batchesReleased = await releaseDueCallBatches();
@@ -418,7 +433,10 @@ export async function runLumosPushRetryOnce(
   run.found = rows.length;
   for (const row of rows) {
     if (stopped) break;
-    const { suppressed, held, policy } = await gatesOnce();
+    const g = await gatesOnce();
+    const { held, policy } = g;
+    // งานติดตามเริ่มงานแยกด้วย person_ref ไม่ใช่ช่อง — เลน Match (card-) ก็ส่งทาง reminder ได้
+    const suppressed = row.person_ref.startsWith('follow-') ? g.suppressedFollow : g.suppressed;
     const dueAt = toDate(row.next_attempt_at) ?? toDate(row.created_at) ?? now;
     const decision = decideLumosPushRetry(dueAt, cfg, policy, now);
     if (decision.action === 'give_up') {
@@ -482,8 +500,10 @@ export async function runLumosPushRetryOnce(
   }
   for (const r of retries) {
     if (stopped) break;
-    const { suppressed, held, policy } = await gatesOnce();
+    const g = await gatesOnce();
+    const { held, policy } = g;
     const isFollow = r.job_ref === 'follow' || r.person_ref.startsWith('follow-');
+    const suppressed = isFollow ? g.suppressedFollow : g.suppressed;
     // เลน Match = คนของเรา `card-` + iRecruit `ir-` — นิยามกลางตัวเดียวกับยอดส่ง Lumos หน้าแรก
     const isMatch = queueLane(r.person_ref, r.job_ref) === 'match';
     // a) ไม่ต้องโทรแล้ว — งานติดตามปิดแล้ว / ใบสมัครมีเจ้าของแล้ว / เลน Match เจ้าหน้าที่คุยแล้ว / เบอร์พักหรือมีคนถือ
@@ -615,11 +635,27 @@ export async function runLumosPushRetryOnce(
     run.retriesReplanned ||
     run.silentEscalated ||
     run.batchesReleased ||
-    run.notImported
+    run.notImported ||
+    run.suppressedCancelled
   ) {
     logInfo('lumos.pushRetry.run', { ...run });
   }
   return run;
+}
+
+/** เบอร์ที่ถูกพักแล้วยังมีสายเสนองานรอ (ยังไม่มีผล) — ทีละไม่เกิน 50 เบอร์ต่อรอบ · คืนจำนวนแถวที่ยกเลิก */
+async function cancelSuppressedOpenInterviews(): Promise<number> {
+  const { rows } = await dbQuery<{ phone: string }>(
+    `select distinct s.phone_e164 as phone
+       from ${suppressionTable} s
+       join ${queueTable} q on coalesce(q.payload->>'recipient_phone', q.payload->>'phone') = s.phone_e164
+      where s.suppressed_until > now()
+        and q.channel = 'interview' and q.result is null and q.status in ('pending', 'delivered')
+      limit 50`,
+  );
+  let n = 0;
+  for (const r of rows) n += await stopOpenInterviewCalls(r.phone, 'lumos.pushRetry.suppressed');
+  return n;
 }
 
 function sleepInterruptible(ms: number): Promise<void> {

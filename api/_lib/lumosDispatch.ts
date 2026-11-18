@@ -735,7 +735,7 @@ async function insertQueueItems(
   // อันนี้ต่างจากล็อก: ถ้าอ่านไม่ได้ต้อง **ไม่ส่ง** ดีกว่าเผลอโทรคนที่บอกว่าเลิกหางานแล้ว
   let suppressedPhones: Set<string> | null;
   try {
-    suppressedPhones = await listSuppressedPhones();
+    suppressedPhones = await listSuppressedPhones({ forFollow: jobRef === 'follow' });
   } catch {
     suppressedPhones = null;
   }
@@ -2922,7 +2922,7 @@ async function listSuppressedFollowRows(): Promise<Array<FollowPlanRow & { dispa
 export async function listPhonesWithStuckSuppressedFollows(): Promise<string[]> {
   const rows = await listSuppressedFollowRows();
   if (rows.length === 0) return [];
-  const blocked = await listSuppressedPhones();
+  const blocked = await listSuppressedPhones({ forFollow: true });
   const held = await listHeldPhones();
   const out = new Set<string>();
   for (const r of rows) {

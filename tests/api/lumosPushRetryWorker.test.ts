@@ -16,7 +16,8 @@ const dbQuery = vi.fn();
 const pushInterviews = vi.fn();
 const pushReminders = vi.fn();
 const getLumosPushConfig = vi.fn(() => ({ baseUrl: 'x', connectionId: 'y', apiKey: 'z' }) as unknown);
-const listSuppressedPhones = vi.fn(async () => new Set<string>());
+const listSuppressedPhones = vi.fn(async (_opts?: { forFollow?: boolean }) => new Set<string>());
+const stopOpenInterviewCalls = vi.fn(async (_phone: string, _tag: string) => 1);
 const listHeldPhones = vi.fn(async () => new Set<string>());
 
 vi.mock('../../api/_lib/postgres.js', () => ({ dbQuery: (...a: unknown[]) => dbQuery(...a) }));
@@ -26,7 +27,10 @@ vi.mock('../../api/_lib/lumosPushClient.js', () => ({
   pushReminders: (...a: unknown[]) => pushReminders(...a),
   getLumosPushConfig: () => getLumosPushConfig(),
 }));
-vi.mock('../../api/_lib/callFollowup.js', () => ({ listSuppressedPhones: () => listSuppressedPhones() }));
+vi.mock('../../api/_lib/callFollowup.js', () => ({
+  listSuppressedPhones: (o?: { forFollow?: boolean }) => listSuppressedPhones(o),
+  stopOpenInterviewCalls: (p: string, t: string) => stopOpenInterviewCalls(p, t),
+}));
 vi.mock('../../api/_lib/candidateCallHolds.js', () => ({ listHeldPhones: () => listHeldPhones() }));
 const releaseDueCallBatches = vi.fn(async () => 0);
 vi.mock('../../api/_lib/callBatchStore.js', () => ({ releaseDueCallBatches: () => releaseDueCallBatches() }));
@@ -61,10 +65,11 @@ const cand = (over: Record<string, unknown> = {}) => ({
 });
 
 /** แยกคิวรีตามชนิด: แถว push ไม่ถึง · โทรซ้ำที่ถึงเวลา · ที่เหลือ (update) ไม่คืนแถว */
-function stub(rows: unknown[], retries: unknown[] = []) {
+function stub(rows: unknown[], retries: unknown[] = [], suppressedOpen: unknown[] = []) {
   dbQuery.mockReset();
   dbQuery.mockImplementation((sql: string) => {
     const s = String(sql);
+    if (s.includes('candidate_call_suppression')) return Promise.resolve({ rows: suppressedOpen });
     if (/^\s*select/i.test(s) && s.includes("followup_state = 'retry_scheduled'")) return Promise.resolve({ rows: retries });
     if (/^\s*select/i.test(s)) return Promise.resolve({ rows });
     return Promise.resolve({ rows: [] });
@@ -80,6 +85,7 @@ beforeEach(() => {
   getLumosPushConfig.mockReturnValue({ baseUrl: 'x', connectionId: 'y', apiKey: 'z' });
   listSuppressedPhones.mockReset().mockResolvedValue(new Set());
   listHeldPhones.mockReset().mockResolvedValue(new Set());
+  stopOpenInterviewCalls.mockReset().mockResolvedValue(1);
 });
 
 describe('runLumosPushRetryOnce', () => {
@@ -176,7 +182,8 @@ describe('runLumosPushRetryOnce', () => {
   it('คิวรีหยิบเฉพาะแถวที่ยังไม่มีผล และจดว่าส่งไม่ถึง/ค้างกลางทาง · 🔴 ไม่แตะงานติดตาม · แถวเก่า push_state null ไม่แตะ', async () => {
     stub([]);
     await runLumosPushRetryOnce(CFG, bkk('2026-09-28T14:05:00'));
-    const sql = String(dbQuery.mock.calls[0][0]);
+    // คิวรีแรกหลังขั้น 0a (ยกเลิกสายของเบอร์ที่ถูกพัก)
+    const sql = dbQuery.mock.calls.map((c) => String(c[0])).filter((q) => !q.includes('candidate_call_suppression'))[0];
     expect(sql).toContain("q.job_ref <> 'follow'");
     expect(sql).toContain("q.person_ref like 'app-%'");
     expect(sql).toContain("q.person_ref like 'ir-%'");
@@ -482,5 +489,28 @@ describe('withScheduledAt', () => {
   it('interview = ช่องเดียว · reminder ที่มี steps = ทุกรอบในแผน (เลน Match รอบเดียว)', () => {
     expect(withScheduledAt({ scheduled_at: 'a', x: 1 }, 'T')).toEqual({ scheduled_at: 'T', x: 1 });
     expect(withScheduledAt({ steps: [{ scheduled_at: 'a' }] }, 'T')).toEqual({ steps: [{ scheduled_at: 'T' }] });
+  });
+});
+
+/** เจ้าของ 18 พ.ย. 2569 "ทำไมต้องมีปุ่มหยุด ทำไมไม่หยุดเองเลย" · "ไม่โทรเลยถ้าเขาบอกไม่สนใจ" */
+describe('เบอร์ถูกพัก = หยุดเอง · บอก AI ว่าไม่สนใจ ไม่ตัดสายติดตามเริ่มงาน', () => {
+  it('ทุกรอบ: เบอร์ถูกพักที่ยังมีสายเสนองานรอ ⇒ ยกเลิกให้เอง (ในฐาน + ที่ Lumos) ไม่ต้องมีคนกด', async () => {
+    stub([], [], [{ phone: '+66877551788' }]);
+    const run = await runLumosPushRetryOnce(CFG, bkk('2026-11-18T10:00:00'));
+    expect(stopOpenInterviewCalls).toHaveBeenCalledWith('+66877551788', 'lumos.pushRetry.suppressed');
+    expect(run.suppressedCancelled).toBe(1);
+    const q = dbQuery.mock.calls.map((c) => String(c[0])).find((x) => x.includes('candidate_call_suppression')) ?? '';
+    expect(q).toContain("q.channel = 'interview' and q.result is null and q.status in ('pending', 'delivered')");
+  });
+
+  it('สายติดตามเริ่มงานใช้ชุดที่ไม่นับ "ไม่สนใจ" ⇒ ยังโทรซ้ำได้ · สายเสนองานของเบอร์เดียวกันถูกปิด', async () => {
+    listSuppressedPhones.mockImplementation(async (o?: { forFollow?: boolean }) => (o?.forFollow ? new Set() : new Set(['+66844444444'])));
+    stub([], [retry({ id: '901', channel: 'reminder', person_ref: 'follow-901', job_ref: 'follow', follow_exists: true, follow_closed: false, next_attempt_at: bkk('2026-11-18T10:05:00') })]);
+    const followRun = await runLumosPushRetryOnce(CFG, bkk('2026-11-18T10:00:00'));
+    expect(followRun.retriesClosed).toBe(0);
+
+    stub([], [retry({ id: '902' })]);
+    const offerRun = await runLumosPushRetryOnce(CFG, bkk('2026-11-18T10:00:00'));
+    expect(offerRun.retriesClosed).toBe(1);
   });
 });
