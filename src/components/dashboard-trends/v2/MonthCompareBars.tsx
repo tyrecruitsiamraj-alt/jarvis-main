@@ -22,6 +22,8 @@ export function MonthCompareBars({
   onPick,
   height = 260,
   testId,
+  unit = 'รายการ',
+  seriesName = monthLabel,
 }: {
   groups: readonly MonthGroup[];
   /** เดือนในช่วงที่เลือก (YYYY-MM) เรียงเก่า → ใหม่ */
@@ -29,6 +31,10 @@ export function MonthCompareBars({
   onPick?: (key: string) => void;
   height?: number;
   testId?: string;
+  /** หน่วยในกล่องตัวเลข (รายการ / ใบ) */
+  unit?: string;
+  /** ชื่อชุดแท่งในกล่องตัวเลข/คำอธิบายสี — ค่าเริ่ม = ชื่อเดือน */
+  seriesName?: (key: string) => string;
 }) {
   const data = groups.map((g) => ({ key: g.key, ...Object.fromEntries(months.map((m) => [m, g.byMonth[m] ?? 0])) }));
   if (groups.length === 0) return <p className={cn('py-8 text-center text-sm', DASH.muted)}>ไม่มีรายการ</p>;
@@ -50,9 +56,9 @@ export function MonthCompareBars({
           <Tooltip
             {...CHART.tooltipLight}
             cursor={CHART.cursorBar}
-            formatter={(v: number, name: string) => [`${v.toLocaleString('th-TH')} รายการ`, monthLabel(name)]}
+            formatter={(v: number, name: string) => [`${v.toLocaleString('th-TH')} ${unit}`, seriesName(name)]}
           />
-          {months.length > 1 ? <Legend formatter={(v: string) => monthLabel(v)} wrapperStyle={{ fontSize: 12 }} /> : null}
+          {months.length > 1 ? <Legend formatter={(v: string) => seriesName(v)} wrapperStyle={{ fontSize: 12 }} /> : null}
           {months.map((m, i) => (
             <Bar
               key={m}

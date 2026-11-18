@@ -17,9 +17,11 @@ import { fetchApplicantNames, type ApplicantNameRow } from '@/lib/recruitOvervie
 import type { RecruitAppFact } from '@/lib/recruitOverviewTypes';
 import type { StuckRequest } from '@/lib/recruitStuck';
 import { requestPathOfJobId } from '@/lib/jobNavigation';
+import { MonthCompareBars } from './MonthCompareBars';
 import { POSTING_STATE_LABEL, postingStateOf } from '@/lib/recruitPostingState';
 import {
   AUDIENCE_DIM_LABEL,
+  BU_UNKNOWN,
   AUDIENCE_MEASURES,
   AUDIENCE_MEASURE_LABEL,
   ageStats,
@@ -41,7 +43,7 @@ export type V2Pane =
   | { kind: 'metric'; metric: V2Metric; bu?: string; page: number }
   | { kind: 'audience'; view: AudienceDim | 'records'; filter: AudienceFilter; measure: AudienceMeasure; display: AudienceDisplay; page: number; title: string }
   | { kind: 'names'; title: string; ids: string[]; page: number; /** สถานะของแต่ละชื่อ (ใบขอที่กดจากการประกาศ) */ labels?: Record<string, string> }
-  | { kind: 'requests'; title: string; rows: StuckRequest[]; page: number }
+  | { kind: 'requests'; title: string; rows: StuckRequest[]; page: number; /** BU ที่กดจากกราฟ — มี = รายการใบ · ไม่มี + หลาย BU = กราฟเทียบ BU ก่อน */ bu?: string }
   /** ส่วนเดิมของระบบที่ฝังในแผง (รายการโพสต์ So Scraping · ลิงก์โพสต์เอง · คลิกฟอร์ม) — ไม่เขียนใหม่ */
   | { kind: 'embed'; title: string; embed: string };
 
@@ -101,7 +103,9 @@ export default function V2Drawer({
               {pane.kind === 'metric' ? <MetricPane pane={pane} model={model} bus={bus} push={push} replace={replace} /> : null}
               {pane.kind === 'audience' ? <AudiencePane pane={pane} model={model} bus={bus} push={push} replace={replace} /> : null}
               {pane.kind === 'names' ? <NamesList ids={pane.ids} page={pane.page} onPage={(page) => replace({ ...pane, page })} model={model} labels={pane.labels} /> : null}
-              {pane.kind === 'requests' ? <RequestList rows={pane.rows} page={pane.page} onPage={(page) => replace({ ...pane, page })} /> : null}
+              {pane.kind === 'requests' ? (
+                <RequestsByBu pane={pane} push={push} replace={replace} />
+              ) : null}
               {pane.kind === 'embed' ? (embeds[pane.embed] ?? null) : null}
             </div>
           </>
@@ -421,6 +425,42 @@ export function NamesList({ ids, page, onPage, model, labels }: { ids: readonly 
       {rows.error ? <p className="text-sm text-destructive">{rows.error}</p> : null}
       <Pager {...pg} onPage={onPage} testId="v2-names-pager" />
     </div>
+  );
+}
+
+/**
+ * ใบขอที่กดมา → กราฟแท่งตั้งเทียบ BU ก่อน กดแท่ง BU = รายการใบของ BU นั้น (Back กลับมากราฟ)
+ * เจ้าของ 18 พ.ย. 2569 "กดช่องพวกนี้ปุ้บ มันต้องขึ้นกราฟแท่ง ที่เปรียบเทียบของแต่ละ Bu ให้ดูทันที แล้วถ้ากด Bu ไหนค่อยขึ้น(รายการใบ)"
+ * มี BU เดียว / กด BU มาแล้ว = รายการใบเลย
+ */
+function RequestsByBu({ pane, push, replace }: { pane: Extract<V2Pane, { kind: 'requests' }>; push: (p: V2Pane) => void; replace: (p: V2Pane) => void }) {
+  const byBu = new Map<string, StuckRequest[]>();
+  for (const r of pane.rows) {
+    const k = r.bu?.trim() || BU_UNKNOWN;
+    byBu.set(k, [...(byBu.get(k) ?? []), r]);
+  }
+  if (pane.bu || byBu.size <= 1) return <RequestList rows={pane.rows} page={pane.page} onPage={(page) => replace({ ...pane, page })} />;
+  const groups = [...byBu.entries()].map(([k, rows]) => ({ key: k, byMonth: { all: rows.length } })).sort((a, b) => b.byMonth.all - a.byMonth.all);
+  const remaining = pane.rows.reduce((n, r) => n + (r.remaining ?? 0), 0);
+  return (
+    <section className="space-y-3" data-testid="v2-requests-by-bu">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h3 className="text-sm font-medium">
+          {fmt(pane.rows.length)} ใบ · เหลือหา {fmt(remaining)} อัตรา · แยกตาม BU
+        </h3>
+        <Button type="button" size="xs" variant="outline" onClick={() => push({ ...pane, bu: 'ทุก BU', title: `${pane.title} · ทุก BU`, page: 1 })}>
+          ดูรายการทั้งหมด
+        </Button>
+      </div>
+      <MonthCompareBars
+        groups={groups}
+        months={['all']}
+        unit="ใบ"
+        seriesName={() => 'ใบขอ'}
+        onPick={(bu) => push({ kind: 'requests', title: `${pane.title} · ${bu}`, rows: byBu.get(bu) ?? [], page: 1, bu })}
+        testId="v2-requests-bu-chart"
+      />
+    </section>
   );
 }
 
