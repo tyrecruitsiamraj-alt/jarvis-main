@@ -514,3 +514,21 @@ describe('เบอร์ถูกพัก = หยุดเอง · บอก
     expect(offerRun.retriesClosed).toBe(1);
   });
 });
+
+describe('ลดเพดานโทรซ้ำแล้ว นัดที่ค้างเกินเพดานไม่โทร (เจ้าของ 18 พ.ย. 2569 "สายเดียวจบ")', () => {
+  it('เพดาน 1 ครั้ง: นัดโทรซ้ำครั้งที่ 2 ที่ค้างอยู่ ⇒ ส่งให้คนตาม ไม่ยิง Lumos · ขอให้โทรกลับยังยิง', async () => {
+    const { DEFAULT_CALL_FOLLOWUP_POLICY } = await import('../../src/lib/callFollowupPolicy.js');
+    const store = await import('../../api/_lib/callFollowupPolicyStore.js');
+    const spy = vi.spyOn(store, 'getCallFollowupPolicy').mockResolvedValue({ ...DEFAULT_CALL_FOLLOWUP_POLICY, roundCalls: 1, roundsPerDay: 1, retryDays: 1, maxAttempts: 1 });
+    stub([], [retry({ id: '910', attempt_count: 2, last_outcome: 'no_answer', next_attempt_at: bkk('2026-11-18T11:30:00') })]);
+    const run = await runLumosPushRetryOnce(CFG, bkk('2026-11-18T11:30:00'));
+    expect(run.retriesClosed).toBe(1);
+    expect(run.retriesSent).toBe(0);
+    expect(updates().some((q) => q.includes('needs_human') || q.includes('followup_state'))).toBe(true);
+
+    stub([], [retry({ id: '911', attempt_count: 2, last_outcome: 'reschedule_requested', next_attempt_at: bkk('2026-11-18T11:30:00') })]);
+    const cb = await runLumosPushRetryOnce(CFG, bkk('2026-11-18T11:30:00'));
+    expect(cb.retriesClosed).toBe(0);
+    spy.mockRestore();
+  });
+});

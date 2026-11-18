@@ -533,6 +533,13 @@ export async function runLumosPushRetryOnce(
       await closeRetry(r.id, 'closed', suppressed.has(phone) ? 'เบอร์ถูกพัก — ไม่โทรซ้ำ' : 'เบอร์นี้มีเจ้าหน้าที่ถืออยู่ — ไม่โทรซ้ำ');
       continue;
     }
+    // a1) เพดานโทรซ้ำลดลงหลังนัดไว้ (เจ้าของ 18 พ.ย. 2569 ตั้ง "สายเดียวจบ") ⇒ นัดที่ค้างเกินเพดานไม่โทร ส่งให้คนตาม
+    //     attempt_count ของแถวรอโทรซ้ำ = ครั้งที่กำลังจะโทร · ขอให้โทรกลับไม่อยู่ในชุดนี้ (ใช้เพดานของตัวเอง)
+    if (!isFollow && UNREACHED.has(String(r.last_outcome ?? '')) && (Number(r.attempt_count) || 1) > policy.maxAttempts) {
+      run.retriesClosed += 1;
+      await closeRetry(r.id, 'needs_human', `โทรครบ ${policy.maxAttempts} ครั้งแล้วยังไม่ติด — ต้องให้คนตาม`);
+      continue;
+    }
     // a2) เลน Match: ใบขอต้องยังเปิดอยู่ (ชุดเดียวกับกล่องงาน) · อ่านไม่ได้ = รอบนี้ไม่โทร (fail-safe ไปทางไม่โทร)
     if (isMatch) {
       const openIds = await openJobsOnce();
