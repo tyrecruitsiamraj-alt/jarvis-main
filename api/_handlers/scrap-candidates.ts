@@ -11,6 +11,7 @@ import { withRbac, sendError, handleApiError, type ApiRes, type AuthedReq } from
 import { readJsonBody } from '../_lib/body.js';
 import { auditFromAuthed } from '../_lib/audit.js';
 import { staffEntryDepartment } from '../_lib/applicationScope.js';
+import { staffEntryDepartmentFor } from '../_lib/applicationDepartment.js';
 import { getSiamrajUnitRequestById, loadScopedJobIdSet } from '../_lib/siamrajUnitRequests.js';
 import { isRequestClosedForApply, REQUEST_CLOSED_APPLY_MESSAGE } from '../_lib/requestClosedForApply.js';
 import { attachAssignments } from './siamraj-unit-requests.js';
@@ -81,7 +82,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
       { id: job.id, title: publicJobPositionLabel(job), unitName: job.unit_name ?? null, recruiterName: job.recruiter_name ?? null },
       requestNo,
       ids,
-      { userId: req.user.sub, name: operator, departmentCode: dept.code },
+      { userId: req.user.sub, name: operator, departmentCode: await staffEntryDepartmentFor(job.id, dept.code) },
     );
     void auditFromAuthed(req, {
       action: 'scrap_candidates.to_contact',

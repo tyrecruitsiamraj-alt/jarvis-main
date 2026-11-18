@@ -71,6 +71,7 @@ import {
 import { loadContactAppointments, loadLatestContactResults } from '../_lib/applicationContacts.js';
 import { loadLatestAttendanceByApplication } from '../_lib/applicationAttendance.js';
 import { isEarlierAppointment } from '../../src/lib/appointmentAttendance.js';
+import { staffEntryDepartmentFor } from '../_lib/applicationDepartment.js';
 import { loadLatestScreeningByApplication } from '../_lib/applicationScreening.js';
 import { loadBoardPhoneSet } from '../_lib/applicationBoardLink.js';
 import { toE164Thai } from '../_lib/thaiPhone.js';
@@ -747,7 +748,7 @@ async function createByStaff(req: AuthedReq, res: ApiRes) {
         `insert into ${tbl} as a (${STAFF_INSERT_COLUMNS})
        values (${STAFF_INSERT_VALUES})
        returning ${LIST_COLUMNS}`,
-        staffInsertParams(v, staffName, entryDept.code),
+        staffInsertParams(v, staffName, await staffEntryDepartmentFor(v.job_id, entryDept.code)),
       );
       if (callMode && inserted[0]) {
         const { rows: chosen } = await client.query<Row>(

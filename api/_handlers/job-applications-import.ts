@@ -28,6 +28,7 @@ import { readImportRows, type ImportFileKind } from '../_lib/importDocRows.js';
 import { tableInAppSchema } from '../_lib/schema.js';
 import { auditFromAuthed } from '../_lib/audit.js';
 import { staffEntryDepartment } from '../_lib/applicationScope.js';
+import { staffEntryDepartmentFor } from '../_lib/applicationDepartment.js';
 import { toE164Thai } from '../_lib/thaiPhone.js';
 import {
   IMPORT_COLUMNS,
@@ -134,6 +135,13 @@ async function handler(req: AuthedReq, res: ApiRes) {
     // ใบไม่ผูกใบขอ ⇒ คนล็อก BU ประทับแผนกตัวเอง (เห็นใบที่นำเข้าผ่าน department_code) — กติกาเดียวกับเพิ่มข้อมูลผู้สมัคร
     const entryDept = await staffEntryDepartment(req.user);
     if (!entryDept.ok) return sendError(res, 403, 'Forbidden', NO_DEPARTMENT_MESSAGE);
+    // ผูกใบขอ = แผนกของใบขอ (18 พ.ย. 2569) · ทั้งไฟล์มักเป็นใบขอเดียว — ถามครั้งเดียวต่อใบ
+    const deptByJob = new Map<string, Promise<string | null>>();
+    const deptOf = (jobId: string | null) => {
+      const k = jobId?.trim() ?? '';
+      if (!deptByJob.has(k)) deptByJob.set(k, staffEntryDepartmentFor(k || null, entryDept.code));
+      return deptByJob.get(k) as Promise<string | null>;
+    };
 
     let rows: unknown[][];
     let rawRows: unknown[][];
@@ -267,7 +275,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
         }
         const { rows: ins } = await client.query<{ id: string }>(
           `insert into ${tbl} (${STAFF_INSERT_COLUMNS}) values (${STAFF_INSERT_VALUES}) returning id`,
-          staffInsertParams(p.value, staffName, entryDept.code),
+          staffInsertParams(p.value, staffName, await deptOf(p.value.job_id)),
         );
         if (ins[0]?.id) {
           insertedIds.push(ins[0].id);

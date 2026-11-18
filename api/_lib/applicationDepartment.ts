@@ -53,3 +53,13 @@ export async function resolveApplicationDepartment(input: {
   }
   return null;
 }
+
+/**
+ * แผนกของใบที่เจ้าหน้าที่คีย์/นำเข้า/เก็บจาก Scrap (เจ้าของ 18 พ.ย. 2569 "ติดตามใบขอ")
+ * ผูกใบขอ = แผนกของใบขอ (จากประกาศของใบนั้น) · ไม่ผูก/ไม่รู้แผนกใบขอ = แผนกของคนคีย์ (`staffEntryDepartment`)
+ * เดิมใช้แผนกคนคีย์เสมอ ⇒ คน LBD คีย์ให้ใบขอ LBA 515 ใบ ติด LBD หมด หัวหน้า LBD เห็น/เก็บงาน LBA ได้
+ */
+export async function staffEntryDepartmentFor(jobId: string | null | undefined, fallback: string | null): Promise<string | null> {
+  if (!jobId?.trim()) return fallback;
+  return (await resolveApplicationDepartment({ jobId })) ?? fallback;
+}
