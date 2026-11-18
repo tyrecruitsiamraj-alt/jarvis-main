@@ -13,6 +13,7 @@ import { aiResultOf } from './requestPipeline';
 import { aiStage, staffResultOf } from './recruitJourney';
 import { isStaffFollowed } from './recruitOverview';
 import { isInterested } from './recruitContactTab';
+import { isWaitingForStaff } from './waitingForStaff';
 
 export type PersonPart = { key: string; label: string; tone: ToneKey; ids: string[]; /** ทางนี้ไปขั้นถัดไป */ next?: boolean; note?: string };
 export type PersonStage = { key: string; label: string; total: number; ids: string[]; parts: PersonPart[] };
@@ -44,9 +45,11 @@ export function buildPersonJourney(list: readonly RecruitAppFact[], now: Date = 
   const ai = (k: ReturnType<typeof aiResultOf>) => aiCalled.filter((f) => aiBranchOf(f) === k);
   const yes = ai('yes');
   // 🔴 ติดต่อได้/ไม่ได้ = `staffResultOf` ตัวเดียวกับแท็บการติดต่อ + ตารางช่องทาง (เจ้าของ 9 พ.ย. 2569 "ตามร่างทั้งหมด" — เดิมหน้าเดียวกัน 3 นิยาม)
-  const reached = yes.filter((f) => staffResultOf(f) === 'ok');
-  const failed = yes.filter((f) => staffResultOf(f) === 'fail');
-  const waiting = yes.filter((f) => staffResultOf(f) === 'waiting');
+  // ยังไม่มีคนโทร = นิยามเดียว `isWaitingForStaff` (เจ้าของ 18 พ.ย. 2569) · ที่เหลือ (เจ้าหน้าที่ลงมือหลัง AI แล้ว) แบ่งติดต่อได้/ไม่ได้
+  const waiting = yes.filter((f) => isWaitingForStaff(f));
+  const followed = yes.filter((f) => !isWaitingForStaff(f));
+  const reached = followed.filter((f) => staffResultOf(f) === 'ok');
+  const failed = followed.filter((f) => staffResultOf(f) !== 'ok');
 
   const booked = reached.filter((f) => Boolean(f.appointmentAt));
   const notBooked = reached.filter((f) => !f.appointmentAt);

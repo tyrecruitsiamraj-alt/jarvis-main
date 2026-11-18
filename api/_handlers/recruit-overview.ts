@@ -50,6 +50,7 @@ import { toBangkokYmd } from '../_lib/businessDate.js';
 import { logError } from '../_lib/logger.js';
 import { loadStaffDisplay } from '../_lib/staffDisplay.js';
 import { INTEREST_VOCAB, classifyCallMicro } from '../../src/lib/callMicroOutcome.js';
+import { isWaitingForStaff } from '../../src/lib/waitingForStaff.js';
 import { normalizeTrendBu } from '../../src/lib/trends/bu.js';
 import { emptyRegionCount, regionOfProvince, type Region } from '../../src/lib/bkkRegion.js';
 import { boardProvinceOf } from '../../src/lib/boardFilters.js';
@@ -267,12 +268,9 @@ export const BACKLOG_BUCKETS = ['waiting_staff', 'uncalled_now', 'overdue_now'] 
 export type BacklogBucket = (typeof BACKLOG_BUCKETS)[number];
 export const isBacklogBucket = (v: unknown): v is BacklogBucket => typeof v === 'string' && (BACKLOG_BUCKETS as readonly string[]).includes(v);
 
-/** ตอบ AI ว่าสนใจ แล้วยังไม่มีเจ้าหน้าที่ลงมือหลังจากนั้น — ตัวเดียวของการ์ด "สนใจแล้ว รอเจ้าหน้าที่โทร" */
+/** สนใจแล้ว รอเจ้าหน้าที่โทร — นิยามเดียว `isWaitingForStaff` (แถวดิบ → ช่องเดียวกับใบสมัครของภาพรวม) */
 export function isWaitingStaffRow(r: Row): boolean {
-  if (!bool(r.called) || micro(r.ai_outcome, r.ai_summary, r.ai_reply) !== 'said_yes') return false;
-  const aiAt = iso(r.ai_at);
-  const staffAt = iso(r.staff_last_at);
-  return !(staffAt && aiAt && staffAt >= aiAt);
+  return bool(r.called) && isWaitingForStaff({ aiAnswer: micro(r.ai_outcome, r.ai_summary, r.ai_reply), aiAnswerAt: iso(r.ai_at), staffLastAt: iso(r.staff_last_at) });
 }
 
 export async function backlogIds(kind: BacklogBucket, buSet: BuSet): Promise<string[]> {

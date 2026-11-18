@@ -19,8 +19,10 @@ const cohort: RecruitAppFact[] = [
   fact({ calledByAi: true, aiAnswer: 'said_no', channelLabel: 'Tiktok · Tiktok Live', bringer: 'ว่าน', postSource: 'manual' }),
   fact({ calledByAi: true, aiAnswer: 'said_yes', channelLabel: 'Facebook · Facebook Group · กลุ่มหางานจังหวัด', bringer: 'ว่าน', postSource: 'manual' }),
   fact({ calledByAi: true, aiAnswer: 'said_yes', claimedBy: 'คิว', channelLabel: 'Jobthai' }),
-  fact({ calledByAi: true, aiAnswer: 'said_yes', calledByStaff: true, logOk: true, logAt: '2026-11-17T05:00:00Z', appointmentAt: '2026-11-19T02:00:00Z', attendance: 'showed', channelLabel: 'Tiktok · Tiktok Live', bringer: 'ว่าน', postSource: 'manual' }),
-  fact({ calledByAi: true, aiAnswer: 'said_yes', calledByStaff: true, staffAnswer: 'no_pickup', staffAnswerAt: '2026-11-17T06:00:00Z' }),
+  fact({ calledByAi: true, aiAnswer: 'said_yes', aiAnswerAt: '2026-11-17T04:00:00Z', calledByStaff: true, logOk: true, logAt: '2026-11-17T05:00:00Z', staffLastAt: '2026-11-17T05:00:00Z', appointmentAt: '2026-11-19T02:00:00Z', attendance: 'showed', channelLabel: 'Tiktok · Tiktok Live', bringer: 'ว่าน', postSource: 'manual' }),
+  fact({ calledByAi: true, aiAnswer: 'said_yes', aiAnswerAt: '2026-11-17T04:00:00Z', calledByStaff: true, staffAnswer: 'no_pickup', staffAnswerAt: '2026-11-17T06:00:00Z', staffLastAt: '2026-11-17T06:00:00Z' }),
+  // สนใจกับ AI ทีหลังที่เจ้าหน้าที่เคยโทร = ยังรอเจ้าหน้าที่โทร (นิยามเดียว 18 พ.ย. 2569)
+  fact({ calledByAi: true, aiAnswer: 'said_yes', aiAnswerAt: '2026-11-17T09:00:00Z', calledByStaff: true, logOk: false, logAt: '2026-11-17T03:00:00Z', staffLastAt: '2026-11-17T03:00:00Z' }),
   fact({ calledByStaff: true, logOk: false, logAt: '2026-11-17T06:00:00Z', referralSource: 'facebook' }),
   fact({ calledByStaff: true, logOk: true, logAt: '2026-11-17T06:00:00Z', appointmentAt: '2026-11-18T02:00:00Z' }),
 ];
@@ -31,11 +33,11 @@ describe('รายชื่อเข้ามาไปถึงไหน', () =
       expect(b.rows.reduce((s, r) => s + r.ids.length, 0)).toBe(b.ids.length);
     }
     const [apps, ai, follow, self, booked] = buildIntakeFlow(cohort);
-    expect(apps.ids.length).toBe(10);
-    expect(apps.rows.map((r) => [r.label, r.ids.length])).toEqual([['โทรไปแล้ว', 8], ['รอ AI โทร', 1], ['ยังไม่มีใครโทร', 1]]);
-    expect(ai.ids.length).toBe(6);
+    expect(apps.ids.length).toBe(11);
+    expect(apps.rows.map((r) => [r.label, r.ids.length])).toEqual([['โทรไปแล้ว', 9], ['รอ AI โทร', 1], ['ยังไม่มีใครโทร', 1]]);
+    expect(ai.ids.length).toBe(7);
     expect(ai.rows.find((r) => r.key === 'not_yet')).toBeUndefined();
-    expect(follow.rows.map((r) => r.ids.length)).toEqual([1, 0, 1, 1, 1]);
+    expect(follow.rows.map((r) => r.ids.length)).toEqual([1, 0, 1, 1, 2]);
     expect(self.rows.map((r) => r.ids.length)).toEqual([1, 0, 1]);
     expect(booked.rows.map((r) => r.ids.length)).toEqual([1, 0, 1]);
   });
@@ -64,7 +66,7 @@ describe('แยกช่องทาง: หลัก → รอง → (กล
     const people = intakeChildren(cohort, ['Facebook', 'Facebook Group', 'กลุ่มหางานจังหวัด']);
     expect(people.map((p) => [p.label, p.list.length])).toEqual([['เจมส์', 1], ['ว่าน', 1]]);
     expect(cohort.filter((f) => onIntakePath(f, ['Tiktok', 'Tiktok Live', 'ว่าน']))).toHaveLength(2);
-    expect(intakeCounts(cohort)).toEqual([10, 6, 4, 2, 2, 1]);
+    expect(intakeCounts(cohort)).toEqual([11, 7, 5, 2, 2, 1]);
   });
 });
 
@@ -135,5 +137,24 @@ describe('การ์ด "ต้องทำ" กดแล้วเห็นค
     const src = readFileSync('src/components/dashboard-trends/v2/IntakeFlowPanel.tsx', 'utf8');
     expect(src).toContain('data-intake-key');
     expect(src).toContain('window.scrollBy');
+  });
+});
+
+describe('สนใจแล้ว รอเจ้าหน้าที่โทร = นิยามเดียวทั้งหน้า (เจ้าของ 18 พ.ย. 2569 "เอานิยามเดียว")', () => {
+  it('ส่วนผู้สมัคร · รายชื่อเข้ามาไปถึงไหน · รายชื่ออยู่กับใคร นับคนชุดเดียวกัน', async () => {
+    const { isWaitingForStaff } = await import('@/lib/waitingForStaff');
+    const { buildPersonJourney } = await import('@/lib/recruitPersonJourney');
+    const { buildCallerResults } = await import('@/lib/callerResults');
+    const want = cohort.filter((f) => isWaitingForStaff(f)).map((f) => f.id).sort();
+    const journeyWaiting = buildPersonJourney(cohort).find((s) => s.key === 'follow')!.parts.find((p) => p.key === 'waiting')!.ids!.slice().sort();
+    const follow = buildIntakeFlow(cohort).find((b) => b.key === 'follow')!;
+    const intakeWaiting = follow.rows.filter((r) => r.key === 'heldNotCalled' || r.key === 'notHeld').flatMap((r) => r.ids).sort();
+    expect(journeyWaiting).toEqual(want);
+    expect(intakeWaiting).toEqual(want);
+    // รายชื่ออยู่กับใคร (แถวที่ยังไม่มีใครเก็บ) = แถว "รอเจ้าหน้าที่โทร · ยังไม่มีใครเก็บ"
+    expect(buildCallerResults(cohort).ai.waiting.slice().sort()).toEqual(follow.rows.find((r) => r.key === 'notHeld')!.ids.slice().sort());
+  });
+  it('ฝั่ง API (การ์ดต้องทำ) เรียกตัวเดียวกัน', () => {
+    expect(readFileSync('api/_handlers/recruit-overview.ts', 'utf8')).toContain('isWaitingForStaff({ aiAnswer: micro(');
   });
 });

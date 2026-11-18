@@ -24,6 +24,7 @@ import { DAY_MS, fullDaysBetween } from '@/lib/fullDays';
 import { ALL_MAX_DAYS } from '@/lib/recruitOverviewWindow';
 import { CONTACT_OK, contactBucketOf, isInterested } from '@/lib/recruitContactTab';
 import { applicantCallBucketOf } from '@/lib/recruitRequestTab';
+import { isWaitingForStaff } from '@/lib/waitingForStaff';
 import type {
   RecruitAiRow,
   RecruitAppFact,
@@ -71,8 +72,7 @@ export const isAiQueued = (f: RecruitAppFact) => {
   return b === 'queued' || b === 'retry';
 };
 /** ตอบ AI ว่าสนใจ แล้วเจ้าหน้าที่ลงมือหลังเวลาที่ AI ได้คำตอบ */
-export const isStaffFollowed = (f: RecruitAppFact) =>
-  isAiSaidYes(f) && !!f.staffLastAt && !!f.aiAnswerAt && f.staffLastAt >= f.aiAnswerAt;
+export const isStaffFollowed = (f: RecruitAppFact) => isAiSaidYes(f) && !isWaitingForStaff(f);
 /** สนใจแล้วยังไม่มีเจ้าหน้าที่โทร / เจ้าหน้าที่ติดต่อได้ — ตัวเดียวกับกล่อง "รอติดต่อ" / "ติดต่อสำเร็จ" ของแท็บการติดต่อ (ไม่ขึ้นกับเวลา) */
 export const isContactWaiting = (f: RecruitAppFact) => isInterested(f) && contactBucketOf(f, new Date()) === 'waiting';
 export const isContactOk = (f: RecruitAppFact) => isInterested(f) && CONTACT_OK.includes(contactBucketOf(f, new Date()));

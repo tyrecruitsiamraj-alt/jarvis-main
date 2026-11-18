@@ -8,6 +8,7 @@
  */
 import type { RecruitAppFact } from '@/lib/recruitOverviewTypes';
 import { isTalkedBucket } from '@/lib/callMicroOutcome';
+import { isWaitingForStaff } from '@/lib/waitingForStaff';
 
 export type CallerCellKey =
   | 'kept'
@@ -72,17 +73,19 @@ function place(row: CallerResultRow, f: RecruitAppFact, id: string) {
   else row.notLogged.push(id);
 }
 
-export type AiResultRow = { sent: string[]; notCalled: string[]; unreachable: string[]; reached: string[]; notInterested: string[]; interested: string[] };
+/** waiting = สนใจแล้ว รอเจ้าหน้าที่โทร (นิยามเดียว `isWaitingForStaff`) ของรายชื่อที่ยังไม่มีใครเก็บ */
+export type AiResultRow = { sent: string[]; notCalled: string[]; unreachable: string[]; reached: string[]; notInterested: string[]; interested: string[]; waiting: string[] };
 
 export function buildCallerResults(cohort: readonly RecruitAppFact[]): { rows: CallerResultRow[]; total: CallerResultRow; ai: AiResultRow } {
   const by = new Map<string, CallerResultRow>();
   const total = emptyRow('รวมคนโทร');
-  const ai: AiResultRow = { sent: [], notCalled: [], unreachable: [], reached: [], notInterested: [], interested: [] };
+  const ai: AiResultRow = { sent: [], notCalled: [], unreachable: [], reached: [], notInterested: [], interested: [], waiting: [] };
   for (const f of cohort) {
     if (!f.id) continue;
     const who = (f.claimedBy ?? '').trim();
     if (!who) {
       ai.sent.push(f.id);
+      if (isWaitingForStaff(f)) ai.waiting.push(f.id);
       if (!f.calledByAi) ai.notCalled.push(f.id);
       // ติดต่อได้ = ตัวตัดสินกลาง `isTalkedBucket` (รีวิวโค้ด 15 พ.ย. 2569: เดิมเขียนชุดคำตอบซ้ำไว้ที่นี่)
       else if (isTalkedBucket(f.aiAnswer)) {

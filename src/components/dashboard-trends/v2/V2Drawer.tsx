@@ -355,6 +355,8 @@ export function NamesList({ ids, page, onPage, model, labels }: { ids: readonly 
     };
   }, [key]);
   const byId = new Map((rows.key === key ? rows.data ?? [] : []).map((r) => [r.id, r]));
+  /** ยังโหลดไม่เสร็จ = "กำลังโหลด…" (เดิมขึ้น "ไม่พบชื่อ" ระหว่างรอ · เจ้าของ 18 พ.ย. 2569) · โหลดไม่ได้ = บอกตรง ๆ */
+  const nameState = rows.key !== key || (rows.data === null && !rows.error) ? 'loading' : rows.error ? 'error' : 'ready';
   return (
     <div className="space-y-1" data-testid="v2-names">
       <ul className="divide-y rounded-xl border">
@@ -365,10 +367,16 @@ export function NamesList({ ids, page, onPage, model, labels }: { ids: readonly 
           return (
             <li key={id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2">
               <div className="min-w-0 text-sm">
-                <div className="font-medium">{rows.key !== key ? 'กำลังโหลด…' : r?.full_name || 'ไม่พบชื่อ'}</div>
+                <div className="font-medium">{nameState === 'loading' ? 'กำลังโหลด…' : nameState === 'error' ? 'โหลดชื่อไม่ได้' : r?.full_name || 'ไม่พบชื่อ'}</div>
                 {labels?.[id] ? <div className="text-xs font-medium text-primary">{labels[id]}</div> : null}
                 <div className={cn('text-xs', DASH.sub)}>
-                  {[f?.bu || 'ไม่ระบุ BU', r?.unit_name || r?.job_title || 'ยังไม่ผูกใบขอ', f ? dimValueOf(f, 'sub') : null, r?.claimed_by ? `อยู่กับ ${r.claimed_by}` : 'ยังไม่มีคนเก็บ']
+                  {[
+                    f?.bu || 'ไม่ระบุ BU',
+                    // ช่องที่มาจากชื่อ (ใบขอ · คนเก็บ) ยังไม่รู้ระหว่างโหลด — ห้ามขึ้น "ยังไม่ผูกใบขอ" / "ยังไม่มีคนเก็บ" ก่อนได้ข้อมูล
+                    nameState === 'ready' ? r?.unit_name || r?.job_title || 'ยังไม่ผูกใบขอ' : null,
+                    f ? dimValueOf(f, 'sub') : null,
+                    nameState === 'ready' ? (r?.claimed_by ? `อยู่กับ ${r.claimed_by}` : 'ยังไม่มีคนเก็บ') : null,
+                  ]
                     .filter(Boolean)
                     .join(' · ')}
                 </div>

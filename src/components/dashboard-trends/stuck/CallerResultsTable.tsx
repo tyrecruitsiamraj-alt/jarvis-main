@@ -16,6 +16,8 @@ import TrendDelta from './TrendDelta';
 /** ช่องที่เพิ่มแล้วแย่ — ยังไม่ทำ + ติดต่อไม่ได้ + ไม่มา */
 const UP_BAD = new Set<string>([...CALLER_TODO_KEYS, 'notOk', 'noShow']);
 const AI_UP_BAD = new Set(['notCalled', 'unreachable', 'interested']);
+/** สนใจแล้ว รอเจ้าหน้าที่โทร (นิยามเดียว `isWaitingForStaff`) ของรายชื่อที่ยังไม่มีใครเก็บ — คำเดียวกับรายชื่อเข้ามาไปถึงไหน (18 พ.ย. 2569) */
+const WAITING_LABEL = 'สนใจแล้ว รอเจ้าหน้าที่โทร · ยังไม่มีใครเก็บ';
 
 export default function CallerResultsTable({
   cohort,
@@ -138,18 +140,18 @@ export default function CallerResultsTable({
               {num('AI · ติดต่อไม่ได้', r.ai.unreachable)}
               {num('AI · ติดต่อได้', r.ai.reached)}
               <TableCell colSpan={2} className="border-l border-border text-sm">
-                {r.ai.interested.length > 0 ? (
+                {r.ai.waiting.length > 0 ? (
                   <Button
                     type="button"
                     variant="ghost"
                     size="xs"
                     className={cn('-ml-2 px-2 text-sm font-normal', TONE.danger.value)}
-                    onClick={() => onOpen('AI · สนใจ ยังไม่มีคนเก็บไปนัด', r.ai.interested)}
+                    onClick={() => onOpen(WAITING_LABEL, r.ai.waiting)}
                   >
-                    สนใจ ยังไม่มีคนเก็บไปนัด {fmt(r.ai.interested.length)}
+                    {WAITING_LABEL} {fmt(r.ai.waiting.length)}
                   </Button>
                 ) : (
-                  <span className="text-muted-foreground">สนใจ ยังไม่มีคนเก็บไปนัด 0</span>
+                  <span className="text-muted-foreground">{WAITING_LABEL} 0</span>
                 )}
               </TableCell>
               <TableCell colSpan={5} className="border-l border-border" />
@@ -164,7 +166,7 @@ export default function CallerResultsTable({
                   {plain(pr.ai.unreachable.length)}
                   {plain(pr.ai.reached.length)}
                   <TableCell colSpan={2} className="border-l border-border text-sm text-muted-foreground">
-                    สนใจ ยังไม่มีคนเก็บไปนัด {fmt(pr.ai.interested.length)}
+                    {WAITING_LABEL} {fmt(pr.ai.waiting.length)}
                   </TableCell>
                   <TableCell colSpan={5} className="border-l border-border" />
                 </TableRow>
@@ -174,7 +176,7 @@ export default function CallerResultsTable({
                   <TableCell />
                   {(['notCalled', 'unreachable', 'reached'] as const).map((k, i) => React.cloneElement(delta(r.ai[k].length, pr.ai[k].length, AI_UP_BAD.has(k), i === 0 ? 'border-l border-border' : undefined), { key: k }))}
                   <TableCell colSpan={2} className="border-l border-border">
-                    <TrendDelta cur={r.ai.interested.length} prev={pr.ai.interested.length} sense="bad" />
+                    <TrendDelta cur={r.ai.waiting.length} prev={pr.ai.waiting.length} sense="bad" />
                   </TableCell>
                   <TableCell colSpan={5} className="border-l border-border" />
                 </TableRow>

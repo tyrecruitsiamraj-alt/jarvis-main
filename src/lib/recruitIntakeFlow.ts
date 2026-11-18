@@ -9,6 +9,7 @@
 import type { CallMicroOutcome } from '@/lib/callMicroOutcome';
 import { FUNNEL_GROUP_LABEL, bringerOf, funnelPlaceOf, funnelSubOf, type FunnelGroupKey } from '@/lib/channelFunnel';
 import type { RecruitAppFact } from '@/lib/recruitOverviewTypes';
+import { isWaitingForStaff } from '@/lib/waitingForStaff';
 
 export type IntakeRow = { key: string; label: string; ids: string[]; drop: boolean };
 export type IntakeBox = { key: string; title: string; ids: string[]; rows: IntakeRow[] };
@@ -47,7 +48,10 @@ export function buildIntakeFlow(cohort: readonly RecruitAppFact[]): IntakeBox[] 
   const booked = cohort.filter((f) => f.appointmentAt);
   const notCalled = cohort.filter((f) => !f.calledByAi && !f.calledByStaff);
   const known = new Set<string>(AI_ROWS.map((r) => r.key));
-  const yesTalk = yes.filter((f) => staffReachOf(f) === 'talk');
+  // รอเจ้าหน้าที่โทร = นิยามเดียว `isWaitingForStaff` · ที่เหลือเจ้าหน้าที่ลงมือหลัง AI แล้ว → คุยได้ / ไม่ติด
+  const yesWaiting = yes.filter((f) => isWaitingForStaff(f));
+  const yesFollowed = yes.filter((f) => !isWaitingForStaff(f));
+  const yesTalk = yesFollowed.filter((f) => staffReachOf(f) === 'talk');
   const selfTalk = self.filter((f) => staffReachOf(f) === 'talk');
   return [
     {
@@ -80,9 +84,9 @@ export function buildIntakeFlow(cohort: readonly RecruitAppFact[]): IntakeBox[] 
       rows: [
         row('booked', 'คุยได้ · นัดได้', yesTalk.filter((f) => f.appointmentAt), false),
         row('talkNoBook', 'คุยได้ · ยังไม่นัด', yesTalk.filter((f) => !f.appointmentAt), true),
-        row('miss', 'ทีมโทรแล้วไม่ติด', yes.filter((f) => staffReachOf(f) === 'miss'), true),
-        row('heldNotCalled', 'ทีมยังไม่โทร · มีคนเก็บไว้', yes.filter((f) => !f.calledByStaff && f.claimedBy), true),
-        row('notHeld', 'ทีมยังไม่โทร · ยังไม่มีใครเก็บ', yes.filter((f) => !f.calledByStaff && !f.claimedBy), true),
+        row('miss', 'ทีมโทรแล้วไม่ติด', yesFollowed.filter((f) => staffReachOf(f) !== 'talk'), true),
+        row('heldNotCalled', 'รอเจ้าหน้าที่โทร · มีคนเก็บไว้', yesWaiting.filter((f) => f.claimedBy), true),
+        row('notHeld', 'รอเจ้าหน้าที่โทร · ยังไม่มีใครเก็บ', yesWaiting.filter((f) => !f.claimedBy), true),
       ],
     },
     {

@@ -8,8 +8,8 @@ import { aiBlockOf } from '../../api/_handlers/recruit-overview';
 const f = (id: string, p: Partial<RecruitAppFact> = {}): RecruitAppFact =>
   ({ id, createdAt: '2026-11-03T03:00:00.000Z', jobId: 'siamraj-sql:OPL6911001', bu: 'LBD', channelLabel: 'Facebook · Facebook Group', referralSource: null, phoneOk: true, calledByAi: false, calledByStaff: false, ...p }) as RecruitAppFact;
 const LIST = [
-  f('1', { calledByAi: true, aiAnswer: 'said_yes', logOk: true, appointmentAt: '2026-11-05T03:00:00.000Z', attendance: 'showed' }),
-  f('2', { calledByAi: true, aiAnswer: 'said_yes', logOk: false }),
+  f('1', { calledByAi: true, aiAnswer: 'said_yes', aiAnswerAt: '2026-11-03T04:00:00.000Z', calledByStaff: true, logOk: true, logAt: '2026-11-03T06:00:00.000Z', staffLastAt: '2026-11-03T06:00:00.000Z', appointmentAt: '2026-11-05T03:00:00.000Z', attendance: 'showed' }),
+  f('2', { calledByAi: true, aiAnswer: 'said_yes', aiAnswerAt: '2026-11-03T04:00:00.000Z', calledByStaff: true, logOk: false, logAt: '2026-11-03T06:00:00.000Z', staffLastAt: '2026-11-03T06:00:00.000Z' }),
   f('3', { calledByAi: true, aiAnswer: 'no_pickup' }),
   f('4', { calledByStaff: true, claimedBy: 'อ้น', appointmentAt: '2026-11-06T03:00:00.000Z' }),
   f('5', { aiQueued: true }),
