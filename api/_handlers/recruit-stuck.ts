@@ -119,7 +119,7 @@ export async function buildRecruitStuck(
 
   const skip = Promise.resolve(null);
   const [reqR, monR] = await Promise.allSettled([
-    part === 'requests' ? loadStuckRequests(departmentScope, buSet, win, today) : skip,
+    part === 'requests' ? loadStuckRequests(departmentScope, buSet, win, today, { appsInWindow: true }) : skip,
     part === 'monthly' ? loadMonthly(departmentScope, buSet, body.today) : skip,
   ]);
   if (reqR.status === 'fulfilled') body.requests = reqR.value;
@@ -213,7 +213,18 @@ function onlineRowOfLedger(r: LedgerRequest, role: RequestFlowRole, x: ErpExtra 
  * ใบขอชั่วคราว (ไม่อยู่ในสมุด): ยังเปิด = ยกมา/ขอใหม่ตามวันที่ขอ
  * พื้นที่/ประเภทงาน = `toRequestRows` ตัวเดียวกับแท็บใบขอเดิม · อ่านไม่ได้ = ที่ทีมพิมพ์ในใบ/ที่อยู่ของใบ (`placeOf`)
  */
-async function loadStuckRequests(departmentScope: Scope, buSet: readonly string[] | null, win: Win, today: string): Promise<StuckRequest[]> {
+/**
+ * `appsInWindow` = ผู้สมัครของแต่ละใบนับเฉพาะใบสมัครที่เข้ามาในช่วงที่เลือก (เจ้าของ 18 พ.ย. 2569
+ * "เลือกช่วง 1-17 ข้อมูลทั้งหน้าต้องตามช่วง" · Choice "นับเฉพาะคนที่สมัครในช่วง") — ใบขอยังเป็นชุดเดิม
+ * ตัวจดยอดรายวัน (`loadOpenStuckRequestsAll`) ไม่ส่ง = นับทุกวันเหมือนเดิม
+ */
+async function loadStuckRequests(
+  departmentScope: Scope,
+  buSet: readonly string[] | null,
+  win: Win,
+  today: string,
+  opts: { appsInWindow?: boolean } = {},
+): Promise<StuckRequest[]> {
   const toEff = win.to > today ? today : win.to;
   const [all, ranged, raw] = await Promise.all([
     readUnitRequestListThroughCache({ limit: 500, departmentScope }).then((r) => r.value as unknown as JobRequest[]),
@@ -292,8 +303,13 @@ async function loadStuckRequests(departmentScope: Scope, buSet: readonly string[
   ]);
   await attachRequestRecruiters(rows);
   const factsBy = new Map<string, RecruitAppFact[]>();
+  const inWin = (f: RecruitAppFact) => {
+    const d = f.createdAt ? toBangkokYmd(new Date(f.createdAt)) : null;
+    return d !== null && d >= win.from && d <= win.to;
+  };
   for (const f of facts) {
     if (!f.jobId) continue;
+    if (opts.appsInWindow && !inWin(f)) continue;
     const list = factsBy.get(f.jobId);
     if (list) list.push(f);
     else factsBy.set(f.jobId, [f]);
