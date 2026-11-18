@@ -246,7 +246,7 @@ const FACETS: readonly Def[] = [
     key: 'status',
     label: 'สถานะ',
     ui: 'chip',
-    order: ['pending', 'ok', 'fail'],
+    order: Object.keys(PROCESS_STATE_LABEL),
     labelOf: (v) => PROCESS_STATE_LABEL[v as keyof typeof PROCESS_STATE_LABEL] ?? v,
     values: (r) => [applicantProcessOf(r).state],
   },

@@ -39,6 +39,11 @@ describe('สถานะผู้สมัคร 5 คำ', () => {
     expect(isEarlierAppointment('2026-11-20T03:00:30Z', APPT)).toBe(false);
     expect(isEarlierAppointment(null, APPT)).toBe(false);
   });
+  it('ตัวกรองสถานะมีครบ 5 คำ เรียงตามเส้นทาง', () => {
+    expect(Object.values(PROCESS_STATE_LABEL)).toEqual(['รอดำเนินการ', 'นัดได้', 'เลื่อนนัด', 'สำเร็จ', 'ไม่สำเร็จ']);
+    const src = readFileSync('src/lib/applicantFilters.ts', 'utf8');
+    expect(src).toContain('order: Object.keys(PROCESS_STATE_LABEL)');
+  });
   it('server ไม่ยอมบันทึกติดต่อสำเร็จโดยไม่มีผลนัด', () => {
     const src = readFileSync('api/_handlers/application-contacts.ts', 'utf8');
     expect(src).toContain('ติดต่อสำเร็จต้องเลือก นัดหมาย (ใส่วัน) หรือ นัดหมายไม่สำเร็จ (ใส่เหตุผล)');
