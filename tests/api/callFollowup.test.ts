@@ -430,3 +430,33 @@ describe('บอก AI ว่าไม่สนใจ = พักเบอร์
     expect(sqlOf(0)).toContain("reason = case when candidate_call_suppression.reason = 'pdpa' then candidate_call_suppression.reason else excluded.reason end");
   });
 });
+
+describe('รับสายแล้วเงียบ หยุดโทรเฉพาะสายเสนองาน · เสียงฝากข้อความ = ไม่รับสาย (เจ้าของ 18 พ.ย. 2569)', () => {
+  beforeEach(() => vi.mocked(dbQuery).mockReset());
+  const row = (channel: string, jobRef: string, personRef: string) => ({
+    id: 36353, channel, attempt_count: 1, payload: { phone: '+66812345678' }, person_ref: personRef, job_ref: jobRef,
+  });
+  const route = (r: ReturnType<typeof row>) =>
+    vi.mocked(dbQuery).mockImplementation(async (sql: string) =>
+      /where id = \$1 limit 1/.test(String(sql)) ? ({ rows: [r] } as never) : ({ rows: [] } as never),
+    );
+
+  it('สายเสนองาน รับแล้วเงียบ (idle_timeout) → ปิด ไม่ตั้งโทรซ้ำ', async () => {
+    route(row('interview', 'siamraj-sql:OPL6911004', 'app-c9803f61'));
+    const d = await applyCallFollowupToQueueRow({ queueId: 36353, outcome: 'unresponsive', result: { ended_reason: 'idle_timeout' } });
+    expect(d?.action).toBe('closed');
+    expect(allSql().some((q) => q.includes("status = 'pending'"))).toBe(false);
+  });
+
+  it('สายเสนองาน เสียงฝากข้อความ → ถือว่าไม่รับสาย โทรซ้ำ', async () => {
+    route(row('interview', 'siamraj-sql:OPL6911004', 'app-c9803f61'));
+    const d = await applyCallFollowupToQueueRow({ queueId: 36353, outcome: 'unresponsive', result: { ended_reason: 'voicemail_greeting' } });
+    expect(d?.action).toBe('retry');
+  });
+
+  it('สายติดตามเริ่มงาน รับแล้วเงียบ → กติกาเดิม (โทรซ้ำ)', async () => {
+    route(row('reminder', 'follow', 'follow-604d4bdc'));
+    const d = await applyCallFollowupToQueueRow({ queueId: 36353, outcome: 'unresponsive', result: { ended_reason: 'idle_timeout' } });
+    expect(d?.action).toBe('retry');
+  });
+});

@@ -19,7 +19,8 @@ const hoursFrom = (base: Date, iso: string) =>
 const bkkHour = (iso: string) => (new Date(iso).getUTCHours() + 7) % 24;
 
 describe('ไม่รับสาย → โทรซ้ำเป็นรอบจนครบเพดาน แล้วส่งให้คนตาม (27 ต.ค. 2569)', () => {
-  for (const outcome of ['no_answer', 'busy', 'unresponsive', 'failed'] as const) {
+  // unresponsive (รับแล้วเงียบ) ไม่อยู่ในชุดนี้แล้ว — เจ้าของ 18 พ.ย. 2569 "ให้โทรซ้ำเฉพาะไม่รับสาย" (เทสต์ด้านล่าง)
+  for (const outcome of ['no_answer', 'busy', 'failed'] as const) {
     it(`${outcome}: สายที่ 1 (10:00) → โทรซ้ำอีก 10 นาที (สายที่ 2/18)`, () => {
       const d = resolveCallFollowup({ outcome, attemptCount: 1, now: NOW });
       expect(d.action).toBe('retry');
@@ -276,5 +277,14 @@ describe('โทรซ้ำเป็นรอบ 3 สาย × 2 รอบ × 
     const p: CallFollowupPolicy = normalizeCallFollowupPolicy({ roundCalls: 2, roundGapMinutes: 30, roundsPerDay: 1, retryDays: 2, retryDayMode: 'next' });
     expect(bkk(nextRetryAt(new Date('2026-10-27T02:00:00Z'), 1, p))).toBe('2026-10-27 09:30');
     expect(bkk(nextRetryAt(new Date('2026-10-27T02:30:00Z'), 2, p))).toBe('2026-10-28 13:00');
+  });
+});
+
+describe('รับสายแล้วเงียบ/วาง = รับแล้วแต่สรุปไม่ได้ → หยุดโทร (เจ้าของ 18 พ.ย. 2569)', () => {
+  it('unresponsive → closed ไม่ตั้งเวลาโทรซ้ำ', () => {
+    const d = resolveCallFollowup({ outcome: 'unresponsive', attemptCount: 1, now: NOW });
+    expect(d.action).toBe('closed');
+    expect(d.nextAttemptAt).toBeNull();
+    expect(d.reason).toBe('รับสายแล้ว สรุปไม่ได้ — หยุดโทร');
   });
 });

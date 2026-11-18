@@ -117,6 +117,18 @@ export async function suppressPhone(input: {
   }
 }
 
+/**
+ * รับสายแล้วเงียบ (unresponsive) หยุดโทรเฉพาะสายเสนองาน (เจ้าของ 18 พ.ย. 2569 "ให้โทรซ้ำเฉพาะไม่รับสาย")
+ * - เสียงฝากข้อความ = ไม่มีคนรับ ⇒ no_answer (โทรซ้ำ)
+ * - สายติดตามเริ่มงาน (reminder) คงกติกาเดิม ⇒ no_answer (โทรซ้ำ)
+ */
+function outcomeForPolicy(outcome: CallOutcome, channel: string | undefined, result: unknown): CallOutcome {
+  if (outcome !== 'unresponsive') return outcome;
+  const ended = typeof result === 'object' && result !== null ? (result as Record<string, unknown>).ended_reason : null;
+  if (channel !== 'interview' || ended === 'voicemail_greeting') return 'no_answer';
+  return outcome;
+}
+
 type QueueRow = {
   id: number;
   channel: string;
@@ -208,7 +220,7 @@ export async function applyCallFollowupToQueueRow(input: {
   const followGroupId = followSchedule.groupId;
 
   const decision = resolveCallFollowup({
-    outcome: input.outcome as CallOutcome,
+    outcome: outcomeForPolicy(input.outcome as CallOutcome, row.channel, input.result),
     attemptCount: Number(row.attempt_count) || 1,
     now: input.now ?? new Date(),
     requestedCallbackAt: pickRequestedCallbackAt(input.result),

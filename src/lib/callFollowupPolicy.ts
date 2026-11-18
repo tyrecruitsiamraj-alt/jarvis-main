@@ -324,10 +324,21 @@ export function resolveCallFollowup(input: {
       };
     }
 
-    // ── ไม่รับสาย/สายไม่ว่าง/โทรไม่สำเร็จ → โทรซ้ำจนครบเพดาน ──────────────
+    // ── รับสายแล้วเงียบ/วาง = รับแล้วแต่สรุปไม่ได้ → หยุดโทร ──────────────
+    // เจ้าของ 18 พ.ย. 2569 "ฉันให้โทรซ้ำเฉพาะไม่รับสายแค่นั้น" · "ถือว่ารับแต่สรุปไม่ได้"
+    // (เคสจริง: รับสาย 1 นาทีแล้วเงียบ 3 สายติด ยังโดนโทรสายที่ 4 · รับตอน 03:40 ยังโดนโทรอีก 08:24)
+    // เสียงฝากข้อความ = ไม่มีคนรับ ⇒ ตัวเรียกส่งมาเป็น no_answer แทน (`applyCallFollowupToQueueRow`)
+    case 'unresponsive':
+      return {
+        action: 'closed',
+        nextAttemptAt: null,
+        suppressUntil: null,
+        reason: 'รับสายแล้ว สรุปไม่ได้ — หยุดโทร',
+      };
+
+    // ── ไม่รับสาย/สายไม่ว่าง/โทรไม่ติด → โทรซ้ำจนครบเพดาน ──────────────
     case 'no_answer':
     case 'busy':
-    case 'unresponsive':
     case 'failed': {
       if (attemptCount >= policy.maxAttempts) {
         return {
