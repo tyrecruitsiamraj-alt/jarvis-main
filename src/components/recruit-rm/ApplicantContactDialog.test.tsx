@@ -218,15 +218,16 @@ describe('ApplicantContactDialog (โฉม iRecruit)', () => {
   });
 
   // 18 ต.ค. 2569 เจ้าของเลือกคำ "มา / ไม่มา" — ปุ่ม มา · ไม่มา · เลื่อนนัด กดตรง ๆ (เลิก ติดตามสำเร็จ/ไม่สำเร็จ)
-  it('🔴 กด ไม่มา ⇒ บันทึกผลติดตามนัดของนัดเดิม', async () => {
+  it('🔴 กด ไม่มา ⇒ บันทึกผลติดตามนัดของนัดเดิมทันที ไม่ต้องกดบันทึก (เจ้าของ 18 พ.ย. 2569 "มันบันทึกไปเลยสิ")', async () => {
     recordAppointmentAttendance.mockResolvedValue(undefined);
-    const { dialog, onClose } = renderDialog(app({ appointment_at: '2026-09-15T05:00:00.000Z' }), vi.fn(), vi.fn(), 'appointment');
+    const onSaved = vi.fn();
+    const { dialog } = renderDialog(app({ appointment_at: '2026-09-15T05:00:00.000Z' }), onSaved, vi.fn(), 'appointment');
     // แท็บติดตามนัดหมาย = นัดปัจจุบัน + ขั้นติดตามนัด · ไม่มีขั้นติดต่อ/นัดหมาย
     expect(within(dialog).getByTestId('appointment-summary').textContent).toContain('15 ก.ย. 2569');
     expect(within(dialog).queryByTestId('step-contact')).toBeNull();
     fireEvent.click(within(dialog).getByRole('button', { name: /ไม่มา/ }));
-    fireEvent.click(within(dialog).getByRole('button', { name: 'บันทึก' }));
-    await waitFor(() => expect(onClose).toHaveBeenCalled());
+    await waitFor(() => expect(onSaved).toHaveBeenCalled());
+    expect(within(dialog).getByRole('button', { name: /ไม่มา/ }).getAttribute('aria-pressed')).toBe('true');
     expect(recordAppointmentAttendance).toHaveBeenCalledWith({
       applicationId: '11111111-1111-4111-8111-111111111111',
       appointmentAt: '2026-09-15T05:00:00.000Z',
@@ -318,14 +319,14 @@ describe('โหมด profile (แท็บผู้สมัคร)', () => {
 });
 
 describe('ผ่าน/ไม่ผ่าน ในป๊อป (QA 18 ต.ค. 2569)', () => {
-  it('กด มา ⇒ ขึ้น ผ่านไหม · เลือกผ่าน แล้วบันทึก = ส่งผลนัดก่อน แล้วส่ง passed', async () => {
+  it('กด มา ⇒ บันทึกทันที แล้วขึ้น ผ่านไหม · กดผ่าน ⇒ บันทึกทันที (ส่งผลนัดก่อน แล้วส่ง passed)', async () => {
     recordAppointmentAttendance.mockResolvedValue(undefined);
-    const { dialog, onClose } = renderDialog(app({ appointment_at: '2026-09-15T05:00:00.000Z' }), vi.fn(), vi.fn(), 'appointment');
+    const { dialog } = renderDialog(app({ appointment_at: '2026-09-15T05:00:00.000Z' }), vi.fn(), vi.fn(), 'appointment');
     expect(within(dialog).queryByTestId('step-screening')).toBeNull();
     fireEvent.click(within(dialog).getByRole('button', { name: /^มา$/ }));
-    fireEvent.click(within(within(dialog).getByTestId('step-screening')).getByRole('button', { name: 'ผ่าน' }));
-    fireEvent.click(within(dialog).getByRole('button', { name: 'บันทึก' }));
-    await waitFor(() => expect(onClose).toHaveBeenCalled());
+    const step = await within(dialog).findByTestId('step-screening');
+    fireEvent.click(within(step).getByRole('button', { name: 'ผ่าน' }));
+    await waitFor(() => expect(recordAppointmentAttendance).toHaveBeenCalledTimes(2));
     expect(recordAppointmentAttendance.mock.calls.map((c) => c[0].result)).toEqual(['showed', 'passed']);
   });
 });

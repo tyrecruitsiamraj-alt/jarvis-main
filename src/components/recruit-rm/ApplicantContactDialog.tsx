@@ -165,6 +165,9 @@ export default function ApplicantContactDialog({
   const [followPicked, setFollowPicked] = useState<FollowUpChoice | 'fail' | null>(null);
   /** ผ่าน/ไม่ผ่าน หลังมา (151 · QA 18 ต.ค. 2569 — เดิมลงได้แค่บนแถว) */
   const [screenPicked, setScreenPicked] = useState<ScreeningResult | null>(null);
+  /** มา/ไม่มา · ผ่าน/ไม่ผ่าน ที่กดแล้วบันทึกทันที (เจ้าของ 18 พ.ย. 2569 "กดแล้ว…มันบันทึกไปเลยสิ") — โชว์ค่าใหม่ระหว่างรอรายการโหลดใหม่ */
+  const [followSaved, setFollowSaved] = useState<FollowUpChoice | null>(null);
+  const [screenSaved, setScreenSaved] = useState<ScreeningResult | null>(null);
   // ── แท็บข้อมูลผู้สมัคร
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<ProfileDraft | null>(null);
@@ -230,6 +233,9 @@ export default function ApplicantContactDialog({
     setApptJob(ADVANCE);
     setApptReasonId('');
     setFollowPicked(null);
+    setScreenPicked(null);
+    setFollowSaved(null);
+    setScreenSaved(null);
     setEditing(false);
     setDraft(null);
     setBusy(false);
@@ -259,7 +265,7 @@ export default function ApplicantContactDialog({
 
   const now = new Date();
   const contactShown = contactPicked ?? contactChoiceOf(a);
-  const followInitial = followUpChoiceOf(a);
+  const followInitial = followSaved ?? followUpChoiceOf(a);
   const followShownValue = followPicked && followPicked !== 'fail' ? followPicked : followPicked ? null : followInitial;
   const contactFailPicked = contactPicked === 'fail';
   const followBlocked = !a.appointment_at
@@ -360,7 +366,31 @@ export default function ApplicantContactDialog({
   const dirty = profileDirty || contactPicked !== null || apptPick !== null || followPicked !== null || screenPicked !== null;
   /** ผลนัดที่โชว์อยู่ (ที่เพิ่งกด หรือของเดิม) — ผ่าน/ไม่ผ่าน เปิดเมื่อเป็น "มา" */
   const followNow = followPicked && followPicked !== 'fail' ? followPicked : followPicked ? null : followInitial;
-  const screenShown = screenPicked ?? (a.screening_result ?? null);
+  const screenShown = screenPicked ?? screenSaved ?? (a.screening_result ?? null);
+
+  /** มา / ไม่มา / ผ่าน / ไม่ผ่าน = บันทึกทันที (เลื่อนนัดยังต้องกรอกวันใหม่แล้วกดบันทึก) — ตัวเดียวกับปุ่มบนแถว (`recordAppointmentAttendance`) */
+  const quickAttend = async (result: 'showed' | 'no_show' | ScreeningResult) => {
+    if (busy || !a.appointment_at) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await recordAppointmentAttendance({ applicationId: a.id, appointmentAt: a.appointment_at, result });
+      if (result === 'showed' || result === 'no_show') {
+        setFollowSaved(result);
+        setFollowPicked(null);
+        setScreenPicked(null);
+        setScreenSaved(null);
+      } else {
+        setScreenSaved(result);
+        setScreenPicked(null);
+      }
+      onSaved();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'บันทึกไม่สำเร็จ');
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const save = async () => {
     if (busy) return;
@@ -640,8 +670,9 @@ export default function ApplicantContactDialog({
                   disabled={busy || Boolean(followBlocked)}
                   title={followBlocked ?? undefined}
                   onClick={() => {
+                    if (k !== 'rescheduled') return void quickAttend(k);
                     setFollowPicked(k);
-                    if (k !== 'showed') setScreenPicked(null);
+                    setScreenPicked(null);
                     setError(null);
                   }}
                   className={cn(on && tone)}
@@ -663,7 +694,7 @@ export default function ApplicantContactDialog({
                   variant={screenShown === k ? 'default' : 'outline'}
                   aria-pressed={screenShown === k}
                   disabled={busy}
-                  onClick={() => setScreenPicked(k)}
+                  onClick={() => void quickAttend(k)}
                 >
                   {SCREENING_LABEL[k]}
                 </Button>
