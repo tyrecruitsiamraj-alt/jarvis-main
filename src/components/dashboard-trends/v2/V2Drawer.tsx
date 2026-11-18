@@ -433,7 +433,7 @@ function RequestsByBu({ pane, replace }: { pane: Extract<V2Pane, { kind: 'reques
   );
 }
 
-const STATE_LABEL: Record<string, string> = { open: 'ยังเปิด', filled: 'ปิดใบขอ', cancelled: 'ยกเลิกใบขอ' };
+const STATE_LABEL: Record<string, string> = { open: 'ยังเปิด', filled: 'ปิดครบใบขอ', cancelled: 'ยกเลิกใบขอ' };
 
 /** ใบขอทีละ 10 — รายละเอียดแบบหน้าใบขอ: ค้างกี่วัน · หน่วยงาน · ตำแหน่ง · พื้นที่ · ผู้รับผิดชอบ · ประกาศ · คนสมัคร · อัตรา · ทางไปหน้าใบขอจริง */
 function RequestList({ rows, page, onPage }: { rows: readonly StuckRequest[]; page: number; onPage?: (p: number) => void }) {

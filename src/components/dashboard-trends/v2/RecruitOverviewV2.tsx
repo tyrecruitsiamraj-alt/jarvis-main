@@ -255,6 +255,9 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
   };
 
   const loadingReq = stuck.key !== filterKey;
+  /** วันสั้นบนหัวการ์ด เช่น "1 พ.ย." / "1–18 พ.ย." */
+  const shortDay = (ymd: string) => `${Number(ymd.slice(8, 10))} ${TH_MONTH[Number(ymd.slice(5, 7)) - 1]}`;
+  const rangeShort = win.from === win.to ? shortDay(win.from) : `${shortDay(win.from)}–${shortDay(win.to)}`;
   /** อัตราของใบชุดนั้น (ใบ ≠ อัตรา · เจ้าของ 17 พ.ย. 2569 "322 ใบ กี่อัตรา") */
   const sumOf = (rows: readonly StuckRequest[], k: 'requested' | 'filled' | 'cancelled' | 'remaining') => rows.reduce((n, r) => n + (Number(r[k]) || 0), 0);
   const rateText = (rows: readonly StuckRequest[] | undefined, label: string, k: 'requested' | 'filled' | 'cancelled' | 'remaining') =>
@@ -269,11 +272,15 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
       <Card className="min-w-0 space-y-5 rounded-2xl p-5" data-testid="v2-requests">
         <SectionTitle title="ใบขอ" right={`สถานะ ณ ${dayText(win.to)} · ใบขอใหม่นับตามวันคีย์ใน ERP`} />
         {stuck.error && stuck.key === filterKey ? <p className="text-sm text-destructive">{stuck.error}</p> : null}
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <Kpi label={`${RELEASE_LANE_TEXT.all.label} (ใบ)`} emphasis value={loadingReq ? undefined : eq ? eq.remaining.length : null} sub={rateText(eq?.remaining, 'เหลือหา', 'remaining')} onClick={eq ? () => openRequests(RELEASE_LANE_TEXT.all.label, eq.remaining) : undefined} testId="v2-req-open" />
-          <Kpi label="ใบขอใหม่ (ใบ)" emphasis value={loadingReq ? undefined : eq ? eq.new.length : null} sub={rateText(eq?.new, 'ขอมา', 'requested')} onClick={eq ? () => openRequests('ใบขอใหม่', eq.new) : undefined} />
-          <Kpi label="ปิดใบขอ (ใบ)" emphasis value={loadingReq ? undefined : eq ? eq.filled.length : null} sub={rateText(eq?.filled, 'หาได้', 'filled')} onClick={eq ? () => openRequests('ปิดใบขอ', eq.filled) : undefined} />
-          <Kpi label="ยกเลิกใบขอ (ใบ)" emphasis value={loadingReq ? undefined : eq ? eq.cancelled.length : null} sub={rateText(eq?.cancelled, 'ยกเลิก', 'cancelled')} onClick={eq ? () => openRequests('ยกเลิกใบขอ', eq.cancelled) : undefined} tone="danger" />
+        {/* บวกลบลงตัวทั้งใบและอัตรา (เจ้าของ 18 พ.ย. 2569 "ตรงนี้บวกลบกันต้องลง 327 ใบ 378 อัตรา และคำต้องบอกเลยว่าคือสถานะอะไร")
+            ใบ: ยกมา + ขอใหม่ − ปิดครบ − ยกเลิก = เหลือหา · อัตรา: ขอไว้ของใบยกมา + ขอมา − หาได้แล้ว − ยกเลิก = เหลือหา
+            อัตราหาได้/ยกเลิก = สะสมของใบทุกใบในชุด (รวมที่หาได้บางส่วนของใบที่ยังเปิด) — ERP ไม่มีวันที่ของการหาได้รายอัตรา */}
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-5" data-testid="v2-req-equation">
+          <Kpi label={`ยอดยกมา · เปิดอยู่ก่อน ${shortDay(win.from)}`} emphasis value={loadingReq ? undefined : eq ? eq.carried.length : null} sub={eq ? `ขอไว้ ${fmt(sumOf(eq.carried, 'requested'))} อัตรา` : undefined} onClick={eq ? () => openRequests('ยอดยกมา', eq.carried) : undefined} testId="v2-req-carried" />
+          <Kpi label={`+ ใบขอใหม่ · ${rangeShort}`} emphasis value={loadingReq ? undefined : eq ? eq.new.length : null} sub={rateText(eq?.new, 'ขอมา', 'requested')} onClick={eq ? () => openRequests('ใบขอใหม่', eq.new) : undefined} testId="v2-req-new" />
+          <Kpi label={`− ปิดครบใบขอ · ${rangeShort}`} emphasis value={loadingReq ? undefined : eq ? eq.filled.length : null} sub={reqRows ? `หาได้แล้ว ${fmt(sumOf(reqRows, 'filled'))} อัตรา (รวมใบที่หาได้บางส่วน)` : undefined} onClick={eq ? () => openRequests('ปิดครบใบขอ', eq.filled) : undefined} testId="v2-req-filled" />
+          <Kpi label={`− ยกเลิกใบขอ · ${rangeShort}`} emphasis value={loadingReq ? undefined : eq ? eq.cancelled.length : null} sub={reqRows ? `ยกเลิก ${fmt(sumOf(reqRows, 'cancelled'))} อัตรา` : undefined} onClick={eq ? () => openRequests('ยกเลิกใบขอ', eq.cancelled) : undefined} tone="danger" testId="v2-req-cancelled" />
+          <Kpi label={`= เหลือหา · ยังเปิดอยู่ ณ ${shortDay(win.to)}`} emphasis value={loadingReq ? undefined : eq ? eq.remaining.length : null} sub={rateText(eq?.remaining, 'เหลือหา', 'remaining')} onClick={eq ? () => openRequests('เหลือหา', eq.remaining) : undefined} testId="v2-req-open" />
         </div>
       </Card>
 
