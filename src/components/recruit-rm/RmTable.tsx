@@ -238,7 +238,7 @@ const RmTable: React.FC<{
    * 🔴 ว่างแล้วตารางห้ามหาย (กติกา 1 ต.ค. 2569 · QA 5 ต.ค. 2569 เจอว่าตารางหายเหลือย่อหน้า)
    * ⇒ หัวตารางอยู่เสมอ + แถวเดียว "ไม่พบใบสมัคร" · จำนวนคอลัมน์ต้องตรงกับหัวข้างล่าง
    */
-  const colCount = 1 + (ownerColumns ? 11 : 4) + (tab === 'appointments' ? 1 : 0) + (tab === 'contact' ? 1 : 0) + 1;
+  const colCount = 1 + (ownerColumns ? 11 : 5) + (tab === 'appointments' ? 1 : 0) + (tab === 'contact' ? 1 : 0) + 1;
 
   return (
     <div className={cn('overflow-hidden rounded-xl border', DASH.card)}>
@@ -284,6 +284,8 @@ const RmTable: React.FC<{
                   <th className="px-1.5 py-2 font-medium">ที่อยู่</th>
                   <th className="px-1.5 py-2 font-medium">หน่วยงาน</th>
                   <th className="px-1.5 py-2 font-medium">สมัคร</th>
+                  {/* สถานะ 5 คำ ทั้งแท็บการติดต่อ + ติดตามนัดหมาย (เจ้าของ Choice 18 พ.ย. 2569) */}
+                  <th className="px-1.5 py-2 font-medium">สถานะ</th>
                 </>
               )}
               {/* วันนัดโผล่เฉพาะแท็บติดตามนัดหมาย — แท็บอื่นไม่มีใครถามคำถามนี้
@@ -494,6 +496,9 @@ const RmTable: React.FC<{
                             {r.channel_label?.trim() || (r.referral_source ? REFERRAL_SOURCE_LABEL[r.referral_source] : EM_DASH)}
                           </span>
                         </span>
+                      </td>
+                      <td className="px-1.5 py-2">
+                        <ProcessCell r={r} />
                       </td>
                     </>
                   )}
