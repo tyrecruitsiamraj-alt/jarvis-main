@@ -6,6 +6,7 @@
  * นิยามทุกยอดมาจากตัวกลางเดิม (`v2Model.ts`) — ไม่มีตัวเลขฝัง · ไม่ทราบ = "—"
  */
 import React from 'react';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -20,9 +21,9 @@ import { stuckEquation, type StuckRequest } from '@/lib/recruitStuck';
 import { POSTING_STATES, POSTING_STATE_LABEL, postingStateOf } from '@/lib/recruitPostingState';
 import { fetchSoPostGroups } from '@/lib/soPostGroupsApi';
 import { fetchManualLinks } from '@/lib/jobPostActionsApi';
-import { legacyReportsPath, requestPathOfJobId } from '@/lib/jobNavigation';
+import { requestPathOfJobId } from '@/lib/jobNavigation';
 import { RELEASE_LANE_TEXT } from '@/lib/boardRelease';
-import { EMPTY_REQUEST_FILTER, filterRequestRows, isRequestFilterActive, jobFilterOf, requestFilterToParams, type RequestTabFilter } from '@/lib/recruitRequestTab';
+import { EMPTY_REQUEST_FILTER, filterRequestRows, isRequestFilterActive, jobFilterOf, type RequestTabFilter } from '@/lib/recruitRequestTab';
 import { prevCohortOf } from '@/lib/recruitScale';
 import { friendlyErrorText } from '@/lib/friendlyError';
 import { BU_UNKNOWN, buOfFact, pageOf, bkkDay } from '@/lib/recruitAudience';
@@ -121,6 +122,7 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
     { key: 'unreleased', rows: unreleasedRows, view: 'unreleased' },
   ];
 
+  const [areaOpen, setAreaOpen] = React.useState(false);
   const push = (p: V2Pane) => setStack([p]);
   const openRequests = (title: string, rows: StuckRequest[]) => push({ kind: 'requests', title, rows, page: 1 });
   const openNames = (title: string, ids: readonly string[]) => push({ kind: 'names', title, ids: [...ids], page: 1 });
@@ -432,23 +434,21 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
       </Card>
 
       {/* พื้นที่ที่ขาดคน ย้ายลงล่างสุด (เจ้าของ 17 พ.ย. 2569 "เอาไปไว้ด้านล่างเถอะตรงนี้เกะกะ") · ชื่อเจ้าของ 18 พ.ย. 2569 */}
+      {/* พับไว้ กดค่อยกาง (เจ้าของ 18 พ.ย. 2569 "ซ่อนไว้กดค่อยกาง") · ปุ่มรายงานเพิ่มเติม (แบบเดิม) ถอดแล้ว ("เอาออก") */}
       <Card className="min-w-0 space-y-3 rounded-2xl p-5" data-testid="v2-area">
-        <SectionTitle title="พื้นที่ที่ขาดคน" right="ใบขอที่ยังเหลือหา แยกจังหวัด / อำเภอ" />
-        {eq ? <StuckAreaTable bare rows={openRows.filter((r) => (r.remaining ?? 0) > 0)} onPick={(title, rows) => openRequests(title, rows)} /> : <Skeleton className="h-32 rounded-xl" />}
+        <SectionTitle
+          title="พื้นที่ที่ขาดคน"
+          right={
+            <Button type="button" size="sm" variant="outline" aria-expanded={areaOpen} onClick={() => setAreaOpen((v) => !v)} data-testid="v2-area-toggle">
+              {areaOpen ? <ChevronUp aria-hidden /> : <ChevronDown aria-hidden />}
+              {areaOpen ? 'พับ' : 'ดูแยกจังหวัด / อำเภอ'}
+            </Button>
+          }
+        />
+        {areaOpen ? (
+          eq ? <StuckAreaTable bare rows={openRows.filter((r) => (r.remaining ?? 0) > 0)} onPick={(title, rows) => openRequests(title, rows)} /> : <Skeleton className="h-32 rounded-xl" />
+        ) : null}
       </Card>
-
-      <div className="flex justify-end">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => {
-            navigate(legacyReportsPath(win, data.bu, requestFilterToParams(reqFilter)));
-            window.scrollTo({ top: 0 });
-          }}
-        >
-          รายงานเพิ่มเติม (แบบเดิม)
-        </Button>
-      </div>
 
       <V2Drawer stack={stack} onStack={setStack} model={model} bus={bus} periodText={periodText} buText={buText} embeds={embeds} />
     </div>
