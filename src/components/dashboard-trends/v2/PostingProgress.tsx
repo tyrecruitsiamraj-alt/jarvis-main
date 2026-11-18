@@ -6,6 +6,8 @@
  *   ประกาศแล้ว = มีคนกรอก + ยังไม่มีคนกรอก (คนกรอก = `applications` ตัวเดียวกับหัวหน้าโพสต์ประกาศ) → รายใบที่มีคนกรอก × 8 ขั้นหลัก
  *   ยังไม่ประกาศ = ยังต้องหาคน + เริ่มงานแล้ว (`sourcing`) → ใบต่อเจ้าหน้าที่สรรหา
  * กดเลข = รายชื่อพร้อมสถานะละเอียด (`PERSON_STAGE_LABEL`)
+ * 18 พ.ย. 2569 "ไม่มีกราฟบอกว่าแต่ละ Bu เท่าไหร่" → กราฟแท่ง BU ของช่องที่กดอยู่บนสุด · กด BU = สมการและตารางข้างล่างเหลือ BU นั้น
+ *   แกน BU เรียงตามใบที่ยังเปิดทั้งหมด (สลับช่องแล้วแท่งไม่สลับที่)
  */
 import React from 'react';
 import { Button } from '@/components/ui/button';
@@ -14,9 +16,10 @@ import { cn } from '@/lib/utils';
 import { DASH } from '@/lib/designTokens';
 import { recruiterLabelOf, type StuckRequest } from '@/lib/recruitStuck';
 import { PERSON_GROUPS, PERSON_GROUP_LABEL, PERSON_GROUP_OF, PERSON_STAGE_LABEL, type PersonGroupKey, type PersonStageKey } from '@/lib/personStage';
-import { pageOf } from '@/lib/recruitAudience';
+import { BU_UNKNOWN, pageOf } from '@/lib/recruitAudience';
 import { RELEASE_LANE_TEXT } from '@/lib/boardRelease';
 import { Pager, fmt } from './V2Parts';
+import { MonthCompareBars } from './MonthCompareBars';
 
 type Props = {
   view: 'released' | 'unreleased';
@@ -42,12 +45,44 @@ function groupsOf(rows: readonly StuckRequest[]): { ids: Record<PersonGroupKey, 
 const peopleOf = (r: StuckRequest) => Object.values(r.people ?? {}).reduce((n, l) => n + (l?.length ?? 0), 0);
 
 const L = (k: keyof typeof RELEASE_LANE_TEXT) => RELEASE_LANE_TEXT[k].label;
+const buOf = (r: StuckRequest) => r.bu?.trim() || BU_UNKNOWN;
 
 export default function PostingProgress({ view, open, onRequests, onNames, resetKey }: Props) {
-  const released = open.filter((r) => r.released);
-  const unreleased = open.filter((r) => !r.released);
+  const [bu, setBu] = React.useState<string | null>(null);
   const [page, setPage] = React.useState(1);
-  React.useEffect(() => setPage(1), [resetKey, view]);
+  React.useEffect(() => setBu(null), [resetKey, view]);
+  React.useEffect(() => setPage(1), [resetKey, view, bu]);
+
+  const lane = (r: StuckRequest) => (view === 'released' ? Boolean(r.released) : !r.released);
+  const buCount = new Map<string, number>();
+  for (const r of open) buCount.set(buOf(r), (buCount.get(buOf(r)) ?? 0) + 1);
+  const buKeys = [...buCount.keys()].sort((a, b) => (buCount.get(b) ?? 0) - (buCount.get(a) ?? 0) || a.localeCompare(b));
+  const laneRows = open.filter(lane);
+  const groups = buKeys.map((k) => ({ key: k, byMonth: { all: laneRows.filter((r) => buOf(r) === k).length } }));
+  const pick = (k: string | null) => setBu((cur) => (k === null || cur === k ? null : k));
+  const buBar = (
+    <div className="space-y-2" data-testid="v2-post-bu">
+      <h3 className="text-sm font-medium">
+        {L(view)} {fmt(laneRows.length)} ใบ · แยกตาม BU
+      </h3>
+      <MonthCompareBars groups={groups} months={['all']} unit="ใบ" seriesName={() => L(view)} onPick={(k) => pick(k)} height={220} testId="v2-post-bu-chart" />
+      <div className="flex flex-wrap items-center gap-2">
+        <Button type="button" size="xs" variant={bu === null ? 'default' : 'outline'} onClick={() => pick(null)}>
+          ทุก BU {fmt(laneRows.length)}
+        </Button>
+        {groups.map((g) => (
+          <Button key={g.key} type="button" size="xs" variant={bu === g.key ? 'default' : 'outline'} aria-pressed={bu === g.key} onClick={() => pick(g.key)}>
+            {g.key} {fmt(g.byMonth.all)}
+          </Button>
+        ))}
+      </div>
+    </div>
+  );
+
+  const scoped = bu ? open.filter((r) => buOf(r) === bu) : open;
+  const released = scoped.filter((r) => r.released);
+  const unreleased = scoped.filter((r) => !r.released);
+  const tag = bu ? ` · ${bu}` : '';
 
   if (view === 'unreleased') {
     const sourcing = unreleased.filter((r) => r.sourcing !== false);
@@ -58,16 +93,17 @@ export default function PostingProgress({ view, open, onRequests, onNames, reset
     const pg = pageOf(owners, page);
     return (
       <section className="min-w-0 space-y-3" data-testid="v2-not-started">
+        {buBar}
         <div className="flex flex-wrap items-center gap-2 text-sm">
           <span className="font-medium">
-            {L('unreleased')} {fmt(unreleased.length)} ใบ
+            {L('unreleased')}{tag} {fmt(unreleased.length)} ใบ
           </span>
           <span className={DASH.sub}>=</span>
-          <Button type="button" size="xs" variant="outline" onClick={() => onRequests(L('sourcing'), sourcing)}>
+          <Button type="button" size="xs" variant="outline" onClick={() => onRequests(`${L('sourcing')}${tag}`, sourcing)}>
             {L('sourcing')} {fmt(sourcing.length)} ใบ
           </Button>
           <span className={DASH.sub}>+</span>
-          <Button type="button" size="xs" variant="outline" onClick={() => onRequests(L('started'), startedWork)}>
+          <Button type="button" size="xs" variant="outline" onClick={() => onRequests(`${L('started')}${tag}`, startedWork)}>
             {L('started')} {fmt(startedWork.length)} ใบ
           </Button>
         </div>
@@ -126,16 +162,17 @@ export default function PostingProgress({ view, open, onRequests, onNames, reset
   const pg = pageOf(sorted, page);
   return (
     <section className="min-w-0 space-y-3" data-testid="v2-started">
+      {buBar}
       <div className="flex flex-wrap items-center gap-2 text-sm">
         <span className="font-medium">
-          {L('released')} {fmt(released.length)} ใบ
+          {L('released')}{tag} {fmt(released.length)} ใบ
         </span>
         <span className={DASH.sub}>=</span>
-        <Button type="button" size="xs" variant="outline" onClick={() => onRequests(L('applied'), withNames)}>
+        <Button type="button" size="xs" variant="outline" onClick={() => onRequests(`${L('applied')}${tag}`, withNames)}>
           {L('applied')} {fmt(withNames.length)} ใบ · {fmt(heads)} คน
         </Button>
         <span className={DASH.sub}>+</span>
-        <Button type="button" size="xs" variant="outline" onClick={() => onRequests(L('silent'), noNames)}>
+        <Button type="button" size="xs" variant="outline" onClick={() => onRequests(`${L('silent')}${tag}`, noNames)}>
           {L('silent')} {fmt(noNames.length)} ใบ
         </Button>
       </div>
