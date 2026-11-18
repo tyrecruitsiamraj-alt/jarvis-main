@@ -498,6 +498,11 @@ export function buildApplicationsListQuery(input: {
   everyoneAppointments?: boolean;
   /** แท็บการติดต่อ "ทุกคน" — ผ่าน `wantsEveryoneContact` มาแล้วเท่านั้น · ได้แต่ใบที่มีคนเก็บ */
   everyoneContact?: boolean;
+  /**
+   * drill-down `?bucket=` ของ Admin/หัวหน้า = ทุกคน ไม่ใช่ "ของฉัน" (เจ้าของ 18 พ.ย. 2569 กดการ์ด "นัดเลยวันแล้ว 74" จากภาพรวม
+   * แล้ว "ไม่เห็นเจอไรเลย" — การ์ดนับทุกคน แต่ลิสต์ซ่อนใบที่คนอื่นเก็บ) · สิทธิ์ BU ข้างบนยังอยู่ครบ
+   */
+  everyoneBucket?: boolean;
 }): {
   sql: string;
   params: unknown[];
@@ -539,6 +544,17 @@ export function buildApplicationsListQuery(input: {
      * 🔴 ห้ามเอาไปใช้กับแท็บอื่น — ใบที่คนอื่นเก็บจะโผล่ในแท็บผู้สมัคร (หน้าเว็บแยกชุดนี้ไว้ใช้เฉพาะแท็บการติดต่อ)
      */
     conds.push(`(claimed_by is not null or coalesce(is_lead, false))`);
+    return {
+      sql: `select {{cols}} from ${tbl} a ${conds.length ? `where ${conds.join(' and ')}` : ''}
+        order by created_at desc limit ${APPLICATIONS_LIST_MAX}`,
+      params,
+      claimWhere: 'true',
+      legacyClaimWhere: 'true',
+      leadWhere: 'true',
+    };
+  }
+  if (input.everyoneBucket === true && input.bucketWhere && !jobId && !input.leadView) {
+    conds.push(input.bucketWhere);
     return {
       sql: `select {{cols}} from ${tbl} a ${conds.length ? `where ${conds.join(' and ')}` : ''}
         order by created_at desc limit ${APPLICATIONS_LIST_MAX}`,
@@ -1758,6 +1774,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
       // แท็บติดตามนัดหมาย "ทุกคน" — สิทธิ์ตัดสินที่นี่ (staff ส่งมา = ลิสต์เดิม)
       everyoneAppointments: wantsEveryoneAppointments(req.query, req.user.role),
       everyoneContact,
+      everyoneBucket: req.user.role === 'admin' || req.user.role === 'supervisor',
     });
     const showClaimer = everyoneContact;
     const rows = await queryWithLegacyFallback(

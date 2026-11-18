@@ -313,7 +313,7 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
               sub: 'ลงผลที่หน้าติดตามนัดหมาย',
               tone: 'warn',
               icon: TODO_ICONS.CalendarX,
-              onOpen: () => navigate('/jobs/board?view=list&bucket=overdue_no_result'),
+              onOpen: () => navigate('/jobs/board?view=appointments&bucket=overdue_no_result'),
             },
             {
               key: 'unreleased',

@@ -122,3 +122,14 @@ describe('buildApplicationsListQuery — Lead ไปแท็บการติ�
     }
   });
 });
+
+describe('drill-down ?bucket= ของ Admin/หัวหน้า = ทุกคน (เจ้าของ 18 พ.ย. 2569 "กดไปแล้วไม่เห็นเจอไรเลย")', () => {
+  it('everyoneBucket + bucketWhere = ไม่กรอง "ของฉัน" (claim/Lead) · ไม่ส่ง = เหมือนเดิม', () => {
+    const q = buildApplicationsListQuery({ viewerId: 'u1', bucketWhere: '(a.x = 1)', everyoneBucket: true } as never);
+    expect(q.claimWhere).toBe('true');
+    expect(q.leadWhere).toBe('true');
+    expect(q.sql).toContain('(a.x = 1)');
+    const mine = buildApplicationsListQuery({ viewerId: 'u1', bucketWhere: '(a.x = 1)' } as never);
+    expect(mine.claimWhere).not.toBe('true');
+  });
+});

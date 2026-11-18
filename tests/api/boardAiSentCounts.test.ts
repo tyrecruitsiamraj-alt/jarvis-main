@@ -73,7 +73,7 @@ describe('🔴 แท็บผู้สมัครดึงครบทุก�
   it('ลิสต์ไม่มี limit 500 · ใช้ราวกันตก APPLICATIONS_LIST_MAX (สูงกว่าจำนวนใบจริงมาก) + ล็อกเตือนเมื่อถึง', () => {
     expect(HANDLER).not.toMatch(/order by created_at desc limit 500/);
     // ลิสต์ปกติ · นัดทุกคน · การติดต่อทุกคน (10 พ.ย. 2569) — ทุกเส้นใช้ราวกันตกตัวเดียว
-    expect((HANDLER.match(/order by created_at desc limit \$\{APPLICATIONS_LIST_MAX\}/g) ?? []).length).toBe(3);
+    expect((HANDLER.match(/order by created_at desc limit \$\{APPLICATIONS_LIST_MAX\}/g) ?? []).length).toBe(4); // + drill-down ทุกคนของ Admin/หัวหน้า (18 พ.ย. 2569)
     expect(HANDLER).toMatch(/export const APPLICATIONS_LIST_MAX = 20000;/);
     expect(HANDLER).toContain('if (rows.length >= APPLICATIONS_LIST_MAX) {');
   });
