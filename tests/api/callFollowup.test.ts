@@ -477,3 +477,39 @@ describe('บัญชีห้ามโทรของสายติดตา�
     expect(src).toContain('const blocked = await listSuppressedPhones({ forFollow: true });');
   });
 });
+
+describe('รหัสนอกชุดของ Lumos ในสายเสนองาน (เจ้าของ 18 พ.ย. 2569 Choice)', () => {
+  beforeEach(() => vi.mocked(dbQuery).mockReset());
+  const row = (channel: string, jobRef: string, personRef: string) => ({
+    id: 4242, channel, attempt_count: 1, payload: { phone: '+66812345678' }, person_ref: personRef, job_ref: jobRef,
+  });
+  const route = (r: ReturnType<typeof row>) =>
+    vi.mocked(dbQuery).mockImplementation(async (sql: string) =>
+      /where id = \$1 limit 1/.test(String(sql)) ? ({ rows: [r] } as never) : ({ rows: [] } as never),
+    );
+  const updateParams = () => vi.mocked(dbQuery).mock.calls.find((c) => /update lumos_dispatch_queue/.test(String(c[0])))?.[1] as unknown[] | undefined;
+
+  it('rejected (ดังแล้วตัดก่อนรับ) = ไม่รับสาย ⇒ โทรซ้ำ · เก็บผลเป็น no_answer', async () => {
+    route(row('interview', 'siamraj-sql:OPL6911004', 'app-c9803f61'));
+    const d = await applyCallFollowupToQueueRow({ queueId: 4242, outcome: 'rejected' });
+    expect(d?.action).toBe('retry');
+    expect(updateParams()?.[2]).toBe('no_answer');
+  });
+
+  it('automated_service (ปิดเครื่อง/ติดต่อไม่ได้) ⇒ หยุด ให้คนตามทันที', async () => {
+    route(row('interview', 'siamraj-sql:OPL6911004', 'app-c9803f61'));
+    const d = await applyCallFollowupToQueueRow({ queueId: 4242, outcome: 'automated_service' });
+    expect(d?.action).toBe('needs_human');
+    expect(updateParams()).toEqual([4242, 'automated_service', 'needs_human']);
+  });
+
+  it('สายติดตามเริ่มงาน: รหัสนอกชุดคงเดิม (ไม่ตัดสิน)', async () => {
+    route(row('reminder', 'follow', 'follow-604d4bdc'));
+    expect(await applyCallFollowupToQueueRow({ queueId: 4242, outcome: 'rejected' })).toBeNull();
+  });
+
+  it('รหัสที่ไม่รู้จักเลย ⇒ ไม่แตะฐาน', async () => {
+    expect(await applyCallFollowupToQueueRow({ queueId: 4242, outcome: 'something_new' })).toBeNull();
+    expect(vi.mocked(dbQuery)).not.toHaveBeenCalled();
+  });
+});

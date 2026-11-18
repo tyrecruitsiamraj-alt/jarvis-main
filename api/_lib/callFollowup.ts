@@ -121,12 +121,22 @@ export async function suppressPhone(input: {
 }
 
 /**
+ * รหัสจาก Lumos ที่ไม่อยู่ในชุดผลโทร แต่สายเสนองานต้องตัดสินต่อ (เจ้าของ 18 พ.ย. 2569 Choice)
+ * - rejected (SIP 487 ดังแล้วสายตัดก่อนรับ) = ไม่รับสาย ⇒ โทรซ้ำ
+ * - automated_service (เจอระบบตอบรับอัตโนมัติ เช่น ปิดเครื่อง/เลขหมายติดต่อไม่ได้) ⇒ หยุด ให้คนตามทันที
+ * เดิมสองตัวนี้ไม่มีใครตัดสิน แถวค้าง 24 ชม. แล้วไปกองให้คนตาม (20 วัน: 771 + 113 สาย)
+ */
+const OFFER_ONLY_OUTCOMES = new Set(['rejected', 'automated_service']);
+
+/**
  * รับสายแล้วเงียบ (unresponsive) หยุดโทรเฉพาะสายเสนองาน (เจ้าของ 18 พ.ย. 2569 "ให้โทรซ้ำเฉพาะไม่รับสาย")
  * - เสียงฝากข้อความ = ไม่มีคนรับ ⇒ no_answer (โทรซ้ำ)
  * - สายติดตามเริ่มงาน (reminder) คงกติกาเดิม ⇒ no_answer (โทรซ้ำ)
+ * - rejected (ดังแล้วตัดก่อนรับ) ⇒ no_answer (โทรซ้ำ)
  */
-function outcomeForPolicy(outcome: CallOutcome, channel: string | undefined, result: unknown): CallOutcome {
-  if (outcome !== 'unresponsive') return outcome;
+function outcomeForPolicy(outcome: string, channel: string | undefined, result: unknown): CallOutcome {
+  if (outcome === 'rejected') return 'no_answer';
+  if (outcome !== 'unresponsive') return outcome as CallOutcome;
   const ended = typeof result === 'object' && result !== null ? (result as Record<string, unknown>).ended_reason : null;
   if (channel !== 'interview' || ended === 'voicemail_greeting') return 'no_answer';
   return outcome;
@@ -200,7 +210,7 @@ export async function applyCallFollowupToQueueRow(input: {
   declinedScope?: 'job' | 'all' | null;
   now?: Date;
 }): Promise<CallFollowupDecision | null> {
-  if (!isCallOutcome(input.outcome)) return null;
+  if (!isCallOutcome(input.outcome) && !OFFER_ONLY_OUTCOMES.has(input.outcome)) return null;
 
   let row: QueueRow | undefined;
   try {
@@ -215,6 +225,7 @@ export async function applyCallFollowupToQueueRow(input: {
     throw e;
   }
   if (!row) return null;
+  if (!isCallOutcome(input.outcome) && row.channel !== 'interview') return null;
 
   // Follow ตั้งตาราง: person_ref = follow-<id> ที่มี group_id **หรือ** call_round/call_times
   // → **ตารางคือ retry อยู่แล้ว** (หลายรอบ/วัน + วันถัดไปเป็นแถวใหม่) ห้ามให้ policy
@@ -222,17 +233,22 @@ export async function applyCallFollowupToQueueRow(input: {
   const followSchedule = await followScheduleOfPersonRef(row.person_ref);
   const followGroupId = followSchedule.groupId;
 
-  const decision = resolveCallFollowup({
-    outcome: outcomeForPolicy(input.outcome as CallOutcome, row.channel, input.result),
-    attemptCount: Number(row.attempt_count) || 1,
-    now: input.now ?? new Date(),
-    requestedCallbackAt: pickRequestedCallbackAt(input.result),
-    // สายทักทายทั่วไป (15 ต.ค. 2569): คำถามเดียวที่ตัดสินคือ "ยังหางานอยู่ไหม" ⇒ ไม่สนใจ = ไม่หางานแล้ว = พักเบอร์ทุกใบขอ
-    declinedScope: input.declinedScope ?? (row.job_ref === GREETING_JOB_REF ? 'all' : null),
-    // นโยบายที่เจ้าของตั้งจากหน้า Follow (migration 073) — ตารางยังไม่ migrate = ค่าเดิมในโค้ด
-    policy: await getCallFollowupPolicy(),
-    // ไม่รับสาย ⇒ เวลาโทรซ้ำถัดไปจากหน้า ตั้งค่า › โทรซ้ำคนไม่รับสาย (ทุกงาน · 26 ต.ค. 2569)
-  });
+  const policyOutcome = outcomeForPolicy(input.outcome, row.channel, input.result);
+  const decision: CallFollowupDecision = input.outcome === 'automated_service'
+    ? { action: 'needs_human', nextAttemptAt: null, suppressUntil: null, reason: 'เจอระบบตอบรับอัตโนมัติ (ปิดเครื่อง/ติดต่อไม่ได้) — ให้คนตาม' }
+    : resolveCallFollowup({
+        outcome: policyOutcome,
+        attemptCount: Number(row.attempt_count) || 1,
+        now: input.now ?? new Date(),
+        requestedCallbackAt: pickRequestedCallbackAt(input.result),
+        // สายทักทายทั่วไป (15 ต.ค. 2569): คำถามเดียวที่ตัดสินคือ "ยังหางานอยู่ไหม" ⇒ ไม่สนใจ = ไม่หางานแล้ว = พักเบอร์ทุกใบขอ
+        declinedScope: input.declinedScope ?? (row.job_ref === GREETING_JOB_REF ? 'all' : null),
+        // นโยบายที่เจ้าของตั้งจากหน้า Follow (migration 073) — ตารางยังไม่ migrate = ค่าเดิมในโค้ด
+        policy: await getCallFollowupPolicy(),
+        // ไม่รับสาย ⇒ เวลาโทรซ้ำถัดไปจากหน้า ตั้งค่า › โทรซ้ำคนไม่รับสาย (ทุกงาน · 26 ต.ค. 2569)
+      });
+  // rejected เก็บเป็น no_answer (นับเป็นไม่รับสายทุกหน้า + ตัวส่งซ้ำจัดนัดค้างได้)
+  const storedOutcome = input.outcome === 'rejected' ? policyOutcome : input.outcome;
 
   // แถวตั้งตาราง: retry ของ policy → ปิดแทน (ไม่โทรซ้ำนอกตาราง) · ผลอื่นคงเดิม
   const scheduledFollow = followSchedule.scheduled;
@@ -249,7 +265,7 @@ export async function applyCallFollowupToQueueRow(input: {
                 next_attempt_at = $2::timestamptz,
                 last_outcome = $3, followup_state = 'retry_scheduled', updated_at = now()
           where id = $1`,
-        [row.id, decision.nextAttemptAt, input.outcome],
+        [row.id, decision.nextAttemptAt, storedOutcome],
       );
     } else {
       const state = decision.action === 'needs_human' ? 'needs_human' : 'closed';
@@ -257,7 +273,7 @@ export async function applyCallFollowupToQueueRow(input: {
         `update ${queueTable}
             set last_outcome = $2, followup_state = $3, next_attempt_at = null, updated_at = now()
           where id = $1`,
-        [row.id, input.outcome, state],
+        [row.id, storedOutcome, state],
       );
     }
   } catch (e) {
