@@ -78,6 +78,10 @@ async function handler(req: AuthedReq, res: ApiRes) {
         return sendError(res, 400, 'Bad request', 'ติดต่อไม่สำเร็จต้องเลือกเหตุผล');
       }
       const appointmentFailed = body.ok === true && body.appointmentFailed === true;
+      // ติดต่อสำเร็จต้องลงผลนัดด้วยเสมอ — นัดได้ (วัน) หรือนัดไม่ได้ (เหตุผล) · เจ้าของ 18 พ.ย. 2569 "ต้องบันทึกทุกคน"
+      if (body.ok && !appointmentFailed && !(body.appointmentAt ?? '').toString().trim()) {
+        return sendError(res, 400, 'Bad request', 'ติดต่อสำเร็จต้องเลือก นัดหมาย (ใส่วัน) หรือ นัดหมายไม่สำเร็จ (ใส่เหตุผล)');
+      }
       if (appointmentFailed && !(body.reasonLabel ?? '').trim()) {
         return sendError(res, 400, 'Bad request', 'นัดหมายไม่สำเร็จต้องเลือกเหตุผล');
       }

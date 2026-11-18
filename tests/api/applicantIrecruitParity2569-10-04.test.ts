@@ -19,9 +19,9 @@ describe('ขั้นตอน + สถานะแบบ iRecruit', () => {
     expect(applicantProcessOf(app({}))).toEqual({ step: 'contact', state: 'pending' });
     expect(applicantProcessOf(app({ last_contact_ok: false }))).toEqual({ step: 'contact', state: 'fail' });
     expect(applicantProcessOf(app({ last_contact_ok: true }))).toEqual({ step: 'appointment', state: 'pending' });
-    expect(applicantProcessOf(app({ last_contact_ok: true, appointment_at: '2026-10-06T05:00:00Z' }))).toEqual({ step: 'follow', state: 'pending' });
+    expect(applicantProcessOf(app({ last_contact_ok: true, appointment_at: '2026-10-06T05:00:00Z' }))).toEqual({ step: 'follow', state: 'booked' });
     expect(applicantProcessOf(app({ appointment_at: '2026-10-06T05:00:00Z', attendance_result: 'showed' }))).toEqual({ step: 'follow', state: 'ok' });
-    expect(applicantProcessOf(app({ appointment_at: '2026-10-06T05:00:00Z', attendance_result: 'no_show' }))).toEqual({ step: 'follow', state: 'fail' });
+    expect(applicantProcessOf(app({ appointment_at: '2026-10-06T05:00:00Z', attendance_result: 'no_show' }))).toEqual({ step: 'follow', state: 'fail', reason: 'ไม่มาตามนัด' });
   });
   it('สถานะการติดต่อ: ยังไม่โทร / โทรแล้ว / นัดสัมภาษณ์แล้ว', () => {
     expect(applicantContactStateOf(app({}))).toBe('not_called');

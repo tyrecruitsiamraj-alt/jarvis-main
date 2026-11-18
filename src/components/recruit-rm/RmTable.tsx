@@ -43,12 +43,16 @@ import { PROCESS_STATE_LABEL, PROCESS_STATE_TONE, PROCESS_STEP_LABEL, applicantP
 import { irecruitLateHours, lateText } from '@/lib/irecruitPullStatus';
 
 /** สถานะแบบ iRecruit (เจ้าของ 4 ต.ค. 2569 "เอาสถานะมาเพิ่มพอ") — ชิปสถานะ + ขั้นที่อยู่ */
+/** บรรทัดล่าง: ไม่สำเร็จ = เหตุผล · นัดได้/เลื่อนนัด = วันนัด · อื่น ๆ = ขั้นที่อยู่ (เจ้าของ 18 พ.ย. 2569 "นัดไม่ได้ก็บอกเลยว่าเพราะอะไร") */
 function ProcessCell({ r }: { r: PublicApplication }) {
   const p = applicantProcessOf(r);
+  const sub =
+    p.reason ??
+    ((p.state === 'booked' || p.state === 'rescheduled') && r.appointment_at ? formatDateTimeTh(r.appointment_at) : PROCESS_STEP_LABEL[p.step]);
   return (
     <span className="flex flex-col items-start gap-0.5">
       <span className={cn('whitespace-nowrap', TONE[PROCESS_STATE_TONE[p.state]].chip)}>{PROCESS_STATE_LABEL[p.state]}</span>
-      <span className={cn('whitespace-nowrap text-xs', DASH.cellMuted)}>{PROCESS_STEP_LABEL[p.step]}</span>
+      <span className={cn('whitespace-nowrap text-xs', DASH.cellMuted)}>{sub}</span>
     </span>
   );
 }

@@ -152,6 +152,13 @@ describe('ApplicantContactDialog (โฉม iRecruit)', () => {
     expect(within(step).getByRole('button', { name: /นัดหมายใหม่/ })).toBeTruthy();
   });
 
+  it('🔴 ขั้นนัดหมายบอกผลที่บันทึกไว้: นัดไม่สำเร็จ + เหตุผล · ยังไม่ลงผลนัด (เจ้าของ 18 พ.ย. 2569 "ติดต่อสำเร็จ แต่นัดได้หรือไม่ได้อะ")', () => {
+    const { dialog } = renderDialog(app({ last_contact_ok: true, last_appointment_failed: true, last_contact_reason: 'ไม่สนใจงาน' }));
+    expect(within(dialog).getByTestId('saved-appointment-result').textContent).toBe('นัดหมายไม่สำเร็จ · ไม่สนใจงาน');
+    cleanup();
+    const again = renderDialog(app({ last_contact_ok: true }));
+    expect(within(again.dialog).getByTestId('saved-appointment-result').textContent).toBe('ยังไม่ได้ลงผลนัด');
+  });
   it('นัดหมายโดยไม่ใส่วัน ⇒ บอกให้ใส่วันนัด ไม่ยิงอะไร · สถานที่เป็นรายการแบบ iRecruit', async () => {
     const { dialog } = renderDialog(app());
     fireEvent.click(within(dialog).getByRole('button', { name: /ติดต่อสำเร็จ/ }));

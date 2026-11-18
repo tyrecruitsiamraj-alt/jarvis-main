@@ -50,6 +50,8 @@ export type PublicApplication = {
   last_contact_at?: string | null;
   /** ผลติดต่อล่าสุด = ติดต่อสำเร็จ แต่นัดหมายไม่สำเร็จ (มีเหตุผล · ไม่มีวันนัด) */
   last_appointment_failed?: boolean;
+  /** เหตุผลของผลติดต่อล่าสุด (ติดต่อไม่สำเร็จ / นัดหมายไม่สำเร็จ) — คอลัมน์สถานะโชว์ใต้ชิป */
+  last_contact_reason?: string | null;
   /**
    * เวลาที่ **เจ้าหน้าที่กดโทร** (095) — คนละอันกับ `last_call_at` ข้างบน
    * (อันนั้นคือเวลาที่ได้ **ผล** โทร จากคิว AI หรือถังคนโทร)
@@ -70,6 +72,8 @@ export type PublicApplication = {
   appointment_by?: string | null;
   /** ผลติดตามนัดล่าสุด (migration 089) — 'showed' | 'no_show' | 'rescheduled' */
   attendance_result?: string | null;
+  /** นัดรอบก่อนที่ถูกเลื่อนมาเป็นนัดปัจจุบัน (ISO) — มี = สถานะ "เลื่อนนัด" · ผลของนัดเก่าไม่แนบใน attendance_result */
+  rescheduled_from?: string | null;
   /** ผ่าน/ไม่ผ่าน หลังมาตามนัด (151 · 18 ต.ค. 2569) */
   screening_result?: 'passed' | 'not_passed' | null;
   attendance_at?: string | null;

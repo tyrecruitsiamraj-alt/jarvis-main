@@ -70,6 +70,7 @@ import {
 } from '../_lib/applicantCallOutcomes.js';
 import { loadContactAppointments, loadLatestContactResults } from '../_lib/applicationContacts.js';
 import { loadLatestAttendanceByApplication } from '../_lib/applicationAttendance.js';
+import { isEarlierAppointment } from '../../src/lib/appointmentAttendance.js';
 import { loadLatestScreeningByApplication } from '../_lib/applicationScreening.js';
 import { loadBoardPhoneSet } from '../_lib/applicationBoardLink.js';
 import { toE164Thai } from '../_lib/thaiPhone.js';
@@ -1912,6 +1913,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
           (item as Record<string, unknown>).last_contact_ok = hit.ok;
           (item as Record<string, unknown>).last_contact_at = hit.at;
           if (hit.appointmentFailed) (item as Record<string, unknown>).last_appointment_failed = true;
+          if (hit.reason) (item as Record<string, unknown>).last_contact_reason = hit.reason;
         }
       }
       // เหตุที่ตัวส่งอัตโนมัติยังไม่ส่ง AI (169 · 28 ต.ค. 2569 "ทำไมไม่โทร") — อ่านไม่ได้ = ไม่มีเหตุ (จอใช้คำเดิม)
@@ -1932,10 +1934,16 @@ async function handler(req: AuthedReq, res: ApiRes) {
       const attendance = await loadLatestAttendanceByApplication(items.map((i) => i.id));
       for (const item of items) {
         const hit = attendance.get(item.id);
-        if (hit) {
-          (item as Record<string, unknown>).attendance_result = hit.result;
-          (item as Record<string, unknown>).attendance_at = hit.createdAt;
+        if (!hit) continue;
+        // ผลของนัดรอบก่อน (เลื่อนนัด/ไม่มาแล้วนัดใหม่) ไม่ใช่ผลของนัดปัจจุบัน — เจ้าของ 18 พ.ย. 2569
+        // "ถ้าเลื่อนนัดแล้วมีวันที่ถัดไปก็เป็นเลื่อน" ⇒ นัดใหม่ยังรอลง มา/ไม่มา
+        const current = (item as Record<string, unknown>).appointment_at;
+        if (isEarlierAppointment(hit.appointmentAt, typeof current === 'string' ? current : null)) {
+          if (hit.result === 'rescheduled') (item as Record<string, unknown>).rescheduled_from = hit.appointmentAt;
+          continue;
         }
+        (item as Record<string, unknown>).attendance_result = hit.result;
+        (item as Record<string, unknown>).attendance_at = hit.createdAt;
       }
       // ผู้สรรหาของผู้สมัครรายคน (154 · 19 ต.ค. 2569 "ข้อมูลผู้สรรหา ทำให้แก้ไขได้") — ว่าง = ใช้ของใบขอ
       // แนบแยกจากชุดคอลัมน์หลัก (มีชั้นสำรองหลายรุ่นฐาน) · ยังไม่รัน 154 = ไม่แนบ ไม่ล้ม

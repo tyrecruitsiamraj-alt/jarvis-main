@@ -163,8 +163,8 @@ export async function listContactLogs(applicationId: string): Promise<ContactLog
  */
 export async function loadLatestContactResults(
   applicationIds: string[],
-): Promise<Map<string, { ok: boolean; at: string; appointmentFailed: boolean }>> {
-  const out = new Map<string, { ok: boolean; at: string; appointmentFailed: boolean }>();
+): Promise<Map<string, { ok: boolean; at: string; appointmentFailed: boolean; reason: string | null }>> {
+  const out = new Map<string, { ok: boolean; at: string; appointmentFailed: boolean; reason: string | null }>();
   if (applicationIds.length === 0) return out;
   try {
     const { rows } = await dbQuery<{
@@ -185,6 +185,7 @@ export async function loadLatestContactResults(
         ok: r.ok,
         at: r.created_at,
         appointmentFailed: isAppointmentFailedLog({ ok: r.ok, reasonLabel: r.reason_label, appointmentAt: r.appointment_at }),
+        reason: r.reason_label?.trim() || null,
       });
     }
     return out;

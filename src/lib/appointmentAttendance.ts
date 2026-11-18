@@ -44,3 +44,13 @@ export function canRecordAttendance(appointmentAtIso: string | null | undefined,
   if (Number.isNaN(appt.getTime())) return false;
   return bangkokYmd.format(appt) <= bangkokYmd.format(now);
 }
+
+/**
+ * ผลติดตามนัดนี้เป็นของนัดรอบก่อนไหม (เลื่อนนัด / ไม่มาแล้วนัดใหม่ — เจ้าของ 18 พ.ย. 2569)
+ * true = วันนัดของผลเก่ากว่านัดปัจจุบันเกิน 1 นาที ⇒ นัดปัจจุบันยังไม่มีผล มา/ไม่มา
+ */
+export function isEarlierAppointment(resultAppointmentAt: string | null | undefined, currentAppointmentAt: string | null | undefined): boolean {
+  const a = resultAppointmentAt ? Date.parse(resultAppointmentAt) : NaN;
+  const b = currentAppointmentAt ? Date.parse(currentAppointmentAt) : NaN;
+  return Number.isFinite(a) && Number.isFinite(b) && b - a > 60_000;
+}

@@ -369,6 +369,8 @@ export default function ApplicantContactDialog({
   );
   // ปุ่มขั้น 2 ขึ้นเมื่อติดต่อสำเร็จ (กดตอนนี้ หรือผลล่าสุดสำเร็จอยู่แล้ว) — ตาม Journey ข้อ 4
   const apptUnlocked = contactShown === 'ok';
+  /** นัดไม่สำเร็จที่บันทึกไว้แล้ว (ผลติดต่อล่าสุด) */
+  const apptSavedFail = !a.appointment_at && a.last_contact_ok === true && a.last_appointment_failed === true;
   const profile = editing && draft ? profilePatchFromDraft(baseDraft, draft) : { patch: {}, error: null };
   const profileDirty = Object.keys(profile.patch).length > 0 || Boolean(profile.error);
   const dirty = profileDirty || contactPicked !== null || apptPick !== null || followPicked !== null || screenPicked !== null;
@@ -562,7 +564,7 @@ export default function ApplicantContactDialog({
         {/* 🔴 ขั้น 2 โผล่หลังกด "ติดต่อสำเร็จ" เท่านั้น (เจ้าของสั่ง 4 ต.ค. 2569) · ฟอร์มนัดโผล่หลังเลือก "นัดหมาย" */}
         {apptUnlocked ? (
         <div className="overflow-hidden rounded-xl border border-border/70" data-testid="step-appointment">
-          <StepHead index={1} done={Boolean(a.appointment_at)}>
+          <StepHead index={1} done={Boolean(a.appointment_at) || apptSavedFail}>
             {apptUnlocked ? (
               <>
                 <Button
@@ -614,6 +616,16 @@ export default function ApplicantContactDialog({
                 <p className="text-xs text-muted-foreground">ลงหน่วยงาน</p>
                 <p className="text-sm text-foreground">{a.appointment_job || 'หาล่วงหน้า'}</p>
               </div>
+            </div>
+          ) : null}
+          {/* ผลนัดที่บันทึกไว้แล้ว — นัดไม่ได้บอกเหตุผล · ยังไม่ลงผลนัดบอกตรง ๆ (เจ้าของ 18 พ.ย. 2569 "ติดต่อสำเร็จ แต่นัดได้หรือไม่ได้อะ") */}
+          {!a.appointment_at && apptPick === null ? (
+            <div className="border-t border-border/70 bg-muted/30 p-3 text-sm" data-testid="saved-appointment-result">
+              {apptSavedFail ? (
+                <span className={TONE.danger.value}>นัดหมายไม่สำเร็จ{a.last_contact_reason ? ` · ${a.last_contact_reason}` : ''}</span>
+              ) : (
+                <span className={TONE.warn.value}>ยังไม่ได้ลงผลนัด</span>
+              )}
             </div>
           ) : null}
           {apptPick === 'ok' ? apptFields('new-appointment') : null}
