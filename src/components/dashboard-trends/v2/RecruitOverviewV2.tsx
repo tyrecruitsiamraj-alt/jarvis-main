@@ -41,6 +41,10 @@ import { ActivityFeed, DailyCharts, OutreachTiles, TODO_ICONS, TodoList, dailyPu
 import { fetchStaffActivity, fetchStaffActivityFeed } from '@/lib/staffActivityApi';
 import type { StaffActivityFeedItem, StaffActivityKind, StaffActivityRow } from '@/lib/staffActivity';
 import { MonthCompareBars } from './MonthCompareBars';
+import WorkStatusBoard from './WorkStatusBoard';
+import IntakeFlowPanel from './IntakeFlowPanel';
+import { useUnitRequestsFeed } from '@/hooks/useUnitRequestsFeed';
+import { filterUnitRequestsByDepartment } from '@/lib/siamrajUnitFilters';
 import { V2_METRICS, V2_METRIC_LABEL, buildV2Model, type V2Metric } from './v2Model';
 
 const ALL_BUS = ['LBD', 'LBA', 'LM', 'DS', 'SN'];
@@ -117,6 +121,14 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
     return (f: { jobId?: string | null }) => ok(f.jobId ?? null);
   }, [filterOn, reqFilter, reqRows, data.appJobs]);
   const model = React.useMemo(() => buildV2Model(data, keep), [data, keep]);
+  /** ใบขอเส้นเดียวกับ Dashboard (กล่องสถานะทำงาน · 18 พ.ย. 2569) — BU + ตัวกรองบนสุดชุดเดียวกับส่วนอื่น */
+  const reqFeed = useUnitRequestsFeed();
+  const statusJobs = React.useMemo(() => {
+    if (reqFeed.feedState !== 'ready') return null;
+    const byBu = data.bu ? filterUnitRequestsByDepartment(reqFeed.jobs, data.bu) : reqFeed.jobs;
+    return keep ? byBu.filter((j) => keep({ jobId: j.id })) : byBu;
+  }, [reqFeed.feedState, reqFeed.jobs, data.bu, keep]);
+  const statusRange = React.useMemo(() => (win.all ? null : { from: win.from, to: win.to }), [win.all, win.from, win.to]);
   /** ช่วงก่อน (ช่วงวันเท่ากัน · ตัวกรองชุดเดียวกัน) — เทียบไม่ได้ = null */
   const prevModel = React.useMemo(() => {
     const prev = prevCohortOf(data.apps ?? [], win, data.firstDay, data.generatedAt);
@@ -342,6 +354,16 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
           <Kpi label={`− ยกเลิกใบขอ · ${rangeShort}`} emphasis value={loadingReq ? undefined : eq ? eq.cancelled.length : null} sub={reqRows ? `ยกเลิก ${fmt(sumOf(reqRows, 'cancelled'))} อัตรา` : undefined} onClick={eq ? () => openRequests('ยกเลิกใบขอ', eq.cancelled) : undefined} tone="danger" testId="v2-req-cancelled" />
           <Kpi label={`= เหลือหา · ยังเปิดอยู่ ณ ${shortDay(win.to)}`} emphasis value={loadingReq ? undefined : eq ? eq.remaining.length : null} sub={rateText(eq?.remaining, 'เหลือหา', 'remaining')} onClick={eq ? () => openRequests('เหลือหา', eq.remaining) : undefined} testId="v2-req-open" />
         </div>
+        {/* สถานะทำงานแบบ Dashboard — ช่วง = วันที่ต้องการคน ตามวันที่ที่เลือก (เจ้าของ 18 พ.ย. 2569 Choice) */}
+        <div className="border-t pt-4">
+          <WorkStatusBoard
+            jobs={statusJobs}
+            range={statusRange}
+            error={reqFeed.feedState === 'failed' || reqFeed.feedState === 'forbidden' ? 'โหลดใบขอไม่ได้' : null}
+            onOpenRequest={(jobId) => navigate(requestPathOfJobId(jobId))}
+            resetKey={viewKey}
+          />
+        </div>
       </Card>
 
       {/* ── การออกหาคน: Autopost / โพสต์เอง / Scrap (เจ้าของ 18 พ.ย. 2569 "ยังต้องบอกเรื่อง Autopost โพสต์เอง Scrap ด้วย") ── */}
@@ -366,6 +388,12 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
             { key: 'scrap', n: staffSum('scrap'), unit: 'ใบ', sub: 'ใบขอที่สั่ง Scrap · ดูรายคนที่งานรายคน' },
           ]}
         />
+      </Card>
+
+      {/* ── รายชื่อเข้ามาไปถึงไหน (เจ้าของ 18 พ.ย. 2569 จากการ์ด Milo "รายชื่อเข้ามาหายไปไหน") — ทุกกล่องบอกขั้นที่หลุด · แยกช่องทางกดไล่ลงถึงคนหามา ── */}
+      <Card className="min-w-0 space-y-3 rounded-2xl p-5" data-testid="v2-intake-card">
+        <SectionTitle title="รายชื่อเข้ามาไปถึงไหน" right={`${buText} · คนที่สมัคร ${periodText}`} />
+        <IntakeFlowPanel cohort={model.cohort} onNames={openNames} resetKey={viewKey} />
       </Card>
 
       {/* ── การประกาศรับสมัคร ── */}
