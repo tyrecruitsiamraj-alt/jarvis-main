@@ -366,21 +366,6 @@ const DashboardShell: React.FC<Props> = ({
                       ));
                     })()}
                   </div>
-                  {/* ใบขอชั่วคราวแยกจากกล่องสถานะ — "ทั้งหมด" ข้างบน = ผลรวมสถานะของใบจริงพอดี (29 ต.ค. 2569) */}
-                  {(() => {
-                    const pre = data.prequestKpi;
-                    if (!pre) return null;
-                    return (
-                      <div className="mt-3 grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
-                        <DashboardKpiCard
-                          surface="tile"
-                          kpi={pre}
-                          selected={statusPick?.kpiId === pre.id}
-                          onClick={onKpiClick ? () => onKpiClick(pre.id, pre.label, pre.secondaryCount ?? null) : undefined}
-                        />
-                      </div>
-                    );
-                  })()}
                 </div>
               </div>
 

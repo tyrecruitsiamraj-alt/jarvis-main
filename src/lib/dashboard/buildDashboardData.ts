@@ -24,7 +24,6 @@ import { buildPriorityWorkQueue } from '@/lib/dashboard/priorityWorkQueue';
 import { jobRequestDateYmd } from '@/components/shared/DateRangeCalendarPicker';
 import { toYmdLocal } from '@/lib/dateTh';
 import { dashboardCohortYmd } from '@/lib/jobUrgency';
-import { PREQUEST_LABEL, isPrequestJob } from '@/lib/publicJobVisibility';
 import { buildRemainingBridge } from '@/lib/dashboard/remainingBridge';
 import { kpiTrendWindow, withKpiTrend } from '@/lib/dashboard/kpiTrend';
 import type {
@@ -561,7 +560,8 @@ function resolveOpenJobsForStockKpi(
 /** KPI สถานะทำงาน (นับอัตรา/ตำแหน่ง): ทั้งหมด = ผลรวมสถานะ · คงเหลือตำแหน่งอยู่แถว stock แยก
  *  totalOverride: โหมดมีงวดส่งยอด cohort มาให้ "ทั้งหมด" เท่าการ์ดคงเหลือ (ใบนอก feed ไม่มี work_status ให้แจก leaf)
  *  🔴 29 ต.ค. 2569 (เจ้าของ "การนับคงเดิมไว้ก่อน" · ร่าง 2): ใบขอชั่วคราว (`siamraj-pre:`) ไม่อยู่ในกล่องสถานะ —
- *  แยกกล่องของมันเอง (`buildPrequestKpi`) · เดิม "ทั้งหมด" 326 แต่กล่องย่อยรวมใบชั่วคราวเป็น 370 → กดแล้วเลขไม่ตรงกล่อง
+ *  แยกกล่องของมันเอง · เดิม "ทั้งหมด" 326 แต่กล่องย่อยรวมใบชั่วคราวเป็น 370 → กดแล้วเลขไม่ตรงกล่อง
+ *  🔴 18 พ.ย. 2569 ถอดกล่องแยกแล้ว — ใบชั่วคราวนับเข้ากล่องตามสถานะ (เจ้าของ "แยกออกมาทำไม ฉันสั่งไว้หรอ")
  *  ยอด cohort ที่เกินผลรวมสถานะ (ใบ ERP ที่ไม่อยู่ใน feed) ขึ้นเป็นกล่อง "ไม่มีสถานะ" ให้บวกกันลงตัว
  *  🔴 2 พ.ย. 2569 (เจ้าของ "เอา ใบขอชั่วคราวด้วย" หลังถามว่าทำไม เหลือหา 410 ≠ ทั้งหมด 374): โหมดทั้งหมด "ทั้งหมด" = ผลรวมสถานะ + ใบขอชั่วคราว
  *  = เท่าการ์ดเหลือหา · กล่องย่อยยังเป็นใบจริง บวกกล่องใบขอชั่วคราวข้างล่างแล้วลงตัว · โหมดมีงวดคงเดิม (เหลือหาเป็น cohort ERP ไม่มีใบชั่วคราวอยู่แล้ว) */
@@ -569,7 +569,6 @@ function buildWorkStatusKpis(
   jobs: JobRequest[],
   periodLabel?: string | null,
   totalOverride?: { positions: number; requests: number },
-  withPrequest = false,
 ): DashboardKpi[] {
   const counts: Record<UnitRequestWorkStatus, number> = {
     in_progress: 0,
@@ -596,8 +595,9 @@ function buildWorkStatusKpis(
   // กำลังดำเนินการสรรหา แยกตามช่อง "ส่งคนแทน" ในหน้าใบขอ (เจ้าของ 18 พ.ย. 2569 "ย่อยให้หน่อยว่า ส่งคนแทน ไม่ส่งคนแทนอย่างละเท่าไหร่")
   // สามค่าเหมือนหน้าใบขอ — ยังไม่ระบุ ห้ามยุบเข้าไม่ส่ง · สามกองรวมกัน = เลขบนการ์ด
   const replacement = { yes: 0, no: 0, unset: 0 };
+  // 🔴 18 พ.ย. 2569 เจ้าของ "แยกใบขอชั่วคราวออกมาทำไม ฉันสั่งไว้หรอ" — ใบขอชั่วคราวนับเข้ากล่องตามสถานะของมันเหมือนใบจริง
+  //    (ถอดกล่องใบขอชั่วคราวแยกแล้ว · ตามข้อเคาะ 11 พ.ย. "นับรวมเหมือนหน้าหลัก")
   for (const j of jobs) {
-    if (isPrequestJob(j)) continue;
     const status = resolveUnitRequestWorkStatus(j.work_status);
     const units = positionBreakdownFromJob(j).remainingPositions;
     if (units <= 0) continue;
@@ -609,13 +609,10 @@ function buildWorkStatusKpis(
   const leafRequests = Object.values(requestCounts).reduce((s, n) => s + n, 0);
   // 🔴 QA 15 พ.ย. 2569: โหมดมีงวดยอด cohort รวมใบขอชั่วคราวแล้ว (11 พ.ย. "นับรวมเหมือนหน้าหลัก") แต่เดิมไม่หักกล่องใบขอชั่วคราว
   // ⇒ ใบชั่วคราว 11 ไปโผล่ซ้ำเป็น "ไม่มีสถานะ 11" · กล่องย่อยรวม 122 แต่ทั้งหมด 111 ⇒ หักทุกโหมด
-  const pre = withPrequest || totalOverride ? buildPrequestKpi(jobs) : null;
-  const preTotal = pre && pre.value > 0 ? pre.value : 0;
-  const total = totalOverride?.positions ?? leafTotal + preTotal;
-  const totalRequests = totalOverride?.requests ?? leafRequests + (preTotal ? (pre?.secondaryCount ?? 0) : 0);
-  // ส่วนที่เป็นใบขอชั่วคราวมีกล่องของมันเอง ไม่ใช่ "ไม่มีสถานะ"
-  const nonePositions = Math.max(total - leafTotal - preTotal, 0);
-  const noneRequests = Math.max(totalRequests - leafRequests - (preTotal ? (pre?.secondaryCount ?? 0) : 0), 0);
+  const total = totalOverride?.positions ?? leafTotal;
+  const totalRequests = totalOverride?.requests ?? leafRequests;
+  const nonePositions = Math.max(total - leafTotal, 0);
+  const noneRequests = Math.max(totalRequests - leafRequests, 0);
   const scopeHint = periodLabel
     ? `ใบเปิดในช่วงที่เลือก`
     : `ใบเปิดทั้งหมด`;
@@ -636,9 +633,10 @@ function buildWorkStatusKpis(
       value: total,
       secondaryCount: totalRequests,
       secondaryLabel: 'ใบขอ',
-      description: preTotal
-        ? `${scopeHint} · สถานะ ${leafTotal.toLocaleString('th-TH')}${nonePositions > 0 ? ` + ไม่มีสถานะ ${nonePositions.toLocaleString('th-TH')}` : ''} + ${PREQUEST_LABEL} ${preTotal.toLocaleString('th-TH')} = ${total.toLocaleString('th-TH')} อัตรา · ${totalRequests.toLocaleString('th-TH')} ใบ`
-        : `${scopeHint} · ผลรวมสถานะ = ${total.toLocaleString('th-TH')} อัตรา · ${totalRequests.toLocaleString('th-TH')} ใบ`,
+      description:
+        nonePositions > 0
+          ? `${scopeHint} · สถานะ ${leafTotal.toLocaleString('th-TH')} + ไม่มีสถานะ ${nonePositions.toLocaleString('th-TH')} = ${total.toLocaleString('th-TH')} อัตรา · ${totalRequests.toLocaleString('th-TH')} ใบ`
+          : `${scopeHint} · ผลรวมสถานะ = ${total.toLocaleString('th-TH')} อัตรา · ${totalRequests.toLocaleString('th-TH')} ใบ`,
       trendPercent: null,
     },
     {
@@ -667,28 +665,6 @@ function buildWorkStatusKpis(
         ]
       : []),
   ];
-}
-
-/** กล่องใบขอชั่วคราวที่ยังต้องหา — ชุดใบเดียวกับกล่องสถานะ (ส่วนที่ถูกแยกออกมา) */
-function buildPrequestKpi(jobs: JobRequest[]): DashboardKpi {
-  let positions = 0;
-  let requests = 0;
-  for (const j of jobs) {
-    if (!isPrequestJob(j)) continue;
-    const units = positionBreakdownFromJob(j).remainingPositions;
-    if (units <= 0) continue;
-    positions += units;
-    requests += 1;
-  }
-  return {
-    id: 'work_status_prequest',
-    label: PREQUEST_LABEL,
-    value: positions,
-    secondaryCount: requests,
-    secondaryLabel: 'ใบขอ',
-    description: `${positions.toLocaleString('th-TH')} อัตรา · ${requests.toLocaleString('th-TH')} ใบ`,
-    trendPercent: null,
-  };
 }
 
 /** KPI ชุดสั้น: เข้ามา / ปิดแล้ว / ยกเลิก / คงเหลือ (ตำแหน่ง) */
@@ -1273,9 +1249,7 @@ export function buildDashboardData(
     period && cohortStock
       ? { positions: cohortStock.remainingPositions, requests: cohortStock.remainingRequestCount }
       : undefined,
-    !period,
   );
-  const prequestKpi = buildPrequestKpi(openRemainingJobs);
   const remainingBridge =
     !period && cohortStock
       ? buildRemainingBridge(
@@ -1297,10 +1271,8 @@ export function buildDashboardData(
   return {
     kpis,
     workStatusKpis,
-    prequestKpi,
     remainingBridge,
     activityTrend,
-    // 9 พ.ย. 2569 เจ้าของ "ตามร่างทั้งหมด": นับใบขอชั่วคราวด้วย (ใบชั่วคราวที่ต้องการคนในช่วง) — ชิปเหลือหาบวก `prequestKpi` ให้ชุดเดียวกัน
     unitOverview: buildUnitOverview(openRemainingJobs, today),
     ageDaysBreakdown: buildAgeDaysBreakdown(period ? stockJobs : openRemainingJobs, today),
     ageDaysRequestTotal: (period ? stockJobs : openRemainingJobs).length,

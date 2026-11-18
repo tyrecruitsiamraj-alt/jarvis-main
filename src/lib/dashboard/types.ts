@@ -313,8 +313,6 @@ export type DashboardData = {
   kpis: DashboardKpi[];
   /** นับใบตามสถานะทำงาน (คู่กับ KPI ตำแหน่ง — คงเหลือแยกต่างหาก) */
   workStatusKpis: DashboardKpi[];
-  /** ใบขอชั่วคราวที่ยังต้องหา (ทีมคีย์เอง ยังไม่เข้า ERP) — กล่องแยกจากสถานะทำงาน (29 ต.ค. 2569) */
-  prequestKpi?: DashboardKpi;
   /** โหมดทั้งหมด: ยังเปิดในช่วง → เหลือหา แตกส่วนต่างให้เห็น (31 ต.ค. 2569 · `remainingBridge.ts`) */
   remainingBridge?: RemainingBridge;
   activityTrend: DashboardActivityTrendPoint[];

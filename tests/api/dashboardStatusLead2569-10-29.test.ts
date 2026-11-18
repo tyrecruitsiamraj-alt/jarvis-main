@@ -139,30 +139,29 @@ describe('กล่อง เข้ามา/หาได้แล้ว/ยก�
     expect(page).toContain('buildCohortLeadPanel(drill.rows');
     const shell = readFileSync('src/components/dashboard/analytics/DashboardShell.tsx', 'utf8');
     expect(shell).toContain('selected={statusPick?.kpiId === kpi.id}');
-    expect(shell).toContain('data.prequestKpi');
+    expect(shell).not.toContain('data.prequestKpi'); // 18 พ.ย. 2569 ถอดกล่องใบขอชั่วคราวแยก
     const panel = readFileSync('src/components/dashboard/analytics/DashboardStatusLeadPanel.tsx', 'utf8');
     expect(panel).toContain('ใครคีย์ใบขอพวกนี้');
   });
 });
 
-describe('ใบขอชั่วคราวแยกกล่อง · "ทั้งหมด" = ผลรวมสถานะ + ใบขอชั่วคราว (2 พ.ย. 2569)', () => {
-  it('กล่องย่อยไม่นับใบชั่วคราว · "ทั้งหมด" โหมดทั้งหมดรวมใบชั่วคราว = เท่าเหลือหา · กล่องย่อย + กล่องใบขอชั่วคราว = ทั้งหมด', () => {
+describe('ใบขอชั่วคราวนับเข้ากล่องตามสถานะ (เจ้าของ 18 พ.ย. 2569 "แยกใบขอชั่วคราวออกมาทำไม ฉันสั่งไว้หรอ")', () => {
+  it('ไม่มีกล่องใบขอชั่วคราวแยก · ใบชั่วคราวอยู่กล่องสถานะของมัน · กล่องย่อยรวม = ทั้งหมด = เหลือหา', () => {
     const open = [
       job({ id: 'siamraj-sql:OPL6910101', work_status: 'in_progress', request_positions: 2 }),
       job({ id: 'siamraj-pre:OPL6910101', request_no: 'OPL6910101', work_status: 'in_progress', request_positions: 3, is_prequest: true }),
     ];
     const data = buildDashboardData(open, [], null, DEFAULT_DASHBOARD_FILTERS, new Date('2026-10-29T03:00:00Z'));
     const total = data.workStatusKpis.find((k) => k.id === 'work_status_total');
+    const inProgress = data.workStatusKpis.find((k) => k.id === 'work_status_in_progress');
     const leaves = data.workStatusKpis.filter((k) => k.id !== 'work_status_total').reduce((n, k) => n + k.value, 0);
-    // เจ้าของ "เอา ใบขอชั่วคราวด้วย" (เดิม 2 · 1 ใบ ไม่เท่าเหลือหา 5 · 2 ใบ)
-    expect([total?.value, total?.secondaryCount, leaves]).toEqual([5, 2, 2]);
-    expect(data.prequestKpi).toMatchObject({ id: 'work_status_prequest', label: 'ใบขอชั่วคราว', value: 3, secondaryCount: 1 });
-    expect(leaves + (data.prequestKpi?.value ?? 0)).toBe(total?.value);
+    expect([total?.value, total?.secondaryCount, leaves]).toEqual([5, 2, 5]);
+    expect([inProgress?.value, inProgress?.secondaryCount]).toEqual([5, 2]);
+    expect('prequestKpi' in data).toBe(false);
     const remaining = data.kpis.find((k) => k.id === 'remaining');
     expect([remaining?.value, remaining?.secondaryCount]).toEqual([total?.value, total?.secondaryCount]);
-    expect(total?.description).toBe('ใบเปิดทั้งหมด · สถานะ 2 + ใบขอชั่วคราว 3 = 5 อัตรา · 2 ใบ');
-    // กดกล่อง "ทั้งหมด" โหมดทั้งหมด = รายการรวมใบชั่วคราว
-    expect(readFileSync('src/pages/dashboard/SupervisorDashboard.tsx', 'utf8')).toContain("if (kpiId === 'work_status_total' && !period) return stock;");
+    expect(total?.description).toBe('ใบเปิดทั้งหมด · ผลรวมสถานะ = 5 อัตรา · 2 ใบ');
+    expect(readFileSync('src/pages/dashboard/SupervisorDashboard.tsx', 'utf8')).not.toContain('PREQUEST_KPI_ID');
   });
 });
 

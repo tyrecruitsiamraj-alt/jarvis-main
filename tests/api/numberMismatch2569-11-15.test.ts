@@ -94,10 +94,10 @@ describe('สนใจแล้วติดต่อได้ ≠ ติดต�
 });
 
 describe('Dashboard ศูนย์ควบคุมใบขอ: ใบขอชั่วคราวไม่นับซ้ำเป็น "ไม่มีสถานะ" (เจ้าของ Choice "แก้บนโค้ดล่าสุดได้เลย")', () => {
-  it('โหมดมีงวดก็หักกล่องใบขอชั่วคราว · กล่องย่อยรวมกัน = ทั้งหมด', () => {
+  it('ใบขอชั่วคราวอยู่ในกล่องสถานะแล้ว (18 พ.ย. 2569) · ไม่มีสถานะ = ส่วนเกินจากผลรวมกล่องเท่านั้น', () => {
     const src = read('src/lib/dashboard/buildDashboardData.ts');
-    expect(src).toContain('const pre = withPrequest || totalOverride ? buildPrequestKpi(jobs) : null;');
-    expect(src).toContain('const nonePositions = Math.max(total - leafTotal - preTotal, 0);');
+    expect(src).not.toContain('buildPrequestKpi');
+    expect(src).toContain('const nonePositions = Math.max(total - leafTotal, 0);');
   });
 });
 

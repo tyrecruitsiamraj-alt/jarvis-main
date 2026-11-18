@@ -89,8 +89,6 @@ import type { JobRequest } from '@/types';
 
 /** กล่องที่กดแล้วการ์ดเร่งด่วนเป็นใบจาก cohort (ชุดเดียวกับเลขบนการ์ด) */
 const COHORT_KPI_IDS: readonly CohortDrillKpi[] = ['total_requests', 'closed', 'cancelled', 'remaining'];
-/** กล่องใบขอชั่วคราว (`buildPrequestKpi`) */
-const PREQUEST_KPI_ID = 'work_status_prequest';
 
 /** กล่องสถานะทำงาน → สถานะ (null = ทุกสถานะ) — 29 ต.ค. 2569 ใช้กับการ์ดเร่งด่วนตอนกดกล่อง */
 const WORK_STATUS_OF_KPI: Record<string, string | null> = {
@@ -837,7 +835,7 @@ const SupervisorDashboard: React.FC = () => {
   const pickId = searchParams.get('pick');
   const statusPick = useMemo(() => {
     if (!pickId) return null;
-    const all = [...data.kpis, ...(data.workStatusKpis ?? []), ...(data.prequestKpi ? [data.prequestKpi] : [])];
+    const all = [...data.kpis, ...(data.workStatusKpis ?? [])];
     const kpi = all.find((k) => k.id === pickId);
     return kpi ? { kpiId: pickId, label: kpi.label } : null;
   }, [pickId, data]);
@@ -891,15 +889,11 @@ const SupervisorDashboard: React.FC = () => {
     const jobs =
       kpiId === 'remaining'
         ? stock
-        : kpiId === PREQUEST_KPI_ID
-          ? stock.filter(isPrequestJob)
-          : (() => {
-              const target = WORK_STATUS_OF_KPI[kpiId];
-              // "ทั้งหมด" โหมดทั้งหมดรวมใบขอชั่วคราว (2 พ.ย. 2569) — รายการต้องชุดเดียวกับเลขบนการ์ด
-              if (kpiId === 'work_status_total' && !period) return stock;
-              const real = stock.filter((j) => !isPrequestJob(j));
-              return target == null ? real : real.filter((j) => resolveUnitRequestWorkStatus(j.work_status) === target);
-            })();
+        : (() => {
+            // ใบขอชั่วคราวอยู่ในกล่องตามสถานะของมัน (18 พ.ย. 2569 ถอดกล่องแยก) — รายการชุดเดียวกับเลขบนการ์ด
+            const target = WORK_STATUS_OF_KPI[kpiId];
+            return target == null ? stock : stock.filter((j) => resolveUnitRequestWorkStatus(j.work_status) === target);
+          })();
     return { kpiId, label: kpiId in WORK_STATUS_OF_KPI ? `สถานะ ${label}` : label, panel: buildStatusLeadPanel(jobs), amountLabel: LEAD_AMOUNT_LABEL.remaining, note: null };
   }, [statusPick, period, dateRange, jobsWithoutAgeFilter, cohortScope, jobById]);
 
@@ -957,7 +951,7 @@ const SupervisorDashboard: React.FC = () => {
 
       if (kpiId.startsWith('work_status_')) {
         // 29 ต.ค. 2569 เจ้าของ (แบบร่างที่เคาะ "ทำเลย"): ไม่เด้งป๊อปแล้ว — การ์ดเร่งด่วนเปลี่ยนเป็นใบของสถานะนี้ (`DashboardStatusLeadPanel`)
-        if (kpiId in WORK_STATUS_OF_KPI || kpiId === PREQUEST_KPI_ID) {
+        if (kpiId in WORK_STATUS_OF_KPI) {
           togglePick();
           return;
         }
