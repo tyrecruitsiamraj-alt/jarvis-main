@@ -118,11 +118,7 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
   const postLanes: Array<{ key: keyof typeof RELEASE_LANE_TEXT; rows: StuckRequest[]; view: 'released' | 'unreleased' | null }> = [
     { key: 'all', rows: openRows, view: null },
     { key: 'released', rows: releasedRows, view: 'released' },
-    { key: 'applied', rows: releasedRows.filter((r) => (r.applications ?? 0) > 0), view: 'released' },
-    { key: 'silent', rows: releasedRows.filter((r) => !(r.applications ?? 0)), view: 'released' },
     { key: 'unreleased', rows: unreleasedRows, view: 'unreleased' },
-    { key: 'sourcing', rows: unreleasedRows.filter((r) => r.sourcing !== false), view: 'unreleased' },
-    { key: 'started', rows: unreleasedRows.filter((r) => r.sourcing === false), view: 'unreleased' },
   ];
 
   const push = (p: V2Pane) => setStack([p]);
@@ -281,23 +277,23 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
       {/* ── การประกาศรับสมัคร ── */}
       <Card className="min-w-0 space-y-4 rounded-2xl p-5" data-testid="v2-posting">
         <SectionTitle title="การประกาศรับสมัคร" />
-        {/* 7 ช่องเรียงและใช้คำเดียวกับหัวหน้าโพสต์ประกาศ (เจ้าของ 18 พ.ย. 2569 "ใช้คำให้ตรงกันดิ่") — ยอดชุดเดียวกัน */}
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-7" data-testid="v2-post-lanes">
+        {/* 3 ช่องก่อน (เจ้าของ 18 พ.ย. 2569 "ถ้าจากตรงนี้ฉันอ่านฉันคงเอา 165+150+15+157+68+89 แน่นอน โชว์ 3 อันก่อนก็พอ")
+            คำเดียวกับหัวหน้าโพสต์ประกาศ · กดประกาศแล้ว/ยังไม่ประกาศ = ก้อนย่อยขึ้นข้างล่าง (PostingProgress) */}
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3" data-testid="v2-post-lanes">
           {postLanes.map((c) => (
             <Kpi
               key={c.key}
               label={RELEASE_LANE_TEXT[c.key].label}
-              emphasis={c.key === 'all' || c.key === 'released' || c.key === 'unreleased'}
-              tone={c.key === 'silent' || c.key === 'sourcing' ? 'warn' : undefined}
-              active={c.view === postView && (c.key === 'released' || c.key === 'unreleased')}
+              emphasis
+              active={c.view === postView}
               value={loadingReq ? undefined : eq ? c.rows.length : null}
-              sub={c.key === 'applied' && eq ? `${fmt(c.rows.reduce((n, r) => n + (r.applications ?? 0), 0))} คน` : undefined}
+              sub={c.key === 'all' && eq ? `เหลือหา ${fmt(c.rows.reduce((n, r) => n + (r.remaining ?? 0), 0))} อัตรา` : undefined}
               onClick={
                 eq
                   ? () => {
-                      // ประกาศแล้ว/ยังไม่ประกาศ = เปิดไส้ในข้างล่าง · ช่องอื่น = รายการใบของช่องนั้น
+                      // ประกาศแล้ว/ยังไม่ประกาศ = ก้อนย่อยข้างล่าง · ใบขอทั้งหมด = กราฟ BU + รายการใบ
                       if (c.view) setPostView(c.view);
-                      if (c.key !== 'released' && c.key !== 'unreleased') openRequests(RELEASE_LANE_TEXT[c.key].label, c.rows);
+                      else openRequests(RELEASE_LANE_TEXT[c.key].label, c.rows);
                     }
                   : undefined
               }
