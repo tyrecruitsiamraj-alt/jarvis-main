@@ -78,8 +78,8 @@ const CallSuppressionTab: React.FC = () => {
       <div>
         <h2 className="text-sm font-medium text-foreground">บัญชีห้ามโทร</h2>
         <p className="mt-0.5 text-xs text-muted-foreground">
-          เบอร์ที่ AI จะ <b>ไม่โทรถึงชั่วคราว</b> — ระบบพักให้เองเมื่อผลโทรกลับมาว่า
-          &ldquo;เบอร์ผิด&rdquo; (7 วัน) หรือ &ldquo;ไม่หางานแล้ว&rdquo; (30 วัน) ·
+          เบอร์ที่ AI จะ <b>ไม่โทรถึง</b> — ระบบพักให้เองเมื่อเจ้าตัวบอก AI ว่า
+          &ldquo;ไม่สนใจ&rdquo; (จนกว่าจะปลด) หรือ &ldquo;ไม่หางานแล้ว&rdquo; (30 วัน) ·
           รายการที่พ้นกำหนดแล้วไม่ต้องปลด ระบบเลิกบล็อกเอง
         </p>
         <p className="mt-1 text-xs text-muted-foreground">
@@ -114,7 +114,7 @@ const CallSuppressionTab: React.FC = () => {
                 <b className="font-mono text-sm text-foreground">{it.phone}</b>
                 <span className={cn('block text-xs', DASH.muted)}>
                   {it.reason_label}
-                  {it.reason === 'pdpa' ? ' · ถาวร' : it.until ? ` · พักถึง ${formatDateTimeTh(it.until)}` : ''}
+                  {it.reason === 'pdpa' ? ' · ถาวร' : it.reason === 'declined' ? ' · จนกว่าจะปลด' : it.until ? ` · พักถึง ${formatDateTimeTh(it.until)}` : ''}
                 </span>
               </span>
               {/* เจ้าตัวขอให้หยุดติดต่อตาม PDPA (18 ต.ค. 2569) — ปลดไม่ได้ (เซิร์ฟเวอร์กันอีกชั้น) */}

@@ -380,3 +380,53 @@ describe('พักเบอร์', () => {
     await expect(listSuppressedPhones()).resolves.toEqual(new Set());
   });
 });
+
+/**
+ * เจ้าของ 18 พ.ย. 2569 "แต่เขาปฏิเสธแล้วหนิทำไมยังโทร" → Choice "ไม่โทรเลยถ้าเขาบอกไม่สนใจ"
+ * เคสจริง: บอก AI ว่าไม่สนใจ 3 พ.ย. (ไม่เอางานผ่านซับ) · 17 พ.ย. ถูกคีย์ใบงานอื่น AI โทรตีหนึ่งถึงแปดโมง
+ */
+describe('บอก AI ว่าไม่สนใจ = พักเบอร์จนกว่าคนปลด (สายเสนองานเท่านั้น)', () => {
+  beforeEach(() => vi.mocked(dbQuery).mockReset());
+  const queueRow = (channel: string, jobRef: string, personRef: string) => ({
+    id: 36353,
+    channel,
+    attempt_count: 1,
+    payload: { phone: '+66812345678' },
+    person_ref: personRef,
+    job_ref: jobRef,
+  });
+  const route = (row: ReturnType<typeof queueRow>) =>
+    vi.mocked(dbQuery).mockImplementation(async (sql: string) =>
+      /where id = \$1 limit 1/.test(String(sql)) ? ({ rows: [row] } as never) : ({ rows: [] } as never),
+    );
+
+  it('สายเสนองาน ไม่สนใจงานนี้ → ลงบัญชีห้ามโทร declined ถึง 2099 + ยกเลิกสายเสนองานอื่นของเบอร์นี้ที่ยังรอ', async () => {
+    route(queueRow('interview', 'siamraj-sql:OPL6910072', 'app-17d93ba4'));
+    await applyCallFollowupToQueueRow({ queueId: 36353, outcome: 'declined', declinedScope: 'job' });
+    const sqls = allSql();
+    const ins = vi.mocked(dbQuery).mock.calls.find((c) => /insert into candidate_call_suppression/.test(String(c[0])));
+    expect(ins?.[1]).toEqual(['+66812345678', '2099-12-31T00:00:00+07:00', 'declined', 'บอก AI ว่าไม่สนใจ', null]);
+    const cancel = vi.mocked(dbQuery).mock.calls.find((c) => /set status = 'cancelled'/.test(String(c[0])));
+    expect(String(cancel?.[0])).toContain("channel = 'interview' and result is null and status in ('pending', 'delivered')");
+    expect(cancel?.[1]).toEqual(['812345678']);
+    expect(sqls.indexOf(String(ins?.[0]))).toBeLessThan(sqls.indexOf(String(cancel?.[0])));
+  });
+
+  it('สายติดตามเริ่มงาน declined (= ไม่ไปวันนี้) → ไม่พักเบอร์', async () => {
+    route(queueRow('reminder', 'follow', 'follow-604d4bdc'));
+    await applyCallFollowupToQueueRow({ queueId: 36353, outcome: 'declined' });
+    expect(allSql().some((q) => /candidate_call_suppression/.test(q))).toBe(false);
+  });
+
+  it('ไม่รับสาย → ไม่พักเบอร์ (โทรซ้ำตามรอบเดิม)', async () => {
+    route(queueRow('interview', 'siamraj-sql:OPL6911004', 'app-c9803f61'));
+    await applyCallFollowupToQueueRow({ queueId: 36353, outcome: 'no_answer' });
+    expect(allSql().some((q) => /candidate_call_suppression/.test(q))).toBe(false);
+  });
+
+  it('เบอร์ที่ลง PDPA ไว้ ห้ามถูกเหตุผลอื่นทับจนปลดได้', async () => {
+    vi.mocked(dbQuery).mockResolvedValue({ rows: [] } as never);
+    await suppressPhone({ phone: '0812345678', until: '2099-12-31T00:00:00+07:00', reason: 'declined' });
+    expect(sqlOf(0)).toContain("reason = case when candidate_call_suppression.reason = 'pdpa' then candidate_call_suppression.reason else excluded.reason end");
+  });
+});

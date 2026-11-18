@@ -72,7 +72,9 @@ describe('เซิร์ฟเวอร์', () => {
   it('หยุดโทร = บัญชีห้ามโทรเหตุผล pdpa + ยกเลิกคิว AI + ยกเลิกสายติดตามผ่าน cancelFollowScope', () => {
     expect(lib).toContain("reason: 'pdpa'");
     expect(lib).toContain("cancelFollowScope(a.id, 'person'");
-    expect(lib).toContain('cancelPushedInterview(');
+    // ยกเลิกสายเสนองานที่ค้าง (ในฐาน + ที่ Lumos) ย้ายไปตัวกลางใช้ร่วมกับ "บอก AI ว่าไม่สนใจ" (18 พ.ย. 2569)
+    expect(lib).toContain("stopOpenInterviewCalls(e164, 'pdpa.stopCalls')");
+    expect(read('api/_lib/callFollowup.ts')).toContain('cancelPushedInterview(');
   });
   it('ไม่แตะคอลัมน์ที่ฐานคำนวณเอง (phone_e164 ของใบสมัคร)', () => {
     expect(lib).not.toMatch(/phone_e164 = null/);

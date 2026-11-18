@@ -26,6 +26,7 @@ const REASON_LABEL: Record<string, string> = {
   not_looking: 'เจ้าตัวบอกว่าไม่หางานแล้ว',
   manual: 'เจ้าหน้าที่สั่งพักเอง',
   pdpa: 'เจ้าตัวขอลบข้อมูล / ขอให้หยุดติดต่อ (PDPA)',
+  declined: 'เจ้าตัวบอก AI ว่าไม่สนใจ',
 };
 
 type Row = {
@@ -49,7 +50,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
            from ${tbl}
           where suppressed_until > now()
           order by suppressed_until desc
-          limit 500`,
+          limit 2000`,
       );
       return res.status(200).json({
         items: rows.map((r) => ({

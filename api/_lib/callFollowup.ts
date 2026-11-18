@@ -21,13 +21,16 @@ import {
   type CallOutcome,
 } from '../../src/lib/callFollowupPolicy.js';
 import { getCallFollowupPolicy } from './callFollowupPolicyStore.js';
-import { getLumosPushConfig } from './lumosPushClient.js';
+import { cancelPushedInterview, getLumosPushConfig } from './lumosPushClient.js';
 import { cancelFollowPlanAtLumos } from './followLumosCancel.js';
 import { followSameStopUnitSql } from './followDayScope.js';
 import { logError, logInfo } from './logger.js';
 
 const queueTable = tableInAppSchema('lumos_dispatch_queue');
 const suppressionTable = tableInAppSchema('candidate_call_suppression');
+
+/** บอก AI ว่าไม่สนใจ = พักเบอร์จนกว่าคนปลดที่ ตั้งค่า › บัญชีห้ามโทร (เจ้าของ 18 พ.ย. 2569 "ไม่โทรเลยถ้าเขาบอกไม่สนใจ") */
+export const DECLINED_SUPPRESS_UNTIL = '2099-12-31T00:00:00+07:00';
 
 /**
  * ดึงเวลาที่ผู้สมัครขอให้โทรกลับออกจากผลที่ Lumos ส่งมา
@@ -88,8 +91,8 @@ export async function listSuppressedPhones(): Promise<Set<string>> {
 export async function suppressPhone(input: {
   phone: string | null | undefined;
   until: string;
-  /** pdpa = เจ้าตัวขอลบ/ขอให้หยุดติดต่อ (18 ต.ค. 2569) — หน้าบัญชีห้ามโทรปลดไม่ได้ */
-  reason: 'not_looking' | 'wrong_number' | 'manual' | 'pdpa';
+  /** pdpa = เจ้าตัวขอลบ/ขอให้หยุดติดต่อ (18 ต.ค. 2569) — หน้าบัญชีห้ามโทรปลดไม่ได้ · declined = บอก AI ว่าไม่สนใจ (18 พ.ย. 2569) */
+  reason: 'not_looking' | 'wrong_number' | 'manual' | 'pdpa' | 'declined';
   note?: string | null;
   byName?: string | null;
 }): Promise<boolean> {
@@ -101,7 +104,8 @@ export async function suppressPhone(input: {
        values ($1, $2::timestamptz, $3, $4, $5)
        on conflict (phone_e164) do update
          set suppressed_until = greatest(${suppressionTable}.suppressed_until, excluded.suppressed_until),
-             reason = excluded.reason,
+             -- pdpa ห้ามถูกเหตุผลอื่นทับ ไม่งั้นกลายเป็นปลดได้
+             reason = case when ${suppressionTable}.reason = 'pdpa' then ${suppressionTable}.reason else excluded.reason end,
              note = coalesce(excluded.note, ${suppressionTable}.note),
              created_by_name = excluded.created_by_name`,
       [phone, input.until, input.reason, input.note ?? null, input.byName ?? null],
@@ -115,11 +119,43 @@ export async function suppressPhone(input: {
 
 type QueueRow = {
   id: number;
+  channel: string;
   attempt_count: number;
   payload: unknown;
   person_ref: string;
   job_ref: string;
 };
+
+/** 9 หลักท้ายของเบอร์ในคอลัมน์ — เทียบได้ทั้ง 081… / +6681… */
+const key9 = (col: string) => `right(regexp_replace(coalesce(${col}, ''), '\\D', '', 'g'), 9)`;
+const QUEUE_PHONE = `coalesce(payload->>'recipient_phone', payload->>'phone')`;
+
+/**
+ * ยกเลิกสายเสนองาน (channel interview) ของเบอร์นี้ที่ยังไม่มีผล — ในฐาน + ที่ Lumos ถ้าส่งไปแล้ว
+ * ใช้ร่วมกัน: คำขอ PDPA หยุดติดต่อ · บอก AI ว่าไม่สนใจ · แถวที่มีผลแล้วไม่แตะ (DELETE แผนที่จบแล้วที่ Lumos ไปยกเลิกแผนอื่นของเบอร์เดียวกัน)
+ * ล้มที่ Lumos = log ไว้ ไม่ throw (บัญชีห้ามโทรกันชั้นหลักแล้ว)
+ */
+export async function stopOpenInterviewCalls(rawPhone: string, logTag: string): Promise<number> {
+  const k = rawPhone.replace(/\D/g, '').slice(-9);
+  if (k.length < 9) return 0;
+  const { rows: items } = await dbQuery<{ id: string; job_ref: string; person_ref: string; pushed: boolean }>(
+    `update ${queueTable} set status = 'cancelled', updated_at = now()
+      where channel = 'interview' and result is null and status in ('pending', 'delivered')
+        and ${key9(QUEUE_PHONE)} = $1
+      returning id::text, job_ref, person_ref, (push_state = 'pushed' or pushed_at is not null) as pushed`,
+    [k],
+  );
+  if (getLumosPushConfig()) {
+    for (const it of items.filter((x) => x.pushed)) {
+      try {
+        await cancelPushedInterview(`${it.job_ref}::${it.person_ref}::interview`);
+      } catch (e) {
+        logError(`${logTag}: ยกเลิกที่ Lumos ไม่สำเร็จ`, e, { queueId: it.id });
+      }
+    }
+  }
+  return items.length;
+}
 
 function phoneFromPayload(payload: unknown): string | null {
   if (typeof payload !== 'object' || payload === null) return null;
@@ -154,7 +190,7 @@ export async function applyCallFollowupToQueueRow(input: {
   let row: QueueRow | undefined;
   try {
     const { rows } = await dbQuery<QueueRow>(
-      `select id, attempt_count, payload, person_ref, job_ref from ${queueTable} where id = $1 limit 1`,
+      `select id, channel, attempt_count, payload, person_ref, job_ref from ${queueTable} where id = $1 limit 1`,
       [input.queueId],
     );
     row = rows[0];
@@ -221,6 +257,20 @@ export async function applyCallFollowupToQueueRow(input: {
       reason: 'not_looking',
       note: decision.reason,
     });
+  }
+  // 🔴 บอก AI ว่าไม่สนใจ = ไม่โทรอีกทุกใบขอ จนกว่าคนปลดที่บัญชีห้ามโทร (เจ้าของ 18 พ.ย. 2569 "ไม่โทรเลยถ้าเขาบอกไม่สนใจ")
+  //    เคสจริง: ปฏิเสธ 3 พ.ย. (ไม่เอางานผ่านซับ) ระบบนับแค่ "ไม่สนใจงานนี้" · 17 พ.ย. ถูกคีย์ใบงานอื่น AI โทรตีหนึ่งถึงแปดโมง
+  //    เฉพาะสายเสนองาน (interview) · สายติดตามเริ่มงาน (reminder) declined = "ไม่ไปวันนี้" ไม่เกี่ยว
+  //    สายเสนองานอื่นของเบอร์นี้ที่ยังรอ = ยกเลิกด้วย (ที่ Lumos ด้วย ถ้าส่งไปแล้ว)
+  if (input.outcome === 'declined' && row.channel === 'interview') {
+    const phone = phoneFromPayload(row.payload);
+    if (await suppressPhone({ phone, until: DECLINED_SUPPRESS_UNTIL, reason: 'declined', note: 'บอก AI ว่าไม่สนใจ' })) {
+      try {
+        await stopOpenInterviewCalls(phone ?? '', 'declined.stopCalls');
+      } catch (e) {
+        logError('declined.stopCalls: ยกเลิกสายที่ค้างไม่สำเร็จ', e, { queueId: row.id });
+      }
+    }
   }
   // 🔴 **AI ห้ามบล็อกเบอร์เอง** (เจ้าของสั่ง 17 ก.ย. 2569: *"อย่าพึ่งบล็อคเบอร์"*)
   //

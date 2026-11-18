@@ -11,9 +11,8 @@
 import { dbQuery, dbTransaction } from './postgres.js';
 import { tableInAppSchema } from './schema.js';
 import { toE164Thai } from './thaiPhone.js';
-import { suppressPhone } from './callFollowup.js';
+import { stopOpenInterviewCalls, suppressPhone } from './callFollowup.js';
 import { cancelFollowScope } from './followCancelScope.js';
-import { cancelPushedInterview, getLumosPushConfig } from './lumosPushClient.js';
 import { logError, logInfo } from './logger.js';
 import {
   PDPA_ERASED_NAME,
@@ -69,23 +68,7 @@ export async function stopCallsForPhone(e164: string, requestId: string, byName:
   const out = { queue: 0, follow: 0 };
 
   // คิวสัมภาษณ์/ทักทาย (ผู้สมัคร) ที่ยังไม่มีผล
-  const { rows: items } = await dbQuery<{ id: string; job_ref: string; person_ref: string; pushed: boolean }>(
-    `update ${QUEUE} set status = 'cancelled', updated_at = now()
-      where channel = 'interview' and result is null and status in ('pending', 'delivered')
-        and ${key9(QUEUE_PHONE)} = $1
-      returning id::text, job_ref, person_ref, (push_state = 'pushed' or pushed_at is not null) as pushed`,
-    [k],
-  );
-  out.queue = items.length;
-  if (getLumosPushConfig()) {
-    for (const it of items.filter((x) => x.pushed)) {
-      try {
-        await cancelPushedInterview(`${it.job_ref}::${it.person_ref}::interview`);
-      } catch (e) {
-        logError('pdpa.stopCalls: ยกเลิกที่ Lumos ไม่สำเร็จ', e, { queueId: it.id });
-      }
-    }
-  }
+  out.queue = await stopOpenInterviewCalls(e164, 'pdpa.stopCalls');
 
   // สายติดตาม/ส่งคนแทน — ทีละทีม (cancelFollowScope 'person' = เบอร์เดียวกัน + ทีมเดียวกัน)
   const { rows: anchors } = await dbQuery<{ id: string }>(
