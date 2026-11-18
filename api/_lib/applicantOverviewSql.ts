@@ -317,6 +317,13 @@ export const LATEST_ATTENDANCE_SQL = `(
      order by r.appointment_at desc nulls last, r.created_at desc limit 1
   )`;
 
+/**
+ * ใบ iRecruit เก่าก่อน ต.ค. 2569 ไม่ขึ้นหน้าผู้สมัคร (เจ้าของ 10 พ.ย. 2569 "เยอะเกิน เก่าๆเขาคงไม่โทร")
+ * การ์ด "ต้องทำ" ที่พาไปหน้านั้นต้องตัดแบบเดียวกัน (เจ้าของ 18 พ.ย. 2569 "พอกดไปมันยอดแค่ 185")
+ */
+export const IRECRUIT_LIST_SINCE = '2026-10-01T00:00:00+07:00';
+export const OLD_IRECRUIT_SQL = `(a.created_by_name = 'iRecruit' and a.created_at < timestamptz '${IRECRUIT_LIST_SINCE}')`;
+
 const OVERDUE_NO_RESULT_SQL = `(
   ${APPOINTMENT_AT_SQL} < now()
   and coalesce(${LATEST_ATTENDANCE_SQL}, 'rescheduled') = 'rescheduled'

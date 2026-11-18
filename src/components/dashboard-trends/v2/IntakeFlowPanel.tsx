@@ -33,8 +33,28 @@ export default function IntakeFlowPanel({
   const boxes = React.useMemo(() => buildIntakeFlow(scoped), [scoped]);
   const where = path.length ? ` · ${path.join(' › ')}` : '';
 
-  /** กดแถวเดิมที่เลือกอยู่ = หุบขึ้นหนึ่งชั้น */
-  const pick = (p: string[]) => setPath((cur) => (same(cur, p) ? p.slice(0, -1) : p));
+  /**
+   * กดแถวเดิมที่เลือกอยู่ = หุบขึ้นหนึ่งชั้น
+   * แถวที่กดต้องอยู่ที่เดิมใต้เมาส์ (เจ้าของ "กดเสร็จต้องขยับเม้าไหม") — กิ่งอื่นที่หุบ/กล่องข้างบนที่สูงเปลี่ยน ทำให้แถวเลื่อน
+   * ⇒ จำตำแหน่งก่อนกด แล้วเลื่อนจอชดเชยหลังวาดใหม่ (วัดซ้ำอีกรอบหลังเบราว์เซอร์จัดเอง)
+   */
+  const anchor = React.useRef<{ key: string; top: number } | null>(null);
+  const pick = (p: string[], el: HTMLElement) => {
+    anchor.current = { key: p.join('|'), top: el.getBoundingClientRect().top };
+    setPath((cur) => (same(cur, p) ? p.slice(0, -1) : p));
+  };
+  React.useLayoutEffect(() => {
+    const a = anchor.current;
+    if (!a) return;
+    anchor.current = null;
+    const keep = () => {
+      const el = [...document.querySelectorAll<HTMLElement>('[data-intake-key]')].find((x) => x.dataset.intakeKey === a.key);
+      const d = el ? el.getBoundingClientRect().top - a.top : 0;
+      if (Math.abs(d) >= 1) window.scrollBy(0, d);
+    };
+    keep();
+    requestAnimationFrame(keep);
+  }, [path]);
   const rows = (p: string[]): React.ReactNode[] =>
     intakeChildren(cohort, p).flatMap(({ label, list }) => {
       const np = [...p, label];
@@ -46,7 +66,8 @@ export default function IntakeFlowPanel({
         <TableRow
           key={np.join('|')}
           className={cn('cursor-pointer', np.length > 1 && 'bg-muted/30', on && 'ring-2 ring-inset ring-primary')}
-          onClick={() => pick(np)}
+          onClick={(e) => pick(np, e.currentTarget)}
+          data-intake-key={np.join('|')}
           data-testid={`v2-intake-row-${np.length}`}
         >
           <TableCell className={cn(PAD[np.length - 1], np.length === 1 && 'font-medium')}>

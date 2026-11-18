@@ -328,10 +328,13 @@ export async function fetchAllJobApplications(
   everyoneAppointments = false,
   /** true = แท็บการติดต่อของ **ทุกคน** (10 พ.ย. 2569) — ได้แต่ใบที่มีคนเก็บ พร้อมชื่อคนเก็บ · ห้ามใช้กับแท็บอื่น */
   everyoneContact = false,
+  /** BU ของการ์ดที่กดมา (`?bu=` · ถังการ์ด "ต้องทำ" ของภาพรวม) */
+  bucketBu: string | null = null,
 ): Promise<PublicApplication[]> {
   const qs = new URLSearchParams();
   if (leadView) qs.set('lead', '1');
   if (bucket) qs.set('bucket', bucket);
+  if (bucket && bucketBu) qs.set('bu', bucketBu);
   if (cancelledView) qs.set('cancelled', '1');
   if (everyoneAppointments) {
     qs.set('view', 'appointments');

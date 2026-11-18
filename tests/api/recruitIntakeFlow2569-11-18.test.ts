@@ -107,3 +107,33 @@ describe('สถานะทำงานแบบ Dashboard บนหน้า�
     expect(readFileSync('src/components/dashboard-trends/v2/WorkStatusBoard.tsx', 'utf8')).toContain("description: ''");
   });
 });
+
+describe('การ์ด "ต้องทำ" กดแล้วเห็นคนชุดเดียวกับเลข (เจ้าของ 18 พ.ย. 2569 "พอกดไปมันยอดแค่ 185")', () => {
+  it('ถัง waiting_staff ใช้ตัวตัดสินเดียวกับเลขบนการ์ด (isWaitingStaffRow) · ใบ iRecruit เก่าตัดเหมือนหน้าผู้สมัคร', async () => {
+    const mod = await import('../../api/_handlers/recruit-overview');
+    const NOW = Date.parse('2026-11-18T12:00:00Z');
+    const rows = [
+      { id: '0b6e1a52-1c2d-4e3f-8a9b-0c1d2e3f4a5b', created_at: '2026-11-17T02:00:00Z', called: true, ai_outcome: 'confirmed', ai_at: '2026-11-17T03:00:00Z', staff_last_at: null },
+      { id: '1c7f2b63-2d3e-4f40-9b0c-1d2e3f4a5b6c', created_at: '2026-11-17T02:00:00Z', called: true, ai_outcome: 'confirmed', ai_at: '2026-11-17T03:00:00Z', staff_last_at: '2026-11-17T05:00:00Z' },
+      { id: '2d803c74-3e4f-4051-8c1d-2e3f4a5b6c7d', created_at: '2026-11-17T02:00:00Z', called: true, ai_outcome: 'declined', ai_at: '2026-11-17T03:00:00Z', staff_last_at: null },
+    ];
+    expect(rows.filter(mod.isWaitingStaffRow).map((r) => r.id)).toEqual(['0b6e1a52-1c2d-4e3f-8a9b-0c1d2e3f4a5b']);
+    expect(mod.toBacklog(rows, null, NOW).waitingStaff.total).toBe(1);
+    expect(mod.isBacklogBucket('waiting_staff')).toBe(true);
+    expect(mod.isBacklogBucket('untouched')).toBe(false);
+    expect(mod.backlogSql()).toContain("a.created_by_name = 'iRecruit'");
+    expect(mod.appointmentBacklogSql()).toContain("a.created_by_name = 'iRecruit'");
+  });
+  it('การ์ดพาไปถังใหม่ทั้ง 3 ใบ พร้อม BU ที่เลือก · หน้ารายชื่อรู้จักถัง', () => {
+    const src = readFileSync('src/components/dashboard-trends/v2/RecruitOverviewV2.tsx', 'utf8');
+    for (const b of ['bucket=waiting_staff', 'bucket=uncalled_now', 'bucket=overdue_now']) expect(src).toContain(b);
+    const labels = readFileSync('src/lib/recruitRmOverviewApi.ts', 'utf8');
+    for (const b of ['waiting_staff:', 'uncalled_now:', 'overdue_now:']) expect(labels).toContain(b);
+    expect(readFileSync('api/_handlers/job-applications.ts', 'utf8')).toContain('backlogIds(bucketParam, picked.buSet)');
+  });
+  it('แยกช่องทาง: แถวที่กดอยู่ที่เดิมใต้เมาส์ (จำตำแหน่งก่อนกดแล้วเลื่อนจอชดเชย)', () => {
+    const src = readFileSync('src/components/dashboard-trends/v2/IntakeFlowPanel.tsx', 'utf8');
+    expect(src).toContain('data-intake-key');
+    expect(src).toContain('window.scrollBy');
+  });
+});

@@ -26,7 +26,10 @@ import {
   loadApplicationScopeRowOrNull,
   staffEntryDepartment,
 } from '../_lib/applicationScope.js';
-import { bucketCondition, isOverviewBucket, type OverviewBucket } from '../_lib/applicantOverviewSql.js';
+import { IRECRUIT_LIST_SINCE, bucketCondition, isOverviewBucket, type OverviewBucket } from '../_lib/applicantOverviewSql.js';
+import { backlogIds, isBacklogBucket } from './recruit-overview.js';
+import { loadMatchingBuScope } from '../_lib/departmentScope.js';
+import { pickDashboardBuSet } from '../_lib/homeBuSql.js';
 import {
   applicationOriginColumn,
   applicationOriginExpr,
@@ -433,7 +436,8 @@ function isUndefinedColumn(e: unknown): boolean {
  * ผู้เรียกเช็ค `checkFunctionAccess` ต่อ (ไม่มีสิทธิ์ = 403) · สิทธิ์ BU ข้างในยังอยู่ · ได้เฉพาะใบที่มีคนเก็บ (เก็บไปโทร หรือ Lead)
  */
 /** ใบจาก iRecruit ที่สมัครก่อนเวลานี้ไม่ขึ้นหน้าผู้สมัคร (เจ้าของ 10 พ.ย. 2569) */
-export const IRECRUIT_LIST_SINCE = '2026-10-01T00:00:00+07:00';
+export { IRECRUIT_LIST_SINCE };
+const BACKLOG_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export function wantsEveryoneContact(query: Record<string, unknown> | undefined, role: UserRole | undefined): boolean {
   if (!role) return false;
@@ -1760,6 +1764,15 @@ async function handler(req: AuthedReq, res: ApiRes) {
       const access = await checkFunctionAccess(req.user.role, 'contact_view_all');
       if (!access.ok) return sendError(res, 403, 'Forbidden', 'ไม่มีสิทธิ์ดูรายชื่อการติดต่อของทุกคน');
     }
+    // การ์ด "ต้องทำ" ของภาพรวม (?bucket=waiting_staff|uncalled_now|overdue_now) — คนชุดเดียวกับเลขบนการ์ด (เจ้าของ 18 พ.ย. 2569)
+    // id มาจากตัวนับของการ์ดเอง (`backlogIds`) · BU ชุดเดียวกับภาพรวม (`?bu=`) · id ตรวจรูปแบบก่อนต่อ SQL
+    const bucketParam = getString(req.query?.bucket);
+    let backlogWhere: string | null = null;
+    if (isBacklogBucket(bucketParam)) {
+      const picked = pickDashboardBuSet(await loadMatchingBuScope(req.user), req.query?.bu);
+      const ids = (await backlogIds(bucketParam, picked.buSet)).filter((id) => BACKLOG_ID_RE.test(id));
+      backlogWhere = ids.length ? `a.id = any(array[${ids.map((id) => `'${id}'`).join(',')}]::uuid[])` : 'false';
+    }
     const q = buildApplicationsListQuery({
       jobId,
       scopedJobIds,
@@ -1768,9 +1781,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
       leadView: getString(req.query?.lead) === '1',
       // drill-down จากกล่อง dashboard — รับเฉพาะชื่อถังที่รู้จัก (เงื่อนไขมาจาก
       // bucketCondition ที่เดียว ห้ามรับ SQL จาก client)
-      bucketWhere: isOverviewBucket(getString(req.query?.bucket))
-        ? bucketCondition(getString(req.query?.bucket) as OverviewBucket)
-        : null,
+      bucketWhere: backlogWhere ?? (isOverviewBucket(bucketParam) ? bucketCondition(bucketParam as OverviewBucket) : null),
       // แท็บติดตามนัดหมาย "ทุกคน" — สิทธิ์ตัดสินที่นี่ (staff ส่งมา = ลิสต์เดิม)
       everyoneAppointments: wantsEveryoneAppointments(req.query, req.user.role),
       everyoneContact,

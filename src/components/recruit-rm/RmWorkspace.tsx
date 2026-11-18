@@ -361,7 +361,7 @@ const RmWorkspace: React.FC<{
     setLoading(true);
     setLoadError(null);
     if (rowsScopeRef.current !== null && rowsScopeRef.current !== rowsScope) setRows([]);
-    (jobAll ? fetchJobApplications(jobAll) : fetchAllJobApplications(leadView, bucket, cancelledView, everyoneAppointments, everyoneContact))
+    (jobAll ? fetchJobApplications(jobAll) : fetchAllJobApplications(leadView, bucket, cancelledView, everyoneAppointments, everyoneContact, bucket ? searchParams.get('bu') : null))
       .then((next) => {
         if (seq === loadSeq.current) {
           setRows(next);

@@ -64,6 +64,8 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
   }, [data.bu, data.buChoices]);
   const periodText = win.all ? 'ทั้งหมด' : win.from === win.to ? dayText(win.from) : `${dayText(win.from)} – ${dayText(win.to)}`;
   const buText = data.bu ?? 'ทุก BU';
+  /** การ์ด "ต้องทำ" กดแล้วไปหน้าผู้สมัคร เห็นคนชุดเดียวกับเลข — BU เดียวกับที่เลือกบนหน้านี้ (เจ้าของ 18 พ.ย. 2569) */
+  const buQs = data.bu ? `&bu=${encodeURIComponent(data.bu)}` : '';
   const filterKey = `${data.bu ?? 'all'}:${win.from}:${win.to}:${data.generatedAt}`;
   /** ตัวกรองบนสุดชุดเดียวกับหน้าเดิม (เจ้าหน้าที่ · ประเภทงาน · งานย่อย · Code Site · จังหวัด · อำเภอ · ตำบล) — คุมใบขอ + รายชื่อทุกส่วน */
   const [reqFilter, setReqFilter] = React.useState<RequestTabFilter>(EMPTY_REQUEST_FILTER);
@@ -307,7 +309,7 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
               sub: data.backlog ? `ค้างเกิน 3 วัน ${fmt(data.backlog.waitingStaff.over3)}` : '—',
               tone: 'danger',
               icon: TODO_ICONS.PhoneCall,
-              onOpen: () => navigate('/jobs/board?view=list'),
+              onOpen: () => navigate(`/jobs/board?view=list&bucket=waiting_staff${buQs}`),
             },
             {
               key: 'uncalled',
@@ -316,7 +318,7 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
               sub: data.backlog ? `อยู่ในคิว AI ${fmt(data.backlog.uncalled.inQueue)} · ค้างเกิน 7 วัน ${fmt(data.backlog.uncalled.over7)}` : '—',
               tone: 'danger',
               icon: TODO_ICONS.UserRoundSearch,
-              onOpen: () => navigate('/jobs/board?view=list&bucket=untouched'),
+              onOpen: () => navigate(`/jobs/board?view=list&bucket=uncalled_now${buQs}`),
             },
             {
               key: 'overdue',
@@ -325,7 +327,7 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
               sub: 'ลงผลที่หน้าติดตามนัดหมาย',
               tone: 'warn',
               icon: TODO_ICONS.CalendarX,
-              onOpen: () => navigate('/jobs/board?view=appointments&bucket=overdue_no_result'),
+              onOpen: () => navigate(`/jobs/board?view=appointments&bucket=overdue_now${buQs}`),
             },
             {
               key: 'unreleased',

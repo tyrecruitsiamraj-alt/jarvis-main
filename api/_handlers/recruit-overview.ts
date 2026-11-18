@@ -41,6 +41,7 @@ import {
   STAFF_LAST_AT_SQL,
   firstStaffAtSinceSql,
   UPCOMING_7D_NO_RESULT_SQL,
+  OLD_IRECRUIT_SQL,
   holdEventAtSql,
 } from '../_lib/applicantOverviewSql.js';
 import { queueReplySql } from '../_lib/lumosQueueDefs.js';
@@ -225,10 +226,13 @@ export function factsSql(
      and ${scopeWhere('$3')}`}`;
 }
 
-/** งานค้างตอนนี้ — ทุกใบในขอบเขต (ไม่ขึ้นกับเดือน) · $1 = BU */
+/**
+ * งานค้างตอนนี้ — ทุกใบในขอบเขต (ไม่ขึ้นกับเดือน) · $1 = BU
+ * ไม่นับใบ iRecruit เก่า (ไม่ขึ้นหน้าผู้สมัคร) — การ์ดต้องเท่ารายการที่กดไป (เจ้าของ 18 พ.ย. 2569)
+ */
 export function backlogSql(): string {
   return `
-  select a.created_at, a.job_id, (a.phone_e164 is null) as bad_phone,
+  select a.id::text as id, a.created_at, a.job_id, (a.phone_e164 is null) as bad_phone,
          ${CALLED_SQL} as called,
          ${IN_QUEUE_SQL} as in_queue,
          air.outcome as ai_outcome, air.summary as ai_summary, air.reply as ai_reply, air.at as ai_at,
@@ -236,7 +240,7 @@ export function backlogSql(): string {
     from ${APPS} a
     ${appBuJoin('a')}
     ${LATEST_AI_RESULT_LATERAL}
-   where ${scopeWhere('$1')}`;
+   where ${scopeWhere('$1')} and not ${OLD_IRECRUIT_SQL}`;
 }
 
 /**
@@ -251,8 +255,37 @@ export function appointmentBacklogSql(): string {
          count(*) filter (where ${UPCOMING_7D_NO_RESULT_SQL})::int as next7
     from ${APPS} a
     ${appBuJoin('a')}
-   where ${buInSql('$1')}
+   where ${buInSql('$1')} and not ${OLD_IRECRUIT_SQL}
    group by a.job_id`;
+}
+
+/**
+ * การ์ด "ต้องทำ" กดแล้วไปหน้าผู้สมัคร เห็นคนชุดเดียวกับเลขบนการ์ด (เจ้าของ 18 พ.ย. 2569 Choice)
+ * ถังพวกนี้คิดจากแถวชุดเดียวกับ `toBacklog` แล้วส่ง id ให้หน้ารายชื่อ — ห้ามเขียนเงื่อนไขซ้ำที่อื่น
+ */
+export const BACKLOG_BUCKETS = ['waiting_staff', 'uncalled_now', 'overdue_now'] as const;
+export type BacklogBucket = (typeof BACKLOG_BUCKETS)[number];
+export const isBacklogBucket = (v: unknown): v is BacklogBucket => typeof v === 'string' && (BACKLOG_BUCKETS as readonly string[]).includes(v);
+
+/** ตอบ AI ว่าสนใจ แล้วยังไม่มีเจ้าหน้าที่ลงมือหลังจากนั้น — ตัวเดียวของการ์ด "สนใจแล้ว รอเจ้าหน้าที่โทร" */
+export function isWaitingStaffRow(r: Row): boolean {
+  if (!bool(r.called) || micro(r.ai_outcome, r.ai_summary, r.ai_reply) !== 'said_yes') return false;
+  const aiAt = iso(r.ai_at);
+  const staffAt = iso(r.staff_last_at);
+  return !(staffAt && aiAt && staffAt >= aiAt);
+}
+
+export async function backlogIds(kind: BacklogBucket, buSet: BuSet): Promise<string[]> {
+  if (kind === 'overdue_now') {
+    const { rows } = await dbQuery<Row>(
+      `select a.id::text as id from ${APPS} a ${appBuJoin('a')}
+        where ${buInSql('$1')} and not ${OLD_IRECRUIT_SQL} and ${OVERVIEW_BUCKETS.overdue_no_result}`,
+      [buSet],
+    );
+    return rows.map((r) => String(r.id));
+  }
+  const { rows } = await dbQuery<Row>(backlogSql(), [buSet]);
+  return rows.filter((r) => (kind === 'uncalled_now' ? !bool(r.called) : isWaitingStaffRow(r))).map((r) => String(r.id));
 }
 
 /** ผลงานรายคนของเดือน [$1, $2) · $3 = BU — คืนแถวดิบ (ใบ × คน) ให้นับรายชื่อไม่ซ้ำฝั่ง Node */
@@ -680,10 +713,8 @@ export function toBacklog(
       if (bool(r.bad_phone)) uncalled.badPhone += 1;
       continue;
     }
-    if (micro(r.ai_outcome, r.ai_summary, r.ai_reply) !== 'said_yes') continue;
+    if (!isWaitingStaffRow(r)) continue;
     const aiAt = iso(r.ai_at);
-    const staffAt = iso(r.staff_last_at);
-    if (staffAt && aiAt && staffAt >= aiAt) continue;
     waitingStaff.total += 1;
     const reg = regionOf(jobOf(r));
     regions.waitingStaff[reg] += 1;

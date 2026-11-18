@@ -184,7 +184,8 @@ describe('หน้าเว็บ: ปุ่ม ของฉัน / ทุก�
   it('ทุกคน = ยิง ?view=appointments&scope=all · ของฉัน = เส้นเดิมไม่มี param เพิ่ม', () => {
     expect(api).toContain("qs.set('view', 'appointments')");
     expect(api).toContain("qs.set('scope', 'all')");
-    expect(code).toContain('fetchAllJobApplications(leadView, bucket, cancelledView, everyoneAppointments, everyoneContact)');
+    // 18 พ.ย. 2569: ส่ง BU ของการ์ด "ต้องทำ" คู่ถังด้วย (เฉพาะโหมดถัง)
+    expect(code).toContain("fetchAllJobApplications(leadView, bucket, cancelledView, everyoneAppointments, everyoneContact, bucket ? searchParams.get('bu') : null)");
     expect(code).toMatch(/const everyoneAppointments =\s*tab === 'appointments' &&\s*appointmentScope === 'all' &&\s*canSeeEveryoneAppointments\(user\?\.role\)/);
     // ชุดที่โหลด (ของฉัน · นัดทุกคน · การติดต่อทุกคน) ตัดสินจาก everyoneAppointments ตัวเดิม
     expect(code).toContain("const rowsScope = jobAll ? `job:${jobAll}` : everyoneAppointments ? 'appointments' : everyoneContact ? 'contact' : 'mine';");

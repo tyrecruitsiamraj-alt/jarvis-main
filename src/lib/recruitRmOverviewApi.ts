@@ -59,6 +59,10 @@ export const RM_BUCKET_LABEL: Record<string, string> = {
   claimed_idle: 'เก็บไปแล้วยังไม่โทร (เกิน 1 วัน)',
   awaiting_call_choice: 'รอเลือกวิธีโทร (ถูกถอดเพราะดองเกิน 1 วัน)',
   overdue_no_result: 'เลยวันนัดแล้วยังไม่บันทึกผล มา/ไม่มา',
+  // การ์ด "ต้องทำ" ของภาพรวม — คนชุดเดียวกับเลขบนการ์ด (เจ้าของ 18 พ.ย. 2569)
+  waiting_staff: 'สนใจแล้ว รอเจ้าหน้าที่โทร',
+  uncalled_now: 'ใบสมัครที่ยังไม่มีใครโทร',
+  overdue_now: 'นัดเลยวันแล้ว ยังไม่ลง มา/ไม่มา',
 };
 
 export function isRmBucket(v: string | null | undefined): v is string {
