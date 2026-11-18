@@ -146,10 +146,19 @@ describe('ApplicantContactDialog (โฉม iRecruit)', () => {
     expect(within(step).getByRole('button', { name: /นัดหมายไม่สำเร็จ/ })).toBeTruthy();
   });
 
-  it('ผลล่าสุดติดต่อสำเร็จ + มีนัดเดิม ⇒ ปุ่มเป็น "นัดหมายใหม่"', () => {
+  it('🔴 ผลล่าสุดติดต่อสำเร็จ + มีนัดเดิม ⇒ ปุ่ม "นัดหมาย" ติดสีตั้งแต่เปิด · กดแล้วเป็น "นัดหมายใหม่" (เจ้าของ 18 พ.ย. 2569)', () => {
     const { dialog } = renderDialog(app({ last_contact_ok: true, appointment_at: '2026-09-15T05:00:00.000Z' }));
     const step = within(dialog).getByTestId('step-appointment');
-    expect(within(step).getByRole('button', { name: /นัดหมายใหม่/ })).toBeTruthy();
+    const btn = within(step).getByRole('button', { name: /^นัดหมาย$/ });
+    expect(btn.getAttribute('aria-pressed')).toBe('true');
+    fireEvent.click(btn);
+    expect(within(step).getByRole('button', { name: /นัดหมายใหม่/ }).getAttribute('aria-pressed')).toBe('true');
+  });
+  it('🔴 นัดหมายไม่สำเร็จที่บันทึกไว้ ⇒ ปุ่ม "นัดหมายไม่สำเร็จ" ติดสีตั้งแต่เปิด เหมือนขั้นการติดต่อ', () => {
+    const { dialog } = renderDialog(app({ last_contact_ok: true, last_appointment_failed: true, last_contact_reason: 'ได้งานใหม่แล้ว' }));
+    const step = within(dialog).getByTestId('step-appointment');
+    expect(within(step).getByRole('button', { name: /นัดหมายไม่สำเร็จ/ }).getAttribute('aria-pressed')).toBe('true');
+    expect(within(step).getByRole('button', { name: /^นัดหมาย$/ }).getAttribute('aria-pressed')).toBe('false');
   });
 
   it('🔴 ขั้นนัดหมายบอกผลที่บันทึกไว้: นัดไม่สำเร็จ + เหตุผล · ยังไม่ลงผลนัด (เจ้าของ 18 พ.ย. 2569 "ติดต่อสำเร็จ แต่นัดได้หรือไม่ได้อะ")', () => {

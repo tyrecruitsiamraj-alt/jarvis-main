@@ -371,6 +371,8 @@ export default function ApplicantContactDialog({
   const apptUnlocked = contactShown === 'ok';
   /** นัดไม่สำเร็จที่บันทึกไว้แล้ว (ผลติดต่อล่าสุด) */
   const apptSavedFail = !a.appointment_at && a.last_contact_ok === true && a.last_appointment_failed === true;
+  /** ปุ่มขั้น 2 ติดสีตามผลที่บันทึกไว้ เหมือนขั้น 1 (เจ้าของ 18 พ.ย. 2569 "เปิดมาจะได้รู้ว่านัดได้ไหม") · กดเลือกใหม่ = ค่าที่กด */
+  const apptShown: 'ok' | 'fail' | null = apptPick ?? (a.appointment_at ? 'ok' : apptSavedFail ? 'fail' : null);
   const profile = editing && draft ? profilePatchFromDraft(baseDraft, draft) : { patch: {}, error: null };
   const profileDirty = Object.keys(profile.patch).length > 0 || Boolean(profile.error);
   const dirty = profileDirty || contactPicked !== null || apptPick !== null || followPicked !== null || screenPicked !== null;
@@ -571,27 +573,27 @@ export default function ApplicantContactDialog({
                   type="button"
                   size="sm"
                   variant="outline"
-                  aria-pressed={apptPick === 'ok'}
+                  aria-pressed={apptShown === 'ok'}
                   disabled={busy}
                   onClick={() => {
                     setApptPick((v) => (v === 'ok' ? null : 'ok'));
                     setError(null);
                   }}
-                  className={cn(apptPick === 'ok' && TONE.success.solid)}
+                  className={cn(apptShown === 'ok' && TONE.success.solid)}
                 >
-                  <CalendarCheck aria-hidden /> {a.appointment_at ? 'นัดหมายใหม่' : 'นัดหมาย'}
+                  <CalendarCheck aria-hidden /> {a.appointment_at && apptPick === 'ok' ? 'นัดหมายใหม่' : 'นัดหมาย'}
                 </Button>
                 <Button
                   type="button"
                   size="sm"
                   variant="outline"
-                  aria-pressed={apptPick === 'fail'}
+                  aria-pressed={apptShown === 'fail'}
                   disabled={busy}
                   onClick={() => {
                     setApptPick((v) => (v === 'fail' ? null : 'fail'));
                     setError(null);
                   }}
-                  className={cn(apptPick === 'fail' && TONE.danger.solid)}
+                  className={cn(apptShown === 'fail' && TONE.danger.solid)}
                 >
                   <CalendarX aria-hidden /> นัดหมายไม่สำเร็จ
                 </Button>
