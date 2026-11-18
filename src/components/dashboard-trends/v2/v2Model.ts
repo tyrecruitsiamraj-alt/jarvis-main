@@ -45,8 +45,6 @@ export type V2Model = {
   byId: Map<string, RecruitAppFact>;
   sets: OutcomeSets;
   stages: Record<V2Metric, V2Stage>;
-  /** สมการ: AI โทร + คนโทรเอง + รอ AI + ยังไม่มีใครโทร = รายการสมัคร */
-  equation: V2Part[];
   /** ผู้ถือรายชื่อที่สนใจแล้วรอโทรเกิน 24 ชม. (id) */
   late: Set<string>;
   why: V2Part[];
@@ -95,7 +93,6 @@ export function buildV2Model(data: RecruitOverviewResponse, keep?: (f: RecruitAp
     byId: new Map(cohort.map((f) => [f.id ?? '', f])),
     sets,
     stages,
-    equation: parts(j('apps')?.parts),
     late,
     why: whyParts(cohort).map((p) => ({ key: p.key, label: p.label, ids: p.ids ?? [] })),
   };

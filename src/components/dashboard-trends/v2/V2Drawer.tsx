@@ -14,7 +14,6 @@ import { cn } from '@/lib/utils';
 import { DASH, TONE } from '@/lib/designTokens';
 import { applicantWorkLink } from '@/lib/recruitRm';
 import { fetchApplicantNames, type ApplicantNameRow } from '@/lib/recruitOverviewApi';
-import type { RecruitAppFact } from '@/lib/recruitOverviewTypes';
 import type { StuckRequest } from '@/lib/recruitStuck';
 import { requestPathOfJobId } from '@/lib/jobNavigation';
 import { MonthCompareBars } from './MonthCompareBars';
@@ -26,13 +25,11 @@ import {
   BU_UNKNOWN,
   AUDIENCE_MEASURES,
   AUDIENCE_MEASURE_LABEL,
-  ageStats,
   applyAudience,
   audienceRows,
   buCompare,
   dimValueOf,
   pageOf,
-  topOf,
   type AudienceDim,
   type AudienceDisplay,
   type AudienceFilter,
@@ -168,7 +165,6 @@ function MetricPane({ pane, model, bus, push, replace }: { pane: Extract<V2Pane,
           </ul>
         </section>
       ) : null}
-      <AudienceSummary facts={facts} onView={(view) => push({ kind: 'audience', view, filter: { dims: {}, results: pane.metric === 'apps' ? [] : metricResults(pane.metric), bu: pane.bu }, measure: 'apps', display: 'count', page: 1, title: 'ผู้สมัครกลุ่มนี้' })} />
       <section className="space-y-1">
         <h3 className="text-sm font-medium">รายชื่อ</h3>
         <NamesList ids={ids} page={pane.page} onPage={(page) => replace({ ...pane, page })} model={model} />
@@ -177,45 +173,8 @@ function MetricPane({ pane, model, bus, push, replace }: { pane: Extract<V2Pane,
   );
 }
 
-/** ยอดหลักที่เป็นผลของตาราง 5 ยอด → ตัวกรองผล (AND) · ยอดอื่น (AI โทร/ติดต่อได้) ใช้ทางเมตริก ไม่เข้าตาราง */
-function metricResults(m: V2Metric): AudienceMeasure[] {
-  return (AUDIENCE_MEASURES as readonly string[]).includes(m) ? [m as AudienceMeasure] : [];
-}
 
-function AudienceSummary({ facts, onView }: { facts: readonly RecruitAppFact[]; onView: (view: AudienceDim) => void }) {
-  const a = ageStats(facts);
-  const topAge = topOf(facts, 'age');
-  const topHome = topOf(facts, 'home');
-  const homeMissing = facts.filter((f) => !f.homeProvince?.trim()).length;
-  const pct = (n: number) => (facts.length ? `${((n / facts.length) * 100).toFixed(1)}%` : '—');
-  return (
-    <section className="space-y-1 rounded-xl border p-3" data-testid="v2-audience-summary">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <span className="text-sm font-medium">{fmt(facts.length)} รายการสมัคร</span>
-        <span className="text-sm">
-          อายุเฉลี่ย <span className="text-2xl font-medium tabular-nums">{a.average === null ? '—' : a.average.toFixed(1)}</span> ปี
-          <span className={cn('ml-1 text-xs', DASH.sub)}>(จาก {fmt(a.known)} รายการที่มีอายุ)</span>
-        </span>
-      </div>
-      <p className="text-sm">{topAge ? `ช่วงอายุที่พบมาก: ${topAge.key} · ${fmt(topAge.n)} (${pct(topAge.n)})` : 'ยังไม่มีข้อมูลอายุ'}</p>
-      <p className="text-sm">{topHome ? `จังหวัดที่อยู่ที่พบมาก: ${topHome.key} · ${fmt(topHome.n)} (${pct(topHome.n)})` : 'ยังไม่มีข้อมูลจังหวัดที่อยู่'}</p>
-      <p className={cn('text-xs', DASH.sub)}>
-        อายุไม่ระบุ {fmt(a.missing)} · จังหวัดที่อยู่ไม่ระบุ {fmt(homeMissing)} รายการ · อายุ/จังหวัดเป็นค่าที่กรอกล่าสุด
-      </p>
-      <div className="flex flex-wrap gap-2 pt-1">
-        <Button type="button" size="sm" variant="outline" onClick={() => onView('age')}>
-          ดูอายุและผลที่ได้
-        </Button>
-        <Button type="button" size="sm" variant="outline" onClick={() => onView('home')}>
-          ดูจังหวัดและผลที่ได้
-        </Button>
-        <Button type="button" size="sm" variant="outline" onClick={() => onView('ch')}>
-          ดูช่องทาง
-        </Button>
-      </div>
-    </section>
-  );
-}
+
 
 /** ตารางกลุ่มผู้สมัคร (อายุ · จังหวัดที่อยู่ · ช่องทาง) × 5 ยอด — ใช้ทั้งในแผงข้างและกางบนหน้า (`RecruitOverviewV2`) */
 export function AudiencePane({
@@ -296,7 +255,6 @@ export function AudiencePane({
           {AUDIENCE_MEASURE_LABEL[pane.measure]} · {rate ? '% = ผลที่เลือก / รายการสมัครของ BU นั้น · รวม = ผลรวม / รายการรวม' : 'จำนวนรายการที่มีผลตามที่เลือก'} · ผลถึงวันสิ้นสุดที่เลือก
         </p>
       </section>
-      <AudienceSummary facts={facts} onView={(v) => push({ ...pane, view: v, page: 1 })} />
       </>
       )}
       {view === 'records' ? (

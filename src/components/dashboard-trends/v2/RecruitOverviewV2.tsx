@@ -351,18 +351,6 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
             />
           ))}
         </div>
-        <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm" data-testid="v2-equation">
-          <span className={DASH.sub}>จากรายการทั้งหมด</span>
-          {model.equation.map((p, i) => (
-            <React.Fragment key={p.key}>
-              {i > 0 ? <span className={DASH.sub}>+</span> : null}
-              <button type="button" className="rounded px-1 hover:bg-muted/60" onClick={() => openNames(`รายการสมัคร · ${p.label}`, p.ids)}>
-                {p.label} <span className="font-medium tabular-nums">{fmt(p.ids.length)}</span>
-              </button>
-            </React.Fragment>
-          ))}
-          <span className={DASH.sub}>= {fmt(model.cohort.length)} รายการ</span>
-        </p>
         <div className="flex flex-wrap gap-2">
           <Button type="button" size="sm" variant="ghost" onClick={() => openMetric('allBooked')}>
             ที่มาของยอดนัด
@@ -443,9 +431,9 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
         </div>
       </Card>
 
-      {/* งานที่ยังขาดคน ย้ายลงล่างสุด (เจ้าของ 17 พ.ย. 2569 "เอาไปไว้ด้านล่างเถอะตรงนี้เกะกะ") */}
+      {/* พื้นที่ที่ขาดคน ย้ายลงล่างสุด (เจ้าของ 17 พ.ย. 2569 "เอาไปไว้ด้านล่างเถอะตรงนี้เกะกะ") · ชื่อเจ้าของ 18 พ.ย. 2569 */}
       <Card className="min-w-0 space-y-3 rounded-2xl p-5" data-testid="v2-area">
-        <SectionTitle title="งานที่ยังขาดคน" right="ใบขอที่ยังเหลือหา แยกจังหวัด / อำเภอ" />
+        <SectionTitle title="พื้นที่ที่ขาดคน" right="ใบขอที่ยังเหลือหา แยกจังหวัด / อำเภอ" />
         {eq ? <StuckAreaTable bare rows={openRows.filter((r) => (r.remaining ?? 0) > 0)} onPick={(title, rows) => openRequests(title, rows)} /> : <Skeleton className="h-32 rounded-xl" />}
       </Card>
 
