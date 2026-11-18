@@ -18,6 +18,9 @@ export const STAFF_ACTIVITY_LABEL: Record<StaffActivityKind, string> = {
 
 export type StaffActivityRow = { userId: string; name: string; bu: string | null; day: string } & Record<StaffActivityKind, number>;
 
+/** ความเคลื่อนไหวล่าสุด — at = ISO · kind = คำบนจอ (สั่ง Autopost / สร้างลิงก์โพสต์เอง / ติดต่อสำเร็จ …) */
+export type StaffActivityFeedItem = { at: string; kind: string; who: string; subject: string | null; detail: string | null; applicationId: string | null; requestNo: string | null };
+
 export type StaffActivityItem = { day: string; title: string; sub: string | null; applicationId: string | null; requestNo: string | null };
 
 /** รวมทุกวันต่อคน (ตัวกรอง "ทุกคน") · เรียงงานมากไปน้อย */

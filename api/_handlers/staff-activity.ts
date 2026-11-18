@@ -1,5 +1,6 @@
 /**
  * GET /api/staff-activity?from=YYYY-MM-DD&to=YYYY-MM-DD&bu=LBD — งานรายคนต่อวัน (เจ้าของ 18 พ.ย. 2569)
+ * GET ...&feed=1 — ความเคลื่อนไหวล่าสุด 30 รายการในช่วง (ภาพรวมแบบ Mobix)
  * GET ...&detail=1&user=<uuid>&kind=<StaffActivityKind>&day=YYYY-MM-DD(ไม่ส่ง = ทั้งช่วง) — รายการของช่องที่กด
  * อ่านอย่างเดียว · สิทธิ์เดียวกับภาพรวม (`job-applications`) · BU = แผนกของผู้ใช้ (ชุดเลือก BU เดียวกับภาพรวม)
  * แหล่ง: Autopost/Scrap = job_posting_requests · สร้างลิงก์ = recruit_posting_links · ติ๊กโพสต์เอง = recruit_posting_link_posts
@@ -11,7 +12,7 @@ import { tableInAppSchema } from '../_lib/schema.js';
 import { loadMatchingBuScope } from '../_lib/departmentScope.js';
 import { pickDashboardBuSet } from '../_lib/homeBuSql.js';
 import { STAFF_NAME_SQL } from '../_lib/staffNameSql.js';
-import { STAFF_ACTIVITY_KINDS, type StaffActivityItem, type StaffActivityKind, type StaffActivityRow } from '../../src/lib/staffActivity.js';
+import { STAFF_ACTIVITY_KINDS, type StaffActivityFeedItem, type StaffActivityItem, type StaffActivityKind, type StaffActivityRow } from '../../src/lib/staffActivity.js';
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const UUID = /^[0-9a-f-]{36}$/i;
@@ -69,14 +70,50 @@ const DETAIL: Record<StaffActivityKind, string> = {
        nullif(split_part(p.job_id, ':', 2), '') from ${LINK_POSTS} x join ${LINKS} l on l.id = x.link_id join ${POSTINGS} p on p.id = l.posting_id
      where x.posted_by_user_id = $3 and x.day between $1::date and $2::date order by x.day desc, x.created_at desc`,
   contacts: `select to_char(${bkk('c.created_at')}, 'YYYY-MM-DD'), coalesce(a.full_name, '—'),
-       case when not c.ok then concat_ws(' · ', 'ติดต่อไม่สำเร็จ', c.reason_label) when c.appointment_at is not null then 'นัดได้'
-            when c.reason_label is not null then concat_ws(' · ', 'นัดหมายไม่สำเร็จ', c.reason_label) else 'ติดต่อสำเร็จ' end,
+       case when not c.ok then concat_ws(' · ', 'ติดต่อไม่ได้', c.reason_label) when c.appointment_at is not null then 'นัดได้'
+            when c.reason_label is not null then concat_ws(' · ', 'นัดหมายไม่สำเร็จ', c.reason_label) else 'ติดต่อได้' end,
        c.application_id::text, nullif(split_part(a.job_id, ':', 2), '') from ${CONTACTS} c left join ${APPS} a on a.id = c.application_id
      where c.created_by = $3 and ${bkk('c.created_at')} between $1::date and $2::date order by c.created_at desc`,
   appts: `select to_char(${bkk('c.created_at')}, 'YYYY-MM-DD'), coalesce(a.full_name, '—'), to_char(c.appointment_at at time zone 'Asia/Bangkok', 'DD/MM HH24:MI'),
        c.application_id::text, nullif(split_part(a.job_id, ':', 2), '') from ${CONTACTS} c left join ${APPS} a on a.id = c.application_id
      where c.created_by = $3 and c.appointment_at is not null and ${bkk('c.created_at')} between $1::date and $2::date order by c.created_at desc`,
 };
+
+/**
+ * ความเคลื่อนไหวล่าสุด (ภาพรวม · เจ้าของ 18 พ.ย. 2569 แบบ Mobix) — งานที่บันทึกล่าสุดในช่วง ทุกคนใน BU
+ * เรื่อง · ใคร · กับอะไร · รายละเอียด · เวลา (กรุงเทพ)
+ */
+async function loadFeed(from: string, to: string, buSet: readonly string[] | null): Promise<StaffActivityFeedItem[]> {
+  const who = (u: string, raw: string) => STAFF_NAME_SQL(u, raw);
+  const { rows } = await dbQuery<{ at: string; kind: string; who: string; subject: string | null; detail: string | null; application_id: string | null; request_no: string | null }>(
+    `select * from (
+       select o.created_at as at, case when o.request_type = 'scraping' then 'สั่ง Scrap' else 'สั่ง Autopost' end as kind, ${who('u', 'o.requested_by_name')} as who,
+              coalesce(o.request_no, o.job_id) as subject,
+              case when o.request_type = 'scraping' then o.status
+                   else concat_ws(' · ', o.job_snapshot->>'account_name', jsonb_array_length(coalesce(o.job_snapshot->'group_ids', '[]'::jsonb)) || ' กลุ่ม') end as detail,
+              null::text as application_id, o.request_no, u.department_code as bu
+         from ${ORDERS} o join ${USERS} u on u.id = o.requested_by_user_id
+        where ${bkk('o.created_at')} between $1::date and $2::date
+       union all
+       select l.created_at, 'สร้างลิงก์โพสต์เอง', ${who('u', 'l.created_by_name')}, coalesce(nullif(split_part(p.job_id, ':', 2), ''), p.standalone_kind), coalesce(l.channel_label, l.code),
+              null, nullif(split_part(p.job_id, ':', 2), ''), u.department_code
+         from ${LINKS} l join ${POSTINGS} p on p.id = l.posting_id join ${USERS} u on u.id = l.created_by_user_id
+        where ${bkk('l.created_at')} between $1::date and $2::date
+       union all
+       select c.created_at,
+              case when not c.ok then 'ติดต่อไม่ได้' when c.appointment_at is not null then 'นัดได้' when c.reason_label is not null then 'นัดหมายไม่สำเร็จ' else 'ติดต่อได้' end,
+              ${who('u', 'c.created_by_name')}, a.full_name,
+              case when c.appointment_at is not null then to_char(c.appointment_at at time zone 'Asia/Bangkok', 'DD/MM HH24:MI') else c.reason_label end,
+              c.application_id::text, nullif(split_part(a.job_id, ':', 2), ''), u.department_code
+         from ${CONTACTS} c join ${USERS} u on u.id = c.created_by left join ${APPS} a on a.id = c.application_id
+        where ${bkk('c.created_at')} between $1::date and $2::date
+     ) e
+     where ($3::text[] is null or e.bu = any($3::text[]))
+     order by e.at desc limit 30`,
+    [from, to, buSet ? [...buSet] : null],
+  );
+  return rows.map((r) => ({ at: new Date(r.at).toISOString(), kind: r.kind, who: r.who, subject: r.subject, detail: r.detail, applicationId: r.application_id, requestNo: r.request_no }));
+}
 
 async function loadDetail(from: string, to: string, userId: string, kind: StaffActivityKind): Promise<StaffActivityItem[]> {
   const { rows } = await dbQuery<{ day: string; title: string; sub: string | null; application_id: string | null; request_no: string | null }>(
@@ -97,6 +134,7 @@ export async function staffActivityHandler(req: AuthedReq, res: ApiRes) {
     const { buSet } = pickDashboardBuSet(scope, one(req.query?.bu) ?? null);
     res.setHeader?.('Cache-Control', 'no-store');
     if (buSet !== null && buSet.length === 0) return res.status(200).json({ rows: [] });
+    if (String(one(req.query?.feed) ?? '') === '1') return res.status(200).json({ items: await loadFeed(from, to, buSet) });
     if (String(one(req.query?.detail) ?? '') === '1') {
       const user = String(one(req.query?.user) ?? '');
       const kind = String(one(req.query?.kind) ?? '') as StaffActivityKind;

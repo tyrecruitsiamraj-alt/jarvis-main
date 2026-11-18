@@ -1,5 +1,5 @@
 import { apiFetch } from './apiFetch';
-import type { StaffActivityItem, StaffActivityKind, StaffActivityRow } from './staffActivity';
+import type { StaffActivityFeedItem, StaffActivityItem, StaffActivityKind, StaffActivityRow } from './staffActivity';
 
 async function readError(r: Response, fallback: string): Promise<never> {
   const b = (await r.json().catch(() => ({}))) as { message?: string };
@@ -23,4 +23,13 @@ export async function fetchStaffActivityItems(q: { from: string; to: string; bu:
   const r = await apiFetch(`/api/staff-activity?${p.toString()}`);
   if (!r.ok) return readError(r, 'อ่านรายการไม่ได้');
   return ((await r.json()) as { items: StaffActivityItem[] }).items;
+}
+
+/** ความเคลื่อนไหวล่าสุด 30 รายการในช่วง */
+export async function fetchStaffActivityFeed(q: { from: string; to: string; bu: string | null }): Promise<StaffActivityFeedItem[]> {
+  const p = new URLSearchParams({ from: q.from, to: q.to, feed: '1' });
+  if (q.bu) p.set('bu', q.bu);
+  const r = await apiFetch(`/api/staff-activity?${p.toString()}`);
+  if (!r.ok) return readError(r, 'อ่านความเคลื่อนไหวไม่ได้');
+  return ((await r.json()) as { items: StaffActivityFeedItem[] }).items;
 }

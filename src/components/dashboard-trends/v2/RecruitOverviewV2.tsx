@@ -37,6 +37,9 @@ import ApplicantStory from './ApplicantStory';
 import PostingProgress from './PostingProgress';
 import { Kpi, Pager, SectionTitle, fmt } from './V2Parts';
 import StaffActivityPanel from './StaffActivityPanel';
+import { ActivityFeed, DailyCharts, OutreachTiles, TODO_ICONS, TodoList, dailyPulse } from './PulseParts';
+import { fetchStaffActivity, fetchStaffActivityFeed } from '@/lib/staffActivityApi';
+import type { StaffActivityFeedItem, StaffActivityKind, StaffActivityRow } from '@/lib/staffActivity';
 import { MonthCompareBars } from './MonthCompareBars';
 import { V2_METRICS, V2_METRIC_LABEL, buildV2Model, type V2Metric } from './v2Model';
 
@@ -78,7 +81,10 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
 
   // ใบขอ + การประกาศ (เส้นเดิม) — ทิ้งคำตอบที่ไม่ใช่ตัวกรองปัจจุบัน
   const [stuck, setStuck] = React.useState<{ key: string; data: RecruitStuckResponse | null; error: string | null }>({ key: '', data: null, error: null });
-  const [posts, setPosts] = React.useState<{ key: string; total: number | null; error: string | null }>({ key: '', total: null, error: null });
+  const [posts, setPosts] = React.useState<{ key: string; total: number | null; jobs: number | null; posted: number | null; postedJobs: number | null; error: string | null }>({ key: '', total: null, jobs: null, posted: null, postedJobs: null, error: null });
+  /** งานรายคน + ความเคลื่อนไหวล่าสุด (ภาพรวมแบบ Mobix · 18 พ.ย. 2569) — ดึงครั้งเดียวต่อช่วง/BU */
+  const [staff, setStaff] = React.useState<{ key: string; rows: StaffActivityRow[] | null; error: string | null }>({ key: '', rows: null, error: null });
+  const [feed, setFeed] = React.useState<{ key: string; items: StaffActivityFeedItem[] | null }>({ key: '', items: null });
   const [links, setLinks] = React.useState<{ key: string; rows: Awaited<ReturnType<typeof fetchManualLinks>> | null }>({ key: '', rows: null });
   React.useEffect(() => {
     let alive = true;
@@ -86,8 +92,14 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
       .then((d) => alive && setStuck({ key: filterKey, data: d, error: null }))
       .catch((e: unknown) => alive && setStuck({ key: filterKey, data: null, error: friendlyErrorText(e, 'โหลดใบขอไม่ได้') }));
     fetchSoPostGroups({ from: win.from, to: win.to, bu: data.bu, page: 1 })
-      .then((d) => alive && setPosts({ key: filterKey, total: d.total, error: null }))
-      .catch((e: unknown) => alive && setPosts({ key: filterKey, total: null, error: friendlyErrorText(e, 'อ่านรายการโพสต์ไม่ได้') }));
+      .then((d) => alive && setPosts({ key: filterKey, total: d.total, jobs: d.jobs ?? null, posted: d.counts?.posted ?? 0, postedJobs: d.postedJobs ?? null, error: null }))
+      .catch((e: unknown) => alive && setPosts({ key: filterKey, total: null, jobs: null, posted: null, postedJobs: null, error: friendlyErrorText(e, 'อ่านรายการโพสต์ไม่ได้') }));
+    fetchStaffActivity({ from: win.from, to: win.to, bu: data.bu })
+      .then((rows) => alive && setStaff({ key: filterKey, rows, error: null }))
+      .catch((e: unknown) => alive && setStaff({ key: filterKey, rows: null, error: friendlyErrorText(e, 'อ่านงานรายคนไม่ได้') }));
+    fetchStaffActivityFeed({ from: win.from, to: win.to, bu: data.bu })
+      .then((items) => alive && setFeed({ key: filterKey, items }))
+      .catch(() => alive && setFeed({ key: filterKey, items: [] }));
     fetchManualLinks({ from: win.from, to: win.to, bu: data.bu })
       .then((rows) => alive && setLinks({ key: filterKey, rows }))
       .catch(() => alive && setLinks({ key: filterKey, rows: null }));
@@ -255,6 +267,9 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
   };
 
   const loadingReq = stuck.key !== filterKey;
+  /** รวมงานรายคนทั้งช่วง (ทุกคนใน BU) — การ์ดการออกหาคน · null = ยังโหลด */
+  const staffSum = (k: StaffActivityKind): number | null =>
+    staff.key === filterKey && staff.rows ? staff.rows.reduce((n, r) => n + r[k], 0) : null;
   /** วันสั้นบนหัวการ์ด เช่น "1 พ.ย." / "1–18 พ.ย." */
   const shortDay = (ymd: string) => `${Number(ymd.slice(8, 10))} ${TH_MONTH[Number(ymd.slice(5, 7)) - 1]}`;
   const rangeShort = win.from === win.to ? shortDay(win.from) : `${shortDay(win.from)}–${shortDay(win.to)}`;
@@ -267,6 +282,51 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
   return (
     <div className="space-y-8" data-testid="recruit-overview-v2">
       <StuckFilterBar rows={allRows ?? []} appRecruiters={appRecruiters} value={reqFilter} onChange={setReqFilter} />
+
+      {/* ── ต้องทำ (บนสุด · ณ ตอนนี้ ไม่ขึ้นกับช่วงวันที่) — แบบ Mobix (เจ้าของ 18 พ.ย. 2569) · กด = ไปหน้าที่แก้ได้ ── */}
+      <Card className="min-w-0 space-y-3 rounded-2xl p-5" data-testid="v2-todo-card">
+        <SectionTitle title="ต้องทำ" right="ณ ตอนนี้" />
+        <TodoList
+          items={[
+            {
+              key: 'waiting',
+              n: data.backlog?.waitingStaff.total ?? null,
+              title: 'สนใจแล้ว รอเจ้าหน้าที่โทร',
+              sub: data.backlog ? `ค้างเกิน 3 วัน ${fmt(data.backlog.waitingStaff.over3)}` : '—',
+              tone: 'danger',
+              icon: TODO_ICONS.PhoneCall,
+              onOpen: () => navigate('/jobs/board?view=list'),
+            },
+            {
+              key: 'uncalled',
+              n: data.backlog?.uncalled.total ?? null,
+              title: 'ใบสมัครที่ยังไม่มีใครโทร',
+              sub: data.backlog ? `อยู่ในคิว AI ${fmt(data.backlog.uncalled.inQueue)} · ค้างเกิน 7 วัน ${fmt(data.backlog.uncalled.over7)}` : '—',
+              tone: 'danger',
+              icon: TODO_ICONS.UserRoundSearch,
+              onOpen: () => navigate('/jobs/board?view=list&bucket=untouched'),
+            },
+            {
+              key: 'overdue',
+              n: data.backlog?.appointments?.overdue ?? null,
+              title: 'นัดเลยวันแล้ว ยังไม่ลง มา/ไม่มา',
+              sub: 'ลงผลที่หน้าติดตามนัดหมาย',
+              tone: 'warn',
+              icon: TODO_ICONS.CalendarX,
+              onOpen: () => navigate('/jobs/board?view=list&bucket=overdue_no_result'),
+            },
+            {
+              key: 'unreleased',
+              n: loadingReq || !eq ? null : unreleasedRows.length,
+              title: 'ใบขอที่ยังไม่ประกาศ',
+              sub: eq ? `จากเหลือหา ${fmt(openRows.length)} ใบ` : '—',
+              tone: 'info',
+              icon: TODO_ICONS.FileText,
+              onOpen: eq ? () => openRequests(RELEASE_LANE_TEXT.unreleased.label, unreleasedRows) : undefined,
+            },
+          ]}
+        />
+      </Card>
 
       {/* ── ใบขอ (ใบ + อัตรา) · ใครต้องทำอะไร · งานที่ยังขาดคน — กางไว้ (เจ้าของ 17 พ.ย. 2569 "ซ่อนไว้ทำไม") ── */}
       <Card className="min-w-0 space-y-5 rounded-2xl p-5" data-testid="v2-requests">
@@ -282,6 +342,30 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
           <Kpi label={`− ยกเลิกใบขอ · ${rangeShort}`} emphasis value={loadingReq ? undefined : eq ? eq.cancelled.length : null} sub={reqRows ? `ยกเลิก ${fmt(sumOf(reqRows, 'cancelled'))} อัตรา` : undefined} onClick={eq ? () => openRequests('ยกเลิกใบขอ', eq.cancelled) : undefined} tone="danger" testId="v2-req-cancelled" />
           <Kpi label={`= เหลือหา · ยังเปิดอยู่ ณ ${shortDay(win.to)}`} emphasis value={loadingReq ? undefined : eq ? eq.remaining.length : null} sub={rateText(eq?.remaining, 'เหลือหา', 'remaining')} onClick={eq ? () => openRequests('เหลือหา', eq.remaining) : undefined} testId="v2-req-open" />
         </div>
+      </Card>
+
+      {/* ── การออกหาคน: Autopost / โพสต์เอง / Scrap (เจ้าของ 18 พ.ย. 2569 "ยังต้องบอกเรื่อง Autopost โพสต์เอง Scrap ด้วย") ── */}
+      <Card className="min-w-0 space-y-3 rounded-2xl p-5" data-testid="v2-outreach-card">
+        <SectionTitle title="การออกหาคน" right={`${dayText(win.from)} – ${dayText(win.to)}`} />
+        <OutreachTiles
+          tiles={[
+            {
+              key: 'autopost',
+              n: posts.key === filterKey ? posts.jobs : null,
+              unit: 'งาน',
+              sub: posts.key === filterKey && posts.total !== null ? `${fmt(posts.total)} กลุ่ม · เผยแพร่แล้ว ${fmt(posts.posted)} กลุ่ม (${fmt(posts.postedJobs)} งาน)` : '—',
+              onOpen: () => push({ kind: 'embed', title: 'Autopost · รายการโพสต์', embed: 'posts' }),
+            },
+            {
+              key: 'self',
+              n: staffSum('links'),
+              unit: 'ลิงก์',
+              sub: staffSum('manualPosted') === null ? '—' : `ติ๊กโพสต์เองแล้ว ${fmt(staffSum('manualPosted'))}`,
+              onOpen: () => push({ kind: 'embed', title: 'โพสต์เอง / สร้างลิงก์', embed: 'self' }),
+            },
+            { key: 'scrap', n: staffSum('scrap'), unit: 'ใบ', sub: 'ใบขอที่สั่ง Scrap · ดูรายคนที่งานรายคน' },
+          ]}
+        />
       </Card>
 
       {/* ── การประกาศรับสมัคร ── */}
@@ -347,7 +431,7 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
       {/* ── งานรายคน (เจ้าของ 18 พ.ย. 2569 "วันนี้ เมื่อวาน วันก่อน ใหม่ทำอะไรไป" · Choice ภาพรวม + Filter รายคน) ── */}
       <Card className="min-w-0 space-y-3 rounded-2xl p-5" data-testid="v2-staff-card">
         <SectionTitle title="งานรายคน" right={`${dayText(win.from)} – ${dayText(win.to)}`} />
-        <StaffActivityPanel from={win.from} to={win.to} bu={data.bu} onNames={openNames} />
+        <StaffActivityPanel from={win.from} to={win.to} bu={data.bu} rows={staff.key === filterKey ? staff.rows : null} error={staff.key === filterKey ? staff.error : null} onNames={openNames} />
       </Card>
 
       <Separator />
@@ -451,6 +535,16 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
       </Card>
 
       {/* พื้นที่ที่ขาดคน ย้ายลงล่างสุด (เจ้าของ 17 พ.ย. 2569 "เอาไปไว้ด้านล่างเถอะตรงนี้เกะกะ") · ชื่อเจ้าของ 18 พ.ย. 2569 */}
+      {/* ── แนวโน้มรายวัน + ความเคลื่อนไหวล่าสุด (แบบ Mobix · 18 พ.ย. 2569) ── */}
+      <Card className="min-w-0 space-y-3 rounded-2xl p-5" data-testid="v2-daily-card">
+        <SectionTitle title="แนวโน้มรายวัน" right={`${dayText(win.from)} – ${dayText(win.to)}`} />
+        <DailyCharts points={dailyPulse(model.cohort, win.from, win.to)} />
+      </Card>
+      <Card className="min-w-0 space-y-3 rounded-2xl p-5" data-testid="v2-feed-card">
+        <SectionTitle title="ความเคลื่อนไหวล่าสุด" right="30 รายการล่าสุดในช่วง" />
+        <ActivityFeed items={feed.key === filterKey ? feed.items : null} today={data.today} onPerson={(id, name) => openNames(name, [id])} />
+      </Card>
+
       {/* พับไว้ กดค่อยกาง (เจ้าของ 18 พ.ย. 2569 "ซ่อนไว้กดค่อยกาง") · ปุ่มรายงานเพิ่มเติม (แบบเดิม) ถอดแล้ว ("เอาออก") */}
       <Card className="min-w-0 space-y-3 rounded-2xl p-5" data-testid="v2-area">
         <SectionTitle

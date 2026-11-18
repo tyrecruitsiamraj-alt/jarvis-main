@@ -13,7 +13,7 @@ import { DASH, TONE } from '@/lib/designTokens';
 import { formatYmdTh } from '@/lib/dateTh';
 import { pageOf } from '@/lib/recruitAudience';
 import { STAFF_ACTIVITY_KINDS, STAFF_ACTIVITY_LABEL, staffActivityTotals, type StaffActivityItem, type StaffActivityKind, type StaffActivityRow } from '@/lib/staffActivity';
-import { fetchStaffActivity, fetchStaffActivityItems } from '@/lib/staffActivityApi';
+import { fetchStaffActivityItems } from '@/lib/staffActivityApi';
 import { Pager, fmt } from './V2Parts';
 
 const ALL = '__all__';
@@ -22,33 +22,25 @@ export default function StaffActivityPanel({
   from,
   to,
   bu,
+  rows,
+  error,
   onNames,
 }: {
   from: string;
   to: string;
   bu: string | null;
+  /** งานรายคนของช่วง (หน้าแม่ดึงครั้งเดียว ใช้ร่วมกับการ์ดการออกหาคน) · null = กำลังโหลด */
+  rows: StaffActivityRow[] | null;
+  error: string | null;
   /** ลงผลติดต่อ/นัดได้ = เปิดรายชื่อผู้สมัครในแผงข้าง */
   onNames: (title: string, ids: readonly string[]) => void;
 }) {
-  const [rows, setRows] = React.useState<StaffActivityRow[] | null>(null);
-  const [error, setError] = React.useState<string | null>(null);
   const [who, setWho] = React.useState<string | null>(null);
   const [pick, setPick] = React.useState<{ user: string; name: string; kind: StaffActivityKind; day: string | null } | null>(null);
   const [items, setItems] = React.useState<StaffActivityItem[] | null>(null);
   const [page, setPage] = React.useState(1);
 
-  React.useEffect(() => {
-    let alive = true;
-    setRows(null);
-    setError(null);
-    setPick(null);
-    fetchStaffActivity({ from, to, bu })
-      .then((r) => alive && setRows(r))
-      .catch((e: unknown) => alive && setError(e instanceof Error ? e.message : 'อ่านงานรายคนไม่ได้'));
-    return () => {
-      alive = false;
-    };
-  }, [from, to, bu]);
+  React.useEffect(() => setPick(null), [from, to, bu]);
 
   React.useEffect(() => {
     if (!pick) return setItems(null);
