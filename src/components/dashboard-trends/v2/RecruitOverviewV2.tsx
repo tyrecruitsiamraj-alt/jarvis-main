@@ -415,7 +415,8 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
         {/* รายชื่ออยู่กับใคร = ทีมสรรหาแต่ละคน เก็บไป → โทร → นัด → ผลนัด → แจ้งเข้า บวกลบลงตัวในแถว (เจ้าของ 17 พ.ย. 2569) */}
         <section className="min-w-0 space-y-2 border-t pt-4" data-testid="v2-holders">
           <h3 className="text-sm font-medium">รายชื่ออยู่กับใคร</h3>
-          <CallerResultsTable cohort={model.cohort} prev={prevModel?.cohort ?? null} onOpen={(title, ids) => openNames(title, ids)} />
+          {/* ไม่ส่ง prev = ไม่มีแถว/ช่องเทียบช่วงก่อน (เจ้าของ 18 พ.ย. 2569 "เอาแถวที่ฉันส่งรูปให้ออกไปเลย เกะกะ") */}
+          <CallerResultsTable cohort={model.cohort} onOpen={(title, ids) => openNames(title, ids)} />
         </section>
 
         <div className="border-t pt-4">
