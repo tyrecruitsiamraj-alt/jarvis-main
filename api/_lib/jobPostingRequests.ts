@@ -249,6 +249,11 @@ export type CreateJobPostingInput = {
   userName?: string | null;
   /** ข้อมูลใบขอ (ตำแหน่ง/พื้นที่/รายได้ ฯลฯ) แนบให้ทีมคอนเทนต์ปลายทาง — เก็บลง job_snapshot */
   jobSnapshot?: Record<string, unknown> | null;
+  /**
+   * สถานะตอนสร้าง — ไม่ส่ง = pending (So Scraping หยิบเฉพาะ pending)
+   * 'in_progress' = ใบที่ Jarvis ส่ง phone-box เอง (18 พ.ย. 2569) — So Scraping ต้องไม่เห็นเป็นงานรอทำแม้ชั่วขณะ
+   */
+  initialStatus?: 'in_progress';
 };
 
 /**
@@ -277,13 +282,14 @@ export async function createJobPostingRequest(input: CreateJobPostingInput): Pro
     userId,
     trimTo(input.userName, MAX_TEXT),
     snapshot,
+    input.initialStatus ?? 'pending',
   ];
 
   const insert = (withSnapshot: boolean) =>
     dbQuery<Row>(
       withSnapshot
-        ? `insert into ${table} (job_id, request_no, request_type, reason, requested_by_user_id, requested_by_name, job_snapshot)
-           values ($1, $2, $3, $4, $5::uuid, $6, $7::jsonb)
+        ? `insert into ${table} (job_id, request_no, request_type, reason, requested_by_user_id, requested_by_name, job_snapshot, status)
+           values ($1, $2, $3, $4, $5::uuid, $6, $7::jsonb, $8)
            returning ${COLS}`
         : `insert into ${table} (job_id, request_no, request_type, reason, requested_by_user_id, requested_by_name)
            values ($1, $2, $3, $4, $5::uuid, $6)

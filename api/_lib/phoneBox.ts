@@ -2,8 +2,10 @@
  * ═══ phone-box — มือถือโพสต์กลุ่ม Facebook (เจ้าของ 16 พ.ย. 2569 "ฉันจะใส่กุญแจให้ ถ้าใส่แล้วนายเช็คได้ไหม") ═══
  * https://phone-box.sosiamraj.com · header `Authorization: Bearer <key>` · เรียกจาก server เท่านั้น ไม่ส่ง key ไปหน้าจอ
  * - key + URL ใส่ที่ ตั้งค่า › เชื่อมระบบภายนอก (ตาราง `app_outbound_api_keys` เข้ารหัสตัวเดียวกับ So Scraping)
- * - เฟสนี้ "อ่านอย่างเดียว": health · devices · accounts · กลุ่มของแต่ละบัญชี — ยังไม่สั่งโพสต์ (POST /v1/posts)
- *   ย้าย Autopost 5 บัญชีมาที่นี่เป็นงานถัดไป (เจ้าของ: "5 เครื่อง ย้ายแค่ 5 Account ไปก่อน ที่เหลือทำแบบเดิม")
+ * - อ่าน: health · devices · accounts · กลุ่มของแต่ละบัญชี
+ * - สั่งโพสต์ (18 พ.ย. 2569 เจ้าของ "ยิงไป phone box ... ไม่ปนไปกับ RM009 เพื่อลดโอกาสถูกปิด"):
+ *   บัญชีที่ติ๊กไว้ (`phone_box_post_accounts` · ตั้งค่า › เชื่อมระบบภายนอก) — Autopost ที่เลือกบัญชีนี้ส่ง POST /v1/posts
+ *   ทีละกลุ่มแทน So Scraping · กติกาเจ้าของ 17 พ.ย.: ได้ 202 = นับว่าโพสต์แล้ว · ห้ามส่งซ้ำ (request_id เดิมเท่านั้น)
  */
 import { dbQuery, isPgUndefinedTable } from './postgres.js';
 import { tableInAppSchema } from './schema.js';
@@ -144,4 +146,78 @@ export async function readPhoneBoxStatus(baseUrl: string, key: string, fetchImpl
     if (e instanceof PhoneBoxError) return { ok: false, message: e.message };
     throw e;
   }
+}
+
+/* ═══ บัญชีที่ Autopost ส่งผ่าน phone-box ═══ */
+const ROUTES = tableInAppSchema('phone_box_post_accounts');
+
+export type PhoneBoxRoute = { accountId: string; accountName: string; enabled: boolean; updatedBy: string | null; updatedAt: string | null };
+
+export async function listPhoneBoxRoutes(): Promise<PhoneBoxRoute[]> {
+  try {
+    const { rows } = await dbQuery<{ account_id: string; account_name: string; enabled: boolean; updated_by: string | null; updated_at: Date | string | null }>(
+      `select account_id, account_name, enabled, updated_by, updated_at from ${ROUTES} order by account_name`,
+    );
+    return rows.map((r) => ({
+      accountId: r.account_id,
+      accountName: r.account_name,
+      enabled: r.enabled,
+      updatedBy: r.updated_by,
+      updatedAt: r.updated_at ? new Date(r.updated_at).toISOString() : null,
+    }));
+  } catch (e) {
+    if (isPgUndefinedTable(e)) return [];
+    throw e;
+  }
+}
+
+/** ติ๊ก/ถอนบัญชีจากหน้าตั้งค่า — ชื่อบัญชีใช้จับคู่กับบัญชีของ So Scraping ที่เลือกใน Autopost */
+export async function setPhoneBoxRoute(input: { accountId: string; accountName: string; enabled: boolean }, by: string | null): Promise<void> {
+  await dbQuery(
+    `insert into ${ROUTES} (account_id, account_name, enabled, updated_by, updated_at)
+     values ($1, $2, $3, $4, now())
+     on conflict (account_id) do update set account_name = excluded.account_name, enabled = excluded.enabled,
+       updated_by = excluded.updated_by, updated_at = now()`,
+    [input.accountId, input.accountName, input.enabled, by],
+  );
+}
+
+const nameKey = (s: string | null | undefined) => (s ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
+
+/** บัญชีของ So Scraping ที่เลือก (ชื่อ) → บัญชี phone-box ที่เปิดส่งไว้ · ไม่ตรง = null (ไป So Scraping ตามเดิม) */
+export function phoneBoxRouteFor(routes: readonly PhoneBoxRoute[], accountName: string | null | undefined): PhoneBoxRoute | null {
+  const k = nameKey(accountName);
+  if (!k) return null;
+  return routes.find((r) => r.enabled && nameKey(r.accountName) === k) ?? null;
+}
+
+export type PhoneBoxPostResult = { requestId: string; groupName: string; ok: boolean; status: number | null; postId: string | null; message: string | null };
+
+/** POST /v1/posts หนึ่งกลุ่ม — ตอบ 2xx = ส่งแล้ว · อื่น ๆ บอกเหตุ ไม่ลองซ้ำ (ห้ามส่งซ้ำ) */
+export async function sendPhoneBoxPost(
+  baseUrl: string,
+  key: string,
+  body: { request_id: string; account_id: string; group_name: string; content: string },
+  fetchImpl: typeof fetch = fetch,
+): Promise<PhoneBoxPostResult> {
+  const base = { requestId: body.request_id, groupName: body.group_name };
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
+  let res: Response;
+  try {
+    res = await fetchImpl(`${baseUrl}/v1/posts`, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${key}`, accept: 'application/json', 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: ctrl.signal,
+    });
+  } catch {
+    return { ...base, ok: false, status: null, postId: null, message: 'ติดต่อ phone-box ไม่ได้' };
+  } finally {
+    clearTimeout(timer);
+  }
+  const json = (await res.json().catch(() => null)) as { id?: unknown; message?: unknown; error?: unknown } | null;
+  if (res.ok) return { ...base, ok: true, status: res.status, postId: str(json?.id), message: null };
+  const message = str(json?.message) ?? str(json?.error) ?? `phone-box ตอบ ${res.status}`;
+  return { ...base, ok: false, status: res.status, postId: null, message };
 }

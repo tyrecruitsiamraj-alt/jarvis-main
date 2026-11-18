@@ -75,6 +75,8 @@ async function recentGroupsOfJob(jobId: string): Promise<string[]> {
   }
 }
 import { soGroupLinksError, soPickError, soSnapshotError } from '../../src/lib/soScraping.js';
+import { phoneBoxPostsOf } from '../../src/lib/phoneBoxPosts.js';
+import { getPhoneBoxKeyView, listPhoneBoxRoutes, phoneBoxRouteFor, savedPhoneBoxKey, sendPhoneBoxPost, type PhoneBoxPostResult } from '../_lib/phoneBox.js';
 
 const OUT_OF_SCOPE = 'ไม่มีสิทธิ์เข้าถึงใบขอของแผนกอื่น';
 
@@ -236,8 +238,8 @@ async function handler(req: AuthedReq, res: ApiRes) {
       // ค่าที่เลือก (บัญชี · กลุ่ม · บัญชี Scrap) ต้องตรงกับ So Scraping ตอนกดส่ง — ดึงใหม่ ไม่ใช้ของที่จอถือไว้ (26 ต.ค. 2569)
       // Scrap ตรวจทุกครั้ง — ใส่ key แล้วต้องเลือกบัญชี JobThai/JobBKK (เอกสารรอบ 3: บังคับถ้าจะเริ่มงานเอง)
       const picksSomething = requestType === 'content' ? Array.isArray(jobSnapshot?.group_ids) : true;
+      let options: Awaited<ReturnType<typeof fetchSoOptions>> | null = null;
       if (picksSomething) {
-        let options;
         try {
           options = await fetchSoOptions();
         } catch (e) {
@@ -264,6 +266,55 @@ async function handler(req: AuthedReq, res: ApiRes) {
           }
         }
       }
+      /**
+       * บัญชีที่ติ๊กส่งผ่าน phone-box (18 พ.ย. 2569 "ไม่ปนไปกับ RM009") — สร้างใบเป็น in_progress (So Scraping หยิบแค่ pending)
+       * แล้วยิงทีละกลุ่ม · ไม่เรียก So Scraping เริ่มงาน
+       */
+      if (requestType === 'content' && jobSnapshot && options) {
+        const route = phoneBoxRouteFor(await listPhoneBoxRoutes(), typeof jobSnapshot.account_name === 'string' ? jobSnapshot.account_name : null);
+        if (route) {
+          const [baseUrl, key] = [(await getPhoneBoxKeyView()).base_url, await savedPhoneBoxKey()];
+          if (!key) return sendError(res, 400, 'phone-box', 'ยังไม่ได้ใส่กุญแจ phone-box ที่ ตั้งค่า › เชื่อมระบบภายนอก');
+          const posts = phoneBoxPostsOf(jobSnapshot, options.groups);
+          if (posts.length === 0) return sendError(res, 400, 'Bad request', 'ไม่พบชื่อกลุ่มที่เลือก — ปิดแล้วเลือกกลุ่มใหม่');
+          const item = await createJobPostingRequest({
+            jobId,
+            requestNo: getString(body.request_no) ?? getString(body.requestNo),
+            requestType,
+            reason: body.reason,
+            userId: req.user.sub,
+            userName: req.user.email,
+            jobSnapshot: { ...jobSnapshot, sent_via: 'phone-box', phone_box_account_id: route.accountId },
+            initialStatus: 'in_progress',
+          });
+          // ใบเดิมที่ยังค้าง (กันซ้ำระดับใบขอ) = ไม่ยิงซ้ำ
+          if (item.status !== 'in_progress' || (item.job_snapshot as { sent_via?: unknown } | null)?.sent_via !== 'phone-box') {
+            return res.status(200).json(item);
+          }
+          const results: PhoneBoxPostResult[] = [];
+          for (const [i, p] of posts.entries()) {
+            results.push(
+              await sendPhoneBoxPost(baseUrl, key, { request_id: `jarvis-${item.id}-${i + 1}`, account_id: route.accountId, group_name: p.groupName, content: p.content }),
+            );
+          }
+          const sent = results.filter((r) => r.ok).length;
+          const failed = results.filter((r) => !r.ok);
+          const notes = [
+            `ส่ง phone-box (${route.accountName}) ${sent}/${results.length} กลุ่ม`,
+            ...failed.map((f) => `ไม่สำเร็จ ${f.groupName}: ${f.message ?? ''}`),
+          ].join('\n');
+          // กติกาเจ้าของ: phone-box ตอบ 202 = นับว่าโพสต์แล้ว · ส่งไม่ได้สักกลุ่ม = ไม่สำเร็จ (ไม่ลองซ้ำเอง)
+          const done = (await updateJobPostingRequest(item.id, { status: sent > 0 ? 'posted' : 'rejected', notes })) ?? item;
+          await auditFromAuthed(req, {
+            action: 'job_posting_request.create',
+            entityType: 'job_posting_request',
+            entityId: item.id,
+            after: { job_id: done.job_id, request_type: done.request_type, status: done.status, phone_box: results },
+          });
+          return res.status(200).json({ ...done, phone_box: { account: route.accountName, sent, total: results.length, results } });
+        }
+      }
+
       const item = await createJobPostingRequest({
         jobId,
         requestNo: getString(body.request_no) ?? getString(body.requestNo),

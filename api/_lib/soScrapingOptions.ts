@@ -6,6 +6,7 @@
  * - ยังไม่ได้ใส่ key = อ่านจากฐานของ So Scraping แบบเดิม (`source: 'db'`) — ทางถอยจนกว่าจะได้ key
  * - ใส่ key แล้วเรียกไม่ได้ (401 / ล่ม) = บอกตรง ๆ ไม่ถอยไปฐานเงียบ ๆ
  */
+import { listPhoneBoxRoutes, phoneBoxRouteFor } from './phoneBox.js';
 import { dbQuery, isPgUndefinedTable } from './postgres.js';
 import { tableInAppSchema } from './schema.js';
 import { decryptApiKey, encryptApiKey } from './aiSettingsStore.js';
@@ -166,10 +167,27 @@ export async function loadSoKey(): Promise<{ baseUrl: string; key: string } | nu
 
 export async function fetchSoOptions(requestNo: string | null = null): Promise<SoOptions> {
   const k = await loadSoKey();
-  if (!k) return optionsFromDb();
+  if (!k) return withPhoneBoxAccounts(await optionsFromDb());
   // options API ยังไม่ส่งธุรกิจของกลุ่ม/บัญชี — เติมจากฐานของ So Scraping (อ่านอย่างเดียว · อ่านไม่ได้ = ไม่ระบุธุรกิจ) · 2 พ.ย. 2569
   const [o, groups, accounts] = await Promise.all([callSoOptions(k.baseUrl, k.key, fetch, requestNo), listSoGroups(), listSoAccountDepartments()]);
-  return withSoDepartments(o, { groups, accounts });
+  return withPhoneBoxAccounts(withSoDepartments(o, { groups, accounts }));
+}
+
+/**
+ * บัญชีที่ติ๊กส่งผ่าน phone-box (18 พ.ย. 2569) — สถานะ/โควต้า/เครื่องของ So Scraping (RM009) ไม่เกี่ยวแล้ว
+ * ⇒ ให้เลือกได้เสมอ + ป้าย `phoneBox` · อ่านตารางไม่ได้ = คงค่าเดิม
+ */
+async function withPhoneBoxAccounts(o: SoOptions): Promise<SoOptions> {
+  const routes = await listPhoneBoxRoutes().catch(() => []);
+  if (routes.length === 0) return o;
+  return {
+    ...o,
+    accounts: o.accounts.map((a) =>
+      phoneBoxRouteFor(routes, a.name)
+        ? { ...a, phoneBox: true, status: 'ready', warning: null, pausedUntil: null, pauseReason: null, dailyCap: null, remainingToday: null, pendingGroups: 0, workerOnline: true }
+        : a,
+    ),
+  };
 }
 
 /**

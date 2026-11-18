@@ -420,13 +420,31 @@ export function AutopostBody({
 
       {sent ? (
         <div className="space-y-3" data-testid="autopost-sent">
-          <p className="text-sm text-foreground">
-            ส่งให้ So Scraping แล้ว ·{' '}
-            <Badge variant="outline" className={cn('font-medium', TONE[soStatusView(sent).tone].outline)}>
-              {soStatusView(sent).label}
-            </Badge>
-          </p>
-          <SoStartLine requestId={sent.id} initial={sent.so_start} onItem={(item) => setSent((cur) => (cur ? { ...item, so_start: cur.so_start } : item))} />
+          {sent.phone_box ? (
+            /* บัญชีที่ติ๊กไว้ส่งผ่าน phone-box (18 พ.ย. 2569) — ไม่ผ่าน So Scraping/RM009 */
+            <div className="space-y-1 text-sm" data-testid="autopost-phone-box">
+              <p className={sent.phone_box.sent > 0 ? 'text-foreground' : TONE.danger.value}>
+                ส่ง phone-box ({sent.phone_box.account}) แล้ว {sent.phone_box.sent}/{sent.phone_box.total} กลุ่ม
+              </p>
+              {sent.phone_box.results
+                .filter((r) => !r.ok)
+                .map((r) => (
+                  <p key={r.groupName} className={cn('text-xs', TONE.danger.value)}>
+                    ไม่สำเร็จ {r.groupName}{r.message ? ` · ${r.message}` : ''}
+                  </p>
+                ))}
+            </div>
+          ) : (
+            <>
+              <p className="text-sm text-foreground">
+                ส่งให้ So Scraping แล้ว ·{' '}
+                <Badge variant="outline" className={cn('font-medium', TONE[soStatusView(sent).tone].outline)}>
+                  {soStatusView(sent).label}
+                </Badge>
+              </p>
+              <SoStartLine requestId={sent.id} initial={sent.so_start} onItem={(item) => setSent((cur) => (cur ? { ...item, so_start: cur.so_start } : item))} />
+            </>
+          )}
           <Button type="button" variant="outline" onClick={onClose}>
             ปิด
           </Button>

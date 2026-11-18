@@ -256,6 +256,8 @@ export type SoOptAccount = {
   warning: string | null;
   /** ค่าเริ่มต้นให้คนสั่ง: พร้อมโพสต์ ไม่มีคำเตือน ล็อกอินบนเครื่องที่ออนไลน์ (So Scraping ตัดสิน · สเปค 6.1) */
   recommended: boolean;
+  /** ส่งผ่าน phone-box แทน So Scraping (ติ๊กที่ ตั้งค่า › เชื่อมระบบภายนอก · 18 พ.ย. 2569) */
+  phoneBox?: boolean;
   /** Facebook ขอยืนยันตัวตนตั้งแต่เมื่อไร · null = ไม่ติด */
   needsVerificationSince: string | null;
   groupIds: string[];
@@ -436,9 +438,11 @@ export function soAccountStatusText(
 
 /** ตัวเลือกในช่องบัญชี — ชื่อ · คำสถานะ (+ "ยังไม่ได้ล็อกอิน Facebook" เมื่อไม่มี session · เจ้าของ 3 พ.ย. 2569 เลือกได้ เตือนตอนส่ง) */
 export function soAccountChoice(
-  a: Pick<SoOptAccount, 'id' | 'name' | 'status' | 'sessionWorkers' | 'remainingToday' | 'worker' | 'warning'>,
+  a: Pick<SoOptAccount, 'id' | 'name' | 'status' | 'sessionWorkers' | 'remainingToday' | 'worker' | 'warning' | 'phoneBox'>,
   workers: readonly Pick<SoOptWorker, 'fbAccountIds'>[],
 ): { label: string; disabled: boolean; tone: SoAccountTone } {
+  // ส่งผ่าน phone-box = ไม่ขึ้นกับเครื่อง/ล็อกอินของ So Scraping (18 พ.ย. 2569)
+  if (a.phoneBox) return { label: `${a.name} · ส่งผ่าน phone-box`, disabled: false, tone: soAccountStatusText(a).tone };
   const st = soAccountStatusText(a);
   const selectable = soAccountSelectable(a.status);
   const noLogin = selectable && !soAccountHasSession(a, workers) ? ' · ยังไม่ได้ล็อกอิน Facebook' : '';

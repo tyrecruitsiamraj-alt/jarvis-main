@@ -31,7 +31,7 @@ import {
   SO_OPTIONS_KEY_NAME,
 } from '../_lib/soScrapingOptions.js';
 import { getLineBotKeyView, LINE_BOT_KEY_NAME, saveLineBotKey } from '../_lib/lineBotSoWork.js';
-import { getPhoneBoxKeyView, PHONE_BOX_KEY_NAME, readPhoneBoxStatus, savedPhoneBoxKey, savePhoneBoxKey } from '../_lib/phoneBox.js';
+import { getPhoneBoxKeyView, listPhoneBoxRoutes, PHONE_BOX_KEY_NAME, readPhoneBoxStatus, savedPhoneBoxKey, savePhoneBoxKey, setPhoneBoxRoute } from '../_lib/phoneBox.js';
 
 const KEYS = tableInAppSchema('app_integration_keys');
 const LEADS = tableInAppSchema('so_scraping_comment_leads');
@@ -64,7 +64,22 @@ async function handler(req: AuthedReq, res: ApiRes) {
       });
     }
     if (m === 'PUT') {
-      const body = (await readJsonBody(req)) as { outbound?: unknown; key?: unknown; base_url?: unknown; clear?: unknown } | null;
+      const body = (await readJsonBody(req)) as { outbound?: unknown; key?: unknown; base_url?: unknown; clear?: unknown; route?: unknown } | null;
+      // ติ๊กบัญชีที่ Autopost ส่งผ่าน phone-box (18 พ.ย. 2569) — ไม่แตะกุญแจ
+      if (body?.outbound === PHONE_BOX_KEY_NAME && body.route && typeof body.route === 'object') {
+        const r = body.route as { account_id?: unknown; account_name?: unknown; enabled?: unknown };
+        const accountId = typeof r.account_id === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(r.account_id) ? r.account_id : null;
+        const accountName = typeof r.account_name === 'string' && r.account_name.trim() ? r.account_name.trim().slice(0, 200) : null;
+        if (!accountId || !accountName || typeof r.enabled !== 'boolean') return sendError(res, 400, 'Bad request', 'ข้อมูลบัญชีไม่ครบ');
+        await setPhoneBoxRoute({ accountId, accountName, enabled: r.enabled }, req.user.email ?? req.user.sub);
+        await auditFromAuthed(req, {
+          action: 'phone_box.route',
+          entityType: 'outbound_key',
+          entityId: PHONE_BOX_KEY_NAME,
+          after: { account_id: accountId, account_name: accountName, enabled: r.enabled },
+        });
+        return res.status(200).json({ routes: await listPhoneBoxRoutes() });
+      }
       if (body?.outbound === LINE_BOT_KEY_NAME) {
         const baseUrl = normalizeSoBaseUrl(body.base_url);
         if (!baseUrl) return sendError(res, 400, 'Bad request', 'URL ต้องขึ้นต้นด้วย https://');
@@ -114,7 +129,8 @@ async function handler(req: AuthedReq, res: ApiRes) {
         if (!baseUrl) return sendError(res, 400, 'Bad request', 'URL ต้องขึ้นต้นด้วย https://');
         const key = (typeof body.key === 'string' && body.key.trim() ? body.key.trim() : null) ?? (await savedPhoneBoxKey());
         if (!key) return sendError(res, 400, 'Bad request', 'ใส่กุญแจก่อนกดเช็ก');
-        return res.status(200).json(await readPhoneBoxStatus(baseUrl, key));
+        const st = await readPhoneBoxStatus(baseUrl, key);
+        return res.status(200).json(st.ok ? { ...st, routes: await listPhoneBoxRoutes() } : st);
       }
       if (body?.outbound === SO_OPTIONS_KEY_NAME && body.test === true) {
         const baseUrl = normalizeSoBaseUrl(body.base_url);

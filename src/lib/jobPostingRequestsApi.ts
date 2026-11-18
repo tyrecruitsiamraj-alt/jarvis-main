@@ -18,6 +18,8 @@ export type JobPostingRequest = {
   id: string;
   /** ผลเรียก start ของ So Scraping — มากับคำตอบตอนสร้างเท่านั้น (26 ต.ค. 2569) */
   so_start?: SoStartView;
+  /** บัญชีที่ส่งผ่าน phone-box (18 พ.ย. 2569) — มากับคำตอบตอนสร้างเท่านั้น · ไม่มี = ไป So Scraping */
+  phone_box?: { account: string; sent: number; total: number; results: Array<{ groupName: string; ok: boolean; message: string | null }> };
   job_id: string;
   request_no: string | null;
   request_type: JobPostingRequestType;

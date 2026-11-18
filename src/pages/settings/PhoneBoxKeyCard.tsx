@@ -1,13 +1,15 @@
 /**
  * ═══ ตั้งค่า › เชื่อมระบบภายนอก › กุญแจ phone-box (เจ้าของ 16 พ.ย. 2569) ═══
  * มือถือโพสต์กลุ่ม Facebook · เก็บกุญแจเข้ารหัสฝั่ง server จอเห็นแค่ 4 ตัวท้าย
- * ใส่กุญแจแล้วจอขึ้นสถานะเครื่อง + บัญชีที่ผูก + จำนวนกลุ่ม (อ่านอย่างเดียว ยังไม่สั่งโพสต์)
+ * ใส่กุญแจแล้วจอขึ้นสถานะเครื่อง + บัญชีที่ผูก + จำนวนกลุ่ม
+ * ติ๊ก "ส่ง Autopost" (18 พ.ย. 2569) = Autopost ที่เลือกบัญชีนี้ส่งมา phone-box แทน So Scraping (RM009)
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { Smartphone } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -27,7 +29,8 @@ type Device = {
   groups: number | null;
   groupsMapped: number | null;
 };
-type Status = { ok: true; status: string; onlineDevices: number; devices: Device[] } | { ok: false; message: string };
+type Route = { accountId: string; accountName: string; enabled: boolean };
+type Status = { ok: true; status: string; onlineDevices: number; devices: Device[]; routes?: Route[] } | { ok: false; message: string };
 
 const NAME = 'phone-box';
 const NUM = new Intl.NumberFormat('th-TH');
@@ -111,6 +114,27 @@ const PhoneBoxKeyCard: React.FC = () => {
 
   const canCheck = Boolean(baseUrl.trim()) && (Boolean(key.trim()) || Boolean(view?.configured));
   const devices = status?.ok === true ? status.devices : [];
+  const routes = status?.ok === true ? (status.routes ?? []) : [];
+  const routed = (accountId: string | null) => Boolean(accountId && routes.some((r) => r.accountId === accountId && r.enabled));
+  const [routeBusy, setRouteBusy] = useState<string | null>(null);
+  const toggleRoute = async (d: Device, enabled: boolean) => {
+    if (!d.accountId || routeBusy) return;
+    setRouteBusy(d.accountId);
+    setError(null);
+    try {
+      const r = await apiFetch('/api/integration-keys', {
+        method: 'PUT',
+        body: JSON.stringify({ outbound: NAME, route: { account_id: d.accountId, account_name: d.accountName ?? d.accountId, enabled } }),
+      });
+      if (!r.ok) throw new Error(await errorText(r, 'บันทึกไม่สำเร็จ'));
+      const b = (await r.json()) as { routes: Route[] };
+      setStatus((cur) => (cur?.ok === true ? { ...cur, routes: b.routes } : cur));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'บันทึกไม่สำเร็จ');
+    } finally {
+      setRouteBusy(null);
+    }
+  };
 
   return (
     <Card variant="solid" className="space-y-4 p-5" data-testid="phone-box-key">
@@ -162,12 +186,13 @@ const PhoneBoxKeyCard: React.FC = () => {
                   <TableHead>Facebook</TableHead>
                   <TableHead className="text-right">กลุ่ม</TableHead>
                   <TableHead className="text-right">กลุ่มที่จับคู่แล้ว</TableHead>
+                  <TableHead>ส่ง Autopost</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {devices.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-muted-foreground">
+                    <TableCell colSpan={7} className="text-muted-foreground">
                       ไม่มีเครื่อง
                     </TableCell>
                   </TableRow>
@@ -182,6 +207,19 @@ const PhoneBoxKeyCard: React.FC = () => {
                       <TableCell className="whitespace-nowrap">{d.facebookOpen == null ? '—' : d.facebookOpen ? 'เปิดอยู่' : 'ไม่ได้เปิด'}</TableCell>
                       <TableCell className="text-right tabular-nums">{d.groups == null ? '—' : NUM.format(d.groups)}</TableCell>
                       <TableCell className="text-right tabular-nums">{d.groupsMapped == null ? '—' : NUM.format(d.groupsMapped)}</TableCell>
+                      <TableCell>
+                        {d.accountId ? (
+                          <Checkbox
+                            checked={routed(d.accountId)}
+                            disabled={routeBusy !== null}
+                            onCheckedChange={(v) => void toggleRoute(d, v === true)}
+                            aria-label={`ส่ง Autopost ด้วย ${d.accountName ?? d.accountId}`}
+                            data-testid={`phone-box-route-${d.accountId}`}
+                          />
+                        ) : (
+                          '—'
+                        )}
+                      </TableCell>
                     </TableRow>
                   ))
                 )}
