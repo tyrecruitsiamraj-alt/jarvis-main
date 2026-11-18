@@ -593,6 +593,9 @@ function buildWorkStatusKpis(
     daily_work: 0,
     daily_pay: 0,
   };
+  // กำลังดำเนินการสรรหา แยกตามช่อง "ส่งคนแทน" ในหน้าใบขอ (เจ้าของ 18 พ.ย. 2569 "ย่อยให้หน่อยว่า ส่งคนแทน ไม่ส่งคนแทนอย่างละเท่าไหร่")
+  // สามค่าเหมือนหน้าใบขอ — ยังไม่ระบุ ห้ามยุบเข้าไม่ส่ง · สามกองรวมกัน = เลขบนการ์ด
+  const replacement = { yes: 0, no: 0, unset: 0 };
   for (const j of jobs) {
     if (isPrequestJob(j)) continue;
     const status = resolveUnitRequestWorkStatus(j.work_status);
@@ -600,6 +603,7 @@ function buildWorkStatusKpis(
     if (units <= 0) continue;
     counts[status] += units;
     requestCounts[status] += 1;
+    if (status === 'in_progress') replacement[j.send_replacement === true ? 'yes' : j.send_replacement === false ? 'no' : 'unset'] += units;
   }
   const leafTotal = Object.values(counts).reduce((s, n) => s + n, 0);
   const leafRequests = Object.values(requestCounts).reduce((s, n) => s + n, 0);
@@ -637,7 +641,10 @@ function buildWorkStatusKpis(
         : `${scopeHint} · ผลรวมสถานะ = ${total.toLocaleString('th-TH')} อัตรา · ${totalRequests.toLocaleString('th-TH')} ใบ`,
       trendPercent: null,
     },
-    leaf('work_status_in_progress', 'กำลังดำเนินการสรรหา', 'in_progress'),
+    {
+      ...leaf('work_status_in_progress', 'กำลังดำเนินการสรรหา', 'in_progress'),
+      description: `${scopeHint} · ส่งคนแทน ${replacement.yes.toLocaleString('th-TH')} + ไม่ส่งคนแทน ${replacement.no.toLocaleString('th-TH')} + ยังไม่ระบุ ${replacement.unset.toLocaleString('th-TH')} = ${counts.in_progress.toLocaleString('th-TH')} อัตรา · ${requestCounts.in_progress.toLocaleString('th-TH')} ใบ`,
+    },
     leaf('work_status_on_hold', UNIT_REQUEST_WORK_STATUS_LABELS.on_hold, 'on_hold'),
     leaf('work_status_evaluating', UNIT_REQUEST_WORK_STATUS_LABELS.evaluating, 'evaluating'),
     leaf('work_status_waiting_inform', UNIT_REQUEST_WORK_STATUS_LABELS.waiting_inform, 'waiting_inform'),

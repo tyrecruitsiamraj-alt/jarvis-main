@@ -184,3 +184,18 @@ describe('QA 30 ต.ค. 2569 ก้อน 3 Dashboard', () => {
     expect(readFileSync('src/components/dashboard/analytics/DashboardShell.tsx', 'utf8')).not.toContain("(dateRange != null ? data.prequestKpi?.value ?? 0 : 0)");
   });
 });
+
+describe('กำลังดำเนินการสรรหา แยก ส่งคนแทน / ไม่ส่งคนแทน / ยังไม่ระบุ (เจ้าของ 18 พ.ย. 2569)', () => {
+  it('สามกองตามช่องในหน้าใบขอ (อัตราที่ยังต้องหา) รวมกัน = เลขบนการ์ด · ยังไม่ระบุไม่ยุบเข้าไม่ส่ง · สถานะอื่นไม่ปน', () => {
+    const open = [
+      job({ id: 'siamraj-sql:OPL6911001', request_no: 'OPL6911001', work_status: 'in_progress', request_positions: 3, send_replacement: true }),
+      job({ id: 'siamraj-sql:OPL6911002', request_no: 'OPL6911002', work_status: 'in_progress', request_positions: 2, send_replacement: false }),
+      job({ id: 'siamraj-sql:OPL6911003', request_no: 'OPL6911003', work_status: 'in_progress', request_positions: 1, send_replacement: null }),
+      job({ id: 'siamraj-sql:OPL6911004', request_no: 'OPL6911004', work_status: 'waiting_start', request_positions: 4, send_replacement: true }),
+    ];
+    const data = buildDashboardData(open, [], null, DEFAULT_DASHBOARD_FILTERS, new Date('2026-11-18T03:00:00Z'));
+    const k = data.workStatusKpis.find((x) => x.id === 'work_status_in_progress');
+    expect([k?.value, k?.secondaryCount]).toEqual([6, 3]);
+    expect(k?.description).toBe('ใบเปิดทั้งหมด · ส่งคนแทน 3 + ไม่ส่งคนแทน 2 + ยังไม่ระบุ 1 = 6 อัตรา · 3 ใบ');
+  });
+});
