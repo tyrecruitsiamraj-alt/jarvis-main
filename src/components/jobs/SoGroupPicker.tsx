@@ -1,6 +1,7 @@
 import React from 'react';
 import { bkkWhen } from '@/lib/bkkWhen';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { FieldSelect } from '@/components/shared/FieldSelect';
 import { cn } from '@/lib/utils';
@@ -118,6 +119,8 @@ export function SoGroupFilterPicker({
   const [buPick, setBuPick] = React.useState<string | null | undefined>(undefined);
   const [sectorPick, setSectorPick] = React.useState<UnitSector | null | undefined>(undefined);
   const [province, setProvince] = React.useState('');
+  /** ค้นหาชื่อกลุ่ม (เจ้าของ 19 พ.ย. 2569 "ทำให้ค้นหาชื่อกลุ่มได้ที") — พิมพ์แล้วหาจากทุกกลุ่มที่โพสต์ได้ ไม่สนธุรกิจ/ประเภท/จังหวัด */
+  const [query, setQuery] = React.useState('');
 
   // ค่าที่ใช้จริง = ที่เลือกไว้ถ้ายังมีในตัวเลือก ไม่งั้นค่าตั้งต้น (ของใบขอ → ตัวแรก)
   const bus = soFilterBus(usable, jobBu);
@@ -127,7 +130,10 @@ export function SoGroupFilterPicker({
   const sector = has(sectors, sectorPick) ? (sectorPick as UnitSector | null) : has(sectors, jobSector) ? jobSector : (sectors[0]?.value ?? null);
   const provinces = soFilterProvinces(usable, bu, sector);
   const prov = provinces.includes(province) ? province : '';
-  const list = soFilterGroups(usable, { bu, sector, province: prov });
+  const q = query.trim().toLowerCase();
+  const list = q
+    ? usable.filter((g) => [soGroupLabel(g, allGroups), g.fbGroupId ?? '', g.id].some((t) => t.toLowerCase().includes(q)))
+    : soFilterGroups(usable, { bu, sector, province: prov });
 
   const ids = list.map((g) => g.id);
   const n = ids.filter((id) => picked.includes(id)).length;
@@ -151,6 +157,7 @@ export function SoGroupFilterPicker({
             onChange={(v) => setBuPick(v === NONE_KEY ? null : v)}
             ariaLabel="ธุรกิจของกลุ่ม"
             testId={`${testPrefix}-filter-bu`}
+            disabled={Boolean(q)}
             options={bus.map((b) => ({ value: b.value ?? NONE_KEY, label: b.label }))}
           />
         </div>
@@ -161,6 +168,7 @@ export function SoGroupFilterPicker({
             onChange={(v) => setSectorPick(v === NONE_KEY ? null : (v as UnitSector))}
             ariaLabel="เอกชนหรือราชการ"
             testId={`${testPrefix}-filter-sector`}
+            disabled={Boolean(q)}
             options={sectors.map((x) => ({ value: x.value ?? NONE_KEY, label: x.label }))}
           />
         </div>
@@ -171,10 +179,20 @@ export function SoGroupFilterPicker({
             onChange={(v) => setProvince(v === ALL_PROVINCES ? '' : v)}
             ariaLabel="จังหวัดของกลุ่ม"
             testId={`${testPrefix}-filter-province`}
+            disabled={Boolean(q)}
             options={[{ value: ALL_PROVINCES, label: 'ทุกจังหวัด' }, ...provinces.map((p) => ({ value: p, label: p }))]}
           />
         </div>
       </div>
+
+      <Input
+        type="search"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder="ค้นหาชื่อกลุ่ม"
+        aria-label="ค้นหาชื่อกลุ่ม"
+        data-testid={`${testPrefix}-group-search`}
+      />
 
       {/* พื้นสีอ่อนแทนเส้นกรอบ + เส้นคั่นหัว (เจ้าของ 13 พ.ย. 2569 "กรอบมันเยอะชวนตาลาย") */}
       <div className="rounded-xl bg-muted/40">
@@ -187,11 +205,11 @@ export function SoGroupFilterPicker({
             aria-label="เลือกทุกกลุ่มในรายการนี้"
           />
           <Label htmlFor={`${idPrefix}-all`} className="flex-1 text-sm font-medium tabular-nums text-foreground" data-testid={`${testPrefix}-list-head`}>
-            โพสต์ได้ {NUM.format(ids.length)} กลุ่ม · เลือก {NUM.format(n)}
+            {q ? 'เจอ' : 'โพสต์ได้'} {NUM.format(ids.length)} กลุ่ม · เลือก {NUM.format(n)}
           </Label>
         </div>
         {list.length === 0 ? (
-          <p className="px-3 py-2 text-sm text-muted-foreground">ไม่มีกลุ่มที่โพสต์ได้ในตัวเลือกนี้</p>
+          <p className="px-3 py-2 text-sm text-muted-foreground">{q ? 'ไม่เจอกลุ่มชื่อนี้' : 'ไม่มีกลุ่มที่โพสต์ได้ในตัวเลือกนี้'}</p>
         ) : (
           <ul className="max-h-96 space-y-2 overflow-y-auto px-3 py-2">
             {list.map((g) => (
