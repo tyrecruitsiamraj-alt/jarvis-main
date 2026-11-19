@@ -65,6 +65,7 @@ import staffActivityHandler from './staff-activity.js';
 import soPostSummaryHandler from './so-post-summary.js';
 import requestPipelineHandler from './request-pipeline.js';
 import { soScrapingAiCallHandler, soScrapingLeadsHandler } from './so-scraping-integration.js';
+import { irecruitSkillResultsHandler } from './irecruit-integration.js';
 import scrapCandidatesHandler from './scrap-candidates.js';
 import postImagesHandler from './post-images.js';
 import publicPostImageHandler from './public/post-image.js';
@@ -282,6 +283,7 @@ export const apiRoutes: Record<string, ApiHandler> = {
   '/api/request-pipeline': requestPipelineHandler as ApiHandler,
   '/api/integrations/so-scraping/leads': soScrapingLeadsHandler as ApiHandler,
   '/api/integrations/so-scraping/ai-call': soScrapingAiCallHandler as ApiHandler,
+  '/api/integrations/irecruit/skill-results': irecruitSkillResultsHandler as ApiHandler,
   '/api/scrap-candidates': scrapCandidatesHandler as ApiHandler,
   '/api/post-images': postImagesHandler as ApiHandler,
   '/api/public/post-image': publicPostImageHandler as ApiHandler,

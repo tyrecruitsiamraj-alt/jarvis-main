@@ -8,6 +8,12 @@ export const INTEGRATIONS = [
     label: 'So Scraping',
     endpoints: ['/api/integrations/so-scraping/leads', '/api/integrations/so-scraping/ai-call'],
   },
+  // iRecruit ดึงผลแบบทดสอบ (เจ้าของ 18 พ.ย. 2569) — ไฟล์ api/_handlers/irecruit-integration.ts
+  {
+    name: 'irecruit',
+    label: 'iRecruit',
+    endpoints: ['/api/integrations/irecruit/skill-results'],
+  },
 ] as const;
 
 export type IntegrationName = (typeof INTEGRATIONS)[number]['name'];

@@ -84,6 +84,15 @@ export default function SkillQuizPage() {
   const [notice, setNotice] = useState<string | null>(null);
   const [editing, setEditing] = useState<{ id: string | null; item: QuizSetItem | null } | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
+  /** ลิงก์ใบผลจากระบบอื่น (`?set=…&open=<ใบ>` · iRecruit 18 พ.ย. 2569) — เปิดใบนั้นทันที แล้วล้าง open ออก ปิดแล้วไม่เด้งกลับ */
+  const openParam = params.get('open');
+  useEffect(() => {
+    if (!openParam || !attempts) return;
+    if (attempts.some((a) => a.id === openParam)) setOpenId(openParam);
+    const next = new URLSearchParams(params);
+    next.delete('open');
+    setParams(next, { replace: true });
+  }, [openParam, attempts, params, setParams]);
   const [share, setShare] = useState<{ title: string; url: string } | null>(null);
   const [skillsOpen, setSkillsOpen] = useState(false);
   const [search, setSearch] = useState('');

@@ -902,6 +902,17 @@ export const API_CATALOG: ApiCatalogEntry[] = [
   "reachesPeople": true
  },
  {
+  "path": "/api/integrations/irecruit/skill-results",
+  "file": "api/_handlers/irecruit-integration.ts",
+  "methods": [
+   "GET"
+  ],
+  "doc": "═══ iRecruit → Jarvis: ดึงผลแบบทดสอบ (เจ้าของ 18 พ.ย. 2569 \"ทำ API ให้ iRecruit ดึงผลแบบทดสอบตามที่แนะนำเลย\") ═══\n\nGET /api/integrations/irecruit/skill-results\nยืนยันตัว: header `x-api-key` (`withIntegrationKey` · key ชื่อ `irecruit` · ออก/ยกเลิกได้ที่ ตั้งค่า › เชื่อมระบบภายนอก)\n\nquery:\n  since=<ISO 8601>          ใบที่ส่งคำตอบหลังเวลานี้ (ใช้ครั้งแรก) · ไม่ส่ง = ตั้งแต่ใบแรก\n  cursor=<next_cursor>      ดึงต่อจากรอบก่อน (ใช้แทน since) — ไม่ซ้ำ ไม่ตกหล่น\n  phone=0XXXXXXXXX          เฉพาะเบอร์นี้ (หาคนด้วยเบอร์โทร)\n  limit=1–500               ค่าเริ่ม 100\nตอบ { items, next_cursor, has_more }\n\nส่งเฉพาะใบที่ส่งคำตอบแล้ว และไม่ถูกลบ · เรียงตามเวลาส่งคำตอบ\n🔴 PDPA: ส่งเท่าที่ iRecruit ใช้ — ไม่ส่งเลขบัตร · วันเกิด · คำตอบรายข้อ · บทวิเคราะห์\nลิงก์ใบผล = หน้าแบบทดสอบของ Jarvis (ต้องล็อกอิน Jarvis และมีสิทธิ์ดูชุดนั้น) — ไม่มีลิงก์สาธารณะ",
+  "query": [],
+  "body": [],
+  "reachesPeople": false
+ },
+ {
   "path": "/api/integrations/so-scraping/ai-call",
   "file": "api/_handlers/so-scraping-integration.ts",
   "methods": [
@@ -979,8 +990,9 @@ export const API_CATALOG: ApiCatalogEntry[] = [
    "detail_of",
    "counts",
    "job_id",
-   "lead",
    "bucket",
+   "bu",
+   "lead",
    "cancelled"
   ],
   "body": [
@@ -2419,11 +2431,12 @@ export const API_CATALOG: ApiCatalogEntry[] = [
   "methods": [
    "GET"
   ],
-  "doc": "GET /api/staff-activity?from=YYYY-MM-DD&to=YYYY-MM-DD&bu=LBD — งานรายคนต่อวัน (เจ้าของ 18 พ.ย. 2569)\nGET ...&detail=1&user=<uuid>&kind=<StaffActivityKind>&day=YYYY-MM-DD(ไม่ส่ง = ทั้งช่วง) — รายการของช่องที่กด\nอ่านอย่างเดียว · สิทธิ์เดียวกับภาพรวม (`job-applications`) · BU = แผนกของผู้ใช้ (ชุดเลือก BU เดียวกับภาพรวม)\nแหล่ง: Autopost/Scrap = job_posting_requests · สร้างลิงก์ = recruit_posting_links · ติ๊กโพสต์เอง = recruit_posting_link_posts\n       ลงผลติดต่อ/นัดได้ = application_contact_logs (วันที่บันทึก)",
+  "doc": "GET /api/staff-activity?from=YYYY-MM-DD&to=YYYY-MM-DD&bu=LBD — งานรายคนต่อวัน (เจ้าของ 18 พ.ย. 2569)\nGET ...&feed=1 — ความเคลื่อนไหวล่าสุด 30 รายการในช่วง (ภาพรวมแบบ Mobix)\nGET ...&detail=1&user=<uuid>&kind=<StaffActivityKind>&day=YYYY-MM-DD(ไม่ส่ง = ทั้งช่วง) — รายการของช่องที่กด\nอ่านอย่างเดียว · สิทธิ์เดียวกับภาพรวม (`job-applications`) · BU = แผนกของผู้ใช้ (ชุดเลือก BU เดียวกับภาพรวม)\nแหล่ง: Autopost/Scrap = job_posting_requests · สร้างลิงก์ = recruit_posting_links · ติ๊กโพสต์เอง = recruit_posting_link_posts\n       ลงผลติดต่อ/นัดได้ = application_contact_logs (วันที่บันทึก)",
   "query": [
    "from",
    "to",
    "bu",
+   "feed",
    "detail",
    "user",
    "kind",
