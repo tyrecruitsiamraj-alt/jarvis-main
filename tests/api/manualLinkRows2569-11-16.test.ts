@@ -42,6 +42,17 @@ describe('โพสต์เองรายลิงก์', () => {
     expect(linkTreeChildren(rows, ['ไม่ระบุช่องทาง'])[0]).toMatchObject({ key: 'ว่าน', leaf: true });
   });
 
+  it('ป้ายเก่า "Facebook Group · ชื่อกลุ่ม" อยู่ใต้ Facebook · กลุ่ม FB ไม่มีชื่อ = ไม่ระบุกลุ่ม (ชื่อคนไม่ปนชั้นกลุ่ม)', () => {
+    const rows = manualLinkRows(
+      [L('o', { channel_label: 'Facebook Group · กลุ่มขับรถ' }), L('n', { channel_label: 'Facebook · Facebook Group', created_by_name: 'ใหม่' }), L('p', { channel_label: 'Facebook · Facebook Page' })],
+      new Map(),
+    );
+    expect(linkPathOf(rows[0])).toEqual(['Facebook', 'Facebook Group', 'กลุ่มขับรถ', 'เจมส์']);
+    expect(linkPathOf(rows[1])).toEqual(['Facebook', 'Facebook Group', 'ไม่ระบุกลุ่ม', 'ใหม่']);
+    expect(linkPathOf(rows[2])).toEqual(['Facebook', 'Facebook Page', 'เจมส์']);
+    expect(linkTreeChildren(rows, []).map((n) => n.key)).toEqual(['Facebook']);
+  });
+
   it('เส้น ?links=1 อ่านอย่างเดียว + BU แบบเดียวกับรายวัน', () => {
     const h = readFileSync('api/_handlers/job-post-actions.ts', 'utf8');
     expect(h).toContain("if (one(req.query?.links) === '1') {");

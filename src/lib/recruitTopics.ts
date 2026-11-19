@@ -225,8 +225,13 @@ export const linkTotalsOf = (rows: readonly ManualLinkRow[]): LinkTotals => ({
  * ทางไล่ลงของลิงก์ (แผงโพสต์เอง · เจ้าของ 19 พ.ย. 2569 Choice "กล่อง + ตารางกดไล่ลง" แบบรายชื่อเข้ามาไปถึงไหน)
  * ช่องทางหลัก › ช่องทางรอง › กลุ่ม FB (จากป้ายช่องทาง "A · B · C") › ผู้รับผิดชอบ — ชั้นสุดท้ายเป็นคนเสมอ
  */
+export const LINK_NO_GROUP = 'ไม่ระบุกลุ่ม';
 export function linkPathOf(r: ManualLinkRow): string[] {
-  const parts = r.place.split(' · ').map((x) => x.trim()).filter(Boolean);
+  let parts = r.place.split(' · ').map((x) => x.trim()).filter(Boolean);
+  // ป้ายเก่าขึ้นต้นด้วยช่องทางรอง ("Facebook Group · ชื่อกลุ่ม") — ต่อหัว Facebook ให้อยู่กองเดียวกัน
+  if (/^Facebook (Group|Page|Ads)$/.test(parts[0] ?? '')) parts = ['Facebook', ...parts];
+  // กลุ่ม FB ที่ไม่ได้ใส่ชื่อกลุ่ม — ชั้นกลุ่มต้องมีเสมอ ไม่งั้นชื่อคนปนกับชื่อกลุ่มชั้นเดียวกัน (ตรวจบนเว็บ 19 พ.ย. 2569)
+  if (parts.length === 2 && parts[0] === 'Facebook' && parts[1] === 'Facebook Group') parts = [...parts, LINK_NO_GROUP];
   const head = parts.length > 3 ? [...parts.slice(0, 2), parts.slice(2).join(' · ')] : parts;
   return [...head, r.by];
 }
