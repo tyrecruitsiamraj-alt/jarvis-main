@@ -44,6 +44,8 @@ const KIND_TONE: Record<RequestLeadKind, ToneKey> = { advance: 'success', urgent
 const DEFAULT_TOPIC = 'work_status_in_progress';
 const topicHex = (key: string) => REQUEST_TOPIC_HEX[key] ?? REQUEST_TOPIC_HEX.work_status_none;
 const buKey = (r: StuckRequest) => r.bu?.trim() || BU_UNKNOWN;
+const BU_ORDER = ['LBD', 'LBA', 'LM', 'SN', 'DS', 'CR'];
+const buRank = (b: string) => (b === BU_UNKNOWN ? 99 : BU_ORDER.indexOf(b) < 0 ? 50 : BU_ORDER.indexOf(b));
 const sumOf = (rows: readonly StuckRequest[], f: Field) => rows.reduce((n, r) => n + (Number(r[f]) || 0), 0);
 const aiYesOf = (r: StuckRequest) => r.aiYesIds?.length ?? r.signals?.counts?.aiYes ?? 0;
 const apptOf = (r: StuckRequest) => r.apptIds?.length ?? r.signals?.counts?.appointed ?? 0;
@@ -111,7 +113,10 @@ export default function RequestBuPanel({
   };
 
   // ไม่ระบุ BU ขึ้นเฉพาะเมื่อมีใบแบบนั้นจริง (BU อื่นอยู่เสมอ ว่าง = 0)
-  const busShown = bus.filter((b) => b !== BU_UNKNOWN || (rows ?? []).some((r) => buKey(r) === BU_UNKNOWN));
+  // ลำดับคงที่ BU ใหญ่ซ้ายสุด (ภาพรวมจริง 19 พ.ย. 2569 ขึ้น SN DS LM LBA LBD ตามลำดับสิทธิ์ผู้ใช้)
+  const busShown = bus
+    .filter((b) => b !== BU_UNKNOWN || (rows ?? []).some((r) => buKey(r) === BU_UNKNOWN))
+    .sort((a, b) => buRank(a) - buRank(b));
   const byBu = topic
     ? busShown.map((b) => {
         const list = topic.rows.filter((r) => buKey(r) === b);

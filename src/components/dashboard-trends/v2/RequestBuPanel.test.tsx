@@ -69,6 +69,11 @@ describe('RequestBuPanel', () => {
     expect(screen.getByTestId('req-bu-pager').textContent).toContain('1–10 จาก 13');
   });
 
+  it('แท่ง BU เรียง LBD ซ้ายสุดเสมอ ไม่ตามลำดับที่ส่งมา', () => {
+    render(<RequestBuPanel rows={rows} jobs={jobs} bus={['SN', 'DS', 'LM', 'LBA', 'LBD']} rangeText="" error={null} onOpenRequest={vi.fn()} onNames={vi.fn()} resetKey="k" />);
+    expect(screen.getAllByTestId(/^req-bu-bar-/).map((b) => b.getAttribute('data-testid'))).toEqual(['req-bu-bar-LBD', 'req-bu-bar-LBA', 'req-bu-bar-LM', 'req-bu-bar-SN', 'req-bu-bar-DS']);
+  });
+
   it('กดแท่ง BU = ตารางเหลือ BU นั้น · กดซ้ำ = ทุก BU', () => {
     draw();
     fireEvent.click(screen.getByTestId('req-bu-bar-LBA'));
