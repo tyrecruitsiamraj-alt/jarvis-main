@@ -4,9 +4,9 @@
    Instrument Sans (หน้าเข้าสู่ระบบ) ⇒ หน้าจอมีสามหน้าตาปนกัน + โหลดช้าโดยไม่จำเป็น
    ⚠️ ตัดสองตัวหลังออก · `font-mono` ถูก map ไป Kanit ที่ tailwind.config.ts แล้ว
    ตัวเลขยังเรียงตรงกันด้วย `tabular-nums` (Kanit มีชุดตัวเลขความกว้างเท่ากัน) */
-/* 🔴 หนาสุด = SemiBold 600 (เจ้าของ 12 พ.ย. 2569 "เอาขนาดไม่หนามากเป็นแค่ Semi พอ") — ไม่โหลด 700
-   ⇒ <b>/<strong>/bold ทุกที่แสดงเป็น 600 เอง (เบราว์เซอร์เลือกน้ำหนักที่ใกล้สุดที่มี) */
-@import url('https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600&display=swap');
+/* 🔴 ไฟล์ฟอนต์อยู่ในระบบเอง (`@fontsource/kanit` 300/400/500/600/700 · import ที่ src/main.tsx)
+   เจ้าของ 19 พ.ย. 2569 "ปรับตัวหนังสือทั้งระบบให้เหมือน Knowa" — เลิกดึงจาก Google ตอนเปิดหน้า
+   (Knowa เคย deploy ล้มสามครั้งติดเพราะเครื่อง build ออกไปหา Google ไม่ได้) */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -185,15 +185,10 @@
 
 @layer base {
   /**
-   * ขนาดฐานของทั้งแอป — เจ้าของบอกทุกหน้าดูเล็ก (7 ส.ค. 2569) เลยขยายจาก 16px
-   * ปรับที่นี่ที่เดียว: ทุกอย่างที่เป็น rem (ตัวหนังสือ text-* / ระยะห่าง p-* gap-*)
-   * โตตามสัดส่วนพร้อมกัน โครงหน้าจึงไม่เพี้ยนเป็นจุด ๆ
-   * ⚠️ ขนาด px ตายตัว (text-[11px] ฯลฯ) ไม่โตตาม — ตั้งใจ เพราะเป็นป้ายจิ๋วในชิป
-   * ที่ถ้าโตแล้วจะดันบรรทัดตก
+   * ขนาดฐาน 16px ของเบราว์เซอร์ (เจ้าของ 19 พ.ย. 2569 "ปรับตัวหนังสือทั้งระบบให้เหมือน Knowa")
+   * เดิม 112.5% (18px · 7 ส.ค. 2569) ถอดแล้ว ⇒ ตัวหนังสือ/ระยะห่างที่เป็น rem เล็กลงตามแบบ Knowa — ตั้งใจ
+   * ⚠️ หัวข้อ h1–h5 คงขนาดเดิมทุกพิกเซล ด้วยชุดชดเชยท้าย @layer base นี้
    */
-  html {
-    font-size: 112.5%; /* 18px */
-  }
 
   * {
     @apply border-border;
@@ -206,17 +201,14 @@
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
     font-optical-sizing: auto;
-    letter-spacing: -0.006em; /* tracking แน่นบางๆ แบบ Apple ให้ตัวอักษรคม */
+    /* เนื้อความแบบ Knowa: บาง 300 · ระยะตัวอักษร 0 (ไทยห้ามบีบ สระ/วรรณยุกต์ชนกัน) · ระยะบรรทัดของฟอนต์เอง
+       คลาสที่ระบุเอง (font-medium · leading-* · tracking-*) ยังทำงานตามเดิม */
+    font-weight: 300;
+    letter-spacing: 0;
+    line-height: normal;
   }
 
-  /**
-   * 🔴 **`<b>` กับ `<strong>` เบราว์เซอร์ตั้งให้ 700 เอง** — ไล่แก้คลาส Tailwind
-   * อย่างเดียวจึงไม่พอ (มี 24 จุดในระบบที่ใช้แท็กพวกนี้เน้นคำกลางประโยค)
-   * เจ้าของสั่ง 16 ก.ย. 2569 ว่าให้ลดทั้งระบบ ⇒ ตั้งทับที่ต้นทางทีเดียว ไม่ต้องไล่แก้ทีละที่
-   */
-  b, strong {
-    font-weight: 500;
-  }
+  /* <b>/<strong> ใช้ค่าของเบราว์เซอร์ (700) แบบ Knowa — เดิมตั้งทับ 500 (16 ก.ย. 2569) ถอดแล้ว 19 พ.ย. 2569 */
 
   h1, h2, h3, h4, h5 {
     letter-spacing: -0.022em; /* หัวข้อแน่นขึ้น = ดูพรีเมียม/คม */
@@ -231,6 +223,7 @@
   h1 {
     letter-spacing: -0.03em; /* หัวใหญ่สุดแน่นสุดแบบ Apple display */
   }
+
 
   ::-webkit-scrollbar {
     width: 6px;
@@ -879,3 +872,152 @@
    จอโฮโล · เมืองกลางคืน · มาสคอตเดินได้ ~490 บรรทัด) **ไม่มีไฟล์จอไหนเรียกใช้แล้ว**
    ตั้งแต่รอบยุบหน้าแรก 26 ส.ค. 2569 (ตรวจแล้ว: ชื่อคลาส jarvis-office ไม่ปรากฏในไฟล์จอเลย)
    ⇒ ลบออกเพื่อให้ไฟล์สไตล์เหลือเฉพาะของที่ใช้จริง · ของเดิมอยู่ในประวัติ git ถ้าต้องการคืน */
+
+/**
+ * ═══ หัวข้อ h1–h5 คงขนาดเดิม (ฐาน 18px) ทุกพิกเซล หลังถอด 112.5% (เจ้าของ 19 พ.ย. 2569 "ยกเว้นหัวข้อให้คงแบบ Jarvis เดิมทุกอย่าง") ═══
+ * คลาสขนาดของ Tailwind เป็น rem ⇒ หัวข้อที่ใช้คลาส text-xx หรือ leading-N (rem) ตั้งค่าคูณ 1.125 แล้วเป็น px (ความเจาะจง h+คลาส ชนะคลาสเดี่ยว)
+ * หัวข้อที่ไม่มีคลาสขนาด = 1.125 เท่าของขนาดที่สืบมา · ระยะบรรทัด 1.5 เท่าเดิม (ค่า preflight ก่อน body เป็น normal)
+ * ขนาด px ตายตัว (text-[22px]) ไม่ต้องชดเชย · คลาส tracking กับ leading-snug ฯลฯ เป็นสัดส่วน ไม่ต้องชดเชย · เทสต์ tests/api/typographyRules.test.ts
+ */
+h1, h2, h3, h4, h5 { font-size: 1.125em; line-height: 1.5; }
+:is(h1, h2, h3, h4, h5).text-xs { font-size: 13.5px; line-height: 18px; }
+:is(h1, h2, h3, h4, h5).text-sm { font-size: 15.75px; line-height: 22.5px; }
+:is(h1, h2, h3, h4, h5).text-base { font-size: 18px; line-height: 27px; }
+:is(h1, h2, h3, h4, h5).text-lg { font-size: 20.25px; line-height: 31.5px; }
+:is(h1, h2, h3, h4, h5).text-xl { font-size: 22.5px; line-height: 31.5px; }
+:is(h1, h2, h3, h4, h5).text-2xl { font-size: 27px; line-height: 36px; }
+:is(h1, h2, h3, h4, h5).text-3xl { font-size: 33.75px; line-height: 40.5px; }
+:is(h1, h2, h3, h4, h5).text-4xl { font-size: 40.5px; line-height: 45px; }
+:is(h1, h2, h3, h4, h5).text-5xl { font-size: 54px; line-height: 1; }
+:is(h1, h2, h3, h4, h5).text-6xl { font-size: 67.5px; line-height: 1; }
+:is(h1, h2, h3, h4, h5).text-7xl { font-size: 81px; line-height: 1; }
+:is(h1, h2, h3, h4, h5).text-8xl { font-size: 108px; line-height: 1; }
+:is(h1, h2, h3, h4, h5).text-9xl { font-size: 144px; line-height: 1; }
+:is(h1, h2, h3, h4, h5).leading-3 { line-height: 13.5px; }
+:is(h1, h2, h3, h4, h5).leading-4 { line-height: 18px; }
+:is(h1, h2, h3, h4, h5).leading-5 { line-height: 22.5px; }
+:is(h1, h2, h3, h4, h5).leading-6 { line-height: 27px; }
+:is(h1, h2, h3, h4, h5).leading-7 { line-height: 31.5px; }
+:is(h1, h2, h3, h4, h5).leading-8 { line-height: 36px; }
+:is(h1, h2, h3, h4, h5).leading-9 { line-height: 40.5px; }
+:is(h1, h2, h3, h4, h5).leading-10 { line-height: 45px; }
+@media (min-width: 640px) {
+  :is(h1, h2, h3, h4, h5).sm\:text-xs { font-size: 13.5px; line-height: 18px; }
+  :is(h1, h2, h3, h4, h5).sm\:text-sm { font-size: 15.75px; line-height: 22.5px; }
+  :is(h1, h2, h3, h4, h5).sm\:text-base { font-size: 18px; line-height: 27px; }
+  :is(h1, h2, h3, h4, h5).sm\:text-lg { font-size: 20.25px; line-height: 31.5px; }
+  :is(h1, h2, h3, h4, h5).sm\:text-xl { font-size: 22.5px; line-height: 31.5px; }
+  :is(h1, h2, h3, h4, h5).sm\:text-2xl { font-size: 27px; line-height: 36px; }
+  :is(h1, h2, h3, h4, h5).sm\:text-3xl { font-size: 33.75px; line-height: 40.5px; }
+  :is(h1, h2, h3, h4, h5).sm\:text-4xl { font-size: 40.5px; line-height: 45px; }
+  :is(h1, h2, h3, h4, h5).sm\:text-5xl { font-size: 54px; line-height: 1; }
+  :is(h1, h2, h3, h4, h5).sm\:text-6xl { font-size: 67.5px; line-height: 1; }
+  :is(h1, h2, h3, h4, h5).sm\:text-7xl { font-size: 81px; line-height: 1; }
+  :is(h1, h2, h3, h4, h5).sm\:text-8xl { font-size: 108px; line-height: 1; }
+  :is(h1, h2, h3, h4, h5).sm\:text-9xl { font-size: 144px; line-height: 1; }
+  :is(h1, h2, h3, h4, h5).sm\:leading-3 { line-height: 13.5px; }
+  :is(h1, h2, h3, h4, h5).sm\:leading-4 { line-height: 18px; }
+  :is(h1, h2, h3, h4, h5).sm\:leading-5 { line-height: 22.5px; }
+  :is(h1, h2, h3, h4, h5).sm\:leading-6 { line-height: 27px; }
+  :is(h1, h2, h3, h4, h5).sm\:leading-7 { line-height: 31.5px; }
+  :is(h1, h2, h3, h4, h5).sm\:leading-8 { line-height: 36px; }
+  :is(h1, h2, h3, h4, h5).sm\:leading-9 { line-height: 40.5px; }
+  :is(h1, h2, h3, h4, h5).sm\:leading-10 { line-height: 45px; }
+}
+@media (min-width: 768px) {
+  :is(h1, h2, h3, h4, h5).md\:text-xs { font-size: 13.5px; line-height: 18px; }
+  :is(h1, h2, h3, h4, h5).md\:text-sm { font-size: 15.75px; line-height: 22.5px; }
+  :is(h1, h2, h3, h4, h5).md\:text-base { font-size: 18px; line-height: 27px; }
+  :is(h1, h2, h3, h4, h5).md\:text-lg { font-size: 20.25px; line-height: 31.5px; }
+  :is(h1, h2, h3, h4, h5).md\:text-xl { font-size: 22.5px; line-height: 31.5px; }
+  :is(h1, h2, h3, h4, h5).md\:text-2xl { font-size: 27px; line-height: 36px; }
+  :is(h1, h2, h3, h4, h5).md\:text-3xl { font-size: 33.75px; line-height: 40.5px; }
+  :is(h1, h2, h3, h4, h5).md\:text-4xl { font-size: 40.5px; line-height: 45px; }
+  :is(h1, h2, h3, h4, h5).md\:text-5xl { font-size: 54px; line-height: 1; }
+  :is(h1, h2, h3, h4, h5).md\:text-6xl { font-size: 67.5px; line-height: 1; }
+  :is(h1, h2, h3, h4, h5).md\:text-7xl { font-size: 81px; line-height: 1; }
+  :is(h1, h2, h3, h4, h5).md\:text-8xl { font-size: 108px; line-height: 1; }
+  :is(h1, h2, h3, h4, h5).md\:text-9xl { font-size: 144px; line-height: 1; }
+  :is(h1, h2, h3, h4, h5).md\:leading-3 { line-height: 13.5px; }
+  :is(h1, h2, h3, h4, h5).md\:leading-4 { line-height: 18px; }
+  :is(h1, h2, h3, h4, h5).md\:leading-5 { line-height: 22.5px; }
+  :is(h1, h2, h3, h4, h5).md\:leading-6 { line-height: 27px; }
+  :is(h1, h2, h3, h4, h5).md\:leading-7 { line-height: 31.5px; }
+  :is(h1, h2, h3, h4, h5).md\:leading-8 { line-height: 36px; }
+  :is(h1, h2, h3, h4, h5).md\:leading-9 { line-height: 40.5px; }
+  :is(h1, h2, h3, h4, h5).md\:leading-10 { line-height: 45px; }
+}
+@media (min-width: 1024px) {
+  :is(h1, h2, h3, h4, h5).lg\:text-xs { font-size: 13.5px; line-height: 18px; }
+  :is(h1, h2, h3, h4, h5).lg\:text-sm { font-size: 15.75px; line-height: 22.5px; }
+  :is(h1, h2, h3, h4, h5).lg\:text-base { font-size: 18px; line-height: 27px; }
+  :is(h1, h2, h3, h4, h5).lg\:text-lg { font-size: 20.25px; line-height: 31.5px; }
+  :is(h1, h2, h3, h4, h5).lg\:text-xl { font-size: 22.5px; line-height: 31.5px; }
+  :is(h1, h2, h3, h4, h5).lg\:text-2xl { font-size: 27px; line-height: 36px; }
+  :is(h1, h2, h3, h4, h5).lg\:text-3xl { font-size: 33.75px; line-height: 40.5px; }
+  :is(h1, h2, h3, h4, h5).lg\:text-4xl { font-size: 40.5px; line-height: 45px; }
+  :is(h1, h2, h3, h4, h5).lg\:text-5xl { font-size: 54px; line-height: 1; }
+  :is(h1, h2, h3, h4, h5).lg\:text-6xl { font-size: 67.5px; line-height: 1; }
+  :is(h1, h2, h3, h4, h5).lg\:text-7xl { font-size: 81px; line-height: 1; }
+  :is(h1, h2, h3, h4, h5).lg\:text-8xl { font-size: 108px; line-height: 1; }
+  :is(h1, h2, h3, h4, h5).lg\:text-9xl { font-size: 144px; line-height: 1; }
+  :is(h1, h2, h3, h4, h5).lg\:leading-3 { line-height: 13.5px; }
+  :is(h1, h2, h3, h4, h5).lg\:leading-4 { line-height: 18px; }
+  :is(h1, h2, h3, h4, h5).lg\:leading-5 { line-height: 22.5px; }
+  :is(h1, h2, h3, h4, h5).lg\:leading-6 { line-height: 27px; }
+  :is(h1, h2, h3, h4, h5).lg\:leading-7 { line-height: 31.5px; }
+  :is(h1, h2, h3, h4, h5).lg\:leading-8 { line-height: 36px; }
+  :is(h1, h2, h3, h4, h5).lg\:leading-9 { line-height: 40.5px; }
+  :is(h1, h2, h3, h4, h5).lg\:leading-10 { line-height: 45px; }
+}
+@media (min-width: 1280px) {
+  :is(h1, h2, h3, h4, h5).xl\:text-xs { font-size: 13.5px; line-height: 18px; }
+  :is(h1, h2, h3, h4, h5).xl\:text-sm { font-size: 15.75px; line-height: 22.5px; }
+  :is(h1, h2, h3, h4, h5).xl\:text-base { font-size: 18px; line-height: 27px; }
+  :is(h1, h2, h3, h4, h5).xl\:text-lg { font-size: 20.25px; line-height: 31.5px; }
+  :is(h1, h2, h3, h4, h5).xl\:text-xl { font-size: 22.5px; line-height: 31.5px; }
+  :is(h1, h2, h3, h4, h5).xl\:text-2xl { font-size: 27px; line-height: 36px; }
+  :is(h1, h2, h3, h4, h5).xl\:text-3xl { font-size: 33.75px; line-height: 40.5px; }
+  :is(h1, h2, h3, h4, h5).xl\:text-4xl { font-size: 40.5px; line-height: 45px; }
+  :is(h1, h2, h3, h4, h5).xl\:text-5xl { font-size: 54px; line-height: 1; }
+  :is(h1, h2, h3, h4, h5).xl\:text-6xl { font-size: 67.5px; line-height: 1; }
+  :is(h1, h2, h3, h4, h5).xl\:text-7xl { font-size: 81px; line-height: 1; }
+  :is(h1, h2, h3, h4, h5).xl\:text-8xl { font-size: 108px; line-height: 1; }
+  :is(h1, h2, h3, h4, h5).xl\:text-9xl { font-size: 144px; line-height: 1; }
+  :is(h1, h2, h3, h4, h5).xl\:leading-3 { line-height: 13.5px; }
+  :is(h1, h2, h3, h4, h5).xl\:leading-4 { line-height: 18px; }
+  :is(h1, h2, h3, h4, h5).xl\:leading-5 { line-height: 22.5px; }
+  :is(h1, h2, h3, h4, h5).xl\:leading-6 { line-height: 27px; }
+  :is(h1, h2, h3, h4, h5).xl\:leading-7 { line-height: 31.5px; }
+  :is(h1, h2, h3, h4, h5).xl\:leading-8 { line-height: 36px; }
+  :is(h1, h2, h3, h4, h5).xl\:leading-9 { line-height: 40.5px; }
+  :is(h1, h2, h3, h4, h5).xl\:leading-10 { line-height: 45px; }
+}
+@media (min-width: 1536px) {
+  :is(h1, h2, h3, h4, h5).2xl\:text-xs { font-size: 13.5px; line-height: 18px; }
+  :is(h1, h2, h3, h4, h5).2xl\:text-sm { font-size: 15.75px; line-height: 22.5px; }
+  :is(h1, h2, h3, h4, h5).2xl\:text-base { font-size: 18px; line-height: 27px; }
+  :is(h1, h2, h3, h4, h5).2xl\:text-lg { font-size: 20.25px; line-height: 31.5px; }
+  :is(h1, h2, h3, h4, h5).2xl\:text-xl { font-size: 22.5px; line-height: 31.5px; }
+  :is(h1, h2, h3, h4, h5).2xl\:text-2xl { font-size: 27px; line-height: 36px; }
+  :is(h1, h2, h3, h4, h5).2xl\:text-3xl { font-size: 33.75px; line-height: 40.5px; }
+  :is(h1, h2, h3, h4, h5).2xl\:text-4xl { font-size: 40.5px; line-height: 45px; }
+  :is(h1, h2, h3, h4, h5).2xl\:text-5xl { font-size: 54px; line-height: 1; }
+  :is(h1, h2, h3, h4, h5).2xl\:text-6xl { font-size: 67.5px; line-height: 1; }
+  :is(h1, h2, h3, h4, h5).2xl\:text-7xl { font-size: 81px; line-height: 1; }
+  :is(h1, h2, h3, h4, h5).2xl\:text-8xl { font-size: 108px; line-height: 1; }
+  :is(h1, h2, h3, h4, h5).2xl\:text-9xl { font-size: 144px; line-height: 1; }
+  :is(h1, h2, h3, h4, h5).2xl\:leading-3 { line-height: 13.5px; }
+  :is(h1, h2, h3, h4, h5).2xl\:leading-4 { line-height: 18px; }
+  :is(h1, h2, h3, h4, h5).2xl\:leading-5 { line-height: 22.5px; }
+  :is(h1, h2, h3, h4, h5).2xl\:leading-6 { line-height: 27px; }
+  :is(h1, h2, h3, h4, h5).2xl\:leading-7 { line-height: 31.5px; }
+  :is(h1, h2, h3, h4, h5).2xl\:leading-8 { line-height: 36px; }
+  :is(h1, h2, h3, h4, h5).2xl\:leading-9 { line-height: 40.5px; }
+  :is(h1, h2, h3, h4, h5).2xl\:leading-10 { line-height: 45px; }
+}
+
+/* ช่องกรอกบนมือถือ 16px ขึ้นไป ไม่งั้น iPhone ซูมจอเอง (ฐาน 16px แล้ว text-sm = 14px) */
+@media (max-width: 767px) {
+  :is(input, textarea, select):not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']) { font-size: max(16px, 1em); }
+}

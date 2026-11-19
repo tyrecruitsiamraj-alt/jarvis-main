@@ -36,11 +36,33 @@ describe('ฟอนต์เดียวทั้งระบบ = Kanit', () =>
   const css = read('src/index.css');
   const tw = read('tailwind.config.ts');
 
-  it('🔴 โหลดฟอนต์ตัวเดียว — ไม่มี JetBrains Mono / Instrument Sans แล้ว', () => {
-    const importLine = css.split('\n').find((l) => l.includes('fonts.googleapis.com')) ?? '';
-    expect(importLine).toContain('family=Kanit');
-    expect(importLine).not.toContain('JetBrains');
-    expect(importLine).not.toContain('Instrument');
+  it('🔴 โหลดฟอนต์ตัวเดียว (Kanit) จากไฟล์ในระบบ — ไม่ดึง Google ตอนเปิดหน้า (19 พ.ย. 2569 แบบ Knowa)', () => {
+    const main = read('src/main.tsx');
+    for (const w of [300, 400, 500, 600, 700]) expect(main).toContain(`@fontsource/kanit/${w}.css`);
+    expect(css).not.toContain('fonts.googleapis.com');
+    expect(read('index.html')).not.toMatch(/fonts\.(googleapis|gstatic)\.com/);
+    expect(main).not.toMatch(/JetBrains|Instrument/);
+    expect(JSON.parse(read('package.json')).dependencies['@fontsource/kanit']).toBeTruthy();
+  });
+
+  it('🔴 ตัวหนังสือแบบ Knowa: ฐาน 16px · เนื้อความ 300 · ระยะตัวอักษร 0 · บรรทัด normal · b/strong 700 ของเบราว์เซอร์', () => {
+    expect(css).not.toMatch(/font-size:\s*112\.5%/);
+    const body = css.slice(css.indexOf('  body {'), css.indexOf('}', css.indexOf('  body {')));
+    expect(body).toMatch(/font-weight:\s*300/);
+    expect(body).toMatch(/letter-spacing:\s*0;/);
+    expect(body).toMatch(/line-height:\s*normal/);
+    expect(css).not.toMatch(/b, strong \{\s*font-weight/);
+  });
+
+  it('🔴 หัวข้อ h1–h5 คงขนาดเดิม (ฐาน 18px): text-lg = 20.25px/31.5px · text-3xl = 33.75px/40.5px · ไม่มีคลาส = 1.125em', () => {
+    expect(css).toContain(':is(h1, h2, h3, h4, h5).text-lg { font-size: 20.25px; line-height: 31.5px; }');
+    expect(css).toContain(':is(h1, h2, h3, h4, h5).text-3xl { font-size: 33.75px; line-height: 40.5px; }');
+    expect(css).toContain(':is(h1, h2, h3, h4, h5).md\\:text-xl { font-size: 22.5px; line-height: 31.5px; }');
+    expect(css).toContain('h1, h2, h3, h4, h5 { font-size: 1.125em; line-height: 1.5; }');
+  });
+
+  it('🔴 ช่องกรอกบนมือถือ 16px ขึ้นไป (iPhone ไม่ซูมจอ)', () => {
+    expect(css).toMatch(/@media \(max-width: 767px\) \{\s*:is\(input, textarea, select\)[^{]*\{ font-size: max\(16px, 1em\); \}/);
   });
 
   it('font-sans และ font-mono ชี้ Kanit ทั้งคู่', () => {
@@ -278,9 +300,9 @@ describe('🔴 ทั้งระบบต้องไม่มีตัวห�
     expect(bad, `ไฟล์ที่ยังมีน้ำหนักเกิน medium:\n${bad.join('\n')}`).toEqual([]);
   });
 
-  it('🔴 `<b>` / `<strong>` ต้องถูกตั้งทับเป็น 500 ที่ CSS กลาง (เบราว์เซอร์ตั้ง 700 มาเอง)', () => {
+  it('🔴 `<b>` / `<strong>` ใช้ค่าของเบราว์เซอร์ (700) แบบ Knowa — ไม่ตั้งทับที่ CSS กลางแล้ว (เจ้าของ 19 พ.ย. 2569 ทับคำสั่ง 16 ก.ย.)', () => {
     const css = read('src/index.css').replace(/\/\*[\s\S]*?\*\//g, '');
-    expect(css).toMatch(/b,\s*strong\s*\{[^}]*font-weight:\s*500/);
+    expect(css).not.toMatch(/b,\s*strong\s*\{[^}]*font-weight/);
   });
 
   it('CSS ของแถบเมนูล่างก็ต้องไม่เกิน 500', () => {

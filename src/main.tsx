@@ -1,5 +1,10 @@
 import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
+import "@fontsource/kanit/300.css";
+import "@fontsource/kanit/400.css";
+import "@fontsource/kanit/500.css";
+import "@fontsource/kanit/600.css";
+import "@fontsource/kanit/700.css";
 import "./index.css";
 import { initTheme } from "./lib/theme";
 import { installStaleChunkReload } from "./lib/staleChunkReload";
