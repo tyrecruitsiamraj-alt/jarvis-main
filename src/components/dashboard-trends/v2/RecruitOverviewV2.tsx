@@ -23,13 +23,11 @@ import { fetchSoPostGroups } from '@/lib/soPostGroupsApi';
 import { fetchManualLinks } from '@/lib/jobPostActionsApi';
 import { requestPathOfJobId } from '@/lib/jobNavigation';
 import { RELEASE_LANE_TEXT } from '@/lib/boardRelease';
-import { EMPTY_REQUEST_FILTER, filterRequestRows, isRequestFilterActive, jobFilterOf, type RequestTabFilter } from '@/lib/recruitRequestTab';
 import { prevCohortOf } from '@/lib/recruitScale';
 import { friendlyErrorText } from '@/lib/friendlyError';
 import { BU_UNKNOWN, buOfFact, pageOf, bkkDay } from '@/lib/recruitAudience';
 import SoPostGroupsCard from '../stuck/SoPostGroupsCard';
 import SelfLinksPanel from '../topics/SelfLinksPanel';
-import StuckFilterBar from '../stuck/StuckFilterBar';
 import StuckAreaTable from '../stuck/StuckAreaTable';
 import CallerResultsTable from '../stuck/CallerResultsTable';
 import V2Drawer, { type V2Pane } from './V2Drawer';
@@ -67,9 +65,11 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
   /** การ์ด "ต้องทำ" กดแล้วไปหน้าผู้สมัคร เห็นคนชุดเดียวกับเลข — BU เดียวกับที่เลือกบนหน้านี้ (เจ้าของ 18 พ.ย. 2569) */
   const buQs = data.bu ? `&bu=${encodeURIComponent(data.bu)}` : '';
   const filterKey = `${data.bu ?? 'all'}:${win.from}:${win.to}:${data.generatedAt}`;
-  /** ตัวกรองบนสุดชุดเดียวกับหน้าเดิม (เจ้าหน้าที่ · ประเภทงาน · งานย่อย · Code Site · จังหวัด · อำเภอ · ตำบล) — คุมใบขอ + รายชื่อทุกส่วน */
-  const [reqFilter, setReqFilter] = React.useState<RequestTabFilter>(EMPTY_REQUEST_FILTER);
-  const viewKey = `${filterKey}:${JSON.stringify(reqFilter)}`;
+  /**
+   * แถบกรองบนสุด 7 ช่อง (เจ้าหน้าที่ · ประเภทงาน · งานย่อย · Code Site · จังหวัด · อำเภอ · ตำบล) ถอดแล้ว
+   * (เจ้าของ 19 พ.ย. 2569 Choice "ถอดออกทั้งแถบ") — เหลือปฏิทิน + BU คุมทั้งหน้า · หน้าแบบเดิม (`RecruitStuckBody`) ยังมีแถบนี้
+   */
+  const viewKey = filterKey;
 
   const [stack, setStack] = React.useState<V2Pane[]>([]);
   const [metric, setMetric] = React.useState<V2Metric>('apps');
@@ -114,30 +114,21 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
     };
   }, [filterKey, data.bu, win.from, win.to]);
   const allRows = stuck.key === filterKey ? stuck.data?.requests ?? null : null;
-  const reqRows = React.useMemo(() => (allRows ? (filterRequestRows(allRows, reqFilter) as StuckRequest[]) : null), [allRows, reqFilter]);
-  const filterOn = isRequestFilterActive(reqFilter);
-  // รายชื่อตามตัวกรองบนสุด — ตัวตัดสินเดียวกับหน้าเดิม (`jobFilterOf`) · รายชื่อที่ไม่ผูกใบขอหลุดตอนกรอง (ตั้งใจ เหมือนหน้าเดิม)
-  const keep = React.useMemo(() => {
-    if (!filterOn || !reqRows) return undefined;
-    const ok = jobFilterOf(reqFilter, reqRows, (jobId) => data.appJobs?.[jobId]?.recruiter ?? null);
-    return (f: { jobId?: string | null }) => ok(f.jobId ?? null);
-  }, [filterOn, reqFilter, reqRows, data.appJobs]);
-  const model = React.useMemo(() => buildV2Model(data, keep), [data, keep]);
-  /** ใบขอเส้นเดียวกับ Dashboard (กล่องสถานะทำงาน · 18 พ.ย. 2569) — BU + ตัวกรองบนสุดชุดเดียวกับส่วนอื่น */
+  const reqRows: StuckRequest[] | null = allRows;
+  const model = React.useMemo(() => buildV2Model(data), [data]);
+  /** ใบขอเส้นเดียวกับ Dashboard (กล่องสถานะทำงาน · 18 พ.ย. 2569) — BU ชุดเดียวกับส่วนอื่น */
   const reqFeed = useUnitRequestsFeed();
   const statusJobs = React.useMemo(() => {
     if (reqFeed.feedState !== 'ready') return null;
-    const byBu = data.bu ? filterUnitRequestsByDepartment(reqFeed.jobs, data.bu) : reqFeed.jobs;
-    return keep ? byBu.filter((j) => keep({ jobId: j.id })) : byBu;
-  }, [reqFeed.feedState, reqFeed.jobs, data.bu, keep]);
+    return data.bu ? filterUnitRequestsByDepartment(reqFeed.jobs, data.bu) : reqFeed.jobs;
+  }, [reqFeed.feedState, reqFeed.jobs, data.bu]);
   const statusRange = React.useMemo(() => (win.all ? null : { from: win.from, to: win.to }), [win.all, win.from, win.to]);
-  /** ช่วงก่อน (ช่วงวันเท่ากัน · ตัวกรองชุดเดียวกัน) — เทียบไม่ได้ = null */
+  /** ช่วงก่อน (ช่วงวันเท่ากัน) — เทียบไม่ได้ = null */
   const prevModel = React.useMemo(() => {
     const prev = prevCohortOf(data.apps ?? [], win, data.firstDay, data.generatedAt);
-    return prev ? buildV2Model(data, keep, prev) : null;
-  }, [data, win, keep]);
+    return prev ? buildV2Model(data, undefined, prev) : null;
+  }, [data, win]);
   const prevOf = (m: V2Metric): number | null => (prevModel ? (prevModel.stages[m].ids?.length ?? null) : null);
-  const appRecruiters = React.useMemo(() => Object.values(data.appJobs ?? {}).map((j) => j.recruiter), [data.appJobs]);
   const eq = reqRows ? stuckEquation(reqRows) : null;
   const openRows = eq?.remaining ?? [];
   /** ประกาศแล้ว / ยังไม่ประกาศ — ตัวแบ่งเดียวกับหัวหน้าโพสต์ประกาศ (เจ้าของ 18 พ.ย. 2569 "ยอดมันไม่ตรงกับหน้าภาพรวมหรอ") */
@@ -295,8 +286,6 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
   const storyCohort = idSet ? model.cohort.filter((f) => inMetric(f.id)) : model.cohort;
   return (
     <div className="space-y-8" data-testid="recruit-overview-v2">
-      <StuckFilterBar rows={allRows ?? []} appRecruiters={appRecruiters} value={reqFilter} onChange={setReqFilter} />
-
       {/* ── ต้องทำ (บนสุด · ณ ตอนนี้ ไม่ขึ้นกับช่วงวันที่) — แบบ Mobix (เจ้าของ 18 พ.ย. 2569) · กด = ไปหน้าที่แก้ได้ ── */}
       <Card className="min-w-0 space-y-3 rounded-2xl p-5" data-testid="v2-todo-card">
         <SectionTitle title="ต้องทำ" right="ณ ตอนนี้" />

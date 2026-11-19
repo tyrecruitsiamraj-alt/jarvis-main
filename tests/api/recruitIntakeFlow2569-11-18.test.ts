@@ -158,3 +158,10 @@ describe('สนใจแล้ว รอเจ้าหน้าที่โท
     expect(readFileSync('api/_handlers/recruit-overview.ts', 'utf8')).toContain('isWaitingForStaff({ aiAnswer: micro(');
   });
 });
+
+describe('ภาพรวมไม่มีแถบกรอง 7 ช่องแล้ว (เจ้าของ 19 พ.ย. 2569 "ถอดออกทั้งแถบ")', () => {
+  it('ไม่มี StuckFilterBar และไม่มีค่ากรองค้างเบื้องหลัง', () => {
+    const src = readFileSync('src/components/dashboard-trends/v2/RecruitOverviewV2.tsx', 'utf8');
+    for (const s of ['StuckFilterBar', 'reqFilter', 'jobFilterOf', 'appRecruiters']) expect(src).not.toContain(s);
+  });
+});
