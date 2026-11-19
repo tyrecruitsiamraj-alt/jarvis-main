@@ -38,7 +38,7 @@ import StaffActivityPanel from './StaffActivityPanel';
 import { ActivityFeed, OutreachTiles, TODO_ICONS, TodoList } from './PulseParts';
 import { fetchStaffActivity, fetchStaffActivityFeed } from '@/lib/staffActivityApi';
 import type { StaffActivityFeedItem, StaffActivityKind, StaffActivityRow } from '@/lib/staffActivity';
-import WorkStatusBoard from './WorkStatusBoard';
+import RequestBuPanel from './RequestBuPanel';
 import IntakeFlowPanel from './IntakeFlowPanel';
 import { useUnitRequestsFeed } from '@/hooks/useUnitRequestsFeed';
 import { filterUnitRequestsByDepartment } from '@/lib/siamrajUnitFilters';
@@ -294,30 +294,18 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
 
       {/* ── ใบขอ (ใบ + อัตรา) · ใครต้องทำอะไร · งานที่ยังขาดคน — กางไว้ (เจ้าของ 17 พ.ย. 2569 "ซ่อนไว้ทำไม") ── */}
       <Card className="min-w-0 space-y-5 rounded-2xl p-5" data-testid="v2-requests">
-        <SectionTitle title="ใบขอ" right={`นับอัตรา · สถานะ ณ ${dayText(win.to)} · ใบขอใหม่นับตามวันคีย์ใน ERP`} />
-        {stuck.error && stuck.key === filterKey ? <p className="text-sm text-destructive">{stuck.error}</p> : null}
-        {/* บวกลบลงตัวทั้งใบและอัตรา (เจ้าของ 18 พ.ย. 2569 "ตรงนี้บวกลบกันต้องลง 327 ใบ 378 อัตรา และคำต้องบอกเลยว่าคือสถานะอะไร")
-            เลขใหญ่ = อัตรา ชุดเดียวกับสถานะทำงาน · ใบเป็นบรรทัดรอง (เจ้าของ 19 พ.ย. 2569 "ถ้าจะนับอัตราก็เอาอัตราขึ้นไม่ใช่ใช้คนละยอด")
-            อัตรา: ขอไว้ของใบยกมา + ขอมา − หาได้แล้ว − ยกเลิก = เหลือหา · ใบ: ยกมา + ขอใหม่ − ปิดครบ − ยกเลิก = เหลือหา
-            อัตราหาได้/ยกเลิก = สะสมของใบทุกใบในชุด (รวมที่หาได้บางส่วนของใบที่ยังเปิด) — ERP ไม่มีวันที่ของการหาได้รายอัตรา */}
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-5" data-testid="v2-req-equation">
-          <Kpi label={`ยอดยกมา · เปิดอยู่ก่อน ${shortDay(win.from)}`} emphasis value={loadingReq ? undefined : eq ? sumOf(eq.carried, 'requested') : null} sub={eq ? `${fmt(eq.carried.length)} ใบ` : undefined} onClick={eq ? () => openRequests('ยอดยกมา', eq.carried) : undefined} testId="v2-req-carried" />
-          <Kpi label={`+ ขอใหม่ · ${rangeShort}`} emphasis value={loadingReq ? undefined : eq ? sumOf(eq.new, 'requested') : null} sub={eq ? `ใบขอใหม่ ${fmt(eq.new.length)} ใบ` : undefined} onClick={eq ? () => openRequests('ขอใหม่', eq.new) : undefined} testId="v2-req-new" />
-          <Kpi label={`− หาได้แล้ว · ${rangeShort}`} emphasis value={loadingReq ? undefined : reqRows ? sumOf(reqRows, 'filled') : null} sub={eq ? `ปิดครบใบขอ ${fmt(eq.filled.length)} ใบ` : undefined} onClick={reqRows ? () => openRequests('หาได้แล้ว', reqRows.filter((r) => r.filled > 0)) : undefined} testId="v2-req-filled" />
-          <Kpi label={`− ยกเลิก · ${rangeShort}`} emphasis value={loadingReq ? undefined : reqRows ? sumOf(reqRows, 'cancelled') : null} sub={eq ? `ยกเลิกใบขอ ${fmt(eq.cancelled.length)} ใบ` : undefined} onClick={reqRows ? () => openRequests('ยกเลิก', reqRows.filter((r) => r.cancelled > 0)) : undefined} tone="danger" testId="v2-req-cancelled" />
-          <Kpi label={`= เหลือหา · ยังเปิดอยู่ ณ ${shortDay(win.to)}`} emphasis tone="warn" value={loadingReq ? undefined : eq ? sumOf(eq.remaining, 'remaining') : null} sub={eq ? `${fmt(eq.remaining.length)} ใบ` : undefined} onClick={eq ? () => openRequests('เหลือหา', eq.remaining) : undefined} testId="v2-req-open" />
-        </div>
-        {/* สถานะทำงาน = เหลือหาแตกตามสถานะ (บวกกันได้เหลือหา) · การประกาศ = เหลือหาแบ่งประกาศแล้ว/ยังไม่ประกาศ
-            รวมอยู่ก้อนใบขอ ไม่มีกล่องทั้งหมดซ้ำ (เจ้าของ 19 พ.ย. 2569 "ใบขอ กับ สถานะทำงาน มันรวมกันได้ไหม" → "แก้ 2 อันนี้ก่อน") */}
-        <div className="border-t pt-4">
-          <WorkStatusBoard
-            remaining={eq ? eq.remaining : null}
-            jobs={statusJobs}
-            error={reqFeed.feedState === 'failed' || reqFeed.feedState === 'forbidden' ? 'โหลดใบขอไม่ได้' : null}
-            onOpenRequest={(jobId) => navigate(requestPathOfJobId(jobId))}
-            resetKey={viewKey}
-          />
-        </div>
+        {/* ใบขอ + สถานะทำงาน รวมเป็นเรื่องเดียวเลือกจากรายการ → กราฟแยก BU → ตารางใบขอข้างล่าง (เจ้าของ 19 พ.ย. 2569 แบบร่าง "เอาขึ้นระบบเลย")
+            ตัวกรอง เจ้าหน้าที่สรรหา · เจ้าหน้าที่คัดสรร · ชนิดใบ คัดใบก่อน ⇒ สมการ/สถานะ/กราฟ/ตาราง ชุดเดียวกัน */}
+        <RequestBuPanel
+          rows={loadingReq ? null : reqRows}
+          jobs={statusJobs}
+          bus={bus}
+          rangeText={`${rangeShort} · สถานะ ณ ${dayText(win.to)}`}
+          error={stuck.error && stuck.key === filterKey ? stuck.error : reqFeed.feedState === 'failed' || reqFeed.feedState === 'forbidden' ? 'โหลดสถานะทำงานของใบขอไม่ได้' : null}
+          onOpenRequest={(jobId) => navigate(requestPathOfJobId(jobId))}
+          onNames={(title, ids) => openNames(title, ids)}
+          resetKey={viewKey}
+        />
         {/* ── การประกาศรับสมัคร: กราฟ BU ชุดเดียวบนหน้า กดช่อง = กราฟกับตารางข้างล่างเปลี่ยนตาม
             กดปุ่ม/แถวในนี้ = รายการใบอย่างเดียว ไม่มีกราฟ BU ซ้ำในแผงข้าง (เจ้าของ 19 พ.ย. 2569 "พอกดแต่ละช่องก็มีกราฟอีกมันซับซ้อนปะ") ── */}
         <section className="min-w-0 space-y-4 border-t pt-4" data-testid="v2-posting">

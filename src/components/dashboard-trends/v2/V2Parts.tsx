@@ -19,6 +19,8 @@ export const fmtPct = (n: number | null | undefined): string => (n === null || n
 /** สีประจำ BU (คงที่ — ไม่ใช้สีที่มีความหมาย เขียว/เหลือง/แดง) */
 const BU_TONE: Record<string, ToneKey> = { LBD: 'primary', LBA: 'violet', LM: 'teal', DS: 'info', SN: 'orange' };
 export const buDot = (bu: string): string => TONE[BU_TONE[bu] ?? 'neutral'].dot;
+/** สีประจำ BU เป็น hex (แท่งกราฟ/แถบสัดส่วน) — ชุดเดียวกับ `buDot` */
+export const buHex = (bu: string): string => TONE[BU_TONE[bu] ?? 'neutral'].hex;
 
 export function SectionTitle({ title, right, id }: { title: string; right?: React.ReactNode; id?: string }) {
   return (

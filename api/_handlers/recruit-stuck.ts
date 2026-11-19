@@ -25,8 +25,9 @@ import { listLatestJobPostingsForBoard } from '../_lib/jobPostingRequests.js';
 import { loadErpExtras, loadOnlineRequestRows, loadReleaseMatches, type ErpExtra } from '../_lib/homeOnlineSql.js';
 import { loadInformDaysByPhone } from '../_lib/applicantSourceSql.js';
 import { ERP_INFORM_SINCE, informedByPhone, phone9Of } from '../../src/lib/applicantSourceMatch.js';
-import { countsOf } from '../../src/lib/requestPipeline.js';
-import { getJobRequestAgeDays } from '../../src/lib/jobUrgency.js';
+import { aiResultOf, countsOf } from '../../src/lib/requestPipeline.js';
+import { computeJobUrgency, getJobRequestAgeDays } from '../../src/lib/jobUrgency.js';
+import { requestLeadKindFromYmd } from '../../src/lib/requestLeadKind.js';
 import { boardProvinceOf, drivingSubtypeOf, UNSPECIFIED } from '../../src/lib/boardFilters.js';
 import { districtMatcherFor } from '../../src/lib/districtMatch.js';
 import { getDistrictOptionsForProvince } from '../../src/lib/thaiDistricts.js';
@@ -322,6 +323,7 @@ async function loadStuckRequests(
   const postBy = new Map<string, StuckPostStatus>();
   for (const p of postings) if (p.request_type === 'content' && POST_STATUSES.includes(p.status as StuckPostStatus) && !postBy.has(p.job_id)) postBy.set(p.job_id, p.status as StuckPostStatus);
 
+  const ledgerOf = (jobId: string) => roleOf(jobId)?.r ?? null;
   return base.map((b, i) => {
     const id = b.online.jobId as string;
     const row = rows[i];
@@ -352,6 +354,12 @@ async function loadStuckRequests(
       released: signals.released,
       applications: counts.apps,
       recruiter: row.recruiter ?? text(j?.recruiter_name),
+      // ชนิดใบ (ล่วงหน้า/ฉุกเฉิน/ย้อนหลัง) — ใบเปิด = เกณฑ์ของใบ (`computeJobUrgency`) · ใบที่จบแล้ว = วันคีย์/วันที่ต้องการจากสมุดใบขอ
+      // (เจ้าของ 19 พ.ย. 2569 ภาพรวมก้อนใบขอ "แยกล่วงหน้าออกมาด้วย" · Filter เลือกหลายอันได้)
+      leadKind: j ? computeJobUrgency(j).kind : ledgerOf(id) ? requestLeadKindFromYmd(ledgerOf(id)!.keyYmd, ledgerOf(id)!.needYmd) : null,
+      // คนที่ AI ได้คำตอบว่าสนใจ / ลงวันนัดแล้ว — ตัวนับเดียวกับ `countsOf` (aiYes · appointed) ⇒ กดเลขแล้วเห็นชื่อชุดเดียวกัน
+      aiYesIds: fs.filter((f) => f.calledByAi && aiResultOf(f) === 'yes').map((f) => f.id ?? '').filter(Boolean),
+      apptIds: fs.filter((f) => f.appointmentAt).map((f) => f.id ?? '').filter(Boolean),
       ageDays: state === 'open' && j ? getJobRequestAgeDays(j) : null,
       bu: b.online.bu,
       screener: text(j?.screener_name),

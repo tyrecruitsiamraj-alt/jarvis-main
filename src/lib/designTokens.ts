@@ -249,6 +249,29 @@ export const TONE: Record<ToneKey, ToneClasses> = {
 };
 
 /** variant ที่ต้องมีคู่ `dark:` เสมอ — dot/solid ใช้สีอิ่มตัวเดียวกันทั้งสองธีมโดยตั้งใจ */
+/**
+ * สีประจำเรื่องของก้อนใบขอ (ภาพรวมงานสรรหา · เจ้าของ 19 พ.ย. 2569 "เอาสีให้ตรงกับเรื่องด้วย ปิดแล้วเขียว ยกเลิก ดำเนินการสรรหา เอาให้ดูสีแล้วรู้")
+ * หาได้แล้ว/ยกเลิก/เหลือหา = สีที่มีความหมายเดิม (success/danger/warn) · สถานะทำงานแต่ละตัวมีสีของตัวเอง
+ * ใช้กับจุดหน้าชื่อเรื่อง + เลขใหญ่ — แท่งกราฟใช้สีประจำ BU (`buHex`)
+ */
+export const REQUEST_TOPIC_HEX: Record<string, string> = {
+  carried: '#64748b',
+  new: '#1f3f7a',
+  filled: '#047857',
+  cancelled: '#9f1239',
+  remaining: '#b45309',
+  work_status_in_progress: '#2563c4',
+  work_status_on_hold: '#94a0b4',
+  work_status_evaluating: '#7c4fc4',
+  work_status_waiting_inform: '#0f8a8a',
+  work_status_waiting_interview: '#d4589a',
+  work_status_waiting_result: '#a46ad6',
+  work_status_waiting_start: '#5aa34a',
+  work_status_daily_work: '#e07b2a',
+  work_status_daily_pay: '#9a6b3c',
+  work_status_none: '#b8bfcc',
+};
+
 export const TONE_DARK_REQUIRED_VARIANTS = [
   'bar',
   'tile',

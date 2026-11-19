@@ -25,9 +25,19 @@ describe('สมการใบขอ', () => {
     expect(sum(eq.carried, 'requested') + sum(eq.new, 'requested') - sum(rows, 'filled') - sum(rows, 'cancelled')).toBe(sum(eq.remaining, 'remaining'));
   });
   it('เลขใหญ่ = อัตรา ใบเป็นบรรทัดรอง (เจ้าของ 19 พ.ย. 2569 "ถ้าจะนับอัตราก็เอาอัตราขึ้น")', () => {
-    const src = readFileSync('src/components/dashboard-trends/v2/RecruitOverviewV2.tsx', 'utf8');
-    for (const w of ['ยอดยกมา · เปิดอยู่ก่อน', '+ ขอใหม่ ·', '− หาได้แล้ว ·', '− ยกเลิก ·', '= เหลือหา · ยังเปิดอยู่ ณ', 'ปิดครบใบขอ ${fmt(eq.filled.length)} ใบ', 'ยกเลิกใบขอ ${fmt(eq.cancelled.length)} ใบ']) expect(src).toContain(w);
-    for (const w of ["value={loadingReq ? undefined : eq ? sumOf(eq.carried, 'requested')", "sumOf(reqRows, 'filled')", "sumOf(reqRows, 'cancelled')", "sumOf(eq.remaining, 'remaining')"]) expect(src).toContain(w);
+    // 19 พ.ย. 2569 ค่ำ: สมการย้ายเข้าแผงใบขอ (เลือกเรื่องจากรายการ) — เลขใหญ่ = อัตรา · บรรทัดรอง = ใบ / ปิดครบ / ยกเลิกทั้งใบ
+    const src = readFileSync('src/components/dashboard-trends/v2/RequestBuPanel.tsx', 'utf8');
+    for (const w of [
+      "{ key: 'carried', label: 'ยอดยกมา', field: 'requested', rows: eq.carried",
+      "{ key: 'new', label: 'ขอใหม่', field: 'requested', rows: eq.new",
+      "{ key: 'filled', label: 'หาได้แล้ว', field: 'filled', rows: kept.filter((r) => r.filled > 0)",
+      "{ key: 'cancelled', label: 'ยกเลิก', field: 'cancelled', rows: kept.filter((r) => r.cancelled > 0)",
+      "{ key: 'remaining', label: 'เหลือหา', field: 'remaining', rows: eq.remaining",
+      'ปิดครบ ${fmt(eq.filled.filter(inBu).length)} ใบ',
+      'ยกเลิกทั้งใบ ${fmt(eq.cancelled.filter(inBu).length)} ใบ',
+      'อัตรา · {subOf(topic)}',
+    ])
+      expect(src).toContain(w);
   });
   it('ใบขอชั่วคราวที่จบในช่วง: อัตราที่ไม่ได้คนเป็นยกเลิก ไม่หายจากสมการ', () => {
     const src = readFileSync('api/_handlers/recruit-stuck.ts', 'utf8');
