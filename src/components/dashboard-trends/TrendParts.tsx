@@ -343,14 +343,19 @@ export function TrendState({ loading, error, onRetry }: { loading: boolean; erro
     );
   }
   if (!error) return null;
+  // โหลดไม่ขึ้น = น้องใบขอท่า "ติดปัญหา" (เจ้าของ 19 พ.ย. 2569 "เวลาโหลดมีปัญหา ขออะไรที่ดูน่ารักๆ เอารูปจากตรงนี้มาเตือน")
+  // ภาพจากชุดน้องใบขอที่เจ้าของทำเอง (`public/mascot/request-trouble.png`) — ห้ามวาดใหม่
   return (
-    <Card className={cn('flex flex-wrap items-center justify-between gap-2 rounded-2xl p-3 text-sm', TONE.danger.soft)}>
-      <span className={TONE.danger.value}>{error}</span>
-      {onRetry ? (
-        <Button type="button" size="xs" variant="outline" onClick={onRetry}>
-          <RefreshCw aria-hidden /> ลองใหม่
-        </Button>
-      ) : null}
+    <Card className={cn('flex flex-wrap items-center gap-4 rounded-2xl p-4 text-sm', TONE.danger.soft)} data-testid="trend-load-error">
+      <img src="/mascot/request-trouble.png" alt="น้องใบขอติดปัญหา" width={100} height={120} className="h-28 w-auto shrink-0 rounded-xl" />
+      <div className="flex min-w-0 flex-1 flex-col items-start gap-2">
+        <span className={TONE.danger.value}>{error}</span>
+        {onRetry ? (
+          <Button type="button" size="sm" variant="outline" onClick={onRetry}>
+            <RefreshCw aria-hidden /> ลองใหม่
+          </Button>
+        ) : null}
+      </div>
     </Card>
   );
 }
