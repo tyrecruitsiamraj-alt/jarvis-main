@@ -14,7 +14,8 @@ describe('ผล ณ วันสิ้นสุด (ภาพรวม v2 · 17
     const sql = asOfSql(factsSql(), '$4::timestamptz');
     expect(sql.startsWith('with ov_asof_')).toBe(true);
     for (const cte of ['ov_asof_queue', 'ov_asof_holds', 'ov_asof_contacts', 'ov_asof_attendance', 'ov_asof_screening', 'ov_asof_cancellations']) {
-      expect(sql).toContain(`${cte} as (select * from `);
+      // not materialized — อ้างหลายครั้งแล้ว PG 13 เก็บเป็นตารางชั่วคราวไม่มีดัชนี ช่วงในอดีตเกิน 90 วิ (504 · 19 พ.ย. 2569)
+      expect(sql).toContain(`${cte} as not materialized (select * from `);
     }
     const body = sql.slice(sql.indexOf('\n  select a.id'));
     // ตารางจริงเหลือแค่ในคิวรี "อยู่ในคิว ณ วันนั้น" (คิวที่ได้ผลหลัง cutoff = ยังรออยู่ ณ วันนั้น)

@@ -61,7 +61,9 @@ export function asOfSql(sql: string, cutoffRef: string): string {
   for (const t of AS_OF_TABLES) {
     if (!body.includes(t.table)) continue;
     body = body.split(t.table).join(t.cte);
-    ctes.push(`${t.cte} as (select * from ${t.table} where ${t.where.split('$c').join(cutoffRef)})`);
+    // not materialized: CTE ถูกอ้างหลายครั้ง (คิว 5 · hold 9 · บันทึกติดต่อ 8) ⇒ PG 13 เก็บเป็นตารางชั่วคราวไม่มีดัชนี
+    // คิวรีย่อยรายใบสมัครไล่ทั้งก้อนทุกครั้ง — ช่วงวันในอดีตเกิน 90 วิ หน้า 504 (เจ้าของ 19 พ.ย. 2569) · แบบนี้ 0.4 วิ
+    ctes.push(`${t.cte} as not materialized (select * from ${t.table} where ${t.where.split('$c').join(cutoffRef)})`);
   }
   body = body.split(HOLE).join(inQueueAsOfSql(cutoffRef));
   return ctes.length ? `with ${ctes.join(',\n')}\n${body}` : body;
