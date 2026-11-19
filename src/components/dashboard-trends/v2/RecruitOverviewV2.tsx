@@ -38,7 +38,6 @@ import { fetchStaffActivity, fetchStaffActivityFeed } from '@/lib/staffActivityA
 import type { StaffActivityFeedItem, StaffActivityKind, StaffActivityRow } from '@/lib/staffActivity';
 import WorkStatusBoard from './WorkStatusBoard';
 import IntakeFlowPanel from './IntakeFlowPanel';
-import IntakeScopeStory from './IntakeScopeStory';
 import { useUnitRequestsFeed } from '@/hooks/useUnitRequestsFeed';
 import { filterUnitRequestsByDepartment } from '@/lib/siamrajUnitFilters';
 import { buildV2Model } from './v2Model';
@@ -82,7 +81,7 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
 
   // ใบขอ + การประกาศ (เส้นเดิม) — ทิ้งคำตอบที่ไม่ใช่ตัวกรองปัจจุบัน
   const [stuck, setStuck] = React.useState<{ key: string; data: RecruitStuckResponse | null; error: string | null }>({ key: '', data: null, error: null });
-  const [posts, setPosts] = React.useState<{ key: string; total: number | null; jobs: number | null; posted: number | null; postedJobs: number | null; error: string | null }>({ key: '', total: null, jobs: null, posted: null, postedJobs: null, error: null });
+  const [posts, setPosts] = React.useState<{ key: string; jobs: number | null; error: string | null }>({ key: '', jobs: null, error: null });
   /** งานรายคน + ความเคลื่อนไหวล่าสุด (ภาพรวมแบบ Mobix · 18 พ.ย. 2569) — ดึงครั้งเดียวต่อช่วง/BU */
   const [staff, setStaff] = React.useState<{ key: string; rows: StaffActivityRow[] | null; error: string | null }>({ key: '', rows: null, error: null });
   const [feed, setFeed] = React.useState<{ key: string; items: StaffActivityFeedItem[] | null }>({ key: '', items: null });
@@ -93,8 +92,8 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
       .then((d) => alive && setStuck({ key: filterKey, data: d, error: null }))
       .catch((e: unknown) => alive && setStuck({ key: filterKey, data: null, error: friendlyErrorText(e, 'โหลดใบขอไม่ได้') }));
     fetchSoPostGroups({ from: win.from, to: win.to, bu: data.bu, page: 1 })
-      .then((d) => alive && setPosts({ key: filterKey, total: d.total, jobs: d.jobs ?? null, posted: d.counts?.posted ?? 0, postedJobs: d.postedJobs ?? null, error: null }))
-      .catch((e: unknown) => alive && setPosts({ key: filterKey, total: null, jobs: null, posted: null, postedJobs: null, error: friendlyErrorText(e, 'อ่านรายการโพสต์ไม่ได้') }));
+      .then((d) => alive && setPosts({ key: filterKey, jobs: d.jobs ?? null, error: null }))
+      .catch((e: unknown) => alive && setPosts({ key: filterKey, jobs: null, error: friendlyErrorText(e, 'อ่านรายการโพสต์ไม่ได้') }));
     fetchStaffActivity({ from: win.from, to: win.to, bu: data.bu })
       .then((rows) => alive && setStaff({ key: filterKey, rows, error: null }))
       .catch((e: unknown) => alive && setStaff({ key: filterKey, rows: null, error: friendlyErrorText(e, 'อ่านงานรายคนไม่ได้') }));
@@ -319,10 +318,20 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
             { key: 'scrap', n: staffSum('scrap'), unit: 'ใบ' },
           ]}
         />
+        {/* ปุ่มใต้การประกาศย้ายมาที่นี่ (เจ้าของ 19 พ.ย. 2569 "ย้ายไปไว้ในการสั่งงาน อันไหนไม่ซ้ำทำเพิ่ม") — Autopost/โพสต์เอง ซ้ำกับการ์ดข้างบน ถอดแล้ว */}
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" size="sm" variant="outline" disabled={!eq} onClick={() => push({ kind: 'embed', title: 'สถานะและหลักฐานรายใบ', embed: 'states' })}>
+            สถานะและหลักฐานรายใบ
+          </Button>
+          <Button type="button" size="sm" variant="outline" onClick={() => push({ kind: 'embed', title: 'เปิดฟอร์ม / ส่งใบสมัคร', embed: 'clicks' })}>
+            เปิดฟอร์ม / ส่งใบสมัคร
+          </Button>
+        </div>
       </Card>
 
       {/* ── รายชื่อเข้ามาไปถึงไหน (เจ้าของ 18 พ.ย. 2569 จากการ์ด Milo "รายชื่อเข้ามาหายไปไหน") — ทุกกล่องบอกขั้นที่หลุด · แยกช่องทางกดไล่ลงถึงคนหามา
           19 พ.ย. 2569 รวมส่วน "ผู้สมัครและผลการติดต่อ" เข้ามา (คนชุดเดียวกัน เลขซ้ำ) — Choice ถอดการ์ด 7 ใบ ใช้หัวกล่องแทน · เอามาแค่เรื่องเล่ารายชื่อ
+          กดหัวกล่อง = แผงข้าง (เรื่องเล่ารายชื่อย้ายเข้าแผง · เจ้าของ "ต้องย้ายเข้ามาใน Pop up")
           (รอโทรเกิน 24 ชม. · รายชื่ออยู่กับใคร · เหตุผลที่ยังไม่ได้คน · ปุ่มที่มาของยอดนัด/ผลโทรต่อ/เบอร์ไม่ซ้ำ/ยังไม่ผูกใบขอ ถอดแล้ว) ── */}
       <Card className="min-w-0 space-y-3 rounded-2xl p-5" data-testid="v2-intake-card">
         <SectionTitle title="รายชื่อเข้ามาไปถึงไหน" right={`${buText} · คนที่สมัคร ${periodText}`} />
@@ -333,9 +342,7 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
           prevCohort={win.all ? undefined : (prevModel?.cohort ?? null)}
           erpIds={model.stages.erp.ids}
           prevErpIds={prevModel?.stages.erp.ids ?? null}
-          renderScope={(box, where) => (
-            <IntakeScopeStory title={box.title} ids={box.ids} cohort={model.cohort} sets={model.sets} bus={bus} months={months} onNames={openNames} resetKey={`${viewKey}:${box.key}:${where}`} />
-          )}
+          onOpenBox={(box) => push({ kind: 'story', title: box.title, ids: [...box.ids], key: `${viewKey}:${box.key}:${box.title}` })}
         />
       </Card>
 
@@ -380,20 +387,6 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
           ) : (
             <Skeleton className="h-40 rounded-xl" />
           )}
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button type="button" size="sm" variant="outline" onClick={() => push({ kind: 'embed', title: 'Autopost · รายการโพสต์', embed: 'posts' })}>
-            Autopost · รายการโพสต์ {posts.key === filterKey ? fmt(posts.total) : ''}
-          </Button>
-          <Button type="button" size="sm" variant="outline" onClick={() => push({ kind: 'embed', title: 'โพสต์เอง / สร้างลิงก์', embed: 'self' })}>
-            โพสต์เอง / สร้างลิงก์
-          </Button>
-          <Button type="button" size="sm" variant="outline" disabled={!eq} onClick={() => push({ kind: 'embed', title: 'สถานะและหลักฐานรายใบ', embed: 'states' })}>
-            สถานะและหลักฐานรายใบ
-          </Button>
-          <Button type="button" size="sm" variant="outline" onClick={() => push({ kind: 'embed', title: 'เปิดฟอร์ม / ส่งใบสมัคร', embed: 'clicks' })}>
-            เปิดฟอร์ม / ส่งใบสมัคร
-          </Button>
         </div>
       </Card>
 
@@ -441,6 +434,7 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
         buText={buText}
         embeds={embeds}
         bu={data.bu}
+        months={months}
         // ปุ่ม "ประกาศ" ในรายการใบขอ (เจ้าของ 19 พ.ย. 2569 "กดทำจากหน้านี้เลย") — ปิดแผงก่อน แล้วเปิดป๊อปประกาศของใบนั้นบนหน้านี้ (`?posting=` ของกล่องงาน)
         onPublish={(jobId) => {
           setStack([]);

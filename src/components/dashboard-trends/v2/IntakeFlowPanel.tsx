@@ -1,8 +1,8 @@
 /**
  * รายชื่อเข้ามาไปถึงไหน + แยกช่องทาง (ภาพรวมงานสรรหา · เจ้าของ 18 พ.ย. 2569)
  * 5 กล่อง: ขั้นที่ไปต่อ + ขั้นที่หลุด (ป้าย "หลุด") · กดแถว = รายชื่อ (แผงข้าง แยก BU ก่อน)
- * กดหัวกล่อง = เลือกกล่อง → เรื่องเล่ารายชื่อข้างล่าง (`renderScope`) เป็นของคนในกล่องนั้น (เจ้าของ 19 พ.ย. 2569 Choice
- * "ถอดการ์ด 7 ใบ ใช้หัวกล่องแทน") · เทียบช่วงก่อนใต้เลขหัวกล่อง · กล่องที่ 6 = พบรายการแจ้งเข้า ERP
+ * กดหัวกล่อง = แผงข้าง กราฟ BU + เรื่องเล่ารายชื่อของคนในกล่อง (`onOpenBox` · เจ้าของ 19 พ.ย. 2569 "2942 กดแล้วไม่ขึ้นไรเลย …
+ * ข้อมูลชุดคนสมัครเข้ามาต้องย้ายเข้ามาใน Pop up") · เทียบช่วงก่อนใต้เลขหัวกล่อง · กล่องที่ 6 = พบรายการแจ้งเข้า ERP
  * แยกช่องทาง: ช่องทางหลัก → ช่องทางรอง → (Facebook Group: กลุ่ม) → คนหามา · กดแถว = กาง/หุบ + 5 กล่องเหลือเฉพาะแถวนั้น
  * นิยามทั้งหมดอยู่ `recruitIntakeFlow.ts`
  */
@@ -41,7 +41,7 @@ export default function IntakeFlowPanel({
   prevCohort,
   erpIds,
   prevErpIds,
-  renderScope,
+  onOpenBox,
 }: {
   cohort: readonly RecruitAppFact[];
   onNames: (title: string, ids: readonly string[]) => void;
@@ -51,19 +51,14 @@ export default function IntakeFlowPanel({
   /** คนที่พบรายการแจ้งเข้า ERP — ไม่ส่ง = ไม่มีกล่อง · null = อ่าน ERP ไม่ได้ */
   erpIds?: readonly string[] | null;
   prevErpIds?: readonly string[] | null;
-  /** ของข้างล่างที่ตามกล่องที่เลือก */
-  renderScope?: (box: { key: string; title: string; ids: readonly string[] }, where: string) => React.ReactNode;
+  /** กดหัวกล่อง — ชื่อกล่องรวมช่องทางที่กดลงมาแล้ว */
+  onOpenBox?: (box: { key: string; title: string; ids: readonly string[] }) => void;
 }) {
   const [path, setPath] = React.useState<string[]>([]);
-  const [sel, setSel] = React.useState('apps');
-  React.useEffect(() => {
-    setPath([]);
-    setSel('apps');
-  }, [resetKey]);
+  React.useEffect(() => setPath([]), [resetKey]);
   const boxes = React.useMemo(() => boxesOf(cohort, path, erpIds), [cohort, path, erpIds]);
   const prevBoxes = React.useMemo(() => (prevCohort ? boxesOf(prevCohort, path, prevErpIds) : null), [prevCohort, path, prevErpIds]);
   const where = path.length ? ` · ${path.join(' › ')}` : '';
-  const picked = boxes.find((b) => b.key === sel) ?? boxes[0];
 
   /**
    * กดแถวเดิมที่เลือกอยู่ = หุบขึ้นหนึ่งชั้น
@@ -134,17 +129,12 @@ export default function IntakeFlowPanel({
 
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
         {boxes.map((b) => (
-          <div
-            key={b.key}
-            className={cn('min-w-0 space-y-2 rounded-xl border p-4', b.key === picked?.key ? 'border-primary bg-primary/5' : 'border-border bg-muted/30')}
-            data-testid={`v2-intake-box-${b.key}`}
-          >
+          <div key={b.key} className="min-w-0 space-y-2 rounded-xl border border-border bg-muted/30 p-4" data-testid={`v2-intake-box-${b.key}`}>
             <button
               type="button"
-              aria-pressed={b.key === picked?.key}
               disabled={b.unknown}
-              className="flex w-full flex-wrap items-baseline justify-between gap-x-2 text-left"
-              onClick={() => setSel(b.key)}
+              className="flex w-full flex-wrap items-baseline justify-between gap-x-2 rounded-lg text-left hover:bg-muted/70"
+              onClick={() => onOpenBox?.({ key: b.key, title: `${b.title}${where}`, ids: b.ids })}
               data-testid={`v2-intake-head-${b.key}`}
             >
               <span className="font-medium">{b.title}</span>
@@ -213,7 +203,6 @@ export default function IntakeFlowPanel({
           </TableBody>
         </Table>
       </section>
-      {renderScope && picked && !picked.unknown ? renderScope({ key: picked.key, title: `${picked.title}${where}`, ids: picked.ids }, where) : null}
     </div>
   );
 }

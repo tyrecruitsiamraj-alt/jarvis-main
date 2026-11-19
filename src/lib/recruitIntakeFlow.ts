@@ -59,7 +59,9 @@ export function buildIntakeFlow(cohort: readonly RecruitAppFact[]): IntakeBox[] 
       title: 'คนสมัครเข้ามา',
       ids: idsOf(cohort),
       rows: [
-        row('called', 'โทรไปแล้ว', cohort.filter((f) => f.calledByAi || f.calledByStaff), false),
+        // โทรไปแล้ว แยกใครโทร (เจ้าของ 19 พ.ย. 2569 "โทรไปแล้วแล้วเป็นยังไง คนโทร หรือ Ai โทร") — ชุดเดียวกับกล่อง AI โทร / ทีมโทรเอง
+        row('ai', 'AI โทร', ai, false),
+        row('staff', 'ทีมโทรเอง', self, false),
         row('queued', 'รอ AI โทร', notCalled.filter((f) => f.aiQueued), false),
         row('none', 'ยังไม่มีใครโทร', notCalled.filter((f) => !f.aiQueued), true),
       ],

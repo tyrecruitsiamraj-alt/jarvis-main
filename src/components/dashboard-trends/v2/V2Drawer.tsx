@@ -15,6 +15,7 @@ import { DASH, TONE } from '@/lib/designTokens';
 import { applicantWorkLink } from '@/lib/recruitRm';
 import { fetchApplicantNames, type ApplicantNameRow, type TodoBucket } from '@/lib/recruitOverviewApi';
 import TodoPane from './TodoPane';
+import IntakeScopeStory from './IntakeScopeStory';
 import type { StuckRequest } from '@/lib/recruitStuck';
 import { requestPathOfJobId } from '@/lib/jobNavigation';
 import { MonthCompareBars } from './MonthCompareBars';
@@ -46,7 +47,9 @@ export type V2Pane =
   /** การ์ด "ต้องทำ" (19 พ.ย. 2569) — กราฟ BU + รายชื่อ + ปุ่มทำทีละแถว · `listHref` = หน้าผู้สมัครคนชุดเดียวกัน */
   | { kind: 'todo'; title: string; todo: TodoBucket; listHref: string }
   /** ส่วนเดิมของระบบที่ฝังในแผง (รายการโพสต์ So Scraping · ลิงก์โพสต์เอง · คลิกฟอร์ม) — ไม่เขียนใหม่ */
-  | { kind: 'embed'; title: string; embed: string };
+  | { kind: 'embed'; title: string; embed: string }
+  /** หัวกล่อง "รายชื่อเข้ามาไปถึงไหน" (19 พ.ย. 2569) — กราฟ BU + เรื่องเล่ารายชื่อของคนในกล่อง · `key` ล้างตัวกรองเมื่อเปลี่ยนกล่อง */
+  | { kind: 'story'; title: string; ids: string[]; key: string };
 
 const sortBars = <T extends { value: number | null }>(bars: T[]) => [...bars].sort((a, b) => (b.value ?? -1) - (a.value ?? -1));
 
@@ -69,7 +72,10 @@ export default function V2Drawer({
   embeds,
   bu = null,
   onPublish,
+  months = [],
 }: {
+  /** เดือนในช่วง (YYYY-MM) — กราฟ BU ของแผงหัวกล่อง */
+  months?: readonly string[];
   /** BU ที่เลือกบนหน้า (แผงการ์ดต้องทำดึงคนของ BU นี้) */
   bu?: string | null;
   /** ปุ่ม "ประกาศ" ในรายการใบขอ — เปิดป๊อปประกาศของใบนั้นบนหน้านี้ (ปิดแผงก่อน ไม่ซ้อนป๊อป) */
@@ -114,6 +120,19 @@ export default function V2Drawer({
               ) : null}
               {pane.kind === 'todo' ? <TodoPane key={pane.todo} todo={pane.todo} bu={bu} listHref={pane.listHref} /> : null}
               {pane.kind === 'embed' ? (embeds[pane.embed] ?? null) : null}
+              {pane.kind === 'story' ? (
+                <IntakeScopeStory
+                  key={pane.key}
+                  title={pane.title}
+                  ids={pane.ids}
+                  cohort={model.cohort}
+                  sets={model.sets}
+                  bus={bus}
+                  months={months}
+                  onNames={(title, ids) => push({ kind: 'names', title, ids: [...ids], page: 1 })}
+                  resetKey={pane.key}
+                />
+              ) : null}
             </div>
           </>
         ) : null}

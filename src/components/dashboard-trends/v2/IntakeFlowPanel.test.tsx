@@ -1,6 +1,6 @@
 /**
  * รายชื่อเข้ามาไปถึงไหน รวมส่วนผู้สมัครและผลการติดต่อ (เจ้าของ 19 พ.ย. 2569 Choice "ถอดการ์ด 7 ใบ ใช้หัวกล่องแทน")
- * กดหัวกล่อง = เรื่องเล่าข้างล่างเป็นคนในกล่องนั้น · เทียบช่วงก่อนใต้เลข · กล่องแจ้งเข้า ERP
+ * กดหัวกล่อง = แผงข้างของคนในกล่องนั้น ("2942 กดแล้วไม่ขึ้นไรเลย") · เทียบช่วงก่อนใต้เลข · กล่องแจ้งเข้า ERP
  */
 import React from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -18,18 +18,24 @@ const cohort = [fact({}), fact({ calledByAi: true, aiAnswer: 'no_pickup' }), fac
 const prev = [fact({}), fact({ calledByAi: true, aiAnswer: 'no_pickup' })];
 
 describe('รายชื่อเข้ามาไปถึงไหน · กดหัวกล่อง', () => {
-  it('ค่าเริ่ม = คนสมัครเข้ามา · กด AI โทร = เรื่องเล่าเป็นคนที่ AI โทร · เทียบช่วงก่อน · กล่อง ERP', () => {
-    const scope = vi.fn((box: { key: string; ids: readonly string[] }) => <p>{`เลือก ${box.key} ${box.ids.length}`}</p>);
-    render(<IntakeFlowPanel cohort={cohort} onNames={() => {}} resetKey="k" prevCohort={prev} erpIds={[cohort[2].id as string]} prevErpIds={[]} renderScope={scope} />);
-    expect(screen.getByText('เลือก apps 3')).toBeTruthy();
+  it('กดหัวกล่อง = เปิดแผงของคนในกล่อง · เทียบช่วงก่อน · กล่อง ERP · โทรไปแล้วแยก AI / ทีมโทรเอง', () => {
+    const open = vi.fn();
+    render(<IntakeFlowPanel cohort={[...cohort, fact({ calledByStaff: true })]} onNames={() => {}} resetKey="k" prevCohort={prev} erpIds={[cohort[2].id as string]} prevErpIds={[]} onOpenBox={open} />);
+    fireEvent.click(screen.getByTestId('v2-intake-head-apps'));
+    expect(open).toHaveBeenLastCalledWith(expect.objectContaining({ key: 'apps', title: 'คนสมัครเข้ามา' }));
+    expect(open.mock.calls[0][0].ids).toHaveLength(4);
     fireEvent.click(screen.getByTestId('v2-intake-head-ai'));
-    expect(screen.getByText('เลือก ai 2')).toBeTruthy();
-    expect(screen.getByTestId('v2-intake-head-ai').getAttribute('aria-pressed')).toBe('true');
+    expect(open.mock.calls[1][0].ids).toHaveLength(2);
     // ช่วงก่อน AI โทร 1 → ตอนนี้ 2
     expect(screen.getByTestId('v2-intake-head-ai').textContent).toContain('เพิ่มขึ้น 1');
     expect(screen.getByTestId('v2-intake-head-erp').textContent).toContain('พบรายการแจ้งเข้า ERP');
     fireEvent.click(screen.getByTestId('v2-intake-head-erp'));
-    expect(screen.getByText('เลือก erp 1')).toBeTruthy();
+    expect(open.mock.calls[2][0].ids).toHaveLength(1);
+    // กล่องคนสมัครเข้ามา: AI โทร 2 + ทีมโทรเอง 1 (ไม่มีแถว "โทรไปแล้ว" รวมก้อนแล้ว)
+    const apps = screen.getByTestId('v2-intake-box-apps').textContent ?? '';
+    expect(apps).toContain('AI โทร');
+    expect(apps).toContain('ทีมโทรเอง');
+    expect(apps).not.toContain('โทรไปแล้ว');
   });
 
   it('อ่าน ERP ไม่ได้ = กล่องบอกตรง ๆ ไม่ขึ้น 0 และกดเลือกไม่ได้', () => {

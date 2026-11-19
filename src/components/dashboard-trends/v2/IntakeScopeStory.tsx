@@ -1,5 +1,5 @@
 /**
- * เรื่องเล่ารายชื่อของกล่องที่เลือกในส่วน "รายชื่อเข้ามาไปถึงไหน" (เจ้าของ 19 พ.ย. 2569 รวมส่วนผู้สมัครและผลการติดต่อเข้ามา
+ * แผงข้างของหัวกล่องในส่วน "รายชื่อเข้ามาไปถึงไหน" (เจ้าของ 19 พ.ย. 2569 รวมส่วนผู้สมัครและผลการติดต่อเข้ามา
  * "ชอบที่บอกว่า ช่องทางไหน ใครเอาเข้ามา วิธีที่เข้ามา รายชื่อมาจากจังหวัดไหน ช่วงอายุ เพศ เอามารวมกัน" · Choice ถอดการ์ด 7 ใบ ใช้หัวกล่องแทน)
  * กราฟแท่ง BU × เดือนของคนในกล่อง → กดแท่ง = เรื่องเล่า (`ApplicantStory`) เหลือ BU นั้น
  */
@@ -48,7 +48,7 @@ export default function IntakeScopeStory({
     [bus, facts],
   );
   return (
-    <section className="space-y-4 border-t pt-4" data-testid="v2-intake-story">
+    <section className="space-y-4" data-testid="v2-intake-story">
       <section className="min-w-0 space-y-2">
         <h3 className="text-sm font-medium">
           {title} {fmt(facts.length)} · แยกตาม BU

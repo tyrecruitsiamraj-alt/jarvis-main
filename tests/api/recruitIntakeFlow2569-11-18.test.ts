@@ -35,7 +35,7 @@ describe('รายชื่อเข้ามาไปถึงไหน', () =
     }
     const [apps, ai, follow, self, booked] = buildIntakeFlow(cohort);
     expect(apps.ids.length).toBe(11);
-    expect(apps.rows.map((r) => [r.label, r.ids.length])).toEqual([['โทรไปแล้ว', 9], ['รอ AI โทร', 1], ['ยังไม่มีใครโทร', 1]]);
+    expect(apps.rows.map((r) => [r.label, r.ids.length])).toEqual([['AI โทร', 7], ['ทีมโทรเอง', 2], ['รอ AI โทร', 1], ['ยังไม่มีใครโทร', 1]]);
     expect(ai.ids.length).toBe(7);
     expect(ai.rows.find((r) => r.key === 'not_yet')).toBeUndefined();
     expect(follow.rows.map((r) => r.ids.length)).toEqual([1, 0, 1, 1, 2]);
