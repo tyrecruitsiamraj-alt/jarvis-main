@@ -22,6 +22,12 @@ describe('dailyPulse', () => {
     expect(pts.map((p) => p.apps)).toEqual([0, 2, 0]);
     expect(pts[2].yes + pts[2].no + pts[2].noPickup + pts[2].other).toBe(1);
   });
+  it('เรื่องเล่ารายชื่อในแผงข้าง: 2 คอลัมน์ ชื่อไม่โดนตัด (เจ้าของ 19 พ.ย. 2569 "ชื่อมันตกแล้วจะดูรู้เรื่องได้ไง")', () => {
+    const src = readFileSync('src/components/dashboard-trends/v2/ApplicantStory.tsx', 'utf8');
+    expect(src).toContain('<div className="grid gap-4 sm:grid-cols-2">');
+    expect(src).not.toContain('xl:grid-cols-3');
+    expect(src).not.toContain('flex-1 truncate');
+  });
   it('การ์ด Autopost = ยอดสั่งโพสต์ทั้งหมดรายกลุ่ม (เจ้าของ 19 พ.ย. 2569 Choice "1,819 กลุ่ม")', () => {
     const src = readFileSync('src/components/dashboard-trends/v2/RecruitOverviewV2.tsx', 'utf8');
     expect(src).toContain("n: posts.key === filterKey ? posts.total : null,\n              unit: 'กลุ่ม'");

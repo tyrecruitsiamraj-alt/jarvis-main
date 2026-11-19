@@ -77,7 +77,8 @@ export default function ApplicantStory({
         </Button>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      {/* อยู่ในแผงข้าง (กว้าง ~670px) — แบ่งตามจอแล้ว 3 คอลัมน์ชื่อโดนตัด (เจ้าของ 19 พ.ย. 2569 "ชื่อมันตกแล้วจะดูรู้เรื่องได้ไง") ⇒ 2 คอลัมน์ + ชื่อขึ้นบรรทัดใหม่ */}
+      <div className="grid gap-4 sm:grid-cols-2">
         {PANELS.map((dim) => {
           const own = base.filter((f) => passes(f, dim));
           // ช่วงอายุเรียงตามอายุ · กล่องอื่นเรียงตามจำนวน (ไม่ทราบอยู่ท้าย)
@@ -103,7 +104,7 @@ export default function ApplicantStory({
                         onClick={() => toggle(dim, r.key)}
                         className={cn('flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm hover:bg-muted/60', on && 'bg-primary/10 font-medium text-primary')}
                       >
-                        <span className="min-w-0 flex-1 truncate">{r.key}</span>
+                        <span className="min-w-0 flex-1 break-words">{r.key}</span>
                         <span className="w-16 shrink-0 text-right font-medium tabular-nums">{fmt(r.apps)}</span>
                         <span className={cn('w-14 shrink-0 text-right text-xs tabular-nums', DASH.sub)}>{fmtPct(own.length ? (r.apps / own.length) * 100 : null)}</span>
                       </button>
