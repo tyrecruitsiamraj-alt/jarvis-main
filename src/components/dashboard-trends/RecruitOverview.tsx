@@ -6,7 +6,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { useSearchParams } from 'react-router-dom';
 import { rangeFromParams } from '@/lib/jobNavigation';
 import RecruitStuckBody from './stuck/RecruitStuckBody';
-import { Skeleton } from '@/components/ui/skeleton';
+import MascotState from './MascotState';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ChoiceDropdown } from '@/components/shared/ChoiceDropdown';
 import { cn } from '@/lib/utils';
@@ -245,16 +245,11 @@ const RecruitOverview: React.FC<{
   if (!data || !win || !view) {
     // ล้มแล้วมีปุ่มลองใหม่ (QA 5 ต.ค. 2569: เดิมเหลือข้อความอังกฤษดิบบรรทัดเดียว กดอะไรต่อไม่ได้)
     if (state.error) return <TrendState loading={false} error={state.error} onRetry={() => setRev((n) => n + 1)} />;
+    // กำลังโหลด = น้องใบขอท่า "กำลังทำ" กลางหน้า (เจ้าของ 19 พ.ย. 2569 "ใส่ท่ากำลังทำตอนโหลดด้วย")
     return (
-      <div className="space-y-4" aria-busy>
-        <Skeleton className="h-10 w-72 rounded-xl" />
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
-          {[0, 1, 2, 3, 4, 5].map((i) => (
-            <Skeleton key={i} className="h-28 rounded-2xl" />
-          ))}
-        </div>
-        <Skeleton className="h-72 rounded-2xl" />
-      </div>
+      <MascotState pose="working" testId="overview-loading">
+        กำลังโหลด…
+      </MascotState>
     );
   }
 
@@ -456,7 +451,7 @@ const RecruitOverview: React.FC<{
        * การ์ดที่นับฝั่งเซิร์ฟเวอร์ (งานค้างตอนนี้ · ผลงานรายคน · คนแจ้งเข้า) ตามตัวกรองด้วย — เซิร์ฟเวอร์ส่งแยกต่อใบขอ (`recruitOverviewScope.ts`)
        */}
       {legacyCards ? null : dashV2 ? (
-        <Suspense fallback={<Skeleton className="h-72 rounded-2xl" />}>
+        <Suspense fallback={<MascotState pose="working">กำลังโหลด…</MascotState>}>
           <RecruitOverviewV2 data={data} />
         </Suspense>
       ) : (
