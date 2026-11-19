@@ -22,6 +22,8 @@ const COLS: Array<[keyof OutreachNumbers, string]> = [
   ['clicks', 'คลิก'],
   ['applicants', 'กรอก'],
 ];
+/** คอลัมน์ของลิงก์โพสต์เอง — กดแล้วเปิดลิงก์ของคนนั้น */
+const LINK_COLS = new Set<keyof OutreachNumbers>(['gen', 'posted', 'clicks', 'applicants']);
 
 export default function OutreachPeopleTable({
   people,
@@ -29,6 +31,7 @@ export default function OutreachPeopleTable({
   onIds,
 }: {
   people: readonly OutreachPerson[] | null;
+  /** กดเลขโพสต์เอง (Gen link · โพสต์แล้ว · คลิก · กรอก) = ลิงก์ของคนนั้น */
   onPerson?: (name: string) => void;
   /** กดเลขรายชื่อ/สนใจ/นัด/มาจริง */
   onIds?: (title: string, ids: readonly string[]) => void;
@@ -65,15 +68,9 @@ export default function OutreachPeopleTable({
             ) : null}
             {people.map((p) => (
               <TableRow key={p.name}>
-                <TableCell className="whitespace-nowrap">
-                  {onPerson && p.gen + p.posted > 0 ? (
-                    <Button type="button" variant="link" size="sm" className="h-auto p-0" onClick={() => onPerson(p.name)}>
-                      {p.name}
-                    </Button>
-                  ) : (
-                    p.name
-                  )}
-                </TableCell>
+                {/* ชื่อไม่เป็นลิงก์ทุกแถว — เดิมกดได้เฉพาะคนที่มีลิงก์โพสต์เอง (เจ้าของ 19 พ.ย. 2569 "ใหม่กดดูได้ เจมส์กดดูไม่ได้มันตลกๆไหม")
+                    กดเลขแทน: รายชื่อ/สนใจ/นัด/มาจริง = รายชื่อ · โพสต์เอง/คลิก/กรอก = ลิงก์ของคนนั้น */}
+                <TableCell className="whitespace-nowrap">{p.name}</TableCell>
 {PERSON_FUNNEL_KEYS.map((k) => (
                   <TableCell key={k} className="text-right tabular-nums">
                     {p[k].length && onIds ? (
@@ -87,7 +84,13 @@ export default function OutreachPeopleTable({
                 ))}
                 {COLS.map(([k]) => (
                   <TableCell key={k} className={cn('text-right tabular-nums', p[k] === 0 && DASH.muted)}>
-                    {fmt(p[k])}
+                    {onPerson && p[k] > 0 && LINK_COLS.has(k) ? (
+                      <Button type="button" variant="link" size="sm" className="h-auto p-0 tabular-nums" onClick={() => onPerson(p.name)} data-testid="v2-outreach-person-links">
+                        {fmt(p[k])}
+                      </Button>
+                    ) : (
+                      fmt(p[k])
+                    )}
                   </TableCell>
                 ))}
               </TableRow>
