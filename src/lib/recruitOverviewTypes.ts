@@ -19,7 +19,7 @@ export type RecruitAttendance = 'showed' | 'no_show' | 'rescheduled';
  * ลิงก์ Autopost · ลิงก์โพสต์เอง · ลิงก์ที่ไม่รู้แบบ · เจ้าหน้าที่คีย์/นำเข้า · กรอกเองหน้าประกาศ · ดึงจาก iRecruit
  * (Scrap เก็บเข้าเป็น Lead — ไม่อยู่ในรายชื่อที่นับ)
  */
-export type AppMethod = 'autopost' | 'manual' | 'link' | 'staff' | 'self' | 'irecruit';
+export type AppMethod = 'autopost' | 'manual' | 'link' | 'staff' | 'self' | 'irecruit' | 'scrap';
 
 export type RecruitAppFact = {
   /** id ใบ (ไม่ใช่ชื่อ/เบอร์) — ใช้เปิดรายชื่อตอนกดเลข (18 ต.ค. 2569) */

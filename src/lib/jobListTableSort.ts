@@ -54,7 +54,8 @@ export const JOB_LIST_TABLE_COLUMN_LABEL: Record<JobListTableColumn, string> = {
   required: 'วันที่ต้องการ',
   remaining: 'เหลือหา',
   applicants: 'คนกรอก',
-  scrap: 'Scrap',
+  // โทรแล้ว/รายชื่อ Scrap (เจ้าของ 19 พ.ย. 2569 "ทำเป็นแบบ โทรเท่าไหร่/จำนวน Scrap")
+  scrap: 'โทร/Scrap',
   request_type: 'ประเภทใบขอ',
   position: 'ตำแหน่ง',
   subtype: 'ลักษณะงานย่อย',

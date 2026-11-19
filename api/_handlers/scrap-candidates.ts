@@ -2,7 +2,7 @@
  * /api/scrap-candidates — รายชื่อจาก Scrap (So Scraping) ของใบขอ (เจ้าของ 17 พ.ย. 2569 · ตรรกะ `api/_lib/scrapCandidates.ts`)
  * GET ?job=<job id หรือเลขใบขอ> → รายชื่อของใบนั้น (แท็บ Scrap ในหน้าใบขอ)
  * GET ?all=1                    → ทุกใบที่เห็นได้ (แท็บผู้สมัคร ▾ Scrap ของหน้างานสรรหา)
- * GET ?counts=1                 → ยอดต่อเลขใบขอ (คอลัมน์ Scrap ของตารางใบขอ · 17 พ.ย. 2569)
+ * GET ?counts=1                 → ยอดต่อเลขใบขอ + โทรแล้ว (คอลัมน์ โทร/Scrap ของตารางใบขอ · 17 · 19 พ.ย. 2569)
  * POST { action: 'to_contact', job_id, candidate_ids } → สร้าง/ใช้ใบสมัครเดิม แล้วเก็บเข้าการติดต่อ (Lead) ของคนกด
  * สิทธิ์ resource เดียวกับผู้สมัคร (`job-applications`) · ผู้ใช้ที่ล็อก BU เห็นเฉพาะใบขอใน BU ตัวเอง (`loadScopedJobIdSet`)
  * AI ไม่โทรเอง: ใบสร้างในชื่อ So Scraping + เป็น Lead — ตัวส่งอัตโนมัติข้ามทั้งสองแบบ
@@ -15,7 +15,7 @@ import { staffEntryDepartmentFor } from '../_lib/applicationDepartment.js';
 import { getSiamrajUnitRequestById, loadScopedJobIdSet } from '../_lib/siamrajUnitRequests.js';
 import { isRequestClosedForApply, REQUEST_CLOSED_APPLY_MESSAGE } from '../_lib/requestClosedForApply.js';
 import { attachAssignments } from './siamraj-unit-requests.js';
-import { addScrapToContact, listScrapCandidates, listScrapRequestNos, requestNoOfJobId, scrapJobIdOf } from '../_lib/scrapCandidates.js';
+import { addScrapToContact, listScrapCalledCounts, listScrapCandidates, listScrapRequestNos, requestNoOfJobId, scrapJobIdOf } from '../_lib/scrapCandidates.js';
 import { countScrapResults, SCRAP_TO_CONTACT_MAX } from '../../src/lib/scrapCandidates.js';
 import { publicJobPositionLabel } from '../../src/lib/unitRequestDisplay.js';
 import type { JobRequest } from '../../src/types/index.js';
@@ -41,7 +41,8 @@ async function handler(req: AuthedReq, res: ApiRes) {
       res.setHeader?.('Cache-Control', 'no-store');
       if (one(req.query?.counts) === '1') {
         const reqs = (await listScrapRequestNos()).filter((r) => canSee(r.request_no));
-        return res.status(200).json({ counts: Object.fromEntries(reqs.map((r) => [r.request_no, r.total])) });
+        const called = await listScrapCalledCounts(reqs.map((r) => r.request_no));
+        return res.status(200).json({ counts: Object.fromEntries(reqs.map((r) => [r.request_no, r.total])), called });
       }
       if (one(req.query?.all) === '1') {
         const reqs = (await listScrapRequestNos()).filter((r) => canSee(r.request_no));

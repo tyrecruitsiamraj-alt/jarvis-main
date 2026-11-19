@@ -84,7 +84,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { fetchSiamrajClosedRequests, fetchSiamrajUnitRequest } from '@/lib/siamrajUnitRequestsApi';
 import { friendlyErrorText } from '@/lib/friendlyError';
 import LoadErrorNotice from '@/components/shared/LoadErrorNotice';
-import { boardScrapPathOfRequest, fetchScrapCountsByRequest } from '@/lib/scrapCandidatesApi';
+import { boardScrapPathOfRequest, fetchScrapCountsByRequest, type ScrapCountsByRequest } from '@/lib/scrapCandidatesApi';
 import { Button } from '@/components/ui/button';
 import { requestNoMatchesSearch } from '@/lib/siamrajRequestNo';
 import { getTotalPages } from '@/lib/pagination';
@@ -238,7 +238,7 @@ const JobListPage: React.FC = () => {
    * รายชื่อจาก Scrap ต่อใบ (เจ้าของ 17 พ.ย. 2569 รูปตารางใบขอ "เพิ่ม Scrap มาด้วย") — ผูกด้วยเลขใบขอจริงใน ERP
    * null = ยังโหลดไม่เสร็จ/โหลดไม่ได้ (ขีด ไม่ใช่ 0) · ใบขอล่วงหน้าสั่ง Scrap ไม่ได้ = ขีด
    */
-  const [scrapCounts, setScrapCounts] = useState<Record<string, number> | null>(null);
+  const [scrapCounts, setScrapCounts] = useState<ScrapCountsByRequest | null>(null);
   useEffect(() => {
     let cancelled = false;
     fetchScrapCountsByRequest()
@@ -252,7 +252,16 @@ const JobListPage: React.FC = () => {
     (j: JobRequest): number | null => {
       const no = /^siamraj-sql:(.+)$/.exec(j.id)?.[1]?.toUpperCase();
       if (!scrapCounts || !no) return null;
-      return scrapCounts[no] ?? 0;
+      return scrapCounts.counts[no] ?? 0;
+    },
+    [scrapCounts],
+  );
+  /** โทรแล้วจากรายชื่อ Scrap ของใบ (19 พ.ย. 2569 "โทรเท่าไหร่/จำนวน Scrap") — null = ยังโหลด */
+  const scrapCalledOf = useCallback(
+    (j: JobRequest): number | null => {
+      const no = /^siamraj-sql:(.+)$/.exec(j.id)?.[1]?.toUpperCase();
+      if (!scrapCounts || !no) return null;
+      return scrapCounts.called[no] ?? 0;
     },
     [scrapCounts],
   );
@@ -991,7 +1000,7 @@ const JobListPage: React.FC = () => {
                       {' · เหลือหา '}
                       {remainingPositionsOf(j)}
                       {` · คนกรอก ${applicantCountOf(j) ?? '—'}`}
-                      {` · Scrap ${scrapCountOf(j) ?? '—'}`}
+                      {` · โทร/Scrap ${scrapCountOf(j) == null ? '—' : `${scrapCalledOf(j) ?? 0}/${scrapCountOf(j)}`}`}
                     </span>
                   </div>
                   <RequestGapsLine job={j} className="mt-1" />
@@ -1208,17 +1217,18 @@ const JobListPage: React.FC = () => {
                               openApplicantsOfJob(j);
                             }}
                           >
-                            {n.toLocaleString('en-US')}
+                            {(scrapCalledOf(j) ?? 0).toLocaleString('en-US')}/{n.toLocaleString('en-US')}
                           </Button>
                         );
                       })()}
                     </td>
-                    {/* Scrap (17 พ.ย. 2569) — กดเลขไปแท็บผู้สมัคร ▾ Scrap เลือกใบนี้ไว้ · 0 = ยังไม่มีรายชื่อ (ไม่ใช่ลิงก์) */}
+                    {/* Scrap (17 พ.ย. 2569) — กดเลขไปแท็บผู้สมัคร ▾ Scrap เลือกใบนี้ไว้ · 0 = ยังไม่มีรายชื่อ (ไม่ใช่ลิงก์)
+                        19 พ.ย. 2569 "โทรเท่าไหร่/จำนวน Scrap" = โทรแล้ว/รายชื่อ เช่น 3/12 */}
                     <td className="px-1.5 py-3 text-center text-xs tabular-nums whitespace-nowrap">
                       {(() => {
                         const n = scrapCountOf(j);
                         if (n == null) return <span className={DASH.cellMuted}>—</span>;
-                        if (n === 0) return <span className={DASH.cellMuted}>0</span>;
+                        if (n === 0) return <span className={DASH.cellMuted}>0/0</span>;
                         return (
                           <Button
                             type="button"
@@ -1230,7 +1240,7 @@ const JobListPage: React.FC = () => {
                               navigate(boardScrapPathOfRequest(j.id.replace(/^siamraj-sql:/, '')), { state: { backTo: returnTo } });
                             }}
                           >
-                            {n.toLocaleString('en-US')}
+                            {(scrapCalledOf(j) ?? 0).toLocaleString('en-US')}/{n.toLocaleString('en-US')}
                           </Button>
                         );
                       })()}

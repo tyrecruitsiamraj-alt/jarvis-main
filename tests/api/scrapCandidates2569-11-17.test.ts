@@ -107,3 +107,16 @@ describe('เส้น API + หน้าจอ', () => {
     expect(readFileSync('src/pages/jobs/UnitRequestTabPage.tsx', 'utf8')).toContain('data-testid="applicants-to-contact"');
   });
 });
+
+describe('คอลัมน์ โทร/Scrap ของตารางใบขอ (เจ้าของ 19 พ.ย. 2569 "ทำเป็นแบบ โทรเท่าไหร่/จำนวน Scrap")', () => {
+  it('โทรแล้ว = ใบสมัครในใบขอนั้นเบอร์ตรงกับคนจาก Scrap + หลักฐานโทรชุดเดียวกับ CALLED_SQL · ตารางขึ้น โทรแล้ว/ทั้งหมด', () => {
+    const lib = readFileSync('api/_lib/scrapCandidates.ts', 'utf8');
+    expect(lib).toContain('export async function listScrapCalledCounts');
+    expect(lib).toContain('and a.phone_e164 = any($2::text[]) and ${CALLED_SQL}');
+    const api = readFileSync('api/_handlers/scrap-candidates.ts', 'utf8');
+    expect(api).toContain('const called = await listScrapCalledCounts(reqs.map((r) => r.request_no));');
+    const page = readFileSync('src/pages/jobs/JobListPage.tsx', 'utf8');
+    expect(page).toContain("{(scrapCalledOf(j) ?? 0).toLocaleString('en-US')}/{n.toLocaleString('en-US')}");
+    expect(readFileSync('src/lib/jobListTableSort.ts', 'utf8')).toContain("scrap: 'โทร/Scrap',");
+  });
+});

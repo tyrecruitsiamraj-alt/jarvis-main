@@ -14,6 +14,7 @@
  * 5. "ใบที่ประกาศ" ไม่ได้คิดที่เส้นนี้ — หน้าเว็บใช้เลขของหัวกล่องงานตรง ๆ (เจ้าของสั่ง 1 ต.ค. 2569:
  *    *"เปลี่ยนเป็น 7 เหมือนหัวกล่องงาน"*) · เดิมนับใบที่ประกาศในเดือนจาก `job_public_releases` — ถอดแล้ว
  */
+import { SO_SCRAPING_CREATED_BY } from '../../src/lib/soScrapingLeads.js';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { withRbac, sendError, handleApiError, type ApiRes, type AuthedReq } from '../_lib/http.js';
 import { loadLinkClicks } from '../_lib/postingLinkHits.js';
@@ -415,9 +416,17 @@ export function postSourceOf(code: string | null, note: string | null, autopostC
  * วิธีที่รายชื่อเข้ามา (เจ้าของ 17 พ.ย. 2569) — ลิงก์ก่อน (Autopost / โพสต์เอง / ไม่รู้แบบ) › iRecruit › มีคนคีย์ = เจ้าหน้าที่คีย์/นำเข้า › กรอกเอง
  * ข้อมูลจริง 17 พ.ย.: ลิงก์ 1,240 · คีย์/นำเข้า 2,792 · iRecruit 730 · กรอกเองหน้าประกาศ 276
  */
-export function methodOf(source: string | null, linkCode: string | null, post: 'autopost' | 'manual' | null, keyedBy: string | null): AppMethod {
+export function methodOf(
+  source: string | null,
+  linkCode: string | null,
+  post: 'autopost' | 'manual' | null,
+  keyedBy: string | null,
+  channelLabel: string | null = null,
+): AppMethod {
   if (linkCode) return post ?? 'link';
   if (source === 'irecruit') return 'irecruit';
+  // คนจาก Scrap ที่เก็บเข้าการติดต่อ — ใบสร้างในชื่อ So Scraping + ช่องทาง "Scrap · …" (เจ้าของ 19 พ.ย. 2569 "หน้าที่ Scrap มาทำไมขึ้นว่าเจ้าหน้าที่คีย์")
+  if (keyedBy === SO_SCRAPING_CREATED_BY && /^Scrap\s·/.test(channelLabel ?? '')) return 'scrap';
   return keyedBy ? 'staff' : 'self';
 }
 
@@ -502,7 +511,7 @@ export function toFact(
     phoneKey: phone ? createHash('sha256').update(`jarvis-ov2:${phone}`).digest('base64url').slice(0, 12) : null,
     homeProvince: text(r.home_province) ? canonProvinceName(String(text(r.home_province))) || text(r.home_province) : null,
     gender: r.gender === 'male' || r.gender === 'female' || r.gender === 'other' ? r.gender : null,
-    method: methodOf(text(r.entry_source), text(r.link_code), sources ? postSourceOf(text(r.link_code), text(r.link_note), sources.autopostCodes) : null, text(r.keyed_by)),
+    method: methodOf(text(r.entry_source), text(r.link_code), sources ? postSourceOf(text(r.link_code), text(r.link_note), sources.autopostCodes) : null, text(r.keyed_by), text(r.channel_label)),
   };
 }
 

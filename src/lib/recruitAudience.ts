@@ -60,6 +60,8 @@ export const APP_METHOD_LABEL: Record<AppMethod, string> = {
   staff: 'เจ้าหน้าที่คีย์ / นำเข้า',
   self: 'กรอกเองที่หน้าประกาศ',
   irecruit: 'ดึงจาก iRecruit',
+  // เก็บจากรายชื่อ Scrap เข้าการติดต่อ (19 พ.ย. 2569 — เดิมนับเป็นเจ้าหน้าที่คีย์)
+  scrap: 'ดึงจาก Scrap',
 };
 export const METHOD_UNKNOWN = 'ไม่ทราบวิธี';
 export const BRINGER_NONE = 'ไม่ทราบคนพามา';

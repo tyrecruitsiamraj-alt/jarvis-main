@@ -10,6 +10,7 @@ import { tableInAppSchema } from './schema.js';
 import { lockAndFindRepeat } from './applicationRepeatGuard.js';
 import { parseStaffApplication, STAFF_INSERT_COLUMNS, STAFF_INSERT_VALUES, staffInsertParams } from '../../src/lib/staffApplicationInput.js';
 import { SO_SCRAPING_CREATED_BY } from '../../src/lib/soScrapingLeads.js';
+import { CALLED_SQL } from './applicantOverviewSql.js';
 import {
   scrapAge,
   scrapChannelLabel,
@@ -136,6 +137,44 @@ export async function listScrapRequestNos(): Promise<Array<{ request_no: string;
       order by max(tc.last_matched_at) desc nulls last`,
   );
   return rows.map((r) => ({ request_no: r.request_no, total: Number(r.total) }));
+}
+
+/**
+ * โทรแล้วต่อเลขใบขอ (เจ้าของ 19 พ.ย. 2569 "ทำเป็นแบบ โทรเท่าไหร่/จำนวน Scrap") — นับคนจาก Scrap (ต่อเบอร์) ที่มีใบสมัคร
+ * ในใบขอนั้นเบอร์ตรงกัน และมีหลักฐานโทรชุดเดียวกับ `CALLED_SQL` (คิว AI · ผลที่เจ้าหน้าที่ลง · บันทึกติดต่อ)
+ * ยังไม่เก็บเข้าการติดต่อ = ยังไม่มีใบ = ยังไม่โทร · ใบที่ไม่อยู่ในผล = 0
+ */
+export async function listScrapCalledCounts(requestNos: readonly string[]): Promise<Record<string, number>> {
+  if (requestNos.length === 0) return {};
+  const { rows } = await dbQuery<{ request_no: string; phone: string | null }>(
+    `select distinct upper(t.source_request_no) as request_no, c.phone
+       from ${CAND}.scrape_tasks t
+       join ${CAND}.scrape_task_candidates tc on tc.task_id = t.id
+       join ${CAND}.candidates c on c.id = tc.candidate_id
+      where upper(t.source_request_no) = any($1::text[]) and c.phone is not null`,
+    [requestNos.map((r) => r.toUpperCase())],
+  );
+  const pairs = new Map<string, { req: string; jobId: string; e164: string }>();
+  for (const r of rows) {
+    const p = scrapPhone10(r.phone);
+    if (!p) continue;
+    const jobId = scrapJobIdOf(r.request_no);
+    const e164 = `+66${p.slice(1)}`;
+    pairs.set(`${jobId}|${e164}`, { req: r.request_no, jobId, e164 });
+  }
+  if (pairs.size === 0) return {};
+  const all = [...pairs.values()];
+  const { rows: called } = await dbQuery<{ job_id: string; phone_e164: string }>(
+    `select distinct a.job_id, a.phone_e164 from ${APPS} a
+      where a.job_id = any($1::text[]) and a.phone_e164 = any($2::text[]) and ${CALLED_SQL}`,
+    [[...new Set(all.map((x) => x.jobId))], [...new Set(all.map((x) => x.e164))]],
+  );
+  const out: Record<string, number> = {};
+  for (const r of called) {
+    const hit = pairs.get(`${r.job_id}|${r.phone_e164}`);
+    if (hit) out[hit.req] = (out[hit.req] ?? 0) + 1;
+  }
+  return out;
 }
 
 export type ScrapJobInfo = { id: string; title: string | null; unitName: string | null; recruiterName: string | null };

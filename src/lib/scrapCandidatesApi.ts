@@ -22,11 +22,13 @@ export async function fetchScrapCandidatesAll(): Promise<ScrapCandidatesAll> {
   return (await r.json()) as ScrapCandidatesAll;
 }
 
-/** ยอดรายชื่อ Scrap ต่อเลขใบขอ — ใบที่ไม่มีในนี้ = 0 */
-export async function fetchScrapCountsByRequest(): Promise<Record<string, number>> {
+/** ยอดรายชื่อ Scrap ต่อเลขใบขอ + โทรแล้ว (19 พ.ย. 2569) — ใบที่ไม่มีในนี้ = 0 */
+export type ScrapCountsByRequest = { counts: Record<string, number>; called: Record<string, number> };
+export async function fetchScrapCountsByRequest(): Promise<ScrapCountsByRequest> {
   const r = await apiFetch('/api/scrap-candidates?counts=1');
   if (!r.ok) return readError(r);
-  return ((await r.json()) as { counts: Record<string, number> }).counts;
+  const data = (await r.json()) as Partial<ScrapCountsByRequest>;
+  return { counts: data.counts ?? {}, called: data.called ?? {} };
 }
 
 /** ลิงก์แท็บผู้สมัคร ▾ Scrap ของหน้างานสรรหา เลือกใบขอไว้ให้ */

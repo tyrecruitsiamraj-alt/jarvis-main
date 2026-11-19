@@ -33,10 +33,10 @@ describe('เก็บไปโทรแล้วหรือยัง (บร�
 });
 
 describe('คอลัมน์ Scrap ในตารางใบขอ', () => {
-  it('ต่อจากคนกรอก · ชื่อ Scrap', () => {
+  it('ต่อจากคนกรอก · ชื่อ โทร/Scrap (19 พ.ย. 2569 "โทรเท่าไหร่/จำนวน Scrap")', () => {
     const i = JOB_LIST_TABLE_COLUMNS.indexOf('applicants');
     expect(JOB_LIST_TABLE_COLUMNS[i + 1]).toBe('scrap');
-    expect(JOB_LIST_TABLE_COLUMN_LABEL.scrap).toBe('Scrap');
+    expect(JOB_LIST_TABLE_COLUMN_LABEL.scrap).toBe('โทร/Scrap');
   });
   it('เรียงตามยอด Scrap · ยังไม่รู้ยอดตกท้าย', () => {
     const a = { id: 'siamraj-sql:A' } as JobRequest;

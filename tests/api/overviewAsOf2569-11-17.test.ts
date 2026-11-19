@@ -42,4 +42,13 @@ describe('วิธีที่รายชื่อเข้ามา (methodOf
     expect(methodOf('apply_page', null, null, 'pakkorn.k@siamraj.com')).toBe('staff');
     expect(methodOf('apply_page', null, null, null)).toBe('self');
   });
+  it('คนจาก Scrap ที่เก็บเข้าการติดต่อ = ดึงจาก Scrap ไม่ใช่เจ้าหน้าที่คีย์ (เจ้าของ 19 พ.ย. 2569)', async () => {
+    const { methodOf } = await import('../../api/_handlers/recruit-overview');
+    const { APP_METHOD_LABEL } = await import('../../src/lib/recruitAudience');
+    expect(methodOf('apply_page', null, null, 'So Scraping', 'Scrap · JobBKK')).toBe('scrap');
+    expect(APP_METHOD_LABEL.scrap).toBe('ดึงจาก Scrap');
+    // So Scraping แต่ไม่ใช่ Scrap (คอมเมนต์) · เจ้าหน้าที่ตั้งช่องทาง Scrap เอง = ไม่เดา
+    expect(methodOf('apply_page', null, null, 'So Scraping', 'Facebook คอมเมนต์')).toBe('staff');
+    expect(methodOf('apply_page', null, null, 'pakkorn.k@siamraj.com', 'Scrap · JobBKK')).toBe('staff');
+  });
 });
