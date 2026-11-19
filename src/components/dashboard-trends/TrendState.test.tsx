@@ -15,8 +15,8 @@ describe('กล่องโหลดไม่ขึ้น', () => {
     const retry = vi.fn();
     render(<TrendState loading={false} error="โหลดภาพรวมงานสรรหาไม่สำเร็จ (HTTP 504)" onRetry={retry} />);
     const img = screen.getByAltText('น้องใบขอติดปัญหา') as HTMLImageElement;
-    expect(img.getAttribute('src')).toBe('/mascot/request-trouble.png');
-    expect(existsSync('public/mascot/request-trouble.png')).toBe(true);
+    expect(img.getAttribute('src')).toContain('request-trouble');
+    expect(existsSync('src/assets/mascot/request-trouble.png')).toBe(true);
     expect(screen.getByText('โหลดภาพรวมงานสรรหาไม่สำเร็จ (HTTP 504)')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'ลองใหม่' }));
     expect(retry).toHaveBeenCalledTimes(1);
@@ -24,8 +24,8 @@ describe('กล่องโหลดไม่ขึ้น', () => {
 
   it('กำลังโหลด = น้องใบขอท่ากำลังทำ กลางหน้า (เจ้าของ "ใส่ท่ากำลังทำตอนโหลดด้วย แล้วใส่ไว้กลางหน้าเลย")', () => {
     render(<MascotState pose="working" testId="x">กำลังโหลด…</MascotState>);
-    expect((screen.getByAltText('น้องใบขอกำลังทำงาน') as HTMLImageElement).getAttribute('src')).toBe('/mascot/request-working.png');
-    expect(existsSync('public/mascot/request-working.png')).toBe(true);
+    expect((screen.getByAltText('น้องใบขอกำลังทำงาน') as HTMLImageElement).getAttribute('src')).toContain('request-working');
+    expect(existsSync('src/assets/mascot/request-working.png')).toBe(true);
     expect(screen.getByTestId('x').className).toContain('items-center');
     expect(screen.getByText('กำลังโหลด…')).toBeTruthy();
   });
