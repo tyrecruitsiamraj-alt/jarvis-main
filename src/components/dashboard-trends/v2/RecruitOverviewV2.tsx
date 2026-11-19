@@ -81,7 +81,7 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
 
   // ใบขอ + การประกาศ (เส้นเดิม) — ทิ้งคำตอบที่ไม่ใช่ตัวกรองปัจจุบัน
   const [stuck, setStuck] = React.useState<{ key: string; data: RecruitStuckResponse | null; error: string | null }>({ key: '', data: null, error: null });
-  const [posts, setPosts] = React.useState<{ key: string; jobs: number | null; error: string | null }>({ key: '', jobs: null, error: null });
+  const [posts, setPosts] = React.useState<{ key: string; total: number | null; error: string | null }>({ key: '', total: null, error: null });
   /** งานรายคน + ความเคลื่อนไหวล่าสุด (ภาพรวมแบบ Mobix · 18 พ.ย. 2569) — ดึงครั้งเดียวต่อช่วง/BU */
   const [staff, setStaff] = React.useState<{ key: string; rows: StaffActivityRow[] | null; error: string | null }>({ key: '', rows: null, error: null });
   const [feed, setFeed] = React.useState<{ key: string; items: StaffActivityFeedItem[] | null }>({ key: '', items: null });
@@ -92,8 +92,8 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
       .then((d) => alive && setStuck({ key: filterKey, data: d, error: null }))
       .catch((e: unknown) => alive && setStuck({ key: filterKey, data: null, error: friendlyErrorText(e, 'โหลดใบขอไม่ได้') }));
     fetchSoPostGroups({ from: win.from, to: win.to, bu: data.bu, page: 1 })
-      .then((d) => alive && setPosts({ key: filterKey, jobs: d.jobs ?? null, error: null }))
-      .catch((e: unknown) => alive && setPosts({ key: filterKey, jobs: null, error: friendlyErrorText(e, 'อ่านรายการโพสต์ไม่ได้') }));
+      .then((d) => alive && setPosts({ key: filterKey, total: d.total, error: null }))
+      .catch((e: unknown) => alive && setPosts({ key: filterKey, total: null, error: friendlyErrorText(e, 'อ่านรายการโพสต์ไม่ได้') }));
     fetchStaffActivity({ from: win.from, to: win.to, bu: data.bu })
       .then((rows) => alive && setStaff({ key: filterKey, rows, error: null }))
       .catch((e: unknown) => alive && setStaff({ key: filterKey, rows: null, error: friendlyErrorText(e, 'อ่านงานรายคนไม่ได้') }));
@@ -305,8 +305,9 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
           tiles={[
             {
               key: 'autopost',
-              n: posts.key === filterKey ? posts.jobs : null,
-              unit: 'งาน',
+              // ยอดสั่งโพสต์ทั้งหมด นับรายกลุ่ม Facebook (เจ้าของ 19 พ.ย. 2569 Choice "1,819 กลุ่ม" · เดิม 96 = ใบขอ)
+              n: posts.key === filterKey ? posts.total : null,
+              unit: 'กลุ่ม',
               onOpen: () => push({ kind: 'embed', title: 'Autopost · รายการโพสต์', embed: 'posts' }),
             },
             {
