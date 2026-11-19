@@ -562,20 +562,6 @@ export function openRemainingJobsOf(jobs: readonly JobRequest[]): JobRequest[] {
   return jobs.filter((j) => j.status !== 'closed' && j.status !== 'cancelled' && positionBreakdownFromJob(j).remainingPositions > 0);
 }
 
-/**
- * กล่องสถานะทำงานแบบ Dashboard สำหรับหน้าอื่น (ภาพรวมงานสรรหา · เจ้าของ 18 พ.ย. 2569 "ยกมาแบบหน้า dashboard")
- * ช่วง = วันที่ต้องการคน (`filterJobsByRequestDate`) แบบเดียวกับ Dashboard · null = ใบเปิดทั้งหมด
- * ไม่มียอด cohort จาก ERP ⇒ "ทั้งหมด" = ผลรวมสถานะ (ไม่มีกล่อง "ไม่มีสถานะ")
- */
-export function workStatusBoardOf(
-  openJobs: readonly JobRequest[],
-  range: { from: string; to: string } | null,
-): { kpis: DashboardKpi[]; jobs: JobRequest[] } {
-  const scoped = range ? filterJobsByRequestDate([...openJobs], range.from, range.to) : [...openJobs];
-  const jobs = openRemainingJobsOf(scoped);
-  return { kpis: buildWorkStatusKpis(jobs, range ? 'ช่วงที่เลือก' : null), jobs };
-}
-
 /** KPI สถานะทำงาน (นับอัตรา/ตำแหน่ง): ทั้งหมด = ผลรวมสถานะ · คงเหลือตำแหน่งอยู่แถว stock แยก
  *  totalOverride: โหมดมีงวดส่งยอด cohort มาให้ "ทั้งหมด" เท่าการ์ดคงเหลือ (ใบนอก feed ไม่มี work_status ให้แจก leaf)
  *  🔴 29 ต.ค. 2569 (เจ้าของ "การนับคงเดิมไว้ก่อน" · ร่าง 2): ใบขอชั่วคราว (`siamraj-pre:`) ไม่อยู่ในกล่องสถานะ —

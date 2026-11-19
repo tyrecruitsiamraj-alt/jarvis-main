@@ -7,7 +7,7 @@
  */
 import React from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
@@ -53,6 +53,7 @@ const monthText = (ym: string) => `${TH_MONTH[Number(ym.slice(5, 7)) - 1]} ${Str
 
 export default function RecruitOverviewV2({ data }: { data: RecruitOverviewResponse }) {
   const navigate = useNavigate();
+  const [, setSearchParams] = useSearchParams();
   const win = data.window;
   /** BU ที่เทียบ — ล็อก BU เดียว = BU นั้นอย่างเดียว (ไม่ดึง BU นอกสิทธิ์มาเทียบ) */
   const bus = React.useMemo(() => {
@@ -122,7 +123,6 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
     if (reqFeed.feedState !== 'ready') return null;
     return data.bu ? filterUnitRequestsByDepartment(reqFeed.jobs, data.bu) : reqFeed.jobs;
   }, [reqFeed.feedState, reqFeed.jobs, data.bu]);
-  const statusRange = React.useMemo(() => (win.all ? null : { from: win.from, to: win.to }), [win.all, win.from, win.to]);
   /** ช่วงก่อน (ช่วงวันเท่ากัน) — เทียบไม่ได้ = null */
   const prevModel = React.useMemo(() => {
     const prev = prevCohortOf(data.apps ?? [], win, data.firstDay, data.generatedAt);
@@ -286,7 +286,8 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
   const storyCohort = idSet ? model.cohort.filter((f) => inMetric(f.id)) : model.cohort;
   return (
     <div className="space-y-8" data-testid="recruit-overview-v2">
-      {/* ── ต้องทำ (บนสุด · ณ ตอนนี้ ไม่ขึ้นกับช่วงวันที่) — แบบ Mobix (เจ้าของ 18 พ.ย. 2569) · กด = ไปหน้าที่แก้ได้ ── */}
+      {/* ── ต้องทำ (บนสุด · ณ ตอนนี้ ไม่ขึ้นกับช่วงวันที่) — แบบ Mobix (เจ้าของ 18 พ.ย. 2569)
+          กด = แผงข้าง กราฟ BU + รายชื่อ/ใบขอ + ปุ่มทำทีละแถว ทำจากหน้านี้ได้เลย (เจ้าของ 19 พ.ย. 2569) ── */}
       <Card className="min-w-0 space-y-3 rounded-2xl p-5" data-testid="v2-todo-card">
         <SectionTitle title="ต้องทำ" right="ณ ตอนนี้" />
         <TodoList
@@ -298,7 +299,7 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
               sub: data.backlog ? `ค้างเกิน 3 วัน ${fmt(data.backlog.waitingStaff.over3)}` : '—',
               tone: 'danger',
               icon: TODO_ICONS.PhoneCall,
-              onOpen: () => navigate(`/jobs/board?view=list&bucket=waiting_staff${buQs}`),
+              onOpen: () => push({ kind: 'todo', title: 'สนใจแล้ว รอเจ้าหน้าที่โทร', todo: 'waiting_staff', listHref: `/jobs/board?view=list&bucket=waiting_staff${buQs}` }),
             },
             {
               key: 'uncalled',
@@ -307,16 +308,16 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
               sub: data.backlog ? `อยู่ในคิว AI ${fmt(data.backlog.uncalled.inQueue)} · ค้างเกิน 7 วัน ${fmt(data.backlog.uncalled.over7)}` : '—',
               tone: 'danger',
               icon: TODO_ICONS.UserRoundSearch,
-              onOpen: () => navigate(`/jobs/board?view=list&bucket=uncalled_now${buQs}`),
+              onOpen: () => push({ kind: 'todo', title: 'ใบสมัครที่ยังไม่มีใครโทร', todo: 'uncalled_now', listHref: `/jobs/board?view=list&bucket=uncalled_now${buQs}` }),
             },
             {
               key: 'overdue',
               n: data.backlog?.appointments?.overdue ?? null,
               title: 'นัดเลยวันแล้ว ยังไม่ลง มา/ไม่มา',
-              sub: 'ลงผลที่หน้าติดตามนัดหมาย',
+              sub: data.backlog?.appointments ? `นัดใน 7 วันข้างหน้า ${fmt(data.backlog.appointments.next7)}` : '—',
               tone: 'warn',
               icon: TODO_ICONS.CalendarX,
-              onOpen: () => navigate(`/jobs/board?view=appointments&bucket=overdue_now${buQs}`),
+              onOpen: () => push({ kind: 'todo', title: 'นัดเลยวันแล้ว ยังไม่ลง มา/ไม่มา', todo: 'overdue_now', listHref: `/jobs/board?view=appointments&bucket=overdue_now${buQs}` }),
             },
             {
               key: 'unreleased',
@@ -343,13 +344,13 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
           <Kpi label={`+ ใบขอใหม่ · ${rangeShort}`} emphasis value={loadingReq ? undefined : eq ? eq.new.length : null} sub={rateText(eq?.new, 'ขอมา', 'requested')} onClick={eq ? () => openRequests('ใบขอใหม่', eq.new) : undefined} testId="v2-req-new" />
           <Kpi label={`− ปิดครบใบขอ · ${rangeShort}`} emphasis value={loadingReq ? undefined : eq ? eq.filled.length : null} sub={reqRows ? `หาได้แล้ว ${fmt(sumOf(reqRows, 'filled'))} อัตรา (รวมใบที่หาได้บางส่วน)` : undefined} onClick={eq ? () => openRequests('ปิดครบใบขอ', eq.filled) : undefined} testId="v2-req-filled" />
           <Kpi label={`− ยกเลิกใบขอ · ${rangeShort}`} emphasis value={loadingReq ? undefined : eq ? eq.cancelled.length : null} sub={reqRows ? `ยกเลิก ${fmt(sumOf(reqRows, 'cancelled'))} อัตรา` : undefined} onClick={eq ? () => openRequests('ยกเลิกใบขอ', eq.cancelled) : undefined} tone="danger" testId="v2-req-cancelled" />
-          <Kpi label={`= เหลือหา · ยังเปิดอยู่ ณ ${shortDay(win.to)}`} emphasis value={loadingReq ? undefined : eq ? eq.remaining.length : null} sub={rateText(eq?.remaining, 'เหลือหา', 'remaining')} onClick={eq ? () => openRequests('เหลือหา', eq.remaining) : undefined} testId="v2-req-open" />
+          <Kpi label={`= เหลือหา · ยังเปิดอยู่ ณ ${shortDay(win.to)}`} emphasis tone="warn" value={loadingReq ? undefined : eq ? eq.remaining.length : null} sub={rateText(eq?.remaining, 'เหลือหา', 'remaining')} onClick={eq ? () => openRequests('เหลือหา', eq.remaining) : undefined} testId="v2-req-open" />
         </div>
-        {/* สถานะทำงานแบบ Dashboard — ช่วง = วันที่ต้องการคน ตามวันที่ที่เลือก (เจ้าของ 18 พ.ย. 2569 Choice) */}
+        {/* สถานะทำงานแบบ Dashboard — ใบชุดเดียวกับการ์ดเหลือหา "ทั้งหมด" เท่ากันทุกช่วง + สีเดียวกัน (เจ้าของ 19 พ.ย. 2569) */}
         <div className="border-t pt-4">
           <WorkStatusBoard
+            remaining={eq ? eq.remaining : null}
             jobs={statusJobs}
-            range={statusRange}
             error={reqFeed.feedState === 'failed' || reqFeed.feedState === 'forbidden' ? 'โหลดใบขอไม่ได้' : null}
             onOpenRequest={(jobId) => navigate(requestPathOfJobId(jobId))}
             resetKey={viewKey}
@@ -580,7 +581,28 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
         ) : null}
       </Card>
 
-      <V2Drawer stack={stack} onStack={setStack} model={model} bus={bus} periodText={periodText} buText={buText} embeds={embeds} />
+      <V2Drawer
+        stack={stack}
+        onStack={setStack}
+        model={model}
+        bus={bus}
+        periodText={periodText}
+        buText={buText}
+        embeds={embeds}
+        bu={data.bu}
+        // ปุ่ม "ประกาศ" ในรายการใบขอ (เจ้าของ 19 พ.ย. 2569 "กดทำจากหน้านี้เลย") — ปิดแผงก่อน แล้วเปิดป๊อปประกาศของใบนั้นบนหน้านี้ (`?posting=` ของกล่องงาน)
+        onPublish={(jobId) => {
+          setStack([]);
+          setSearchParams(
+            (prev) => {
+              const next = new URLSearchParams(prev);
+              next.set('posting', jobId);
+              return next;
+            },
+            { replace: true },
+          );
+        }}
+      />
     </div>
   );
 }

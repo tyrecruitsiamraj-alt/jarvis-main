@@ -41,7 +41,15 @@ export function MonthCompareBars({
   return (
     <div className={cn('w-full', DASH.sub)} style={{ height }} data-testid={testId}>
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data} margin={{ top: 20, right: 8, bottom: 0, left: -16 }} barCategoryGap="18%" barGap={2}>
+        {/* กดตรงไหนในช่องของกลุ่มก็ได้ (แถบเทาที่ขึ้นตอนชี้) ไม่ต้องเล็งโดนตัวแท่ง — แท่งเตี้ยอย่าง SN 3 · DS 1 กดยาก (เจ้าของ 19 พ.ย. 2569) */}
+        <BarChart
+          data={data}
+          margin={{ top: 20, right: 8, bottom: 0, left: -16 }}
+          barCategoryGap="18%"
+          barGap={2}
+          className={onPick ? 'cursor-pointer' : undefined}
+          onClick={(st: { activeLabel?: string | number } | null) => st?.activeLabel != null && onPick?.(String(st.activeLabel))}
+        >
           <CartesianGrid vertical={false} stroke={CHART.gridStroke} strokeOpacity={CHART.gridOpacity} />
           <XAxis
             dataKey="key"

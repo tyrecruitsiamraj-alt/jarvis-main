@@ -15,7 +15,25 @@ const UNIT_REQUESTS_FETCH_LIMIT = 500;
 /** เวลาของข้อมูลชุดล่าสุดที่โหลดได้ — ประกาศระดับโมดูล (กติกา `new Intl.*`) */
 const CLOCK_TH = new Intl.DateTimeFormat('th-TH', { timeZone: 'Asia/Bangkok', hour: '2-digit', minute: '2-digit', hour12: false });
 
-async function loadLiveJobs(fresh = false): Promise<{
+/**
+ * หลายส่วนบนหน้าเดียวใช้เส้นนี้พร้อมกัน (กล่องงาน + กล่องสถานะทำงานบนภาพรวม) — ขอพร้อมกันใช้คำตอบเดียว
+ * (เจ้าของ 19 พ.ย. 2569 "หน้าภาพรวมโหลดช้ามาก" · วัดจริงดึง 402 KB ซ้ำหลายรอบต่อการเปิดหน้า)
+ * แชร์เฉพาะคำขอที่ยังวิ่งอยู่ — ได้คำตอบแล้วรอบถัดไปยิงใหม่ตามเดิม · `fresh` (กดอัปเดต) ไม่แชร์
+ */
+let inflight: ReturnType<typeof loadLiveJobsOnce> | null = null;
+function loadLiveJobs(fresh = false): ReturnType<typeof loadLiveJobsOnce> {
+  if (fresh) return loadLiveJobsOnce(true);
+  if (inflight) return inflight;
+  const p = loadLiveJobsOnce(false);
+  inflight = p;
+  const clear = () => {
+    if (inflight === p) inflight = null;
+  };
+  p.then(clear, clear);
+  return p;
+}
+
+async function loadLiveJobsOnce(fresh = false): Promise<{
   jobs: JobRequest[];
   siamrajPrimary: boolean;
   readOnly: boolean;

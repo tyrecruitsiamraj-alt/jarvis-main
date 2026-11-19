@@ -14,6 +14,7 @@
  * 5. "ใบที่ประกาศ" ไม่ได้คิดที่เส้นนี้ — หน้าเว็บใช้เลขของหัวกล่องงานตรง ๆ (เจ้าของสั่ง 1 ต.ค. 2569:
  *    *"เปลี่ยนเป็น 7 เหมือนหัวกล่องงาน"*) · เดิมนับใบที่ประกาศในเดือนจาก `job_public_releases` — ถอดแล้ว
  */
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { withRbac, sendError, handleApiError, type ApiRes, type AuthedReq } from '../_lib/http.js';
 import { loadLinkClicks } from '../_lib/postingLinkHits.js';
 import { dbQuery, isPgUndefinedTable } from '../_lib/postgres.js';
@@ -47,7 +48,7 @@ import {
 import { queueReplySql } from '../_lib/lumosQueueDefs.js';
 import { loadBoardPhoneSet } from '../_lib/applicationBoardLink.js';
 import { toBangkokYmd } from '../_lib/businessDate.js';
-import { logError } from '../_lib/logger.js';
+import { logError, logWarn } from '../_lib/logger.js';
 import { loadStaffDisplay } from '../_lib/staffDisplay.js';
 import { INTEREST_VOCAB, classifyCallMicro } from '../../src/lib/callMicroOutcome.js';
 import { isWaitingForStaff } from '../../src/lib/waitingForStaff.js';
@@ -233,7 +234,7 @@ export function factsSql(
  */
 export function backlogSql(): string {
   return `
-  select a.id::text as id, a.created_at, a.job_id, (a.phone_e164 is null) as bad_phone,
+  select a.id::text as id, ${appBuSql('a')} as bu, a.created_at, a.job_id, (a.phone_e164 is null) as bad_phone,
          ${CALLED_SQL} as called,
          ${IN_QUEUE_SQL} as in_queue,
          air.outcome as ai_outcome, air.summary as ai_summary, air.reply as ai_reply, air.at as ai_at,
@@ -273,17 +274,23 @@ export function isWaitingStaffRow(r: Row): boolean {
   return bool(r.called) && isWaitingForStaff({ aiAnswer: micro(r.ai_outcome, r.ai_summary, r.ai_reply), aiAnswerAt: iso(r.ai_at), staffLastAt: iso(r.staff_last_at) });
 }
 
-export async function backlogIds(kind: BacklogBucket, buSet: BuSet): Promise<string[]> {
+/** คนของการ์ด "ต้องทำ" + BU ของแต่ละคน (แผงข้างแยก BU · เจ้าของ 19 พ.ย. 2569 "พอกดแล้วเด้งกราฟแท่งแยก Bu") */
+export async function backlogPeople(kind: BacklogBucket, buSet: BuSet): Promise<Array<{ id: string; bu: string | null }>> {
+  const pick = (rows: Row[]) => rows.map((r) => ({ id: String(r.id), bu: text(r.bu) }));
   if (kind === 'overdue_now') {
     const { rows } = await dbQuery<Row>(
-      `select a.id::text as id from ${APPS} a ${appBuJoin('a')}
+      `select a.id::text as id, ${appBuSql('a')} as bu from ${APPS} a ${appBuJoin('a')}
         where ${buInSql('$1')} and not ${OLD_IRECRUIT_SQL} and ${OVERVIEW_BUCKETS.overdue_no_result}`,
       [buSet],
     );
-    return rows.map((r) => String(r.id));
+    return pick(rows);
   }
   const { rows } = await dbQuery<Row>(backlogSql(), [buSet]);
-  return rows.filter((r) => (kind === 'uncalled_now' ? !bool(r.called) : isWaitingStaffRow(r))).map((r) => String(r.id));
+  return pick(rows.filter((r) => (kind === 'uncalled_now' ? !bool(r.called) : isWaitingStaffRow(r))));
+}
+
+export async function backlogIds(kind: BacklogBucket, buSet: BuSet): Promise<string[]> {
+  return (await backlogPeople(kind, buSet)).map((p) => p.id);
 }
 
 /** ผลงานรายคนของเดือน [$1, $2) · $3 = BU — คืนแถวดิบ (ใบ × คน) ให้นับรายชื่อไม่ซ้ำฝั่ง Node */
@@ -858,12 +865,42 @@ export function toAiRow(events: Row[]): RecruitAiRow {
 
 type Settled<T> = { ok: true; value: T } | { ok: false; error: string };
 
+/**
+ * เวลาของแต่ละก้อน (เจ้าของ 19 พ.ย. 2569 "หน้าภาพรวมโหลดช้ามาก") — ส่งกลับใน header `Server-Timing` ให้วัดบนเว็บจริงได้
+ * ชื่อใน header ต้องเป็น ASCII ⇒ แปลงชื่อก้อนเป็นรหัสสั้น · ไม่เปลี่ยนข้อมูลที่ตอบ
+ */
+const stepTimings = new AsyncLocalStorage<Array<[string, number]>>();
+const STEP_KEY: Record<string, string> = {
+  รายชื่อบนบอร์ด: 'board',
+  ใบสมัคร: 'facts',
+  งานค้าง: 'backlog',
+  นัดที่รอผล: 'appt',
+  ผลงานรายคน: 'staff',
+  ผลมาตามนัด: 'showed',
+  'ผลโทรของ AI': 'ai',
+  วันแรกของข้อมูล: 'firstDay',
+  ผลนัด: 'attend',
+  ช่องทางลงงาน: 'placement',
+  ใบขอ: 'requests',
+  'ใบแจ้งเข้า ERP': 'erpInform',
+  'ช่องทาง iRecruit': 'irecRegs',
+  'ผู้สมัคร iRecruit': 'irecApps',
+  'ลิงก์ Autopost': 'autopostLinks',
+  คลิกลิงก์: 'clicks',
+};
+export function serverTimingHeader(t: ReadonlyArray<[string, number]>): string {
+  return t.map(([k, ms]) => `${k};dur=${Math.round(ms)}`).join(', ');
+}
+
 async function settle<T>(what: string, run: () => Promise<T>): Promise<Settled<T>> {
+  const t0 = Date.now();
   try {
     return { ok: true, value: await run() };
   } catch (e) {
     logError(`recruit-overview: ${what}`, e);
     return { ok: false, error: `อ่าน${what}ไม่ได้` };
+  } finally {
+    stepTimings.getStore()?.push([STEP_KEY[what] ?? 'step', Date.now() - t0]);
   }
 }
 
@@ -1123,7 +1160,9 @@ export async function loadApplicantNames(ids: readonly string[], scope: Departme
   const { rows } = await dbQuery<Row>(
     // ใครถืออยู่ · เก็บเมื่อไหร่ · ลงผลล่าสุดเมื่อไหร่ (เจ้าของ 11 พ.ย. 2569 "กดเข้าไปปุ้บโชว์ชื่อ แล้วบอกเลยว่าเก็บไปแล้วนะอยู่ที่ใคร
     // … เก็บไปแล้วยังไม่โทรอยู่ใคร ค้างมากี่วันแล้ว") — อีเมลแปลงเป็นชื่อเล่นที่ handler
+    // job_id + วันนัด (19 พ.ย. 2569): แผงข้างของการ์ด "ต้องทำ" กด มา/ไม่มา ต้องส่งวันนัด · ส่ง AI ได้เฉพาะใบที่ผูกใบขอ
     `select a.id::text as id, a.full_name, a.phone, a.unit_name, a.job_title, a.position_interest, a.created_at,
+            a.job_id, ${APPOINTMENT_AT_SQL} as appointment_at,
             case when a.claimed_by is not null then coalesce(nullif(btrim(a.claimed_by_name), ''), 'ไม่ระบุชื่อ') end as claimed_by,
             case when a.claimed_by is not null then a.claimed_at end as claimed_at,
             (select c.created_at from ${CONTACTS} c where c.application_id = a.id order by c.created_at desc limit 1) as last_log_at,
@@ -1143,6 +1182,12 @@ async function handler(req: AuthedReq, res: ApiRes) {
   }
   try {
     const scope = await loadMatchingBuScope(req.user);
+    // คนของการ์ด "ต้องทำ" + BU (`?todo=waiting_staff|uncalled_now|overdue_now&bu=`) — แผงข้างของภาพรวม
+    if (isBacklogBucket(req.query?.todo)) {
+      const items = await backlogPeople(req.query.todo, pickDashboardBuSet(scope, req.query?.bu).buSet);
+      res.setHeader?.('Cache-Control', 'no-store');
+      return res.status(200).json({ items });
+    }
     if (typeof req.query?.names === 'string') {
       const rows = await loadApplicantNames(req.query.names.split(','), scope);
       if (rows.some((r) => String(r.claimed_by ?? '').includes('@'))) {
@@ -1158,9 +1203,17 @@ async function handler(req: AuthedReq, res: ApiRes) {
     const month = typeof req.query?.month === 'string' ? req.query.month.trim() : undefined;
     const from = typeof req.query?.from === 'string' ? req.query.from.trim() : undefined;
     const to = typeof req.query?.to === 'string' ? req.query.to.trim() : undefined;
-    const body = await buildRecruitOverview(month, scope, new Date(), from && to ? { from, to, all: req.query?.all === '1' } : undefined, req.query?.bu, {
-      asOf: req.query?.asof === '1',
-    });
+    const timings: Array<[string, number]> = [];
+    const t0 = Date.now();
+    const body = await stepTimings.run(timings, () =>
+      buildRecruitOverview(month, scope, new Date(), from && to ? { from, to, all: req.query?.all === '1' } : undefined, req.query?.bu, {
+        asOf: req.query?.asof === '1',
+      }),
+    );
+    timings.push(['total', Date.now() - t0]);
+    res.setHeader?.('Server-Timing', serverTimingHeader(timings));
+    // ช้าเกิน 5 วิ = จดไว้ใน log ว่าก้อนไหนช้า (ไม่มีข้อมูลบุคคล)
+    if (Date.now() - t0 > 5000) logWarn('recruit-overview.slow', { timings: Object.fromEntries(timings) });
     res.setHeader?.('Cache-Control', 'no-store');
     return res.status(200).json(body);
   } catch (e) {

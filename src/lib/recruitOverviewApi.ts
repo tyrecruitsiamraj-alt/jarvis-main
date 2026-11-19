@@ -43,7 +43,21 @@ export type ApplicantNameRow = {
   /** ลงผลติดต่อล่าสุด · null = ยังไม่เคยลงผล */
   last_log_at?: string | null;
   last_log_ok?: boolean | null;
+  /** ใบขอที่ผูก · null = ยังไม่ผูก (ส่ง AI ไม่ได้จากแผงข้าง) */
+  job_id?: string | null;
+  /** วันนัดล่าสุด (กด มา/ไม่มา ต้องส่งค่านี้) · null = ไม่มีนัด */
+  appointment_at?: string | null;
 };
+
+/** คนของการ์ด "ต้องทำ" + BU (เจ้าของ 19 พ.ย. 2569) — ตัวนับเดียวกับเลขบนการ์ด */
+export type TodoBucket = 'waiting_staff' | 'uncalled_now' | 'overdue_now';
+export async function fetchTodoPeople(todo: TodoBucket, bu: string | null): Promise<Array<{ id: string; bu: string | null }>> {
+  const qs = new URLSearchParams({ todo });
+  if (bu) qs.set('bu', bu);
+  const r = await apiFetch(`/api/recruit-overview?${qs}`);
+  if (!r.ok) throw new Error(`โหลดรายชื่อไม่สำเร็จ (HTTP ${r.status})`);
+  return ((await r.json()) as { items: Array<{ id: string; bu: string | null }> }).items;
+}
 
 export async function fetchApplicantNames(ids: readonly string[]): Promise<ApplicantNameRow[]> {
   const chunks: string[][] = [];

@@ -4,7 +4,8 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { buildIntakeFlow, intakeChildren, intakeCounts, intakePathOf, isIntakeLeaf, onIntakePath, staffReachOf } from '@/lib/recruitIntakeFlow';
-import { buildDashboardData, DEFAULT_DASHBOARD_FILTERS, resolvePeriodRange, workStatusBoardOf } from '@/lib/dashboard/buildDashboardData';
+import { workStatusOfRemaining } from '@/lib/workStatusOfRemaining';
+import type { StuckRequest } from '@/lib/recruitStuck';
 import type { RecruitAppFact } from '@/lib/recruitOverviewTypes';
 import type { JobRequest } from '@/types';
 
@@ -81,26 +82,24 @@ describe('สถานะทำงานแบบ Dashboard บนหน้า�
     job({ id: 'siamraj-sql:OPL6910036', request_no: 'OPL6910036', required_date: '2026-10-20' }),
     job({ id: 'siamraj-sql:OPL6911002', request_no: 'OPL6911002', required_date: '2026-11-17', status: 'closed' }),
   ];
-  it('ช่วง = วันที่ต้องการคน · เมื่อวาน = ใบที่ต้องการคนเมื่อวาน', () => {
-    const y = workStatusBoardOf(jobs, { from: '2026-11-17', to: '2026-11-17' });
-    expect(y.jobs.map((j) => j.request_no)).toEqual(['OPL6911059', 'OPL6911017']);
-    expect(y.kpis.find((k) => k.id === 'work_status_total')).toMatchObject({ value: 2, secondaryCount: 2 });
-    expect(y.kpis.find((k) => k.id === 'work_status_in_progress')).toMatchObject({ value: 1, secondaryCount: 1 });
+  // ใบชุดเดียวกับการ์ดเหลือหา (เจ้าของ 19 พ.ย. 2569 "ถ้าเอาตามช่วง 2 อันก็ต้องเท่ากัน")
+  const rem = (no: string, remaining: number): StuckRequest =>
+    ({ requestNo: no, jobId: `siamraj-sql:${no}`, remaining, ageDays: 5, state: 'open' }) as unknown as StuckRequest;
+  it('"ทั้งหมด" = การ์ดเหลือหาเสมอ · ใบที่ปิดไปหลังวันสุดท้ายของช่วง = ไม่มีสถานะ (ยอดไม่ขาด)', () => {
+    const remaining = [rem('OPL6911059', 1), rem('OPL6911017', 1), rem('OPL6911001', 2), rem('OPL6909004', 1)];
+    const boxes = workStatusOfRemaining(remaining, jobs);
+    expect(boxes[0]).toMatchObject({ id: 'work_status_total', positions: 5, requests: 4 });
+    expect(boxes.find((b) => b.id === 'work_status_in_progress')).toMatchObject({ label: 'กำลังดำเนินการสรรหา', positions: 1, requests: 1 });
+    expect(boxes.find((b) => b.id === 'work_status_waiting_interview')).toMatchObject({ positions: 2, requests: 1 });
+    expect(boxes.find((b) => b.id === 'work_status_none')).toMatchObject({ positions: 1, requests: 1 });
+    expect(boxes.slice(1).reduce((n, b) => n + b.positions, 0)).toBe(boxes[0].positions);
+    expect(boxes.slice(1).reduce((n, b) => n + b.requests, 0)).toBe(boxes[0].requests);
+    // ทุกใบมีสถานะ = ไม่ขึ้นกล่องไม่มีสถานะ
+    expect(workStatusOfRemaining(remaining.slice(0, 3), jobs).some((b) => b.id === 'work_status_none')).toBe(false);
   });
-  it('กล่องย่อยเท่ากล่องของ Dashboard ช่วงเดียวกัน (ตัวนับตัวเดียวกัน)', () => {
-    const today = new Date('2026-11-18T05:00:00.000Z');
-    const period = resolvePeriodRange('custom', { from: '2026-11-01', to: '2026-11-30' }, today);
-    const dash = buildDashboardData(jobs, [], period, DEFAULT_DASHBOARD_FILTERS, today, undefined, [], jobs);
-    const mine = workStatusBoardOf(jobs, { from: '2026-11-01', to: '2026-11-30' });
-    // กล่องย่อยต้องเท่ากันเป๊ะ · "ทั้งหมด" ของ Dashboard โหมดมีงวดมาจากยอด cohort ERP (เทสต์นี้ไม่มี) — ของภาพรวม = ผลรวมกล่องย่อย
-    for (const k of mine.kpis.filter((x) => x.id !== 'work_status_total')) {
-      const d = dash.workStatusKpis.find((x) => x.id === k.id);
-      expect([k.id, d?.value, d?.secondaryCount]).toEqual([k.id, k.value, k.secondaryCount]);
-    }
-    const total = mine.kpis.find((k) => k.id === 'work_status_total');
-    expect(total).toMatchObject({ value: 4, secondaryCount: 3 });
-    expect(mine.kpis.filter((k) => k.id !== 'work_status_total').reduce((s, k) => s + k.value, 0)).toBe(4);
-    expect(workStatusBoardOf(jobs, null).kpis[0]).toMatchObject({ value: 5, secondaryCount: 4 });
+  it('การ์ดเหลือหากับกล่องทั้งหมดสีเดียวกัน (เหลือง = เหลือหา)', () => {
+    expect(readFileSync('src/components/dashboard-trends/v2/RecruitOverviewV2.tsx', 'utf8')).toContain('emphasis tone="warn"');
+    expect(readFileSync('src/components/dashboard-trends/v2/WorkStatusBoard.tsx', 'utf8')).toContain("b.id === STATUS_TOTAL_ID ? 'remaining'");
   });
   it('หน้าภาพรวมมีสถานะทำงาน + รายชื่อเข้ามาไปถึงไหน · ไม่มีบรรทัดอธิบายใต้เลข', () => {
     const src = readFileSync('src/components/dashboard-trends/v2/RecruitOverviewV2.tsx', 'utf8');
@@ -163,5 +162,11 @@ describe('ภาพรวมไม่มีแถบกรอง 7 ช่อง�
   it('ไม่มี StuckFilterBar และไม่มีค่ากรองค้างเบื้องหลัง', () => {
     const src = readFileSync('src/components/dashboard-trends/v2/RecruitOverviewV2.tsx', 'utf8');
     for (const s of ['StuckFilterBar', 'reqFilter', 'jobFilterOf', 'appRecruiters']) expect(src).not.toContain(s);
+  });
+});
+
+describe('กราฟแท่ง BU กดง่าย (เจ้าของ 19 พ.ย. 2569 "ถ้าไม่กดโดนแท่งมันไม่ขึ้นอะ … เล็กจนกดยากมาก")', () => {
+  it('กดที่ช่องของกลุ่มได้ทั้งช่อง ไม่ต้องโดนตัวแท่ง', () => {
+    expect(readFileSync('src/components/dashboard-trends/v2/MonthCompareBars.tsx', 'utf8')).toContain('st?.activeLabel');
   });
 });

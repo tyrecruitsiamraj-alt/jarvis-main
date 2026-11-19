@@ -13,7 +13,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { cn } from '@/lib/utils';
 import { DASH, TONE } from '@/lib/designTokens';
 import { applicantWorkLink } from '@/lib/recruitRm';
-import { fetchApplicantNames, type ApplicantNameRow } from '@/lib/recruitOverviewApi';
+import { fetchApplicantNames, type ApplicantNameRow, type TodoBucket } from '@/lib/recruitOverviewApi';
+import TodoPane from './TodoPane';
 import type { StuckRequest } from '@/lib/recruitStuck';
 import { requestPathOfJobId } from '@/lib/jobNavigation';
 import { MonthCompareBars } from './MonthCompareBars';
@@ -43,6 +44,8 @@ export type V2Pane =
   | { kind: 'audience'; view: AudienceDim | 'records'; filter: AudienceFilter; measure: AudienceMeasure; display: AudienceDisplay; page: number; title: string }
   | { kind: 'names'; title: string; ids: string[]; page: number; /** สถานะของแต่ละชื่อ (ใบขอที่กดจากการประกาศ) */ labels?: Record<string, string> }
   | { kind: 'requests'; title: string; rows: StuckRequest[]; page: number; /** BU ที่กดจากกราฟ — มี = รายการใบ · ไม่มี + หลาย BU = กราฟเทียบ BU ก่อน */ bu?: string }
+  /** การ์ด "ต้องทำ" (19 พ.ย. 2569) — กราฟ BU + รายชื่อ + ปุ่มทำทีละแถว · `listHref` = หน้าผู้สมัครคนชุดเดียวกัน */
+  | { kind: 'todo'; title: string; todo: TodoBucket; listHref: string }
   /** ส่วนเดิมของระบบที่ฝังในแผง (รายการโพสต์ So Scraping · ลิงก์โพสต์เอง · คลิกฟอร์ม) — ไม่เขียนใหม่ */
   | { kind: 'embed'; title: string; embed: string };
 
@@ -65,7 +68,13 @@ export default function V2Drawer({
   periodText,
   buText,
   embeds,
+  bu = null,
+  onPublish,
 }: {
+  /** BU ที่เลือกบนหน้า (แผงการ์ดต้องทำดึงคนของ BU นี้) */
+  bu?: string | null;
+  /** ปุ่ม "ประกาศ" ในรายการใบขอ — เปิดป๊อปประกาศของใบนั้นบนหน้านี้ (ปิดแผงก่อน ไม่ซ้อนป๊อป) */
+  onPublish?: (jobId: string) => void;
   stack: V2Pane[];
   onStack: (next: V2Pane[]) => void;
   model: V2Model;
@@ -103,8 +112,9 @@ export default function V2Drawer({
               {pane.kind === 'audience' ? <AudiencePane pane={pane} model={model} bus={bus} push={push} replace={replace} /> : null}
               {pane.kind === 'names' ? <NamesList ids={pane.ids} page={pane.page} onPage={(page) => replace({ ...pane, page })} model={model} labels={pane.labels} /> : null}
               {pane.kind === 'requests' ? (
-                <RequestsByBu pane={pane} push={push} replace={replace} />
+                <RequestsByBu pane={pane} push={push} replace={replace} onPublish={onPublish} />
               ) : null}
+              {pane.kind === 'todo' ? <TodoPane key={pane.todo} todo={pane.todo} bu={bu} listHref={pane.listHref} /> : null}
               {pane.kind === 'embed' ? (embeds[pane.embed] ?? null) : null}
             </div>
           </>
@@ -402,9 +412,19 @@ export function NamesList({ ids, page, onPage, model, labels }: { ids: readonly 
  * แล้ว พอกด Bu ไหนก็ไม่ต้องให้มันเด้งไปอีกหน้า เอาชื่อลงมาเลย บอกด้วยว่าค้างมานานแค่ไหนแล้ว โชว์รายละเอียดแบบหน้าใบขอ"
  * มี BU เดียว / มาจากกด BU แล้ว = รายการใบเลย
  */
-function RequestsByBu({ pane, replace }: { pane: Extract<V2Pane, { kind: 'requests' }>; push: (p: V2Pane) => void; replace: (p: V2Pane) => void }) {
+function RequestsByBu({
+  pane,
+  replace,
+  onPublish,
+}: {
+  pane: Extract<V2Pane, { kind: 'requests' }>;
+  push: (p: V2Pane) => void;
+  replace: (p: V2Pane) => void;
+  onPublish?: (jobId: string) => void;
+}) {
   const [range, setRange] = React.useState<DateRangeYmd | null>(null);
-  const [bu, setBu] = React.useState<string | null>(null);
+  // รายการรวมขึ้นก่อน · กดแท่ง/ปุ่ม BU = เหลือ BU นั้น (เจ้าของ 19 พ.ย. 2569 "ขึ้นรวมก่อนแล้วกด Bu ไหนก็เป็นของ BU นั้นๆ")
+  const [bu, setBu] = React.useState<string>('ทุก BU');
   const inRange = (r: StuckRequest) => !range || !r.day || ((!range.from || r.day >= range.from) && (!range.to || r.day <= range.to));
   const rows = pane.rows.filter(inRange);
   const byBu = new Map<string, StuckRequest[]>();
@@ -413,9 +433,9 @@ function RequestsByBu({ pane, replace }: { pane: Extract<V2Pane, { kind: 'reques
     byBu.set(k, [...(byBu.get(k) ?? []), r]);
   }
   const allBus = new Set(pane.rows.map((r) => r.bu?.trim() || BU_UNKNOWN));
-  if (pane.bu || allBus.size <= 1) return <RequestList rows={rows} page={pane.page} onPage={(page) => replace({ ...pane, page })} />;
+  if (pane.bu || allBus.size <= 1) return <RequestList rows={rows} page={pane.page} onPage={(page) => replace({ ...pane, page })} onPublish={onPublish} />;
   const groups = [...allBus].map((k) => ({ key: k, byMonth: { all: byBu.get(k)?.length ?? 0 } })).sort((x, y) => y.byMonth.all - x.byMonth.all);
-  const shown = bu === null ? [] : bu === 'ทุก BU' ? rows : byBu.get(bu) ?? [];
+  const shown = bu === 'ทุก BU' ? rows : byBu.get(bu) ?? [];
   const remaining = rows.reduce((n, r) => n + (r.remaining ?? 0), 0);
   return (
     <section className="space-y-3" data-testid="v2-requests-by-bu">
@@ -427,16 +447,16 @@ function RequestsByBu({ pane, replace }: { pane: Extract<V2Pane, { kind: 'reques
       </div>
       <MonthCompareBars groups={groups} months={['all']} unit="ใบ" seriesName={() => 'ใบขอ'} onPick={(k) => setBu(k)} testId="v2-requests-bu-chart" />
       <div className="flex flex-wrap items-center gap-2">
-        <Button type="button" size="xs" variant={bu === 'ทุก BU' ? 'default' : 'outline'} onClick={() => setBu(bu === 'ทุก BU' ? null : 'ทุก BU')}>
+        <Button type="button" size="xs" variant={bu === 'ทุก BU' ? 'default' : 'outline'} onClick={() => setBu('ทุก BU')}>
           ทุก BU {fmt(rows.length)}
         </Button>
         {groups.map((g) => (
-          <Button key={g.key} type="button" size="xs" variant={bu === g.key ? 'default' : 'outline'} onClick={() => setBu(bu === g.key ? null : g.key)}>
+          <Button key={g.key} type="button" size="xs" variant={bu === g.key ? 'default' : 'outline'} onClick={() => setBu(g.key)}>
             {g.key} {fmt(g.byMonth.all)}
           </Button>
         ))}
       </div>
-      {bu !== null ? <RequestList key={`${bu}:${range?.from ?? ''}:${range?.to ?? ''}`} rows={shown} page={1} /> : null}
+      <RequestList key={`${bu}:${range?.from ?? ''}:${range?.to ?? ''}`} rows={shown} page={1} onPublish={onPublish} />
     </section>
   );
 }
@@ -444,7 +464,7 @@ function RequestsByBu({ pane, replace }: { pane: Extract<V2Pane, { kind: 'reques
 const STATE_LABEL: Record<string, string> = { open: 'ยังเปิด', filled: 'ปิดครบใบขอ', cancelled: 'ยกเลิกใบขอ' };
 
 /** ใบขอทีละ 10 — รายละเอียดแบบหน้าใบขอ: ค้างกี่วัน · หน่วยงาน · ตำแหน่ง · พื้นที่ · ผู้รับผิดชอบ · ประกาศ · คนสมัคร · อัตรา · ทางไปหน้าใบขอจริง */
-function RequestList({ rows, page, onPage }: { rows: readonly StuckRequest[]; page: number; onPage?: (p: number) => void }) {
+function RequestList({ rows, page, onPage, onPublish }: { rows: readonly StuckRequest[]; page: number; onPage?: (p: number) => void; onPublish?: (jobId: string) => void }) {
   const [own, setOwn] = React.useState(page);
   const cur = onPage ? page : own;
   const sorted = React.useMemo(
@@ -471,6 +491,11 @@ function RequestList({ rows, page, onPage }: { rows: readonly StuckRequest[]; pa
                     ค้าง {fmt(r.ageDays)} วัน
                   </span>
                 )}
+                {r.jobId && onPublish && r.state !== 'filled' && r.state !== 'cancelled' ? (
+                  <Button type="button" size="xs" onClick={() => r.jobId && onPublish(r.jobId)} data-testid="v2-request-publish">
+                    ประกาศ
+                  </Button>
+                ) : null}
                 {r.jobId ? (
                   <Button asChild size="xs" variant="outline">
                     <Link to={requestPathOfJobId(r.jobId)}>
