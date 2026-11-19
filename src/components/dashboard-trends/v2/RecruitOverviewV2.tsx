@@ -28,6 +28,8 @@ import { friendlyErrorText } from '@/lib/friendlyError';
 import { BU_UNKNOWN, pageOf } from '@/lib/recruitAudience';
 import SoPostGroupsCard from '../stuck/SoPostGroupsCard';
 import SelfLinksPanel from '../topics/SelfLinksPanel';
+import OutreachPeopleTable from './OutreachPeopleTable';
+import { outreachByPerson } from '@/lib/outreachByPerson';
 import StuckAreaTable from '../stuck/StuckAreaTable';
 import V2Drawer, { type V2Pane } from './V2Drawer';
 import PostingProgress from './PostingProgress';
@@ -105,12 +107,9 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
     };
   }, [filterKey, data.bu, win.from, win.to]);
   /**
-   * ลิงก์โพสต์เอง โหลดตอนเปิดแผง "โพสต์เอง / สร้างลิงก์" เท่านั้น (เจ้าของ 19 พ.ย. 2569 "หน้าภาพรวมโหลดช้า")
-   * วัดบนเว็บจริง 11.3 วิ ทั้งที่ใช้แค่ในแผงนั้น · เลขบนการ์ดโพสต์เองมาจากงานรายคน ไม่ได้ใช้ชุดนี้
+   * ลิงก์โพสต์เอง — โหลดพร้อมหน้าอีกครั้ง (19 พ.ย. 2569 ตารางรายคนของการสั่งงานใช้ชุดนี้ · หลังเพิ่มดัชนี 191 วัดได้ 1.8 วิ จากเดิม 11.3 วิ)
    */
-  const selfOpen = stack.some((p) => p.kind === 'embed' && p.embed === 'self');
   React.useEffect(() => {
-    if (!selfOpen || links.key === filterKey) return;
     let alive = true;
     fetchManualLinks({ from: win.from, to: win.to, bu: data.bu })
       .then((rows) => alive && setLinks({ key: filterKey, rows }))
@@ -118,10 +117,13 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
     return () => {
       alive = false;
     };
-  }, [selfOpen, links.key, filterKey, win.from, win.to, data.bu]);
+  }, [filterKey, win.from, win.to, data.bu]);
+  const linkRows = links.key === filterKey ? links.rows : null;
   const allRows = stuck.key === filterKey ? stuck.data?.requests ?? null : null;
   const reqRows: StuckRequest[] | null = allRows;
   const model = React.useMemo(() => buildV2Model(data), [data]);
+  /** การสั่งงานรายคน (19 พ.ย. 2569 Choice "ในการสั่งงาน คนละแถว") */
+  const outreachPeople = staff.key === filterKey && staff.rows && linkRows ? outreachByPerson(staff.rows, linkRows, model.cohort) : null;
   /** ใบขอเส้นเดียวกับ Dashboard (กล่องสถานะทำงาน · 18 พ.ย. 2569) — BU ชุดเดียวกับส่วนอื่น */
   const reqFeed = useUnitRequestsFeed();
   const statusJobs = React.useMemo(() => {
@@ -221,7 +223,14 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
       </div>
     ),
     posts: <SoPostGroupsCard from={win.from} to={win.to} bu={data.bu} title="Autopost · รายการโพสต์" />,
-    self: links.key === filterKey && links.rows ? <SelfLinksPanel rows={links.rows} onOpenRequest={(jobId) => navigate(requestPathOfJobId(jobId))} /> : <Skeleton className="h-40 rounded-xl" />,
+    self: linkRows ? <SelfLinksPanel rows={linkRows} onOpenRequest={(jobId) => navigate(requestPathOfJobId(jobId))} /> : <Skeleton className="h-40 rounded-xl" />,
+    // กดชื่อในตารางรายคน = แผงโพสต์เองของคนนั้น
+    ...Object.fromEntries(
+      (outreachPeople ?? []).map((p) => [
+        `self:${p.name}`,
+        linkRows ? <SelfLinksPanel key={p.name} rows={linkRows.filter((l) => (l.by.trim() || 'ไม่รู้') === p.name)} onOpenRequest={(jobId) => navigate(requestPathOfJobId(jobId))} /> : null,
+      ]),
+    ),
   };
 
   const loadingReq = stuck.key !== filterKey;
@@ -369,12 +378,18 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
             },
             {
               key: 'self',
-              n: staffSum('links'),
+              // ลิงก์โพสต์เองชุดเดียวกับแผงและตารางรายคน (เดิมงานรายคนนับลิงก์ทุกแบบรวม Autopost — เลขไม่ตรงแผง 2,905 vs 1,508)
+              n: linkRows ? linkRows.length : null,
               unit: 'ลิงก์',
               onOpen: () => push({ kind: 'embed', title: 'โพสต์เอง / สร้างลิงก์', embed: 'self' }),
             },
             { key: 'scrap', n: staffSum('scrap'), unit: 'ใบ' },
           ]}
+        />
+        <OutreachPeopleTable
+          people={outreachPeople}
+          onPerson={(name) => push({ kind: 'embed', title: `โพสต์เอง / สร้างลิงก์ · ${name}`, embed: `self:${name}` })}
+          onIds={(title, ids) => push({ kind: 'story', title, ids: [...ids], key: `${viewKey}:person:${title}`, box: 'person' })}
         />
         {/* ปุ่มใต้การประกาศย้ายมาที่นี่ (เจ้าของ 19 พ.ย. 2569 "ย้ายไปไว้ในการสั่งงาน อันไหนไม่ซ้ำทำเพิ่ม") — Autopost/โพสต์เอง ซ้ำกับการ์ดข้างบน ถอดแล้ว */}
         <div className="flex flex-wrap gap-2">

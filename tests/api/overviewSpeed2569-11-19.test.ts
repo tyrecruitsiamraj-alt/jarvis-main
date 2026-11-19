@@ -22,10 +22,10 @@ describe('ภาพรวมโหลดเร็วขึ้น', () => {
     expect(apiFetch).toHaveBeenCalledTimes(2);
   });
 
-  it('ลิงก์โพสต์เองโหลดตอนเปิดแผงเท่านั้น · ฐานมีดัชนีใบสมัครตามลิงก์', () => {
+  it('ฐานมีดัชนีใบสมัครตามลิงก์ (ลิงก์โพสต์เอง 11.3 → 1.8 วิ จึงกลับมาโหลดพร้อมหน้าได้ — ตารางรายคนของการสั่งงานใช้)', () => {
     const src = readFileSync('src/components/dashboard-trends/v2/RecruitOverviewV2.tsx', 'utf8');
-    expect(src).toContain("const selfOpen = stack.some((p) => p.kind === 'embed' && p.embed === 'self');");
-    expect(src).toContain('if (!selfOpen || links.key === filterKey) return;');
+    expect(src).not.toContain('selfOpen');
+    expect(src).toContain('const outreachPeople = staff.key === filterKey && staff.rows && linkRows ? outreachByPerson(staff.rows, linkRows, model.cohort) : null;');
     const mig = readFileSync('migrations/191_application_link_id_index.sql', 'utf8');
     expect(mig).toContain('on public_job_applications (link_id) where link_id is not null');
   });
