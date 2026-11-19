@@ -16,16 +16,21 @@ describe('สมการใบขอ', () => {
       row({ requested: 2, filled: 1, cancelled: 1, remaining: 0, state: 'filled' }), // ยกมา ปิดครบ (ยกเลิกบางส่วน)
       row({ requested: 1, cancelled: 1, remaining: 0, state: 'cancelled', inRange: true }), // ใหม่ ยกเลิก
       row({ requested: 4, remaining: 4, inRange: true }), // ใหม่ ยังเปิด
+      // ใบขอชั่วคราวที่จบ = ปิดแล้ว (ใบ) · อัตราที่ไม่ได้คน = ยกเลิก (เจ้าของ 11 พ.ย. 2569) — เดิมยกเลิก 0 ⇒ อัตราขาด
+      row({ requested: 3, filled: 0, cancelled: 3, remaining: 0, state: 'filled', inRange: true }),
     ];
     const eq = stuckEquation(rows);
     expect(eq.carried.length + eq.new.length - eq.filled.length - eq.cancelled.length).toBe(eq.remaining.length);
     const sum = (xs: readonly StuckRequest[], k: 'requested' | 'filled' | 'cancelled' | 'remaining') => xs.reduce((n, r) => n + r[k], 0);
     expect(sum(eq.carried, 'requested') + sum(eq.new, 'requested') - sum(rows, 'filled') - sum(rows, 'cancelled')).toBe(sum(eq.remaining, 'remaining'));
   });
-  it('หัวการ์ดบอกสถานะ + เครื่องหมาย และอัตราหาได้/ยกเลิกนับจากใบทุกใบในชุด', () => {
+  it('เลขใหญ่ = อัตรา ใบเป็นบรรทัดรอง (เจ้าของ 19 พ.ย. 2569 "ถ้าจะนับอัตราก็เอาอัตราขึ้น")', () => {
     const src = readFileSync('src/components/dashboard-trends/v2/RecruitOverviewV2.tsx', 'utf8');
-    for (const w of ['ยอดยกมา · เปิดอยู่ก่อน', '+ ใบขอใหม่ ·', '− ปิดครบใบขอ ·', '− ยกเลิกใบขอ ·', '= เหลือหา · ยังเปิดอยู่ ณ']) expect(src).toContain(w);
-    expect(src).toContain("sumOf(reqRows, 'filled')");
-    expect(src).toContain("sumOf(reqRows, 'cancelled')");
+    for (const w of ['ยอดยกมา · เปิดอยู่ก่อน', '+ ขอใหม่ ·', '− หาได้แล้ว ·', '− ยกเลิก ·', '= เหลือหา · ยังเปิดอยู่ ณ', 'ปิดครบใบขอ ${fmt(eq.filled.length)} ใบ', 'ยกเลิกใบขอ ${fmt(eq.cancelled.length)} ใบ']) expect(src).toContain(w);
+    for (const w of ["value={loadingReq ? undefined : eq ? sumOf(eq.carried, 'requested')", "sumOf(reqRows, 'filled')", "sumOf(reqRows, 'cancelled')", "sumOf(eq.remaining, 'remaining')"]) expect(src).toContain(w);
+  });
+  it('ใบขอชั่วคราวที่จบในช่วง: อัตราที่ไม่ได้คนเป็นยกเลิก ไม่หายจากสมการ', () => {
+    const src = readFileSync('api/_handlers/recruit-stuck.ts', 'utf8');
+    expect(src).toContain('v?.r.prequest && v.role.closed ? { ...r, jobId, remaining: 0, cancelled: Math.max(0, r.requested - r.filled) }');
   });
 });

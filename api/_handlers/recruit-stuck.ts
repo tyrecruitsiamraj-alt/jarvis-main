@@ -270,7 +270,10 @@ async function loadStuckRequests(
   for (const r of ranged) {
     const jobId = r.jobId ?? `${SQL_PREFIX}${r.requestNo}`;
     const v = roleOf(jobId);
-    base.push({ online: { ...r, jobId }, job: jobById.get(jobId) ?? null, inRange: true, state: v ? stateOfRole(v.role) : STATE_OF[onlineRequestStateOf(r)] });
+    // ใบขอชั่วคราวที่จบ = ปิดแล้ว (หน่วยใบ) แต่อัตราที่ไม่ได้คน = ยกเลิก (เจ้าของ 11 พ.ย. 2569 "จบ = ยกเลิกอัตรา")
+    // เดิมหาได้ 0 ยกเลิก 0 ⇒ สมการอัตราหน้าภาพรวมขาด 50 อัตรา (19 พ.ย. 2569)
+    const online = v?.r.prequest && v.role.closed ? { ...r, jobId, remaining: 0, cancelled: Math.max(0, r.requested - r.filled) } : { ...r, jobId };
+    base.push({ online, job: jobById.get(jobId) ?? null, inRange: true, state: v ? stateOfRole(v.role) : STATE_OF[onlineRequestStateOf(r)] });
   }
   for (const j of carriedJobs) {
     const jobId = String(j.id);

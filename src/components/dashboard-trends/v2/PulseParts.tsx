@@ -1,11 +1,11 @@
 /**
  * ═══ ภาพรวมแบบ Mobix (เจ้าของ 18 พ.ย. 2569 "ทำแบบร่างหน้าภาพรวมแบบ Mobix" → "หน้าภาพรวม ที่ยังต้องบอกเรื่อง Autopost โพสต์เอง Scrap ด้วย") ═══
- * ต้องทำ (บนสุด · ณ ตอนนี้) · การออกหาคน (Autopost / โพสต์เอง / Scrap ในช่วง) · แนวโน้มรายวัน · ความเคลื่อนไหวล่าสุด
+ * ต้องทำ (บนสุด · ณ ตอนนี้) · การสั่งงาน (Autopost / โพสต์เอง / Scrap ในช่วง) · แนวโน้มรายวัน · ความเคลื่อนไหวล่าสุด
  * ตัวเลขทุกตัวมาจากของที่หน้ามีอยู่แล้ว (backlog ของ recruit-overview · รายการโพสต์ · งานรายคน · รายชื่อในช่วง) — ไม่คิดนิยามใหม่
  */
 import React from 'react';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { CalendarX, FileText, Link2, PhoneCall, Search, Send, UserRoundSearch } from 'lucide-react';
+import { CalendarX, FileText, PhoneCall, UserRoundSearch } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
@@ -48,29 +48,20 @@ export function TodoList({ items }: { items: readonly TodoItem[] }) {
   );
 }
 
-/* ── การออกหาคน: Autopost / โพสต์เอง / Scrap ── */
-export type OutreachTile = { key: 'autopost' | 'self' | 'scrap'; n: number | null; unit: string; sub: string; onOpen?: () => void };
-const OUTREACH_META: Record<OutreachTile['key'], { label: string; icon: React.ElementType }> = {
-  autopost: { label: 'Autopost', icon: Send },
-  self: { label: 'โพสต์เอง', icon: Link2 },
-  scrap: { label: 'Scrap', icon: Search },
-};
+/* ── การสั่งงาน: Autopost / โพสต์เอง / Scrap — ไม่มีไอคอน ไม่มีบรรทัดรอง (เจ้าของ 19 พ.ย. 2569) ── */
+export type OutreachTile = { key: 'autopost' | 'self' | 'scrap'; n: number | null; unit: string; onOpen?: () => void };
+const OUTREACH_LABEL: Record<OutreachTile['key'], string> = { autopost: 'Autopost', self: 'โพสต์เอง', scrap: 'Scrap' };
 
 export function OutreachTiles({ tiles }: { tiles: readonly OutreachTile[] }) {
   return (
     <div className="grid gap-3 sm:grid-cols-3" data-testid="v2-outreach">
       {tiles.map((t) => {
-        const { label, icon: Icon } = OUTREACH_META[t.key];
         const body = (
           <>
-            <span className={cn('flex items-center gap-1.5 text-xs', DASH.sub)}>
-              <Icon className="h-4 w-4" aria-hidden />
-              {label}
-            </span>
+            <span className={cn('text-xs', DASH.sub)}>{OUTREACH_LABEL[t.key]}</span>
             <span className="text-3xl font-medium tabular-nums text-foreground">
               {fmt(t.n)} <span className={cn('text-sm font-normal', DASH.sub)}>{t.unit}</span>
             </span>
-            <span className={cn('text-xs tabular-nums', DASH.sub)}>{t.sub}</span>
           </>
         );
         return t.onOpen ? (

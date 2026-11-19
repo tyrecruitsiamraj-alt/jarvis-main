@@ -42,7 +42,7 @@ import { V2_METRIC_LABEL, type V2Metric, type V2Model } from './v2Model';
 export type V2Pane =
   | { kind: 'metric'; metric: V2Metric; bu?: string; page: number }
   | { kind: 'audience'; view: AudienceDim | 'records'; filter: AudienceFilter; measure: AudienceMeasure; display: AudienceDisplay; page: number; title: string }
-  | { kind: 'names'; title: string; ids: string[]; page: number; /** สถานะของแต่ละชื่อ (ใบขอที่กดจากการประกาศ) */ labels?: Record<string, string> }
+  | { kind: 'names'; title: string; ids: string[]; page: number; /** สถานะของแต่ละชื่อ (ใบขอที่กดจากการประกาศ) */ labels?: Record<string, string>; /** BU ที่กด — ไม่มี = ทุก BU */ bu?: string }
   | { kind: 'requests'; title: string; rows: StuckRequest[]; page: number; /** BU ที่กดจากกราฟ — มี = รายการใบ · ไม่มี + หลาย BU = กราฟเทียบ BU ก่อน */ bu?: string }
   /** การ์ด "ต้องทำ" (19 พ.ย. 2569) — กราฟ BU + รายชื่อ + ปุ่มทำทีละแถว · `listHref` = หน้าผู้สมัครคนชุดเดียวกัน */
   | { kind: 'todo'; title: string; todo: TodoBucket; listHref: string }
@@ -110,7 +110,7 @@ export default function V2Drawer({
             <div className="space-y-5 px-5 py-4">
               {pane.kind === 'metric' ? <MetricPane pane={pane} model={model} bus={bus} push={push} replace={replace} /> : null}
               {pane.kind === 'audience' ? <AudiencePane pane={pane} model={model} bus={bus} push={push} replace={replace} /> : null}
-              {pane.kind === 'names' ? <NamesList ids={pane.ids} page={pane.page} onPage={(page) => replace({ ...pane, page })} model={model} labels={pane.labels} /> : null}
+              {pane.kind === 'names' ? <NamesByBu pane={pane} replace={replace} model={model} /> : null}
               {pane.kind === 'requests' ? (
                 <RequestsByBu pane={pane} push={push} replace={replace} onPublish={onPublish} />
               ) : null}
@@ -340,6 +340,42 @@ export function AudiencePane({
         </section>
       )}
     </>
+  );
+}
+
+const ALL_BU = 'ทุก BU';
+/**
+ * รายชื่อที่กดมา → กราฟแท่งแยก BU + ปุ่ม BU ก่อน · รายชื่อรวมขึ้นเลย · กด BU = เหลือคนของ BU นั้น
+ * (เจ้าของ 19 พ.ย. 2569 กล่องรายชื่อเข้ามา "อยากกดแล้วเห็นแยก Bu ก่อน พอกดแต่ละ Bu ค่อยโชว์ยอดของ Bu นั้นๆ") · BU เดียว = รายชื่อเลย
+ */
+function NamesByBu({ pane, replace, model }: { pane: Extract<V2Pane, { kind: 'names' }>; replace: (p: V2Pane) => void; model: V2Model }) {
+  const buOf = React.useCallback((id: string) => model.byId.get(id)?.bu?.trim() || BU_UNKNOWN, [model]);
+  const ids = React.useMemo(() => [...new Set(pane.ids)].filter(Boolean), [pane.ids]);
+  const groups = React.useMemo(() => {
+    const by = new Map<string, number>();
+    for (const id of ids) by.set(buOf(id), (by.get(buOf(id)) ?? 0) + 1);
+    return [...by.entries()].map(([key, n]) => ({ key, byMonth: { all: n } })).sort((a, b) => b.byMonth.all - a.byMonth.all || a.key.localeCompare(b.key));
+  }, [ids, buOf]);
+  const pick = pane.bu ?? ALL_BU;
+  const shown = React.useMemo(() => (pick === ALL_BU ? ids : ids.filter((id) => buOf(id) === pick)), [ids, pick, buOf]);
+  const choose = (bu: string) => replace({ ...pane, bu: bu === ALL_BU ? undefined : bu, page: 1 });
+  return (
+    <section className="space-y-3" data-testid="v2-names-by-bu">
+      {groups.length > 1 ? (
+        <>
+          <h3 className="text-sm font-medium">{fmt(ids.length)} คน · แยกตาม BU</h3>
+          <MonthCompareBars groups={groups} months={['all']} unit="คน" seriesName={() => 'คน'} onPick={choose} testId="v2-names-bu-chart" />
+          <div className="flex flex-wrap items-center gap-2">
+            {[{ key: ALL_BU, n: ids.length }, ...groups.map((g) => ({ key: g.key, n: g.byMonth.all }))].map((g) => (
+              <Button key={g.key} type="button" size="xs" variant={pick === g.key ? 'default' : 'outline'} onClick={() => choose(g.key)}>
+                {g.key} {fmt(g.n)}
+              </Button>
+            ))}
+          </div>
+        </>
+      ) : null}
+      <NamesList ids={shown} page={pane.page} onPage={(page) => replace({ ...pane, page })} model={model} labels={pane.labels} />
+    </section>
   );
 }
 

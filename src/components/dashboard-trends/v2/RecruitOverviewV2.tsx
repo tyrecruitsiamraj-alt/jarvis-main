@@ -272,7 +272,7 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
   };
 
   const loadingReq = stuck.key !== filterKey;
-  /** รวมงานรายคนทั้งช่วง (ทุกคนใน BU) — การ์ดการออกหาคน · null = ยังโหลด */
+  /** รวมงานรายคนทั้งช่วง (ทุกคนใน BU) — การ์ดการสั่งงาน · null = ยังโหลด */
   const staffSum = (k: StaffActivityKind): number | null =>
     staff.key === filterKey && staff.rows ? staff.rows.reduce((n, r) => n + r[k], 0) : null;
   /** วันสั้นบนหัวการ์ด เช่น "1 พ.ย." / "1–18 พ.ย." */
@@ -334,17 +334,18 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
 
       {/* ── ใบขอ (ใบ + อัตรา) · ใครต้องทำอะไร · งานที่ยังขาดคน — กางไว้ (เจ้าของ 17 พ.ย. 2569 "ซ่อนไว้ทำไม") ── */}
       <Card className="min-w-0 space-y-5 rounded-2xl p-5" data-testid="v2-requests">
-        <SectionTitle title="ใบขอ" right={`สถานะ ณ ${dayText(win.to)} · ใบขอใหม่นับตามวันคีย์ใน ERP`} />
+        <SectionTitle title="ใบขอ" right={`นับอัตรา · สถานะ ณ ${dayText(win.to)} · ใบขอใหม่นับตามวันคีย์ใน ERP`} />
         {stuck.error && stuck.key === filterKey ? <p className="text-sm text-destructive">{stuck.error}</p> : null}
         {/* บวกลบลงตัวทั้งใบและอัตรา (เจ้าของ 18 พ.ย. 2569 "ตรงนี้บวกลบกันต้องลง 327 ใบ 378 อัตรา และคำต้องบอกเลยว่าคือสถานะอะไร")
-            ใบ: ยกมา + ขอใหม่ − ปิดครบ − ยกเลิก = เหลือหา · อัตรา: ขอไว้ของใบยกมา + ขอมา − หาได้แล้ว − ยกเลิก = เหลือหา
+            เลขใหญ่ = อัตรา ชุดเดียวกับสถานะทำงาน · ใบเป็นบรรทัดรอง (เจ้าของ 19 พ.ย. 2569 "ถ้าจะนับอัตราก็เอาอัตราขึ้นไม่ใช่ใช้คนละยอด")
+            อัตรา: ขอไว้ของใบยกมา + ขอมา − หาได้แล้ว − ยกเลิก = เหลือหา · ใบ: ยกมา + ขอใหม่ − ปิดครบ − ยกเลิก = เหลือหา
             อัตราหาได้/ยกเลิก = สะสมของใบทุกใบในชุด (รวมที่หาได้บางส่วนของใบที่ยังเปิด) — ERP ไม่มีวันที่ของการหาได้รายอัตรา */}
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-5" data-testid="v2-req-equation">
-          <Kpi label={`ยอดยกมา · เปิดอยู่ก่อน ${shortDay(win.from)}`} emphasis value={loadingReq ? undefined : eq ? eq.carried.length : null} sub={eq ? `ขอไว้ ${fmt(sumOf(eq.carried, 'requested'))} อัตรา` : undefined} onClick={eq ? () => openRequests('ยอดยกมา', eq.carried) : undefined} testId="v2-req-carried" />
-          <Kpi label={`+ ใบขอใหม่ · ${rangeShort}`} emphasis value={loadingReq ? undefined : eq ? eq.new.length : null} sub={rateText(eq?.new, 'ขอมา', 'requested')} onClick={eq ? () => openRequests('ใบขอใหม่', eq.new) : undefined} testId="v2-req-new" />
-          <Kpi label={`− ปิดครบใบขอ · ${rangeShort}`} emphasis value={loadingReq ? undefined : eq ? eq.filled.length : null} sub={reqRows ? `หาได้แล้ว ${fmt(sumOf(reqRows, 'filled'))} อัตรา (รวมใบที่หาได้บางส่วน)` : undefined} onClick={eq ? () => openRequests('ปิดครบใบขอ', eq.filled) : undefined} testId="v2-req-filled" />
-          <Kpi label={`− ยกเลิกใบขอ · ${rangeShort}`} emphasis value={loadingReq ? undefined : eq ? eq.cancelled.length : null} sub={reqRows ? `ยกเลิก ${fmt(sumOf(reqRows, 'cancelled'))} อัตรา` : undefined} onClick={eq ? () => openRequests('ยกเลิกใบขอ', eq.cancelled) : undefined} tone="danger" testId="v2-req-cancelled" />
-          <Kpi label={`= เหลือหา · ยังเปิดอยู่ ณ ${shortDay(win.to)}`} emphasis tone="warn" value={loadingReq ? undefined : eq ? eq.remaining.length : null} sub={rateText(eq?.remaining, 'เหลือหา', 'remaining')} onClick={eq ? () => openRequests('เหลือหา', eq.remaining) : undefined} testId="v2-req-open" />
+          <Kpi label={`ยอดยกมา · เปิดอยู่ก่อน ${shortDay(win.from)}`} emphasis value={loadingReq ? undefined : eq ? sumOf(eq.carried, 'requested') : null} sub={eq ? `${fmt(eq.carried.length)} ใบ` : undefined} onClick={eq ? () => openRequests('ยอดยกมา', eq.carried) : undefined} testId="v2-req-carried" />
+          <Kpi label={`+ ขอใหม่ · ${rangeShort}`} emphasis value={loadingReq ? undefined : eq ? sumOf(eq.new, 'requested') : null} sub={eq ? `ใบขอใหม่ ${fmt(eq.new.length)} ใบ` : undefined} onClick={eq ? () => openRequests('ขอใหม่', eq.new) : undefined} testId="v2-req-new" />
+          <Kpi label={`− หาได้แล้ว · ${rangeShort}`} emphasis value={loadingReq ? undefined : reqRows ? sumOf(reqRows, 'filled') : null} sub={eq ? `ปิดครบใบขอ ${fmt(eq.filled.length)} ใบ` : undefined} onClick={reqRows ? () => openRequests('หาได้แล้ว', reqRows.filter((r) => r.filled > 0)) : undefined} testId="v2-req-filled" />
+          <Kpi label={`− ยกเลิก · ${rangeShort}`} emphasis value={loadingReq ? undefined : reqRows ? sumOf(reqRows, 'cancelled') : null} sub={eq ? `ยกเลิกใบขอ ${fmt(eq.cancelled.length)} ใบ` : undefined} onClick={reqRows ? () => openRequests('ยกเลิก', reqRows.filter((r) => r.cancelled > 0)) : undefined} tone="danger" testId="v2-req-cancelled" />
+          <Kpi label={`= เหลือหา · ยังเปิดอยู่ ณ ${shortDay(win.to)}`} emphasis tone="warn" value={loadingReq ? undefined : eq ? sumOf(eq.remaining, 'remaining') : null} sub={eq ? `${fmt(eq.remaining.length)} ใบ` : undefined} onClick={eq ? () => openRequests('เหลือหา', eq.remaining) : undefined} testId="v2-req-open" />
         </div>
         {/* สถานะทำงานแบบ Dashboard — ใบชุดเดียวกับการ์ดเหลือหา "ทั้งหมด" เท่ากันทุกช่วง + สีเดียวกัน (เจ้าของ 19 พ.ย. 2569) */}
         <div className="border-t pt-4">
@@ -358,26 +359,25 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
         </div>
       </Card>
 
-      {/* ── การออกหาคน: Autopost / โพสต์เอง / Scrap (เจ้าของ 18 พ.ย. 2569 "ยังต้องบอกเรื่อง Autopost โพสต์เอง Scrap ด้วย") ── */}
+      {/* ── การสั่งงาน: Autopost / โพสต์เอง / Scrap (เจ้าของ 18 พ.ย. 2569 "ยังต้องบอกเรื่อง Autopost โพสต์เอง Scrap ด้วย")
+          19 พ.ย. 2569 ไม่มีไอคอน ไม่มีบรรทัดรอง หัวข้อ "การสั่งงาน" (Choice) ── */}
       <Card className="min-w-0 space-y-3 rounded-2xl p-5" data-testid="v2-outreach-card">
-        <SectionTitle title="การออกหาคน" right={`${dayText(win.from)} – ${dayText(win.to)}`} />
+        <SectionTitle title="การสั่งงาน" right={`${dayText(win.from)} – ${dayText(win.to)}`} />
         <OutreachTiles
           tiles={[
             {
               key: 'autopost',
               n: posts.key === filterKey ? posts.jobs : null,
               unit: 'งาน',
-              sub: posts.key === filterKey && posts.total !== null ? `${fmt(posts.total)} กลุ่ม · เผยแพร่แล้ว ${fmt(posts.posted)} กลุ่ม (${fmt(posts.postedJobs)} งาน)` : '—',
               onOpen: () => push({ kind: 'embed', title: 'Autopost · รายการโพสต์', embed: 'posts' }),
             },
             {
               key: 'self',
               n: staffSum('links'),
               unit: 'ลิงก์',
-              sub: staffSum('manualPosted') === null ? '—' : `ติ๊กโพสต์เองแล้ว ${fmt(staffSum('manualPosted'))}`,
               onOpen: () => push({ kind: 'embed', title: 'โพสต์เอง / สร้างลิงก์', embed: 'self' }),
             },
-            { key: 'scrap', n: staffSum('scrap'), unit: 'ใบ', sub: 'ใบขอที่สั่ง Scrap · ดูรายคนที่งานรายคน' },
+            { key: 'scrap', n: staffSum('scrap'), unit: 'ใบ' },
           ]}
         />
       </Card>

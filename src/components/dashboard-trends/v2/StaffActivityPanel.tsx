@@ -29,7 +29,7 @@ export default function StaffActivityPanel({
   from: string;
   to: string;
   bu: string | null;
-  /** งานรายคนของช่วง (หน้าแม่ดึงครั้งเดียว ใช้ร่วมกับการ์ดการออกหาคน) · null = กำลังโหลด */
+  /** งานรายคนของช่วง (หน้าแม่ดึงครั้งเดียว ใช้ร่วมกับการ์ดการสั่งงาน) · null = กำลังโหลด */
   rows: StaffActivityRow[] | null;
   error: string | null;
   /** ลงผลติดต่อ/นัดได้ = เปิดรายชื่อผู้สมัครในแผงข้าง */

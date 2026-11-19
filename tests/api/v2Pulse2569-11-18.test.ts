@@ -22,8 +22,8 @@ describe('dailyPulse', () => {
     expect(pts.map((p) => p.apps)).toEqual([0, 2, 0]);
     expect(pts[2].yes + pts[2].no + pts[2].noPickup + pts[2].other).toBe(1);
   });
-  it('หน้าภาพรวมมี ต้องทำ · การออกหาคน (Autopost/โพสต์เอง/Scrap) · แนวโน้มรายวัน · ความเคลื่อนไหวล่าสุด', () => {
+  it('หน้าภาพรวมมี ต้องทำ · การสั่งงาน (Autopost/โพสต์เอง/Scrap) · แนวโน้มรายวัน · ความเคลื่อนไหวล่าสุด', () => {
     const src = readFileSync('src/components/dashboard-trends/v2/RecruitOverviewV2.tsx', 'utf8');
-    for (const t of ['title="ต้องทำ"', 'title="การออกหาคน"', 'title="แนวโน้มรายวัน"', 'title="ความเคลื่อนไหวล่าสุด"', "key: 'autopost'", "key: 'self'", "key: 'scrap'"]) expect(src).toContain(t);
+    for (const t of ['title="ต้องทำ"', 'title="การสั่งงาน"', 'title="แนวโน้มรายวัน"', 'title="ความเคลื่อนไหวล่าสุด"', "key: 'autopost'", "key: 'self'", "key: 'scrap'"]) expect(src).toContain(t);
   });
 });
