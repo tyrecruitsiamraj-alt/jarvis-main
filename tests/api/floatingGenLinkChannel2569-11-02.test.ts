@@ -27,7 +27,7 @@ describe('Gen link กล่องลอย — ช่องทาง', () => {
 describe('การ์ดกล่องลอยบอก Gen link ล่าสุด วันไหน ใครกด (เจ้าของ 2 พ.ย. 2569 Choice "โชว์บนการ์ดกล่องลอย")', () => {
   const view = fs.readFileSync(path.resolve(__dirname, '../../src/components/jobs/JobBoardView.tsx'), 'utf8');
 
-  it('ใช้ลิงก์ที่สร้างล่าสุดของประเภท · ชื่อ = คนกด Gen จริง (postingLinkCreator) ไม่ใช่ผู้รับผิดชอบ (QA 2 พ.ย.)', () => {
+  it('ใช้ลิงก์ที่สร้างล่าสุดของประเภท · ชื่อ = ผู้รับผิดชอบของลิงก์ที่เลือกตอน Gen › คนกด (postingLinkCreator · 19 พ.ย.) ไม่ใช่ผู้รับผิดชอบของประกาศ (QA 2 พ.ย.)', () => {
     expect(view).toMatch(/l\.createdAt > a\.lastGen\.at\) a\.lastGen = \{ at: l\.createdAt, by: postingLinkCreator\(l, p\) \}/);
   });
 

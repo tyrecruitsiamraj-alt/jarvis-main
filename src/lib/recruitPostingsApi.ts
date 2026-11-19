@@ -153,6 +153,7 @@ export type CreatePostingBody = {
   positionName?: string | null;
   province?: string | null;
   responsibleName?: string | null;
+  /** ผู้รับผิดชอบของลิงก์ทุกอันที่สร้างรอบนี้ + ของประกาศ (19 พ.ย. 2569) · API ตรวจว่าเป็นเจ้าหน้าที่จริง · ไม่ส่ง = คนกด */
   responsibleUserId?: string | null;
   specificType?: string | null;
   formType?: string | null;
@@ -171,7 +172,14 @@ export async function createRecruitPosting(body: CreatePostingBody): Promise<Rec
 
 export async function addPostingLink(
   postingId: string,
-  input: { channelId?: string | null; channelLabel?: string | null; fbGroupId?: string | null; note?: string | null },
+  input: {
+    channelId?: string | null;
+    channelLabel?: string | null;
+    fbGroupId?: string | null;
+    note?: string | null;
+    /** ผู้รับผิดชอบของลิงก์ (19 พ.ย. 2569) · ไม่ส่ง = คนกด */
+    responsibleUserId?: string | null;
+  },
 ): Promise<RecruitPostingLink> {
   const r = await apiFetch('/api/recruit/postings', {
     method: 'POST',

@@ -24,12 +24,14 @@ const POSTINGS = tableInAppSchema('recruit_postings');
 const CONTACTS = tableInAppSchema('application_contact_logs');
 const APPS = tableInAppSchema('public_job_applications');
 const bkk = (col: string) => `(${col} at time zone 'Asia/Bangkok')::date`;
+/** ลิงก์เป็นงานของผู้รับผิดชอบที่เลือกตอน Gen link › คนกด (190 · เจ้าของ 19 พ.ย. 2569) — คนกดจริงยังอยู่ที่ created_by_user_id */
+const LINK_OWNER = 'coalesce(l.responsible_user_id, l.created_by_user_id)';
 
 /** เหตุการณ์ต่อชนิด: [ผู้ใช้, วัน] ในช่วง $1–$2 */
 const EVENTS: Record<StaffActivityKind, string> = {
   autopost: `select o.requested_by_user_id as user_id, ${bkk('o.created_at')} as day from ${ORDERS} o where o.request_type = 'content' and ${bkk('o.created_at')} between $1::date and $2::date`,
   scrap: `select o.requested_by_user_id, ${bkk('o.created_at')} from ${ORDERS} o where o.request_type = 'scraping' and ${bkk('o.created_at')} between $1::date and $2::date`,
-  links: `select l.created_by_user_id, ${bkk('l.created_at')} from ${LINKS} l where ${bkk('l.created_at')} between $1::date and $2::date`,
+  links: `select ${LINK_OWNER}, ${bkk('l.created_at')} from ${LINKS} l where ${bkk('l.created_at')} between $1::date and $2::date`,
   manualPosted: `select p.posted_by_user_id, p.day from ${LINK_POSTS} p where p.day between $1::date and $2::date`,
   contacts: `select c.created_by, ${bkk('c.created_at')} from ${CONTACTS} c where ${bkk('c.created_at')} between $1::date and $2::date`,
   appts: `select c.created_by, ${bkk('c.created_at')} from ${CONTACTS} c where c.appointment_at is not null and ${bkk('c.created_at')} between $1::date and $2::date`,
@@ -65,7 +67,7 @@ const DETAIL: Record<StaffActivityKind, string> = {
      where o.request_type = 'scraping' and o.requested_by_user_id = $3 and ${bkk('o.created_at')} between $1::date and $2::date order by o.created_at desc`,
   links: `select to_char(${bkk('l.created_at')}, 'YYYY-MM-DD'), coalesce(split_part(p.job_id, ':', 2), p.standalone_kind, '—'), coalesce(l.channel_label, l.code), null::text,
        nullif(split_part(p.job_id, ':', 2), '') from ${LINKS} l join ${POSTINGS} p on p.id = l.posting_id
-     where l.created_by_user_id = $3 and ${bkk('l.created_at')} between $1::date and $2::date order by l.created_at desc`,
+     where ${LINK_OWNER} = $3 and ${bkk('l.created_at')} between $1::date and $2::date order by l.created_at desc`,
   manualPosted: `select to_char(x.day, 'YYYY-MM-DD'), coalesce(split_part(p.job_id, ':', 2), p.standalone_kind, '—'), coalesce(l.channel_label, l.code), null::text,
        nullif(split_part(p.job_id, ':', 2), '') from ${LINK_POSTS} x join ${LINKS} l on l.id = x.link_id join ${POSTINGS} p on p.id = l.posting_id
      where x.posted_by_user_id = $3 and x.day between $1::date and $2::date order by x.day desc, x.created_at desc`,
@@ -97,7 +99,7 @@ async function loadFeed(from: string, to: string, buSet: readonly string[] | nul
        union all
        select l.created_at, 'สร้างลิงก์โพสต์เอง', ${who('u', 'l.created_by_name')}, coalesce(nullif(split_part(p.job_id, ':', 2), ''), p.standalone_kind), coalesce(l.channel_label, l.code),
               null, nullif(split_part(p.job_id, ':', 2), ''), u.department_code
-         from ${LINKS} l join ${POSTINGS} p on p.id = l.posting_id join ${USERS} u on u.id = l.created_by_user_id
+         from ${LINKS} l join ${POSTINGS} p on p.id = l.posting_id join ${USERS} u on u.id = ${LINK_OWNER}
         where ${bkk('l.created_at')} between $1::date and $2::date
        union all
        select c.created_at,

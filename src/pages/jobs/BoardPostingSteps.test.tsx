@@ -44,7 +44,7 @@ vi.mock('@/lib/jobPublicReleaseApi', async (orig) => ({
   releaseJobsToPublic: (ids: string[]) => releaseJobsToPublic(ids),
 }));
 // ป๊อปอ่านสิทธิ์แค่ว่าเห็นประวัติการแก้ไขไหม (admin) — เจ้าหน้าที่ทั่วไปพอ
-vi.mock('@/contexts/AuthContext', () => ({ useAuth: () => ({ hasPermission: () => false }) }));
+vi.mock('@/contexts/AuthContext', () => ({ useAuth: () => ({ hasPermission: () => false }), useOptionalAuthUser: () => null }));
 // กล่องลูก (อัตราจ้าง/คนลาออก ฯลฯ) ยิงของตัวเอง — ตอบว่างให้หมด ไม่ต้องออกเน็ต
 vi.mock('@/lib/apiFetch', async (orig) => ({
   ...(await orig<typeof import('@/lib/apiFetch')>()),

@@ -92,9 +92,9 @@ describe('ใครหารายชื่อเข้ามา (เจ้า�
     expect(t.groups.find((g) => g.channel === NO_BRINGER_WEB)!.children!.map((c) => c.channel)).toEqual(['Tiktok']);
     expect(t.groups.reduce((n, g) => n + (g.names.value ?? 0), 0)).toBe(t.total.names.value);
   });
-  it('เซิร์ฟเวอร์: ลิงก์ = คนสร้างลิงก์ › ผู้รับผิดชอบประกาศ (ลิงก์เก่า) · ไม่มีลิงก์ = คนเพิ่ม · อีเมลเป็นชื่อเล่น', () => {
+  it('เซิร์ฟเวอร์: ลิงก์ = ผู้รับผิดชอบที่เลือกตอน Gen (19 พ.ย.) › คนสร้างลิงก์ › ผู้รับผิดชอบประกาศ (ลิงก์เก่า) · ไม่มีลิงก์ = คนเพิ่ม · อีเมลเป็นชื่อเล่น', () => {
     const src = readFileSync('api/_handlers/recruit-overview.ts', 'utf8');
-    expect(src).toContain("coalesce(nullif(btrim(l.created_by_name), ''), nullif(btrim(pp.responsible_name), ''), nullif(btrim(pp.created_by_name), ''))");
+    expect(src).toContain("nullif(btrim(l.responsible_name), ''),\n                            nullif(btrim(l.created_by_name), ''), nullif(btrim(pp.responsible_name), ''), nullif(btrim(pp.created_by_name), ''))");
     expect(src).toContain("if (a.bringer?.includes('@')) a.bringer = displayOf(a.bringer.toLowerCase()) ?? a.bringer;");
   });
 });

@@ -1724,10 +1724,10 @@
      "label": "ตำแหน่ง / จังหวัด / ผู้รับผิดชอบ",
      "action": "filter",
      "target": "กรอกฟอร์ม",
-     "api": "GET /api/recruit/job-titles · GET /api/job-staff",
+     "api": "GET /api/recruit/job-titles · GET /api/app-user-names?lane=recruiter · ?lane=online · GET /api/recruit/postings?standalone=1 (ผู้รับผิดชอบของกล่อง)",
      "effects": [],
      "when": null,
-     "src": "src/components/jobs/GenApplyLinkDialog.tsx:472-498"
+     "src": "src/components/jobs/GenApplyLinkDialog.tsx:460-505 · LinkResponsibleField.tsx"
     },
     {
      "label": "ประเภทฟอร์มการสมัคร: ทั่วไป / แนบเอกสารได้",

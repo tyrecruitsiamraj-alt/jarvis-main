@@ -63,6 +63,9 @@ export const useAuth = () => {
   return context;
 };
 
+/** ผู้ใช้ที่ล็อกอิน หรือ null เมื่อไม่มี AuthProvider (ฟอร์มที่ฝังได้หลายที่ เช่น Gen link — ไม่ให้พังตอนไม่มี provider) */
+export const useOptionalAuthUser = (): User | null => useContext(AuthContext)?.user ?? null;
+
 const ROLE_HIERARCHY: Record<UserRole, number> = {
   admin: 4,
   supervisor: 3,

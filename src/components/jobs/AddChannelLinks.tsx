@@ -3,6 +3,7 @@ import { copyText } from '@/lib/copyText';
 import { Check, Copy, Link2, Loader2 } from 'lucide-react';
 import MultiChannelPicker from '@/components/shared/MultiChannelPicker';
 import SoGroupPicker from '@/components/jobs/SoGroupPicker';
+import LinkResponsibleField, { useLinkResponsible } from '@/components/jobs/LinkResponsibleField';
 import { fetchSoOptions } from '@/lib/jobPostingRequestsApi';
 import { isFacebookGroupChannel, soGroupLinkKey, soGroupLinkLabel, soGroupLinkName, type SoOptGroup } from '@/lib/soScraping';
 import { Button } from '@/components/ui/button';
@@ -63,6 +64,8 @@ const AddChannelLinks: React.FC<{
   const [error, setError] = React.useState<string | null>(null);
   const { copied, copy } = useCopy();
   const resultRef = React.useRef<HTMLDivElement | null>(null);
+  /** ผู้รับผิดชอบของลิงก์ที่ Gen เพิ่ม (เจ้าของ 19 พ.ย. 2569) — ค่าเริ่ม = คนกด · ชุดเดียวกับฟอร์ม Gen link */
+  const responsible = useLinkResponsible(posting.id);
 
   const fbGroupChannels = picked.filter((c) => isFacebookGroupChannel(c.name));
   const needGroups = fbGroupChannels.length > 0 && soGroups === null;
@@ -109,7 +112,7 @@ const AddChannelLinks: React.FC<{
     const made: RecruitPostingLink[] = [];
     try {
       for (const c of wanted) {
-        const link = await addPostingLink(posting.id, c ?? {});
+        const link = await addPostingLink(posting.id, { ...(c ?? {}), responsibleUserId: responsible.value || null });
         // ไม่มีรหัส = ลิงก์เสีย (/apply/p/undefined) ห้ามโชว์ให้คัดลอก (QA 5 ต.ค. 2569)
         if (!link?.code) throw new Error('Gen link ไม่สำเร็จ');
         made.push(link);
@@ -146,6 +149,7 @@ const AddChannelLinks: React.FC<{
           {missingGroup ? <p className={cn('text-xs', TONE.warn.value)}>เลือกกลุ่ม Facebook อย่างน้อย 1 กลุ่ม</p> : null}
         </div>
       ) : null}
+      <LinkResponsibleField value={responsible.value} onChange={responsible.setValue} options={responsible.options} disabled={busy} />
       <Button type="button" className="w-full" disabled={busy || missingGroup} onClick={() => void create()}>
         {busy ? <Loader2 className="animate-spin" aria-hidden /> : <Link2 aria-hidden />}
         {/* คำว่า "Gen link" ทั้งก้อน (เจ้าของสั่ง 5 ต.ค. 2569 "สร้างลิงก์ เปลี่ยนเป็น Gen link") */}

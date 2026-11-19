@@ -122,6 +122,7 @@ const CANCELLATIONS = tableInAppSchema('application_cancellations');
 const POSTING_LINKS = tableInAppSchema('recruit_posting_links');
 const JOB_POSTING_REQUESTS = tableInAppSchema('job_posting_requests');
 const POSTINGS_TABLE = tableInAppSchema('recruit_postings');
+const USERS_TABLE = tableInAppSchema('users');
 const scopeWhere = (bu: string) =>
   `not coalesce(a.is_lead, false) and not exists (select 1 from ${CANCELLATIONS} cx where cx.application_id = a.id) and ${buInSql(bu)}`;
 
@@ -172,9 +173,12 @@ export function factsSql(
          -- ลิงก์ที่กรอกผ่าน → Autopost หรือโพสต์เอง (เจ้าของ 9 พ.ย. 2569) · คิดฝั่ง Node (postSourceOf)
          (select l.code from ${POSTING_LINKS} l where l.id = a.link_id) as link_code,
          (select nullif(btrim(l.note), '') from ${POSTING_LINKS} l where l.id = a.link_id) as link_note,
-         -- ใครหารายชื่อมา: คนสร้างลิงก์ › ผู้รับผิดชอบ/คนสร้างประกาศ (ลิงก์เก่า) · ไม่มีลิงก์ = คนเพิ่ม/นำเข้า (9 พ.ย. 2569)
+         -- ใครหารายชื่อมา: ผู้รับผิดชอบที่เลือกตอน Gen link (190 · 19 พ.ย. 2569) › คนสร้างลิงก์ › ผู้รับผิดชอบ/คนสร้างประกาศ (ลิงก์เก่า)
+         -- · ไม่มีลิงก์ = คนเพิ่ม/นำเข้า (9 พ.ย. 2569) · ผู้รับผิดชอบส่งเป็นอีเมล → ชื่อเล่นด้วย displayOf ชุดเดียวกับคนสร้างลิงก์
          case when a.link_id is not null then
-           (select coalesce(nullif(btrim(l.created_by_name), ''), nullif(btrim(pp.responsible_name), ''), nullif(btrim(pp.created_by_name), ''))
+           (select coalesce((select nullif(btrim(ru.email), '') from ${USERS_TABLE} ru where ru.id = l.responsible_user_id),
+                            nullif(btrim(l.responsible_name), ''),
+                            nullif(btrim(l.created_by_name), ''), nullif(btrim(pp.responsible_name), ''), nullif(btrim(pp.created_by_name), ''))
               from ${POSTING_LINKS} l left join ${POSTINGS_TABLE} pp on pp.id = l.posting_id where l.id = a.link_id)
          else nullif(btrim(a.created_by_name), '') end as bringer,
          nullif(btrim(a.position_interest), '') as position,

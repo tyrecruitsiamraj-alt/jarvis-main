@@ -1,19 +1,17 @@
 import React, { useEffect, useState } from 'react';
 import { copyText } from '@/lib/copyText';
-import { FieldSelect } from '@/components/shared/FieldSelect';
 import SearchableSelect from '@/components/shared/SearchableSelect';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import type { JobRequest } from '@/types';
 import { jobBoardCardTitle, jobUnitSectorOf } from '@/lib/unitRequestDisplay';
-import { buildOnlineNameOptions } from '@/lib/jobStaffNames';
-import { refreshJobStaffFromApi } from '@/lib/jobStaffRemote';
 import {
   applyLinkPath,
   recruitChannelLabel,
   type RecruitChannelMatch,
 } from '@/lib/recruitPostings';
-import { createRecruitPosting, type CreatePostingBody } from '@/lib/recruitPostingsApi';
+import { createRecruitPosting, fetchRecruitPostings, type CreatePostingBody } from '@/lib/recruitPostingsApi';
+import { standaloneBoxResponsible } from '@/lib/linkResponsible';
 import MultiChannelPicker from '@/components/shared/MultiChannelPicker';
 import JobTitleField from '@/components/shared/JobTitleField';
 import {
@@ -34,6 +32,7 @@ import { jobPostingDraft } from '@/lib/recruitPostingDraft';
 import { RM_FORM_TYPES, RM_SPECIFIC_TYPES } from '@/lib/recruitRmMasters';
 import { createShortLink } from '@/lib/shortLinksApi';
 import SoGroupPicker from '@/components/jobs/SoGroupPicker';
+import LinkResponsibleField, { useLinkResponsible } from '@/components/jobs/LinkResponsibleField';
 import { fetchSoOptions } from '@/lib/jobPostingRequestsApi';
 import { isFacebookGroupChannel, jobBuOf, soGroupLinkKey, soGroupLinkLabel, soGroupLinkName, type SoOptGroup } from '@/lib/soScraping';
 import { normalizeTrendBu } from '@/lib/trends/bu';
@@ -134,7 +133,28 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
   // ── ข้อมูลที่ระบบเดิมเก็บตอนสร้างลิงก์ (เจ้าของสั่ง 11 ส.ค. 2569) ──
   const [positionName, setPositionName] = useState('');
   const [province, setProvince] = useState('');
-  const [responsible, setResponsible] = useState('');
+  /**
+   * ผู้รับผิดชอบ (เจ้าของ 19 พ.ย. 2569 "พวกนี้มีเจ้าหน้าที่สรรหารับผิดชอบนะ ตอน gen link เพิ่มให้สามารถเลือกคนรับผิดชอบด้วยเลย"
+   * · "หมายถึงให้มีชื่อเจ้าหน้าที่สรรหาด้วย") — ช่องเดิมของฟอร์ม รายชื่อ = ทีม Online + สายสรรหา (มี id แล้ว)
+   * ลิงก์ ใบสมัครที่มาทางลิงก์ งานรายคน นับเป็นของคนนี้ · ประกาศยังเก็บเป็นชื่อเหมือนเดิม (API เติมจาก id)
+   * ค่าเริ่ม: กล่องลอย = ผู้รับผิดชอบของกล่อง (ชื่อในประกาศล่าสุดของกล่อง ถ้าตรงกับคนในรายชื่อ) › คนกด · ใบขอ = คนกด
+   */
+  const [boxResponsible, setBoxResponsible] = useState<string | null>(null);
+  const responsible = useLinkResponsible(open ? `${job?.id ?? ''}|${standalone?.kind ?? ''}` : null, boxResponsible);
+  const standaloneKind = standalone?.kind ?? null;
+  const standaloneDept = standalone?.departmentCode ?? null;
+  useEffect(() => {
+    setBoxResponsible(null);
+    if (!open || job || !standaloneKind) return;
+    let alive = true;
+    // โหลดไม่ได้ = ค่าเริ่มเป็นคนกด (ยังเลือกเองได้)
+    void fetchRecruitPostings({ standaloneOnly: true })
+      .then((list) => alive && setBoxResponsible(standaloneBoxResponsible(list, standaloneKind, standaloneDept)))
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, [open, job, standaloneKind, standaloneDept]);
   /**
    * "ข้อมูลเจาะจง" ถูกถอดออกจากฟอร์ม 17 ส.ค. 2569 (เจ้าของสั่ง) — ไม่มีใครกรอกจริง
    * ⚠️ **ไม่ได้ลบฟิลด์ฝั่งหลังบ้าน** ประกาศเก่าที่เคยกรอกไว้ยังอ่านได้เหมือนเดิม
@@ -142,8 +162,6 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
    */
   const specificType = '';
   const [formType, setFormType] = useState<string>('rm');
-  /** ชื่อทีม Online — ที่มาของช่อง "ผู้รับผิดชอบ" (เจ้าของสั่ง 19 ส.ค. 2569) */
-  const [onlineNames, setOnlineNames] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [links, setLinks] = useState<Array<{ code: string; label: string | null }>>([]);
@@ -196,7 +214,6 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
     setPositionName(draft ? draft.positionName : (standalone?.kindLabel ?? ''));
     // จังหวัดไม่มีเป็นฟิลด์เดี่ยวในใบขอ — ถอดจากที่อยู่ด้วยตัวถอดเดิมที่ตัวกรองบอร์ดใช้
     setProvince(draft?.province ?? '');
-    setResponsible('');
     setFormType('rm');
     setShortLinks({});
     setPicked([]);
@@ -204,15 +221,6 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
     // เหลือแค่ช่องทาง = กางรายการช่องทางให้เลย (ไม่มีอะไรอื่นให้ทำในฟอร์มนี้)
     // กล่องลอย = กางและอยู่บนสุดด้วย (เจ้าของ 2 พ.ย. 2569 "ทำให้เลือกช่องทางตอน Genlink ได้ด้วยสิ่" — เดิมหุบอยู่ท้ายฟอร์มยาว หาไม่เจอ)
     setChannelsOpen(channelOnly || Boolean(standalone));
-    /**
-     * ผู้รับผิดชอบ = **ทีม Online** ที่เพิ่มไว้ในหน้าตั้งค่า (เจ้าของสั่ง 19 ส.ค. 2569)
-     * เดิมดึงผู้ใช้ทั้งระบบมาให้เลือก ซึ่งได้ชื่อคนที่ไม่เกี่ยวกับงานประกาศเลย
-     * ⚠️ roster เก็บเป็น **ชื่อ** ไม่ใช่ user id — ประกาศจึงบันทึกที่ `responsibleName`
-     * (`responsibleUserId` เป็น null ตั้งใจ · ฟิลด์นั้นมีไว้ตอนผูกกับ user จริงเท่านั้น)
-     */
-    void refreshJobStaffFromApi()
-      .then(() => setOnlineNames(buildOnlineNameOptions()))
-      .catch(() => setOnlineNames(buildOnlineNameOptions()));
   }, [open, job, standalone, channelOnly]);
 
   // รายชื่อกลุ่มโหลดเมื่อเลือกช่องทาง Facebook Group ครั้งแรก (ดึงใหม่ทุกครั้งที่เปิดป๊อป)
@@ -295,8 +303,9 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
         channels: linkChannels,
         positionName: positionName.trim() || null,
         province: province || null,
-        responsibleName: responsible || null,
-        responsibleUserId: null,
+        // ชื่อผู้รับผิดชอบ API เติมจาก id ที่ตรวจแล้ว (ไม่เชื่อชื่อที่ส่งมา)
+        responsibleName: null,
+        responsibleUserId: responsible.value || null,
         specificType: specificType || null,
         formType,
       };
@@ -489,18 +498,7 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
                       options={[{ value: '', label: 'ไม่ระบุ' }, ...THAI_PROVINCE_NAMES_SORTED.map((p) => ({ value: p, label: p }))]}
                     />
                   </div>
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-medium text-muted-foreground">ผู้รับผิดชอบ</label>
-                    <FieldSelect
-                      ariaLabel="ผู้รับผิดชอบ"
-                      value={responsible}
-                      onChange={setResponsible}
-                      options={[{ value: '', label: 'ไม่ระบุ' }, ...onlineNames.map((n) => ({ value: n, label: n }))]}
-                    />
-                    <p className="text-[11px] text-muted-foreground">
-                      ชื่อมาจากทีม Online (ตั้งค่า → สรรหา / คัดสรร / OPL / Online)
-                    </p>
-                  </div>
+                  <LinkResponsibleField value={responsible.value} onChange={responsible.setValue} options={responsible.options} />
                 </div>
 
                 <div className="space-y-1.5">
@@ -526,6 +524,10 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
               </>
               )}
               {standalone ? null : channelSection}
+              {/* ใบขอเหลือแค่ช่องทาง = ไม่มีฟอร์มเต็ม ช่องผู้รับผิดชอบอยู่ตรงนี้แทน (ฟอร์มหนึ่งมีช่องนี้ช่องเดียว) */}
+              {channelOnly ? (
+                <LinkResponsibleField value={responsible.value} onChange={responsible.setValue} options={responsible.options} />
+              ) : null}
 
               {error ? <p className="text-xs text-red-600">{error}</p> : null}
               {missingGroup ? (

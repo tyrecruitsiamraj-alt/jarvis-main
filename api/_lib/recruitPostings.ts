@@ -7,6 +7,8 @@ import { isActivePostingKind } from './recruitPostingKinds.js';
 import {
   isStandalonePostingKind,
   validatePostingInput,
+  LINK_RESPONSIBLE_INVALID,
+  LINK_RESPONSIBLE_LANES,
   type RecruitChannel,
   type RecruitChannelMatch,
   type RecruitPosting,
@@ -22,6 +24,7 @@ const applicationsTable = tableInAppSchema('public_job_applications');
 
 const MAX_TEXT = 200;
 const MAX_LONG_TEXT = 4000;
+const UUID_RE = /^[0-9a-f-]{36}$/i;
 
 function trimTo(value: unknown, max: number): string | null {
   const s = typeof value === 'string' ? value.trim() : '';
@@ -361,13 +364,16 @@ type PostingRow = {
 
 /**
  * ═══ ผู้รับผิดชอบของลิงก์ — ตัวตัดสินเดียว (เจ้าของ 28 ต.ค. 2569 "ลิงก์นี้ใครรับผิดชอบ" · "ช่องผู้รับผิดชอบในใบประวัติให้ตรงกับลิงก์") ═══
- * คนกดสร้างลิงก์ (170) → ผู้รับผิดชอบที่ตั้งตอน Gen ของประกาศ → คนสร้างประกาศ · ชื่อ = ชื่อเล่น → ชื่อเต็ม → ส่วนหน้าอีเมล
+ * ผู้รับผิดชอบที่เลือกตอน Gen link (190 · 19 พ.ย. 2569) → คนกดสร้างลิงก์ (170) → ผู้รับผิดชอบที่ตั้งตอน Gen ของประกาศ → คนสร้างประกาศ
+ * ชื่อ = ชื่อเล่น → ชื่อเต็ม → ส่วนหน้าอีเมล
  * ใช้ทั้งรายการลิงก์ (`attachLinks`) และใบประวัติผู้สมัคร (`POSTING_OWNER_SQL` ใน job-applications) ⇒ สองที่บอกชื่อเดียวกันเสมอ
  */
 export function linkOwnerSql(linkIdExpr: string, postingIdExpr: string): string {
   return `coalesce(
-    (select coalesce(nullif(btrim(lu.nickname), ''), nullif(btrim(lu.full_name), ''), nullif(split_part(btrim(lk.created_by_name), '@', 1), ''))
+    (select coalesce(nullif(btrim(ru.nickname), ''), nullif(btrim(ru.full_name), ''), nullif(btrim(lk.responsible_name), ''),
+                     nullif(btrim(lu.nickname), ''), nullif(btrim(lu.full_name), ''), nullif(split_part(btrim(lk.created_by_name), '@', 1), ''))
        from ${linksTable} lk
+       left join ${usersTable} ru on ru.id = lk.responsible_user_id
        left join ${usersTable} lu on lu.id = lk.created_by_user_id
       where lk.id = ${linkIdExpr}),
     (select coalesce(nullif(btrim(pp.responsible_name), ''), nullif(btrim(pu.nickname), ''), nullif(btrim(pu.full_name), ''),
@@ -376,6 +382,42 @@ export function linkOwnerSql(linkIdExpr: string, postingIdExpr: string): string 
        left join ${usersTable} pu on pu.id::text = pp.created_by_user_id::text
       where pp.id = ${postingIdExpr})
   )`;
+}
+
+/** ผู้รับผิดชอบของลิงก์ที่ตรวจแล้ว (190) — id ผู้ใช้จริง + ชื่อที่คนเรียก (ชื่อเล่น › ชื่อเต็ม) */
+export type LinkResponsible = { userId: string; name: string };
+
+/**
+ * ═══ ตรวจผู้รับผิดชอบที่เลือกตอน Gen link (เจ้าของ 19 พ.ย. 2569) ═══
+ * รับได้แค่ผู้ใช้ที่ยังใช้งาน และเป็น (ก) คนกดเอง หรือ (ข) สายสรรหา/ทีม Online (`LINK_RESPONSIBLE_LANES`)
+ * ที่ตั้งชื่อเล่นแล้ว อยู่ BU ที่คนกดเห็น — ชุดเดียวกับรายชื่อในฟอร์ม (`/api/app-user-names?lane=` ทีละสาย) · id อื่นตอบ 400 ไม่เก็บ
+ * ไม่ได้เลือก (null/ว่าง) = null → ลิงก์เป็นของคนกดตามเดิม
+ * `scopeCodes` = BU ที่คนกดเห็น (null = ทุก BU) · คนที่ไม่ผูก BU (แอดมิน) เลือกได้เสมอ เหมือนรายชื่อในฟอร์ม
+ */
+export async function resolveLinkResponsible(input: {
+  pickedUserId: unknown;
+  actorUserId: string | null | undefined;
+  scopeCodes: readonly string[] | null;
+}): Promise<LinkResponsible | null> {
+  if (input.pickedUserId == null || input.pickedUserId === '') return null;
+  const picked = typeof input.pickedUserId === 'string' ? input.pickedUserId.trim() : '';
+  if (!UUID_RE.test(picked)) throw new Error(LINK_RESPONSIBLE_INVALID);
+  const actor = input.actorUserId && UUID_RE.test(input.actorUserId) ? input.actorUserId : null;
+  const { rows } = await dbQuery<{ id: string; name: string | null }>(
+    `select u.id::text as id,
+            coalesce(nullif(btrim(u.nickname), ''), nullif(btrim(u.full_name), ''), nullif(split_part(btrim(u.email), '@', 1), '')) as name
+       from ${usersTable} u
+      where u.id = $1::uuid and u.is_active
+        and (u.id = $2::uuid
+             or ($3::text[] && coalesce(u.job_lanes, '{}'::text[])
+                 and coalesce(btrim(u.full_name), '') <> '' and coalesce(btrim(u.nickname), '') <> ''
+                 and ($4::text[] is null or u.department_code is null or upper(btrim(u.department_code)) = any($4::text[]))))
+      limit 1`,
+    [picked, actor, [...LINK_RESPONSIBLE_LANES], input.scopeCodes ? [...input.scopeCodes] : null],
+  );
+  const row = rows[0];
+  if (!row?.name) throw new Error(LINK_RESPONSIBLE_INVALID);
+  return { userId: row.id, name: row.name };
 }
 
 type LinkRow = {
@@ -492,6 +534,7 @@ async function attachLinks(postings: PostingRow[]): Promise<RecruitPosting[]> {
       ORDER BY l.created_at`;
   let rows: LinkRow[] | null = null;
   // ยังไม่รัน 173 → ไม่รู้รหัสกลุ่ม · ยังไม่รัน 170 → ไม่รู้คนสร้าง — ลิงก์ยังโหลดได้ทุกกรณี
+  // ⚠️ ยังไม่รัน 190 → linkOwnerSql อ้าง responsible_user_id ไม่ได้ ตกไปชุดไม่มีชื่อคน (ลิงก์ยังโหลดได้)
   for (const [withCreator, withFbGroup] of [[true, true], [true, false], [false, false]] as const) {
     try {
       ({ rows } = await dbQuery<LinkRow>(linkSql(withCreator, withFbGroup), [ids]));
@@ -594,6 +637,8 @@ export type CreatePostingInput = {
   channels?: Array<{ channelId?: string | null; label?: string | null; note?: string | null; fbGroupId?: string | null }>;
   createdByUserId?: string | null;
   createdByName?: string | null;
+  /** ผู้รับผิดชอบที่เลือกตอน Gen link (190) — ผ่าน `resolveLinkResponsible` แล้วเท่านั้น · null = คนกด */
+  linkResponsible?: LinkResponsible | null;
 };
 
 export async function createRecruitPosting(input: CreatePostingInput): Promise<RecruitPosting> {
@@ -629,8 +674,9 @@ export async function createRecruitPosting(input: CreatePostingInput): Promise<R
       trimTo(input.contactPhone, 64),
       trimTo(input.positionName, MAX_TEXT),
       trimTo(input.province, 128),
-      trimTo(input.responsibleName, MAX_TEXT),
-      trimTo(input.responsibleUserId, 64),
+      // เลือกผู้รับผิดชอบตอน Gen link = ผู้รับผิดชอบของประกาศด้วย (ลิงก์เก่าที่ไม่มีของตัวเองถอยมาอ่านที่นี่)
+      trimTo(input.linkResponsible?.name ?? input.responsibleName, MAX_TEXT),
+      trimTo(input.linkResponsible?.userId ?? input.responsibleUserId, 64),
       // ⚠️ ข้อมูลเจาะจงรับได้แค่ค่าใน master — ค่าอื่นทิ้งเป็น null ไม่เก็บขยะที่เทียบข้ามระบบไม่ได้
       isRmSpecificType(input.specificType) ? input.specificType : null,
         isRmFormType(input.formType) ? input.formType : 'rm',
@@ -684,6 +730,7 @@ export async function createRecruitPosting(input: CreatePostingInput): Promise<R
         fbGroupId: ch.fbGroupId ?? null,
         createdByUserId: input.createdByUserId ?? null,
         createdByName: input.createdByName ?? null,
+        responsible: input.linkResponsible ?? null,
       }),
     );
   }
@@ -696,40 +743,69 @@ export async function createPostingLink(
     channelId?: string | null;
     label?: string | null;
     note?: string | null;
-    /** คนที่กดสร้างลิงก์ (170 · 28 ต.ค. 2569) — ผู้รับผิดชอบของลิงก์ */
+    /** คนที่กดสร้างลิงก์จริง (170 · 28 ต.ค. 2569) — เก็บไว้ตรวจย้อน · เป็นผู้รับผิดชอบเมื่อไม่ได้เลือกคนอื่น */
     createdByUserId?: string | null;
     createdByName?: string | null;
     /** รหัสกลุ่ม Facebook (173 · 4 พ.ย. 2569) — ลิงก์ของกลุ่มแยกด้วยรหัสนี้ ไม่ใช่ชื่อกลุ่ม */
     fbGroupId?: string | null;
+    /** ผู้รับผิดชอบที่เลือกตอน Gen link (190 · 19 พ.ย. 2569) — ผ่าน `resolveLinkResponsible` แล้วเท่านั้น */
+    responsible?: LinkResponsible | null;
   },
 ): Promise<RecruitPostingLink> {
   const userId = trimTo(input.createdByUserId, 64);
-  const validUser = userId && /^[0-9a-f-]{36}$/i.test(userId) ? userId : null;
+  const validUser = userId && UUID_RE.test(userId) ? userId : null;
   const fbGroupId = trimTo(input.fbGroupId, 128);
+  const respId = input.responsible && UUID_RE.test(input.responsible.userId) ? input.responsible.userId : null;
+  const respName = respId ? trimTo(input.responsible?.name, MAX_TEXT) : null;
   let withCreator = true;
   let withFbGroup = true;
+  // ไม่ได้เลือก = ไม่อ้างคอลัมน์ของ 190 เลย (ทางเดิม)
+  let withResponsible = respId !== null;
   // โค้ดสุ่มอาจชนกันได้ — ลองใหม่ไม่กี่ครั้งแทนที่จะปล่อยพัง
   for (let attempt = 0; attempt < 5; attempt += 1) {
     const base = [postingId, trimTo(input.channelId, 64), trimTo(input.label, MAX_TEXT), makeLinkCode(), trimTo(input.note, MAX_TEXT)];
     try {
-      const { rows } = withCreator
-        ? await dbQuery<LinkRow>(
-            `INSERT INTO ${linksTable} (posting_id, channel_id, channel_label, code, note, created_by_user_id, created_by_name${withFbGroup ? ', fb_group_id' : ''})
-             VALUES ($1,$2,$3,$4,$5,$6,$7${withFbGroup ? ',$8' : ''})
-             RETURNING id, posting_id, channel_id, channel_label, code, note, hit_count, created_at,${withFbGroup ? ' fb_group_id,' : ''}
-                       coalesce((SELECT coalesce(nullif(btrim(u.nickname), ''), nullif(btrim(u.full_name), '')) FROM ${usersTable} u WHERE u.id = $6::uuid),
-                                nullif(btrim($7::text), '')) AS creator_name`,
-            [...base, validUser, trimTo(input.createdByName, MAX_TEXT), ...(withFbGroup ? [fbGroupId] : [])],
-          )
-        : await dbQuery<LinkRow>(
-            `INSERT INTO ${linksTable} (posting_id, channel_id, channel_label, code, note)
-             VALUES ($1,$2,$3,$4,$5)
-             RETURNING id, posting_id, channel_id, channel_label, code, note, hit_count, created_at`,
-            base,
-          );
+      let rows: LinkRow[];
+      if (withCreator) {
+        const vals: unknown[] = [...base, validUser, trimTo(input.createdByName, MAX_TEXT)];
+        let cols = 'posting_id, channel_id, channel_label, code, note, created_by_user_id, created_by_name';
+        if (withFbGroup) {
+          cols += ', fb_group_id';
+          vals.push(fbGroupId);
+        }
+        // ชื่อบนลิงก์ = ผู้รับผิดชอบที่เลือก › คนกด (ตัวตัดสินเดียวกับ linkOwnerSql)
+        let ownerId = '$6::uuid';
+        let ownerName = `nullif(btrim($7::text), '')`;
+        if (withResponsible) {
+          cols += ', responsible_user_id, responsible_name';
+          vals.push(respId, respName);
+          ownerId = `coalesce($${vals.length - 1}::uuid, $6::uuid)`;
+          ownerName = `coalesce(nullif(btrim($${vals.length}::text), ''), nullif(btrim($7::text), ''))`;
+        }
+        ({ rows } = await dbQuery<LinkRow>(
+          `INSERT INTO ${linksTable} (${cols})
+           VALUES (${vals.map((_, i) => `$${i + 1}`).join(',')})
+           RETURNING id, posting_id, channel_id, channel_label, code, note, hit_count, created_at,${withFbGroup ? ' fb_group_id,' : ''}
+                     coalesce((SELECT coalesce(nullif(btrim(u.nickname), ''), nullif(btrim(u.full_name), '')) FROM ${usersTable} u WHERE u.id = ${ownerId}),
+                              ${ownerName}) AS creator_name`,
+          vals,
+        ));
+      } else {
+        ({ rows } = await dbQuery<LinkRow>(
+          `INSERT INTO ${linksTable} (posting_id, channel_id, channel_label, code, note)
+           VALUES ($1,$2,$3,$4,$5)
+           RETURNING id, posting_id, channel_id, channel_label, code, note, hit_count, created_at`,
+          base,
+        ));
+      }
       return mapLink(rows[0]);
     } catch (e) {
-      // ยังไม่รัน 173 — สร้างลิงก์ได้ แค่ไม่จำรหัสกลุ่ม · ยังไม่รัน 170 — ไม่จำคนสร้าง
+      // ยังไม่รัน 190 — ไม่จำผู้รับผิดชอบที่เลือก · 173 — ไม่จำรหัสกลุ่ม · 170 — ไม่จำคนสร้าง (สร้างลิงก์ได้ทุกกรณี)
+      if (withResponsible && isUndefinedColumn(e)) {
+        withResponsible = false;
+        attempt -= 1;
+        continue;
+      }
       if (withFbGroup && isUndefinedColumn(e)) {
         withFbGroup = false;
         attempt -= 1;

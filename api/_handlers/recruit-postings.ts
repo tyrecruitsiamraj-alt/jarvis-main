@@ -14,6 +14,7 @@ import {
   getRecruitPosting,
   createRecruitPosting,
   createPostingLink,
+  resolveLinkResponsible,
   setPostingStatus,
   updateRecruitPosting,
   type UpdatePostingPatch,
@@ -74,6 +75,12 @@ async function handler(req: AuthedReq, res: ApiRes) {
     if (method === 'POST') {
       const body = await readJsonBody(req);
       if (!isPlainObject(body)) return sendError(res, 400, 'Bad request');
+      // ผู้รับผิดชอบที่เลือกตอน Gen link (19 พ.ย. 2569) — id ที่ไม่ใช่เจ้าหน้าที่ในรายชื่อ = 400 · ไม่ส่ง = คนกด
+      const linkResponsible = await resolveLinkResponsible({
+        pickedUserId: body.responsibleUserId,
+        actorUserId: req.user?.sub ?? null,
+        scopeCodes: scope.mode === 'all' ? null : scope.mode === 'code' ? scope.codes : [],
+      });
 
       // เพิ่มลิงก์ให้ประกาศที่มีอยู่แล้ว
       if (typeof body.postingId === 'string' && body.postingId) {
@@ -89,6 +96,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
           fbGroupId: typeof body.fbGroupId === 'string' ? body.fbGroupId : null,
           createdByUserId: req.user?.sub ?? null,
           createdByName: req.user?.email ?? null,
+          responsible: linkResponsible,
         });
         return res.status(201).json(link);
       }
@@ -116,7 +124,9 @@ async function handler(req: AuthedReq, res: ApiRes) {
         positionName: typeof body.positionName === 'string' ? body.positionName : null,
         province: typeof body.province === 'string' ? body.province : null,
         responsibleName: typeof body.responsibleName === 'string' ? body.responsibleName : null,
-        responsibleUserId: typeof body.responsibleUserId === 'string' ? body.responsibleUserId : null,
+        // id ผู้รับผิดชอบเก็บเฉพาะที่ตรวจแล้ว (เดิมเก็บค่าที่ส่งมาตรง ๆ)
+        responsibleUserId: null,
+        linkResponsible,
         // ค่าที่ไม่อยู่ใน master ถูกทิ้งเป็น null ที่ชั้น store — ไม่ต้องตรวจซ้ำที่นี่
         specificType: typeof body.specificType === 'string' ? body.specificType : null,
         formType: typeof body.formType === 'string' ? body.formType : null,
