@@ -1,6 +1,7 @@
 import { dbQuery, isPgUndefinedTable } from './postgres.js';
 import { tableInAppSchema } from './schema.js';
 import { normalizeDepartmentCode } from './departmentScope.js';
+import { trendBuFromSiteCode } from '../../src/lib/trends/bu.js';
 
 /**
  * หา "แผนกเจ้าของงาน" ของใบสมัคร เพื่อเก็บติดตัวใบไว้ (migration 082)
@@ -28,6 +29,16 @@ export async function resolveApplicationDepartment(input: {
 
   const postings = tableInAppSchema('recruit_postings');
   try {
+    /**
+     * BU จากรหัสไซต์ของใบขอมาก่อน (เจ้าของ 19 พ.ย. 2569 Choice "แก้ให้ตาม BU ของใบขอ") — ตัวเดียวกับที่ภาพรวมกรอง BU (`appBuSql`)
+     * เดิมอ่านจากประกาศอย่างเดียว ⇒ ใบขอที่ไม่มีประกาศได้แผนกคนคีย์ (LMO6911010 ติด LBD · หัวหน้า LBD เก็บไปได้)
+     * `job_site_map` อยู่ใน Postgres — ไม่ยิง ERP
+     */
+    if (jobId) {
+      const { rows } = await dbQuery<{ site_code: string | null }>(`select site_code from ${tableInAppSchema('job_site_map')} where job_id = $1 limit 1`, [jobId]);
+      const bu = trendBuFromSiteCode(rows[0]?.site_code ?? null);
+      if (bu) return bu;
+    }
     if (postingId) {
       const { rows } = await dbQuery<{ department_code: string | null }>(
         `select department_code from ${postings} where id = $1 limit 1`,

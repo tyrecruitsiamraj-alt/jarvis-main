@@ -13,13 +13,22 @@ const { staffEntryDepartmentFor } = await import('../../api/_lib/applicationDepa
 beforeEach(() => dbQuery.mockReset());
 
 describe('staffEntryDepartmentFor', () => {
-  it('ผูกใบขอ = แผนกของใบขอ แม้คนคีย์อยู่อีกแผนก', async () => {
-    dbQuery.mockResolvedValueOnce({ rows: [{ department_code: 'LBA' }] });
+  it('ผูกใบขอ = BU จากรหัสไซต์ของใบขอก่อน (19 พ.ย. 2569) — LMO6911010 ไซต์ 69LML0022 = LM แม้คนคีย์อยู่ LBD', async () => {
+    dbQuery.mockResolvedValueOnce({ rows: [{ site_code: '69LML0022' }] });
+    expect(await staffEntryDepartmentFor('siamraj-sql:LMO6911010', 'LBD')).toBe('LM');
+  });
+  it('ไม่รู้ไซต์ = แผนกจากประกาศของใบขอ', async () => {
+    dbQuery.mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({ rows: [{ department_code: 'LBA' }] });
     expect(await staffEntryDepartmentFor('siamraj-sql:LAO6911001', 'LBD')).toBe('LBA');
   });
-  it('ใบขอยังไม่มีประกาศที่บอกแผนก = แผนกของคนคีย์', async () => {
-    dbQuery.mockResolvedValueOnce({ rows: [] });
+  it('ไม่รู้ทั้งไซต์และประกาศ = แผนกของคนคีย์', async () => {
+    dbQuery.mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({ rows: [] });
     expect(await staffEntryDepartmentFor('siamraj-sql:OPL6907053', 'LBD')).toBe('LBD');
+  });
+  it('migration 189 แก้ใบที่ไม่มีประกาศ — เก็บค่าเดิมไว้ย้อนกลับ', () => {
+    const sql = readFileSync('migrations/189_application_department_site_bu.sql', 'utf8');
+    expect(sql).toContain('application_department_fix_189');
+    expect(sql).toContain("when 'LML' then 'LM'");
   });
   it('ไม่ผูกใบขอ = แผนกของคนคีย์ ไม่ถามฐาน', async () => {
     expect(await staffEntryDepartmentFor(null, 'LBD')).toBe('LBD');
