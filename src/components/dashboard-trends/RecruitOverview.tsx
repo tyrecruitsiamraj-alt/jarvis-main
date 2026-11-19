@@ -17,6 +17,7 @@ import { shortTime } from '@/lib/dateTh';
 import { fetchRecruitOverview } from '@/lib/recruitOverviewApi';
 import { monthLabel, monthOptions, monthWindow, rangeWindow, shiftMonth, shiftRange } from '@/lib/recruitOverviewWindow';
 import { prefetchRecruitStuck } from '@/lib/recruitStuckApi';
+import { prefetchSoPostGroups } from '@/lib/soPostGroupsApi';
 import { type DateRangeYmd } from '@/components/shared/DateRangeCalendarPicker';
 import { Calendar } from '@/components/ui/calendar';
 import { parseYmd, toYmdLocal } from '@/lib/dateTh';
@@ -216,6 +217,8 @@ const RecruitOverview: React.FC<{
       const today = toYmdBangkok(new Date());
       const w = (range ? rangeWindow(range.from, range.to, today, range.all === true) : null) ?? monthWindow(month, today);
       prefetchRecruitStuck(pickedBu, { from: w.from, to: w.to });
+      // การ์ด Autopost ของภาพรวม — ยิงพร้อมกัน ไม่รอก้อนนี้ (19 พ.ย. 2569 วัดได้ 3.9 วิ ต่อท้าย 4.2 วิ)
+      if (dashV2) prefetchSoPostGroups({ from: w.from, to: w.to, bu: pickedBu ?? null });
     }
     fetchRecruitOverview(month, range, pickedBu, { asOf: dashV2 })
       .then((data) => !cancelled && setState({ data, loading: false, error: null }))

@@ -100,13 +100,25 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
     fetchStaffActivityFeed({ from: win.from, to: win.to, bu: data.bu })
       .then((items) => alive && setFeed({ key: filterKey, items }))
       .catch(() => alive && setFeed({ key: filterKey, items: [] }));
+    return () => {
+      alive = false;
+    };
+  }, [filterKey, data.bu, win.from, win.to]);
+  /**
+   * ลิงก์โพสต์เอง โหลดตอนเปิดแผง "โพสต์เอง / สร้างลิงก์" เท่านั้น (เจ้าของ 19 พ.ย. 2569 "หน้าภาพรวมโหลดช้า")
+   * วัดบนเว็บจริง 11.3 วิ ทั้งที่ใช้แค่ในแผงนั้น · เลขบนการ์ดโพสต์เองมาจากงานรายคน ไม่ได้ใช้ชุดนี้
+   */
+  const selfOpen = stack.some((p) => p.kind === 'embed' && p.embed === 'self');
+  React.useEffect(() => {
+    if (!selfOpen || links.key === filterKey) return;
+    let alive = true;
     fetchManualLinks({ from: win.from, to: win.to, bu: data.bu })
       .then((rows) => alive && setLinks({ key: filterKey, rows }))
       .catch(() => alive && setLinks({ key: filterKey, rows: null }));
     return () => {
       alive = false;
     };
-  }, [filterKey, data.bu, win.from, win.to]);
+  }, [selfOpen, links.key, filterKey, win.from, win.to, data.bu]);
   const allRows = stuck.key === filterKey ? stuck.data?.requests ?? null : null;
   const reqRows: StuckRequest[] | null = allRows;
   const model = React.useMemo(() => buildV2Model(data), [data]);
@@ -208,7 +220,7 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
       </div>
     ),
     posts: <SoPostGroupsCard from={win.from} to={win.to} bu={data.bu} title="Autopost · รายการโพสต์" />,
-    self: links.rows ? <SelfLinksPanel rows={links.rows} onOpenRequest={(jobId) => navigate(requestPathOfJobId(jobId))} /> : <Skeleton className="h-40 rounded-xl" />,
+    self: links.key === filterKey && links.rows ? <SelfLinksPanel rows={links.rows} onOpenRequest={(jobId) => navigate(requestPathOfJobId(jobId))} /> : <Skeleton className="h-40 rounded-xl" />,
   };
 
   const loadingReq = stuck.key !== filterKey;
