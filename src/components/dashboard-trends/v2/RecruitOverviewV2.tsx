@@ -140,10 +140,10 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
   /** ประกาศแล้ว / ยังไม่ประกาศ — ตัวแบ่งเดียวกับหัวหน้าโพสต์ประกาศ (เจ้าของ 18 พ.ย. 2569 "ยอดมันไม่ตรงกับหน้าภาพรวมหรอ") */
   const releasedRows = openRows.filter((r) => r.released);
   const unreleasedRows = openRows.filter((r) => !r.released);
-  const postLanes: Array<{ key: keyof typeof RELEASE_LANE_TEXT; rows: StuckRequest[]; view: 'released' | 'unreleased' | null }> = [
-    { key: 'all', rows: openRows, view: null },
-    { key: 'released', rows: releasedRows, view: 'released' },
-    { key: 'unreleased', rows: unreleasedRows, view: 'unreleased' },
+  /** ช่อง "ใบขอทั้งหมด" ถอดแล้ว — ซ้ำกับเหลือหา (เจ้าของ 19 พ.ย. 2569 "แก้ 2 อันนี้ก่อน") */
+  const postLanes: Array<{ key: 'released' | 'unreleased'; rows: StuckRequest[] }> = [
+    { key: 'released', rows: releasedRows },
+    { key: 'unreleased', rows: unreleasedRows },
   ];
 
   const [areaOpen, setAreaOpen] = React.useState(false);
@@ -307,7 +307,8 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
           <Kpi label={`− ยกเลิก · ${rangeShort}`} emphasis value={loadingReq ? undefined : reqRows ? sumOf(reqRows, 'cancelled') : null} sub={eq ? `ยกเลิกใบขอ ${fmt(eq.cancelled.length)} ใบ` : undefined} onClick={reqRows ? () => openRequests('ยกเลิก', reqRows.filter((r) => r.cancelled > 0)) : undefined} tone="danger" testId="v2-req-cancelled" />
           <Kpi label={`= เหลือหา · ยังเปิดอยู่ ณ ${shortDay(win.to)}`} emphasis tone="warn" value={loadingReq ? undefined : eq ? sumOf(eq.remaining, 'remaining') : null} sub={eq ? `${fmt(eq.remaining.length)} ใบ` : undefined} onClick={eq ? () => openRequests('เหลือหา', eq.remaining) : undefined} testId="v2-req-open" />
         </div>
-        {/* สถานะทำงานแบบ Dashboard — ใบชุดเดียวกับการ์ดเหลือหา "ทั้งหมด" เท่ากันทุกช่วง + สีเดียวกัน (เจ้าของ 19 พ.ย. 2569) */}
+        {/* สถานะทำงาน = เหลือหาแตกตามสถานะ (บวกกันได้เหลือหา) · การประกาศ = เหลือหาแบ่งประกาศแล้ว/ยังไม่ประกาศ
+            รวมอยู่ก้อนใบขอ ไม่มีกล่องทั้งหมดซ้ำ (เจ้าของ 19 พ.ย. 2569 "ใบขอ กับ สถานะทำงาน มันรวมกันได้ไหม" → "แก้ 2 อันนี้ก่อน") */}
         <div className="border-t pt-4">
           <WorkStatusBoard
             remaining={eq ? eq.remaining : null}
@@ -317,50 +318,37 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
             resetKey={viewKey}
           />
         </div>
-      </Card>
-
-      {/* ── การประกาศรับสมัคร — ต่อจากใบขอ (เจ้าของ 19 พ.ย. 2569 Choice "ต่อจากใบขอ ก่อนการสั่งงาน") ── */}
-      <Card className="min-w-0 space-y-4 rounded-2xl p-5" data-testid="v2-posting">
-        <SectionTitle title="การประกาศรับสมัคร" />
-        {/* 3 ช่องก่อน (เจ้าของ 18 พ.ย. 2569 "ถ้าจากตรงนี้ฉันอ่านฉันคงเอา 165+150+15+157+68+89 แน่นอน โชว์ 3 อันก่อนก็พอ")
-            คำเดียวกับหัวหน้าโพสต์ประกาศ · กดประกาศแล้ว/ยังไม่ประกาศ = ก้อนย่อยขึ้นข้างล่าง (PostingProgress) */}
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3" data-testid="v2-post-lanes">
-          {postLanes.map((c) => (
-            <Kpi
-              key={c.key}
-              label={RELEASE_LANE_TEXT[c.key].label}
-              emphasis
-              active={c.view === postView}
-              value={loadingReq ? undefined : eq ? c.rows.length : null}
-              sub={c.key === 'all' && eq ? `เหลือหา ${fmt(c.rows.reduce((n, r) => n + (r.remaining ?? 0), 0))} อัตรา` : undefined}
-              onClick={
-                eq
-                  ? () => {
-                      // ประกาศแล้ว/ยังไม่ประกาศ = ก้อนย่อยข้างล่าง · ใบขอทั้งหมด = กราฟ BU + รายการใบ
-                      if (c.view) setPostView(c.view);
-                      else openRequests(RELEASE_LANE_TEXT[c.key].label, c.rows);
-                    }
-                  : undefined
-              }
-              testId={`v2-post-${c.key}`}
-            />
-          ))}
-        </div>
-        {posts.error && posts.key === filterKey ? <p className="text-xs text-destructive">{posts.error}</p> : null}
-        {/* ไส้ใน: กดยังไม่เริ่มหา = ใครถือกี่ใบ · กดเริ่มหาแล้ว = มีชื่อ/ไม่มีชื่อ + ใบที่มีชื่อติดขั้นไหน (เจ้าของ 17 พ.ย. 2569) */}
-        <div className="border-t pt-4">
+        {/* ── การประกาศรับสมัคร: กราฟ BU ชุดเดียวบนหน้า กดช่อง = กราฟกับตารางข้างล่างเปลี่ยนตาม
+            กดปุ่ม/แถวในนี้ = รายการใบอย่างเดียว ไม่มีกราฟ BU ซ้ำในแผงข้าง (เจ้าของ 19 พ.ย. 2569 "พอกดแต่ละช่องก็มีกราฟอีกมันซับซ้อนปะ") ── */}
+        <section className="min-w-0 space-y-4 border-t pt-4" data-testid="v2-posting">
+          <SectionTitle title="การประกาศรับสมัคร" right={eq ? `เหลือหา ${fmt(openRows.length)} ใบ` : undefined} />
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2" data-testid="v2-post-lanes">
+            {postLanes.map((c) => (
+              <Kpi
+                key={c.key}
+                label={RELEASE_LANE_TEXT[c.key].label}
+                emphasis
+                active={c.key === postView}
+                value={loadingReq ? undefined : eq ? c.rows.length : null}
+                sub={eq ? `เหลือหา ${fmt(c.rows.reduce((n, r) => n + (r.remaining ?? 0), 0))} อัตรา` : undefined}
+                onClick={eq ? () => setPostView(c.key) : undefined}
+                testId={`v2-post-${c.key}`}
+              />
+            ))}
+          </div>
+          {posts.error && posts.key === filterKey ? <p className="text-xs text-destructive">{posts.error}</p> : null}
           {eq ? (
             <PostingProgress
               view={postView}
               open={openRows}
-              onRequests={openRequests}
+              onRequests={(title, rows) => push({ kind: 'requests', title, rows, page: 1, listOnly: true })}
               onNames={(title, ids, labels) => push({ kind: 'names', title, ids: [...ids], page: 1, labels })}
               resetKey={viewKey}
             />
           ) : (
             <Skeleton className="h-40 rounded-xl" />
           )}
-        </div>
+        </section>
       </Card>
 
       {/* ── การสั่งงาน: Autopost / โพสต์เอง / Scrap (เจ้าของ 18 พ.ย. 2569 "ยังต้องบอกเรื่อง Autopost โพสต์เอง Scrap ด้วย")

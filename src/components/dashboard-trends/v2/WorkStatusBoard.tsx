@@ -1,7 +1,7 @@
 /**
  * สถานะทำงาน หน้าตาแบบหน้า Dashboard (ภาพรวมงานสรรหา · เจ้าของ 18 พ.ย. 2569 "ยกมาแบบหน้า dashboard ตรงเนี้ย")
  * ใบชุดเดียวกับการ์ด "เหลือหา" ของช่วงที่เลือก (เจ้าของ 19 พ.ย. 2569 "ถ้าเอาตามช่วง 2 อันก็ต้องเท่ากัน แล้วใส่สีให้รู้ด้วยว่าอันไหนเรื่องเดียวกัน")
- * ⇒ "ทั้งหมด" = การ์ดเหลือหาเสมอ และใช้สีเดียวกัน (สีเหลือง = เหลือหา ตามภาษาสีของตัวเลข) · ตัวนับ `workStatusOfRemaining`
+ * ⇒ "ทั้งหมด" = การ์ดเหลือหาเสมอ · 19 พ.ย. 2569 รวมเข้าก้อนใบขอ กล่องทั้งหมดไม่ขึ้นแล้ว (ซ้ำกับการ์ดเหลือหา) · ตัวนับ `workStatusOfRemaining`
  * ไม่มีบรรทัดอธิบายใต้เลข · กดกล่อง = ใบขอของสถานะนั้นข้างล่าง กดแถว = เปิดใบขอ
  */
 import React from 'react';
@@ -53,15 +53,15 @@ export default function WorkStatusBoard({
 
   return (
     <section className="min-w-0 space-y-3" data-testid="v2-work-status">
-      <SectionTitle title="สถานะทำงาน" right="นับอัตรา" />
+      <SectionTitle title="เหลือหา แยกตามสถานะทำงาน" right="นับอัตรา" />
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
       {boxes ? (
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5">
-          {boxes.map((b) => (
+          {/* กล่อง "ทั้งหมด" ไม่ขึ้น — เท่ากับการ์ดเหลือหาข้างบนเสมอ (เจ้าของ 19 พ.ย. 2569) · ยังใช้เป็นฐานของแถบเปอร์เซ็นต์ */}
+          {boxes.filter((b) => b.id !== STATUS_TOTAL_ID).map((b) => (
             <DashboardKpiCard
               key={b.id}
-              // "ทั้งหมด" ใช้สีเดียวกับการ์ดเหลือหา (id `remaining` ของ Dashboard = เหลือง)
-              kpi={{ id: b.id === STATUS_TOTAL_ID ? 'remaining' : b.id, label: b.label, value: b.positions, secondaryCount: b.requests, secondaryLabel: 'ใบขอ', description: '', trendPercent: null }}
+              kpi={{ id: b.id, label: b.label, value: b.positions, secondaryCount: b.requests, secondaryLabel: 'ใบขอ', description: '', trendPercent: null }}
               surface="tile"
               selected={sel === b.id}
               progressPercent={total ? (b.positions / total) * 100 : 0}

@@ -97,9 +97,23 @@ describe('สถานะทำงานแบบ Dashboard บนหน้า�
     // ทุกใบมีสถานะ = ไม่ขึ้นกล่องไม่มีสถานะ
     expect(workStatusOfRemaining(remaining.slice(0, 3), jobs).some((b) => b.id === 'work_status_none')).toBe(false);
   });
-  it('การ์ดเหลือหากับกล่องทั้งหมดสีเดียวกัน (เหลือง = เหลือหา)', () => {
-    expect(readFileSync('src/components/dashboard-trends/v2/RecruitOverviewV2.tsx', 'utf8')).toContain('emphasis tone="warn"');
-    expect(readFileSync('src/components/dashboard-trends/v2/WorkStatusBoard.tsx', 'utf8')).toContain("b.id === STATUS_TOTAL_ID ? 'remaining'");
+  it('สถานะทำงานรวมในก้อนใบขอ: ไม่ขึ้นกล่องทั้งหมดซ้ำกับเหลือหา (19 พ.ย. 2569)', () => {
+    const page = readFileSync('src/components/dashboard-trends/v2/RecruitOverviewV2.tsx', 'utf8');
+    const board = readFileSync('src/components/dashboard-trends/v2/WorkStatusBoard.tsx', 'utf8');
+    expect(page).toContain('emphasis tone="warn"');
+    expect(board).toContain('boxes.filter((b) => b.id !== STATUS_TOTAL_ID)');
+    expect(board).toContain('title="เหลือหา แยกตามสถานะทำงาน"');
+    // สถานะทำงาน + การประกาศ อยู่ในการ์ดใบขอใบเดียว
+    const card = page.slice(page.indexOf('data-testid="v2-requests"'), page.indexOf('data-testid="v2-outreach-card"'));
+    expect(card).toContain('<WorkStatusBoard');
+    expect(card).toContain('data-testid="v2-posting"');
+    expect(card.match(/<\/Card>/g)?.length).toBe(1);
+  });
+  it('การประกาศ: ไม่มีช่องใบขอทั้งหมด · กดในนี้ได้รายการใบ ไม่มีกราฟ BU ซ้ำ (19 พ.ย. 2569)', () => {
+    const page = readFileSync('src/components/dashboard-trends/v2/RecruitOverviewV2.tsx', 'utf8');
+    expect(page).not.toContain("{ key: 'all', rows: openRows");
+    expect(page).toContain("push({ kind: 'requests', title, rows, page: 1, listOnly: true })");
+    expect(readFileSync('src/components/dashboard-trends/v2/V2Drawer.tsx', 'utf8')).toContain('if (pane.listOnly || pane.bu || allBus.size <= 1) return');
   });
   it('หน้าภาพรวมมีสถานะทำงาน + รายชื่อเข้ามาไปถึงไหน · ไม่มีบรรทัดอธิบายใต้เลข', () => {
     const src = readFileSync('src/components/dashboard-trends/v2/RecruitOverviewV2.tsx', 'utf8');
