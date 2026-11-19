@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { manualLinkRows } from '../../src/lib/jobPostActions';
-import { linkGroupsBy, linkTotalsOf, selfParts } from '../../src/lib/recruitTopics';
+import { linkPathOf, linkTotalsOf, linkTreeChildren, selfParts } from '../../src/lib/recruitTopics';
 
 /** โพสต์เองรายลิงก์ (ภาพรวม 16 พ.ย. 2569) — โพสต์แล้ว = มีลิงก์โพสต์ · ไม่นับลิงก์ Autopost · ลิงก์ละแถว ไม่ซ้ำวัน */
 const L = (id: string, p: Partial<Parameters<typeof manualLinkRows>[0][number]>) => ({
@@ -22,7 +22,24 @@ describe('โพสต์เองรายลิงก์', () => {
     expect(rows.map((r) => [r.linkId, r.posted, r.day])).toEqual([['a', true, '2026-11-13'], ['b', false, '2026-11-14']]);
     expect(selfParts(rows).map((p) => p.value)).toEqual([1, 1]);
     expect(linkTotalsOf(rows)).toEqual({ links: 2, clicks: 40, applicants: 5 });
-    expect(linkGroupsBy(rows, (r) => r.by)).toEqual([{ key: 'เจมส์', links: 2, clicks: 40, applicants: 5 }]);
+    // ไล่ลง ช่องทางหลัก › ช่องทางรอง › กลุ่ม › ผู้รับผิดชอบ (19 พ.ย. 2569 แบบรายชื่อเข้ามาไปถึงไหน)
+    expect(linkPathOf(rows[0])).toEqual(['Facebook', 'Facebook Group', 'กลุ่มคนขับรถ', 'เจมส์']);
+    expect(linkTreeChildren(rows, [])).toEqual([{ key: 'Facebook', path: ['Facebook'], leaf: false, links: 2, clicks: 40, applicants: 5 }]);
+    expect(linkTreeChildren(rows, ['Facebook', 'Facebook Group', 'กลุ่มคนขับรถ'])).toEqual([
+      { key: 'เจมส์', path: ['Facebook', 'Facebook Group', 'กลุ่มคนขับรถ', 'เจมส์'], leaf: true, links: 2, clicks: 40, applicants: 5 },
+    ]);
+  });
+
+  it('ไม่ระบุช่องทาง = ชั้นเดียวแล้วถึงคน · ป้ายยาวเกิน 3 ชั้นรวมท้ายเป็นชื่อกลุ่ม', () => {
+    const rows = manualLinkRows(
+      [L('x', { channel_label: null, created_by_name: 'ว่าน', hit_count: 3 }), L('y', { channel_label: 'Facebook · Facebook Group · หางาน · ขับรถ', hit_count: 1 })],
+      new Map(),
+    );
+    expect(linkPathOf(rows[0])).toEqual(['ไม่ระบุช่องทาง', 'ว่าน']);
+    expect(linkPathOf(rows[1])).toEqual(['Facebook', 'Facebook Group', 'หางาน · ขับรถ', 'เจมส์']);
+    const top = linkTreeChildren(rows, []);
+    expect(top.map((n) => n.key)).toEqual(['ไม่ระบุช่องทาง', 'Facebook']);
+    expect(linkTreeChildren(rows, ['ไม่ระบุช่องทาง'])[0]).toMatchObject({ key: 'ว่าน', leaf: true });
   });
 
   it('เส้น ?links=1 อ่านอย่างเดียว + BU แบบเดียวกับรายวัน', () => {

@@ -117,17 +117,16 @@ describe('ภาพรวม 8 เรื่อง เทียบ BU', () => {
     expect(within(dlg).getByTestId('topic-equation').textContent).toContain('4');
   });
 
-  it('โพสต์เอง: ลิงก์ = โพสต์แล้ว + Gen link · คลิก/กรอกแยกกอง · ย้อนกลับจากคนที่กรอก · ปุ่มเฉพาะโพสต์แล้ว', async () => {
+  it('โพสต์เอง: กล่อง ลิงก์ / คลิก / กรอก แยกโพสต์แล้ว + Gen link · ย้อนกลับจากคนที่กรอก · กดแถวโพสต์แล้ว = เฉพาะกองนั้น', async () => {
     fetchRecruitStuck.mockResolvedValue({ monthly: [], errors: {} });
     renderView('/?topic=self');
     const panel = await screen.findByTestId('self-links');
-    const eqs = within(panel).getAllByTestId('topic-equation').map((e) => e.textContent ?? '');
-    expect(eqs[0]).toContain('ลิงก์ทั้งหมด 3');
-    expect(eqs[1]).toContain('คลิก 45');
-    expect(eqs[2]).toContain('กรอก 5');
-    for (const e of eqs) expect(e).not.toContain('ไม่ลงตัว');
+    expect(within(panel).getByTestId('self-box-links').textContent).toContain('ลิงก์ทั้งหมด3');
+    expect(within(panel).getByTestId('self-box-clicks').textContent).toContain('คลิก45');
+    expect(within(panel).getByTestId('self-box-apps').textContent).toContain('กรอก5');
+    expect(within(panel).getByTestId('self-links-tree')).toBeTruthy();
     expect(within(screen.getByTestId('self-links-back')).getAllByRole('row')).toHaveLength(3); // หัว + 2 ลิงก์ที่มีคนกรอก
-    fireEvent.click(screen.getByTestId('self-filter-posted'));
+    fireEvent.click(screen.getByTestId('self-filter-links-posted'));
     expect(within(screen.getByTestId('self-links-back')).getAllByRole('row')).toHaveLength(2);
     // แท่ง BU = จำนวนลิงก์ · รายวันรวมเท่ายอด
     expect(screen.getByTestId('topic-bu-LBD').textContent).toContain('3');

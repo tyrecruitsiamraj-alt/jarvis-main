@@ -221,9 +221,28 @@ export const linkTotalsOf = (rows: readonly ManualLinkRow[]): LinkTotals => ({
   clicks: rows.reduce((s, r) => s + r.clicks, 0),
   applicants: rows.reduce((s, r) => s + r.applicants, 0),
 });
-/** แยกตามกลุ่ม/ช่องทาง หรือคนสร้างลิงก์ — เรียงคลิกมากก่อน */
-export function linkGroupsBy(rows: readonly ManualLinkRow[], keyOf: (r: ManualLinkRow) => string): Array<LinkTotals & { key: string }> {
+/**
+ * ทางไล่ลงของลิงก์ (แผงโพสต์เอง · เจ้าของ 19 พ.ย. 2569 Choice "กล่อง + ตารางกดไล่ลง" แบบรายชื่อเข้ามาไปถึงไหน)
+ * ช่องทางหลัก › ช่องทางรอง › กลุ่ม FB (จากป้ายช่องทาง "A · B · C") › ผู้รับผิดชอบ — ชั้นสุดท้ายเป็นคนเสมอ
+ */
+export function linkPathOf(r: ManualLinkRow): string[] {
+  const parts = r.place.split(' · ').map((x) => x.trim()).filter(Boolean);
+  const head = parts.length > 3 ? [...parts.slice(0, 2), parts.slice(2).join(' · ')] : parts;
+  return [...head, r.by];
+}
+/** ลูกของชั้นนั้น — เรียงกรอกมาก › คลิกมาก · `leaf` = ชั้นคน (กดไม่ได้ต่อ) */
+export function linkTreeChildren(rows: readonly ManualLinkRow[], prefix: readonly string[]): Array<LinkTotals & { key: string; path: string[]; leaf: boolean }> {
   const m = new Map<string, ManualLinkRow[]>();
-  for (const r of rows) m.set(keyOf(r), [...(m.get(keyOf(r)) ?? []), r]);
-  return [...m.entries()].map(([key, list]) => ({ key, ...linkTotalsOf(list) })).sort((a, b) => b.applicants - a.applicants || b.clicks - a.clicks || a.key.localeCompare(b.key, 'th'));
+  for (const r of rows) {
+    const p = linkPathOf(r);
+    if (p.length <= prefix.length || prefix.some((x, i) => p[i] !== x)) continue;
+    const k = p[prefix.length];
+    m.set(k, [...(m.get(k) ?? []), r]);
+  }
+  return [...m.entries()]
+    .map(([key, list]) => {
+      const path = [...prefix, key];
+      return { key, path, leaf: list.every((r) => linkPathOf(r).length === path.length), ...linkTotalsOf(list) };
+    })
+    .sort((a, b) => b.applicants - a.applicants || b.clicks - a.clicks || a.key.localeCompare(b.key, 'th'));
 }
