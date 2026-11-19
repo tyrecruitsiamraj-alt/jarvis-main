@@ -309,16 +309,15 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
         {/* ── การประกาศรับสมัคร: กราฟ BU ชุดเดียวบนหน้า กดช่อง = กราฟกับตารางข้างล่างเปลี่ยนตาม
             กดปุ่ม/แถวในนี้ = รายการใบอย่างเดียว ไม่มีกราฟ BU ซ้ำในแผงข้าง (เจ้าของ 19 พ.ย. 2569 "พอกดแต่ละช่องก็มีกราฟอีกมันซับซ้อนปะ") ── */}
         <section className="min-w-0 space-y-4 border-t pt-4" data-testid="v2-posting">
-          <SectionTitle title="การประกาศรับสมัคร" right={eq ? `เหลือหา ${fmt(openRows.length)} ใบ` : undefined} />
+          <SectionTitle title="การประกาศรับสมัคร" right={eq ? `เหลือหา ${fmt(openRows.reduce((n, r) => n + (r.remaining ?? 0), 0))} อัตรา · ${fmt(openRows.length)} ใบ` : undefined} />
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2" data-testid="v2-post-lanes">
             {postLanes.map((c) => (
               <Kpi
                 key={c.key}
-                label={RELEASE_LANE_TEXT[c.key].label}
-                emphasis
+                label={`${RELEASE_LANE_TEXT[c.key].label} · อัตรา`}
                 active={c.key === postView}
-                value={loadingReq ? undefined : eq ? c.rows.length : null}
-                sub={eq ? `เหลือหา ${fmt(c.rows.reduce((n, r) => n + (r.remaining ?? 0), 0))} อัตรา` : undefined}
+                value={loadingReq ? undefined : eq ? c.rows.reduce((n, r) => n + (r.remaining ?? 0), 0) : null}
+                sub={eq ? `${fmt(c.rows.length)} ใบ` : undefined}
                 onClick={eq ? () => setPostView(c.key) : undefined}
                 testId={`v2-post-${c.key}`}
               />

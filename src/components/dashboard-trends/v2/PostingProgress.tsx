@@ -58,17 +58,19 @@ export default function PostingProgress({ view, open, onRequests, onNames, reset
   for (const r of open) buCount.set(buOf(r), (buCount.get(buOf(r)) ?? 0) + 1);
   const buKeys = [...buCount.keys()].sort((a, b) => (buCount.get(b) ?? 0) - (buCount.get(a) ?? 0) || a.localeCompare(b));
   const laneRows = open.filter(lane);
-  const groups = buKeys.map((k) => ({ key: k, byMonth: { all: laneRows.filter((r) => buOf(r) === k).length } }));
+  // อัตราเป็นเลขหลัก ใบเป็นบรรทัดรอง (เจ้าของ 19 พ.ย. 2569 "งั้นเปลี่ยนเป็นอัตราเด่นกว่า" — ให้เทียบกับเหลือหาของก้อนใบขอได้)
+  const rateOf = (rows: readonly StuckRequest[]) => rows.reduce((n, r) => n + (r.remaining ?? 0), 0);
+  const groups = buKeys.map((k) => ({ key: k, byMonth: { all: rateOf(laneRows.filter((r) => buOf(r) === k)) } }));
   const pick = (k: string | null) => setBu((cur) => (k === null || cur === k ? null : k));
   const buBar = (
     <div className="space-y-2" data-testid="v2-post-bu">
       <h3 className="text-sm font-medium">
-        {L(view)} {fmt(laneRows.length)} ใบ · แยกตาม BU
+        {L(view)} {fmt(rateOf(laneRows))} อัตรา · {fmt(laneRows.length)} ใบ · แยกตาม BU
       </h3>
-      <MonthCompareBars groups={groups} months={['all']} unit="ใบ" seriesName={() => L(view)} onPick={(k) => pick(k)} height={220} testId="v2-post-bu-chart" />
+      <MonthCompareBars groups={groups} months={['all']} unit="อัตรา" seriesName={() => L(view)} onPick={(k) => pick(k)} height={160} testId="v2-post-bu-chart" />
       <div className="flex flex-wrap items-center gap-2">
         <Button type="button" size="xs" variant={bu === null ? 'default' : 'outline'} onClick={() => pick(null)}>
-          ทุก BU {fmt(laneRows.length)}
+          ทุก BU {fmt(rateOf(laneRows))}
         </Button>
         {groups.map((g) => (
           <Button key={g.key} type="button" size="xs" variant={bu === g.key ? 'default' : 'outline'} aria-pressed={bu === g.key} onClick={() => pick(g.key)}>
@@ -108,7 +110,7 @@ export default function PostingProgress({ view, open, onRequests, onNames, reset
           </Button>
         </div>
         <div className="overflow-x-auto">
-          <Table>
+          <Table className="text-sm [&_td]:py-1.5 [&_th]:h-9">
             <TableHeader>
               <TableRow>
                 <TableHead>เจ้าหน้าที่สรรหา</TableHead>
@@ -177,7 +179,7 @@ export default function PostingProgress({ view, open, onRequests, onNames, reset
         </Button>
       </div>
       <div className="overflow-x-auto">
-        <Table className="min-w-max">
+        <Table className="min-w-max text-sm [&_td]:py-1.5 [&_th]:h-9">
           <TableHeader>
             <TableRow>
               <TableHead>{L('applied')}</TableHead>
