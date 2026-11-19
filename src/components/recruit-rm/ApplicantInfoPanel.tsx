@@ -323,7 +323,7 @@ const ApplicantInfoPanel: React.FC<{
             </SelectContent>
           </Select>
         ) : (
-          show(applicantResponsibleName(a))
+          show(applicantResponsibleName(a, jobRecruiter))
         )}
       </Field>
       <Field label="วุฒิการศึกษา">

@@ -78,6 +78,9 @@ describe('applicantResponsibleName', () => {
     expect(applicantResponsibleName({ responsible_name: ' ก ', posting_owner_name: 'ข' })).toBe('ก');
     expect(applicantResponsibleName({ responsible_name: '  ', posting_owner_name: ' ข ' })).toBe('ข');
     expect(applicantResponsibleName({})).toBeNull();
+    // บอท LINE / สมัครเองหน้าเว็บ (ไม่มีทั้งคู่) = เจ้าหน้าที่สรรหาของใบขอ (เจ้าของ 19 พ.ย. 2569)
+    expect(applicantResponsibleName({}, ' หมิว ')).toBe('หมิว');
+    expect(applicantResponsibleName({ posting_owner_name: 'ใหม่' }, 'หมิว')).toBe('ใหม่');
   });
 });
 

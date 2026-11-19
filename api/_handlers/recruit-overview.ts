@@ -124,6 +124,7 @@ const POSTING_LINKS = tableInAppSchema('recruit_posting_links');
 const JOB_POSTING_REQUESTS = tableInAppSchema('job_posting_requests');
 const POSTINGS_TABLE = tableInAppSchema('recruit_postings');
 const USERS_TABLE = tableInAppSchema('users');
+const UNIT_ASSIGN = tableInAppSchema('siamraj_unit_assignments');
 const scopeWhere = (bu: string) =>
   `not coalesce(a.is_lead, false) and not exists (select 1 from ${CANCELLATIONS} cx where cx.application_id = a.id) and ${buInSql(bu)}`;
 
@@ -181,7 +182,12 @@ export function factsSql(
                             nullif(btrim(l.responsible_name), ''),
                             nullif(btrim(l.created_by_name), ''), nullif(btrim(pp.responsible_name), ''), nullif(btrim(pp.created_by_name), ''))
               from ${POSTING_LINKS} l left join ${POSTINGS_TABLE} pp on pp.id = l.posting_id where l.id = a.link_id)
-         else nullif(btrim(a.created_by_name), '') end as bringer,
+         -- ไม่มีลิงก์ + ไม่มีคนคีย์ (บอท LINE · สมัครเองหน้าเว็บ) = เจ้าหน้าที่สรรหาของใบขอ (เจ้าของ 19 พ.ย. 2569 Choice
+         -- "เจ้าหน้าที่สรรหาของใบขอ" — "ทำไมพอเข้ามาทาง Line มันไม่ระบุเจ้าหน้าที่สรรหา") · ใบขอชั่วคราวคีย์ด้วย id เต็ม
+         else coalesce(nullif(btrim(a.created_by_name), ''),
+                       (select nullif(btrim(ua.recruiter_name), '') from ${UNIT_ASSIGN} ua
+                         where ua.request_no in (split_part(a.job_id, ':', 2), a.job_id) and nullif(btrim(ua.recruiter_name), '') is not null
+                         order by (ua.request_no = a.job_id) desc limit 1)) end as bringer,
          nullif(btrim(a.position_interest), '') as position,
          a.phone_e164, a.age,
          -- จังหวัดที่อยู่ที่ผู้สมัครกรอก (ไม่ใช่จังหวัดของงาน) — ภาพรวม v2 ตารางจังหวัด (17 พ.ย. 2569)

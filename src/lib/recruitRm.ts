@@ -509,8 +509,9 @@ export function applicationUnitLabel(r: PublicApplication): string {
  * ผู้รับผิดชอบที่เลือกตอนคีย์/นำเข้า → ผู้รับผิดชอบของลิงก์ที่สมัครเข้ามา (ไม่ได้ตั้ง = คนสร้างลิงก์) · ไม่มีทั้งคู่ = null
  * 🔴 คนละคนกับ "ข้อมูลผู้สรรหา" = เจ้าหน้าที่สรรหาของใบขอ (คิว แบงค์ · คอลัมน์ "เจ้าของงาน")
  */
-export function applicantResponsibleName(r: Pick<PublicApplication, 'responsible_name' | 'posting_owner_name'>): string | null {
-  return (r.responsible_name || '').trim() || (r.posting_owner_name || '').trim() || null;
+export function applicantResponsibleName(r: Pick<PublicApplication, 'responsible_name' | 'posting_owner_name'>, jobRecruiter?: string | null): string | null {
+  // ไม่มีทั้งคู่ (บอท LINE · สมัครเองหน้าเว็บ) = เจ้าหน้าที่สรรหาของใบขอ (เจ้าของ 19 พ.ย. 2569 Choice "เจ้าหน้าที่สรรหาของใบขอ")
+  return (r.responsible_name || '').trim() || (r.posting_owner_name || '').trim() || (jobRecruiter || '').trim() || null;
 }
 
 /**
