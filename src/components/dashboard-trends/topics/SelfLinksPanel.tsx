@@ -21,7 +21,7 @@ const pct = (a: number, b: number) => (b > 0 ? `${((a / b) * 100).toFixed(1)}%` 
 /**
  * ═══ โพสต์เองรายลิงก์ (เจ้าของ 16 พ.ย. 2569) ═══
  * > *"ถ้าจะดูแค่ โพสต์แล้วมันว่าคลิกเท่าไหร่ กรอกเท่าไหร่ ดูแบบย้อนกลับด้วยได้ไหม"*
- * สมการ ลิงก์ / คลิก / กรอก แยก โพสต์แล้ว + Gen link · ปุ่มดูเฉพาะกอง · แยกกลุ่ม · แยกคนสร้างลิงก์ · ย้อนกลับจากคนที่กรอก (ลิงก์ไหน กลุ่มไหน ใครสร้าง ใบขออะไร)
+ * สมการ ลิงก์ / คลิก / กรอก แยก โพสต์แล้ว + Gen link · ปุ่มดูเฉพาะกอง · แยกรายคน (ผู้รับผิดชอบ) · แยกกลุ่ม · ย้อนกลับจากคนที่กรอก (ลิงก์ไหน กลุ่มไหน ใครรับผิดชอบ ใบขออะไร)
  */
 export default function SelfLinksPanel({ rows, onOpenRequest }: { rows: readonly ManualLinkRow[]; onOpenRequest?: (jobId: string) => void }) {
   const [filter, setFilter] = React.useState<LinkFilter>('all');
@@ -85,8 +85,10 @@ export default function SelfLinksPanel({ rows, onOpenRequest }: { rows: readonly
           </Button>
         ))}
       </div>
+      {/* รายคนขึ้นก่อนกลุ่ม (เจ้าของ 19 พ.ย. 2569 "อันนี้จะรู้ได้ไงว่าใครเป็นคนทำ" — ตารางกลุ่มยาว รายคนจมอยู่ล่าง)
+          ลิงก์นับเป็นของผู้รับผิดชอบที่เลือกตอน Gen link › คนสร้าง (190 · `linkOwnerSql`) */}
+      {totalsTable('แยกรายคน', people, 'ผู้รับผิดชอบ')}
       {totalsTable('แยกกลุ่ม / ช่องทาง', groups, 'กลุ่ม / ช่องทาง')}
-      {totalsTable('แยกคนสร้างลิงก์', people, 'คนสร้างลิงก์')}
       <div className="space-y-1.5">
         <p className="text-sm font-medium text-foreground">
           ย้อนกลับจากคนที่กรอก {fmt(back.reduce((s, r) => s + r.applicants, 0))} คน · มาจาก {fmt(back.length)} ลิงก์
@@ -98,7 +100,7 @@ export default function SelfLinksPanel({ rows, onOpenRequest }: { rows: readonly
                 <TableHead className="text-right">กรอก</TableHead>
                 <TableHead>มาจากลิงก์ (กลุ่ม / ช่องทาง)</TableHead>
                 <TableHead>โพสต์แล้ว</TableHead>
-                <TableHead>คนสร้างลิงก์</TableHead>
+                <TableHead>ผู้รับผิดชอบ</TableHead>
                 <TableHead>ใบขอ</TableHead>
                 <TableHead>วันที่สร้าง</TableHead>
                 <TableHead className="text-right">คลิก</TableHead>
