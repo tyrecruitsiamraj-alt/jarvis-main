@@ -43,7 +43,7 @@ import type { V2Model } from './v2Model';
 export type V2Pane =
   | { kind: 'audience'; view: AudienceDim | 'records'; filter: AudienceFilter; measure: AudienceMeasure; display: AudienceDisplay; page: number; title: string }
   | { kind: 'names'; title: string; ids: string[]; page: number; /** สถานะของแต่ละชื่อ (ใบขอที่กดจากการประกาศ) */ labels?: Record<string, string>; /** BU ที่กด — ไม่มี = ทุก BU */ bu?: string }
-  | { kind: 'requests'; title: string; rows: StuckRequest[]; page: number; /** BU ที่กดจากกราฟ — มี = รายการใบ · ไม่มี + หลาย BU = กราฟเทียบ BU ก่อน */ bu?: string; /** มาจากส่วนที่มีกราฟ BU บนหน้าแล้ว = รายการใบเลย ไม่มีกราฟซ้ำ (19 พ.ย. 2569) */ listOnly?: boolean }
+  | { kind: 'requests'; title: string; rows: StuckRequest[]; page: number; /** BU ที่กดจากกราฟ — มี = รายการใบ · ไม่มี + หลาย BU = กราฟเทียบ BU ก่อน */ bu?: string }
   /** การ์ด "ต้องทำ" (19 พ.ย. 2569) — กราฟ BU + รายชื่อ + ปุ่มทำทีละแถว · `listHref` = หน้าผู้สมัครคนชุดเดียวกัน */
   | { kind: 'todo'; title: string; todo: TodoBucket; listHref: string }
   /** ส่วนเดิมของระบบที่ฝังในแผง (รายการโพสต์ So Scraping · ลิงก์โพสต์เอง · คลิกฟอร์ม) — ไม่เขียนใหม่ */
@@ -430,7 +430,7 @@ function RequestsByBu({
     byBu.set(k, [...(byBu.get(k) ?? []), r]);
   }
   const allBus = new Set(pane.rows.map((r) => r.bu?.trim() || BU_UNKNOWN));
-  if (pane.listOnly || pane.bu || allBus.size <= 1) return <RequestList rows={rows} page={pane.page} onPage={(page) => replace({ ...pane, page })} onPublish={onPublish} />;
+  if (pane.bu || allBus.size <= 1) return <RequestList rows={rows} page={pane.page} onPage={(page) => replace({ ...pane, page })} onPublish={onPublish} />;
   const groups = [...allBus].map((k) => ({ key: k, byMonth: { all: byBu.get(k)?.length ?? 0 } })).sort((x, y) => y.byMonth.all - x.byMonth.all);
   const shown = bu === 'ทุก BU' ? rows : byBu.get(bu) ?? [];
   const remaining = rows.reduce((n, r) => n + (r.remaining ?? 0), 0);

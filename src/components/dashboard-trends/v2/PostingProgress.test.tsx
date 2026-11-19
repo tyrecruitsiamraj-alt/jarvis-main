@@ -28,7 +28,7 @@ const open: StuckRequest[] = [
 function draw(view: 'released' | 'unreleased' = 'released') {
   const onView = vi.fn();
   const onNames = vi.fn();
-  render(<PostingProgress view={view} open={open} onView={onView} onRequests={vi.fn()} onOpenRequest={vi.fn()} onNames={onNames} resetKey="k" />);
+  render(<PostingProgress view={view} open={open} onView={onView} onOpenRequest={vi.fn()} onNames={onNames} resetKey="k" />);
   return { onView, onNames };
 }
 

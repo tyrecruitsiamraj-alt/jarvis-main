@@ -215,7 +215,7 @@ export default function RequestBuPanel({
                     <span className={DASH.sub}>▾</span>
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent align="start" className="max-h-96 w-96 max-w-[calc(100vw-2rem)] overflow-y-auto p-2">
+                <PopoverContent align="start" className="max-h-96 w-72 max-w-[calc(100vw-2rem)] overflow-y-auto p-2">
                   {(['eq', 'status'] as const).map((g) => (
                     <div key={g}>
                       <p className={cn('px-2 pb-1 pt-2 text-xs', DASH.sub)}>{g === 'eq' ? 'ใบขอ' : 'เหลือหา แยกตามสถานะทำงาน'}</p>
@@ -230,12 +230,11 @@ export default function RequestBuPanel({
                               setTopicKey(t.key);
                               setMenuOpen(false);
                             }}
-                            className={cn('grid w-full grid-cols-[0.625rem_1fr_auto_auto] items-center gap-3 rounded-lg px-2 py-2 text-left text-sm hover:bg-muted', t.key === topic.key && 'bg-muted')}
+                            className={cn('flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left text-sm hover:bg-muted', t.key === topic.key && 'bg-muted')}
                           >
                             <span className="size-2.5 rounded-sm" style={{ background: topicHex(t.key) }} />
+                            {/* ชื่อเรื่องอย่างเดียว ไม่มีเลข (เจ้าของ 19 พ.ย. 2569 "คำอธิบายว่า 461 311ใบ พวกนี้เอาออก") */}
                             <span>{t.label}</span>
-                            <span className="font-medium tabular-nums">{fmt(sumOf(t.rows, t.field))}</span>
-                            <span className={cn('min-w-20 text-right text-xs tabular-nums', DASH.sub)}>{subOf(t)}</span>
                           </button>
                         ))}
                     </div>

@@ -317,7 +317,6 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
               open={postRows}
               onView={setPostView}
               onOpenRequest={(jobId) => navigate(requestPathOfJobId(jobId))}
-              onRequests={(title, rows) => push({ kind: 'requests', title, rows, page: 1, listOnly: true })}
               onNames={(title, ids, labels) => push({ kind: 'names', title, ids: [...ids], page: 1, labels })}
               resetKey={viewKey}
             />

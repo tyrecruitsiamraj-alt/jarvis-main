@@ -106,17 +106,18 @@ describe('สถานะทำงานแบบ Dashboard บนหน้า�
     expect(page).not.toContain('WorkStatusBoard');
     expect(page).not.toContain('data-testid="v2-req-equation"');
   });
-  it('การประกาศ: ไม่มีช่องใบขอทั้งหมด · กดในนี้ได้รายการใบ ไม่มีกราฟ BU ซ้ำ (19 พ.ย. 2569)', () => {
+  it('การประกาศ: ไม่มีตารางรายละเอียดเดิมข้างล่าง · ไม่มีช่องใบขอทั้งหมด (19 พ.ย. 2569 "เอาออก")', () => {
     const page = readFileSync('src/components/dashboard-trends/v2/RecruitOverviewV2.tsx', 'utf8');
+    const pp = readFileSync('src/components/dashboard-trends/v2/PostingProgress.tsx', 'utf8');
     expect(page).not.toContain("{ key: 'all', rows: openRows");
-    expect(page).toContain("push({ kind: 'requests', title, rows, page: 1, listOnly: true })");
-    expect(readFileSync('src/components/dashboard-trends/v2/V2Drawer.tsx', 'utf8')).toContain('if (pane.listOnly || pane.bu || allBus.size <= 1) return');
+    expect(pp).not.toContain('PERSON_GROUP_LABEL');
+    expect(pp).not.toContain('อัตราที่ยังต้องหา');
   });
   it('การประกาศนับเฉพาะใบกำลังดำเนินการสรรหา · กราฟยืดเต็มความสูง (19 พ.ย. 2569 "เอายอดไอนี่ดีกว่า ดำเนินการสรรหา" · "ใต้กราฟมันดูโล่งๆ")', () => {
     const page = readFileSync('src/components/dashboard-trends/v2/RecruitOverviewV2.tsx', 'utf8');
     expect(page).toContain("workStatusOfRemaining(stuckEquation(reqRows).remaining, statusJobs).find((b) => b.id === 'work_status_in_progress')");
     expect(page).toContain('open={postRows}');
-    expect(readFileSync('src/components/dashboard-trends/v2/PostingProgress.tsx', 'utf8')).toContain('flex min-h-44 flex-1 items-end');
+    expect(readFileSync('src/components/dashboard-trends/v2/PostingProgress.tsx', 'utf8')).toContain('flex flex-1 flex-col justify-evenly');
   });
   it('หน้าภาพรวมมีก้อนใบขอ + รายชื่อเข้ามาไปถึงไหน', () => {
     const src = readFileSync('src/components/dashboard-trends/v2/RecruitOverviewV2.tsx', 'utf8');
