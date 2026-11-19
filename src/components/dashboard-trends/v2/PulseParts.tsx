@@ -1,6 +1,6 @@
 /**
  * ═══ ภาพรวมแบบ Mobix (เจ้าของ 18 พ.ย. 2569 "ทำแบบร่างหน้าภาพรวมแบบ Mobix" → "หน้าภาพรวม ที่ยังต้องบอกเรื่อง Autopost โพสต์เอง Scrap ด้วย") ═══
- * ต้องทำ (บนสุด · ณ ตอนนี้) · การสั่งงาน (Autopost / โพสต์เอง / Scrap ในช่วง) · แนวโน้มรายวัน · ความเคลื่อนไหวล่าสุด
+ * ต้องทำ (บนสุด · ณ ตอนนี้) · การสั่งงาน (Autopost / โพสต์เอง / Scrap ในช่วง) · แนวโน้ม (ในแผงของแต่ละกล่อง) · ความเคลื่อนไหวล่าสุด
  * ตัวเลขทุกตัวมาจากของที่หน้ามีอยู่แล้ว (backlog ของ recruit-overview · รายการโพสต์ · งานรายคน · รายชื่อในช่วง) — ไม่คิดนิยามใหม่
  */
 import React from 'react';
@@ -83,17 +83,39 @@ const bkkDay = (iso: string | null | undefined) => (iso ? new Date(new Date(iso)
 const dayLabel = (ymd: string) => `${Number(ymd.slice(8, 10))}/${Number(ymd.slice(5, 7))}`;
 
 export type DailyPoint = { day: string; apps: number; yes: number; no: number; noPickup: number; other: number };
+export type PulseGrain = 'day' | 'month';
+/** รายวันได้ไม่เกิน 92 วัน (แท่งเยอะกว่านี้อ่านไม่ออก) — ช่วงยาวกว่าใช้รายเดือน */
+export const PULSE_MAX_DAYS = 92;
+const TH_MONTH = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+const monthLabel = (ym: string) => `${TH_MONTH[Number(ym.slice(5, 7)) - 1]} ${String(Number(ym.slice(0, 4)) + 543).slice(2)}`;
+export const pulseLabel = (key: string, grain: PulseGrain) => (grain === 'month' ? monthLabel(key) : dayLabel(key));
 
-/** รายชื่อในช่วง → ต่อวัน: ใบสมัครเข้า (วันที่สมัคร) · ผล AI (วันที่ได้ผล) แยก สนใจ / ไม่สนใจ·คนละพื้นที่ / ไม่รับสาย / สรุปไม่ได้ */
-export function dailyPulse(cohort: readonly RecruitAppFact[], from: string, to: string): DailyPoint[] {
-  const days: string[] = [];
-  for (let d = new Date(`${from}T00:00:00Z`); d.toISOString().slice(0, 10) <= to && days.length < 92; d = new Date(d.getTime() + 86_400_000)) days.push(d.toISOString().slice(0, 10));
-  const m = new Map(days.map((d) => [d, { day: d, apps: 0, yes: 0, no: 0, noPickup: 0, other: 0 }]));
+export function pulseDays(from: string, to: string): number {
+  return Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000) + 1;
+}
+
+/**
+ * รายชื่อในช่วง → ต่อวัน/ต่อเดือน: ใบสมัครเข้า (วันที่สมัคร) · ผล AI (วันที่ได้ผล) แยก สนใจ / ไม่สนใจ·คนละพื้นที่ / ไม่รับสาย / สรุปไม่ได้
+ * รายเดือน (เจ้าของ 19 พ.ย. 2569 "เลือกดูแบบรายเดือนได้ รายวันได้ไหม") — `day` = YYYY-MM
+ */
+export function pulsePoints(cohort: readonly RecruitAppFact[], from: string, to: string, grain: PulseGrain): DailyPoint[] {
+  const keys: string[] = [];
+  if (grain === 'day') {
+    for (let d = new Date(`${from}T00:00:00Z`); d.toISOString().slice(0, 10) <= to && keys.length < PULSE_MAX_DAYS; d = new Date(d.getTime() + 86_400_000)) keys.push(d.toISOString().slice(0, 10));
+  } else {
+    for (let y = Number(from.slice(0, 4)), mo = Number(from.slice(5, 7)); `${y}-${String(mo).padStart(2, '0')}` <= to.slice(0, 7); mo === 12 ? ((mo = 1), (y += 1)) : (mo += 1)) keys.push(`${y}-${String(mo).padStart(2, '0')}`);
+  }
+  const keyOf = (iso: string | null | undefined) => {
+    const d = bkkDay(iso);
+    if (!d || d < from || d > to) return null;
+    return grain === 'day' ? d : d.slice(0, 7);
+  };
+  const m = new Map(keys.map((k) => [k, { day: k, apps: 0, yes: 0, no: 0, noPickup: 0, other: 0 }]));
   for (const f of cohort) {
-    const a = m.get(bkkDay(f.createdAt) ?? '');
+    const a = m.get(keyOf(f.createdAt) ?? '');
     if (a) a.apps += 1;
     if (!f.calledByAi) continue;
-    const r = m.get(bkkDay(f.aiAnswerAt ?? f.firstCalledAt) ?? '');
+    const r = m.get(keyOf(f.aiAnswerAt ?? f.firstCalledAt) ?? '');
     if (!r) continue;
     const b = aiBranchOf(f);
     if (b === 'yes') r.yes += 1;
@@ -104,6 +126,11 @@ export function dailyPulse(cohort: readonly RecruitAppFact[], from: string, to: 
   return [...m.values()];
 }
 
+/** ต่อวัน (ชุดเดิม) */
+export function dailyPulse(cohort: readonly RecruitAppFact[], from: string, to: string): DailyPoint[] {
+  return pulsePoints(cohort, from, to, 'day');
+}
+
 const AI_SERIES: Array<{ key: keyof Omit<DailyPoint, 'day' | 'apps'>; label: string; tone: ToneKey }> = [
   { key: 'yes', label: 'สนใจ', tone: 'success' },
   { key: 'no', label: 'ไม่สนใจ / คนละพื้นที่', tone: 'warn' },
@@ -111,43 +138,22 @@ const AI_SERIES: Array<{ key: keyof Omit<DailyPoint, 'day' | 'apps'>; label: str
   { key: 'other', label: 'สรุปไม่ได้', tone: 'violet' },
 ];
 
-function median(xs: number[]): number {
-  if (xs.length === 0) return 0;
-  const s = [...xs].sort((a, b) => a - b);
-  const mid = Math.floor(s.length / 2);
-  return s.length % 2 ? s[mid] : Math.round((s[mid - 1] + s[mid]) / 2);
-}
-
-export function DailyCharts({ points }: { points: readonly DailyPoint[] }) {
-  const data = points.map((p) => ({ ...p, label: dayLabel(p.day) }));
-  const peak = points.reduce<DailyPoint | null>((m, p) => (!m || p.apps > m.apps ? p : m), null);
-  const aiTotal = (p: DailyPoint) => p.yes + p.no + p.noPickup + p.other;
+/**
+ * แนวโน้มของกล่องที่กด (แผงข้าง · เจ้าของ 19 พ.ย. 2569 "แนวโน้มรายวัน มันต้องอยู่ในแต่ละเรื่อง" · Choice ย้ายเข้าแต่ละเรื่อง + สลับวัน/เดือน)
+ * `ai` = ผลโทร AI ซ้อนแท่งตามวันที่ได้ผล · อื่น ๆ = คนในกล่องตามวันที่สมัคร
+ */
+export function PulseChart({ points, grain, ai, unitLabel }: { points: readonly DailyPoint[]; grain: PulseGrain; ai: boolean; unitLabel: string }) {
+  const data = points.map((p) => ({ ...p, label: pulseLabel(p.day, grain) }));
   const axis = { tick: { fontSize: 11, fill: CHART.axisFill }, tickLine: false } as const;
+  const total = ai ? points.reduce((n, p) => n + p.yes + p.no + p.noPickup + p.other, 0) : points.reduce((n, p) => n + p.apps, 0);
+  const peak = points.reduce<DailyPoint | null>((m, p) => (!m || p.apps > m.apps ? p : m), null);
   return (
-    <div className="grid gap-4 lg:grid-cols-2" data-testid="v2-daily">
-      <section className="min-w-0 space-y-1">
-        <h3 className="flex flex-wrap items-baseline justify-between gap-2 text-sm font-medium">
-          ใบสมัครเข้าต่อวัน
-          <span className={cn('text-xs font-normal tabular-nums', DASH.sub)}>ค่ากลาง {fmt(median(points.map((p) => p.apps)))} ใบต่อวัน</span>
-        </h3>
-        <div className="h-48">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={data} margin={{ top: 8, right: 4, bottom: 0, left: -20 }}>
-              <CartesianGrid vertical={false} stroke={CHART.gridStroke} strokeOpacity={CHART.gridOpacity} />
-              <XAxis dataKey="label" {...axis} interval="preserveStartEnd" />
-              <YAxis allowDecimals={false} {...axis} axisLine={false} />
-              <Tooltip {...CHART.tooltipLight} cursor={CHART.cursorBar} formatter={(v: number) => [`${v.toLocaleString('th-TH')} ใบ`, 'ใบสมัคร']} />
-              <Bar dataKey="apps" fill={TONE.primary.hex} radius={[4, 4, 0, 0]} maxBarSize={24} animationDuration={CHART.animationDuration} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-        <p className={cn('text-xs tabular-nums', DASH.sub)}>{peak && peak.apps > 0 ? `สูงสุด ${dayLabel(peak.day)} ${fmt(peak.apps)} ใบ` : 'ไม่มีใบสมัครในช่วงนี้'}</p>
-      </section>
-      <section className="min-w-0 space-y-1">
-        <h3 className="flex flex-wrap items-baseline justify-between gap-2 text-sm font-medium">
-          ผลโทร AI ต่อวัน · รายการสมัครในช่วงนี้
-          <span className={cn('text-xs font-normal tabular-nums', DASH.sub)}>รวม {fmt(points.reduce((n, p) => n + aiTotal(p), 0))} คน</span>
-        </h3>
+    <div className="min-w-0 space-y-1" data-testid="v2-pulse">
+      <p className={cn('text-xs tabular-nums', DASH.sub)}>
+        {ai ? `ผลโทร AI รวม ${fmt(total)} คน · ตามวันที่ได้ผล` : `${unitLabel} ${fmt(total)} คน · ตามวันที่สมัคร`}
+        {!ai && peak && peak.apps > 0 ? ` · สูงสุด ${pulseLabel(peak.day, grain)} ${fmt(peak.apps)} คน` : ''}
+      </p>
+      {ai ? (
         <div className="flex flex-wrap gap-3 text-xs">
           {AI_SERIES.map((s) => (
             <span key={s.key} className={cn('flex items-center gap-1', DASH.sub)}>
@@ -156,20 +162,29 @@ export function DailyCharts({ points }: { points: readonly DailyPoint[] }) {
             </span>
           ))}
         </div>
-        <div className="h-44">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={data} margin={{ top: 8, right: 4, bottom: 0, left: -20 }}>
-              <CartesianGrid vertical={false} stroke={CHART.gridStroke} strokeOpacity={CHART.gridOpacity} />
-              <XAxis dataKey="label" {...axis} interval="preserveStartEnd" />
-              <YAxis allowDecimals={false} {...axis} axisLine={false} />
-              <Tooltip {...CHART.tooltipLight} cursor={CHART.cursorBar} formatter={(v: number, name: string) => [`${v.toLocaleString('th-TH')} คน`, AI_SERIES.find((s) => s.key === name)?.label ?? name]} />
-              {AI_SERIES.map((s) => (
-                <Bar key={s.key} dataKey={s.key} stackId="ai" fill={TONE[s.tone].hex} maxBarSize={24} animationDuration={CHART.animationDuration} />
-              ))}
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </section>
+      ) : null}
+      <div className="h-48">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={data} margin={{ top: 8, right: 4, bottom: 0, left: -20 }}>
+            <CartesianGrid vertical={false} stroke={CHART.gridStroke} strokeOpacity={CHART.gridOpacity} />
+            <XAxis dataKey="label" {...axis} interval="preserveStartEnd" />
+            <YAxis allowDecimals={false} {...axis} axisLine={false} />
+            {ai ? (
+              <>
+                <Tooltip {...CHART.tooltipLight} cursor={CHART.cursorBar} formatter={(v: number, name: string) => [`${v.toLocaleString('th-TH')} คน`, AI_SERIES.find((s) => s.key === name)?.label ?? name]} />
+                {AI_SERIES.map((s) => (
+                  <Bar key={s.key} dataKey={s.key} stackId="ai" fill={TONE[s.tone].hex} maxBarSize={24} animationDuration={CHART.animationDuration} />
+                ))}
+              </>
+            ) : (
+              <>
+                <Tooltip {...CHART.tooltipLight} cursor={CHART.cursorBar} formatter={(v: number) => [`${v.toLocaleString('th-TH')} คน`, unitLabel]} />
+                <Bar dataKey="apps" fill={TONE.primary.hex} radius={[4, 4, 0, 0]} maxBarSize={24} animationDuration={CHART.animationDuration} />
+              </>
+            )}
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
     </div>
   );
 }

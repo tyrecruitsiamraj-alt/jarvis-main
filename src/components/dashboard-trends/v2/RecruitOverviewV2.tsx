@@ -33,7 +33,7 @@ import V2Drawer, { type V2Pane } from './V2Drawer';
 import PostingProgress from './PostingProgress';
 import { Kpi, Pager, SectionTitle, fmt } from './V2Parts';
 import StaffActivityPanel from './StaffActivityPanel';
-import { ActivityFeed, DailyCharts, OutreachTiles, TODO_ICONS, TodoList, dailyPulse } from './PulseParts';
+import { ActivityFeed, OutreachTiles, TODO_ICONS, TodoList } from './PulseParts';
 import { fetchStaffActivity, fetchStaffActivityFeed } from '@/lib/staffActivityApi';
 import type { StaffActivityFeedItem, StaffActivityKind, StaffActivityRow } from '@/lib/staffActivity';
 import WorkStatusBoard from './WorkStatusBoard';
@@ -309,6 +309,50 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
         </div>
       </Card>
 
+      {/* ── การประกาศรับสมัคร — ต่อจากใบขอ (เจ้าของ 19 พ.ย. 2569 Choice "ต่อจากใบขอ ก่อนการสั่งงาน") ── */}
+      <Card className="min-w-0 space-y-4 rounded-2xl p-5" data-testid="v2-posting">
+        <SectionTitle title="การประกาศรับสมัคร" />
+        {/* 3 ช่องก่อน (เจ้าของ 18 พ.ย. 2569 "ถ้าจากตรงนี้ฉันอ่านฉันคงเอา 165+150+15+157+68+89 แน่นอน โชว์ 3 อันก่อนก็พอ")
+            คำเดียวกับหัวหน้าโพสต์ประกาศ · กดประกาศแล้ว/ยังไม่ประกาศ = ก้อนย่อยขึ้นข้างล่าง (PostingProgress) */}
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3" data-testid="v2-post-lanes">
+          {postLanes.map((c) => (
+            <Kpi
+              key={c.key}
+              label={RELEASE_LANE_TEXT[c.key].label}
+              emphasis
+              active={c.view === postView}
+              value={loadingReq ? undefined : eq ? c.rows.length : null}
+              sub={c.key === 'all' && eq ? `เหลือหา ${fmt(c.rows.reduce((n, r) => n + (r.remaining ?? 0), 0))} อัตรา` : undefined}
+              onClick={
+                eq
+                  ? () => {
+                      // ประกาศแล้ว/ยังไม่ประกาศ = ก้อนย่อยข้างล่าง · ใบขอทั้งหมด = กราฟ BU + รายการใบ
+                      if (c.view) setPostView(c.view);
+                      else openRequests(RELEASE_LANE_TEXT[c.key].label, c.rows);
+                    }
+                  : undefined
+              }
+              testId={`v2-post-${c.key}`}
+            />
+          ))}
+        </div>
+        {posts.error && posts.key === filterKey ? <p className="text-xs text-destructive">{posts.error}</p> : null}
+        {/* ไส้ใน: กดยังไม่เริ่มหา = ใครถือกี่ใบ · กดเริ่มหาแล้ว = มีชื่อ/ไม่มีชื่อ + ใบที่มีชื่อติดขั้นไหน (เจ้าของ 17 พ.ย. 2569) */}
+        <div className="border-t pt-4">
+          {eq ? (
+            <PostingProgress
+              view={postView}
+              open={openRows}
+              onRequests={openRequests}
+              onNames={(title, ids, labels) => push({ kind: 'names', title, ids: [...ids], page: 1, labels })}
+              resetKey={viewKey}
+            />
+          ) : (
+            <Skeleton className="h-40 rounded-xl" />
+          )}
+        </div>
+      </Card>
+
       {/* ── การสั่งงาน: Autopost / โพสต์เอง / Scrap (เจ้าของ 18 พ.ย. 2569 "ยังต้องบอกเรื่อง Autopost โพสต์เอง Scrap ด้วย")
           19 พ.ย. 2569 ไม่มีไอคอน ไม่มีบรรทัดรอง หัวข้อ "การสั่งงาน" (Choice) ── */}
       <Card className="min-w-0 space-y-3 rounded-2xl p-5" data-testid="v2-outreach-card">
@@ -355,53 +399,10 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
           prevCohort={win.all ? undefined : (prevModel?.cohort ?? null)}
           erpIds={model.stages.erp.ids}
           prevErpIds={prevModel?.stages.erp.ids ?? null}
-          onOpenBox={(box) => push({ kind: 'story', title: box.title, ids: [...box.ids], key: `${viewKey}:${box.key}:${box.title}` })}
+          onOpenBox={(box) => push({ kind: 'story', title: box.title, ids: [...box.ids], key: `${viewKey}:${box.key}:${box.title}`, box: box.key })}
         />
       </Card>
 
-      {/* ── การประกาศรับสมัคร ── */}
-      <Card className="min-w-0 space-y-4 rounded-2xl p-5" data-testid="v2-posting">
-        <SectionTitle title="การประกาศรับสมัคร" />
-        {/* 3 ช่องก่อน (เจ้าของ 18 พ.ย. 2569 "ถ้าจากตรงนี้ฉันอ่านฉันคงเอา 165+150+15+157+68+89 แน่นอน โชว์ 3 อันก่อนก็พอ")
-            คำเดียวกับหัวหน้าโพสต์ประกาศ · กดประกาศแล้ว/ยังไม่ประกาศ = ก้อนย่อยขึ้นข้างล่าง (PostingProgress) */}
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3" data-testid="v2-post-lanes">
-          {postLanes.map((c) => (
-            <Kpi
-              key={c.key}
-              label={RELEASE_LANE_TEXT[c.key].label}
-              emphasis
-              active={c.view === postView}
-              value={loadingReq ? undefined : eq ? c.rows.length : null}
-              sub={c.key === 'all' && eq ? `เหลือหา ${fmt(c.rows.reduce((n, r) => n + (r.remaining ?? 0), 0))} อัตรา` : undefined}
-              onClick={
-                eq
-                  ? () => {
-                      // ประกาศแล้ว/ยังไม่ประกาศ = ก้อนย่อยข้างล่าง · ใบขอทั้งหมด = กราฟ BU + รายการใบ
-                      if (c.view) setPostView(c.view);
-                      else openRequests(RELEASE_LANE_TEXT[c.key].label, c.rows);
-                    }
-                  : undefined
-              }
-              testId={`v2-post-${c.key}`}
-            />
-          ))}
-        </div>
-        {posts.error && posts.key === filterKey ? <p className="text-xs text-destructive">{posts.error}</p> : null}
-        {/* ไส้ใน: กดยังไม่เริ่มหา = ใครถือกี่ใบ · กดเริ่มหาแล้ว = มีชื่อ/ไม่มีชื่อ + ใบที่มีชื่อติดขั้นไหน (เจ้าของ 17 พ.ย. 2569) */}
-        <div className="border-t pt-4">
-          {eq ? (
-            <PostingProgress
-              view={postView}
-              open={openRows}
-              onRequests={openRequests}
-              onNames={(title, ids, labels) => push({ kind: 'names', title, ids: [...ids], page: 1, labels })}
-              resetKey={viewKey}
-            />
-          ) : (
-            <Skeleton className="h-40 rounded-xl" />
-          )}
-        </div>
-      </Card>
 
       <Separator />
 
@@ -412,11 +413,7 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
       </Card>
 
       {/* พื้นที่ที่ขาดคน ย้ายลงล่างสุด (เจ้าของ 17 พ.ย. 2569 "เอาไปไว้ด้านล่างเถอะตรงนี้เกะกะ") · ชื่อเจ้าของ 18 พ.ย. 2569 */}
-      {/* ── แนวโน้มรายวัน + ความเคลื่อนไหวล่าสุด (แบบ Mobix · 18 พ.ย. 2569) ── */}
-      <Card className="min-w-0 space-y-3 rounded-2xl p-5" data-testid="v2-daily-card">
-        <SectionTitle title="แนวโน้มรายวัน" right={`${dayText(win.from)} – ${dayText(win.to)}`} />
-        <DailyCharts points={dailyPulse(model.cohort, win.from, win.to)} />
-      </Card>
+      {/* ── ความเคลื่อนไหวล่าสุด (แบบ Mobix · 18 พ.ย. 2569) · แนวโน้มรายวันย้ายเข้าแผงของแต่ละกล่องแล้ว (19 พ.ย. 2569 Choice) ── */}
       <Card className="min-w-0 space-y-3 rounded-2xl p-5" data-testid="v2-feed-card">
         <SectionTitle title="ความเคลื่อนไหวล่าสุด" right="30 รายการล่าสุดในช่วง" />
         <ActivityFeed items={feed.key === filterKey ? feed.items : null} today={data.today} onPerson={(id, name) => openNames(name, [id])} />
@@ -448,6 +445,7 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
         embeds={embeds}
         bu={data.bu}
         months={months}
+        range={{ from: win.from, to: win.to }}
         // ปุ่ม "ประกาศ" ในรายการใบขอ (เจ้าของ 19 พ.ย. 2569 "กดทำจากหน้านี้เลย") — ปิดแผงก่อน แล้วเปิดป๊อปประกาศของใบนั้นบนหน้านี้ (`?posting=` ของกล่องงาน)
         onPublish={(jobId) => {
           setStack([]);

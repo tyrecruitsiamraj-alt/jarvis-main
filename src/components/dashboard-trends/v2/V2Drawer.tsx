@@ -49,7 +49,7 @@ export type V2Pane =
   /** ส่วนเดิมของระบบที่ฝังในแผง (รายการโพสต์ So Scraping · ลิงก์โพสต์เอง · คลิกฟอร์ม) — ไม่เขียนใหม่ */
   | { kind: 'embed'; title: string; embed: string }
   /** หัวกล่อง "รายชื่อเข้ามาไปถึงไหน" (19 พ.ย. 2569) — กราฟ BU + เรื่องเล่ารายชื่อของคนในกล่อง · `key` ล้างตัวกรองเมื่อเปลี่ยนกล่อง */
-  | { kind: 'story'; title: string; ids: string[]; key: string };
+  | { kind: 'story'; title: string; ids: string[]; key: string; box: string };
 
 const sortBars = <T extends { value: number | null }>(bars: T[]) => [...bars].sort((a, b) => (b.value ?? -1) - (a.value ?? -1));
 
@@ -73,7 +73,10 @@ export default function V2Drawer({
   bu = null,
   onPublish,
   months = [],
+  range,
 }: {
+  /** ช่วงที่เลือกบนหน้า — แนวโน้มในแผงหัวกล่อง */
+  range: { from: string; to: string };
   /** เดือนในช่วง (YYYY-MM) — กราฟ BU ของแผงหัวกล่อง */
   months?: readonly string[];
   /** BU ที่เลือกบนหน้า (แผงการ์ดต้องทำดึงคนของ BU นี้) */
@@ -123,6 +126,9 @@ export default function V2Drawer({
               {pane.kind === 'story' ? (
                 <IntakeScopeStory
                   key={pane.key}
+                  boxKey={pane.box}
+                  from={range.from}
+                  to={range.to}
                   title={pane.title}
                   ids={pane.ids}
                   cohort={model.cohort}

@@ -3,7 +3,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { dailyPulse } from '@/components/dashboard-trends/v2/PulseParts';
+import { dailyPulse, pulsePoints } from '@/components/dashboard-trends/v2/PulseParts';
 import type { RecruitAppFact } from '@/lib/recruitOverviewTypes';
 
 const fact = (p: Partial<RecruitAppFact>): RecruitAppFact => ({ createdAt: '2026-11-17T03:00:00Z', jobId: null, channelLabel: null, referralSource: null, position: null, phoneOk: true, calledByAi: false, calledByStaff: false, firstCalledAt: null, aiAnswer: null, aiAnswerAt: null, staffAnswer: null, staffAnswerAt: null, staffLastAt: null, contact: null, contactBy: null, logOk: null, logReason: null, logAt: null, appointmentAt: null, attendance: null, onBoard: null, ...p }) as RecruitAppFact;
@@ -32,8 +32,32 @@ describe('dailyPulse', () => {
     const src = readFileSync('src/components/dashboard-trends/v2/RecruitOverviewV2.tsx', 'utf8');
     expect(src).toContain("n: posts.key === filterKey ? posts.total : null,\n              unit: 'กลุ่ม'");
   });
-  it('หน้าภาพรวมมี ต้องทำ · การสั่งงาน (Autopost/โพสต์เอง/Scrap) · แนวโน้มรายวัน · ความเคลื่อนไหวล่าสุด', () => {
+  it('รายเดือน: ทุกเดือนในช่วงมีแถว · นับเฉพาะวันในช่วง (เจ้าของ 19 พ.ย. 2569 "เลือกดูแบบรายเดือนได้ รายวันได้ไหม")', () => {
+    const pts = pulsePoints(
+      [
+        fact({ createdAt: '2026-10-20T03:00:00Z' }),
+        fact({ createdAt: '2026-11-02T03:00:00Z' }),
+        fact({ createdAt: '2026-11-03T03:00:00Z', calledByAi: true, aiAnswer: 'said_yes', aiAnswerAt: '2026-11-04T03:00:00Z' }),
+        fact({ createdAt: '2026-09-30T03:00:00Z' }), // นอกช่วง
+      ],
+      '2026-10-01',
+      '2026-11-19',
+      'month',
+    );
+    expect(pts.map((p) => p.day)).toEqual(['2026-10', '2026-11']);
+    expect(pts.map((p) => p.apps)).toEqual([1, 2]);
+    expect(pts[1].yes).toBe(1);
+  });
+  it('หน้าภาพรวม: ต้องทำ → ใบขอ → การประกาศ → การสั่งงาน · แนวโน้มอยู่ในแผงของแต่ละกล่อง ไม่มีการ์ดแนวโน้มรายวัน', () => {
     const src = readFileSync('src/components/dashboard-trends/v2/RecruitOverviewV2.tsx', 'utf8');
-    for (const t of ['title="ต้องทำ"', 'title="การสั่งงาน"', 'title="แนวโน้มรายวัน"', 'title="ความเคลื่อนไหวล่าสุด"', "key: 'autopost'", "key: 'self'", "key: 'scrap'"]) expect(src).toContain(t);
+    for (const t of ['title="ต้องทำ"', 'title="การสั่งงาน"', 'title="ความเคลื่อนไหวล่าสุด"', "key: 'autopost'", "key: 'self'", "key: 'scrap'"]) expect(src).toContain(t);
+    expect(src).not.toContain('title="แนวโน้มรายวัน"');
+    const at = (id: string) => src.indexOf(`data-testid="${id}"`);
+    expect(at('v2-todo-card')).toBeLessThan(at('v2-requests'));
+    expect(at('v2-requests')).toBeLessThan(at('v2-posting'));
+    expect(at('v2-posting')).toBeLessThan(at('v2-outreach-card'));
+    expect(at('v2-outreach-card')).toBeLessThan(at('v2-intake-card'));
+    const story = readFileSync('src/components/dashboard-trends/v2/IntakeScopeStory.tsx', 'utf8');
+    expect(story).toContain('<PulseChart points={pulsePoints(facts, from, to, grain)}');
   });
 });
