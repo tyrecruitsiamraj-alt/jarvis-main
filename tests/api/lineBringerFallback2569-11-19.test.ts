@@ -15,3 +15,18 @@ describe('ใครเอาเข้ามา: ไม่มีลิงก์ �
     expect(readFileSync('src/components/recruit-rm/ApplicantInfoPanel.tsx', 'utf8')).toContain('show(applicantResponsibleName(a, jobRecruiter))');
   });
 });
+
+describe('แก้ข้อมูลจาก LINE (เจ้าของ 19 พ.ย. 2569 "แก้ข้อมูลจาก line ด้วย")', () => {
+  it('migration 192 เก็บค่าเดิมก่อนแก้ · แก้เฉพาะใบ LINE ที่ไม่มีลิงก์/คนคีย์/ผู้รับผิดชอบ · ไม่ลบแถว', () => {
+    const m = readFileSync('migrations/192_line_application_responsible.sql', 'utf8');
+    expect(m).toContain('create table if not exists application_responsible_fix_192');
+    expect(m).toContain("(a.line_user_id is not null or a.referral_source = 'line_oa' or a.channel_label ilike '%Line AI%')");
+    expect(m).toContain("and nullif(btrim(a.responsible_name), '') is null");
+    expect(m).not.toMatch(/\bdelete\b|\bdrop\b|\btruncate\b/i);
+  });
+  it('ใบใหม่จาก LINE ได้ผู้รับผิดชอบหลังบันทึกใบ · พลาดแค่ log ใบไม่ล้ม', () => {
+    const src = readFileSync('api/_handlers/public/apply.ts', 'utf8');
+    expect(src).toContain("if (!v.linkId && v.jobId && (lineUserId || /line ai/i.test(channelLabel ?? ''))) {");
+    expect(src).toContain(".catch((e: unknown) => logWarn('public_apply.line_responsible_failed'");
+  });
+});

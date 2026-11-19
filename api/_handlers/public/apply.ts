@@ -9,7 +9,7 @@ import { validatePublicApplication } from '../../_lib/publicApplications.js';
 import { resolveApplicationDepartment } from '../../_lib/applicationDepartment.js';
 import { enqueueLumosInterviewForApplications } from '../../_lib/lumosDispatch.js';
 import { splitIrecruitDuplicates } from '../../_lib/irecruitDuplicates.js';
-import { logError } from '../../_lib/logger.js';
+import { logError, logWarn } from '../../_lib/logger.js';
 import { auditFromAnonymous } from '../../_lib/audit.js';
 import { applicantClientIp, lockAndFindRepeat } from '../../_lib/applicationRepeatGuard.js';
 import { repeatPublicMessage } from '../../../src/lib/applicationRepeat.js';
@@ -235,6 +235,18 @@ export default async function handler(req: ApiReq, res: ApiRes) {
     const id = 'id' in outcome ? outcome.id : null;
     if (!id) return sendError(res, 500, 'Failed to submit application');
     logPublicApply(req, 'public_application.submit', id, v);
+    // ใบจาก LINE (ไม่มีลิงก์) = ผู้รับผิดชอบเป็นเจ้าหน้าที่สรรหาของใบขอ (เจ้าของ 19 พ.ย. 2569 · ใบเก่าแก้ใน migration 192)
+    // ทำหลังใบบันทึกแล้ว — พลาดแค่จด log ใบสมัครต้องไม่ล้ม (หน้าภาพรวม/ใบประวัติยังถอยไปผู้สรรหาของใบขอให้อยู่ดี)
+    if (!v.linkId && v.jobId && (lineUserId || /line ai/i.test(channelLabel ?? ''))) {
+      await dbQuery(
+        `update ${tbl} a set responsible_name = (
+           select nullif(btrim(u.recruiter_name), '') from ${tableInAppSchema('siamraj_unit_assignments')} u
+            where u.request_no in (split_part(a.job_id, ':', 2), a.job_id) and nullif(btrim(u.recruiter_name), '') is not null
+            order by (u.request_no = a.job_id) desc limit 1)
+          where a.id = $1 and nullif(btrim(a.responsible_name), '') is null`,
+        [id],
+      ).catch((e: unknown) => logWarn('public_apply.line_responsible_failed', { applicationId: id, message: e instanceof Error ? e.message : String(e) }));
+    }
     if (consented) await recordApplicationConsent([id], 'apply', null);
     // แจ้ง LINE Bot So Work ว่าส่งใบสำเร็จ — ไม่รอ ไม่ทำให้ใบล้ม (28 ต.ค. 2569)
     if (lineUserId) void notifyLineBotApplicationCreated({ applicationId: id, lineUserId, jobId: v.jobId, createdAt: new Date() });
