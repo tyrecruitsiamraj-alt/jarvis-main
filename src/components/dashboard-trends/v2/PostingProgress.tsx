@@ -236,7 +236,7 @@ export default function PostingProgress({ view, open, onView, onRequests, onOpen
                             {fmt(r.applications ?? 0)} คน
                           </Button>
                         ) : (
-                          <span className={DASH.muted}>{fmt(r.applications ?? 0)} คน</span>
+                          <span className={cn('px-2.5', DASH.muted)}>{fmt(r.applications ?? 0)} คน</span>
                         )
                       ) : r.ageDays == null ? (
                         <span className={DASH.muted}>—</span>
