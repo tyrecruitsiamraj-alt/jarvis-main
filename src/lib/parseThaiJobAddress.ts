@@ -77,9 +77,22 @@ function extractProvince(s: string): string | null {
     if (s.includes(name)) return name;
   }
 
-  if (/กรุงเทพฯ?|กทม\.?|bangkok/i.test(s)) return 'กรุงเทพมหานคร';
+  // "กรุงเทฯ" (ตก พ) มาจาก ERP จริง — LAO6910002 ขอ Scrap ไม่ได้เพราะ "ใบขอขาดจังหวัด" (เจ้าของ 19 พ.ย. 2569)
+  if (/กรุงเท(?:พ|ฯ)|กทม\.?|bangkok/i.test(s)) return 'กรุงเทพมหานคร';
+
+  // ไม่มีชื่อจังหวัดเลย แต่มี "เขต…" ที่เป็นเขตของกรุงเทพจริง (เทียบรายชื่อทางการ) = กรุงเทพ
+  // ห้ามเดาจากคำว่าเขตเฉย ๆ — "เขตอุตสาหกรรม…" มีทั่วประเทศ
+  if (bangkokKhetIn(s)) return 'กรุงเทพมหานคร';
 
   return null;
+}
+
+function bangkokKhetIn(s: string): boolean {
+  for (const opt of getDistrictOptionsForProvince('กรุงเทพมหานคร')) {
+    const bare = stripDistrictLabel(opt);
+    if (bare.length >= 2 && new RegExp(`(?:^|[\\s,，])เขต\\s*${bare}(?![ก-๙])`, 'u').test(s)) return true;
+  }
+  return false;
 }
 
 function softMatchProvince(raw: string): string | null {
