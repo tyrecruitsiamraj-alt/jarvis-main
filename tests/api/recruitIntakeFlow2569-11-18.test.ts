@@ -112,6 +112,12 @@ describe('สถานะทำงานแบบ Dashboard บนหน้า�
     expect(page).toContain("push({ kind: 'requests', title, rows, page: 1, listOnly: true })");
     expect(readFileSync('src/components/dashboard-trends/v2/V2Drawer.tsx', 'utf8')).toContain('if (pane.listOnly || pane.bu || allBus.size <= 1) return');
   });
+  it('การประกาศนับเฉพาะใบกำลังดำเนินการสรรหา · กราฟยืดเต็มความสูง (19 พ.ย. 2569 "เอายอดไอนี่ดีกว่า ดำเนินการสรรหา" · "ใต้กราฟมันดูโล่งๆ")', () => {
+    const page = readFileSync('src/components/dashboard-trends/v2/RecruitOverviewV2.tsx', 'utf8');
+    expect(page).toContain("workStatusOfRemaining(stuckEquation(reqRows).remaining, statusJobs).find((b) => b.id === 'work_status_in_progress')");
+    expect(page).toContain('open={postRows}');
+    expect(readFileSync('src/components/dashboard-trends/v2/PostingProgress.tsx', 'utf8')).toContain('flex min-h-44 flex-1 items-end');
+  });
   it('หน้าภาพรวมมีก้อนใบขอ + รายชื่อเข้ามาไปถึงไหน', () => {
     const src = readFileSync('src/components/dashboard-trends/v2/RecruitOverviewV2.tsx', 'utf8');
     expect(src).toContain('<RequestBuPanel');

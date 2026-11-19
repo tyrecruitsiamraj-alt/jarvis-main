@@ -39,6 +39,7 @@ import { ActivityFeed, OutreachTiles, TODO_ICONS, TodoList } from './PulseParts'
 import { fetchStaffActivity, fetchStaffActivityFeed } from '@/lib/staffActivityApi';
 import type { StaffActivityFeedItem, StaffActivityKind, StaffActivityRow } from '@/lib/staffActivity';
 import RequestBuPanel from './RequestBuPanel';
+import { workStatusOfRemaining } from '@/lib/workStatusOfRemaining';
 import IntakeFlowPanel from './IntakeFlowPanel';
 import { useUnitRequestsFeed } from '@/hooks/useUnitRequestsFeed';
 import { filterUnitRequestsByDepartment } from '@/lib/siamrajUnitFilters';
@@ -137,6 +138,11 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
   }, [data, win]);
   const eq = reqRows ? stuckEquation(reqRows) : null;
   const openRows = eq?.remaining ?? [];
+  /** การประกาศนับเฉพาะใบสถานะ กำลังดำเนินการสรรหา (เจ้าของ 19 พ.ย. 2569 "เอายอดไอนี่ดีกว่า ดำเนินการสรรหา") — ตัวแบ่งเดียวกับก้อนใบขอ · null = สถานะยังโหลด */
+  const postRows = React.useMemo(
+    () => (reqRows && statusJobs ? (workStatusOfRemaining(stuckEquation(reqRows).remaining, statusJobs).find((b) => b.id === 'work_status_in_progress')?.rows ?? []) : null),
+    [reqRows, statusJobs],
+  );
   /** ประกาศแล้ว / ยังไม่ประกาศ — ตัวแบ่งเดียวกับหัวหน้าโพสต์ประกาศ (เจ้าของ 18 พ.ย. 2569 "ยอดมันไม่ตรงกับหน้าภาพรวมหรอ") */
   const unreleasedRows = openRows.filter((r) => !r.released);
 
@@ -303,12 +309,12 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
         {/* ── การประกาศรับสมัคร: กราฟ BU ชุดเดียวบนหน้า กดช่อง = กราฟกับตารางข้างล่างเปลี่ยนตาม
             กดปุ่ม/แถวในนี้ = รายการใบอย่างเดียว ไม่มีกราฟ BU ซ้ำในแผงข้าง (เจ้าของ 19 พ.ย. 2569 "พอกดแต่ละช่องก็มีกราฟอีกมันซับซ้อนปะ") ── */}
         <section className="min-w-0 space-y-4 border-t pt-4" data-testid="v2-posting">
-          <SectionTitle title="การประกาศรับสมัคร" right={eq ? `เหลือหา ${fmt(openRows.reduce((n, r) => n + (r.remaining ?? 0), 0))} อัตรา · ${fmt(openRows.length)} ใบ` : undefined} />
+          <SectionTitle title="การประกาศรับสมัคร" right={postRows ? `กำลังดำเนินการสรรหา ${fmt(postRows.reduce((n, r) => n + (r.remaining ?? 0), 0))} อัตรา · ${fmt(postRows.length)} ใบ` : undefined} />
           {posts.error && posts.key === filterKey ? <p className="text-xs text-destructive">{posts.error}</p> : null}
-          {eq ? (
+          {postRows ? (
             <PostingProgress
               view={postView}
-              open={openRows}
+              open={postRows}
               onView={setPostView}
               onOpenRequest={(jobId) => navigate(requestPathOfJobId(jobId))}
               onRequests={(title, rows) => push({ kind: 'requests', title, rows, page: 1, listOnly: true })}

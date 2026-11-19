@@ -148,7 +148,8 @@ export default function PostingProgress({ view, open, onView, onRequests, onOpen
         </p>
       </div>
       <div className="grid gap-5 lg:grid-cols-2">
-        <div className="min-w-0 space-y-2">
+        {/* กราฟยืดเต็มความสูงของรายการขวา (เจ้าของ 19 พ.ย. 2569 "ใต้กราฟมันดูโล่งๆ") */}
+        <div className="flex min-w-0 flex-col gap-2">
           <div className="flex flex-wrap items-center gap-3 text-xs">
             {parts.map((p) => (
               <span key={p.key} className="flex items-center gap-1.5">
@@ -157,7 +158,7 @@ export default function PostingProgress({ view, open, onView, onRequests, onOpen
               </span>
             ))}
           </div>
-          <div className="flex h-44 items-end gap-3 border-b px-1" data-testid="v2-post-bu-chart">
+          <div className="flex min-h-44 flex-1 items-end gap-3 border-b px-1" data-testid="v2-post-bu-chart">
             {bars.map((b) => (
               <div key={b.bu} className={cn('flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-1', bu && bu !== b.bu && 'opacity-40')}>
                 <span className="text-xs font-medium tabular-nums">{fmt(b.rows.length)}</span>
