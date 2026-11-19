@@ -19,7 +19,7 @@ import { recruiterLabelOf, type StuckRequest } from '@/lib/recruitStuck';
 import { PERSON_GROUPS, PERSON_GROUP_OF, PERSON_STAGE_LABEL, type PersonGroupKey, type PersonStageKey } from '@/lib/personStage';
 import { BU_UNKNOWN, pageOf } from '@/lib/recruitAudience';
 import { RELEASE_LANE_TEXT } from '@/lib/boardRelease';
-import { Pager, fmt } from './V2Parts';
+import { Pager, buHex, fmt } from './V2Parts';
 
 type Props = {
   view: 'released' | 'unreleased';
@@ -148,8 +148,8 @@ export default function PostingProgress({ view, open, onView, onOpenRequest, onN
         <div className="flex min-w-0 flex-col gap-2">
           <div className="flex flex-wrap items-center gap-3 text-xs">
             {parts.map((p) => (
-              <span key={p.key} className="flex items-center gap-1.5">
-                <span className="size-2.5 rounded-sm" style={{ background: p.hex }} />
+              <span key={p.key} className="flex items-center gap-1.5 rounded-full bg-muted px-3 py-1">
+                <span className="size-2.5 rounded-full" style={{ background: p.hex }} />
                 {p.label} <b className="font-medium tabular-nums">{fmt(laneRows.filter(p.has).length)}</b> ใบ
               </span>
             ))}
@@ -157,12 +157,13 @@ export default function PostingProgress({ view, open, onView, onOpenRequest, onN
           {/* แท่งแนวนอน BU ละแถว (เจ้าของ 19 พ.ย. 2569 "กราฟไม่สวยเลย" — แท่งตั้งยืดสูงทั้งคอลัมน์) · แถวกระจายเต็มความสูงของรายการขวา */}
           <div className="flex flex-1 flex-col justify-evenly gap-3 py-2" data-testid="v2-post-bu-chart">
             {bars.map((b) => (
-              <div key={b.bu} className={cn('grid grid-cols-[3rem_1fr_5.5rem] items-center gap-3', bu && bu !== b.bu && 'opacity-40')}>
-                <button type="button" onClick={() => pickBar(b.bu, null)} disabled={!b.rows.length} data-testid={`v2-post-bu-${b.bu}`} className={cn('rounded-lg py-1 text-left text-sm font-medium hover:text-primary disabled:hover:text-inherit', bu === b.bu && 'text-primary')}>
+              <div key={b.bu} className={cn('grid grid-cols-[4rem_1fr_4.5rem] items-center gap-3', bu && bu !== b.bu && 'opacity-40')}>
+                <button type="button" onClick={() => pickBar(b.bu, null)} disabled={!b.rows.length} data-testid={`v2-post-bu-${b.bu}`} className={cn('flex items-center gap-2 rounded-lg py-1 text-left text-sm font-medium hover:text-primary disabled:hover:text-inherit', bu === b.bu && 'text-primary')}>
+                  <span className="size-2.5 rounded-full" style={{ background: buHex(b.bu) }} />
                   {b.bu}
                 </button>
-                <div className="h-9 rounded-lg bg-muted">
-                  <div className="flex h-full gap-0.5 overflow-hidden rounded-lg" style={{ width: `${(b.rows.length / maxN) * 100}%` }}>
+                <div className="h-7 rounded-full bg-muted/60">
+                  <div className="flex h-full gap-0.5 overflow-hidden rounded-full" style={{ width: `${(b.rows.length / maxN) * 100}%` }}>
                     {b.segs.map((sg) =>
                       sg.n ? (
                         <button
@@ -180,14 +181,15 @@ export default function PostingProgress({ view, open, onView, onOpenRequest, onN
                     )}
                   </div>
                 </div>
-                <span className="text-right text-sm tabular-nums">
-                  <b className="font-medium">{fmt(b.rows.length)}</b> <span className={DASH.sub}>ใบ</span>
+                <span className="text-right tabular-nums leading-tight">
+                  <b className="text-sm font-medium">{fmt(b.rows.length)}</b> <span className={cn('text-xs', DASH.sub)}>ใบ</span>
+                  <span className={cn('block text-xs', DASH.sub)}>{fmt(rateOf(b.rows))} อัตรา</span>
                 </span>
               </div>
             ))}
           </div>
         </div>
-        <div className="min-w-0 space-y-2" data-testid="v2-post-list">
+        <div className="min-w-0 space-y-2 rounded-2xl border bg-muted/20 p-3" data-testid="v2-post-list">
           <p className="text-sm font-medium">
             {partOf ? partOf.label : L(view)} · {bu ?? 'ทุก BU'}
             {bu || part ? (

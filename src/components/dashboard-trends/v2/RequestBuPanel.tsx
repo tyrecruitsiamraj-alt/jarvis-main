@@ -22,6 +22,7 @@ import { REQUEST_LEAD_KIND_LABEL, type RequestLeadKind } from '@/lib/requestLead
 import { STATUS_TOTAL_ID, workStatusOfRemaining } from '@/lib/workStatusOfRemaining';
 import type { JobRequest } from '@/types';
 import { Pager, buHex, fmt } from './V2Parts';
+import BuDonut from './BuDonut';
 
 type Field = 'requested' | 'filled' | 'cancelled' | 'remaining';
 type Topic = { key: string; label: string; field: Field; rows: StuckRequest[]; group: 'eq' | 'status' };
@@ -203,7 +204,7 @@ export default function RequestBuPanel({
         <Skeleton className="h-64 rounded-xl" />
       ) : (
         <>
-          <div className="grid gap-5 lg:grid-cols-[15rem_1fr]">
+          <div className="grid gap-5 lg:grid-cols-[13rem_1fr]">
             <div className="space-y-3 lg:border-r lg:pr-5">
               <Popover open={menuOpen} onOpenChange={setMenuOpen}>
                 <PopoverTrigger asChild>
@@ -247,32 +248,10 @@ export default function RequestBuPanel({
                 </p>
                 <p className={cn('mt-1 text-sm', DASH.sub)}>อัตรา · {subOf(topic)}</p>
               </div>
-              <div className="space-y-2">
-                <p className={cn('text-xs', DASH.sub)}>สัดส่วนแต่ละ BU</p>
-                <div className="flex h-2 gap-0.5 overflow-hidden rounded-full bg-muted">
-                  {byBu.filter((b) => b.v > 0).map((b) => (
-                    <span key={b.bu} className="h-full" style={{ width: `${(b.v / (total || 1)) * 100}%`, background: buHex(b.bu) }} />
-                  ))}
-                </div>
-                <div className="space-y-0.5">
-                  {byBu.map((b) => (
-                    <button
-                      key={b.bu}
-                      type="button"
-                      disabled={!b.rows.length}
-                      onClick={() => pickBu(b.bu)}
-                      className={cn('grid w-full grid-cols-[0.625rem_1fr_auto_2.5rem] items-center gap-2 rounded-lg px-1.5 py-1 text-left text-xs hover:bg-muted disabled:cursor-default disabled:hover:bg-transparent', bu === b.bu && 'bg-muted', bu && bu !== b.bu && 'opacity-40')}
-                    >
-                      <span className="size-2.5 rounded-sm" style={{ background: buHex(b.bu) }} />
-                      <span>{b.bu}</span>
-                      <span className="font-medium tabular-nums">{fmt(b.v)}</span>
-                      <span className={cn('text-right tabular-nums', DASH.sub)}>{total ? Math.round((b.v / total) * 100) : 0}%</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
             </div>
 
+            {/* กราฟแท่ง + โดนัทสัดส่วน BU ข้างกัน (เจ้าของ 19 พ.ย. 2569 "เอาไปทำกราฟโดนัท ข้างๆกราฟแท่งดีกว่า กราฟแท่งจะได้ไม่ดูอ้วน") */}
+            <div className="grid min-w-0 gap-5 md:grid-cols-[1fr_12rem]">
             <div className="min-w-0">
               <p className="mb-2 flex items-center gap-2 text-sm font-medium">
                 <span className="size-2.5 rounded-sm" style={{ background: topicHex(topic.key) }} />
@@ -301,7 +280,7 @@ export default function RequestBuPanel({
                       className={cn('relative flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-1 disabled:cursor-default', bu && bu !== b.bu && 'opacity-30')}
                     >
                       <span className="rounded-full border bg-background px-2 text-xs font-medium tabular-nums">{fmt(b.v)}</span>
-                      <span className="w-3/5 max-w-14 rounded-t-lg transition-transform hover:-translate-y-0.5" style={{ height: `${(b.v / top) * 100}%`, minHeight: 2, background: buHex(b.bu) }} />
+                      <span className="w-8 rounded-t-lg transition-transform hover:-translate-y-0.5" style={{ height: `${(b.v / top) * 100}%`, minHeight: 2, background: buHex(b.bu) }} />
                     </button>
                   ))}
                 </div>
@@ -314,6 +293,15 @@ export default function RequestBuPanel({
                   </div>
                 ))}
               </div>
+            </div>
+            <BuDonut
+              slices={byBu.map((b) => ({ key: b.bu, label: b.bu, value: b.v, hex: buHex(b.bu) }))}
+              selected={bu}
+              onPick={pickBu}
+              center={total}
+              unit="อัตรา"
+              testId="req-bu-donut"
+            />
             </div>
           </div>
 
