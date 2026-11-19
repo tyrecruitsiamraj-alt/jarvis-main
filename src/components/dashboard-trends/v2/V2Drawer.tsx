@@ -37,10 +37,9 @@ import {
   type AudienceMeasure,
 } from '@/lib/recruitAudience';
 import { BuBars, Pager, fmt, fmtPct } from './V2Parts';
-import { V2_METRIC_LABEL, type V2Metric, type V2Model } from './v2Model';
+import type { V2Model } from './v2Model';
 
 export type V2Pane =
-  | { kind: 'metric'; metric: V2Metric; bu?: string; page: number }
   | { kind: 'audience'; view: AudienceDim | 'records'; filter: AudienceFilter; measure: AudienceMeasure; display: AudienceDisplay; page: number; title: string }
   | { kind: 'names'; title: string; ids: string[]; page: number; /** สถานะของแต่ละชื่อ (ใบขอที่กดจากการประกาศ) */ labels?: Record<string, string>; /** BU ที่กด — ไม่มี = ทุก BU */ bu?: string }
   | { kind: 'requests'; title: string; rows: StuckRequest[]; page: number; /** BU ที่กดจากกราฟ — มี = รายการใบ · ไม่มี + หลาย BU = กราฟเทียบ BU ก่อน */ bu?: string }
@@ -101,14 +100,13 @@ export default function V2Drawer({
                   <ChevronLeft aria-hidden /> กลับ
                 </Button>
               ) : null}
-              <SheetTitle className="text-lg font-medium">{pane.kind === 'metric' ? V2_METRIC_LABEL[pane.metric] : pane.title}</SheetTitle>
+              <SheetTitle className="text-lg font-medium">{pane.title}</SheetTitle>
               <SheetDescription className={cn('text-xs', DASH.sub)}>
-                {periodText} · {pane.kind === 'metric' && pane.bu ? pane.bu : buText}
+                {periodText} · {buText}
                 {pane.kind === 'audience' && filterLabel(pane.filter) ? ` / ${filterLabel(pane.filter)}` : ''}
               </SheetDescription>
             </SheetHeader>
             <div className="space-y-5 px-5 py-4">
-              {pane.kind === 'metric' ? <MetricPane pane={pane} model={model} bus={bus} push={push} replace={replace} /> : null}
               {pane.kind === 'audience' ? <AudiencePane pane={pane} model={model} bus={bus} push={push} replace={replace} /> : null}
               {pane.kind === 'names' ? <NamesByBu pane={pane} replace={replace} model={model} /> : null}
               {pane.kind === 'requests' ? (
@@ -123,68 +121,6 @@ export default function V2Drawer({
     </Sheet>
   );
 }
-
-function MetricPane({ pane, model, bus, push, replace }: { pane: Extract<V2Pane, { kind: 'metric' }>; model: V2Model; bus: readonly string[]; push: (p: V2Pane) => void; replace: (p: V2Pane) => void }) {
-  const st = model.stages[pane.metric];
-  if (st.ids === null) {
-    return <p className={cn('text-sm', DASH.muted)}>อ่านข้อมูลแจ้งเข้า ERP ไม่ได้ในช่วงนี้ — ไม่ทราบผล (ไม่ใช่ 0)</p>;
-  }
-  const idSet = new Set(st.ids);
-  const facts = model.cohort.filter((f) => f.id && idSet.has(f.id) && (!pane.bu || (f.bu?.trim() || 'ไม่ระบุ BU') === pane.bu));
-  const bars = sortBars(
-    bus.map((bu) => {
-      const n = model.cohort.filter((f) => f.id && idSet.has(f.id) && (f.bu?.trim() || 'ไม่ระบุ BU') === bu).length;
-      return { bu, value: n, result: n, sample: n };
-    }),
-  );
-  const ids = facts.map((f) => f.id ?? '');
-  return (
-    <>
-      <div className="flex items-baseline justify-between">
-        <span className={cn('text-sm', DASH.muted)}>รวมทั้งหมด</span>
-        <span className="text-3xl font-medium tabular-nums">{fmt(facts.length)}</span>
-      </div>
-      {!pane.bu ? (
-        <section className="space-y-2">
-          <div className="flex items-baseline justify-between">
-            <h3 className="text-sm font-medium">เทียบแต่ละ BU</h3>
-            {bars[0]?.value ? <span className={cn('text-xs', DASH.sub)}>มากสุด {bars[0].bu} · {fmt(bars[0].value)} รายการ</span> : null}
-          </div>
-          <BuBars bars={bars} unit="รายการ" onPick={(bu) => push({ kind: 'metric', metric: pane.metric, bu, page: 1 })} />
-        </section>
-      ) : null}
-      {st.parts.length ? (
-        <section className="space-y-1">
-          <h3 className="text-sm font-medium">แยกตามผล</h3>
-          <ul className="divide-y rounded-xl border">
-            {st.parts.map((p) => {
-              const own = p.ids.filter((id) => !pane.bu || (model.byId.get(id)?.bu?.trim() || 'ไม่ระบุ BU') === pane.bu);
-              return (
-                <li key={p.key}>
-                  <button
-                    type="button"
-                    className="flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-muted/60"
-                    onClick={() => push({ kind: 'names', title: `${V2_METRIC_LABEL[pane.metric]} · ${p.label}`, ids: own, page: 1 })}
-                  >
-                    <span>{p.label}</span>
-                    <span className="font-medium tabular-nums">{fmt(own.length)} ›</span>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        </section>
-      ) : null}
-      <section className="space-y-1">
-        <h3 className="text-sm font-medium">รายชื่อ</h3>
-        <NamesList ids={ids} page={pane.page} onPage={(page) => replace({ ...pane, page })} model={model} />
-      </section>
-    </>
-  );
-}
-
-
-
 
 /** ตารางกลุ่มผู้สมัคร (อายุ · จังหวัดที่อยู่ · ช่องทาง) × 5 ยอด — ใช้ทั้งในแผงข้างและกางบนหน้า (`RecruitOverviewV2`) */
 export function AudiencePane({

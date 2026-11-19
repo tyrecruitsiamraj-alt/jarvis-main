@@ -1,6 +1,8 @@
 /**
  * รายชื่อเข้ามาไปถึงไหน + แยกช่องทาง (ภาพรวมงานสรรหา · เจ้าของ 18 พ.ย. 2569)
- * 5 กล่อง: ขั้นที่ไปต่อ + ขั้นที่หลุด (ป้าย "หลุด") · กดแถว = รายชื่อ (แผงข้าง)
+ * 5 กล่อง: ขั้นที่ไปต่อ + ขั้นที่หลุด (ป้าย "หลุด") · กดแถว = รายชื่อ (แผงข้าง แยก BU ก่อน)
+ * กดหัวกล่อง = เลือกกล่อง → เรื่องเล่ารายชื่อข้างล่าง (`renderScope`) เป็นของคนในกล่องนั้น (เจ้าของ 19 พ.ย. 2569 Choice
+ * "ถอดการ์ด 7 ใบ ใช้หัวกล่องแทน") · เทียบช่วงก่อนใต้เลขหัวกล่อง · กล่องที่ 6 = พบรายการแจ้งเข้า ERP
  * แยกช่องทาง: ช่องทางหลัก → ช่องทางรอง → (Facebook Group: กลุ่ม) → คนหามา · กดแถว = กาง/หุบ + 5 กล่องเหลือเฉพาะแถวนั้น
  * นิยามทั้งหมดอยู่ `recruitIntakeFlow.ts`
  */
@@ -12,26 +14,56 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { cn } from '@/lib/utils';
 import { DASH, TONE } from '@/lib/designTokens';
 import type { RecruitAppFact } from '@/lib/recruitOverviewTypes';
-import { INTAKE_COLUMNS, buildIntakeFlow, intakeChildren, intakeCounts, isIntakeLeaf, onIntakePath } from '@/lib/recruitIntakeFlow';
+import TrendDelta from '../stuck/TrendDelta';
+import { INTAKE_COLUMNS, buildIntakeFlow, type IntakeBox, intakeChildren, intakeCounts, isIntakeLeaf, onIntakePath } from '@/lib/recruitIntakeFlow';
 import { fmt } from './V2Parts';
 
 const same = (a: readonly string[], b: readonly string[]) => a.length === b.length && a.every((v, i) => v === b[i]);
 const PAD = ['pl-2', 'pl-7', 'pl-12', 'pl-16'];
 
+const ERP_TITLE = 'พบรายการแจ้งเข้า ERP';
+
+/** กล่องตามช่องทางที่กด + กล่องแจ้งเข้า ERP (null = อ่าน ERP ไม่ได้) */
+function boxesOf(cohort: readonly RecruitAppFact[], path: readonly string[], erpIds: readonly string[] | null | undefined): Array<IntakeBox & { unknown?: boolean }> {
+  const scoped = path.length ? cohort.filter((f) => onIntakePath(f, path)) : cohort;
+  const boxes: Array<IntakeBox & { unknown?: boolean }> = buildIntakeFlow(scoped);
+  if (erpIds !== undefined) {
+    const own = new Set(scoped.map((f) => f.id ?? ''));
+    boxes.push({ key: 'erp', title: ERP_TITLE, ids: (erpIds ?? []).filter((id) => own.has(id)), rows: [], unknown: erpIds === null });
+  }
+  return boxes;
+}
+
 export default function IntakeFlowPanel({
   cohort,
   onNames,
   resetKey,
+  prevCohort,
+  erpIds,
+  prevErpIds,
+  renderScope,
 }: {
   cohort: readonly RecruitAppFact[];
   onNames: (title: string, ids: readonly string[]) => void;
   resetKey: string;
+  /** รายชื่อช่วงก่อน (ช่วงวันเท่ากัน) — ไม่ส่ง = ไม่มีป้ายเทียบ · null = เทียบไม่ได้ */
+  prevCohort?: readonly RecruitAppFact[] | null;
+  /** คนที่พบรายการแจ้งเข้า ERP — ไม่ส่ง = ไม่มีกล่อง · null = อ่าน ERP ไม่ได้ */
+  erpIds?: readonly string[] | null;
+  prevErpIds?: readonly string[] | null;
+  /** ของข้างล่างที่ตามกล่องที่เลือก */
+  renderScope?: (box: { key: string; title: string; ids: readonly string[] }, where: string) => React.ReactNode;
 }) {
   const [path, setPath] = React.useState<string[]>([]);
-  React.useEffect(() => setPath([]), [resetKey]);
-  const scoped = React.useMemo(() => (path.length ? cohort.filter((f) => onIntakePath(f, path)) : cohort), [cohort, path]);
-  const boxes = React.useMemo(() => buildIntakeFlow(scoped), [scoped]);
+  const [sel, setSel] = React.useState('apps');
+  React.useEffect(() => {
+    setPath([]);
+    setSel('apps');
+  }, [resetKey]);
+  const boxes = React.useMemo(() => boxesOf(cohort, path, erpIds), [cohort, path, erpIds]);
+  const prevBoxes = React.useMemo(() => (prevCohort ? boxesOf(prevCohort, path, prevErpIds) : null), [prevCohort, path, prevErpIds]);
   const where = path.length ? ` · ${path.join(' › ')}` : '';
+  const picked = boxes.find((b) => b.key === sel) ?? boxes[0];
 
   /**
    * กดแถวเดิมที่เลือกอยู่ = หุบขึ้นหนึ่งชั้น
@@ -102,11 +134,28 @@ export default function IntakeFlowPanel({
 
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
         {boxes.map((b) => (
-          <div key={b.key} className="min-w-0 space-y-2 rounded-xl border border-border bg-muted/30 p-4" data-testid={`v2-intake-box-${b.key}`}>
-            <button type="button" className="flex w-full items-baseline justify-between gap-2 text-left" onClick={() => onNames(`${b.title}${where}`, b.ids)}>
+          <div
+            key={b.key}
+            className={cn('min-w-0 space-y-2 rounded-xl border p-4', b.key === picked?.key ? 'border-primary bg-primary/5' : 'border-border bg-muted/30')}
+            data-testid={`v2-intake-box-${b.key}`}
+          >
+            <button
+              type="button"
+              aria-pressed={b.key === picked?.key}
+              disabled={b.unknown}
+              className="flex w-full flex-wrap items-baseline justify-between gap-x-2 text-left"
+              onClick={() => setSel(b.key)}
+              data-testid={`v2-intake-head-${b.key}`}
+            >
               <span className="font-medium">{b.title}</span>
-              <span className="text-2xl font-medium tabular-nums">{fmt(b.ids.length)}</span>
+              <span className="text-2xl font-medium tabular-nums">{b.unknown ? '—' : fmt(b.ids.length)}</span>
+              {prevCohort !== undefined ? (
+                <span className="w-full">
+                  <TrendDelta cur={b.unknown ? null : b.ids.length} prev={prevBoxes?.find((x) => x.key === b.key && !x.unknown)?.ids.length ?? null} />
+                </span>
+              ) : null}
             </button>
+            {b.unknown ? <p className={cn('text-sm', DASH.muted)}>อ่าน ERP ไม่ได้ในช่วงนี้ ไม่ทราบผล</p> : null}
             <ul className="space-y-2">
               {b.rows.map((r) => {
                 const pct = b.ids.length ? Math.round((r.ids.length / b.ids.length) * 100) : 0;
@@ -164,6 +213,7 @@ export default function IntakeFlowPanel({
           </TableBody>
         </Table>
       </section>
+      {renderScope && picked && !picked.unknown ? renderScope({ key: picked.key, title: `${picked.title}${where}`, ids: picked.ids }, where) : null}
     </div>
   );
 }

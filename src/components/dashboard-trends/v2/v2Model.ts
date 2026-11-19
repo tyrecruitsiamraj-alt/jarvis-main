@@ -7,7 +7,7 @@ import { buildPersonJourney, buildFollowCallers, NO_CLAIMER } from '@/lib/recrui
 import { peopleSteps, whyParts } from '@/lib/recruitTopics';
 import { bkkDay, outcomeSetsOf, type OutcomeSets } from '@/lib/recruitAudience';
 
-/** ยอดของส่วน "ผู้สมัครและผลการติดต่อ" ตามแบบ — ลำดับเดียวกับแบบ */
+/** ยอดรายชื่อ 7 ขั้น (เดิมการ์ดของส่วน "ผู้สมัครและผลการติดต่อ" — ถอดแล้ว 19 พ.ย. 2569 · ยังใช้ stages.erp + ช่วงก่อน) */
 export const V2_METRICS = ['apps', 'ai', 'follow', 'reached', 'allBooked', 'showed', 'erp'] as const;
 export type V2Metric = (typeof V2_METRICS)[number];
 export const V2_METRIC_LABEL: Record<V2Metric, string> = {

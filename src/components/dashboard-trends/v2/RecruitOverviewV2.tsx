@@ -14,7 +14,7 @@ import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
-import { DASH, TONE } from '@/lib/designTokens';
+import { DASH } from '@/lib/designTokens';
 import type { RecruitOverviewResponse } from '@/lib/recruitOverviewTypes';
 import { fetchRecruitStuck, type RecruitStuckResponse } from '@/lib/recruitStuckApi';
 import { stuckEquation, type StuckRequest } from '@/lib/recruitStuck';
@@ -25,25 +25,23 @@ import { requestPathOfJobId } from '@/lib/jobNavigation';
 import { RELEASE_LANE_TEXT } from '@/lib/boardRelease';
 import { prevCohortOf } from '@/lib/recruitScale';
 import { friendlyErrorText } from '@/lib/friendlyError';
-import { BU_UNKNOWN, buOfFact, pageOf, bkkDay } from '@/lib/recruitAudience';
+import { BU_UNKNOWN, pageOf } from '@/lib/recruitAudience';
 import SoPostGroupsCard from '../stuck/SoPostGroupsCard';
 import SelfLinksPanel from '../topics/SelfLinksPanel';
 import StuckAreaTable from '../stuck/StuckAreaTable';
-import CallerResultsTable from '../stuck/CallerResultsTable';
 import V2Drawer, { type V2Pane } from './V2Drawer';
-import ApplicantStory from './ApplicantStory';
 import PostingProgress from './PostingProgress';
 import { Kpi, Pager, SectionTitle, fmt } from './V2Parts';
 import StaffActivityPanel from './StaffActivityPanel';
 import { ActivityFeed, DailyCharts, OutreachTiles, TODO_ICONS, TodoList, dailyPulse } from './PulseParts';
 import { fetchStaffActivity, fetchStaffActivityFeed } from '@/lib/staffActivityApi';
 import type { StaffActivityFeedItem, StaffActivityKind, StaffActivityRow } from '@/lib/staffActivity';
-import { MonthCompareBars } from './MonthCompareBars';
 import WorkStatusBoard from './WorkStatusBoard';
 import IntakeFlowPanel from './IntakeFlowPanel';
+import IntakeScopeStory from './IntakeScopeStory';
 import { useUnitRequestsFeed } from '@/hooks/useUnitRequestsFeed';
 import { filterUnitRequestsByDepartment } from '@/lib/siamrajUnitFilters';
-import { V2_METRICS, V2_METRIC_LABEL, buildV2Model, type V2Metric } from './v2Model';
+import { buildV2Model } from './v2Model';
 
 const ALL_BUS = ['LBD', 'LBA', 'LM', 'DS', 'SN'];
 const TH_MONTH = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
@@ -73,16 +71,12 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
   const viewKey = filterKey;
 
   const [stack, setStack] = React.useState<V2Pane[]>([]);
-  const [metric, setMetric] = React.useState<V2Metric>('apps');
   /** ไส้ในของการประกาศ — กดยอดไหนเห็นอันนั้น (ค่าเริ่ม = เริ่มหาแล้ว) */
   const [postView, setPostView] = React.useState<'released' | 'unreleased'>('released');
-  /** BU ที่กดแท่ง — เรื่องเล่ารายชื่อใต้กราฟ (null = ทุก BU) */
-  const [storyBu, setStoryBu] = React.useState<string | null>(null);
   const [clickPage, setClickPage] = React.useState(1);
   // เปลี่ยนวัน/BU = ล้างรายละเอียด + กลับหน้า 1 ทุกตาราง (ห้ามค้างข้อมูลช่วงเดิม)
   React.useEffect(() => {
     setStack([]);
-    setStoryBu(null);
     setClickPage(1);
   }, [viewKey]);
 
@@ -128,7 +122,6 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
     const prev = prevCohortOf(data.apps ?? [], win, data.firstDay, data.generatedAt);
     return prev ? buildV2Model(data, undefined, prev) : null;
   }, [data, win]);
-  const prevOf = (m: V2Metric): number | null => (prevModel ? (prevModel.stages[m].ids?.length ?? null) : null);
   const eq = reqRows ? stuckEquation(reqRows) : null;
   const openRows = eq?.remaining ?? [];
   /** ประกาศแล้ว / ยังไม่ประกาศ — ตัวแบ่งเดียวกับหัวหน้าโพสต์ประกาศ (เจ้าของ 18 พ.ย. 2569 "ยอดมันไม่ตรงกับหน้าภาพรวมหรอ") */
@@ -144,15 +137,7 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
   const push = (p: V2Pane) => setStack([p]);
   const openRequests = (title: string, rows: StuckRequest[]) => push({ kind: 'requests', title, rows, page: 1 });
   const openNames = (title: string, ids: readonly string[]) => push({ kind: 'names', title, ids: [...ids], page: 1 });
-  const openMetric = (m: V2Metric) => {
-    setMetric(m);
-    push({ kind: 'metric', metric: m, page: 1 });
-  };
 
-  // ── กราฟเทียบ BU + ตามวันที่สมัคร ของยอดที่เลือก ──
-  const st = model.stages[metric];
-  const idSet = st.ids ? new Set(st.ids) : null;
-  const inMetric = (id: string | undefined) => Boolean(id && idSet?.has(id));
   /** เดือนในช่วงที่เลือก (กราฟแท่งตั้งเทียบรายเดือน · เจ้าของ 17 พ.ย. 2569) */
   const months = (() => {
     const out: string[] = [];
@@ -161,55 +146,11 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
     }
     return out;
   })();
-  /** BU × เดือน ของยอดที่เลือก — BU ที่ไม่มีรายการเลยไม่ขึ้นแท่ง ("ไม่ระบุ BU" ขึ้นเมื่อมีจริง) */
-  const buGroups = bus
-    .map((bu) => {
-      const byMonth: Record<string, number> = {};
-      for (const f of model.cohort) if (buOfFact(f) === bu && inMetric(f.id)) byMonth[bkkDay(f.createdAt).slice(0, 7)] = (byMonth[bkkDay(f.createdAt).slice(0, 7)] ?? 0) + 1;
-      return { key: bu, byMonth, total: Object.values(byMonth).reduce((a, b) => a + b, 0) };
-    })
-    .filter((g) => g.total > 0 || g.key !== BU_UNKNOWN)
-    .sort((a, b) => b.total - a.total);
-
-  const unlinked = model.cohort.filter((f) => !f.jobId);
-
   /** สถานะการออกหาคนรายใบ 9 แบบ (ใบขอที่ดำเนินการ) — กดสถานะ = รายการใบ */
   const stateGroups = POSTING_STATES.map((k) => ({ k, rows: openRows.filter((r) => postingStateOf(r) === k) }));
-  /** เบอร์ไม่ซ้ำต่อ BU — เบอร์เดียวสมัครหลาย BU นับ BU ละครั้ง (ผลรวม BU จึงไม่บังคับเท่ายอดรวม) */
-  const distinct = [...bus, null].map((bu) => {
-    const list = bu === null ? model.cohort : model.cohort.filter((f) => buOfFact(f) === bu);
-    return { bu: bu ?? 'รวมทุก BU', apps: list.length, phones: new Set(list.map((f) => f.phoneKey).filter(Boolean)).size, noPhone: list.filter((f) => !f.phoneKey).length };
-  });
   const clickRows = [...(data.linkClicks ?? [])].sort((a, b) => b.clicks - a.clicks || a.label.localeCompare(b.label, 'th'));
   const clickPg = pageOf(clickRows, clickPage);
   const embeds: Record<string, React.ReactNode> = {
-    distinct: (
-      <div className="space-y-2" data-testid="v2-distinct">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>BU</TableHead>
-              <TableHead className="text-right">รายการสมัคร</TableHead>
-              <TableHead className="text-right">เบอร์ไม่ซ้ำ</TableHead>
-              <TableHead className="text-right">ไม่มีเบอร์ที่ใช้ได้</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {distinct.map((r) => (
-              <TableRow key={r.bu}>
-                <TableCell className={r.bu === 'รวมทุก BU' ? 'font-medium' : undefined}>{r.bu}</TableCell>
-                <TableCell className="text-right tabular-nums">{fmt(r.apps)}</TableCell>
-                <TableCell className="text-right tabular-nums">{fmt(r.phones)}</TableCell>
-                <TableCell className="text-right tabular-nums">{fmt(r.noPhone)}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-        <p className={cn('text-xs', DASH.sub)}>
-          ฐานหลักของหน้านี้คือรายการสมัคร · เบอร์ไม่ซ้ำเป็นตัวแทนคน ไม่ใช่คนไม่ซ้ำที่ยืนยันตัวแล้ว · เบอร์เดียวสมัครหลาย BU นับ BU ละครั้ง ผลรวมของ BU จึงอาจมากกว่ารวมทุก BU
-        </p>
-      </div>
-    ),
     clicks: (
       <div className="space-y-2" data-testid="v2-clicks">
         {data.linkClicks === null || data.linkClicks === undefined ? (
@@ -282,8 +223,6 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
   const sumOf = (rows: readonly StuckRequest[], k: 'requested' | 'filled' | 'cancelled' | 'remaining') => rows.reduce((n, r) => n + (Number(r[k]) || 0), 0);
   const rateText = (rows: readonly StuckRequest[] | undefined, label: string, k: 'requested' | 'filled' | 'cancelled' | 'remaining') =>
     rows ? `${label} ${fmt(sumOf(rows, k))} อัตรา` : undefined;
-  /** เรื่องเล่ารายชื่อ = รายชื่อของยอดที่เลือก (ERP อ่านไม่ได้ = รายชื่อทั้งหมด) */
-  const storyCohort = idSet ? model.cohort.filter((f) => inMetric(f.id)) : model.cohort;
   return (
     <div className="space-y-8" data-testid="recruit-overview-v2">
       {/* ── ต้องทำ (บนสุด · ณ ตอนนี้ ไม่ขึ้นกับช่วงวันที่) — แบบ Mobix (เจ้าของ 18 พ.ย. 2569)
@@ -382,10 +321,22 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
         />
       </Card>
 
-      {/* ── รายชื่อเข้ามาไปถึงไหน (เจ้าของ 18 พ.ย. 2569 จากการ์ด Milo "รายชื่อเข้ามาหายไปไหน") — ทุกกล่องบอกขั้นที่หลุด · แยกช่องทางกดไล่ลงถึงคนหามา ── */}
+      {/* ── รายชื่อเข้ามาไปถึงไหน (เจ้าของ 18 พ.ย. 2569 จากการ์ด Milo "รายชื่อเข้ามาหายไปไหน") — ทุกกล่องบอกขั้นที่หลุด · แยกช่องทางกดไล่ลงถึงคนหามา
+          19 พ.ย. 2569 รวมส่วน "ผู้สมัครและผลการติดต่อ" เข้ามา (คนชุดเดียวกัน เลขซ้ำ) — Choice ถอดการ์ด 7 ใบ ใช้หัวกล่องแทน · เอามาแค่เรื่องเล่ารายชื่อ
+          (รอโทรเกิน 24 ชม. · รายชื่ออยู่กับใคร · เหตุผลที่ยังไม่ได้คน · ปุ่มที่มาของยอดนัด/ผลโทรต่อ/เบอร์ไม่ซ้ำ/ยังไม่ผูกใบขอ ถอดแล้ว) ── */}
       <Card className="min-w-0 space-y-3 rounded-2xl p-5" data-testid="v2-intake-card">
         <SectionTitle title="รายชื่อเข้ามาไปถึงไหน" right={`${buText} · คนที่สมัคร ${periodText}`} />
-        <IntakeFlowPanel cohort={model.cohort} onNames={openNames} resetKey={viewKey} />
+        <IntakeFlowPanel
+          cohort={model.cohort}
+          onNames={openNames}
+          resetKey={viewKey}
+          prevCohort={win.all ? undefined : (prevModel?.cohort ?? null)}
+          erpIds={model.stages.erp.ids}
+          prevErpIds={prevModel?.stages.erp.ids ?? null}
+          renderScope={(box, where) => (
+            <IntakeScopeStory title={box.title} ids={box.ids} cohort={model.cohort} sets={model.sets} bus={bus} months={months} onNames={openNames} resetKey={`${viewKey}:${box.key}:${where}`} />
+          )}
+        />
       </Card>
 
       {/* ── การประกาศรับสมัคร ── */}
@@ -452,106 +403,6 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
       <Card className="min-w-0 space-y-3 rounded-2xl p-5" data-testid="v2-staff-card">
         <SectionTitle title="งานรายคน" right={`${dayText(win.from)} – ${dayText(win.to)}`} />
         <StaffActivityPanel from={win.from} to={win.to} bu={data.bu} rows={staff.key === filterKey ? staff.rows : null} error={staff.key === filterKey ? staff.error : null} onNames={openNames} />
-      </Card>
-
-      <Separator />
-
-      {/* ── ผู้สมัครและผลการติดต่อ — ทุกเรื่องของรายชื่ออยู่ในส่วนนี้ (เจ้าของ 17 พ.ย. 2569) ── */}
-      <Card className="min-w-0 space-y-5 rounded-2xl p-5" data-testid="v2-applicants">
-        <SectionTitle title="ผู้สมัครและผลการติดต่อ" right={`รายการสมัคร${win.asOf ? ` · ผล ณ ${dayText(win.asOf)}` : ''}`} />
-        {data.errors.apps ? <p className="text-sm text-destructive">{data.errors.apps}</p> : null}
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-7">
-          {V2_METRICS.map((m) => (
-            <Kpi
-              key={m}
-              label={V2_METRIC_LABEL[m]}
-              value={model.stages[m].ids === null ? null : model.stages[m].ids?.length}
-              prev={win.all ? undefined : prevOf(m)}
-              active={metric === m}
-              onClick={() => openMetric(m)}
-              testId={`v2-kpi-${m}`}
-            />
-          ))}
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button type="button" size="sm" variant="ghost" onClick={() => openMetric('allBooked')}>
-            ที่มาของยอดนัด
-          </Button>
-          <Button type="button" size="sm" variant="ghost" onClick={() => openMetric('reached')}>
-            ผลโทรต่อของเจ้าหน้าที่
-          </Button>
-          <Button type="button" size="sm" variant="ghost" onClick={() => push({ kind: 'embed', title: 'เบอร์ไม่ซ้ำ / คนไม่ซ้ำ', embed: 'distinct' })}>
-            เบอร์ไม่ซ้ำ / คนไม่ซ้ำ
-          </Button>
-          <Button type="button" size="sm" variant="ghost" onClick={() => openNames('ยังไม่ผูกใบขอ', unlinked.map((f) => f.id ?? ''))}>
-            ยังไม่ผูกใบขอ {fmt(unlinked.length)}
-          </Button>
-        </div>
-
-        <section className="space-y-2 border-t pt-4">
-          <h3 className="text-sm font-medium">รายชื่อรอติดต่อ</h3>
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <Kpi label="รอโทรเกิน 24 ชม." tone="danger" value={model.late.size} onClick={() => openNames('สนใจแล้ว รอโทรเกิน 24 ชม.', [...model.late])} testId="v2-late" />
-            <Kpi
-              label="สนใจแล้ว รอเจ้าหน้าที่โทร"
-              value={model.stages.follow.parts.find((p) => p.key === 'waiting')?.ids.length ?? 0}
-              onClick={() => openNames('สนใจแล้ว รอเจ้าหน้าที่โทร', model.stages.follow.parts.find((p) => p.key === 'waiting')?.ids ?? [])}
-            />
-          </div>
-        </section>
-
-        {/* กราฟแท่ง BU ของยอดที่เลือก → กดแท่ง = เล่าเรื่องรายชื่อใต้กราฟ (ช่องทาง › ใครเอาเข้ามา › วิธี › จังหวัด › อายุ/เพศ) */}
-        <section className="space-y-4 border-t pt-4" data-testid="v2-compare">
-          {st.ids === null ? (
-            <p className={cn('text-sm', DASH.muted)}>อ่านข้อมูลแจ้งเข้า ERP ไม่ได้ในช่วงนี้ ไม่ทราบผล</p>
-          ) : (
-            <section className="min-w-0 space-y-2">
-              <h3 className="text-sm font-medium">
-                {V2_METRIC_LABEL[metric]} {fmt(st.ids.length)} · แยกตาม BU
-              </h3>
-              <MonthCompareBars groups={buGroups} months={months} onPick={(bu) => setStoryBu(bu)} testId="v2-bu-chart" />
-            </section>
-          )}
-          <ApplicantStory
-            cohort={storyCohort}
-            sets={model.sets}
-            bu={storyBu}
-            onBu={setStoryBu}
-            scopeLabel={V2_METRIC_LABEL[metric]}
-            onNames={openNames}
-            resetKey={`${viewKey}:${metric}`}
-          />
-        </section>
-
-        {/* รายชื่ออยู่กับใคร = ทีมสรรหาแต่ละคน เก็บไป → โทร → นัด → ผลนัด → แจ้งเข้า บวกลบลงตัวในแถว (เจ้าของ 17 พ.ย. 2569) */}
-        <section className="min-w-0 space-y-2 border-t pt-4" data-testid="v2-holders">
-          <h3 className="text-sm font-medium">รายชื่ออยู่กับใคร</h3>
-          {/* ไม่ส่ง prev = ไม่มีแถว/ช่องเทียบช่วงก่อน (เจ้าของ 18 พ.ย. 2569 "เอาแถวที่ฉันส่งรูปให้ออกไปเลย เกะกะ") */}
-          <CallerResultsTable cohort={model.cohort} onOpen={(title, ids) => openNames(title, ids)} />
-        </section>
-
-        <div className="border-t pt-4">
-          <section className="min-w-0 space-y-2" data-testid="v2-why">
-            <h3 className="text-sm font-medium">เหตุผลที่ยังไม่ได้คน</h3>
-            <ul className="space-y-1">
-              {model.why.map((p) => {
-                const max = Math.max(1, ...model.why.map((x) => x.ids.length));
-                return (
-                  <li key={p.key}>
-                    <button type="button" onClick={() => openNames(p.label, p.ids)} className="flex w-full items-center gap-3 rounded-lg px-1 py-1 text-left text-sm hover:bg-muted/60">
-                      <span className="w-48 shrink-0">{p.label}</span>
-                      <span className="relative h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-muted">
-                        <span className={cn('absolute inset-y-0 left-0 rounded-full', TONE.primary.dot)} style={{ width: `${(p.ids.length / max) * 100}%` }} />
-                      </span>
-                      <span className="w-14 shrink-0 text-right font-medium tabular-nums">{fmt(p.ids.length)}</span>
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-            <p className={cn('text-xs', DASH.sub)}>คนเดียวอาจมีเหตุหลายขั้น ยอดแต่ละแถวรวมกันเป็นจำนวนคนไม่ได้</p>
-          </section>
-        </div>
       </Card>
 
       {/* พื้นที่ที่ขาดคน ย้ายลงล่างสุด (เจ้าของ 17 พ.ย. 2569 "เอาไปไว้ด้านล่างเถอะตรงนี้เกะกะ") · ชื่อเจ้าของ 18 พ.ย. 2569 */}
