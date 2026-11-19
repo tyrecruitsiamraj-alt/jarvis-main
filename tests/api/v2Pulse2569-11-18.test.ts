@@ -57,6 +57,13 @@ describe('dailyPulse', () => {
     expect(at('v2-requests')).toBeLessThan(at('v2-posting'));
     expect(at('v2-posting')).toBeLessThan(at('v2-outreach-card'));
     expect(at('v2-outreach-card')).toBeLessThan(at('v2-intake-card'));
+    // พื้นที่ที่ขาดคนก่อนความเคลื่อนไหว · ความเคลื่อนไหวพับไว้ (19 พ.ย. 2569 "ย่อไว้แล้วเอา พื้นที่ขาดคนขึ้นมาก่อน")
+    expect(at('v2-area')).toBeLessThan(at('v2-feed-card'));
+    expect(src).toContain('const [feedOpen, setFeedOpen] = React.useState(false);');
+    expect(src).toContain('{feedOpen ? <ActivityFeed');
+    // รายการใบขอในแผง: ปุ่มขวาบนทุกแถว ไม่ห่อลงบรรทัดใหม่ ("คงแพทเทิร์น")
+    const drawer = readFileSync('src/components/dashboard-trends/v2/V2Drawer.tsx', 'utf8');
+    expect(drawer).toContain('<div className="flex items-start justify-between gap-2">\n              <div className="min-w-0 flex-1 break-words">');
     const story = readFileSync('src/components/dashboard-trends/v2/IntakeScopeStory.tsx', 'utf8');
     expect(story).toContain('<PulseChart points={pulsePoints(facts, from, to, grain)}');
   });

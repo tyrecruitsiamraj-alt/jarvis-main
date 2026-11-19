@@ -56,7 +56,8 @@ export function buildIntakeFlow(cohort: readonly RecruitAppFact[]): IntakeBox[] 
   return [
     {
       key: 'apps',
-      title: 'คนสมัครเข้ามา',
+      // เจ้าของ 19 พ.ย. 2569 "คนสมัครเข้ามา เปลี่ยนคำเป็นรายชื่อเข้ามา"
+      title: 'รายชื่อเข้ามา',
       ids: idsOf(cohort),
       rows: [
         // โทรไปแล้ว แยกใครโทร (เจ้าของ 19 พ.ย. 2569 "โทรไปแล้วแล้วเป็นยังไง คนโทร หรือ Ai โทร") — ชุดเดียวกับกล่อง AI โทร / ทีมโทรเอง

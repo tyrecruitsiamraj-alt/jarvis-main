@@ -475,8 +475,9 @@ function RequestList({ rows, page, onPage, onPublish }: { rows: readonly StuckRe
         {pg.slice.length === 0 ? <li className={cn('px-3 py-3 text-sm', DASH.muted)}>ไม่มีรายการ</li> : null}
         {pg.slice.map((r) => (
           <li key={`${r.jobId ?? ''}:${r.requestNo}`} className="space-y-1.5 px-3 py-2.5">
-            <div className="flex flex-wrap items-start justify-between gap-2">
-              <div className="min-w-0">
+            {/* ปุ่มอยู่ขวาบนทุกแถว ชื่อยาวขึ้นบรรทัดใหม่แทน (เจ้าของ 19 พ.ย. 2569 "ทำให้มันคงแพทเทิร์นสิ่ มันกระโดดไปกระโดดมา") */}
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0 flex-1 break-words">
                 <div className="text-sm font-medium">
                   {r.requestNo} · {r.unitName || 'ไม่พบชื่อหน่วยงาน'}
                 </div>

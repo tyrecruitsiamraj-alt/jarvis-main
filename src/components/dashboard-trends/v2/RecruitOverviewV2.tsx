@@ -145,6 +145,7 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
   ];
 
   const [areaOpen, setAreaOpen] = React.useState(false);
+  const [feedOpen, setFeedOpen] = React.useState(false);
   const push = (p: V2Pane) => setStack([p]);
   const openRequests = (title: string, rows: StuckRequest[]) => push({ kind: 'requests', title, rows, page: 1 });
   const openNames = (title: string, ids: readonly string[]) => push({ kind: 'names', title, ids: [...ids], page: 1 });
@@ -412,14 +413,7 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
         <StaffActivityPanel from={win.from} to={win.to} bu={data.bu} rows={staff.key === filterKey ? staff.rows : null} error={staff.key === filterKey ? staff.error : null} onNames={openNames} />
       </Card>
 
-      {/* พื้นที่ที่ขาดคน ย้ายลงล่างสุด (เจ้าของ 17 พ.ย. 2569 "เอาไปไว้ด้านล่างเถอะตรงนี้เกะกะ") · ชื่อเจ้าของ 18 พ.ย. 2569 */}
-      {/* ── ความเคลื่อนไหวล่าสุด (แบบ Mobix · 18 พ.ย. 2569) · แนวโน้มรายวันย้ายเข้าแผงของแต่ละกล่องแล้ว (19 พ.ย. 2569 Choice) ── */}
-      <Card className="min-w-0 space-y-3 rounded-2xl p-5" data-testid="v2-feed-card">
-        <SectionTitle title="ความเคลื่อนไหวล่าสุด" right="30 รายการล่าสุดในช่วง" />
-        <ActivityFeed items={feed.key === filterKey ? feed.items : null} today={data.today} onPerson={(id, name) => openNames(name, [id])} />
-      </Card>
-
-      {/* พับไว้ กดค่อยกาง (เจ้าของ 18 พ.ย. 2569 "ซ่อนไว้กดค่อยกาง") · ปุ่มรายงานเพิ่มเติม (แบบเดิม) ถอดแล้ว ("เอาออก") */}
+      {/* พื้นที่ที่ขาดคน — ก่อนความเคลื่อนไหว (19 พ.ย. 2569) · พับไว้ กดค่อยกาง (เจ้าของ 18 พ.ย. 2569 "ซ่อนไว้กดค่อยกาง") · ปุ่มรายงานเพิ่มเติม (แบบเดิม) ถอดแล้ว ("เอาออก") */}
       <Card className="min-w-0 space-y-3 rounded-2xl p-5" data-testid="v2-area">
         <SectionTitle
           title="พื้นที่ที่ขาดคน"
@@ -433,6 +427,20 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
         {areaOpen ? (
           eq ? <StuckAreaTable bare rows={openRows.filter((r) => (r.remaining ?? 0) > 0)} onPick={(title, rows) => openRequests(title, rows)} /> : <Skeleton className="h-32 rounded-xl" />
         ) : null}
+      </Card>
+
+      {/* ── ความเคลื่อนไหวล่าสุด — พับไว้ กดค่อยกาง อยู่ใต้พื้นที่ที่ขาดคน (เจ้าของ 19 พ.ย. 2569 "ย่อไว้แล้วเอา พื้นที่ขาดคนขึ้นมาก่อนสลับตำแหน่งกัน") ── */}
+      <Card className="min-w-0 space-y-3 rounded-2xl p-5" data-testid="v2-feed-card">
+        <SectionTitle
+          title="ความเคลื่อนไหวล่าสุด"
+          right={
+            <Button type="button" size="sm" variant="outline" aria-expanded={feedOpen} onClick={() => setFeedOpen((v) => !v)} data-testid="v2-feed-toggle">
+              {feedOpen ? <ChevronUp aria-hidden /> : <ChevronDown aria-hidden />}
+              {feedOpen ? 'พับ' : 'ดู 30 รายการล่าสุด'}
+            </Button>
+          }
+        />
+        {feedOpen ? <ActivityFeed items={feed.key === filterKey ? feed.items : null} today={data.today} onPerson={(id, name) => openNames(name, [id])} /> : null}
       </Card>
 
       <V2Drawer

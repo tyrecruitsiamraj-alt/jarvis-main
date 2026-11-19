@@ -22,7 +22,7 @@ describe('รายชื่อเข้ามาไปถึงไหน · ก
     const open = vi.fn();
     render(<IntakeFlowPanel cohort={[...cohort, fact({ calledByStaff: true })]} onNames={() => {}} resetKey="k" prevCohort={prev} erpIds={[cohort[2].id as string]} prevErpIds={[]} onOpenBox={open} />);
     fireEvent.click(screen.getByTestId('v2-intake-head-apps'));
-    expect(open).toHaveBeenLastCalledWith(expect.objectContaining({ key: 'apps', title: 'คนสมัครเข้ามา' }));
+    expect(open).toHaveBeenLastCalledWith(expect.objectContaining({ key: 'apps', title: 'รายชื่อเข้ามา' }));
     expect(open.mock.calls[0][0].ids).toHaveLength(4);
     fireEvent.click(screen.getByTestId('v2-intake-head-ai'));
     expect(open.mock.calls[1][0].ids).toHaveLength(2);
