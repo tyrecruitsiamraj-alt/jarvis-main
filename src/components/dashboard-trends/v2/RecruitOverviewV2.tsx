@@ -224,7 +224,16 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
     ),
     posts: <SoPostGroupsCard from={win.from} to={win.to} bu={data.bu} title="Autopost · รายการโพสต์" />,
     self: linkRows ? <SelfLinksPanel rows={linkRows} onOpenRequest={(jobId) => navigate(requestPathOfJobId(jobId))} /> : <Skeleton className="h-40 rounded-xl" />,
-    // กดชื่อในตารางรายคน = แผงโพสต์เองของคนนั้น
+    // กดชื่อในตารางรายคน = งานรายวันของคนนั้น (ตัวนับเดียวกับงานรายคนเดิม · กดเลขเปิดรายการได้)
+    ...Object.fromEntries(
+      (outreachPeople ?? [])
+        .filter((p) => p.userId)
+        .map((p) => [
+          `staff:${p.userId}`,
+          <StaffActivityPanel key={p.userId} from={win.from} to={win.to} bu={data.bu} rows={staff.key === filterKey ? staff.rows : null} error={staff.key === filterKey ? staff.error : null} onNames={openNames} fixedWho={p.userId as string} />,
+        ]),
+    ),
+    // กดเลขโพสต์เองในตารางรายคน = แผงโพสต์เองของคนนั้น
     ...Object.fromEntries(
       (outreachPeople ?? []).map((p) => [
         `self:${p.name}`,
@@ -352,6 +361,7 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
         <OutreachPeopleTable
           people={outreachPeople}
           onPerson={(name) => push({ kind: 'embed', title: `โพสต์เอง / สร้างลิงก์ · ${name}`, embed: `self:${name}` })}
+          onStaff={(userId, name) => push({ kind: 'embed', title: `งานรายวัน · ${name}`, embed: `staff:${userId}` })}
           onIds={(title, ids) => push({ kind: 'story', title, ids: [...ids], key: `${viewKey}:person:${title}`, box: 'person' })}
         />
         {/* ปุ่มใต้การประกาศย้ายมาที่นี่ (เจ้าของ 19 พ.ย. 2569 "ย้ายไปไว้ในการสั่งงาน อันไหนไม่ซ้ำทำเพิ่ม") — Autopost/โพสต์เอง ซ้ำกับการ์ดข้างบน ถอดแล้ว */}
@@ -386,10 +396,7 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
       <Separator />
 
       {/* ── งานรายคน (เจ้าของ 18 พ.ย. 2569 "วันนี้ เมื่อวาน วันก่อน ใหม่ทำอะไรไป" · Choice ภาพรวม + Filter รายคน) ── */}
-      <Card className="min-w-0 space-y-3 rounded-2xl p-5" data-testid="v2-staff-card">
-        <SectionTitle title="งานรายคน" right={`${dayText(win.from)} – ${dayText(win.to)}`} />
-        <StaffActivityPanel from={win.from} to={win.to} bu={data.bu} rows={staff.key === filterKey ? staff.rows : null} error={staff.key === filterKey ? staff.error : null} onNames={openNames} />
-      </Card>
+      {/* การ์ดงานรายคนรวมเข้าตารางรายคนของการสั่งงานแล้ว (เจ้าของ 19 พ.ย. 2569 "งานรายคน กับ รายคน อันเดียวกันไหม" → Choice รวมเป็นตารางเดียว) — กดชื่อ = งานรายวันของคนนั้น */}
 
       {/* พื้นที่ที่ขาดคน — ก่อนความเคลื่อนไหว (19 พ.ย. 2569) · พับไว้ กดค่อยกาง (เจ้าของ 18 พ.ย. 2569 "ซ่อนไว้กดค่อยกาง") · ปุ่มรายงานเพิ่มเติม (แบบเดิม) ถอดแล้ว ("เอาออก") */}
       <Card className="min-w-0 space-y-3 rounded-2xl p-5" data-testid="v2-area">

@@ -21,6 +21,9 @@ const COLS: Array<[keyof OutreachNumbers, string]> = [
   ['scrap', 'Scrap (ใบ)'],
   ['clicks', 'คลิก'],
   ['applicants', 'กรอก'],
+  // งานที่คนนี้ลงเอง (เดิมอยู่การ์ดงานรายคน · รวมเข้ามา 19 พ.ย. 2569) — คนละอย่างกับ "นัด" ข้างหน้าที่นับนัดของรายชื่อที่คนนี้หามา
+  ['contacts', 'ลงผลติดต่อ'],
+  ['appts', 'ลงนัด'],
 ];
 /** คอลัมน์ของลิงก์โพสต์เอง — กดแล้วเปิดลิงก์ของคนนั้น */
 const LINK_COLS = new Set<keyof OutreachNumbers>(['gen', 'posted', 'clicks', 'applicants']);
@@ -28,11 +31,14 @@ const LINK_COLS = new Set<keyof OutreachNumbers>(['gen', 'posted', 'clicks', 'ap
 export default function OutreachPeopleTable({
   people,
   onPerson,
+  onStaff,
   onIds,
 }: {
   people: readonly OutreachPerson[] | null;
   /** กดเลขโพสต์เอง (Gen link · โพสต์แล้ว · คลิก · กรอก) = ลิงก์ของคนนั้น */
   onPerson?: (name: string) => void;
+  /** กดชื่อคน (มีบัญชีในระบบ) = งานของคนนั้นแยกรายวัน */
+  onStaff?: (userId: string, name: string) => void;
   /** กดเลขรายชื่อ/สนใจ/นัด/มาจริง */
   onIds?: (title: string, ids: readonly string[]) => void;
 }) {
@@ -70,7 +76,16 @@ export default function OutreachPeopleTable({
               <TableRow key={p.name}>
                 {/* ชื่อไม่เป็นลิงก์ทุกแถว — เดิมกดได้เฉพาะคนที่มีลิงก์โพสต์เอง (เจ้าของ 19 พ.ย. 2569 "ใหม่กดดูได้ เจมส์กดดูไม่ได้มันตลกๆไหม")
                     กดเลขแทน: รายชื่อ/สนใจ/นัด/มาจริง = รายชื่อ · โพสต์เอง/คลิก/กรอก = ลิงก์ของคนนั้น */}
-                <TableCell className="whitespace-nowrap">{p.name}</TableCell>
+                {/* คนที่มีบัญชี = กดชื่อดูงานรายวันได้ทุกคน · แถวที่ไม่ใช่คน (ดึงจาก iRecruit · So Scraping · สมัครเองที่หน้าเว็บ) ตัวจาง */}
+                <TableCell className="whitespace-nowrap">
+                  {p.userId && onStaff ? (
+                    <Button type="button" variant="link" size="sm" className="h-auto p-0" onClick={() => onStaff(p.userId as string, p.name)} data-testid="v2-outreach-staff">
+                      {p.name}
+                    </Button>
+                  ) : (
+                    <span className={cn(!p.userId && DASH.sub)}>{p.name}</span>
+                  )}
+                </TableCell>
 {PERSON_FUNNEL_KEYS.map((k) => (
                   <TableCell key={k} className="text-right tabular-nums">
                     {p[k].length && onIds ? (

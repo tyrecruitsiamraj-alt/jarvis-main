@@ -16,11 +16,13 @@ describe('การสั่งงานรายคน', () => {
       [staff('เจมส์', { autopost: 3 }), staff('เจมส์', { autopost: 2, scrap: 1, day: '2026-11-19' }), staff('ครีม', { contacts: 6 })],
       [link('ใหม่', { posted: true, clicks: 10, applicants: 2 }), link('ใหม่', { clicks: 5 }), link('เจมส์', { clicks: 1 })],
     );
-    // ไม่มีรายชื่อ = เรียงตามงานที่สั่ง (เจมส์ 7 · ใหม่ 2)
-    expect(rows.map((r) => r.name)).toEqual(['เจมส์', 'ใหม่']);
-    expect(rows[1]).toMatchObject({ autopost: 0, gen: 1, posted: 1, clicks: 15, applicants: 2 });
+    // ไม่มีรายชื่อ = เรียงตามงานรวม (เจมส์ 7 · ครีม 6 · ใหม่ 2) · 19 พ.ย. 2569 รวมงานรายคนเข้ามา: คนที่ลงผลติดต่ออย่างเดียว (ครีม) ขึ้นด้วย
+    expect(rows.map((r) => r.name)).toEqual(['เจมส์', 'ครีม', 'ใหม่']);
+    expect(rows[2]).toMatchObject({ autopost: 0, gen: 1, posted: 1, clicks: 15, applicants: 2 });
     expect(rows[0]).toMatchObject({ autopost: 5, scrap: 1, gen: 1, posted: 0, clicks: 1 });
-    expect(outreachTotals(rows)).toMatchObject({ autopost: 5, scrap: 1, gen: 2, posted: 1, clicks: 16, applicants: 2 });
+    expect(rows[1]).toMatchObject({ contacts: 6, appts: 0 });
+    expect(rows[1].userId).toBeTruthy();
+    expect(outreachTotals(rows)).toMatchObject({ autopost: 5, scrap: 1, gen: 2, posted: 1, clicks: 16, applicants: 2, contacts: 6 });
   });
 
   it('รายชื่อของคนนั้น → สนใจ → นัด → มาจริง ใช้กล่องชุดเดียวกับรายชื่อเข้ามาไปถึงไหน · รวมทุกแถว = รายชื่อทั้งหมด (เจ้าของ "เจมส์รายชื่อทั้งหมดเท่าไหร่ ไปจนถึงนัดแล้วมา")', () => {

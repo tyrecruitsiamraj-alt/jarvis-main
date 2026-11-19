@@ -25,6 +25,7 @@ export default function StaffActivityPanel({
   rows,
   error,
   onNames,
+  fixedWho,
 }: {
   from: string;
   to: string;
@@ -34,8 +35,10 @@ export default function StaffActivityPanel({
   error: string | null;
   /** ลงผลติดต่อ/นัดได้ = เปิดรายชื่อผู้สมัครในแผงข้าง */
   onNames: (title: string, ids: readonly string[]) => void;
+  /** เปิดจากชื่อในตารางรายคน = คนเดียว แยกรายวัน ไม่มีช่องเลือกคน (19 พ.ย. 2569 รวมการ์ดงานรายคนเข้าตารางรายคน) */
+  fixedWho?: string;
 }) {
-  const [who, setWho] = React.useState<string | null>(null);
+  const [who, setWho] = React.useState<string | null>(fixedWho ?? null);
   const [pick, setPick] = React.useState<{ user: string; name: string; kind: StaffActivityKind; day: string | null } | null>(null);
   const [items, setItems] = React.useState<StaffActivityItem[] | null>(null);
   const [page, setPage] = React.useState(1);
@@ -70,7 +73,7 @@ export default function StaffActivityPanel({
 
   return (
     <div className="space-y-3" data-testid="v2-staff">
-      <span className="block w-56">
+      <span className={cn('block w-56', fixedWho && 'hidden')}>
         <Select value={who ?? ALL} onValueChange={(v) => { setWho(v === ALL ? null : v); setPick(null); }}>
           <SelectTrigger className="h-9 text-sm" aria-label="คน" data-testid="v2-staff-who">
             <SelectValue />
