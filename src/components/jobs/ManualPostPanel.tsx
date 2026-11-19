@@ -1,5 +1,5 @@
 import React from 'react';
-import { Check, Copy, ExternalLink } from 'lucide-react';
+import { Check, Copy, ExternalLink, Link2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { DASH, TONE } from '@/lib/designTokens';
@@ -89,6 +89,8 @@ export default function ManualPostPanel({ job, onChanged }: { job: JobRequest; o
   const missingGroup = fbGroupChannel && picked.length === 0;
   const [rows, setRows] = React.useState<Row[] | null>(null);
   const [copied, setCopied] = React.useState<ReadonlySet<string>>(new Set());
+  /** แถวที่คัดลอกลิงก์สมัครเปล่า ๆ แล้ว (ส่งให้ผู้สมัครกรอกเอง · 19 พ.ย. 2569) */
+  const [linkCopied, setLinkCopied] = React.useState<ReadonlySet<string>>(new Set());
   /** ลิงก์โพสต์ที่วางกลับมา (เจ้าของ 13 พ.ย. 2569 Choice "ทำ ไม่บังคับ") — แถวละช่อง อยู่ตั้งแต่เตรียมโพสต์ (ไม่โผล่ทีหลังให้ของขยับ) */
   const [postUrls, setPostUrls] = React.useState<Record<string, string>>({});
   const [postUrlState, setPostUrlState] = React.useState<Record<string, { saved: string | null; error: string | null; busy: boolean }>>({});
@@ -149,6 +151,7 @@ export default function ManualPostPanel({ job, onChanged }: { job: JobRequest; o
       setPostUrlState({});
       if (made.length > 0) onChanged?.();
       setCopied(new Set());
+      setLinkCopied(new Set());
     } catch (e) {
       setError(e instanceof Error ? e.message : 'เตรียมโพสต์ไม่สำเร็จ');
     } finally {
@@ -156,12 +159,16 @@ export default function ManualPostPanel({ job, onChanged }: { job: JobRequest; o
     }
   };
 
-  const textOf = (r: Row) => syncCaptionLink(caption, `${window.location.origin}${applyLinkPath(r.link.code)}`);
+  const urlOf = (r: Row) => `${window.location.origin}${applyLinkPath(r.link.code)}`;
+  const textOf = (r: Row) => syncCaptionLink(caption, urlOf(r));
   // ตัวก๊อปปี้กลางของระบบ — clipboard ถูกกัน (หน้าต่างฝัง/บางเบราว์เซอร์) ถอยไปวิธีเดิมเอง (ทดสอบผ่านหน้าจอ 9 พ.ย. 2569 เคยขึ้นคัดลอกไม่ได้)
-  const copy = async (r: Row) => {
+  // `onlyLink` = คัดลอกลิงก์สมัครอย่างเดียว ส่งให้ผู้สมัครกรอกเข้ามา (เจ้าของ 19 พ.ย. 2569 "เพิ่มให้ copy link ได้หน่อยเพื่อให้ผู้สมัครกรอกเข้ามา")
+  //   นับเป็นการโพสต์ของวันนี้เหมือนคัดลอกข้อความ — ลิงก์ถูกส่งออกไปแล้วเหมือนกัน
+  const copy = async (r: Row, onlyLink = false) => {
     try {
-      await copyText(textOf(r));
+      await copyText(onlyLink ? urlOf(r) : textOf(r));
       setCopied((prev) => new Set(prev).add(r.key));
+      if (onlyLink) setLinkCopied((prev) => new Set(prev).add(r.key));
       setError(null);
     } catch {
       setError('คัดลอกไม่ได้ — ลองกดอีกครั้ง');
@@ -213,7 +220,11 @@ export default function ManualPostPanel({ job, onChanged }: { job: JobRequest; o
                 </span>
                 <Button type="button" size="sm" variant={done ? 'outline' : 'default'} onClick={() => void copy(r)} data-testid="manual-post-copy">
                   <Copy aria-hidden />
-                  {done ? 'คัดลอกแล้ว' : 'คัดลอกข้อความ'}
+                  {done && !linkCopied.has(r.key) ? 'คัดลอกแล้ว' : 'คัดลอกข้อความ'}
+                </Button>
+                <Button type="button" size="sm" variant="outline" onClick={() => void copy(r, true)} data-testid="manual-post-copy-link">
+                  <Link2 aria-hidden />
+                  {linkCopied.has(r.key) ? 'คัดลอกลิงก์แล้ว' : 'คัดลอกลิงก์'}
                 </Button>
                 {!r.group ? null : r.group.url ? (
                   <Button asChild size="sm" variant="outline">
