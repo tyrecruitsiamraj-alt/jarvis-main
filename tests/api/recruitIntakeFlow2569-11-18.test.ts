@@ -112,14 +112,6 @@ describe('สถานะทำงานแบบ Dashboard บนหน้า�
     expect(page).toContain("push({ kind: 'requests', title, rows, page: 1, listOnly: true })");
     expect(readFileSync('src/components/dashboard-trends/v2/V2Drawer.tsx', 'utf8')).toContain('if (pane.listOnly || pane.bu || allBus.size <= 1) return');
   });
-  it('การประกาศ: อัตราเป็นเลขหลัก ใบเป็นบรรทัดรอง · กราฟ BU นับอัตรา (19 พ.ย. 2569 "งั้นเปลี่ยนเป็นอัตราเด่นกว่า")', () => {
-    const page = readFileSync('src/components/dashboard-trends/v2/RecruitOverviewV2.tsx', 'utf8');
-    const pp = readFileSync('src/components/dashboard-trends/v2/PostingProgress.tsx', 'utf8');
-    expect(page).toContain('value={loadingReq ? undefined : eq ? c.rows.reduce((n, r) => n + (r.remaining ?? 0), 0) : null}');
-    expect(page).toContain('sub={eq ? `${fmt(c.rows.length)} ใบ` : undefined}');
-    expect(pp).toContain('byMonth: { all: rateOf(laneRows.filter((r) => buOf(r) === k)) }');
-    expect(pp).toContain('unit="อัตรา"');
-  });
   it('หน้าภาพรวมมีก้อนใบขอ + รายชื่อเข้ามาไปถึงไหน', () => {
     const src = readFileSync('src/components/dashboard-trends/v2/RecruitOverviewV2.tsx', 'utf8');
     expect(src).toContain('<RequestBuPanel');

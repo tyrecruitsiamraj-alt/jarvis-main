@@ -138,13 +138,7 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
   const eq = reqRows ? stuckEquation(reqRows) : null;
   const openRows = eq?.remaining ?? [];
   /** ประกาศแล้ว / ยังไม่ประกาศ — ตัวแบ่งเดียวกับหัวหน้าโพสต์ประกาศ (เจ้าของ 18 พ.ย. 2569 "ยอดมันไม่ตรงกับหน้าภาพรวมหรอ") */
-  const releasedRows = openRows.filter((r) => r.released);
   const unreleasedRows = openRows.filter((r) => !r.released);
-  /** ช่อง "ใบขอทั้งหมด" ถอดแล้ว — ซ้ำกับเหลือหา (เจ้าของ 19 พ.ย. 2569 "แก้ 2 อันนี้ก่อน") */
-  const postLanes: Array<{ key: 'released' | 'unreleased'; rows: StuckRequest[] }> = [
-    { key: 'released', rows: releasedRows },
-    { key: 'unreleased', rows: unreleasedRows },
-  ];
 
   const [areaOpen, setAreaOpen] = React.useState(false);
   const [feedOpen, setFeedOpen] = React.useState(false);
@@ -310,24 +304,13 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
             กดปุ่ม/แถวในนี้ = รายการใบอย่างเดียว ไม่มีกราฟ BU ซ้ำในแผงข้าง (เจ้าของ 19 พ.ย. 2569 "พอกดแต่ละช่องก็มีกราฟอีกมันซับซ้อนปะ") ── */}
         <section className="min-w-0 space-y-4 border-t pt-4" data-testid="v2-posting">
           <SectionTitle title="การประกาศรับสมัคร" right={eq ? `เหลือหา ${fmt(openRows.reduce((n, r) => n + (r.remaining ?? 0), 0))} อัตรา · ${fmt(openRows.length)} ใบ` : undefined} />
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2" data-testid="v2-post-lanes">
-            {postLanes.map((c) => (
-              <Kpi
-                key={c.key}
-                label={`${RELEASE_LANE_TEXT[c.key].label} · อัตรา`}
-                active={c.key === postView}
-                value={loadingReq ? undefined : eq ? c.rows.reduce((n, r) => n + (r.remaining ?? 0), 0) : null}
-                sub={eq ? `${fmt(c.rows.length)} ใบ` : undefined}
-                onClick={eq ? () => setPostView(c.key) : undefined}
-                testId={`v2-post-${c.key}`}
-              />
-            ))}
-          </div>
           {posts.error && posts.key === filterKey ? <p className="text-xs text-destructive">{posts.error}</p> : null}
           {eq ? (
             <PostingProgress
               view={postView}
               open={openRows}
+              onView={setPostView}
+              onOpenRequest={(jobId) => navigate(requestPathOfJobId(jobId))}
               onRequests={(title, rows) => push({ kind: 'requests', title, rows, page: 1, listOnly: true })}
               onNames={(title, ids, labels) => push({ kind: 'names', title, ids: [...ids], page: 1, labels })}
               resetKey={viewKey}
