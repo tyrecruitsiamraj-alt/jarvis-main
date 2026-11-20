@@ -182,7 +182,8 @@ describe('RequestBuPanel', () => {
 
   it('🔴 นับตามช่วง: เส้นรายวันรวมเท่าแท่งเดือน · ยกมาเดือนนี้ = เหลือหาสิ้นเดือนก่อน', () => {
     // ใบเดียวสองเดือน: คีย์ 10 ต.ค. ขอ 3 · เริ่มงาน 1 คน 20 ต.ค. · พ.ย. เริ่มงานอีก 1 คน 5 พ.ย. · ยกเลิกที่เหลือ 12 พ.ย.
-    const oct = req('OPL6910099', { day: '2026-10-10', requested: 3, flow: { carryIn: 0, new: 3, filled: 1, cancelled: 0, remaining: 2, fillDays: [['2026-10-20', 1]], cancelDays: [] } } as Partial<StuckRequest>);
+    // วันที่ของแถว (30 ก.ย.) ไม่ตรงวันคีย์ในสมุด (10 ต.ค.) — เส้นต้องใช้วันคีย์ ไม่งั้นขอใหม่หายจากเส้น
+    const oct = req('OPL6910099', { day: '2026-09-30', requested: 3, flow: { carryIn: 0, new: 3, filled: 1, cancelled: 0, remaining: 2, newDay: '2026-10-10', fillDays: [['2026-10-20', 1]], cancelDays: [] } } as Partial<StuckRequest>);
     const nov = req('OPL6910099', { day: '2026-10-10', inRange: false, state: 'cancelled', requested: 3, flow: { carryIn: 2, new: 0, filled: 1, cancelled: 1, remaining: 0, fillDays: [['2026-11-05', 1]], cancelDays: [['2026-11-12', 1]] } } as Partial<StuckRequest>);
     const blocks: StuckMonthBlock[] = [
       { month: '2026-10', from: '2026-10-01', to: '2026-10-31', rows: [oct] },
@@ -191,6 +192,9 @@ describe('RequestBuPanel', () => {
     render(<RequestBuPanel rows={[nov]} jobs={[]} bus={['LBD']} rangeText="" months={blocks} today={TODAY} error={null} onOpenRequest={vi.fn()} onNames={vi.fn()} resetKey="k" compare />);
     fireEvent.click(screen.getByTestId('req-bu-number-remaining'));
     expect(within(screen.getByTestId('req-bu-month-2026-10')).getByText('2')).toBeTruthy();
+    fireEvent.click(screen.getByTestId('req-bu-month-2026-10'));
+    expect(screen.getByTestId('req-bu-daily').textContent).toContain('LBD 2');
+    fireEvent.click(screen.getByTestId('req-bu-daily-back'));
     fireEvent.click(screen.getByTestId('req-bu-number-carried'));
     // ยกมา พ.ย. 2 = เหลือหา ต.ค. 2
     expect(within(screen.getByTestId('req-bu-month-2026-11')).getByText('2')).toBeTruthy();

@@ -183,7 +183,9 @@ export default function RequestBuPanel({
       for (const r of rows) {
         const f = flowOf(r);
         carry += f.carryIn;
-        if (f.new && r.day) add(nw, r.day.slice(0, 10), f.new);
+        // วันคีย์จากสมุดใบขอ (ตัวเดียวกับแท่งเดือน) › วันที่ของแถว — บนเว็บจริงมีใบที่สองวันนี้ไม่ตรงกัน เส้นสิ้นวันเคยขาด 2 อัตรา
+        const newDay = r.flow?.newDay ?? r.day;
+        if (f.new && newDay) add(nw, newDay.slice(0, 10), f.new);
         for (const [d, v] of r.flow?.fillDays ?? []) add(fl, d, v);
         for (const [d, v] of r.flow?.cancelDays ?? []) add(cx, d, v);
       }

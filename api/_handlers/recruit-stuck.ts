@@ -377,7 +377,7 @@ async function loadStuckRequests(
     const v = roleOf(jobId);
     if (!v) return undefined;
     const days = requestFlowDays(v.r, win.from, toEff, v.role);
-    return { carryIn: v.role.carryIn, new: v.role.newPositions, filled: v.role.filled, cancelled: v.role.cancelled, remaining: v.role.remaining, fillDays: days.fill, cancelDays: days.cancel };
+    return { carryIn: v.role.carryIn, new: v.role.newPositions, filled: v.role.filled, cancelled: v.role.cancelled, remaining: v.role.remaining, newDay: v.role.newPositions ? v.r.keyYmd : null, fillDays: days.fill, cancelDays: days.cancel };
   };
   return base.map((b, i) => {
     const id = b.online.jobId as string;

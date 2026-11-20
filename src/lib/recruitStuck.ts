@@ -138,7 +138,8 @@ export type StuckRequest = RecruitRequestRow & {
    */
   flow?: StuckFlow;
 };
-export type StuckFlow = { carryIn: number; new: number; filled: number; cancelled: number; remaining: number; fillDays: Array<[string, number]>; cancelDays: Array<[string, number]> };
+/** `newDay` = วันคีย์ในสมุดใบขอ (วันที่ขอใหม่เข้าสมการ — อาจไม่ตรง `day` ของแถว) */
+export type StuckFlow = { carryIn: number; new: number; filled: number; cancelled: number; remaining: number; newDay?: string | null; fillDays: Array<[string, number]>; cancelDays: Array<[string, number]> };
 export type StuckFlowKey = 'carryIn' | 'new' | 'filled' | 'cancelled' | 'remaining';
 /** ยอดตามช่วงของใบ — ไม่มี `flow` = ใบนอกสมุด: ยกมา = ทั้งใบถ้ามาก่อนช่วง · ที่เหลือใช้ยอดสะสมของใบ (สมการยังลงตัว) */
 export function flowOf(r: Pick<StuckRequest, 'flow' | 'inRange' | 'requested' | 'filled' | 'cancelled' | 'remaining'>): Record<StuckFlowKey, number> {
