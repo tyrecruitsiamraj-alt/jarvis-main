@@ -39,7 +39,7 @@ import { loadPenaltyLedgerRaw } from '../_lib/siamrajPenaltyLedgerSql.js';
 import { buildPenaltyLedger, ledgerJobIdOf, requestFlowRole, type LedgerRequest, type RequestFlowRole } from '../../src/lib/requestPenaltyLedger.js';
 import { normalizeTrendBu, trendBuFromSiteCode } from '../../src/lib/trends/bu.js';
 import { APPOINTMENT_AT_SQL } from '../_lib/applicantOverviewSql.js';
-import { stuckReasonOf, type StuckDailyRow, type StuckMonthlyRow, type StuckPostStatus, type StuckRequest, type StuckState } from '../../src/lib/recruitStuck.js';
+import { monthWindowsOf, stuckReasonOf, type StuckDailyRow, type StuckMonthBlock, type StuckMonthRow, type StuckMonthlyRow, type StuckPostStatus, type StuckRequest, type StuckState } from '../../src/lib/recruitStuck.js';
 import { loadRequestDaily } from '../_lib/requestDailySnapshot.js';
 import type { RecruitAppFact } from '../../src/lib/recruitOverviewTypes.js';
 import type { JobRequest } from '../../src/types/index.js';
@@ -60,7 +60,9 @@ export type RecruitStuckResponse = {
   monthly: StuckMonthlyRow[] | null;
   /** ยอดใบขอเหลือหา ณ สิ้นวัน (`part=daily`) */
   daily?: StuckDailyRow[] | null;
-  errors: Partial<Record<'requests' | 'monthly' | 'daily', string>>;
+  /** ใบขอทีละเดือนของช่วง (`part=months`) — กราฟรายเดือนของก้อนใบขอ */
+  months?: StuckMonthBlock[] | null;
+  errors: Partial<Record<'requests' | 'monthly' | 'daily' | 'months', string>>;
 };
 
 const text = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null);
@@ -93,7 +95,7 @@ export function stuckWindowOf(from: unknown, to: unknown, today: string): Win {
  * `part` (9 พ.ย. 2569 "ตามร่างทั้งหมด" · หน้าโหลดช้า): ค่าเริ่ม = ใบขอ (ตอนเปิดหน้า) · `monthly` = เทียบเดือนอย่างเดียว (โหลดตอนกางการ์ด)
  * เทียบเดือนอ่านย้อน 6 เดือน (throughput + ERP + แจ้งเข้า) — เดิมโหลดทุกครั้งที่เปิดหน้า
  */
-export type StuckPart = 'requests' | 'monthly' | 'daily';
+export type StuckPart = 'requests' | 'monthly' | 'daily' | 'months';
 export async function buildRecruitStuck(
   user: AuthedReq['user'],
   requestedBu: unknown,
@@ -117,6 +119,24 @@ export async function buildRecruitStuck(
     }
     return body;
   }
+  if (part === 'months') {
+    try {
+      // ตัวโหลดเดียวกับใบขอของหน้า ทีละเดือน (ข้ามส่วนผู้สมัคร/ประกาศ/โพสต์ ที่กราฟไม่ใช้) — ทีละ 3 เดือนกันฐานหนัก
+      const wins = monthWindowsOf(win.from, win.to);
+      const out: StuckMonthBlock[] = [];
+      for (let i = 0; i < wins.length; i += 3) {
+        const chunk = await Promise.all(
+          wins.slice(i, i + 3).map(async (w) => ({ ...w, rows: (await loadStuckRequests(departmentScope, buSet, { from: w.from, to: w.to }, today, { lite: true })).map(monthRowOf) })),
+        );
+        out.push(...chunk);
+      }
+      body.months = out;
+    } catch (e) {
+      logError('recruit-stuck: months', e);
+      body.errors.months = 'อ่านยอดรายเดือนไม่ได้';
+    }
+    return body;
+  }
 
   const skip = Promise.resolve(null);
   const [reqR, monR] = await Promise.allSettled([
@@ -137,6 +157,21 @@ export async function buildRecruitStuck(
 }
 
 type Scope = Awaited<ReturnType<typeof loadUserDepartmentScope>>;
+
+const monthRowOf = (r: StuckRequest): StuckMonthRow => ({
+  jobId: r.jobId,
+  requestNo: r.requestNo,
+  bu: r.bu,
+  recruiter: r.recruiter,
+  screener: r.screener,
+  leadKind: r.leadKind,
+  requested: r.requested,
+  filled: r.filled,
+  cancelled: r.cancelled,
+  remaining: r.remaining,
+  state: r.state,
+  inRange: r.inRange,
+});
 
 /** ใบขอที่ยังเปิดทั้งระบบ ณ วันนี้ — ตัวจดยอดรายวัน (`requestDailySnapshot`) · ชุดเดียวกับหน้าภาพรวม */
 export async function loadOpenStuckRequestsAll(now = new Date()): Promise<StuckRequest[]> {
@@ -224,7 +259,8 @@ async function loadStuckRequests(
   buSet: readonly string[] | null,
   win: Win,
   today: string,
-  opts: { appsInWindow?: boolean } = {},
+  /** `lite` = เอาแค่ตัวเลข/สถานะของใบ (กราฟรายเดือน) ไม่อ่านผู้สมัคร ทะเบียนประกาศ ลิงก์ คำขอโพสต์ */
+  opts: { appsInWindow?: boolean; lite?: boolean } = {},
 ): Promise<StuckRequest[]> {
   const toEff = win.to > today ? today : win.to;
   const [all, ranged, raw] = await Promise.all([
@@ -293,17 +329,21 @@ async function loadStuckRequests(
   const jobIds = base.map((b) => b.online.jobId as string);
   const [rows, facts, releases, links, postings] = await Promise.all([
     toRequestRows(base.map((b) => b.online)),
-    loadFactsForJobs(jobIds, null),
+    opts.lite ? [] : loadFactsForJobs(jobIds, null),
     // จับคู่ทะเบียนประกาศตัวเดียวกับกล่องงาน (QA 15 พ.ย. 2569: เดิมเทียบ job_id ตรง ๆ ⇒ ยังไม่ประกาศ 166 vs กล่องงาน 164)
-    loadReleaseMatches(
-      jobIds,
-      base.filter((b) => b.state === 'open').map((b) => b.online.jobId as string),
-    ),
-    dbQuery<{ job_id: string; n: number }>(
-      `select p.job_id, count(l.id)::int as n from ${POSTINGS} p join ${LINKS} l on l.posting_id = p.id where p.job_id = any($1::text[]) and p.status = 'open' group by p.job_id`,
-      [jobIds],
-    ),
-    listLatestJobPostingsForBoard(),
+    opts.lite
+      ? (new Map() as Awaited<ReturnType<typeof loadReleaseMatches>>)
+      : loadReleaseMatches(
+          jobIds,
+          base.filter((b) => b.state === 'open').map((b) => b.online.jobId as string),
+        ),
+    opts.lite
+      ? { rows: [] as Array<{ job_id: string; n: number }> }
+      : dbQuery<{ job_id: string; n: number }>(
+          `select p.job_id, count(l.id)::int as n from ${POSTINGS} p join ${LINKS} l on l.posting_id = p.id where p.job_id = any($1::text[]) and p.status = 'open' group by p.job_id`,
+          [jobIds],
+        ),
+    opts.lite ? [] : listLatestJobPostingsForBoard(),
   ]);
   await attachRequestRecruiters(rows);
   const factsBy = new Map<string, RecruitAppFact[]>();
@@ -432,7 +472,8 @@ async function handler(req: AuthedReq, res: ApiRes) {
     return sendError(res, 405, 'Method not allowed');
   }
   try {
-    const part = req.query?.part === 'monthly' ? 'monthly' : req.query?.part === 'daily' ? 'daily' : 'requests';
+    const q = req.query?.part;
+    const part: StuckPart = q === 'monthly' || q === 'daily' || q === 'months' ? q : 'requests';
     const body = await buildRecruitStuck(req.user, req.query?.bu, { from: req.query?.from, to: req.query?.to }, new Date(), part);
     res.setHeader?.('Cache-Control', 'no-store');
     return res.status(200).json(body);

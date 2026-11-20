@@ -145,17 +145,51 @@ export const STUCK_SCOPE_LABEL: Record<StuckScope, string> = {
   cancelled: 'ยกเลิก',
   remaining: 'เหลือหา',
 };
-const stateOf = (r: StuckRequest): StuckState => r.state ?? 'open';
-export function stuckInScope(r: StuckRequest, scope: StuckScope): boolean {
+type ScopeRow = Pick<StuckRequest, 'state' | 'inRange'>;
+const stateOf = (r: ScopeRow): StuckState => r.state ?? 'open';
+export function stuckInScope(r: ScopeRow, scope: StuckScope): boolean {
   if (scope === 'remaining') return stateOf(r) === 'open';
   if (scope === 'carried') return r.inRange === false;
   if (scope === 'new') return r.inRange !== false;
   return stateOf(r) === scope;
 }
-export function stuckEquation(rows: readonly StuckRequest[]): Record<StuckScope, StuckRequest[]> {
-  const out: Record<StuckScope, StuckRequest[]> = { carried: [], new: [], filled: [], cancelled: [], remaining: [] };
+export function stuckEquation<T extends ScopeRow = StuckRequest>(rows: readonly T[]): Record<StuckScope, T[]> {
+  const out: Record<StuckScope, T[]> = { carried: [], new: [], filled: [], cancelled: [], remaining: [] };
   for (const r of rows) for (const k of Object.keys(out) as StuckScope[]) if (stuckInScope(r, k)) out[k].push(r);
   return out;
+}
+
+/* ═══ ใบขอรายเดือน (เจ้าของ 20 พ.ย. 2569 "ถ้าฉันเลือก ตุลา พฤจิกา ก็เห็นว่าจากตุลามาพฤศจิกา มันลดลงหรือเพิ่มขึ้น") ═══
+ * แต่ละเดือน = ใบชุดเดียวกับที่ได้เมื่อเลือกเดือนนั้นเดือนเดียว (ตัวโหลดเดียวกัน `loadStuckRequests`) ⇒ แท่งของเดือน = เลขใหญ่ของเดือนนั้น
+ * เดือนหัว/ท้ายตัดตามช่วงที่เลือก ⇒ ขอใหม่ทุกเดือนรวมกัน = ขอใหม่ทั้งช่วง · ยอดยกมาเดือนแรก = ยอดยกมาทั้งช่วง · เหลือหาเดือนท้าย = เหลือหาทั้งช่วง */
+export type StuckMonthRow = Pick<
+  StuckRequest,
+  'jobId' | 'requestNo' | 'bu' | 'recruiter' | 'screener' | 'leadKind' | 'requested' | 'filled' | 'cancelled' | 'remaining' | 'state' | 'inRange'
+>;
+export type StuckMonthWindow = { month: string; from: string; to: string };
+export type StuckMonthBlock = StuckMonthWindow & { rows: StuckMonthRow[] };
+export const STUCK_MONTHS_MAX = 12;
+const lastDayOf = (month: string) => new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0)).toISOString().slice(0, 10);
+/** เดือนในช่วง ตัดหัวท้ายตามช่วง · เกิน `max` = เอาเดือนล่าสุด */
+export function monthWindowsOf(from: string, to: string, max = STUCK_MONTHS_MAX): StuckMonthWindow[] {
+  const out: StuckMonthWindow[] = [];
+  if (from > to) return out;
+  for (let y = Number(from.slice(0, 4)), m = Number(from.slice(5, 7)); ; m === 12 ? ((m = 1), (y += 1)) : (m += 1)) {
+    const month = `${y}-${String(m).padStart(2, '0')}`;
+    if (month > to.slice(0, 7)) break;
+    const first = `${month}-01`;
+    const last = lastDayOf(month);
+    out.push({ month, from: first < from ? from : first, to: last > to ? to : last });
+  }
+  return out.slice(-max);
+}
+const MONTH_TH = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+/** ป้ายใต้แท่ง — เต็มเดือน "ต.ค." · ไม่เต็มเดือนบอกช่วงวัน "1–20 พ.ย." · ข้ามปีต่อท้ายปี พ.ศ. 2 หลัก */
+export function monthWindowLabel(w: StuckMonthWindow, withYear = false): string {
+  const name = MONTH_TH[Number(w.month.slice(5, 7)) - 1];
+  const whole = w.from === `${w.month}-01` && w.to === lastDayOf(w.month);
+  const days = whole ? '' : w.from === w.to ? `${Number(w.from.slice(8))} ` : `${Number(w.from.slice(8))}–${Number(w.to.slice(8))} `;
+  return `${days}${name}${withYear ? ` ${String(Number(w.month.slice(0, 4)) + 543).slice(2)}` : ''}`;
 }
 
 export const NO_RECRUITER_LABEL = 'ยังไม่ได้ตั้งเจ้าหน้าที่สรรหา';

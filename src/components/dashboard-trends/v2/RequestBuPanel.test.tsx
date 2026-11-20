@@ -5,7 +5,7 @@
 import React from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
-import type { StuckRequest } from '@/lib/recruitStuck';
+import type { StuckMonthBlock, StuckRequest } from '@/lib/recruitStuck';
 import type { JobRequest } from '@/types';
 
 (globalThis as unknown as { ResizeObserver: unknown }).ResizeObserver = class {
@@ -49,9 +49,36 @@ const rows: StuckRequest[] = [
 ];
 const jobs = [...rows.filter((r) => r.state === 'open').map((r) => job(r.requestNo, 'in_progress')), job('LMO6911016', 'waiting_inform')];
 
+/** ช่วง 1 ต.ค. – 19 พ.ย.: ต.ค. เต็มเดือน · พ.ย. ถึงวันที่ 19 (ใบของเดือนท้าย = ใบของทั้งช่วง) */
+const TODAY = '2026-11-19';
+const months: StuckMonthBlock[] = [
+  {
+    month: '2026-10',
+    from: '2026-10-01',
+    to: '2026-10-31',
+    rows: [
+      ...Array.from({ length: 9 }, (_, i) => req(`OPL69100${String(10 + i)}`)),
+      req('LAO6910002', { bu: 'LBA', recruiter: 'ฟอร์ด' }),
+      req('OPL6909031', { inRange: false, state: 'filled', remaining: 0, filled: 1 }),
+    ],
+  },
+  { month: '2026-11', from: '2026-11-01', to: '2026-11-19', rows },
+];
+
 function draw(onNames = vi.fn()) {
   render(
-    <RequestBuPanel rows={rows} jobs={jobs} bus={['LBD', 'LBA', 'LM', 'SN', 'DS']} rangeText="1–19 พ.ย." error={null} onOpenRequest={vi.fn()} onNames={onNames} resetKey="k" />,
+    <RequestBuPanel
+      rows={rows}
+      jobs={jobs}
+      bus={['LBD', 'LBA', 'LM', 'SN', 'DS']}
+      rangeText="1–19 พ.ย."
+      months={months}
+      today={TODAY}
+      error={null}
+      onOpenRequest={vi.fn()}
+      onNames={onNames}
+      resetKey="k"
+    />,
   );
   return onNames;
 }
@@ -74,7 +101,7 @@ describe('RequestBuPanel', () => {
   });
 
   it('แท่ง BU เรียง LBD ซ้ายสุดเสมอ ไม่ตามลำดับที่ส่งมา', () => {
-    render(<RequestBuPanel rows={rows} jobs={jobs} bus={['SN', 'DS', 'LM', 'LBA', 'LBD']} rangeText="" error={null} onOpenRequest={vi.fn()} onNames={vi.fn()} resetKey="k" />);
+    render(<RequestBuPanel rows={rows} jobs={jobs} bus={['SN', 'DS', 'LM', 'LBA', 'LBD']} rangeText="" months={null} today={TODAY} error={null} onOpenRequest={vi.fn()} onNames={vi.fn()} resetKey="k" />);
     expect(screen.getAllByTestId(/^req-bu-bar-/).map((b) => b.getAttribute('data-testid'))).toEqual(['req-bu-bar-LBD', 'req-bu-bar-LBA', 'req-bu-bar-LM', 'req-bu-bar-SN', 'req-bu-bar-DS']);
   });
 
@@ -103,5 +130,46 @@ describe('RequestBuPanel', () => {
     fireEvent.click(opts[1]); // ฉุกเฉิน
     expect(screen.getByTestId('req-bu-total').textContent).toBe('1');
     expect(screen.getByTestId('req-bu-list').textContent).toContain('LAO6911003');
+  });
+  it('รายเดือน — แท่งของเดือน = เลขของเรื่องนั้นในเดือนนั้น · บอกเพิ่มขึ้น/ลดลงจากเดือนก่อน · ป้ายเดือนไม่เต็มบอกช่วงวัน', () => {
+    draw();
+    fireEvent.click(screen.getByTestId('req-bu-number-new'));
+    const oct = screen.getByTestId('req-bu-month-2026-10');
+    const nov = screen.getByTestId('req-bu-month-2026-11');
+    // ขอใหม่ ต.ค. 10 อัตรา (ใบยกมาไม่นับ) · พ.ย. 15 = เลขใหญ่ของช่วง (ใบชุดเดียวกัน)
+    expect(within(oct).getByText('10')).toBeTruthy();
+    expect(within(oct).getByText('ต.ค.')).toBeTruthy();
+    expect(within(nov).getByText('15')).toBeTruthy();
+    expect(within(nov).getByText('1–19 พ.ย.')).toBeTruthy();
+    expect(nov.textContent).toContain('เพิ่มขึ้น 5');
+    expect(oct.querySelector('[data-trend]')).toBeNull();
+    // หาได้แล้ว: ต.ค. 1 → พ.ย. 0
+    fireEvent.click(screen.getByTestId('req-bu-number-filled'));
+    expect(screen.getByTestId('req-bu-month-2026-11').textContent).toContain('ลดลง 1');
+  });
+
+  it('รายเดือนตามตัวกรองและ BU ที่กด — เลขเดือนท้ายเท่าแท่ง BU', () => {
+    draw();
+    fireEvent.click(screen.getByTestId('req-bu-number-new'));
+    fireEvent.click(screen.getByTestId('req-bu-bar-LBA'));
+    expect(screen.getByTestId('req-bu-months').textContent).toContain('รายเดือน · LBA');
+    expect(within(screen.getByTestId('req-bu-month-2026-10')).getByText('1')).toBeTruthy();
+    expect(within(screen.getByTestId('req-bu-month-2026-11')).getByText('1')).toBeTruthy();
+    expect(screen.getByTestId('req-bu-month-2026-11').textContent).toContain('ทรงตัว');
+  });
+
+  it('สถานะทำงานของเดือนที่จบไปแล้ว = ไม่มีข้อมูล (ไม่ยุบเป็น 0) · เดือนที่ยังไม่จบมีเลข', () => {
+    draw();
+    const oct = screen.getByTestId('req-bu-month-2026-10');
+    const nov = screen.getByTestId('req-bu-month-2026-11');
+    expect(oct.textContent).toContain('ไม่มีข้อมูล');
+    expect(within(nov).getByText('13')).toBeTruthy();
+    expect(nov.textContent).toContain('เทียบไม่ได้');
+  });
+
+  it('รายเดือนยังโหลด = ที่ว่างรอ ไม่หาย', () => {
+    render(<RequestBuPanel rows={rows} jobs={jobs} bus={['LBD']} rangeText="" months={null} today={TODAY} error={null} onOpenRequest={vi.fn()} onNames={vi.fn()} resetKey="k" />);
+    expect(screen.getByTestId('req-bu-months')).toBeTruthy();
+    expect(screen.queryByTestId('req-bu-month-2026-11')).toBeNull();
   });
 });

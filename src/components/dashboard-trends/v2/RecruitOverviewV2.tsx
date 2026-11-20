@@ -17,7 +17,7 @@ import { cn } from '@/lib/utils';
 import { DASH } from '@/lib/designTokens';
 import type { RecruitOverviewResponse } from '@/lib/recruitOverviewTypes';
 import { fetchRecruitStuck, type RecruitStuckResponse } from '@/lib/recruitStuckApi';
-import { stuckEquation, type StuckRequest } from '@/lib/recruitStuck';
+import { STUCK_MONTHS_MAX, monthWindowsOf, stuckEquation, type StuckMonthBlock, type StuckRequest } from '@/lib/recruitStuck';
 import { POSTING_STATES, POSTING_STATE_LABEL, postingStateOf } from '@/lib/recruitPostingState';
 import { fetchSoPostGroups } from '@/lib/soPostGroupsApi';
 import { fetchManualLinks } from '@/lib/jobPostActionsApi';
@@ -122,6 +122,25 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
   const linkRows = links.key === filterKey ? links.rows : null;
   const allRows = stuck.key === filterKey ? stuck.data?.requests ?? null : null;
   const reqRows: StuckRequest[] | null = allRows;
+  /**
+   * ใบขอทีละเดือนของช่วง — กราฟรายเดือนของก้อนใบขอ (เจ้าของ 20 พ.ย. 2569 "เลือก ตุลา พฤจิกา ก็เห็นว่า … ลดลงหรือเพิ่มขึ้น")
+   * ช่วงอยู่ในเดือนเดียว = ใช้ใบของหน้าเลย ไม่ยิงเพิ่ม · ข้ามเดือน = `part=months` ครั้งเดียว (ตัวโหลดเดียวกับใบของหน้า)
+   */
+  const monthWins = React.useMemo(() => monthWindowsOf(win.from, win.to), [win.from, win.to]);
+  const monthsCapped = React.useMemo(() => monthWindowsOf(win.from, win.to, Number.MAX_SAFE_INTEGER).length > STUCK_MONTHS_MAX, [win.from, win.to]);
+  const [monthData, setMonthData] = React.useState<{ key: string; blocks: StuckMonthBlock[] | null; error: string | null }>({ key: '', blocks: null, error: null });
+  React.useEffect(() => {
+    if (monthWins.length < 2) return;
+    let alive = true;
+    fetchRecruitStuck(data.bu, { from: win.from, to: win.to }, 'months')
+      .then((d) => alive && setMonthData({ key: filterKey, blocks: d.months ?? null, error: d.months ? null : (d.errors.months ?? 'อ่านยอดรายเดือนไม่ได้') }))
+      .catch((e: unknown) => alive && setMonthData({ key: filterKey, blocks: null, error: friendlyErrorText(e, 'อ่านยอดรายเดือนไม่ได้') }));
+    return () => {
+      alive = false;
+    };
+  }, [filterKey, data.bu, win.from, win.to, monthWins.length]);
+  const monthBlocks: readonly StuckMonthBlock[] | null =
+    monthWins.length < 2 ? (reqRows && monthWins[0] ? [{ ...monthWins[0], rows: reqRows }] : null) : monthData.key === filterKey ? monthData.blocks : null;
   const model = React.useMemo(() => buildV2Model(data), [data]);
   /** การสั่งงานรายคน (19 พ.ย. 2569 Choice "ในการสั่งงาน คนละแถว") */
   const outreachPeople = staff.key === filterKey && staff.rows && linkRows ? outreachByPerson(staff.rows, linkRows, model.cohort) : null;
@@ -310,6 +329,10 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
           jobs={statusJobs}
           bus={bus}
           rangeText={`${rangeShort} · สถานะ ณ ${dayText(win.to)}`}
+          months={loadingReq ? null : monthBlocks}
+          monthsCapped={monthsCapped}
+          monthsError={monthWins.length >= 2 && monthData.key === filterKey ? monthData.error : null}
+          today={data.today}
           error={stuck.error && stuck.key === filterKey ? stuck.error : reqFeed.feedState === 'failed' || reqFeed.feedState === 'forbidden' ? 'โหลดสถานะทำงานของใบขอไม่ได้' : null}
           onOpenRequest={(jobId) => navigate(requestPathOfJobId(jobId))}
           onNames={(title, ids) => openNames(title, ids)}

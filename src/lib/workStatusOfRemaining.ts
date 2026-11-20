@@ -8,21 +8,22 @@ import type { JobRequest } from '@/types';
 import type { StuckRequest } from '@/lib/recruitStuck';
 import { UNIT_REQUEST_WORK_STATUS_LABELS, UNIT_REQUEST_WORK_STATUS_OPTIONS, resolveUnitRequestWorkStatus } from '@/lib/unitRequestWorkStatus';
 
-export type StatusBox = { id: string; label: string; positions: number; requests: number; rows: StuckRequest[] };
+type StatusRow = Pick<StuckRequest, 'jobId' | 'remaining'>;
+export type StatusBox<T extends StatusRow = StuckRequest> = { id: string; label: string; positions: number; requests: number; rows: T[] };
 
 export const STATUS_TOTAL_ID = 'work_status_total';
 export const STATUS_NONE_ID = 'work_status_none';
 
-export function workStatusOfRemaining(rows: readonly StuckRequest[], jobs: readonly JobRequest[]): StatusBox[] {
+export function workStatusOfRemaining<T extends StatusRow = StuckRequest>(rows: readonly T[], jobs: readonly JobRequest[]): StatusBox<T>[] {
   const statusOf = new Map(jobs.map((j) => [j.id, resolveUnitRequestWorkStatus(j.work_status)]));
-  const box = (id: string, label: string, list: StuckRequest[]): StatusBox => ({
+  const box = (id: string, label: string, list: T[]): StatusBox<T> => ({
     id,
     label,
     positions: list.reduce((n, r) => n + (Number(r.remaining) || 0), 0),
     requests: list.length,
     rows: list,
   });
-  const keyOf = (r: StuckRequest) => (r.jobId ? statusOf.get(r.jobId) : undefined);
+  const keyOf = (r: T) => (r.jobId ? statusOf.get(r.jobId) : undefined);
   const out = [
     box(STATUS_TOTAL_ID, 'ทั้งหมด', [...rows]),
     ...UNIT_REQUEST_WORK_STATUS_OPTIONS.map((s) =>

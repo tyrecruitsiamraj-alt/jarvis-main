@@ -17,20 +17,22 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { cn } from '@/lib/utils';
 import { DASH, REQUEST_TOPIC_HEX, TONE, type ToneKey } from '@/lib/designTokens';
 import { BU_UNKNOWN, pageOf } from '@/lib/recruitAudience';
-import { recruiterLabelOf, stuckEquation, type StuckRequest } from '@/lib/recruitStuck';
+import { monthWindowLabel, recruiterLabelOf, stuckEquation, type StuckMonthBlock, type StuckMonthRow, type StuckRequest } from '@/lib/recruitStuck';
+import type { TrendSense } from '@/lib/recruitScale';
 import { REQUEST_LEAD_KIND_LABEL, type RequestLeadKind } from '@/lib/requestLeadKind';
 import { STATUS_TOTAL_ID, workStatusOfRemaining } from '@/lib/workStatusOfRemaining';
 import type { JobRequest } from '@/types';
+import TrendDelta from '../stuck/TrendDelta';
 import { Pager, buHex, fmt } from './V2Parts';
 
 type Field = 'requested' | 'filled' | 'cancelled' | 'remaining';
-type Topic = { key: string; label: string; field: Field; rows: StuckRequest[]; group: 'eq' | 'status' };
+type Topic<T extends StuckMonthRow = StuckRequest> = { key: string; label: string; field: Field; rows: T[]; group: 'eq' | 'status' };
 type FilterKey = 'rec' | 'scr' | 'kind';
 
 const NO_SCREENER = 'ยังไม่ได้ตั้งเจ้าหน้าที่คัดสรร';
 const NO_KIND = 'ไม่ระบุ';
 const KIND_ORDER: RequestLeadKind[] = ['advance', 'urgent', 'retroactive'];
-const valueOf: Record<FilterKey, (r: StuckRequest) => string> = {
+const valueOf: Record<FilterKey, (r: StuckMonthRow) => string> = {
   rec: recruiterLabelOf,
   scr: (r) => r.screener?.trim() || NO_SCREENER,
   kind: (r) => (r.leadKind ? REQUEST_LEAD_KIND_LABEL[r.leadKind] : NO_KIND),
@@ -43,10 +45,25 @@ const FILTERS: Array<{ key: FilterKey; label: string }> = [
 const KIND_TONE: Record<RequestLeadKind, ToneKey> = { advance: 'success', urgent: 'warn', retroactive: 'danger' };
 const DEFAULT_TOPIC = 'work_status_in_progress';
 const topicHex = (key: string) => REQUEST_TOPIC_HEX[key] ?? REQUEST_TOPIC_HEX.work_status_none;
-const buKey = (r: StuckRequest) => r.bu?.trim() || BU_UNKNOWN;
+const buKey = (r: StuckMonthRow) => r.bu?.trim() || BU_UNKNOWN;
 const BU_ORDER = ['LBD', 'LBA', 'LM', 'SN', 'DS', 'CR'];
 const buRank = (b: string) => (b === BU_UNKNOWN ? 99 : BU_ORDER.indexOf(b) < 0 ? 50 : BU_ORDER.indexOf(b));
-const sumOf = (rows: readonly StuckRequest[], f: Field) => rows.reduce((n, r) => n + (Number(r[f]) || 0), 0);
+const sumOf = (rows: readonly StuckMonthRow[], f: Field) => rows.reduce((n, r) => n + (Number(r[f]) || 0), 0);
+/** เรื่องทั้งหมดของใบชุดหนึ่ง — ตัวเดียวทั้งเลขใหญ่ กราฟ BU และกราฟรายเดือน (ใบของเดือน = ช่องชุดย่อ `StuckMonthRow`) */
+function topicsOf<T extends StuckMonthRow>(kept: readonly T[], jobs: readonly JobRequest[] | null): Topic<T>[] {
+  const eq = stuckEquation(kept);
+  const list: Topic<T>[] = [
+    { key: 'carried', label: 'ยอดยกมา', field: 'requested', rows: eq.carried, group: 'eq' },
+    { key: 'new', label: 'ขอใหม่', field: 'requested', rows: eq.new, group: 'eq' },
+    { key: 'filled', label: 'หาได้แล้ว', field: 'filled', rows: kept.filter((r) => r.filled > 0), group: 'eq' },
+    { key: 'cancelled', label: 'ยกเลิก', field: 'cancelled', rows: kept.filter((r) => r.cancelled > 0), group: 'eq' },
+    { key: 'remaining', label: 'เหลือหา', field: 'remaining', rows: eq.remaining, group: 'eq' },
+  ];
+  if (jobs) for (const b of workStatusOfRemaining(eq.remaining, jobs)) if (b.id !== STATUS_TOTAL_ID) list.push({ key: b.id, label: b.label, field: 'remaining', rows: b.rows, group: 'status' });
+  return list;
+}
+/** สีของทิศบนกราฟรายเดือน — หาได้แล้วเพิ่ม = ดี · งานค้าง/ยกเลิกเพิ่ม = แย่ · ที่เหลือบอกทิศอย่างเดียว */
+const TOPIC_SENSE: Record<string, TrendSense> = { filled: 'good', carried: 'bad', cancelled: 'bad', remaining: 'bad' };
 const aiYesOf = (r: StuckRequest) => r.aiYesIds?.length ?? r.signals?.counts?.aiYes ?? 0;
 const apptOf = (r: StuckRequest) => r.apptIds?.length ?? r.signals?.counts?.appointed ?? 0;
 
@@ -55,6 +72,10 @@ export default function RequestBuPanel({
   jobs,
   bus,
   rangeText,
+  months,
+  monthsError = null,
+  monthsCapped = false,
+  today,
   error,
   onOpenRequest,
   onNames,
@@ -66,6 +87,13 @@ export default function RequestBuPanel({
   jobs: readonly JobRequest[] | null;
   bus: readonly string[];
   rangeText: string;
+  /** ใบขอทีละเดือนของช่วงที่เลือก (`part=months`) · null = ยังโหลด */
+  months: readonly StuckMonthBlock[] | null;
+  monthsError?: string | null;
+  /** ช่วงยาวเกิน 12 เดือน — กราฟเอา 12 เดือนล่าสุด */
+  monthsCapped?: boolean;
+  /** วันนี้ (YYYY-MM-DD) — เดือนที่จบไปแล้วไม่มีสถานะทำงานย้อนหลัง (ERP เก็บแค่สถานะปัจจุบัน) */
+  today: string;
   error: string | null;
   onOpenRequest: (jobId: string) => void;
   onNames: (title: string, ids: readonly string[]) => void;
@@ -84,23 +112,12 @@ export default function RequestBuPanel({
   React.useEffect(() => setPage(1), [picked, topicKey, bu, q]);
 
   const pass = React.useCallback(
-    (r: StuckRequest, skip?: FilterKey) => FILTERS.every((f) => f.key === skip || !picked[f.key].length || picked[f.key].includes(valueOf[f.key](r))),
+    (r: StuckMonthRow, skip?: FilterKey) => FILTERS.every((f) => f.key === skip || !picked[f.key].length || picked[f.key].includes(valueOf[f.key](r))),
     [picked],
   );
   const kept = React.useMemo(() => (rows ? rows.filter((r) => pass(r)) : null), [rows, pass]);
   const eq = React.useMemo(() => (kept ? stuckEquation(kept) : null), [kept]);
-  const topics = React.useMemo<Topic[]>(() => {
-    if (!kept || !eq) return [];
-    const list: Topic[] = [
-      { key: 'carried', label: 'ยอดยกมา', field: 'requested', rows: eq.carried, group: 'eq' },
-      { key: 'new', label: 'ขอใหม่', field: 'requested', rows: eq.new, group: 'eq' },
-      { key: 'filled', label: 'หาได้แล้ว', field: 'filled', rows: kept.filter((r) => r.filled > 0), group: 'eq' },
-      { key: 'cancelled', label: 'ยกเลิก', field: 'cancelled', rows: kept.filter((r) => r.cancelled > 0), group: 'eq' },
-      { key: 'remaining', label: 'เหลือหา', field: 'remaining', rows: eq.remaining, group: 'eq' },
-    ];
-    if (jobs) for (const b of workStatusOfRemaining(eq.remaining, jobs)) if (b.id !== STATUS_TOTAL_ID) list.push({ key: b.id, label: b.label, field: 'remaining', rows: b.rows, group: 'status' });
-    return list;
-  }, [kept, eq, jobs]);
+  const topics = React.useMemo<Topic[]>(() => (kept ? topicsOf(kept, jobs) : []), [kept, jobs]);
   // สถานะยังไม่มา (เส้นใบขอยังโหลด) = โชว์เหลือหาไปก่อน
   const topic = topics.find((t) => t.key === topicKey) ?? topics.find((t) => t.key === 'remaining') ?? null;
 
@@ -129,6 +146,18 @@ export default function RequestBuPanel({
   const top = Math.ceil((max * 1.1) / step) * step;
   const ticks = Array.from({ length: Math.floor(top / step) + 1 }, (_, i) => i * step);
   const pickBu = (b: string) => setBu((cur) => (cur === b ? null : b));
+
+  /** กราฟรายเดือนของเรื่องที่เลือก — ตัวกรอง/BU เดียวกับข้างบน · สถานะทำงานของเดือนที่จบไปแล้ว = null (ไม่มีข้อมูลย้อนหลัง ห้ามยุบเป็น 0) */
+  const monthly = React.useMemo(() => {
+    if (!months || !topic) return null;
+    const withYear = new Set(months.map((m) => m.month.slice(0, 4))).size > 1;
+    return months.map((m) => {
+      const t = topicsOf(m.rows.filter((r) => pass(r)), jobs).find((x) => x.key === topic.key);
+      const v = topic.group === 'status' && m.to < today ? null : t ? sumOf(t.rows.filter((r) => !bu || buKey(r) === bu), t.field) : 0;
+      return { month: m.month, label: monthWindowLabel(m, withYear), v };
+    });
+  }, [months, topic, pass, jobs, bu, today]);
+  const monthTop = Math.max(1, ...(monthly ?? []).map((m) => m.v ?? 0));
 
   const listAll = React.useMemo(() => {
     if (!topic) return [];
@@ -315,6 +344,33 @@ export default function RequestBuPanel({
               ))}
             </div>
             </div>
+          </div>
+
+          {/* รายเดือน — เลือกช่วงข้ามเดือนแล้วเห็นว่าเพิ่มขึ้นหรือลดลง (เจ้าของ 20 พ.ย. 2569) · อยู่เสมอ เดือนเดียว = แท่งเดียว */}
+          <div className="space-y-2 border-t pt-4" data-testid="req-bu-months">
+            <p className="text-sm font-medium">
+              รายเดือน{monthsCapped ? ' · 12 เดือนล่าสุด' : ''} · {bu ?? 'ทุก BU'}
+            </p>
+            {monthsError ? <p className="text-sm text-destructive">{monthsError}</p> : null}
+            {!monthly ? (
+              <Skeleton className="h-48 rounded-xl" />
+            ) : (
+              <div className="overflow-x-auto">
+                <div className="flex h-48 gap-4 sm:gap-6">
+                  {monthly.map((m, i) => (
+                    <div key={m.month} className="flex w-24 shrink-0 flex-col items-center gap-1 text-center" data-testid={`req-bu-month-${m.month}`}>
+                      <div className="flex w-full min-h-0 flex-1 flex-col items-center justify-end gap-1 border-b">
+                        <span className={cn('rounded-full border bg-background px-2 text-xs font-medium tabular-nums', m.v === null && DASH.sub)}>{m.v === null ? 'ไม่มีข้อมูล' : fmt(m.v)}</span>
+                        <span className="w-8 rounded-t-lg" style={{ height: `${((m.v ?? 0) / monthTop) * 100}%`, minHeight: 2, background: topicHex(topic.key) }} />
+                      </div>
+                      <p className="text-sm font-medium">{m.label}</p>
+                      {/* เดือนแรกไม่มีเดือนก่อนให้เทียบ — จองบรรทัดไว้ แท่งทุกเดือนสูงเท่ากัน */}
+                      {i === 0 ? <span className="text-xs">&nbsp;</span> : <TrendDelta cur={m.v} prev={monthly[i - 1].v} sense={TOPIC_SENSE[topic.key] ?? 'plain'} />}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="space-y-3 border-t pt-4" data-testid="req-bu-list">

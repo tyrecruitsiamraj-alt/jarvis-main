@@ -40,6 +40,6 @@ describe('จดยอดใบขอเหลือหารายวัน', (
     expect(sql).not.toMatch(/^\s*(delete|update|drop|alter) /im);
     expect(readFileSync('server/local-api.ts', 'utf8')).toContain('startRequestDailySnapshotWorker(() => loadOpenStuckRequestsAll());');
     expect(readFileSync('api/_lib/requestDailySnapshot.ts', 'utf8')).toContain("REQUEST_DAILY_SNAPSHOT_ENABLED || '').trim().toLowerCase() === 'false'");
-    expect(readFileSync('api/_handlers/recruit-stuck.ts', 'utf8')).toContain("req.query?.part === 'daily' ? 'daily'");
+    expect(readFileSync('api/_handlers/recruit-stuck.ts', 'utf8')).toContain("q === 'monthly' || q === 'daily' || q === 'months' ? q : 'requests'");
   });
 });
