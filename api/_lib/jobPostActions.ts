@@ -48,11 +48,23 @@ export const STANDALONE_KEY_PREFIX = 'standalone:';
 
 async function loadLinks(jobId?: string) {
   const standalone = jobId?.startsWith(STANDALONE_KEY_PREFIX) ? jobId.slice(STANDALONE_KEY_PREFIX.length) : null;
-  const { rows } = await dbQuery<JobPostLinkInput & { id: string; code: string; channel_label: string | null; fb_group_id: string | null; created_by_name: string | null; post_url: string | null }>(
+  // ใครทำ (เจ้าของ 20 พ.ย. 2569 "มันต้องโชว์ทันทีเลยสิ่ว่าใครสั่งทำอะไร ไม่งั้นจะรู้ได้ไงว่าแต่ละวันทำอะไรไปแล้ว")
+  // link_by = ผู้รับผิดชอบลิงก์ › คนกด Gen (ชื่อเล่น) · posted_* = ลิงก์โพสต์ล่าสุดของลิงก์ + คนวาง (ชื่อเล่น) + เวลาวาง
+  const { rows } = await dbQuery<
+    JobPostLinkInput & { id: string; code: string; channel_label: string | null; fb_group_id: string | null; created_by_name: string | null; post_url: string | null; posted_at: string | null; posted_by: string | null; link_by: string | null }
+  >(
     `select l.id::text, coalesce(p.job_id, '${STANDALONE_KEY_PREFIX}' || p.standalone_kind) as job_id, l.note, l.created_at, l.hit_count, l.code, l.channel_label, l.fb_group_id, p.created_by_name,
-       (select x.post_url from ${POSTS} x where x.link_id = l.id and x.post_url is not null order by x.day desc limit 1) as post_url,
+       lp.post_url, lp.posted_at, lp.posted_by,
+       coalesce(nullif(btrim(l.responsible_name), ''), ${STAFF_NAME_SQL('cu', 'p.created_by_name')}) as link_by,
        coalesce(a.n, 0)::int as applicants
      from ${LINKS} l join ${POSTINGS} p on p.id = l.posting_id
+     left join ${USERS} cu on cu.id = coalesce(l.responsible_user_id, l.created_by_user_id)
+     left join lateral (
+       select x.post_url, x.created_at as posted_at, ${STAFF_NAME_SQL('pu', 'x.posted_by_name')} as posted_by
+         from ${POSTS} x left join ${USERS} pu on pu.id = x.posted_by_user_id
+        where x.link_id = l.id and x.post_url is not null
+        order by x.day desc, x.created_at desc limit 1
+     ) lp on true
      left join (select link_id, count(*) as n from ${APPS} where link_id is not null group by link_id) a on a.link_id = l.id
      where ${standalone !== null ? 'p.job_id is null and p.standalone_kind = $1' : jobId ? 'p.job_id = $1' : '(p.job_id is not null or p.standalone_kind is not null)'}
      order by l.created_at`,
@@ -90,7 +102,7 @@ export async function listJobPostActions(allowJob: (jobId: string) => boolean): 
 
 export type JobPostActionsDetail = {
   summary: JobPostActionsSummary;
-  links: Array<{ id: string; origin: JobPostLinkOrigin; code: string; channel_label: string | null; created_at: string; created_by_name: string | null; clicks: number; applicants: number; post_url: string | null }>;
+  links: Array<{ id: string; origin: JobPostLinkOrigin; code: string; channel_label: string | null; created_at: string; created_by_name: string | null; link_by: string | null; clicks: number; applicants: number; post_url: string | null; posted_at: string | null; posted_by: string | null }>;
   orders: Array<{ request_type: 'content' | 'scraping'; status: string; created_at: string; requested_by_name: string | null; notes: string | null }>;
   groups: { statuses: SoPostGroupStatus[]; rows: SoPostGroupRow[]; error: string | null };
 };
@@ -118,9 +130,12 @@ export async function getJobPostActions(jobId: string, requestNo: string): Promi
         channel_label: l.channel_label,
         created_at: l.created_at,
         created_by_name: l.created_by_name,
+        link_by: l.link_by,
         clicks: l.hit_count,
         applicants: l.applicants,
         post_url: l.post_url,
+        posted_at: l.posted_at,
+        posted_by: l.posted_by,
       }))
       .reverse(),
     orders: orders

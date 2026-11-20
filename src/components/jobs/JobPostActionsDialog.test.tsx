@@ -10,7 +10,8 @@ import { JobPostActionsPanel } from './JobPostActionsDialog';
 
 const link = (id: string, label: string, post_url: string | null) => ({
   id, origin: 'manual' as const, code: `c${id}`, channel_label: `Facebook · Facebook Group · ${label}`, created_at: '2026-11-13T05:56:00Z',
-  created_by_name: 'ใหม่', clicks: 1, applicants: 0, post_url,
+  created_by_name: 'ใหม่', link_by: 'ใหม่', clicks: 1, applicants: 0, post_url,
+  posted_at: post_url ? '2026-11-20T02:58:26Z' : null, posted_by: post_url ? 'เจมส์' : null,
 });
 vi.mock('@/lib/jobPostActionsApi', () => ({
   fetchJobPostActionsDetail: vi.fn(async () => ({
@@ -33,5 +34,13 @@ describe('แท็บโพสต์เอง: Gen link / โพสต์', () 
     expect(rows).toHaveLength(1);
     expect(rows[0].textContent).toContain('กลุ่ม A');
     expect(rows[0].querySelector('a')?.getAttribute('href')).toBe('https://www.facebook.com/groups/1/posts/2/');
+    // ใครทำ + เมื่อไหร่ (เจ้าของ 20 พ.ย. 2569 "ต้องโชว์ทันทีเลยสิ่ว่าใครสั่งทำอะไร")
+    expect(screen.getByText('วันที่โพสต์')).toBeTruthy();
+    expect(screen.getByText('คนโพสต์')).toBeTruthy();
+    expect(rows[0].querySelector('[data-testid="job-actions-link-by"]')?.textContent).toBe('เจมส์');
+    expect(rows[0].textContent).toContain('20 พ.ย. 2569');
+    fireEvent.click(screen.getByTestId('job-actions-manual-gen'));
+    expect(screen.getByText('คนสร้าง')).toBeTruthy();
+    expect(screen.getAllByTestId('job-actions-link-by')[0].textContent).toBe('ใหม่');
   }, 15_000);
 });

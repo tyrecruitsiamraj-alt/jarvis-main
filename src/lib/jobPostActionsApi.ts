@@ -18,7 +18,8 @@ export async function fetchJobPostActions(): Promise<{ byJob: Record<string, Job
 
 export type JobPostActionsDetail = {
   summary: JobPostActionsSummary;
-  links: Array<{ id: string; origin: JobPostLinkOrigin; code: string; channel_label: string | null; created_at: string; created_by_name: string | null; clicks: number; applicants: number; post_url: string | null }>;
+  /** link_by = ผู้รับผิดชอบลิงก์ › คนกด Gen · posted_at/posted_by = ลิงก์โพสต์ล่าสุด เวลาวาง + คนวาง (20 พ.ย. 2569) */
+  links: Array<{ id: string; origin: JobPostLinkOrigin; code: string; channel_label: string | null; created_at: string; created_by_name: string | null; link_by?: string | null; clicks: number; applicants: number; post_url: string | null; posted_at?: string | null; posted_by?: string | null }>;
   orders: Array<{ request_type: 'content' | 'scraping'; status: string; created_at: string; requested_by_name: string | null; notes: string | null }>;
   groups: { statuses: SoPostGroupStatus[]; rows: SoPostGroupRow[]; error: string | null };
 };

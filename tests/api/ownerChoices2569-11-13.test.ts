@@ -23,6 +23,8 @@ describe('ข้อเคาะ 13 พ.ย. 2569', () => {
   it('ป๊อปทำอะไรไปแล้ว: ทุกตาราง table-fixed + ความกว้างคอลัมน์ตายตัว (สลับแท็บ/กรองแล้วหัวไม่ขยับ)', () => {
     const src = read('src/components/jobs/JobPostActionsDialog.tsx');
     expect(src.match(/table-fixed/g)?.length).toBeGreaterThanOrEqual(3);
-    expect(src).toContain('<TableHead className="w-36 whitespace-nowrap text-xs">วันที่สร้าง</TableHead>');
+    // 20 พ.ย. 2569 หัวคอลัมน์วันที่เปลี่ยนตามแท็บ (วันที่สร้าง / วันที่โพสต์) ความกว้างเดิม + คอลัมน์คนทำ
+    expect(src).toContain('<TableHead className="w-36 whitespace-nowrap text-xs">{manualPick === \'posted\' ? \'วันที่โพสต์\' : \'วันที่สร้าง\'}</TableHead>');
+    expect(src).toContain('<TableHead className="w-24 text-xs">{manualPick === \'posted\' ? \'คนโพสต์\' : \'คนสร้าง\'}</TableHead>');
   });
 });

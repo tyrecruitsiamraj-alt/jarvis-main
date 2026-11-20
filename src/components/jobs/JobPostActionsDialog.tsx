@@ -90,7 +90,11 @@ export function JobPostActionsPanel({
   const groupRows = useMemo(() => (groups?.rows ?? []).filter((r) => !statusPick || r.status === statusPick), [groups, statusPick]);
   const manualAll = useMemo(() => (d?.links ?? []).filter((l) => l.origin === 'manual'), [d]);
   const manualGen = useMemo(() => manualAll.filter((l) => !l.post_url), [manualAll]);
-  const manualPosted = useMemo(() => manualAll.filter((l) => l.post_url), [manualAll]);
+  // โพสต์ล่าสุดก่อน (เจ้าของ 20 พ.ย. 2569 "ต้องโชว์ทันทีว่าใครสั่งทำอะไร … แต่ละวันทำอะไรไปแล้ว")
+  const manualPosted = useMemo(
+    () => manualAll.filter((l) => l.post_url).sort((a, b) => (b.posted_at ?? b.created_at).localeCompare(a.posted_at ?? a.created_at)),
+    [manualAll],
+  );
   const manualLinks = manualPick === 'posted' ? manualPosted : manualGen;
   const scrapOrders = useMemo(() => (d?.orders ?? []).filter((o) => o.request_type === 'scraping'), [d]);
   /** กล่องลอย (`standalone:<ประเภท>` · 16 พ.ย. 2569) มีแต่โพสต์เอง — ไม่มีกล่อง Autopost/Scrap */
@@ -257,10 +261,11 @@ export function JobPostActionsPanel({
             </div>
             <div className="overflow-x-auto">
               {/* table-fixed + ความกว้างคอลัมน์ตายตัว — สลับ Gen link / โพสต์ แล้วหัวตารางไม่ขยับ (เจ้าของ 13 พ.ย. 2569 "พวกวันที่สั่ง ลิงค์ อะไรนั่นมันเลื่อน") */}
-              <Table className="min-w-[44rem] table-fixed">
+              <Table className="min-w-[50rem] table-fixed">
                 <TableHeader>
                   <TableRow className={DASH.tableHead}>
-                    <TableHead className="w-36 whitespace-nowrap text-xs">วันที่สร้าง</TableHead>
+                    <TableHead className="w-36 whitespace-nowrap text-xs">{manualPick === 'posted' ? 'วันที่โพสต์' : 'วันที่สร้าง'}</TableHead>
+                    <TableHead className="w-24 text-xs">{manualPick === 'posted' ? 'คนโพสต์' : 'คนสร้าง'}</TableHead>
                     <TableHead className="text-xs">ช่องทาง / กลุ่ม</TableHead>
                     <TableHead className="w-16 text-right text-xs">คลิก</TableHead>
                     <TableHead className="w-16 text-right text-xs">กรอก</TableHead>
@@ -270,14 +275,17 @@ export function JobPostActionsPanel({
                 <TableBody>
                   {manualLinks.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={5} className={cn('py-6 text-center text-sm', DASH.sub)}>
+                      <TableCell colSpan={6} className={cn('py-6 text-center text-sm', DASH.sub)}>
                         {manualPick === 'posted' ? 'ยังไม่มีกลุ่มที่วางลิงก์โพสต์' : 'ไม่มี Gen link ที่ยังไม่ได้วางลิงก์โพสต์'}
                       </TableCell>
                     </TableRow>
                   ) : (
                     slice(manualLinks).map((l) => (
                       <TableRow key={l.id} data-testid="job-actions-link-row">
-                        <TableCell className="whitespace-nowrap text-xs tabular-nums">{formatDateTimeTh(l.created_at)}</TableCell>
+                        <TableCell className="whitespace-nowrap text-xs tabular-nums">{formatDateTimeTh(manualPick === 'posted' ? (l.posted_at ?? l.created_at) : l.created_at)}</TableCell>
+                        <TableCell className="break-words text-sm" data-testid="job-actions-link-by">
+                          {(manualPick === 'posted' ? l.posted_by : (l.link_by ?? l.created_by_name)) || '—'}
+                        </TableCell>
                         <TableCell className="break-words text-sm">{l.channel_label ?? '—'}</TableCell>
                         <TableCell className="text-right text-sm tabular-nums">{th(l.clicks)}</TableCell>
                         <TableCell className="text-right text-sm tabular-nums">{th(l.applicants)}</TableCell>
