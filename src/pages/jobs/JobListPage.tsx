@@ -8,7 +8,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import PageHeader from '@/components/shared/PageHeader';
 import type { JobRequest } from '@/types';
 import { JOB_TYPE_LABELS } from '@/types';
-import { jobSectorLabel, requestActionOrTypeLabel } from '@/lib/unitRequestDisplay';
+import { jobSectorLabel, publicJobPositionLabel, requestActionOrTypeLabel } from '@/lib/unitRequestDisplay';
 import {
   UNIT_SECTOR_FILTER_OPTIONS,
   matchesAnyUnitSectorFilter,
@@ -153,6 +153,7 @@ const JobListPage: React.FC = () => {
     unitFilter,
     departmentFilter: departmentFilterRaw,
     jobSubtypeFilter,
+    positionFilter,
     recruiterFilter,
     screenerFilter,
     oplFilter,
@@ -282,6 +283,7 @@ const JobListPage: React.FC = () => {
       lockedDepartmentCode ? [] : departmentFilterRaw,
       unitFilter,
       jobSubtypeFilter,
+      positionFilter,
       recruiterFilter,
       screenerFilter,
       oplFilter,
@@ -307,6 +309,7 @@ const JobListPage: React.FC = () => {
     departmentFilterRaw,
     unitFilter,
     jobSubtypeFilter,
+    positionFilter,
     recruiterFilter,
     screenerFilter,
     oplFilter,
@@ -437,6 +440,18 @@ const JobListPage: React.FC = () => {
 
   const scopedJobs = subtypeScopedJobs;
 
+  /** ตำแหน่ง — ป้ายเดียวกับคอลัมน์ตำแหน่งในตาราง · ใบมากสุดก่อน (เจ้าของ 20 พ.ย. 2569 "เพิ่มตัวกรอง ตำแหน่งให้หน่อย") */
+  const positionOptions = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const j of scopedJobs) {
+      const p = publicJobPositionLabel(j);
+      counts.set(p, (counts.get(p) ?? 0) + 1);
+    }
+    return [...counts.entries()]
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'th'))
+      .map(([p, n]) => ({ value: p, label: `${p} (${n})` }));
+  }, [scopedJobs]);
+
   const unitOptions = useMemo(
     () => groupedUnitFilterOptions(scopedJobs),
     [scopedJobs],
@@ -531,6 +546,7 @@ const JobListPage: React.FC = () => {
         if (!matchesAnyScreenerFilter(j, screenerFilter)) return false;
         if (!matchesAnyOplFilter(j, oplFilter)) return false;
         if (!matchesAnyUrgencyFilter(j, urgencyFilter)) return false;
+        if (positionFilter.length > 0 && !positionFilter.includes(publicJobPositionLabel(j))) return false;
         if (
           workStatusFilter.length > 0 &&
           !workStatusFilter.includes(resolveUnitRequestWorkStatus(j.work_status))
@@ -560,7 +576,7 @@ const JobListPage: React.FC = () => {
           ? compareJobsByTableColumn(a, b, tableSort, undefined, { applicantCount: applicantCountOf, scrapCount: scrapCountOf })
           : compareJobsForListSort(a, b, sort),
       );
-  }, [scopedJobs, filter, search, unitFilter, recruiterFilter, screenerFilter, oplFilter, urgencyFilter, workStatusFilter, noteFilter, replacementFilter, sectorFilter, ageDaysFilter, gapFilter, applicantFilter, applicantCountOf, scrapCountOf, sort, tableSort, unitScopeNames, lookupJob]);
+  }, [scopedJobs, filter, search, unitFilter, positionFilter, recruiterFilter, screenerFilter, oplFilter, urgencyFilter, workStatusFilter, noteFilter, replacementFilter, sectorFilter, ageDaysFilter, gapFilter, applicantFilter, applicantCountOf, scrapCountOf, sort, tableSort, unitScopeNames, lookupJob]);
 
   const totalPages = getTotalPages(filtered.length, pageSize);
 
@@ -737,6 +753,14 @@ const JobListPage: React.FC = () => {
             />
           ) : null}
 
+          <FilterMultiSelect
+            id="job-list-position"
+            label="ตำแหน่ง"
+            summaryNoun="ตำแหน่ง"
+            values={positionFilter}
+            onChange={(v) => updateListState({ positionFilter: v })}
+            options={positionOptions}
+          />
 
           <FilterMultiSelect
             id="job-list-recruiter"

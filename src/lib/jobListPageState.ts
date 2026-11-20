@@ -27,6 +27,8 @@ export type JobListPageState = {
   unitFilter: string[];
   departmentFilter: string[];
   jobSubtypeFilter: string[];
+  /** ตำแหน่ง (ป้ายเดียวกับคอลัมน์ตำแหน่ง `publicJobPositionLabel` · เจ้าของ 20 พ.ย. 2569) — [] = ทั้งหมด */
+  positionFilter: string[];
   recruiterFilter: string[];
   screenerFilter: string[];
   oplFilter: string[];
@@ -58,6 +60,7 @@ export const JOB_LIST_DEFAULTS: JobListPageState = {
   unitFilter: [],
   departmentFilter: [],
   jobSubtypeFilter: [],
+  positionFilter: [],
   recruiterFilter: [],
   screenerFilter: [],
   oplFilter: [],
@@ -136,6 +139,7 @@ export function parseJobListSearchParams(params: URLSearchParams): JobListPageSt
     unitFilter: parseMulti(params.get('u')),
     departmentFilter: parseMulti(params.get('d')),
     jobSubtypeFilter: parseMulti(params.get('st')),
+    positionFilter: parseMulti(params.get('pos')),
     recruiterFilter: parseMulti(params.get('r')),
     screenerFilter: parseMulti(params.get('sc')),
     oplFilter: parseMulti(params.get('opl')),
@@ -179,6 +183,7 @@ export function buildJobListSearchParams(state: JobListPageState): URLSearchPara
   setMulti('u', state.unitFilter);
   setMulti('d', state.departmentFilter);
   setMulti('st', state.jobSubtypeFilter);
+  setMulti('pos', state.positionFilter);
   setMulti('r', state.recruiterFilter);
   setMulti('sc', state.screenerFilter);
   setMulti('opl', state.oplFilter);
@@ -208,6 +213,7 @@ const FILTER_RESET_KEYS: (keyof JobListPageState)[] = [
   'unitFilter',
   'departmentFilter',
   'jobSubtypeFilter',
+  'positionFilter',
   'recruiterFilter',
   'screenerFilter',
   'oplFilter',
