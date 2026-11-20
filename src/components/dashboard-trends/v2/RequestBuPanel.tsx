@@ -22,7 +22,6 @@ import { REQUEST_LEAD_KIND_LABEL, type RequestLeadKind } from '@/lib/requestLead
 import { STATUS_TOTAL_ID, workStatusOfRemaining } from '@/lib/workStatusOfRemaining';
 import type { JobRequest } from '@/types';
 import { Pager, buHex, fmt } from './V2Parts';
-import BuDonut from './BuDonut';
 
 type Field = 'requested' | 'filled' | 'cancelled' | 'remaining';
 type Topic = { key: string; label: string; field: Field; rows: StuckRequest[]; group: 'eq' | 'status' };
@@ -250,13 +249,9 @@ export default function RequestBuPanel({
               </div>
             </div>
 
-            {/* กราฟแท่ง + โดนัทสัดส่วน BU ข้างกัน (เจ้าของ 19 พ.ย. 2569 "เอาไปทำกราฟโดนัท ข้างๆกราฟแท่งดีกว่า กราฟแท่งจะได้ไม่ดูอ้วน") */}
-            <div className="grid min-w-0 gap-5 md:grid-cols-[1fr_12rem]">
+            {/* กราฟแท่ง BU + ตัวเลขทุกเรื่องข้างกัน · หัว "… แยกตาม BU" ถอดแล้ว (เจ้าของ 20 พ.ย. 2569) */}
+            <div className="grid min-w-0 gap-5 md:grid-cols-[1fr_15rem]">
             <div className="min-w-0">
-              <p className="mb-2 flex items-center gap-2 text-sm font-medium">
-                <span className="size-2.5 rounded-sm" style={{ background: topicHex(topic.key) }} />
-                {topic.label} แยกตาม BU
-              </p>
               <div className="grid grid-cols-[2.5rem_1fr] gap-2" data-testid="req-bu-chart">
                 <div className="relative h-48">
                   {ticks.map((t) => (
@@ -294,14 +289,31 @@ export default function RequestBuPanel({
                 ))}
               </div>
             </div>
-            <BuDonut
-              slices={byBu.map((b) => ({ key: b.bu, label: b.bu, value: b.v, hex: buHex(b.bu) }))}
-              selected={bu}
-              onPick={pickBu}
-              center={total}
-              unit="อัตรา"
-              testId="req-bu-donut"
-            />
+            {/* ตัวเลขทุกเรื่องแทนโดนัท (เจ้าของ 20 พ.ย. 2569 "เอามาโชว์ตัวเลขแทนกราฟโดนัทได้ไหม") · กดแถว = เลือกเรื่อง */}
+            <div className="space-y-2 md:border-l md:pl-4" data-testid="req-bu-numbers">
+              {(['eq', 'status'] as const).map((g) => (
+                <div key={g}>
+                  <p className={cn('px-1.5 pb-1 text-xs', DASH.sub)}>{g === 'eq' ? 'ใบขอ' : 'เหลือหา แยกตามสถานะทำงาน'}</p>
+                  {topics
+                    .filter((t) => t.group === g)
+                    .map((t) => (
+                      <button
+                        key={t.key}
+                        type="button"
+                        onClick={() => setTopicKey(t.key)}
+                        data-testid={`req-bu-number-${t.key}`}
+                        className={cn('grid w-full grid-cols-[0.625rem_1fr_auto] items-center gap-2 rounded-lg px-1.5 py-1 text-left text-xs hover:bg-muted', t.key === topic.key && 'bg-muted font-medium')}
+                      >
+                        <span className="size-2.5 rounded-sm" style={{ background: topicHex(t.key) }} />
+                        <span className="min-w-0 break-words">{t.label}</span>
+                        <span className="text-right tabular-nums">
+                          <b className="font-medium">{fmt(sumOf(t.rows, t.field))}</b> <span className={DASH.sub}>· {subOf(t)}</span>
+                        </span>
+                      </button>
+                    ))}
+                </div>
+              ))}
+            </div>
             </div>
           </div>
 

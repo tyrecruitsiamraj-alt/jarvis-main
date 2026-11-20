@@ -67,8 +67,10 @@ describe('RequestBuPanel', () => {
     const list = screen.getByTestId('req-bu-list');
     expect(within(list).getAllByRole('row').length).toBe(11); // หัว + 10
     expect(screen.getByTestId('req-bu-pager').textContent).toContain('1–10 จาก 13');
-    // โดนัทสัดส่วน BU ข้างกราฟแท่ง — ตรงกลาง = เลขรวม
-    expect(within(screen.getByTestId('req-bu-donut')).getByText('13')).toBeTruthy();
+    // ตัวเลขทุกเรื่องข้างกราฟแท่ง (แทนโดนัท 20 พ.ย. 2569) · กดแถว = เลือกเรื่อง
+    expect(screen.getByTestId('req-bu-number-work_status_in_progress').textContent).toContain('13');
+    fireEvent.click(screen.getByTestId('req-bu-number-remaining'));
+    expect(screen.getByTestId('req-bu-total').textContent).toBe('15');
   });
 
   it('แท่ง BU เรียง LBD ซ้ายสุดเสมอ ไม่ตามลำดับที่ส่งมา', () => {
