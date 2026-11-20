@@ -161,6 +161,7 @@ type Scope = Awaited<ReturnType<typeof loadUserDepartmentScope>>;
 const monthRowOf = (r: StuckRequest): StuckMonthRow => ({
   jobId: r.jobId,
   requestNo: r.requestNo,
+  day: r.day,
   bu: r.bu,
   recruiter: r.recruiter,
   screener: r.screener,

@@ -65,7 +65,7 @@ const months: StuckMonthBlock[] = [
   { month: '2026-11', from: '2026-11-01', to: '2026-11-19', rows },
 ];
 
-function draw(onNames = vi.fn()) {
+function draw(onNames = vi.fn(), compare = false) {
   render(
     <RequestBuPanel
       rows={rows}
@@ -78,6 +78,7 @@ function draw(onNames = vi.fn()) {
       onOpenRequest={vi.fn()}
       onNames={onNames}
       resetKey="k"
+      compare={compare}
     />,
   );
   return onNames;
@@ -134,45 +135,59 @@ describe('RequestBuPanel', () => {
     expect(screen.getByTestId('req-bu-total').textContent).toBe('1');
     expect(screen.getByTestId('req-bu-list').textContent).toContain('LAO6911003');
   });
-  it('รายเดือน — แท่งของเดือน = เลขของเรื่องนั้นในเดือนนั้น · บอกเพิ่มขึ้น/ลดลงจากเดือนก่อน · ป้ายเดือนไม่เต็มบอกช่วงวัน', () => {
+  it('ช่วงวันที่ (ค่าเริ่ม) = แท่ง BU · ไม่มีกราฟรายเดือนแยกข้างล่าง', () => {
     draw();
+    expect(screen.getByTestId('req-bu-chart')).toBeTruthy();
+    expect(screen.queryByTestId('req-bu-compare')).toBeNull();
+    expect(screen.queryByTestId('req-bu-months')).toBeNull();
+  });
+
+  it('เทียบเดือน: กราฟเดิมเป็นแท่งรายเดือน · บอกเพิ่มขึ้น/ลดลงจากเดือนก่อน · ป้ายเดือนไม่เต็มบอกช่วงวัน', () => {
+    draw(vi.fn(), true);
+    expect(screen.queryByTestId('req-bu-chart')).toBeNull();
     fireEvent.click(screen.getByTestId('req-bu-number-new'));
-    const oct = screen.getByTestId('req-bu-month-2026-10');
-    const nov = screen.getByTestId('req-bu-month-2026-11');
-    // ขอใหม่ ต.ค. 10 อัตรา (ใบยกมาไม่นับ) · พ.ย. 15 = เลขใหญ่ของช่วง (ใบชุดเดียวกัน)
-    expect(within(oct).getByText('10')).toBeTruthy();
-    expect(within(oct).getByText('ต.ค.')).toBeTruthy();
-    expect(within(nov).getByText('15')).toBeTruthy();
-    expect(within(nov).getByText('1–19 พ.ย.')).toBeTruthy();
-    expect(nov.textContent).toContain('เพิ่มขึ้น 5');
-    expect(oct.querySelector('[data-trend]')).toBeNull();
-    // หาได้แล้ว: ต.ค. 1 → พ.ย. 0
+    const cmp = screen.getByTestId('req-bu-compare');
+    // ขอใหม่ ต.ค. 10 อัตรา (ใบยกมาไม่นับ) · พ.ย. 15 = เลขใหญ่ของช่วง
+    expect(within(screen.getByTestId('req-bu-month-2026-10')).getByText('10')).toBeTruthy();
+    expect(within(screen.getByTestId('req-bu-month-2026-11')).getByText('15')).toBeTruthy();
+    expect(within(cmp).getByText('ต.ค.')).toBeTruthy();
+    expect(within(cmp).getByText('1–19 พ.ย.')).toBeTruthy();
+    expect(cmp.textContent).toContain('เพิ่มขึ้น 5');
     fireEvent.click(screen.getByTestId('req-bu-number-filled'));
-    expect(screen.getByTestId('req-bu-month-2026-11').textContent).toContain('ลดลง 1');
+    expect(screen.getByTestId('req-bu-compare').textContent).toContain('ลดลง 1');
   });
 
-  it('รายเดือนตามตัวกรองและ BU ที่กด — เลขเดือนท้ายเท่าแท่ง BU', () => {
-    draw();
+  it('เทียบเดือน: กดแท่งเดือน = เส้นรายวันต่อ BU ที่เดิม · ยอดของเส้นรวมเท่าแท่งเดือน · กลับได้', () => {
+    draw(vi.fn(), true);
     fireEvent.click(screen.getByTestId('req-bu-number-new'));
-    fireEvent.click(screen.getByTestId('req-bu-bar-LBA'));
-    expect(screen.getByTestId('req-bu-months').textContent).toContain('รายเดือน · LBA');
-    expect(within(screen.getByTestId('req-bu-month-2026-10')).getByText('1')).toBeTruthy();
-    expect(within(screen.getByTestId('req-bu-month-2026-11')).getByText('1')).toBeTruthy();
-    expect(screen.getByTestId('req-bu-month-2026-11').textContent).toContain('ทรงตัว');
+    fireEvent.click(screen.getByTestId('req-bu-month-2026-11'));
+    const d = screen.getByTestId('req-bu-daily');
+    // พ.ย. ขอใหม่ 15 = LBD 12 + LBA 1 + LM 2 (ทุกใบเข้าวันที่ 3)
+    expect(d.textContent).toContain('LBD 12');
+    expect(d.textContent).toContain('LBA 1');
+    expect(d.textContent).toContain('LM 2');
+    expect(screen.getByTestId('req-bu-daily-SN')).toBeTruthy();
+    fireEvent.click(screen.getByTestId('req-bu-daily-back'));
+    expect(screen.queryByTestId('req-bu-daily')).toBeNull();
+    expect(screen.getByTestId('req-bu-month-2026-11')).toBeTruthy();
   });
 
-  it('สถานะทำงานของเดือนที่จบไปแล้ว = ไม่มีข้อมูล (ไม่ยุบเป็น 0) · เดือนที่ยังไม่จบมีเลข', () => {
-    draw();
-    const oct = screen.getByTestId('req-bu-month-2026-10');
-    const nov = screen.getByTestId('req-bu-month-2026-11');
-    expect(oct.textContent).toContain('ไม่มีข้อมูล');
-    expect(within(nov).getByText('13')).toBeTruthy();
-    expect(nov.textContent).toContain('เทียบไม่ได้');
+  it('เทียบเดือน: มีรายวันเฉพาะขอใหม่ · เรื่องอื่นกดแท่งไม่ได้', () => {
+    draw(vi.fn(), true);
+    fireEvent.click(screen.getByTestId('req-bu-number-filled'));
+    expect((screen.getByTestId('req-bu-month-2026-11') as HTMLButtonElement).disabled).toBe(true);
   });
 
-  it('รายเดือนยังโหลด = ที่ว่างรอ ไม่หาย', () => {
-    render(<RequestBuPanel rows={rows} jobs={jobs} bus={['LBD']} rangeText="" months={null} today={TODAY} error={null} onOpenRequest={vi.fn()} onNames={vi.fn()} resetKey="k" />);
-    expect(screen.getByTestId('req-bu-months')).toBeTruthy();
+  it('เทียบเดือน: สถานะทำงานของเดือนที่จบไปแล้ว = ไม่มีข้อมูล (ไม่ยุบเป็น 0)', () => {
+    draw(vi.fn(), true);
+    expect(screen.getByTestId('req-bu-month-2026-10').textContent).toContain('ไม่มีข้อมูล');
+    expect(within(screen.getByTestId('req-bu-month-2026-11')).getByText('13')).toBeTruthy();
+    expect(screen.getByTestId('req-bu-compare').textContent).toContain('เทียบไม่ได้');
+  });
+
+  it('เทียบเดือนยังโหลด = ที่ว่างรอ ไม่หาย', () => {
+    render(<RequestBuPanel rows={rows} jobs={jobs} bus={['LBD']} rangeText="" months={null} today={TODAY} error={null} onOpenRequest={vi.fn()} onNames={vi.fn()} resetKey="k" compare />);
+    expect(screen.getByTestId('req-bu-compare')).toBeTruthy();
     expect(screen.queryByTestId('req-bu-month-2026-11')).toBeNull();
   });
 });

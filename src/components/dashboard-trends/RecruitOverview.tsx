@@ -154,12 +154,22 @@ const RecruitOverview: React.FC<{
   const [range, setRange] = useState<(DateRangeYmd & { all?: boolean }) | null>(() => rangeFromParams(searchParams));
   /** ป๊อปเลือกช่วง — ปุ่มลัด (7/30 วัน · ทั้งหมด) เลือกแล้วปิดเอง */
   const [periodOpen, setPeriodOpen] = useState(false);
+  /**
+   * ดูแบบเทียบเดือน (เจ้าของ 20 พ.ย. 2569 "ตรงวันที่ก็ต้องทำให้มันเลือกได้ ว่าดูแบบเทียบเดือน หรือ แบบไหน" · Choice "ก้อนใบขอก่อน")
+   * ช่วง = วันแรกของเดือนเริ่ม ถึงวันสุดท้ายของเดือนจบ (เดือนนี้ = ถึงวันนี้) · ส่วนอื่นของหน้าใช้ช่วงเดียวกันตามปกติ · URL `cmp=1`
+   */
+  const [compareMonths, setCompareMonths] = useState(() => searchParams.get('cmp') === '1');
+  /** โหมดในป๊อป (ยังไม่เลือกเดือน = ยังไม่เปลี่ยนหน้า) · เดือนเริ่มที่กดค้างไว้รอเดือนจบ */
+  const [periodTab, setPeriodTab] = useState<'range' | 'compare'>(() => (searchParams.get('cmp') === '1' ? 'compare' : 'range'));
+  const [cmpStart, setCmpStart] = useState<string | null>(null);
   const pickRange = (r: DateRangeYmd & { all?: boolean }) => {
     setRange(r);
+    setCompareMonths(false);
     setPeriodOpen(false);
   };
   const setMonth = (m: string) => {
     setRange(null);
+    setCompareMonths(false);
     setMonthState(m);
   };
   const [rev, setRev] = useState(0);
@@ -185,11 +195,13 @@ const RecruitOverview: React.FC<{
         else p.delete('month');
         if (pickedBu) p.set('bu', pickedBu);
         else p.delete('bu');
+        if (compareMonths && r) p.set('cmp', '1');
+        else p.delete('cmp');
         return p.toString() === prev.toString() ? prev : p;
       },
       { replace: true },
     );
-  }, [range, month, pickedBu, setSearchParams]);
+  }, [range, month, pickedBu, compareMonths, setSearchParams]);
   const [state, setState] = useState<Load>({ data: null, loading: true, error: null });
 
   /**
@@ -260,14 +272,37 @@ const RecruitOverview: React.FC<{
   const prevRange = shiftRange(win, -1);
   const canPrev = isRange ? !data.firstDay || prevRange.to >= data.firstDay : options.includes(shiftMonth(win.month, -1));
   const canNext = isRange ? win.to < data.today : win.month < current;
-  const goPrev = () => (isRange ? setRange(prevRange) : setMonth(shiftMonth(win.month, -1)));
-  const goNext = () => (isRange ? setRange(shiftRange(win, 1)) : setMonth(shiftMonth(win.month, 1)));
+  // เลื่อนช่วง/เลือกวันจากปฏิทิน = แบบช่วงวันที่ (ออกจากเทียบเดือน)
+  const stepRange = (r: DateRangeYmd) => {
+    setRange(r);
+    setCompareMonths(false);
+  };
+  const goPrev = () => (isRange ? stepRange(prevRange) : setMonth(shiftMonth(win.month, -1)));
+  const goNext = () => (isRange ? stepRange(shiftRange(win, 1)) : setMonth(shiftMonth(win.month, 1)));
   /** คำเรียกช่วงในหัวการ์ด — แบบเดือน "เดือนนี้" · แบบช่วง "ช่วงนี้" */
   const period = isRange ? 'ช่วงนี้' : 'เดือนนี้';
   const prevWord = isRange ? 'ช่วงก่อน' : 'เดือนก่อน';
   const appsError = data.errors.apps ?? null;
   // ปุ่มบอกวันที่ที่เลือกจริงเสมอ ไม่ใช่ชื่อเดือน (เจ้าของ 20 พ.ย. 2569 "เปลี่ยนไปใช้คำว่าวันที่ แล้วถ้าเลือกวันไหน หรือ ช่วงวันไหนให้มันขึ้นเป็นตามที่เลือก")
-  const periodLabel = win.all ? 'วันที่ ทั้งหมด' : `วันที่ ${rangeText({ from: win.from, to: win.to })}`;
+  const cmpOn = compareMonths && isRange && !win.all;
+  const periodLabel = cmpOn
+    ? `เทียบเดือน ${monthLabel(win.from.slice(0, 7))}${win.from.slice(0, 7) === win.to.slice(0, 7) ? '' : ` – ${monthLabel(win.to.slice(0, 7))}`}`
+    : win.all
+      ? 'วันที่ ทั้งหมด'
+      : `วันที่ ${rangeText({ from: win.from, to: win.to })}`;
+  /** กดเดือนในโหมดเทียบเดือน — ครั้งแรก = เดือนเริ่ม · ครั้งที่สอง = เดือนจบ (กดกลับหัวได้) แล้วปิดป๊อป */
+  const pickCompareMonth = (m: string) => {
+    if (!cmpStart) {
+      setCmpStart(m);
+      return;
+    }
+    const [a, b] = cmpStart <= m ? [cmpStart, m] : [m, cmpStart];
+    const last = new Date(Date.UTC(Number(b.slice(0, 4)), Number(b.slice(5, 7)), 0)).toISOString().slice(0, 10);
+    setCmpStart(null);
+    setRange({ from: `${a}-01`, to: last > data.today ? data.today : last });
+    setCompareMonths(true);
+    setPeriodOpen(false);
+  };
   /** ปุ่มลัด 7/30 วันล่าสุด กดอยู่ไหม */
   const isLast = (n: number) => {
     const r = lastDays(n);
@@ -347,7 +382,16 @@ const RecruitOverview: React.FC<{
           ) : (
             <span className={cn('text-xs', DASH.sub)}>{data.bu ? `เฉพาะ BU ${data.bu}` : 'ทุก BU'}</span>
           )}
-          <Popover open={periodOpen} onOpenChange={setPeriodOpen}>
+          <Popover
+            open={periodOpen}
+            onOpenChange={(o) => {
+              setPeriodOpen(o);
+              if (o) {
+                setPeriodTab(cmpOn ? 'compare' : 'range');
+                setCmpStart(null);
+              }
+            }}
+          >
             <PopoverTrigger asChild>
               <Button type="button" size="xs" variant="outline" aria-label="เลือกช่วงเวลา" data-testid="recruit-period">
                 <CalendarDays aria-hidden />
@@ -357,6 +401,43 @@ const RecruitOverview: React.FC<{
             </PopoverTrigger>
             {/* มือถือ: ไม่ล้นจอ (เลื่อนในกล่อง) · เลือกปุ่มลัดแล้วปิดเอง (QA 30 ต.ค. 2569) */}
             <PopoverContent align="end" collisionPadding={16} className="max-h-dvh w-80 space-y-4 overflow-y-auto p-4">
+              {/* ดูแบบไหน — ช่วงวันที่ (แบบเดิม) / เทียบเดือน (เลือกเดือนเริ่ม-เดือนจบ) */}
+              {dashV2 ? (
+                <div className="grid grid-cols-2 gap-1 rounded-full border p-1" role="group" aria-label="ดูแบบ">
+                  <Button type="button" size="xs" variant={periodTab === 'range' ? 'default' : 'ghost'} className="rounded-full" aria-pressed={periodTab === 'range'} onClick={() => setPeriodTab('range')} data-testid="recruit-mode-range">
+                    ช่วงวันที่
+                  </Button>
+                  <Button type="button" size="xs" variant={periodTab === 'compare' ? 'default' : 'ghost'} className="rounded-full" aria-pressed={periodTab === 'compare'} onClick={() => setPeriodTab('compare')} data-testid="recruit-mode-compare">
+                    เทียบเดือน
+                  </Button>
+                </div>
+              ) : null}
+              {dashV2 && periodTab === 'compare' ? (
+                <div className="space-y-2" data-testid="recruit-compare-months">
+                  <p className={cn('text-xs', DASH.sub)}>{cmpStart ? 'กดเดือนจบ' : 'กดเดือนเริ่ม'}</p>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {[...options].sort().map((m) => {
+                      const from = cmpOn ? win.from.slice(0, 7) : null;
+                      const to = cmpOn ? win.to.slice(0, 7) : null;
+                      const edge = cmpStart ? m === cmpStart : m === from || m === to;
+                      const inside = !cmpStart && from && to && m > from && m < to;
+                      return (
+                        <Button
+                          key={m}
+                          type="button"
+                          size="xs"
+                          variant={edge ? 'default' : inside ? 'secondary' : 'outline'}
+                          onClick={() => pickCompareMonth(m)}
+                          data-testid={`recruit-cmp-${m}`}
+                        >
+                          {monthLabel(m)}
+                        </Button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : (
+              <>
               <div className="space-y-2">
                 <p className={cn('text-xs', DASH.sub)}>เดือน</p>
                 <div className="flex items-center gap-1">
@@ -404,6 +485,7 @@ const RecruitOverview: React.FC<{
                     if (!r?.from) return;
                     const from = toYmdLocal(r.from);
                     setRange({ from, to: r.to ? toYmdLocal(r.to) : from });
+                    setCompareMonths(false);
                   }}
                 />
               </div>
@@ -424,6 +506,8 @@ const RecruitOverview: React.FC<{
                   ทั้งหมด
                 </Button>
               </div>
+              </>
+              )}
             </PopoverContent>
           </Popover>
         </div>
@@ -439,7 +523,7 @@ const RecruitOverview: React.FC<{
        */}
       {legacyCards ? null : dashV2 ? (
         <Suspense fallback={<MascotState pose="working">กำลังโหลด…</MascotState>}>
-          <RecruitOverviewV2 data={data} />
+          <RecruitOverviewV2 data={data} compareMonths={cmpOn} />
         </Suspense>
       ) : (
         <RecruitStuckBody

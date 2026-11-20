@@ -51,7 +51,8 @@ const dayText = (ymd: string) => `${Number(ymd.slice(8, 10))} ${TH_MONTH[Number(
 const monthText = (ym: string) => `${TH_MONTH[Number(ym.slice(5, 7)) - 1]} ${String(Number(ym.slice(0, 4)) + 543).slice(2)}`;
 
 
-export default function RecruitOverviewV2({ data }: { data: RecruitOverviewResponse }) {
+/** `compareMonths` = ปุ่มวันที่อยู่โหมดเทียบเดือน — ก้อนใบขอเป็นกราฟรายเดือน (เจ้าของ 20 พ.ย. 2569 Choice "ก้อนใบขอก่อน") */
+export default function RecruitOverviewV2({ data, compareMonths = false }: { data: RecruitOverviewResponse; compareMonths?: boolean }) {
   const navigate = useNavigate();
   const [, setSearchParams] = useSearchParams();
   const win = data.window;
@@ -331,6 +332,7 @@ export default function RecruitOverviewV2({ data }: { data: RecruitOverviewRespo
           rangeText={`${rangeShort} · สถานะ ณ ${dayText(win.to)}`}
           months={loadingReq ? null : monthBlocks}
           monthsCapped={monthsCapped}
+          compare={compareMonths}
           monthsError={monthWins.length >= 2 && monthData.key === filterKey ? monthData.error : null}
           today={data.today}
           error={stuck.error && stuck.key === filterKey ? stuck.error : reqFeed.feedState === 'failed' || reqFeed.feedState === 'forbidden' ? 'โหลดสถานะทำงานของใบขอไม่ได้' : null}

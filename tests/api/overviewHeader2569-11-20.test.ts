@@ -10,7 +10,7 @@ const src = readFileSync('src/components/dashboard-trends/RecruitOverview.tsx', 
 
 describe('หัวหน้าภาพรวม', () => {
   it('ปุ่มช่วงเวลาบอกวันที่ที่เลือกจริง ไม่ใช่ชื่อเดือน', () => {
-    expect(src).toContain("const periodLabel = win.all ? 'วันที่ ทั้งหมด' : `วันที่ ${rangeText({ from: win.from, to: win.to })}`;");
+    expect(src).toContain("? 'วันที่ ทั้งหมด'\n      : `วันที่ ${rangeText({ from: win.from, to: win.to })}`;");
     expect(src).not.toContain("isRange ? rangeText({ from: win.from, to: win.to }) : monthLabel(win.month);\n  /** ปุ่มลัด");
   });
   it('ไม่มีบรรทัดเทียบกับ/ข้อมูล ณ', () => {
@@ -20,5 +20,13 @@ describe('หัวหน้าภาพรวม', () => {
   it('เลือก BU อยู่กลุ่มเดียวกับปุ่มวันที่', () => {
     const row = src.slice(src.indexOf('<div className="ml-auto flex flex-wrap items-center gap-2">'), src.indexOf('data-testid="recruit-period"'));
     expect(row).toContain('<BuChoiceSelect');
+  });
+  it('เทียบเดือน: ปุ่มวันที่เลือกแบบที่ดูได้ · เดือนเริ่ม-เดือนจบ · ก้อนใบขอเป็นกราฟรายเดือน · URL cmp=1', () => {
+    expect(src).toContain('data-testid="recruit-mode-compare"');
+    expect(src).toContain('const pickCompareMonth = (m: string) =>');
+    expect(src).toContain('<RecruitOverviewV2 data={data} compareMonths={cmpOn} />');
+    expect(src).toContain("if (compareMonths && r) p.set('cmp', '1');");
+    // เลือกช่วงวันที่/เดือนแบบเดิม = ออกจากโหมดเทียบเดือน
+    expect(src.match(/setCompareMonths\(false\)/g)?.length).toBe(4);
   });
 });

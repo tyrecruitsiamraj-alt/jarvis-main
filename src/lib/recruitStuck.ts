@@ -164,7 +164,7 @@ export function stuckEquation<T extends ScopeRow = StuckRequest>(rows: readonly 
  * เดือนหัว/ท้ายตัดตามช่วงที่เลือก ⇒ ขอใหม่ทุกเดือนรวมกัน = ขอใหม่ทั้งช่วง · ยอดยกมาเดือนแรก = ยอดยกมาทั้งช่วง · เหลือหาเดือนท้าย = เหลือหาทั้งช่วง */
 export type StuckMonthRow = Pick<
   StuckRequest,
-  'jobId' | 'requestNo' | 'bu' | 'recruiter' | 'screener' | 'leadKind' | 'requested' | 'filled' | 'cancelled' | 'remaining' | 'state' | 'inRange'
+  'jobId' | 'requestNo' | 'day' | 'bu' | 'recruiter' | 'screener' | 'leadKind' | 'requested' | 'filled' | 'cancelled' | 'remaining' | 'state' | 'inRange'
 >;
 export type StuckMonthWindow = { month: string; from: string; to: string };
 export type StuckMonthBlock = StuckMonthWindow & { rows: StuckMonthRow[] };

@@ -75,6 +75,7 @@ export default function RequestBuPanel({
   months,
   monthsError = null,
   monthsCapped = false,
+  compare = false,
   today,
   error,
   onOpenRequest,
@@ -92,6 +93,8 @@ export default function RequestBuPanel({
   monthsError?: string | null;
   /** ช่วงยาวเกิน 12 เดือน — กราฟเอา 12 เดือนล่าสุด */
   monthsCapped?: boolean;
+  /** โหมดเทียบเดือนจากปุ่มวันที่ — กราฟเป็นยอดรวมรายเดือนแทนแท่ง BU (เจ้าของ 20 พ.ย. 2569) */
+  compare?: boolean;
   /** วันนี้ (YYYY-MM-DD) — เดือนที่จบไปแล้วไม่มีสถานะทำงานย้อนหลัง (ERP เก็บแค่สถานะปัจจุบัน) */
   today: string;
   error: string | null;
@@ -156,6 +159,22 @@ export default function RequestBuPanel({
     });
   }, [months, topic, pass, jobs, bu, today]);
   const monthTop = Math.max(1, ...(monthly ?? []).map((m) => m.v ?? 0));
+  /** เดือนที่กดดูรายวัน — มีรายวันเฉพาะขอใหม่ (วันที่ใบขอเข้ามา) */
+  const [dayMonth, setDayMonth] = React.useState<string | null>(null);
+  React.useEffect(() => setDayMonth(null), [resetKey, topicKey, compare]);
+  const daily = React.useMemo(() => {
+    const block = dayMonth ? months?.find((m) => m.month === dayMonth) : null;
+    if (!block) return null;
+    const days: string[] = [];
+    for (let d = new Date(`${block.from}T00:00:00Z`); d.toISOString().slice(0, 10) <= block.to; d.setUTCDate(d.getUTCDate() + 1)) days.push(d.toISOString().slice(0, 10));
+    const lineBus = bu ? [bu] : busShown;
+    const rowsNew = block.rows.filter((r) => pass(r) && r.inRange !== false);
+    const series = lineBus.map((b) => ({
+      bu: b,
+      ys: days.map((d) => sumOf(rowsNew.filter((r) => buKey(r) === b && (r.day ?? '').slice(0, 10) === d), 'requested')),
+    }));
+    return { block, days, series };
+  }, [dayMonth, months, bu, busShown, pass]);
 
   const listAll = React.useMemo(() => {
     if (!topic) return [];
@@ -207,6 +226,55 @@ export default function RequestBuPanel({
     );
   };
   const anyFilter = FILTERS.some((f) => picked[f.key].length);
+
+  /**
+   * โหมดเทียบเดือน (เจ้าของ 20 พ.ย. 2569 "เวลาเทียบเดือนก็เป็นยอดรวมไปเลย เว้นแต่ Filter เลือกแค่ Bu ไหน" ·
+   * "ไม่เอากราฟย้ายมาข้างล่าง ไอกราฟอันที่เลือกก็เปลี่ยนตาม" · "กดที่แท่งของเดือนไหนก็แยกวันให้ดู … กราฟเส้น ดูทุก Bu เทียบไปได้")
+   * แท่งละเดือน สีของเรื่อง · ใต้แท่ง เพิ่มขึ้น/ลดลงจากเดือนก่อน · กดแท่ง = เส้นรายวันต่อ BU ที่เดิม
+   */
+  const canDaily = topic?.key === 'new';
+  const compareChart = (
+    <div className="min-w-0 space-y-2" data-testid="req-bu-compare">
+      {monthsError ? <p className="text-sm text-destructive">{monthsError}</p> : null}
+      {!monthly || !topic ? (
+        <Skeleton className="h-56 rounded-xl" />
+      ) : daily ? (
+        <DailyLines daily={daily} onBack={() => setDayMonth(null)} />
+      ) : (
+        <>
+          {monthsCapped ? <p className={cn('text-xs', DASH.sub)}>12 เดือนล่าสุด</p> : null}
+          <div className="overflow-x-auto overflow-y-hidden">
+            <div className="flex h-56 gap-4 border-b px-2 pt-1 sm:gap-6">
+              {monthly.map((m) => (
+                <button
+                  key={m.month}
+                  type="button"
+                  disabled={!canDaily || m.v === null}
+                  onClick={() => setDayMonth(m.month)}
+                  title={canDaily ? `${m.label} · กดดูรายวัน` : m.label}
+                  data-testid={`req-bu-month-${m.month}`}
+                  className="flex min-w-16 flex-1 flex-col items-center justify-end gap-1 disabled:cursor-default"
+                >
+                  <span className={cn('rounded-full border bg-background px-2 text-xs font-medium tabular-nums', m.v === null && DASH.sub)}>{m.v === null ? 'ไม่มีข้อมูล' : fmt(m.v)}</span>
+                  <span className="w-10 rounded-t-lg transition-transform hover:-translate-y-0.5" style={{ height: `${((m.v ?? 0) / monthTop) * 100}%`, minHeight: 2, background: topicHex(topic.key) }} />
+                </button>
+              ))}
+            </div>
+            <div className="flex gap-4 px-2 pt-1.5 sm:gap-6">
+              {monthly.map((m, i) => (
+                <div key={m.month} className="min-w-16 flex-1 text-center">
+                  <p className="text-sm font-medium">{m.label}</p>
+                  {/* เดือนแรกไม่มีเดือนก่อนให้เทียบ — จองบรรทัดไว้ */}
+                  {i === 0 ? <p className="text-xs">&nbsp;</p> : <TrendDelta cur={m.v} prev={monthly[i - 1].v} sense={TOPIC_SENSE[topic.key] ?? 'plain'} />}
+                </div>
+              ))}
+            </div>
+          </div>
+          {canDaily ? <p className={cn('text-xs', DASH.sub)}>กดแท่งเดือนไหน แยกรายวันของเดือนนั้น</p> : null}
+        </>
+      )}
+    </div>
+  );
 
   return (
     <section className="min-w-0 space-y-4" data-testid="req-bu-panel">
@@ -278,6 +346,7 @@ export default function RequestBuPanel({
 
             {/* กราฟแท่ง BU + ตัวเลขทุกเรื่องข้างกัน · หัว "… แยกตาม BU" ถอดแล้ว (เจ้าของ 20 พ.ย. 2569) */}
             <div className="grid min-w-0 gap-5 md:grid-cols-[1fr_15rem]">
+            {compare ? compareChart : (
             <div className="min-w-0">
               <div className="grid grid-cols-[2.5rem_1fr] gap-2" data-testid="req-bu-chart">
                 <div className="relative h-48">
@@ -316,6 +385,7 @@ export default function RequestBuPanel({
                 ))}
               </div>
             </div>
+            )}
             {/* ตัวเลขทุกเรื่องแทนโดนัท (เจ้าของ 20 พ.ย. 2569 "เอามาโชว์ตัวเลขแทนกราฟโดนัทได้ไหม") · กดแถว = เลือกเรื่อง */}
             <div className="space-y-2 md:border-l md:pl-4" data-testid="req-bu-numbers">
               {(['eq', 'status'] as const).map((g) => (
@@ -342,33 +412,6 @@ export default function RequestBuPanel({
               ))}
             </div>
             </div>
-          </div>
-
-          {/* รายเดือน — เลือกช่วงข้ามเดือนแล้วเห็นว่าเพิ่มขึ้นหรือลดลง (เจ้าของ 20 พ.ย. 2569) · อยู่เสมอ เดือนเดียว = แท่งเดียว */}
-          <div className="space-y-2 border-t pt-4" data-testid="req-bu-months">
-            <p className="text-sm font-medium">
-              รายเดือน{monthsCapped ? ' · 12 เดือนล่าสุด' : ''} · {bu ?? 'ทุก BU'}
-            </p>
-            {monthsError ? <p className="text-sm text-destructive">{monthsError}</p> : null}
-            {!monthly ? (
-              <Skeleton className="h-48 rounded-xl" />
-            ) : (
-              <div className="overflow-x-auto overflow-y-hidden">
-                <div className="flex h-52 gap-4 py-1 sm:gap-6">
-                  {monthly.map((m, i) => (
-                    <div key={m.month} className="flex w-24 shrink-0 flex-col items-center gap-1 text-center" data-testid={`req-bu-month-${m.month}`}>
-                      <div className="flex w-full min-h-0 flex-1 flex-col items-center justify-end gap-1 border-b">
-                        <span className={cn('rounded-full border bg-background px-2 text-xs font-medium tabular-nums', m.v === null && DASH.sub)}>{m.v === null ? 'ไม่มีข้อมูล' : fmt(m.v)}</span>
-                        <span className="w-8 rounded-t-lg" style={{ height: `${((m.v ?? 0) / monthTop) * 100}%`, minHeight: 2, background: topicHex(topic.key) }} />
-                      </div>
-                      <p className="text-sm font-medium">{m.label}</p>
-                      {/* เดือนแรกไม่มีเดือนก่อนให้เทียบ — จองบรรทัดไว้ แท่งทุกเดือนสูงเท่ากัน */}
-                      {i === 0 ? <span className="text-xs">&nbsp;</span> : <TrendDelta cur={m.v} prev={monthly[i - 1].v} sense={TOPIC_SENSE[topic.key] ?? 'plain'} />}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
 
           <div className="space-y-3 border-t pt-4" data-testid="req-bu-list">
@@ -474,5 +517,76 @@ export default function RequestBuPanel({
         </>
       )}
     </section>
+  );
+}
+
+/** เส้นรายวันต่อ BU ของเดือนที่กด — สเกลเดียวกันทั้งเส้น/เส้นแกน/ป้าย · วันที่ไม่มีใบเข้า = 0 */
+function DailyLines({
+  daily,
+  onBack,
+}: {
+  daily: { block: StuckMonthBlock; days: string[]; series: Array<{ bu: string; ys: number[] }> };
+  onBack: () => void;
+}) {
+  const { block, days, series } = daily;
+  const max = Math.max(1, ...series.flatMap((s) => s.ys));
+  const step = max > 40 ? 10 : max > 20 ? 5 : max > 8 ? 2 : 1;
+  const top = Math.ceil(max / step) * step;
+  const W = 640;
+  const H = 220;
+  const L = 32;
+  const R = 10;
+  const T = 10;
+  const B = 24;
+  const x = (i: number) => L + (i * (W - L - R)) / Math.max(1, days.length - 1);
+  const y = (v: number) => T + (1 - v / top) * (H - T - B);
+  const ticks = Array.from({ length: Math.floor(top / step) + 1 }, (_, i) => i * step);
+  const dayNo = (d: string) => Number(d.slice(8, 10));
+  return (
+    <div className="space-y-2" data-testid="req-bu-daily">
+      <div className="flex flex-wrap items-center gap-2">
+        <Button type="button" size="xs" variant="outline" onClick={onBack} data-testid="req-bu-daily-back">
+          ← กลับไปเทียบเดือน
+        </Button>
+        <span className={cn('text-xs', DASH.sub)}>ขอใหม่รายวัน · {monthWindowLabel(block)} · อัตรา</span>
+      </div>
+      <svg viewBox={`0 0 ${W} ${H}`} className="block h-auto w-full overflow-visible" role="img" aria-label={`ขอใหม่รายวัน ${monthWindowLabel(block)}`}>
+        {ticks.map((t) => (
+          <g key={t} className="text-border">
+            <line x1={L} x2={W - R} y1={y(t)} y2={y(t)} stroke="currentColor" strokeWidth={1} />
+            <text x={L - 6} y={y(t) + 4} textAnchor="end" className="fill-muted-foreground text-xs">
+              {t}
+            </text>
+          </g>
+        ))}
+        {days.map((d, i) =>
+          i % 5 === 0 || i === days.length - 1 ? (
+            <text key={d} x={x(i)} y={H - 6} textAnchor="middle" className="fill-muted-foreground text-xs">
+              {dayNo(d)}
+            </text>
+          ) : null,
+        )}
+        {series.map((s) => (
+          <g key={s.bu} data-testid={`req-bu-daily-${s.bu}`}>
+            <polyline points={s.ys.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ')} fill="none" stroke={buHex(s.bu)} strokeWidth={2} strokeLinejoin="round" />
+            {s.ys.map((v, i) =>
+              v ? (
+                <circle key={days[i]} cx={x(i)} cy={y(v)} r={3.5} fill={buHex(s.bu)}>
+                  <title>{`${s.bu} · วันที่ ${dayNo(days[i])} · ${v} อัตรา`}</title>
+                </circle>
+              ) : null,
+            )}
+          </g>
+        ))}
+      </svg>
+      <div className="flex flex-wrap gap-3 text-xs">
+        {series.map((s) => (
+          <span key={s.bu} className="inline-flex items-center gap-1.5">
+            <span className="h-1 w-4 rounded-full" style={{ background: buHex(s.bu) }} />
+            {s.bu} <b className="font-medium tabular-nums">{fmt(s.ys.reduce((a, c) => a + c, 0))}</b>
+          </span>
+        ))}
+      </div>
+    </div>
   );
 }
