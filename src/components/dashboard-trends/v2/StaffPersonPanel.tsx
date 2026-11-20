@@ -21,6 +21,7 @@ import {
   defaultStaffPerson,
   emptyStaffPersonDay,
   staffPersonOptions,
+  staffSubText,
   staffWorkTotal,
   ymdAddDays,
   type StaffActivityItem,
@@ -28,7 +29,6 @@ import {
   type StaffActivityRow,
   type StaffPersonDay,
   type StaffPersonJob,
-  type StaffPersonSub,
 } from '@/lib/staffActivity';
 import { fetchStaffActivityItems, fetchStaffPersonDay } from '@/lib/staffActivityApi';
 import TrendDelta from '../stuck/TrendDelta';
@@ -42,8 +42,6 @@ const JOB_KINDS: ReadonlyArray<{ key: 'autopost' | 'scrap' | 'links' | 'manualPo
   { key: 'links', label: 'Gen link' },
   { key: 'manualPosted', label: 'โพสต์แล้ว' },
 ];
-/** แถวย่อย — ช่องทาง/ผล + จำนวน · Autopost = บัญชี + จำนวนกลุ่ม (บอกจำนวนใบเมื่อเกิน 1) */
-const subText = (kind: StaffActivityKind, c: StaffPersonSub) => (kind === 'autopost' ? `${c.label}${c.n > 1 ? ` (${fmt(c.n)} ใบ)` : ''}` : `${c.label} ${fmt(c.n)}`);
 const jobTotal = (jobs: readonly StaffPersonJob[], k: keyof Omit<StaffPersonJob, 'jobId' | 'label'>) => jobs.reduce((n, j) => n + j[k], 0);
 
 export default function StaffPersonPanel({
@@ -226,7 +224,7 @@ export default function StaffPersonPanel({
                         <span className="block">{k.label}</span>
                         {/* ช่องทาง/ผล บรรทัดเดียว จองที่ไว้เสมอ */}
                         <span className={cn('block min-h-4 break-words text-xs', DASH.sub)}>
-                          {data.channels[k.key].length ? data.channels[k.key].map((c) => subText(k.key, c)).join(' · ') : ' '}
+                          {data.channels[k.key].length ? data.channels[k.key].map((c) => staffSubText(k.key, c)).join(' · ') : ' '}
                         </span>
                       </TableCell>
                       {numberCell(data.cur[k.key], () => setPick({ kind: k.key, jobId: null, jobLabel: null }))}

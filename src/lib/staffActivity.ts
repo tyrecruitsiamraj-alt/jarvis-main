@@ -53,6 +53,12 @@ export type StaffPersonDay = {
   /** ใบขอ/กล่องลอยที่มีงาน คลิก หรือคนกรอกในวันที่ดู — ทุกคอลัมน์รวมเท่าแถวแม่ */
   jobs: StaffPersonJob[];
 };
+/**
+ * แถวย่อย — ช่องทาง/ผล + จำนวน · Autopost = บัญชี + จำนวนกลุ่ม (บอกจำนวนใบเมื่อเกิน 1)
+ * ใช้ทั้งแท็บงานรายคนและแท็บ Scale ลง · ไฟล์นี้ใช้ฝั่ง API ด้วย จึงไม่ import ตัวจัดเลขของหน้าเว็บ (รูปเลขเดียวกัน)
+ */
+export const staffSubText = (kind: StaffActivityKind, c: StaffPersonSub): string =>
+  kind === 'autopost' ? `${c.label}${c.n > 1 ? ` (${c.n.toLocaleString('th-TH')} ใบ)` : ''}` : `${c.label} ${c.n.toLocaleString('th-TH')}`;
 export const emptyStaffKinds = (): StaffKindCounts => ({ autopost: 0, scrap: 0, links: 0, manualPosted: 0, contacts: 0, appts: 0 });
 /** งานทั้งหมด — ลงนัดเป็นส่วนหนึ่งของลงผลติดต่อ (แถวเดียวกันในสมุดติดต่อ) จึงไม่บวกซ้ำ */
 export const staffWorkTotal = (r: StaffKindCounts): number => r.autopost + r.scrap + r.links + r.manualPosted + r.contacts;

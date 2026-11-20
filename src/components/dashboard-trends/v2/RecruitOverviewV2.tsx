@@ -36,6 +36,9 @@ import V2Drawer, { type V2Pane } from './V2Drawer';
 import PostingProgress from './PostingProgress';
 import { Kpi, Pager, SectionTitle, fmt } from './V2Parts';
 import StaffPersonPanel from './StaffPersonPanel';
+import ScalePanel from './ScalePanel';
+import { SCALE_ROOT, scaleLevelToParams } from '@/lib/overviewScale';
+import { useAuth } from '@/contexts/AuthContext';
 import { ActivityFeed, OutreachTiles, TODO_ICONS, TodoList } from './PulseParts';
 import { fetchStaffActivity, fetchStaffActivityFeed } from '@/lib/staffActivityApi';
 import type { StaffActivityFeedItem, StaffActivityKind, StaffActivityRow } from '@/lib/staffActivity';
@@ -52,6 +55,7 @@ const dayText = (ymd: string) => `${Number(ymd.slice(8, 10))} ${TH_MONTH[Number(
 const monthText = (ym: string) => `${TH_MONTH[Number(ym.slice(5, 7)) - 1]} ${String(Number(ym.slice(0, 4)) + 543).slice(2)}`;
 
 
+type OverviewTab = 'overview' | 'staff' | 'scale';
 /** `compareMonths` = ปุ่มวันที่อยู่โหมดเทียบเดือน — ก้อนใบขอเป็นกราฟรายเดือน (เจ้าของ 20 พ.ย. 2569 Choice "ก้อนใบขอก่อน") */
 export default function RecruitOverviewV2({ data, compareMonths = false }: { data: RecruitOverviewResponse; compareMonths?: boolean }) {
   const navigate = useNavigate();
@@ -60,15 +64,23 @@ export default function RecruitOverviewV2({ data, compareMonths = false }: { dat
    * แท็บของหน้าภาพรวม: ภาพรวม | งานรายคน (เจ้าของ 20 พ.ย. 2569 "ทำไว้อีกแท็บของ หน้าภาพรวม") · URL `ov=staff`
    * กดชื่อคนในตารางรายคน = ไปแท็บงานรายคนของคนนั้น (แทนแผงข้างเดิม)
    */
-  const tab: 'overview' | 'staff' = searchParams.get('ov') === 'staff' ? 'staff' : 'overview';
+  /**
+   * แท็บที่ 3 "Scale ลง" (เจ้าของ 20 พ.ย. 2569 "แก้ทั้งหมดไว้อีกแท็บของหน้าภาพรวม แล้วเดี๋ยวฉันเปิดดูแล้วตัดสินใจเองว่าจะเอาอันไหนไว้")
+   * — สองแท็บเดิมไม่แตะ · เห็นเฉพาะ Admin จนกว่าเจ้าของเคาะ (พนักงานยังเห็นหน้าเดิม)
+   */
+  const { user } = useAuth();
+  const canScale = user?.role === 'admin';
+  const ov = searchParams.get('ov');
+  const tab: OverviewTab = ov === 'staff' ? 'staff' : ov === 'scale' && canScale ? 'scale' : 'overview';
   const rootRef = React.useRef<HTMLDivElement>(null);
-  const setTab = (t: 'overview' | 'staff') => {
+  const setTab = (t: OverviewTab) => {
     setSearchParams(
       (prev) => {
         const next = new URLSearchParams(prev);
-        if (t === 'staff') next.set('ov', 'staff');
-        else next.delete('ov');
-        return next;
+        if (t === 'overview') next.delete('ov');
+        else next.set('ov', t);
+        // ออกจากแท็บ Scale ลง = ชั้นและกล่องที่เลือกไว้ไม่ค้างใน URL ของแท็บอื่น
+        return t === 'scale' ? next : scaleLevelToParams(next, SCALE_ROOT, null);
       },
       { replace: true },
     );
@@ -286,7 +298,7 @@ export default function RecruitOverviewV2({ data, compareMonths = false }: { dat
     rows ? `${label} ${fmt(sumOf(rows, k))} อัตรา` : undefined;
   return (
     <div data-testid="recruit-overview-v2" ref={rootRef} className="scroll-mt-20">
-      <Tabs value={tab} onValueChange={(v) => setTab(v === 'staff' ? 'staff' : 'overview')}>
+      <Tabs value={tab} onValueChange={(v) => setTab(v === 'staff' || v === 'scale' ? v : 'overview')}>
         <TabsList variant="glass" className="h-auto flex-wrap justify-start rounded-2xl" data-testid="ov-tabs">
           <TabsTrigger value="overview" data-testid="ov-tab-overview">
             ภาพรวม
@@ -294,6 +306,11 @@ export default function RecruitOverviewV2({ data, compareMonths = false }: { dat
           <TabsTrigger value="staff" data-testid="ov-tab-staff">
             งานรายคน
           </TabsTrigger>
+          {canScale ? (
+            <TabsTrigger value="scale" data-testid="ov-tab-scale">
+              Scale ลง
+            </TabsTrigger>
+          ) : null}
         </TabsList>
         {/* ภาพรวมค้างไว้ตอนสลับแท็บ (forceMount) — ตัวกรอง/เรื่องที่เลือกไว้ไม่หาย */}
         <TabsContent value="overview" forceMount className="mt-6 space-y-8 data-[state=inactive]:hidden">
@@ -493,6 +510,23 @@ export default function RecruitOverviewV2({ data, compareMonths = false }: { dat
             />
           </Card>
         </TabsContent>
+        {canScale ? (
+          <TabsContent value="scale" className="mt-6">
+            <ScalePanel
+              cohort={model.cohort}
+              staff={staff.key === filterKey ? staff.rows : null}
+              staffError={staff.key === filterKey ? staff.error : null}
+              requests={stuck.key === filterKey ? (stuck.data?.requests ?? null) : null}
+              requestsError={stuck.key === filterKey ? stuck.error : null}
+              from={win.from}
+              to={win.to}
+              today={data.today}
+              bu={data.bu}
+              onNames={openNames}
+              onOpenRequest={(jobId) => navigate(requestPathOfJobId(jobId))}
+            />
+          </TabsContent>
+        ) : null}
       </Tabs>
 
       <V2Drawer
