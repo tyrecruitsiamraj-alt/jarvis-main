@@ -158,14 +158,26 @@ export async function linkJobId(linkId: string): Promise<string | null> {
   return rows[0]?.job_id ?? null;
 }
 
-/** `postUrl` = ลิงก์โพสต์ที่วาง (ไม่ส่ง = คงของเดิม) · วางลิงก์ = นับว่าโพสต์วันนี้ด้วย */
+/**
+ * `postUrl` = ลิงก์โพสต์ที่วาง (ไม่ส่ง = คงของเดิม) · วางลิงก์ = นับว่าโพสต์วันนี้ด้วย
+ * 🔴 (ลิงก์ · วันไทย · คนวาง) ละแถว (194 · เจ้าของ 20 พ.ย. 2569) — คนที่สองวางลงลิงก์เดียวกันวันเดียวกันได้แถวของตัวเอง
+ * เดิมเขียนทับลิงก์โพสต์ของคนแรกแต่ชื่อยังเป็นคนแรก (ลิงก์ของเจ้าของไปอยู่ในชื่อเจมส์)
+ */
 export async function recordManualPost(linkId: string, by: { id: string | null; name: string | null }, postUrl?: string | null): Promise<void> {
-  await dbQuery(
-    `insert into ${POSTS} (link_id, day, posted_by_user_id, posted_by_name, post_url)
-     values ($1::uuid, (now() at time zone 'Asia/Bangkok')::date, $2::uuid, $3, $4)
-     on conflict (link_id, day) do update set post_url = case when $5::boolean then excluded.post_url else ${POSTS}.post_url end`,
-    [linkId, by.id, by.name, postUrl ?? null, postUrl !== undefined],
-  );
+  const upsert = (target: string) =>
+    dbQuery(
+      `insert into ${POSTS} (link_id, day, posted_by_user_id, posted_by_name, post_url)
+       values ($1::uuid, (now() at time zone 'Asia/Bangkok')::date, $2::uuid, $3, $4)
+       on conflict (${target}) do update set post_url = case when $5::boolean then excluded.post_url else ${POSTS}.post_url end`,
+      [linkId, by.id, by.name, postUrl ?? null, postUrl !== undefined],
+    );
+  try {
+    await upsert('link_id, day, posted_by_user_id');
+  } catch (e) {
+    // ช่วง deploy: โค้ดใหม่ขึ้นก่อน `db:migrate` รัน 194 (ยังไม่มีดัชนีใหม่ = 42P10) — ใช้ key เดิมไปก่อน ไม่ให้กดบันทึกแล้วล้ม
+    if ((e as { code?: string })?.code !== '42P10') throw e;
+    await upsert('link_id, day');
+  }
 }
 
 /**
