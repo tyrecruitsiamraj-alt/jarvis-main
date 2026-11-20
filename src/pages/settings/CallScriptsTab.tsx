@@ -76,7 +76,11 @@ const CallScriptsTab: React.FC = () => {
   /** บทที่กำลังแก้อยู่ในจอ — คีย์บท → บรรทัด (แยกจาก data เพื่อรู้ว่าแก้ค้างไหม) */
   const [draft, setDraft] = useState<Record<string, string[]>>({});
   const [busyKey, setBusyKey] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
+  /**
+   * ผลบันทึก/คืนค่า ขึ้นในการ์ดของบทนั้น ข้างปุ่มที่กด (เจ้าของ 20 พ.ย. 2569 "ฉันแก้แล้วมันไม่บันทึกให้" —
+   * เดิมข้อความไม่ผ่านขึ้นบนสุดของหน้า การ์ดยาวเลยมองไม่เห็นว่าไม่ได้บันทึกเพราะอะไร)
+   */
+  const [cardMsg, setCardMsg] = useState<{ key: string; ok: boolean; text: string } | null>(null);
   /** บทที่กางอยู่ — เปิดหน้ามาเห็นแค่ชื่อบท กดบทไหนค่อยกาง (เจ้าของ 8 ต.ค. 2569 "แยกให้ดูง่าย ๆ กดบทไหนค่อยกางบทพูดมา") */
   const [openKeys, setOpenKeys] = useState<ReadonlySet<string>>(() => new Set());
   const toggleOpen = (key: string) =>
@@ -106,8 +110,7 @@ const CallScriptsTab: React.FC = () => {
 
   const save = async (key: string) => {
     setBusyKey(key);
-    setError(null);
-    setNotice(null);
+    setCardMsg(null);
     try {
       const r = await apiFetch('/api/call-scripts', {
         method: 'PUT',
@@ -116,10 +119,10 @@ const CallScriptsTab: React.FC = () => {
       });
       const body = (await r.json()) as { message?: string };
       if (!r.ok) throw new Error(body.message || 'บันทึกไม่สำเร็จ');
-      setNotice('บันทึกแล้ว — สายที่เข้าคิวหลังจากนี้ใช้บทใหม่ทันที (สายที่ค้างคิวอยู่ยังใช้บทเดิม)');
+      setCardMsg({ key, ok: true, text: 'บันทึกแล้ว — สายที่เข้าคิวหลังจากนี้ใช้บทใหม่ทันที (สายที่ค้างคิวอยู่ยังใช้บทเดิม)' });
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'บันทึกไม่สำเร็จ');
+      setCardMsg({ key, ok: false, text: `ยังไม่ได้บันทึก — ${e instanceof Error ? e.message : 'บันทึกไม่สำเร็จ'}` });
     } finally {
       setBusyKey(null);
     }
@@ -127,17 +130,16 @@ const CallScriptsTab: React.FC = () => {
 
   const restore = async (key: string) => {
     setBusyKey(key);
-    setError(null);
-    setNotice(null);
+    setCardMsg(null);
     try {
       const r = await apiFetch(`/api/call-scripts?key=${encodeURIComponent(key)}`, {
         method: 'DELETE',
       });
       if (!r.ok) throw new Error('คืนบทมาตรฐานไม่สำเร็จ');
-      setNotice('กลับไปใช้บทมาตรฐานแล้ว');
+      setCardMsg({ key, ok: true, text: 'กลับไปใช้บทมาตรฐานแล้ว' });
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'คืนบทมาตรฐานไม่สำเร็จ');
+      setCardMsg({ key, ok: false, text: e instanceof Error ? e.message : 'คืนบทมาตรฐานไม่สำเร็จ' });
     } finally {
       setBusyKey(null);
     }
@@ -172,7 +174,6 @@ const CallScriptsTab: React.FC = () => {
       </div>
 
       {error ? <p className={cn('text-sm', TONE.danger.value)}>{error}</p> : null}
-      {notice ? <p className={cn('text-sm', TONE.success.value)}>{notice}</p> : null}
 
       <Tabs defaultValue={groups[0]?.topic}>
         <TabsList variant="glass" className="h-auto flex-wrap justify-start rounded-2xl">
@@ -306,6 +307,11 @@ const CallScriptsTab: React.FC = () => {
                 </>
               ) : null}
             </div>
+            {cardMsg?.key === s.key ? (
+              <p role="status" data-testid={`script-msg-${s.key}`} className={cn('mt-2 text-sm', cardMsg.ok ? TONE.success.value : TONE.danger.value)}>
+                {cardMsg.text}
+              </p>
+            ) : null}
               </>
             ) : null}
           </section>

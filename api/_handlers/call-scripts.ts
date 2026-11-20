@@ -26,7 +26,7 @@ import {
 import {
   EDITABLE_SCRIPT_DEFAULTS,
   KNOWN_PLACEHOLDERS,
-  MAX_QUESTIONS,
+  MAX_SCRIPT_LINES,
   type EditableScriptKey,
 } from '../_lib/lumosCallScript.js';
 
@@ -107,7 +107,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
       );
       const byKey = new Map(rows.map((r) => [r.script_key, r]));
       return res.status(200).json({
-        max_lines: MAX_QUESTIONS,
+        max_lines: MAX_SCRIPT_LINES,
         placeholders: KNOWN_PLACEHOLDERS,
         scripts: EDITABLE_SCRIPT_KEYS.map((key) => {
           const o = byKey.get(key);

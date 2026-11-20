@@ -11,6 +11,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   EDITABLE_SCRIPT_DEFAULTS,
   MAX_QUESTIONS,
+  MAX_SCRIPT_LINES,
   buildFollowMessage,
   buildScreeningQuestions,
   setCallScriptOverrides,
@@ -73,9 +74,21 @@ describe('validateScriptLines — กันของเสียก่อนถ�
     expect(validateScriptLines([''])).toBeTruthy();
   });
 
-  it(`เกินเพดาน ${MAX_QUESTIONS} ข้อ = ไม่ผ่าน (Lumos ตัดข้อท้ายทิ้งเงียบ ๆ)`, () => {
+  it(`บรรทัดที่พูดทุกสาย (ไม่มีตัวแปร) เกิน ${MAX_QUESTIONS} ข้อ = ไม่ผ่าน (Lumos ตัดข้อท้ายทิ้งเงียบ ๆ)`, () => {
     const lines = Array.from({ length: MAX_QUESTIONS + 1 }, (_, i) => `ข้อ ${i + 1} ครับ`);
-    expect(validateScriptLines(lines)).toContain('ยาวเกิน');
+    expect(validateScriptLines(lines)).toContain(`เกิน ${MAX_QUESTIONS} ข้อ`);
+  });
+
+  it(`แม่แบบเกิน ${MAX_SCRIPT_LINES} บรรทัด = ไม่ผ่าน · บรรทัดมีตัวแปรเกิน 14 ได้ (ใบไม่มีข้อมูล = ข้ามบรรทัด)`, () => {
+    const withVar = (n: number) => Array.from({ length: n }, (_, i) => `ข้อ ${i + 1} {ชื่อผู้รับ}ค่ะ`);
+    expect(validateScriptLines(withVar(MAX_QUESTIONS + 1))).toBeNull();
+    expect(validateScriptLines(withVar(MAX_SCRIPT_LINES + 1))).toContain('ยาวเกิน');
+  });
+
+  it('🔴 บทมาตรฐานทุกบทผ่านด่านบันทึก — แก้คำแล้วบันทึกได้เสมอ (20 พ.ย. 2569 ผู้สมัครผ่านลิงก์ 15 บรรทัด บันทึกไม่ได้)', () => {
+    for (const [key, lines] of Object.entries(EDITABLE_SCRIPT_DEFAULTS)) {
+      expect([key, validateScriptLines([...lines])]).toEqual([key, null]);
+    }
   });
 
   it('🔴 ตัวเลขเงินในบท = ไม่ผ่าน — ค่าแรงมีทั้งรายวัน/รายเดือน ระบบต้องเป็นคนเติม', () => {

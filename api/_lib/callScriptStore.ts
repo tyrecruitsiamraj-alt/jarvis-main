@@ -10,7 +10,7 @@
  * ล้มแล้วใช้ของที่วางไว้ครั้งก่อน (หรือบทมาตรฐาน) แล้ว log ไว้พอ
  *
  * ⚠️ กติกาเดียวกับบทในไฟล์ (มี validate ทั้งฝั่ง API และก่อนวางใช้):
- * - ห้ามเกิน MAX_QUESTIONS ข้อ · ห้ามว่างทั้งชุด (ว่าง = ลบแถวทิ้ง กลับบทมาตรฐาน)
+ * - แม่แบบไม่เกิน MAX_SCRIPT_LINES บรรทัด · บรรทัดที่พูดทุกสาย (ไม่มีตัวแปร) ไม่เกิน MAX_QUESTIONS · ห้ามว่างทั้งชุด (ว่าง = ลบแถวทิ้ง กลับบทมาตรฐาน)
  * - ห้ามมีตัวเลขติดคำว่า "บาท" ในบท (ตัวเลขรายได้ต้องมาจาก {รายได้ต่อเดือน} เท่านั้น)
  * - ตัวแปร {ชื่อ} ต้องเป็นตัวที่ระบบรู้จัก — พิมพ์ผิดแล้วทั้งบรรทัดจะหายตอนโทรจริง
  */
@@ -20,6 +20,7 @@ import { logError } from './logger.js';
 import {
   KNOWN_PLACEHOLDERS,
   MAX_QUESTIONS,
+  MAX_SCRIPT_LINES,
   setCallScriptOverrides,
   type EditableScriptKey,
 } from './lumosCallScript.js';
@@ -57,8 +58,13 @@ export function isEditableScriptKey(v: unknown): v is EditableScriptKey {
 export function validateScriptLines(lines: unknown): string | null {
   if (!Array.isArray(lines)) return 'บทต้องเป็นรายการประโยค';
   if (lines.length === 0) return 'บทว่าง — ถ้าต้องการกลับไปใช้บทมาตรฐาน ให้กดปุ่มคืนค่าแทน';
-  if (lines.length > MAX_QUESTIONS) {
-    return `บทยาวเกิน ${MAX_QUESTIONS} ข้อ — Lumos รับได้จำกัด ข้อท้าย ๆ จะถูกตัดทิ้ง`;
+  if (lines.length > MAX_SCRIPT_LINES) {
+    return `บทยาวเกิน ${MAX_SCRIPT_LINES} บรรทัด — ลบบรรทัดที่ไม่ใช้ออกก่อน`;
+  }
+  // บรรทัดไม่มีตัวแปร = พูดทุกสาย · เกินเพดานของ Lumos แล้วข้อท้าย ๆ ถูกตัดทิ้งทุกสาย
+  const always = lines.filter((l) => typeof l === 'string' && !/\{[^}]*\}/.test(l)).length;
+  if (always > MAX_QUESTIONS) {
+    return `บรรทัดที่พูดทุกสายมี ${always} ข้อ เกิน ${MAX_QUESTIONS} ข้อ — Lumos รับได้จำกัด ข้อท้าย ๆ จะถูกตัดทิ้ง`;
   }
   for (const [i, raw] of lines.entries()) {
     if (typeof raw !== 'string') return `ข้อที่ ${i + 1} ไม่ใช่ข้อความ`;
