@@ -75,7 +75,8 @@ describe('ปุ่ม "ทั้งหมด" ภาพรวมงานสร
   it('มีปุ่มทั้งหมด · ป้ายปุ่มช่วงเวลาขึ้น "ทั้งหมด" · API ส่ง all=1', () => {
     const ui = read('src/components/dashboard-trends/RecruitOverview.tsx');
     expect(ui).toContain('data-testid="recruit-all"');
-    expect(ui).toContain("const periodLabel = win.all ? 'ทั้งหมด'");
+    // 20 พ.ย. 2569 ป้ายขึ้น "วันที่ …" ตามที่เลือก — ทั้งหมด = "วันที่ ทั้งหมด"
+    expect(ui).toContain("const periodLabel = win.all ? 'วันที่ ทั้งหมด'");
     expect(read('src/lib/recruitOverviewApi.ts')).toContain("if (range.all) p.set('all', '1');");
     expect(read('api/_handlers/recruit-overview.ts')).toContain("all: req.query?.all === '1'");
   });

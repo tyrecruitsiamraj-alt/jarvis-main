@@ -266,7 +266,8 @@ const RecruitOverview: React.FC<{
   const period = isRange ? 'ช่วงนี้' : 'เดือนนี้';
   const prevWord = isRange ? 'ช่วงก่อน' : 'เดือนก่อน';
   const appsError = data.errors.apps ?? null;
-  const periodLabel = win.all ? 'ทั้งหมด' : isRange ? rangeText({ from: win.from, to: win.to }) : monthLabel(win.month);
+  // ปุ่มบอกวันที่ที่เลือกจริงเสมอ ไม่ใช่ชื่อเดือน (เจ้าของ 20 พ.ย. 2569 "เปลี่ยนไปใช้คำว่าวันที่ แล้วถ้าเลือกวันไหน หรือ ช่วงวันไหนให้มันขึ้นเป็นตามที่เลือก")
+  const periodLabel = win.all ? 'วันที่ ทั้งหมด' : `วันที่ ${rangeText({ from: win.from, to: win.to })}`;
   /** ปุ่มลัด 7/30 วันล่าสุด กดอยู่ไหม */
   const isLast = (n: number) => {
     const r = lastDays(n);
@@ -325,18 +326,7 @@ const RecruitOverview: React.FC<{
     />
   );
 
-  const compareNote = [
-    win.all
-      ? rangeText({ from: win.from, to: win.to })
-      : view.prev
-      ? `เทียบกับ ${rangeText({ from: win.prevFrom, to: win.prevTo })}`
-      : view.prevPartial && data.firstDay
-        ? `ไม่เทียบ${prevWord} ข้อมูลเพิ่งเริ่ม ${rangeText({ from: data.firstDay, to: data.firstDay })}`
-        : `${prevWord}ยังไม่มีข้อมูล`,
-    `ข้อมูล ณ ${shortTime(data.generatedAt)} น.`,
-  ]
-    .filter(Boolean)
-    .join(' · ');
+  // บรรทัด "เทียบกับ … · ข้อมูล ณ … น." ถอดแล้ว (เจ้าของ 20 พ.ย. 2569 "เอาออก")
 
   return (
     <div
@@ -348,7 +338,15 @@ const RecruitOverview: React.FC<{
       {/* ─── หัว: ชื่อ + ปุ่มช่วงเวลาปุ่มเดียว (เจ้าของ 19 ต.ค. 2569 "รวมกันเลย" · 28 ต.ค. เหลือ เดือน · วันที่ · 7/30 วันล่าสุด) ─── */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         {v5 ? null : <h2 className="text-base font-medium text-foreground">ภาพรวมงานสรรหา</h2>}
+        {/* BU กับวันที่อยู่แถวเดียวกัน (เจ้าของ 20 พ.ย. 2569 "ทุก BU กับ วันที่ต้องอยู่แถวเดียวกัน") */}
         <div className="ml-auto flex flex-wrap items-center gap-2">
+          {data.buChoices?.length ? (
+            <div className="w-28">
+              <BuChoiceSelect value={data.bu} choices={data.buChoices} onChange={setPickedBu} allOption triggerClassName="h-7 text-xs md:text-xs" itemClassName="text-xs" />
+            </div>
+          ) : (
+            <span className={cn('text-xs', DASH.sub)}>{data.bu ? `เฉพาะ BU ${data.bu}` : 'ทุก BU'}</span>
+          )}
           <Popover open={periodOpen} onOpenChange={setPeriodOpen}>
             <PopoverTrigger asChild>
               <Button type="button" size="xs" variant="outline" aria-label="เลือกช่วงเวลา" data-testid="recruit-period">
@@ -429,17 +427,6 @@ const RecruitOverview: React.FC<{
             </PopoverContent>
           </Popover>
         </div>
-      </div>
-
-      <div className={cn('flex flex-wrap items-center justify-between gap-2 text-xs', DASH.sub)}>
-        {data.buChoices?.length ? (
-          <div className="w-28">
-            <BuChoiceSelect value={data.bu} choices={data.buChoices} onChange={setPickedBu} allOption triggerClassName="h-8 text-xs" itemClassName="text-xs" />
-          </div>
-        ) : (
-          <span>{data.bu ? `เฉพาะ BU ${data.bu}` : 'ทุก BU'}</span>
-        )}
-        <span className="tabular-nums">{compareNote}</span>
       </div>
 
       {state.error ? <SectionError message={state.error} onRetry={() => setRev((n) => n + 1)} /> : null}
