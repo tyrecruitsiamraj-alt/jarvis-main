@@ -355,8 +355,8 @@ export default function RequestBuPanel({
             {!monthly ? (
               <Skeleton className="h-48 rounded-xl" />
             ) : (
-              <div className="overflow-x-auto">
-                <div className="flex h-48 gap-4 sm:gap-6">
+              <div className="overflow-x-auto overflow-y-hidden">
+                <div className="flex h-52 gap-4 py-1 sm:gap-6">
                   {monthly.map((m, i) => (
                     <div key={m.month} className="flex w-24 shrink-0 flex-col items-center gap-1 text-center" data-testid={`req-bu-month-${m.month}`}>
                       <div className="flex w-full min-h-0 flex-1 flex-col items-center justify-end gap-1 border-b">

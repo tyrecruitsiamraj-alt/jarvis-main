@@ -408,6 +408,9 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
           ) : (
             <>
               {standalone ? channelSection : null}
+              {/* เจ้าหน้าที่สรรหาของลิงก์อยู่บนสุดของฟอร์ม ใต้ช่องทางที่จะส่ง (เจ้าของ 20 พ.ย. 2569 "ทำไมยังไม่มีให้เลือกเจ้าหน้าที่สรรหา"
+                  → Choice เปลี่ยนชื่อ + ย้ายขึ้นบนสุด · เดิมชื่อ "ผู้รับผิดชอบ" อยู่ท้ายฟอร์มจนหาไม่เจอ) · ฟอร์มหนึ่งมีช่องนี้ช่องเดียว */}
+              <LinkResponsibleField value={responsible.value} onChange={responsible.setValue} options={responsible.options} />
               {/* เหลือแค่เลือกช่องทาง (เจ้าของ Choice 7 ต.ค. 2569) — ลิงก์ผูกใบขอ = หน้าลิงก์ใช้การ์ดเดียวกับ /apply
                   ช่องหัวข้อ/รายละเอียด/สถานที่/ค่าตอบแทน/ผู้ติดต่อ ไม่ขึ้นให้ผู้สมัครเห็นแล้ว · ค่าตั้งต้นจากใบขอยังบันทึกตามเดิม */}
               {channelOnly ? null : (
@@ -498,7 +501,6 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
                       options={[{ value: '', label: 'ไม่ระบุ' }, ...THAI_PROVINCE_NAMES_SORTED.map((p) => ({ value: p, label: p }))]}
                     />
                   </div>
-                  <LinkResponsibleField value={responsible.value} onChange={responsible.setValue} options={responsible.options} />
                 </div>
 
                 <div className="space-y-1.5">
@@ -524,10 +526,6 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
               </>
               )}
               {standalone ? null : channelSection}
-              {/* ใบขอเหลือแค่ช่องทาง = ไม่มีฟอร์มเต็ม ช่องผู้รับผิดชอบอยู่ตรงนี้แทน (ฟอร์มหนึ่งมีช่องนี้ช่องเดียว) */}
-              {channelOnly ? (
-                <LinkResponsibleField value={responsible.value} onChange={responsible.setValue} options={responsible.options} />
-              ) : null}
 
               {error ? <p className="text-xs text-red-600">{error}</p> : null}
               {missingGroup ? (

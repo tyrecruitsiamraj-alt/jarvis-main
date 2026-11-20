@@ -54,9 +54,10 @@ const LinkResponsibleField: React.FC<{
   disabled?: boolean;
 }> = ({ value, onChange, options, disabled }) => (
   <div className="space-y-1.5">
-    <label className="text-xs font-medium text-muted-foreground">ผู้รับผิดชอบ</label>
+    {/* ป้ายใช้คำบนจอ "เจ้าหน้าที่สรรหา" (เจ้าของ 20 พ.ย. 2569) — รายชื่อยังเป็นสายสรรหา + ทีม Online เหมือนเดิม */}
+    <label className="text-xs font-medium text-muted-foreground">เจ้าหน้าที่สรรหา</label>
     <FieldSelect
-      ariaLabel="ผู้รับผิดชอบ"
+      ariaLabel="เจ้าหน้าที่สรรหา"
       testId="link-responsible"
       value={value}
       onChange={onChange}

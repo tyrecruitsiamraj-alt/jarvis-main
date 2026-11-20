@@ -126,19 +126,28 @@ describe('ฟอร์ม Gen link ของกล่องลอย', () => {
     await screen.findByRole('option', { name: 'ว่าน' });
     expect(screen.getByRole('option', { name: 'บี' })).toBeTruthy();
     expect(fetchResponsibleNames.mock.calls.map(([l]) => l).sort()).toEqual(['online', 'recruiter']);
-    expect(screen.getAllByLabelText('ผู้รับผิดชอบ')).toHaveLength(1);
-    expect((screen.getByLabelText('ผู้รับผิดชอบ') as HTMLSelectElement).value).toBe('u-me');
+    expect(screen.getAllByLabelText('เจ้าหน้าที่สรรหา')).toHaveLength(1);
+    expect((screen.getByLabelText('เจ้าหน้าที่สรรหา') as HTMLSelectElement).value).toBe('u-me');
     fireEvent.click(screen.getByRole('button', { name: /Gen link/ }));
     await waitFor(() => expect(createRecruitPosting).toHaveBeenCalledTimes(1));
     expect(createRecruitPosting.mock.calls[0][0]).toMatchObject({ responsibleUserId: 'u-me', responsibleName: null, standaloneKind: 'valet' });
   });
 
+  it('ช่องเจ้าหน้าที่สรรหาอยู่บนสุดของฟอร์ม ก่อนหัวข้อประกาศ (เจ้าของ 20 พ.ย. 2569 "ทำไมยังไม่มีให้เลือกเจ้าหน้าที่สรรหา")', async () => {
+    render(<GenApplyLinkDialog open job={null} standalone={standalone} onClose={() => undefined} />);
+    await screen.findByRole('option', { name: 'ว่าน' });
+    const field = screen.getByLabelText('เจ้าหน้าที่สรรหา');
+    const heading = screen.getByText('หัวข้อประกาศ');
+    expect(field.compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.queryByText('ผู้รับผิดชอบ')).toBeNull();
+  });
+
   it('ค่าเริ่ม = ผู้รับผิดชอบของกล่องที่บันทึกไว้ (ตรงคนในรายชื่อ) · เลือกคนอื่นได้', async () => {
     boxPostings = [{ standaloneKind: 'valet', departmentCode: 'LBD', responsibleName: 'ว่าน', createdAt: '2026-11-17T00:00:00Z' }];
     render(<GenApplyLinkDialog open job={null} standalone={standalone} onClose={() => undefined} />);
-    await waitFor(() => expect((screen.getByLabelText('ผู้รับผิดชอบ') as HTMLSelectElement).value).toBe('u-w'));
+    await waitFor(() => expect((screen.getByLabelText('เจ้าหน้าที่สรรหา') as HTMLSelectElement).value).toBe('u-w'));
     expect(fetchRecruitPostings).toHaveBeenCalledWith({ standaloneOnly: true });
-    fireEvent.change(screen.getByLabelText('ผู้รับผิดชอบ'), { target: { value: 'u-b' } });
+    fireEvent.change(screen.getByLabelText('เจ้าหน้าที่สรรหา'), { target: { value: 'u-b' } });
     fireEvent.click(screen.getByRole('button', { name: /Gen link/ }));
     await waitFor(() => expect(createRecruitPosting).toHaveBeenCalledTimes(1));
     expect(createRecruitPosting.mock.calls[0][0]).toMatchObject({ responsibleUserId: 'u-b' });
@@ -149,7 +158,7 @@ describe('ฟอร์ม Gen link ของกล่องลอย', () => {
     render(<GenApplyLinkDialog open job={null} standalone={standalone} onClose={() => undefined} />);
     await screen.findByRole('option', { name: 'ว่าน' });
     await waitFor(() => expect(fetchRecruitPostings).toHaveBeenCalled());
-    expect((screen.getByLabelText('ผู้รับผิดชอบ') as HTMLSelectElement).value).toBe('u-me');
+    expect((screen.getByLabelText('เจ้าหน้าที่สรรหา') as HTMLSelectElement).value).toBe('u-me');
   });
 });
 
@@ -157,7 +166,7 @@ describe('Gen link ของใบขอ', () => {
   it('Gen link เพิ่ม: ค่าเริ่ม = คนกด (ไม่อ่านผู้รับผิดชอบกล่อง) · เลือกคนอื่นแล้ว id ไปกับทุกลิงก์', async () => {
     const posting = { id: 'p1', title: 'คนขับรถ', links: [], status: 'open' } as unknown as RecruitPosting;
     render(<AddChannelLinks posting={posting} />);
-    const pick = (await screen.findByLabelText('ผู้รับผิดชอบ')) as HTMLSelectElement;
+    const pick = (await screen.findByLabelText('เจ้าหน้าที่สรรหา')) as HTMLSelectElement;
     expect(pick.value).toBe('u-me');
     await screen.findByRole('option', { name: 'บี' });
     fireEvent.change(pick, { target: { value: 'u-b' } });
