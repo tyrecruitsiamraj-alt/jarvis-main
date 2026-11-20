@@ -227,19 +227,19 @@ const RecruitOverview: React.FC<{
     // ใบขอติดตรงไหน (โฉมใหม่) ยิงพร้อมกันเลย ไม่ต้องรอก้อนนี้เสร็จ — ช่วงคิดด้วยตัวเดียวกับ server (10 พ.ย. 2569 หน้าช้า)
     if (!legacyCards) {
       const today = toYmdBangkok(new Date());
-      const w = (range ? rangeWindow(range.from, range.to, today, range.all === true) : null) ?? monthWindow(month, today);
+      const w = (range ? rangeWindow(range.from, range.to, today, range.all === true, compareMonths) : null) ?? monthWindow(month, today);
       prefetchRecruitStuck(pickedBu, { from: w.from, to: w.to });
       // การ์ด Autopost ของภาพรวม — ยิงพร้อมกัน ไม่รอก้อนนี้ (19 พ.ย. 2569 วัดได้ 3.9 วิ ต่อท้าย 4.2 วิ)
       if (dashV2) prefetchSoPostGroups({ from: w.from, to: w.to, bu: pickedBu ?? null });
     }
-    fetchRecruitOverview(month, range, pickedBu, { asOf: dashV2 })
+    fetchRecruitOverview(month, range ? { ...range, compare: compareMonths } : null, pickedBu, { asOf: dashV2 })
       .then((data) => !cancelled && setState({ data, loading: false, error: null }))
       // ล้มแล้วห้ามค้างเลขรอบก่อนพร้อม "ข้อมูล ณ …" (QA 18 ต.ค. 2569) ⇒ ล้างแล้วขึ้นกล่องล้ม + ลองใหม่
       .catch((e: unknown) => !cancelled && setState({ data: null, loading: false, error: friendlyErrorText(e, 'โหลดภาพรวมไม่ได้') }));
     return () => {
       cancelled = true;
     };
-  }, [month, range, rev, pickedBu, legacyCards, dashV2]);
+  }, [month, range, rev, pickedBu, legacyCards, dashV2, compareMonths]);
 
   const data = state.data;
   const win = data?.window ?? null;

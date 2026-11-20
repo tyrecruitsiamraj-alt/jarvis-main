@@ -5,7 +5,7 @@ import type { RecruitOverviewResponse } from './recruitOverviewTypes';
 export async function fetchRecruitOverview(
   month?: string | null,
   /** ช่วงที่เลือกเอง (รายวัน/ช่วง · 5 ต.ค. 2569) — ส่งมา = ไม่ใช้ month */
-  range?: { from: string; to: string; all?: boolean } | null,
+  range?: { from: string; to: string; all?: boolean; compare?: boolean } | null,
   /** ผู้ใช้หลาย BU เลือกทีละ BU (26 ต.ค. 2569) · null = ผลรวมทุก BU ในสิทธิ์ (29 ต.ค. 2569) */
   bu?: string | null,
   /** ผล ณ วันสิ้นสุด (ภาพรวม v2 · 17 พ.ย. 2569) — หน้าเดิมไม่ส่ง */
@@ -18,6 +18,8 @@ export async function fetchRecruitOverview(
     p.set('from', range.from);
     p.set('to', range.to);
     if (range.all) p.set('all', '1');
+    // เทียบเดือน — ช่วงยาวได้ถึง 12 เดือน (`COMPARE_MAX_DAYS`)
+    if (range.compare) p.set('cmp', '1');
   } else if (month) p.set('month', month);
   const qs = p.toString();
   const r = await apiFetch(`/api/recruit-overview${qs ? `?${qs}` : ''}`);

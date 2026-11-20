@@ -61,3 +61,15 @@ describe('recruit-stuck part=months', () => {
     expect(page).toContain("fetchRecruitStuck(data.bu, { from: win.from, to: win.to }, 'months')");
   });
 });
+
+describe('ช่วงของโหมดเทียบเดือน', () => {
+  it('เทียบเดือนเลือกได้ถึง 12 เดือน · ช่วงวันที่แบบเดิมยังตัดที่ 62 วัน', async () => {
+    const { COMPARE_MAX_DAYS, RANGE_MAX_DAYS, rangeWindow } = await import('@/lib/recruitOverviewWindow');
+    expect(rangeWindow('2026-09-01', '2026-11-20', '2026-11-20', false, true)?.from).toBe('2026-09-01');
+    expect(rangeWindow('2026-09-01', '2026-11-20', '2026-11-20')?.from).not.toBe('2026-09-01');
+    expect(RANGE_MAX_DAYS).toBe(62);
+    expect(COMPARE_MAX_DAYS).toBeGreaterThanOrEqual(365);
+    const src = readFileSync('api/_handlers/recruit-overview.ts', 'utf8');
+    expect(src).toContain("compare: req.query?.cmp === '1'");
+  });
+});

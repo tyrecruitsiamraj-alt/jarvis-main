@@ -99,6 +99,8 @@ export function monthOptions(first: string | null, last: string): string[] {
 export const RANGE_MAX_DAYS = 62;
 /** ปุ่ม "ทั้งหมด" (เจ้าของ 29 ต.ค. 2569 "ต้องมีคำว่าทั้งหมดด้วย") — ตั้งแต่วันแรกที่มีข้อมูลถึงวันนี้ · ยาวสุด 2 ปี · ไม่เทียบช่วงก่อน */
 export const ALL_MAX_DAYS = 731;
+/** โหมดเทียบเดือน (20 พ.ย. 2569) — เลือกเดือนเริ่ม-เดือนจบได้ถึง 12 เดือน (กราฟรายเดือนเอา 12 เดือนล่าสุด `STUCK_MONTHS_MAX`) · เทียบช่วงก่อนตามปกติ */
+export const COMPARE_MAX_DAYS = 366;
 
 const DAY_MS = 86_400_000;
 const ymdToDay = (ymd: string) => Math.round(Date.parse(`${ymd}T00:00:00Z`) / DAY_MS);
@@ -108,7 +110,7 @@ export function isYmd(v: unknown): v is string {
   return typeof v === 'string' && YMD_RE.test(v) && !Number.isNaN(Date.parse(`${v}T00:00:00Z`));
 }
 
-export function rangeWindow(fromParam: unknown, toParam: unknown, today: string, all = false): RecruitOverviewWindow | null {
+export function rangeWindow(fromParam: unknown, toParam: unknown, today: string, all = false, compare = false): RecruitOverviewWindow | null {
   if (!YMD_RE.test(today)) throw new Error(`today ต้องเป็น YYYY-MM-DD: ${today}`);
   if (!isYmd(fromParam) || !isYmd(toParam)) return null;
   let a = ymdToDay(fromParam);
@@ -117,7 +119,7 @@ export function rangeWindow(fromParam: unknown, toParam: unknown, today: string,
   const t = ymdToDay(today);
   if (a > t) return null;
   b = Math.min(b, t);
-  a = Math.max(a, b - ((all ? ALL_MAX_DAYS : RANGE_MAX_DAYS) - 1));
+  a = Math.max(a, b - ((all ? ALL_MAX_DAYS : compare ? COMPARE_MAX_DAYS : RANGE_MAX_DAYS) - 1));
   const len = b - a + 1;
   const from = dayToYmd(a);
   const to = dayToYmd(b);

@@ -954,14 +954,14 @@ export async function buildRecruitOverview(
   scope: DepartmentScope,
   now: Date,
   /** ช่วงที่เลือกเอง (รายวัน/ช่วง · 5 ต.ค. 2569) — ค่าผิด/ไม่ส่ง = แบบเดือน */
-  range?: { from: unknown; to: unknown; all?: boolean },
+  range?: { from: unknown; to: unknown; all?: boolean; compare?: boolean },
   /** BU ที่ขอ — ผู้ใช้หลาย BU สลับได้ทีละ BU (26 ต.ค. 2569) · แอดมิน/BU เดียวไม่ใช้ */
   requestedBu?: unknown,
   /** ผล ณ วันสิ้นสุด (`?asof=1` · ภาพรวม v2 17 พ.ย. 2569) — หน้าเดิมไม่ส่ง = ผลล่าสุดแบบเดิม */
   opts: { asOf?: boolean } = {},
 ): Promise<RecruitOverviewResponse> {
   const today = toBangkokYmd(now);
-  const window = (range ? rangeWindow(range.from, range.to, today, range.all === true) : null) ?? monthWindow(monthParam, today);
+  const window = (range ? rangeWindow(range.from, range.to, today, range.all === true, range.compare === true) : null) ?? monthWindow(monthParam, today);
   /**
    * แอดมินเห็นทุก BU เหมือนเดิม · BU เดียว = ล็อก
    * หลาย BU = ค่าเริ่ม **ผลรวมทุก BU ในสิทธิ์** แล้วเลือกดูทีละ BU ได้ (เจ้าของ 29 ต.ค. 2569 "default คือ ผลรวมของทุก bu แล้วฉันไปแยกดูเอง")
@@ -1225,7 +1225,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
     const timings: Array<[string, number]> = [];
     const t0 = Date.now();
     const body = await stepTimings.run(timings, () =>
-      buildRecruitOverview(month, scope, new Date(), from && to ? { from, to, all: req.query?.all === '1' } : undefined, req.query?.bu, {
+      buildRecruitOverview(month, scope, new Date(), from && to ? { from, to, all: req.query?.all === '1', compare: req.query?.cmp === '1' } : undefined, req.query?.bu, {
         asOf: req.query?.asof === '1',
       }),
     );
