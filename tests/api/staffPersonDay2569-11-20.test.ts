@@ -46,7 +46,7 @@ describe('เส้น staff-activity person=1', () => {
     expect(src).toContain("if (ymdAddDays(from, 31) < to) return sendError(res, 400, 'bad_request', 'ช่วงวันที่ยาวเกินไป');");
   });
   it('รายการที่กดมีเวลาที่ทำ + คีย์ใบขอ ทุกชนิดงาน', () => {
-    expect(src).toContain('d(day, title, sub, application_id, request_no, at, job_id)');
+    expect(src).toContain('d(day, title, sub, application_id, request_no, at, job_id) limit 2000');
   });
 });
 

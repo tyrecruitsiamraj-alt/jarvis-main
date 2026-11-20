@@ -140,11 +140,15 @@ async function loadFeed(from: string, to: string, buSet: readonly string[] | nul
   return rows.map((r) => ({ at: new Date(r.at).toISOString(), kind: r.kind, who: r.who, subject: r.subject, detail: r.detail, applicationId: r.application_id, requestNo: r.request_no }));
 }
 
+/** SQL รายการของช่องที่กด (อ่านอย่างเดียว) · $1–$2 ช่วงวัน · $3 คน */
+export const staffDetailSql = (kind: StaffActivityKind): string => `select * from (${DETAIL[kind]}) d(day, title, sub, application_id, request_no, at, job_id) limit 2000`;
+
 async function loadDetail(from: string, to: string, userId: string, kind: StaffActivityKind): Promise<StaffActivityItem[]> {
-  const { rows } = await dbQuery<{ day: string; title: string; sub: string | null; application_id: string | null; request_no: string | null; at: string | null; job_id: string | null }>(
-    `select * from (${DETAIL[kind]}) d(day, title, sub, application_id, request_no, at, job_id) limit 2000`,
-    [from, to, userId],
-  );
+  const { rows } = await dbQuery<{ day: string; title: string; sub: string | null; application_id: string | null; request_no: string | null; at: string | null; job_id: string | null }>(staffDetailSql(kind), [
+    from,
+    to,
+    userId,
+  ]);
   return rows.map((r) => ({ day: r.day, title: r.title, sub: r.sub, applicationId: r.application_id, requestNo: r.request_no, at: r.at ? new Date(r.at).toISOString() : null, jobId: r.job_id }));
 }
 
@@ -208,17 +212,36 @@ export function personDaySql(): Record<'counts' | 'chans' | 'results' | 'jobs', 
  * ทำอะไร = `EVENTS` ชุดเดียวกับตารางรายคน (นิยามเดียว) · ช่องทาง/ผล · ใบไหน · คลิก/กรอก ของลิงก์ที่คนนี้รับผิดชอบ (`LINK_OWNER`)
  * `from`–`to` = 7 วันที่วาดแท่ง · `day` = วันที่ดู (อยู่ในช่วง) · วันก่อนหน้าอ่านเพิ่มถ้าอยู่นอกช่วง
  */
+type PersonCountRow = { day: string; kind: StaffActivityKind; n: number };
+type PersonChanRow = { kind: StaffActivityKind; label: string; n: number; extra: number | null };
+type PersonResultRow = { what: 'clicks' | 'applicants'; day: string; n: number };
+type PersonJobRow = { job: string; kind: string; n: number; kind_label: string | null };
+
 async function loadPersonDay(from: string, to: string, day: string, userId: string): Promise<StaffPersonDay> {
   const prevDay = ymdAddDays(day, -1);
   const lo = prevDay < from ? prevDay : from;
   const sql = personDaySql();
   const [counts, chans, results, jobs] = await Promise.all([
-    dbQuery<{ day: string; kind: StaffActivityKind; n: number }>(sql.counts, [lo, to, userId]),
-    dbQuery<{ kind: StaffActivityKind; label: string; n: number; extra: number | null }>(sql.chans, [day, userId]),
-    dbQuery<{ what: 'clicks' | 'applicants'; day: string; n: number }>(sql.results, [day, prevDay, userId]),
-    dbQuery<{ job: string; kind: string; n: number; kind_label: string | null }>(sql.jobs, [day, userId]),
+    dbQuery<PersonCountRow>(sql.counts, [lo, to, userId]),
+    dbQuery<PersonChanRow>(sql.chans, [day, userId]),
+    dbQuery<PersonResultRow>(sql.results, [day, prevDay, userId]),
+    dbQuery<PersonJobRow>(sql.jobs, [day, userId]),
   ]);
+  return shapePersonDay(from, to, day, { counts: counts.rows, chans: chans.rows, results: results.rows, jobs: jobs.rows });
+}
 
+/** แถวจากฐาน → คำตอบของแท็บ (ไม่แตะฐาน) */
+export function shapePersonDay(
+  from: string,
+  to: string,
+  day: string,
+  q: { counts: readonly PersonCountRow[]; chans: readonly PersonChanRow[]; results: readonly PersonResultRow[]; jobs: readonly PersonJobRow[] },
+): StaffPersonDay {
+  const prevDay = ymdAddDays(day, -1);
+  const counts = { rows: q.counts };
+  const chans = { rows: q.chans };
+  const results = { rows: q.results };
+  const jobs = { rows: q.jobs };
   const byDay = new Map<string, StaffKindCounts>();
   for (const r of counts.rows) {
     const cur = byDay.get(r.day) ?? emptyStaffKinds();
@@ -232,7 +255,7 @@ async function loadPersonDay(from: string, to: string, day: string, userId: stri
   const scrap = new Map<ScrapOutcome, number>();
   for (const r of chans.rows) {
     if (r.kind === 'scrap') scrap.set(scrapOutcomeOf(r.label), (scrap.get(scrapOutcomeOf(r.label)) ?? 0) + r.n);
-    else if (r.kind === 'autopost') channels.autopost.push({ label: `${r.label} · ${r.extra ?? 0} กลุ่ม`, n: r.n });
+    else if (r.kind === 'autopost') channels.autopost.push({ label: `${r.label} ${r.extra ?? 0} กลุ่ม`, n: r.n });
     else channels[r.kind].push({ label: r.label, n: r.n });
   }
   for (const k of ['done', 'waiting', 'failed', 'cancelled'] as const) if (scrap.get(k)) channels.scrap.push({ label: SCRAP_OUTCOME_LABEL[k], n: scrap.get(k) as number });

@@ -39,7 +39,7 @@ const dayOf = (day: string): StaffPersonDay => {
               { label: 'สำเร็จ', n: 6 },
               { label: 'ไม่สำเร็จ', n: 74 },
             ],
-            autopost: [{ label: 'Clarissa Glady · 5 กลุ่ม', n: 2 }],
+            autopost: [{ label: 'Clarissa Glady 12 กลุ่ม', n: 2 }],
           }
         : base.channels,
     results: day === '2026-11-20' ? { clicks: 819, clicksPrev: 897, applicants: 42, applicantsPrev: 52 } : base.results,
@@ -99,6 +99,7 @@ describe('StaffPersonPanel', () => {
     draw();
     await waitFor(() => expect(screen.getByTestId('staff-person-row-links').textContent).toContain('Facebook · Facebook Group 158 · ไม่ระบุช่องทาง 3'));
     expect(screen.getByTestId('staff-person-row-scrap').textContent).toContain('สำเร็จ 6 · ไม่สำเร็จ 74');
+    expect(screen.getByTestId('staff-person-row-autopost').textContent).toContain('Clarissa Glady 12 กลุ่ม (2 ใบ)');
     const res = screen.getByTestId('staff-person-results');
     expect(res.textContent).toContain('819');
     expect(res.textContent).toContain('ลดลง 78');

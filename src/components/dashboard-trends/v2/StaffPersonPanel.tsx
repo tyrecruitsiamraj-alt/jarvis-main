@@ -28,6 +28,7 @@ import {
   type StaffActivityRow,
   type StaffPersonDay,
   type StaffPersonJob,
+  type StaffPersonSub,
 } from '@/lib/staffActivity';
 import { fetchStaffActivityItems, fetchStaffPersonDay } from '@/lib/staffActivityApi';
 import TrendDelta from '../stuck/TrendDelta';
@@ -41,6 +42,8 @@ const JOB_KINDS: ReadonlyArray<{ key: 'autopost' | 'scrap' | 'links' | 'manualPo
   { key: 'links', label: 'Gen link' },
   { key: 'manualPosted', label: 'โพสต์แล้ว' },
 ];
+/** แถวย่อย — ช่องทาง/ผล + จำนวน · Autopost = บัญชี + จำนวนกลุ่ม (บอกจำนวนใบเมื่อเกิน 1) */
+const subText = (kind: StaffActivityKind, c: StaffPersonSub) => (kind === 'autopost' ? `${c.label}${c.n > 1 ? ` (${fmt(c.n)} ใบ)` : ''}` : `${c.label} ${fmt(c.n)}`);
 const jobTotal = (jobs: readonly StaffPersonJob[], k: keyof Omit<StaffPersonJob, 'jobId' | 'label'>) => jobs.reduce((n, j) => n + j[k], 0);
 
 export default function StaffPersonPanel({
@@ -163,7 +166,7 @@ export default function StaffPersonPanel({
           <div className="space-y-1.5">
             <h3 className="text-sm font-medium">7 วัน</h3>
             <div className="overflow-x-auto">
-              <div className="flex h-32 gap-2 border-b" data-testid="staff-person-week">
+              <div className="flex h-32 gap-1 border-b sm:gap-2" data-testid="staff-person-week">
                 {data.week.map((w) => {
                   const n = staffWorkTotal(w);
                   return (
@@ -174,7 +177,7 @@ export default function StaffPersonPanel({
                       aria-pressed={w.day === day}
                       title={`${dayShort(w.day)} · ${fmt(n)} งาน`}
                       data-testid={`staff-person-day-${w.day}`}
-                      className="flex min-w-12 flex-1 flex-col items-center justify-end gap-1"
+                      className="flex min-w-9 flex-1 flex-col items-center justify-end gap-1"
                     >
                       <span className={cn('rounded-full border bg-background px-2 text-xs tabular-nums', w.day === day && 'font-medium')}>{fmt(n)}</span>
                       <span
@@ -185,9 +188,9 @@ export default function StaffPersonPanel({
                   );
                 })}
               </div>
-              <div className="flex gap-2 pt-1">
+              <div className="flex gap-1 pt-1 sm:gap-2">
                 {data.week.map((w) => (
-                  <span key={w.day} className={cn('min-w-12 flex-1 text-center text-xs', w.day === day ? 'font-medium' : DASH.sub)}>
+                  <span key={w.day} className={cn('min-w-9 flex-1 text-center text-xs', w.day === day ? 'font-medium' : DASH.sub)}>
                     {dayShort(w.day)}
                   </span>
                 ))}
@@ -223,7 +226,7 @@ export default function StaffPersonPanel({
                         <span className="block">{k.label}</span>
                         {/* ช่องทาง/ผล บรรทัดเดียว จองที่ไว้เสมอ */}
                         <span className={cn('block min-h-4 break-words text-xs', DASH.sub)}>
-                          {data.channels[k.key].length ? data.channels[k.key].map((c) => `${c.label} ${fmt(c.n)}`).join(' · ') : ' '}
+                          {data.channels[k.key].length ? data.channels[k.key].map((c) => subText(k.key, c)).join(' · ') : ' '}
                         </span>
                       </TableCell>
                       {numberCell(data.cur[k.key], () => setPick({ kind: k.key, jobId: null, jobLabel: null }))}

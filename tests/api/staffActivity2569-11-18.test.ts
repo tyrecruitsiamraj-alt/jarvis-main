@@ -114,7 +114,7 @@ describe('GET /api/staff-activity?person=1 (แท็บงานรายคน
     const sum = (k: string) => p.channels[k].reduce((n, c) => n + c.n, 0);
     for (const k of ['links', 'manualPosted', 'scrap', 'autopost']) expect(sum(k)).toBe(p.cur[k]);
     expect(p.channels.scrap).toEqual([{ label: 'สำเร็จ', n: 6 }, { label: 'ไม่สำเร็จ', n: 74 }]);
-    expect(p.channels.autopost).toEqual([{ label: 'Clarissa Glady · 12 กลุ่ม', n: 2 }]);
+    expect(p.channels.autopost).toEqual([{ label: 'Clarissa Glady 12 กลุ่ม', n: 2 }]);
     expect(p.results).toEqual({ clicks: 819, clicksPrev: 897, applicants: 42, applicantsPrev: 0 });
     // รายใบ: รวมเท่าแถวแม่ · ใบขอชั่วคราว/กล่องลอยมีป้ายบอก
     const col = (k: string) => p.jobs.reduce((n, j) => n + Number(j[k]), 0);
