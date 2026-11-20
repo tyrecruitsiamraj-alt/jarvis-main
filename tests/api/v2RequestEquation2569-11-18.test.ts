@@ -28,10 +28,11 @@ describe('สมการใบขอ', () => {
     // 19 พ.ย. 2569 ค่ำ: สมการย้ายเข้าแผงใบขอ (เลือกเรื่องจากรายการ) — เลขใหญ่ = อัตรา · บรรทัดรอง = ใบ
     const src = readFileSync('src/components/dashboard-trends/v2/RequestBuPanel.tsx', 'utf8');
     for (const w of [
-      "{ key: 'carried', label: 'ยอดยกมา', field: 'requested', rows: eq.carried",
-      "{ key: 'new', label: 'ขอใหม่', field: 'requested', rows: eq.new",
-      "{ key: 'filled', label: 'หาได้แล้ว', field: 'filled', rows: kept.filter((r) => r.filled > 0)",
-      "{ key: 'cancelled', label: 'ยกเลิก', field: 'cancelled', rows: kept.filter((r) => r.cancelled > 0)",
+      // 20 พ.ย. 2569 นับตามช่วง (`flowOf`) — Choice "กดได้ทุกเรื่องใบขอ"
+      "{ key: 'carried', label: 'ยอดยกมา', field: 'carryIn', rows: kept.filter((r) => flowOf(r).carryIn > 0)",
+      "{ key: 'new', label: 'ขอใหม่', field: 'new', rows: eq.new",
+      "{ key: 'filled', label: 'หาได้แล้ว', field: 'filled', rows: kept.filter((r) => flowOf(r).filled > 0)",
+      "{ key: 'cancelled', label: 'ยกเลิก', field: 'cancelled', rows: kept.filter((r) => flowOf(r).cancelled > 0)",
       "{ key: 'remaining', label: 'เหลือหา', field: 'remaining', rows: eq.remaining",
       'อัตรา · {subOf(topic)}',
     ])

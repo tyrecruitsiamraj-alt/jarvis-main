@@ -38,8 +38,17 @@ describe('จดยอดใบขอเหลือหารายวัน', (
     const sql = readFileSync('migrations/181_recruit_request_daily.sql', 'utf8');
     expect(sql).toMatch(/create table if not exists recruit_request_daily/);
     expect(sql).not.toMatch(/^\s*(delete|update|drop|alter) /im);
-    expect(readFileSync('server/local-api.ts', 'utf8')).toContain('startRequestDailySnapshotWorker(() => loadOpenStuckRequestsAll());');
+    expect(readFileSync('server/local-api.ts', 'utf8')).toContain('startRequestDailySnapshotWorker(() => loadOpenStuckRequestsAll(), () => loadOpenWorkStatusesAll());');
     expect(readFileSync('api/_lib/requestDailySnapshot.ts', 'utf8')).toContain("REQUEST_DAILY_SNAPSHOT_ENABLED || '').trim().toLowerCase() === 'false'");
     expect(readFileSync('api/_handlers/recruit-stuck.ts', 'utf8')).toContain("q === 'monthly' || q === 'daily' || q === 'months' ? q : 'requests'");
+  });
+  it('193 สถานะทำงานรายใบ ณ สิ้นวัน (เจ้าของ 20 พ.ย. 2569 "เริ่มกดจดทุกคืน") — ตารางใหม่ เพิ่มอย่างเดียว · ล้มแยกจากยอดรายวัน · ไม่มีที่จด = null', () => {
+    const sql = readFileSync('migrations/193_recruit_request_status_daily.sql', 'utf8');
+    expect(sql).toMatch(/create table if not exists recruit_request_status_daily/);
+    expect(sql).not.toMatch(/^\s*(delete|update|drop|alter) /im);
+    const lib = readFileSync('api/_lib/requestDailySnapshot.ts', 'utf8');
+    expect(lib).toContain("logError('requestStatusSnapshot', e);");
+    expect(lib).toContain('return rows.length ? Object.fromEntries(rows.map((r) => [r.job_id, r.work_status])) : null;');
+    expect(readFileSync('api/_handlers/recruit-stuck.ts', 'utf8')).toContain('statusAt: w.to < today ? await loadRequestStatusAt(w.from, w.to) : null,');
   });
 });

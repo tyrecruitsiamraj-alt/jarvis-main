@@ -73,3 +73,24 @@ describe('ช่วงของโหมดเทียบเดือน', () =
     expect(src).toContain("compare: req.query?.cmp === '1'");
   });
 });
+
+describe('requestFlowDays — หาได้/ยกเลิก รายวันจากสมุดใบขอ', () => {
+  const reqOf = (o: Record<string, unknown>) =>
+    ({ requestNo: 'OPL6910099', site: 'S1', bu: 'LBD', unit: 'ธนาคาร', position: 'ขับรถ', qty: 3, keyYmd: '2026-10-10', needYmd: '2026-10-20', endYmd: null, workDays: null, finePerDay: 0, deductPerDay: 0, starts: [], filled: 0, ...o }) as never;
+  it('รายวันรวมเท่ายอดของช่วงเสมอ · ยกมา + ขอใหม่ − หาได้ − ยกเลิก = เหลือ', async () => {
+    const { requestFlowDays, requestFlowRole } = await import('@/lib/requestPenaltyLedger');
+    const r = reqOf({ starts: [['2026-10-20', 1], ['2026-11-05', 2]], endYmd: '2026-11-12' });
+    for (const [from, to] of [['2026-10-01', '2026-10-31'], ['2026-11-01', '2026-11-19'], ['2026-10-01', '2026-11-19']]) {
+      const role = requestFlowRole(r, from, to);
+      const d = requestFlowDays(r, from, to, role);
+      const sum = (xs: Array<[string, number]>) => xs.reduce((n, [, v]) => n + v, 0);
+      expect(sum(d.fill)).toBe(role.filled);
+      expect(sum(d.cancel)).toBe(role.cancelled);
+      expect(role.carryIn + role.newPositions - role.filled - role.cancelled).toBe(role.remaining);
+      for (const [day] of [...d.fill, ...d.cancel]) expect(day >= from && day <= to).toBe(true);
+    }
+    const nov = requestFlowRole(r, '2026-11-01', '2026-11-19');
+    expect(nov).toMatchObject({ carryIn: 2, filled: 1, cancelled: 1, remaining: 0 });
+    expect(requestFlowDays(r, '2026-11-01', '2026-11-19', nov)).toEqual({ fill: [['2026-11-05', 1]], cancel: [['2026-11-12', 1]] });
+  });
+});

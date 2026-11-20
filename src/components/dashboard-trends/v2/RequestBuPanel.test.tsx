@@ -172,10 +172,37 @@ describe('RequestBuPanel', () => {
     expect(screen.getByTestId('req-bu-month-2026-11')).toBeTruthy();
   });
 
-  it('เทียบเดือน: มีรายวันเฉพาะขอใหม่ · เรื่องอื่นกดแท่งไม่ได้', () => {
+  it('เทียบเดือน: กดรายวันได้ทุกเรื่องของใบขอ · สถานะทำงานกดไม่ได้', () => {
     draw(vi.fn(), true);
     fireEvent.click(screen.getByTestId('req-bu-number-filled'));
+    expect((screen.getByTestId('req-bu-month-2026-10') as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.click(screen.getByTestId('req-bu-number-work_status_in_progress'));
     expect((screen.getByTestId('req-bu-month-2026-11') as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it('🔴 นับตามช่วง: เส้นรายวันรวมเท่าแท่งเดือน · ยกมาเดือนนี้ = เหลือหาสิ้นเดือนก่อน', () => {
+    // ใบเดียวสองเดือน: คีย์ 10 ต.ค. ขอ 3 · เริ่มงาน 1 คน 20 ต.ค. · พ.ย. เริ่มงานอีก 1 คน 5 พ.ย. · ยกเลิกที่เหลือ 12 พ.ย.
+    const oct = req('OPL6910099', { day: '2026-10-10', requested: 3, flow: { carryIn: 0, new: 3, filled: 1, cancelled: 0, remaining: 2, fillDays: [['2026-10-20', 1]], cancelDays: [] } } as Partial<StuckRequest>);
+    const nov = req('OPL6910099', { day: '2026-10-10', inRange: false, state: 'cancelled', requested: 3, flow: { carryIn: 2, new: 0, filled: 1, cancelled: 1, remaining: 0, fillDays: [['2026-11-05', 1]], cancelDays: [['2026-11-12', 1]] } } as Partial<StuckRequest>);
+    const blocks: StuckMonthBlock[] = [
+      { month: '2026-10', from: '2026-10-01', to: '2026-10-31', rows: [oct] },
+      { month: '2026-11', from: '2026-11-01', to: '2026-11-19', rows: [nov] },
+    ];
+    render(<RequestBuPanel rows={[nov]} jobs={[]} bus={['LBD']} rangeText="" months={blocks} today={TODAY} error={null} onOpenRequest={vi.fn()} onNames={vi.fn()} resetKey="k" compare />);
+    fireEvent.click(screen.getByTestId('req-bu-number-remaining'));
+    expect(within(screen.getByTestId('req-bu-month-2026-10')).getByText('2')).toBeTruthy();
+    fireEvent.click(screen.getByTestId('req-bu-number-carried'));
+    // ยกมา พ.ย. 2 = เหลือหา ต.ค. 2
+    expect(within(screen.getByTestId('req-bu-month-2026-11')).getByText('2')).toBeTruthy();
+    // หาได้แล้ว พ.ย. รายวัน รวม 1 = แท่ง · เหลือหาสิ้นวันสุดท้าย 0
+    fireEvent.click(screen.getByTestId('req-bu-number-filled'));
+    fireEvent.click(screen.getByTestId('req-bu-month-2026-11'));
+    expect(screen.getByTestId('req-bu-daily').textContent).toContain('LBD 1');
+    fireEvent.click(screen.getByTestId('req-bu-daily-back'));
+    fireEvent.click(screen.getByTestId('req-bu-number-remaining'));
+    fireEvent.click(screen.getByTestId('req-bu-month-2026-11'));
+    expect(screen.getByTestId('req-bu-daily').textContent).toContain('(สิ้นวัน)');
+    expect(screen.getByTestId('req-bu-daily').textContent).toContain('LBD 0');
   });
 
   it('เทียบเดือน: สถานะทำงานของเดือนที่จบไปแล้ว = ไม่มีข้อมูล (ไม่ยุบเป็น 0)', () => {
@@ -183,6 +210,14 @@ describe('RequestBuPanel', () => {
     expect(screen.getByTestId('req-bu-month-2026-10').textContent).toContain('ไม่มีข้อมูล');
     expect(within(screen.getByTestId('req-bu-month-2026-11')).getByText('13')).toBeTruthy();
     expect(screen.getByTestId('req-bu-compare').textContent).toContain('เทียบไม่ได้');
+  });
+
+  it('เทียบเดือน: เดือนที่จบแล้วมีสถานะที่จดไว้ (193) = ใช้สถานะ ณ สิ้นเดือนนั้น', () => {
+    const withStatus = months.map((m) => (m.month === '2026-10' ? { ...m, statusAt: Object.fromEntries(m.rows.map((r) => [r.jobId as string, 'in_progress'])) } : m));
+    render(<RequestBuPanel rows={rows} jobs={jobs} bus={['LBD', 'LBA']} rangeText="" months={withStatus} today={TODAY} error={null} onOpenRequest={vi.fn()} onNames={vi.fn()} resetKey="k" compare />);
+    // ต.ค. ใบเปิด 10 ใบ (LBD 9 + LBA 1) สถานะดำเนินการทั้งหมด · ใบยกมาที่ปิดแล้วไม่นับ
+    expect(within(screen.getByTestId('req-bu-month-2026-10')).getByText('10')).toBeTruthy();
+    expect(screen.getByTestId('req-bu-month-2026-11').textContent).toContain('13');
   });
 
   it('เทียบเดือนยังโหลด = ที่ว่างรอ ไม่หาย', () => {

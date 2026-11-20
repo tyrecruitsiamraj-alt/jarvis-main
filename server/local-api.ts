@@ -27,7 +27,7 @@ import { startIrecruitImportWorker } from '../api/_lib/irecruitApplicantImport.t
 import { startSoScrapingNoticeWorker } from '../api/_lib/soScrapingNotices.ts';
 import { startIrecruitLateReminderWorker } from '../api/_lib/irecruitLateReminder.ts';
 import { startRequestDailySnapshotWorker } from '../api/_lib/requestDailySnapshot.ts';
-import { loadOpenStuckRequestsAll } from '../api/_handlers/recruit-stuck.ts';
+import { loadOpenStuckRequestsAll, loadOpenWorkStatusesAll } from '../api/_handlers/recruit-stuck.ts';
 import { startUnitRequestKeepWarm } from '../api/_lib/unitRequestCache.ts';
 import { preferIpv4 } from '../api/_lib/netPreferIpv4.ts';
 import { warmUnitRequestListCache } from '../api/_handlers/siamraj-unit-requests.ts';
@@ -251,7 +251,8 @@ server.listen(port, '127.0.0.1', () => {
    * จดยอดใบขอเหลือหารายวัน (เจ้าของ 16 พ.ย. 2569 "จดทุกคืน") — ทุกชั่วโมงเขียนทับยอดของวันนี้ · **เปิดโดยดีฟอลต์**
    * ปิดด้วย REQUEST_DAILY_SNAPSHOT_ENABLED=false · อ่าน ERP/ฐาน แล้วเขียนตารางของตัวเองตารางเดียว
    */
-  startRequestDailySnapshotWorker(() => loadOpenStuckRequestsAll());
+  // + สถานะทำงานรายใบ (193 · เจ้าของ 20 พ.ย. 2569 "เริ่มกดจดทุกคืน") — เทียบเดือนย้อนหลังได้
+  startRequestDailySnapshotWorker(() => loadOpenStuckRequestsAll(), () => loadOpenWorkStatusesAll());
   /**
    * รายชื่อ iRecruit ที่ยัง "รอดำเนินการ" เกิน 24 ชม. — เช้าละครั้งตั้งแต่ 08:00 แจ้งผู้รับผิดชอบ (เจ้าของ 21 ต.ค. 2569)
    * ปิดด้วย IRECRUIT_LATE_REMINDER_ENABLED=false

@@ -36,11 +36,12 @@ import { jobUnitSectorOf } from '../../src/lib/unitRequestDisplay.js';
 import { onlineRequestStateOf, type OnlineRequestRow } from '../../src/lib/homeOnline.js';
 import { toBangkokYmd } from '../_lib/businessDate.js';
 import { loadPenaltyLedgerRaw } from '../_lib/siamrajPenaltyLedgerSql.js';
-import { buildPenaltyLedger, ledgerJobIdOf, requestFlowRole, type LedgerRequest, type RequestFlowRole } from '../../src/lib/requestPenaltyLedger.js';
+import { buildPenaltyLedger, ledgerJobIdOf, requestFlowDays, requestFlowRole, type LedgerRequest, type RequestFlowRole } from '../../src/lib/requestPenaltyLedger.js';
 import { normalizeTrendBu, trendBuFromSiteCode } from '../../src/lib/trends/bu.js';
 import { APPOINTMENT_AT_SQL } from '../_lib/applicantOverviewSql.js';
 import { monthWindowsOf, stuckReasonOf, type StuckDailyRow, type StuckMonthBlock, type StuckMonthRow, type StuckMonthlyRow, type StuckPostStatus, type StuckRequest, type StuckState } from '../../src/lib/recruitStuck.js';
-import { loadRequestDaily } from '../_lib/requestDailySnapshot.js';
+import { loadRequestDaily, loadRequestStatusAt, type RequestStatusRow } from '../_lib/requestDailySnapshot.js';
+import { resolveUnitRequestWorkStatus } from '../../src/lib/unitRequestWorkStatus.js';
 import type { RecruitAppFact } from '../../src/lib/recruitOverviewTypes.js';
 import type { JobRequest } from '../../src/types/index.js';
 
@@ -126,7 +127,12 @@ export async function buildRecruitStuck(
       const out: StuckMonthBlock[] = [];
       for (let i = 0; i < wins.length; i += 3) {
         const chunk = await Promise.all(
-          wins.slice(i, i + 3).map(async (w) => ({ ...w, rows: (await loadStuckRequests(departmentScope, buSet, { from: w.from, to: w.to }, today, { lite: true })).map(monthRowOf) })),
+          wins.slice(i, i + 3).map(async (w) => ({
+            ...w,
+            rows: (await loadStuckRequests(departmentScope, buSet, { from: w.from, to: w.to }, today, { lite: true })).map(monthRowOf),
+            // เดือนที่จบแล้ว = สถานะ ณ วันล่าสุดที่จดในเดือนนั้น (193) · เดือนนี้ใช้สถานะสดของหน้าเว็บ
+            statusAt: w.to < today ? await loadRequestStatusAt(w.from, w.to) : null,
+          })),
         );
         out.push(...chunk);
       }
@@ -162,6 +168,7 @@ const monthRowOf = (r: StuckRequest): StuckMonthRow => ({
   jobId: r.jobId,
   requestNo: r.requestNo,
   day: r.day,
+  flow: r.flow,
   bu: r.bu,
   recruiter: r.recruiter,
   screener: r.screener,
@@ -365,8 +372,16 @@ async function loadStuckRequests(
   for (const p of postings) if (p.request_type === 'content' && POST_STATUSES.includes(p.status as StuckPostStatus) && !postBy.has(p.job_id)) postBy.set(p.job_id, p.status as StuckPostStatus);
 
   const ledgerOf = (jobId: string) => roleOf(jobId)?.r ?? null;
+  /** ยอดตามช่วง + รายวัน (เทียบเดือน 20 พ.ย. 2569) — ใบในสมุดใบขอเท่านั้น */
+  const flowOfRow = (jobId: string): StuckRequest['flow'] => {
+    const v = roleOf(jobId);
+    if (!v) return undefined;
+    const days = requestFlowDays(v.r, win.from, toEff, v.role);
+    return { carryIn: v.role.carryIn, new: v.role.newPositions, filled: v.role.filled, cancelled: v.role.cancelled, remaining: v.role.remaining, fillDays: days.fill, cancelDays: days.cancel };
+  };
   return base.map((b, i) => {
     const id = b.online.jobId as string;
+    const flow = flowOfRow(id);
     const row = rows[i];
     const j = b.job;
     const fs = factsBy.get(id) ?? [];
@@ -414,10 +429,16 @@ async function loadStuckRequests(
       sourcing: j ? openJobBoxOf(j) === 'sourcing' : true,
       state,
       inRange: b.inRange,
+      ...(flow ? { flow } : {}),
     } satisfies StuckRequest;
   });
 }
 
+/** สถานะทำงานของใบที่ยังเปิดทั้งระบบ — ตัวจดสถานะรายวัน (193) · ชุดเดียวกับที่ก้อนใบขอแบ่งสถานะ (`workStatusOfRemaining`) */
+export async function loadOpenWorkStatusesAll(): Promise<RequestStatusRow[]> {
+  const jobs = (await readUnitRequestListThroughCache({ limit: 500, departmentScope: { mode: 'all' } })).value as unknown as JobRequest[];
+  return jobs.filter((j) => j.status === 'open').map((j) => ({ jobId: String(j.id), workStatus: resolveUnitRequestWorkStatus(j.work_status) }));
+}
 const monthOf = (ymd: string) => ymd.slice(0, 7);
 function monthsBack(today: string, n: number): string {
   const y = Number(today.slice(0, 4));

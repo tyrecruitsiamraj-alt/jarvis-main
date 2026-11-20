@@ -17,7 +17,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { cn } from '@/lib/utils';
 import { DASH, REQUEST_TOPIC_HEX, TONE, type ToneKey } from '@/lib/designTokens';
 import { BU_UNKNOWN, pageOf } from '@/lib/recruitAudience';
-import { monthWindowLabel, recruiterLabelOf, stuckEquation, type StuckMonthBlock, type StuckMonthRow, type StuckRequest } from '@/lib/recruitStuck';
+import { flowOf, monthWindowLabel, recruiterLabelOf, stuckEquation, type StuckFlowKey, type StuckMonthBlock, type StuckMonthRow, type StuckRequest } from '@/lib/recruitStuck';
 import type { TrendSense } from '@/lib/recruitScale';
 import { REQUEST_LEAD_KIND_LABEL, type RequestLeadKind } from '@/lib/requestLeadKind';
 import { STATUS_TOTAL_ID, workStatusOfRemaining } from '@/lib/workStatusOfRemaining';
@@ -25,7 +25,8 @@ import type { JobRequest } from '@/types';
 import TrendDelta from '../stuck/TrendDelta';
 import { Pager, buHex, fmt } from './V2Parts';
 
-type Field = 'requested' | 'filled' | 'cancelled' | 'remaining';
+/** ยอดตามช่วง (`flowOf`) — ยกมา/หาได้/ยกเลิก นับตามช่วง ไม่ใช่ยอดสะสมทั้งใบ (เจ้าของ 20 พ.ย. 2569 Choice "กดได้ทุกเรื่องใบขอ") */
+type Field = StuckFlowKey;
 type Topic<T extends StuckMonthRow = StuckRequest> = { key: string; label: string; field: Field; rows: T[]; group: 'eq' | 'status' };
 type FilterKey = 'rec' | 'scr' | 'kind';
 
@@ -48,15 +49,15 @@ const topicHex = (key: string) => REQUEST_TOPIC_HEX[key] ?? REQUEST_TOPIC_HEX.wo
 const buKey = (r: StuckMonthRow) => r.bu?.trim() || BU_UNKNOWN;
 const BU_ORDER = ['LBD', 'LBA', 'LM', 'SN', 'DS', 'CR'];
 const buRank = (b: string) => (b === BU_UNKNOWN ? 99 : BU_ORDER.indexOf(b) < 0 ? 50 : BU_ORDER.indexOf(b));
-const sumOf = (rows: readonly StuckMonthRow[], f: Field) => rows.reduce((n, r) => n + (Number(r[f]) || 0), 0);
+const sumOf = (rows: readonly StuckMonthRow[], f: Field) => rows.reduce((n, r) => n + flowOf(r)[f], 0);
 /** เรื่องทั้งหมดของใบชุดหนึ่ง — ตัวเดียวทั้งเลขใหญ่ กราฟ BU และกราฟรายเดือน (ใบของเดือน = ช่องชุดย่อ `StuckMonthRow`) */
 function topicsOf<T extends StuckMonthRow>(kept: readonly T[], jobs: readonly JobRequest[] | null): Topic<T>[] {
   const eq = stuckEquation(kept);
   const list: Topic<T>[] = [
-    { key: 'carried', label: 'ยอดยกมา', field: 'requested', rows: eq.carried, group: 'eq' },
-    { key: 'new', label: 'ขอใหม่', field: 'requested', rows: eq.new, group: 'eq' },
-    { key: 'filled', label: 'หาได้แล้ว', field: 'filled', rows: kept.filter((r) => r.filled > 0), group: 'eq' },
-    { key: 'cancelled', label: 'ยกเลิก', field: 'cancelled', rows: kept.filter((r) => r.cancelled > 0), group: 'eq' },
+    { key: 'carried', label: 'ยอดยกมา', field: 'carryIn', rows: kept.filter((r) => flowOf(r).carryIn > 0), group: 'eq' },
+    { key: 'new', label: 'ขอใหม่', field: 'new', rows: eq.new, group: 'eq' },
+    { key: 'filled', label: 'หาได้แล้ว', field: 'filled', rows: kept.filter((r) => flowOf(r).filled > 0), group: 'eq' },
+    { key: 'cancelled', label: 'ยกเลิก', field: 'cancelled', rows: kept.filter((r) => flowOf(r).cancelled > 0), group: 'eq' },
     { key: 'remaining', label: 'เหลือหา', field: 'remaining', rows: eq.remaining, group: 'eq' },
   ];
   if (jobs) for (const b of workStatusOfRemaining(eq.remaining, jobs)) if (b.id !== STATUS_TOTAL_ID) list.push({ key: b.id, label: b.label, field: 'remaining', rows: b.rows, group: 'status' });
@@ -153,8 +154,10 @@ export default function RequestBuPanel({
     if (!months || !topic) return null;
     const withYear = new Set(months.map((m) => m.month.slice(0, 4))).size > 1;
     return months.map((m) => {
-      const t = topicsOf(m.rows.filter((r) => pass(r)), jobs).find((x) => x.key === topic.key);
-      const v = topic.group === 'status' && m.to < today ? null : t ? sumOf(t.rows.filter((r) => !bu || buKey(r) === bu), t.field) : 0;
+      // สถานะทำงาน: เดือนนี้ = สถานะสด · เดือนที่จบแล้ว = สถานะที่จดไว้สิ้นเดือน (193) · ไม่มีที่จด = ไม่มีข้อมูล (null ห้ามยุบเป็น 0)
+      const monthJobs = m.to >= today ? jobs : m.statusAt ? Object.entries(m.statusAt).map(([id, work_status]) => ({ id, work_status }) as unknown as JobRequest) : null;
+      const t = topicsOf(m.rows.filter((r) => pass(r)), monthJobs).find((x) => x.key === topic.key);
+      const v = topic.group === 'status' && !monthJobs ? null : t ? sumOf(t.rows.filter((r) => !bu || buKey(r) === bu), t.field) : 0;
       return { month: m.month, label: monthWindowLabel(m, withYear), v };
     });
   }, [months, topic, pass, jobs, bu, today]);
@@ -168,13 +171,34 @@ export default function RequestBuPanel({
     const days: string[] = [];
     for (let d = new Date(`${block.from}T00:00:00Z`); d.toISOString().slice(0, 10) <= block.to; d.setUTCDate(d.getUTCDate() + 1)) days.push(d.toISOString().slice(0, 10));
     const lineBus = bu ? [bu] : busShown;
-    const rowsNew = block.rows.filter((r) => pass(r) && r.inRange !== false);
-    const series = lineBus.map((b) => ({
-      bu: b,
-      ys: days.map((d) => sumOf(rowsNew.filter((r) => buKey(r) === b && (r.day ?? '').slice(0, 10) === d), 'requested')),
-    }));
-    return { block, days, series };
-  }, [dayMonth, months, bu, busShown, pass]);
+    const key = topic?.key ?? 'new';
+    const kept = block.rows.filter((r) => pass(r));
+    /** วันละเท่าไหร่ต่อ BU — ขอใหม่ = วันคีย์ · หาได้/ยกเลิก = รายวันจากสมุด · เหลือ = สิ้นวัน · ยกมา = ต้นวัน (= เหลือของวันก่อน) */
+    const perDay = (rows: readonly StuckMonthRow[]) => {
+      const add = (m: Map<string, number>, d: string, v: number) => m.set(d, (m.get(d) ?? 0) + v);
+      const nw = new Map<string, number>();
+      const fl = new Map<string, number>();
+      const cx = new Map<string, number>();
+      let carry = 0;
+      for (const r of rows) {
+        const f = flowOf(r);
+        carry += f.carryIn;
+        if (f.new && r.day) add(nw, r.day.slice(0, 10), f.new);
+        for (const [d, v] of r.flow?.fillDays ?? []) add(fl, d, v);
+        for (const [d, v] of r.flow?.cancelDays ?? []) add(cx, d, v);
+      }
+      let open = carry;
+      return days.map((d) => {
+        const start = open;
+        open += (nw.get(d) ?? 0) - (fl.get(d) ?? 0) - (cx.get(d) ?? 0);
+        return key === 'new' ? nw.get(d) ?? 0 : key === 'filled' ? fl.get(d) ?? 0 : key === 'cancelled' ? cx.get(d) ?? 0 : key === 'carried' ? start : open;
+      });
+    };
+    const series = lineBus.map((b) => ({ bu: b, ys: perDay(kept.filter((r) => buKey(r) === b)) }));
+    // ใบนอกสมุดใบขอไม่มีวันที่หาได้/ยกเลิก — บอกยอดไว้ ไม่เกลี่ยเอง
+    const undated = kept.filter((r) => !r.flow && (!bu || buKey(r) === bu)).reduce((n, r) => n + (key === 'filled' ? flowOf(r).filled : key === 'cancelled' ? flowOf(r).cancelled : 0), 0);
+    return { block, days, series, label: topic?.label ?? '', stock: key === 'remaining' || key === 'carried', undated };
+  }, [dayMonth, months, bu, busShown, pass, topic]);
 
   const listAll = React.useMemo(() => {
     if (!topic) return [];
@@ -232,7 +256,8 @@ export default function RequestBuPanel({
    * "ไม่เอากราฟย้ายมาข้างล่าง ไอกราฟอันที่เลือกก็เปลี่ยนตาม" · "กดที่แท่งของเดือนไหนก็แยกวันให้ดู … กราฟเส้น ดูทุก Bu เทียบไปได้")
    * แท่งละเดือน สีของเรื่อง · ใต้แท่ง เพิ่มขึ้น/ลดลงจากเดือนก่อน · กดแท่ง = เส้นรายวันต่อ BU ที่เดิม
    */
-  const canDaily = topic?.key === 'new';
+  // รายวันได้ทุกเรื่องของใบขอ · สถานะทำงานไม่มีรายวัน
+  const canDaily = topic?.group === 'eq';
   const compareChart = (
     <div className="min-w-0 space-y-2" data-testid="req-bu-compare">
       {monthsError ? <p className="text-sm text-destructive">{monthsError}</p> : null}
@@ -482,7 +507,7 @@ export default function RequestBuPanel({
                           )}
                         </TableCell>
                         <TableCell className={cn('py-1.5 text-right tabular-nums', r.ageDays == null && DASH.muted)}>{r.ageDays == null ? '—' : fmt(r.ageDays)}</TableCell>
-                        <TableCell className={cn('py-1.5 text-right font-medium tabular-nums', !r.remaining && DASH.muted)}>{fmt(r.remaining ?? 0)}</TableCell>
+                        <TableCell className={cn('py-1.5 text-right font-medium tabular-nums', !flowOf(r).remaining && DASH.muted)}>{fmt(flowOf(r).remaining)}</TableCell>
                         {(
                           [
                             [yes, r.aiYesIds, 'AI สนใจ'],
@@ -525,10 +550,10 @@ function DailyLines({
   daily,
   onBack,
 }: {
-  daily: { block: StuckMonthBlock; days: string[]; series: Array<{ bu: string; ys: number[] }> };
+  daily: { block: StuckMonthBlock; days: string[]; series: Array<{ bu: string; ys: number[] }>; label: string; stock: boolean; undated: number };
   onBack: () => void;
 }) {
-  const { block, days, series } = daily;
+  const { block, days, series, label, stock, undated } = daily;
   const max = Math.max(1, ...series.flatMap((s) => s.ys));
   const step = max > 40 ? 10 : max > 20 ? 5 : max > 8 ? 2 : 1;
   const top = Math.ceil(max / step) * step;
@@ -548,9 +573,12 @@ function DailyLines({
         <Button type="button" size="xs" variant="outline" onClick={onBack} data-testid="req-bu-daily-back">
           ← กลับไปเทียบเดือน
         </Button>
-        <span className={cn('text-xs', DASH.sub)}>ขอใหม่รายวัน · {monthWindowLabel(block)} · อัตรา</span>
+        <span className={cn('text-xs', DASH.sub)}>
+          {label}รายวัน{stock ? (label === 'ยอดยกมา' ? ' (ต้นวัน)' : ' (สิ้นวัน)') : ''} · {monthWindowLabel(block)} · อัตรา
+          {undated ? ` · ไม่มีวันที่ ${fmt(undated)}` : ''}
+        </span>
       </div>
-      <svg viewBox={`0 0 ${W} ${H}`} className="block h-auto w-full overflow-visible" role="img" aria-label={`ขอใหม่รายวัน ${monthWindowLabel(block)}`}>
+      <svg viewBox={`0 0 ${W} ${H}`} className="block h-auto w-full overflow-visible" role="img" aria-label={`${label}รายวัน ${monthWindowLabel(block)}`}>
         {ticks.map((t) => (
           <g key={t} className="text-border">
             <line x1={L} x2={W - R} y1={y(t)} y2={y(t)} stroke="currentColor" strokeWidth={1} />
@@ -583,7 +611,7 @@ function DailyLines({
         {series.map((s) => (
           <span key={s.bu} className="inline-flex items-center gap-1.5">
             <span className="h-1 w-4 rounded-full" style={{ background: buHex(s.bu) }} />
-            {s.bu} <b className="font-medium tabular-nums">{fmt(s.ys.reduce((a, c) => a + c, 0))}</b>
+            {s.bu} <b className="font-medium tabular-nums">{fmt(stock ? (s.ys[s.ys.length - 1] ?? 0) : s.ys.reduce((a, c) => a + c, 0))}</b>
           </span>
         ))}
       </div>

@@ -356,6 +356,54 @@ export function requestFlowRole(r: LedgerRequest, from: string, to: string): Req
 }
 
 /**
+ * หาได้ / ยกเลิก รายวันของใบเดียวในช่วง [from, to] — แตกยอดของ `requestFlowRole` ลงวัน (เจ้าของ 20 พ.ย. 2569 เทียบเดือน
+ * "กดที่แท่งของเดือนไหนก็แยกวันให้ดู" · Choice "กดได้ทุกเรื่องใบขอ")
+ * ตำแหน่งที่เปิดเปลี่ยนแค่ 3 จังหวะ: วันคีย์ (+ขอใหม่) · วันที่คนเริ่มงาน (−หาได้) · วันจบใบ (ที่เหลือหายหมด)
+ * วันนั้นหายไปกี่ตำแหน่ง = หาได้ (ไม่เกินคนที่เริ่มงานวันนั้น · ใบปิดเพราะแจ้งเข้าครบ = หาได้ทั้งหมด) ที่เหลือ = ยกเลิก
+ * 🔴 ผลรวมรายวันเท่า `role.filled` / `role.cancelled` เสมอ (ส่วนต่างจากเศษย้ายไปวันสุดท้ายที่มีของหาย) ⇒ แท่งเดือนกับเส้นรายวันลงตัว
+ */
+export function requestFlowDays(
+  r: LedgerRequest,
+  from: string,
+  to: string,
+  role: Pick<RequestFlowRole, 'filled' | 'cancelled'>,
+): { fill: Array<[string, number]>; cancel: Array<[string, number]> } {
+  const days = new Set<string>();
+  if (r.keyYmd >= from && r.keyYmd <= to) days.add(r.keyYmd);
+  for (const [d] of r.starts) if (d >= from && d <= to) days.add(d);
+  if (r.endYmd != null && r.endYmd >= from && r.endYmd <= to) days.add(r.endYmd);
+  const fill: Array<[string, number]> = [];
+  const cancel: Array<[string, number]> = [];
+  let prevOpen = openPositionsAt(r, ymdOf(t(from) - DAY_MS));
+  let lastGone: string | null = null;
+  for (const d of [...days].sort()) {
+    const newQ = r.keyYmd === d ? r.qty : 0;
+    const open = openPositionsAt(r, d);
+    const gone = Math.max(0, prevOpen + newQ - open);
+    prevOpen = open;
+    if (!gone) continue;
+    lastGone = d;
+    const startsToday = Math.max(0, filledBy(r.starts, d) - filledBy(r.starts, ymdOf(t(d) - DAY_MS)));
+    const f = r.endYmd === d && r.endedFull ? gone : Math.min(gone, startsToday);
+    if (f) fill.push([d, f]);
+    if (gone - f) cancel.push([d, gone - f]);
+  }
+  // ให้รวมเท่ายอดของช่วงเป๊ะ — ส่วนต่าง (ถ้ามี) ย้ายระหว่างหาได้/ยกเลิกในวันสุดท้ายที่มีของหาย
+  const sum = (xs: Array<[string, number]>) => xs.reduce((n, [, v]) => n + v, 0);
+  const diff = role.filled - sum(fill);
+  if (diff && lastGone) {
+    const bump = (xs: Array<[string, number]>, v: number) => {
+      const i = xs.findIndex(([d]) => d === lastGone);
+      if (i >= 0) xs[i] = [lastGone as string, xs[i][1] + v];
+      else xs.push([lastGone as string, v]);
+    };
+    bump(fill, diff);
+    bump(cancel, -diff);
+  }
+  return { fill: fill.filter(([, v]) => v > 0), cancel: cancel.filter(([, v]) => v > 0) };
+}
+
+/**
  * ═══ ยกมา + ขอใหม่ − หาได้ − ยกเลิก = เหลือ (หน่วย: คน) ในช่วง [from, to] (เจ้าของ 24 ต.ค. 2569 ข้อ 1) ═══
  * ผลรวมของ `requestFlowRole` รายใบ ⇒ สมการลงตัวเสมอ (เทสต์คุม) · หน่วยใบ: ยกมา + ขอใหม่ − ปิดครบ − ยกเลิก = เหลือ
  */

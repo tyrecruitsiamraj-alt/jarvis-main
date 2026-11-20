@@ -14,6 +14,9 @@ import { STUCK_PHASES, stuckPhaseOf, type StuckDailyRow, type StuckRequest } fro
 import { isStartedRequest } from '../../src/lib/recruitTopics.js';
 
 const table = tableInAppSchema('recruit_request_daily');
+/** สถานะทำงานรายใบ ณ สิ้นวัน (193 · เจ้าของ 20 พ.ย. 2569 Choice "เริ่มกดจดทุกคืน") */
+const statusTable = tableInAppSchema('recruit_request_status_daily');
+export type RequestStatusRow = { jobId: string; workStatus: string };
 
 export type RequestDailyRow = StuckDailyRow;
 
@@ -61,6 +64,47 @@ export async function runRequestDailySnapshotOnce(
   return rows.length;
 }
 
+/** จดสถานะทำงานของใบที่ยังเปิด ณ วันนี้ (เขียนทับ) — คืนจำนวนใบ · ตารางยังไม่มี = null */
+export async function runRequestStatusSnapshotOnce(loadStatuses: () => Promise<RequestStatusRow[]>, now = new Date()): Promise<number | null> {
+  const day = toBangkokYmd(now);
+  const rows = (await loadStatuses()).filter((r) => r.jobId && r.workStatus);
+  try {
+    await dbTransaction(async (client) => {
+      await client.query(`delete from ${statusTable} where day = $1::date`, [day]);
+      if (rows.length) {
+        await client.query(
+          `insert into ${statusTable} (day, job_id, work_status)
+           select $1::date, x.job_id, x.work_status from unnest($2::text[], $3::text[]) as x(job_id, work_status)
+           on conflict (day, job_id) do update set work_status = excluded.work_status, recorded_at = now()`,
+          [day, rows.map((r) => r.jobId), rows.map((r) => r.workStatus)],
+        );
+      }
+    });
+  } catch (e) {
+    if (isMissingTable(e)) return null;
+    throw e;
+  }
+  return rows.length;
+}
+
+/**
+ * สถานะทำงานของทุกใบ ณ วันล่าสุดที่จดไว้ในช่วง [from, to] (สิ้นเดือน = รอบสุดท้ายของเดือนนั้น)
+ * ไม่มีวันไหนจดเลย / ตารางยังไม่มี = null ("ไม่มีข้อมูล" — ห้ามยุบเป็น 0)
+ */
+export async function loadRequestStatusAt(from: string, to: string): Promise<Record<string, string> | null> {
+  try {
+    const { rows } = await dbQuery<{ job_id: string; work_status: string }>(
+      `select job_id, work_status from ${statusTable}
+        where day = (select max(day) from ${statusTable} where day between $1::date and $2::date)`,
+      [from, to],
+    );
+    return rows.length ? Object.fromEntries(rows.map((r) => [r.job_id, r.work_status])) : null;
+  } catch (e) {
+    if (isMissingTable(e)) return null;
+    throw e;
+  }
+}
+
 /** ยอดรายวันของช่วง (อ่านอย่างเดียว) · `buSet` null = ทุก BU · ตารางยังไม่มี = [] */
 export async function loadRequestDaily(opts: { from: string; to: string; buSet: readonly string[] | null }): Promise<RequestDailyRow[]> {
   try {
@@ -81,7 +125,7 @@ const EVERY_MS = 60 * 60_000;
 let running = false;
 let stopped = false;
 
-export function startRequestDailySnapshotWorker(loadOpen: () => Promise<StuckRequest[]>): boolean {
+export function startRequestDailySnapshotWorker(loadOpen: () => Promise<StuckRequest[]>, loadStatuses?: () => Promise<RequestStatusRow[]>): boolean {
   if ((process.env.REQUEST_DAILY_SNAPSHOT_ENABLED || '').trim().toLowerCase() === 'false') return false;
   if (running) return true;
   running = true;
@@ -98,6 +142,15 @@ export function startRequestDailySnapshotWorker(loadOpen: () => Promise<StuckReq
         logInfo('requestDailySnapshot.saved', { rows: n });
       } catch (e) {
         logError('requestDailySnapshot', e);
+      }
+      // สถานะทำงานรายใบ — ล้มแยกกัน ไม่พาอีกตัวล้ม
+      if (loadStatuses) {
+        try {
+          const n = await runRequestStatusSnapshotOnce(loadStatuses);
+          logInfo('requestStatusSnapshot.saved', { rows: n });
+        } catch (e) {
+          logError('requestStatusSnapshot', e);
+        }
       }
       await new Promise<void>((r) => {
         const t = setTimeout(r, EVERY_MS);

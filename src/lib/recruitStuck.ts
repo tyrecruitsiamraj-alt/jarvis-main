@@ -131,7 +131,24 @@ export type StuckRequest = RecruitRequestRow & {
   /** id คนที่บอก AI ว่าสนใจ / ลงวันนัดแล้ว ของใบ (ตัวนับเดียวกับ `signals.counts.aiYes` · `appointed`) · ไม่มี = เส้นรุ่นเก่า (19 พ.ย. 2569) */
   aiYesIds?: string[];
   apptIds?: string[];
+  /**
+   * ตามช่วงที่เลือก (`requestFlowRole` ของสมุดใบขอ · เจ้าของ 20 พ.ย. 2569 Choice "กดได้ทุกเรื่องใบขอ")
+   * ยกมา = ตำแหน่งที่เปิดอยู่ก่อนวันเริ่มช่วง · หาได้/ยกเลิก = ที่เกิดในช่วง (+ รายวัน) · เหลือ = เปิดอยู่ ณ วันสุดท้าย
+   * ⇒ ยกมา + ขอใหม่ − หาได้ − ยกเลิก = เหลือ ทุกใบ · ยกมาของเดือนนี้ = เหลือของเดือนก่อน · ไม่มี = ใบไม่อยู่ในสมุด (ใช้ยอดสะสมของใบ · ไม่มีรายวัน)
+   */
+  flow?: StuckFlow;
 };
+export type StuckFlow = { carryIn: number; new: number; filled: number; cancelled: number; remaining: number; fillDays: Array<[string, number]>; cancelDays: Array<[string, number]> };
+export type StuckFlowKey = 'carryIn' | 'new' | 'filled' | 'cancelled' | 'remaining';
+/** ยอดตามช่วงของใบ — ไม่มี `flow` = ใบนอกสมุด: ยกมา = ทั้งใบถ้ามาก่อนช่วง · ที่เหลือใช้ยอดสะสมของใบ (สมการยังลงตัว) */
+export function flowOf(r: Pick<StuckRequest, 'flow' | 'inRange' | 'requested' | 'filled' | 'cancelled' | 'remaining'>): Record<StuckFlowKey, number> {
+  if (r.flow) return r.flow;
+  const filled = Number(r.filled) || 0;
+  const cancelled = Number(r.cancelled) || 0;
+  const remaining = Number(r.remaining) || 0;
+  const carried = r.inRange === false;
+  return { carryIn: carried ? remaining + filled + cancelled : 0, new: carried ? 0 : Number(r.requested) || 0, filled, cancelled, remaining };
+}
 
 /* ═══ สมการบนสุด (เจ้าของ 4 พ.ย. 2569 "กรองแค่ใบที่ไม่มีคน … มันต้อง Fil ดูได้หมดเลย") ═══
  * ยกมา + ขอใหม่ − ปิดแล้ว − ยกเลิก = เหลือหา — นิยามเดียวกับสมการหน้าหลัก (review 9 พ.ย. 2569 เจ้าของเลือก "เหมือนหน้าหลัก")
@@ -164,10 +181,11 @@ export function stuckEquation<T extends ScopeRow = StuckRequest>(rows: readonly 
  * เดือนหัว/ท้ายตัดตามช่วงที่เลือก ⇒ ขอใหม่ทุกเดือนรวมกัน = ขอใหม่ทั้งช่วง · ยอดยกมาเดือนแรก = ยอดยกมาทั้งช่วง · เหลือหาเดือนท้าย = เหลือหาทั้งช่วง */
 export type StuckMonthRow = Pick<
   StuckRequest,
-  'jobId' | 'requestNo' | 'day' | 'bu' | 'recruiter' | 'screener' | 'leadKind' | 'requested' | 'filled' | 'cancelled' | 'remaining' | 'state' | 'inRange'
+  'jobId' | 'requestNo' | 'day' | 'flow' | 'bu' | 'recruiter' | 'screener' | 'leadKind' | 'requested' | 'filled' | 'cancelled' | 'remaining' | 'state' | 'inRange'
 >;
 export type StuckMonthWindow = { month: string; from: string; to: string };
-export type StuckMonthBlock = StuckMonthWindow & { rows: StuckMonthRow[] };
+/** `statusAt` = สถานะทำงานรายใบ ณ สิ้นเดือน (จดทุกคืนตั้งแต่ 20 พ.ย. 2569 · 193) · null = ไม่มีข้อมูล / เดือนนี้ใช้สถานะสด */
+export type StuckMonthBlock = StuckMonthWindow & { rows: StuckMonthRow[]; statusAt?: Record<string, string> | null };
 export const STUCK_MONTHS_MAX = 12;
 const lastDayOf = (month: string) => new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0)).toISOString().slice(0, 10);
 /** เดือนในช่วง ตัดหัวท้ายตามช่วง · เกิน `max` = เอาเดือนล่าสุด */
