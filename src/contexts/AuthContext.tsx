@@ -85,6 +85,7 @@ function mapApiUser(raw: Record<string, unknown>): User | null {
     id,
     username: typeof raw.username === 'string' ? raw.username : email,
     full_name: typeof raw.full_name === 'string' ? raw.full_name : email,
+    nickname: typeof raw.nickname === 'string' && raw.nickname.trim() ? raw.nickname.trim() : null,
     email,
     role,
     is_active: raw.is_active !== false,

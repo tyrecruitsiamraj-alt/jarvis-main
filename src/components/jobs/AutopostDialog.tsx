@@ -8,6 +8,8 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { FieldSelect } from '@/components/shared/FieldSelect';
+import { useOptionalAuthUser } from '@/contexts/AuthContext';
+import { actorNameOf } from '@/lib/actorName';
 import { cn } from '@/lib/utils';
 import { DASH, TONE } from '@/lib/designTokens';
 import type { JobRequest } from '@/types';
@@ -140,6 +142,7 @@ export function AutopostBody({
   const jobSector = jobUnitSectorOf(job);
 
   const [postings, setPostings] = React.useState<RecruitPosting[] | null>(null);
+  const actor = actorNameOf(useOptionalAuthUser());
   const [opts, setOpts] = React.useState<SoOptions | null>(null);
   const [state, setState] = React.useState<{ latest: JobPostingRequest[]; recentGroups: string[] } | null>(null);
   const [loadError, setLoadError] = React.useState<string | null>(null);
@@ -778,6 +781,10 @@ export function AutopostBody({
             <Button type="button" variant="ghost" onClick={onClose} disabled={busy !== null}>
               ยกเลิก
             </Button>
+            {/* สั่งในชื่อบัญชีที่ล็อกอิน (เจ้าของ 20 พ.ย. 2569 "จะรู้ได้ไงว่าใครสั่ง") */}
+            <span className={cn('self-center text-xs', DASH.sub)} data-testid="autopost-actor">
+              จะบันทึกในชื่อ {actor}
+            </span>
           </div>
         </>
       )}

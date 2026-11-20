@@ -18,6 +18,8 @@ type UserRow = {
   department_code: string | null;
   /** BU ที่ดูเพิ่ม (164) — หน้าเว็บใช้ตัดสินว่าล็อก BU เดียวหรือให้เลือกในชุดนี้ (28 ต.ค. 2569) */
   extra_department_codes?: string[] | null;
+  /** ชื่อเล่น (114) — มุมขวาบนบอกว่าใครล็อกอินอยู่ (เจ้าของ 20 พ.ย. 2569 "จะรู้ได้ไงว่าใครสั่ง") */
+  nickname?: string | null;
 };
 
 function toUserResponse(row: UserRow) {
@@ -30,6 +32,7 @@ function toUserResponse(row: UserRow) {
     id: row.id,
     username: row.email,
     full_name: row.full_name || row.email,
+    nickname: row.nickname?.trim() || null,
     email: row.email,
     role: row.role,
     is_active: row.is_active,
@@ -59,7 +62,7 @@ async function meHandler(req: AuthedReq, res: ApiRes) {
 
       const { rows: curRows } = await dbQuery<UserRow>(
         `
-        select id, email, role, full_name, is_active, created_at, department_code, extra_department_codes
+        select id, email, role, full_name, is_active, created_at, department_code, extra_department_codes, nickname
         from ${usersTable}
         where id = $1
         limit 1
@@ -87,7 +90,7 @@ async function meHandler(req: AuthedReq, res: ApiRes) {
         update ${usersTable}
         set department_code = $2
         where id = $1 and (department_code is null or btrim(department_code) = '')
-        returning id, email, role, full_name, is_active, created_at, department_code
+        returning id, email, role, full_name, is_active, created_at, department_code, nickname
       `,
         [req.user.sub, department_code],
       );
@@ -109,7 +112,7 @@ async function meHandler(req: AuthedReq, res: ApiRes) {
 
     const { rows } = await dbQuery<UserRow>(
       `
-      select id, email, role, full_name, is_active, created_at, department_code, extra_department_codes
+      select id, email, role, full_name, is_active, created_at, department_code, extra_department_codes, nickname
       from ${usersTable}
       where id = $1
       limit 1

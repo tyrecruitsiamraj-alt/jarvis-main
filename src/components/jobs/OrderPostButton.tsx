@@ -5,6 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { FieldSelect } from '@/components/shared/FieldSelect';
+import { useOptionalAuthUser } from '@/contexts/AuthContext';
+import { actorNameOf } from '@/lib/actorName';
 import { cn } from '@/lib/utils';
 import { DASH, TONE } from '@/lib/designTokens';
 import type { JobRequest } from '@/types';
@@ -79,6 +81,7 @@ export default function OrderPostButton({
   onLinksChanged?: () => void;
 }) {
   const [kind, setKind] = React.useState<OrderKind>(defaultKind);
+  const actor = actorNameOf(useOptionalAuthUser());
   const [latest, setLatest] = React.useState<JobPostingRequest[] | null>(null);
   const [loadError, setLoadError] = React.useState<string | null>(null);
   const [busy, setBusy] = React.useState(false);
@@ -395,6 +398,10 @@ export default function OrderPostButton({
             {busy ? <LoaderCircle className="animate-spin" aria-hidden /> : <Search aria-hidden />}
             {busy ? 'กำลังส่ง…' : scraping?.status === 'rejected' || scraping?.status === 'cancelled' ? 'สั่งใหม่' : 'ขอ Scrap'}
           </Button>
+          {/* สั่งในชื่อบัญชีที่ล็อกอิน (เจ้าของ 20 พ.ย. 2569 "จะรู้ได้ไงว่าใครสั่ง") */}
+          <p className={cn('text-center text-xs', DASH.sub)} data-testid="so-scrap-actor">
+            จะบันทึกในชื่อ {actor}
+          </p>
         </div>
       )}
     </div>

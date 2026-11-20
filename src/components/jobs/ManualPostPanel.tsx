@@ -1,6 +1,8 @@
 import React from 'react';
 import { Check, Copy, ExternalLink, Link2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useOptionalAuthUser } from '@/contexts/AuthContext';
+import { actorNameOf } from '@/lib/actorName';
 import { cn } from '@/lib/utils';
 import { DASH, TONE } from '@/lib/designTokens';
 import type { JobRequest } from '@/types';
@@ -93,6 +95,8 @@ export default function ManualPostPanel({ job, onChanged }: { job: JobRequest; o
   const [linkCopied, setLinkCopied] = React.useState<ReadonlySet<string>>(new Set());
   /** ลิงก์โพสต์ที่วางกลับมา (เจ้าของ 13 พ.ย. 2569 Choice "ทำ ไม่บังคับ") — แถวละช่อง อยู่ตั้งแต่เตรียมโพสต์ (ไม่โผล่ทีหลังให้ของขยับ) */
   const [postUrls, setPostUrls] = React.useState<Record<string, string>>({});
+  /** บัญชีที่ล็อกอิน — ลิงก์โพสต์บันทึกในชื่อนี้ (เจ้าของ 20 พ.ย. 2569 "บันทึกแล้วต้อง Stamp ทันทีเลย") */
+  const actor = actorNameOf(useOptionalAuthUser());
   const [postUrlState, setPostUrlState] = React.useState<Record<string, { saved: string | null; error: string | null; busy: boolean }>>({});
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -254,8 +258,14 @@ export default function ManualPostPanel({ job, onChanged }: { job: JobRequest; o
                     }}
                     data-testid="manual-post-url"
                   />
-                  <span className={cn('w-32 shrink-0 text-xs', postUrlState[r.key]?.error ? TONE.danger.value : postUrlState[r.key]?.saved ? TONE.success.value : DASH.sub)}>
-                    {postUrlState[r.key]?.busy ? 'กำลังบันทึก…' : postUrlState[r.key]?.error ? postUrlState[r.key]?.error : postUrlState[r.key]?.saved ? 'มีลิงก์โพสต์' : 'ยังไม่มีลิงก์โพสต์'}
+                  <span className={cn('w-40 shrink-0 text-xs', postUrlState[r.key]?.error ? TONE.danger.value : postUrlState[r.key]?.saved ? TONE.success.value : DASH.sub)} data-testid="manual-post-url-state">
+                    {postUrlState[r.key]?.busy
+                      ? 'กำลังบันทึก…'
+                      : postUrlState[r.key]?.error
+                        ? postUrlState[r.key]?.error
+                        : postUrlState[r.key]?.saved
+                          ? `บันทึกในชื่อ ${actor}`
+                          : `ยังไม่มีลิงก์โพสต์ · จะบันทึกในชื่อ ${actor}`}
                   </span>
                 </div>
               </li>

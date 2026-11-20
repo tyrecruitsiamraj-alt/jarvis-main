@@ -1,3 +1,4 @@
+import { actorNameOf } from '@/lib/actorName';
 import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -154,7 +155,8 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           <NotificationPanel />
           <div className="hidden 2xl:flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/55 border border-white/70 dark:bg-white/10 dark:border-white/15 max-w-[280px]">
             <UserCircle className="w-4 h-4 text-blue-600 shrink-0" />
-            <span className="text-sm font-medium text-foreground truncate">{user?.full_name}</span>
+            {/* ชื่อเล่นของบัญชีที่ล็อกอิน — งานที่กดบันทึกลงชื่อนี้ (เจ้าของ 20 พ.ย. 2569 "จะรู้ได้ไงว่าใครสั่ง") */}
+            <span className="text-sm font-medium text-foreground truncate" data-testid="header-actor-name">{actorNameOf(user)}</span>
             <span className="text-xs px-2 py-0.5 rounded-full bg-ink text-white shrink-0 capitalize">{user?.role}</span>
             {showSettings ? (
               <Button
@@ -175,7 +177,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           <div className="flex 2xl:hidden items-center gap-1.5 px-2 py-1 rounded-full bg-white/55 border border-white/70 dark:bg-white/10 dark:border-white/15">
             {/* สีจากธีม — เดิม blue-700 บนพื้นมืดอ่านไม่ออก (contrast 2.14:1 · QA รอบ 2 ข้อ 45) */}
             <UserCircle className="w-4 h-4 text-muted-foreground" />
-            <span className="text-xs font-medium text-foreground uppercase">{user?.role}</span>
+            <span className="max-w-28 truncate text-xs font-medium text-foreground">{actorNameOf(user)}</span>
             {showSettings ? (
               <Button
                 type="button"
@@ -244,8 +246,8 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         <div className="flex items-center gap-1 shrink-0">
           <HeaderSearchSlot className="hidden w-44 sm:block md:w-52" />
           <NotificationPanel />
-          <span className="text-[10px] sm:text-xs px-2 py-1 rounded-full bg-ink text-white font-medium uppercase">
-            {user?.role}
+          <span className="max-w-24 truncate text-[10px] sm:text-xs px-2 py-1 rounded-full bg-ink text-white font-medium">
+            {actorNameOf(user)}
           </span>
           {themeSwitchCompact}
         </div>
