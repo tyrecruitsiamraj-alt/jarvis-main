@@ -5,7 +5,9 @@ import { describe, expect, it, vi } from 'vitest';
 
 const calls: Array<[string, unknown[]]> = [];
 let reply: unknown[] = [];
-vi.mock('../../api/_lib/postgres.js', () => ({ dbQuery: async (sql: string, p: unknown[]) => (calls.push([sql, p]), { rows: reply }) }));
+/** ตอบตาม SQL (โหมดที่ยิงหลายคำถามพร้อมกัน) · null = ใช้ `reply` */
+let replyFor: ((sql: string) => unknown[]) | null = null;
+vi.mock('../../api/_lib/postgres.js', () => ({ dbQuery: async (sql: string, p: unknown[]) => (calls.push([sql, p]), { rows: replyFor ? replyFor(sql) : reply }) }));
 vi.mock('../../api/_lib/departmentScope.js', async (o) => ({ ...(await o<object>()), loadMatchingBuScope: async () => ({ mode: 'all' }) }));
 vi.mock('../../api/_lib/http.js', async (o) => ({ ...(await o<object>()), withRbac: (h: unknown) => h }));
 
@@ -17,7 +19,7 @@ async function call(query: Record<string, string>) {
   let body: unknown = null;
   const res = { setHeader() {}, status: (s: number) => ((status = s), { json: (b: unknown) => (body = b) }) };
   await staffActivityHandler({ method: 'GET', query, user: { sub: 'u' } } as never, res as never);
-  return { status, body: body as { rows?: unknown[]; items?: unknown[] } };
+  return { status, body: body as { rows?: unknown[]; items?: unknown[]; person?: Record<string, unknown> | null } };
 }
 
 describe('GET /api/staff-activity', () => {
@@ -42,10 +44,89 @@ describe('GET /api/staff-activity', () => {
     expect((await call({ from: '2026-11-16', to: '2026-11-18', detail: '1', user: 'd3d2bc64-fbc1-48da-8411-f7e789596a04', kind: 'drop' })).status).toBe(400);
   });
   it('รายการของช่องที่กด · ไม่ส่งวัน = ทั้งช่วง', async () => {
-    reply = [{ day: '2026-11-18', title: 'OPL6908011', sub: 'Facebook Group', application_id: null, request_no: 'OPL6908011' }];
+    // 20 พ.ย. 2569 รายการมีเวลาที่ทำ + คีย์ใบขอ (แท็บงานรายคน)
+    reply = [{ day: '2026-11-18', title: 'OPL6908011', sub: 'Facebook Group', application_id: null, request_no: 'OPL6908011', at: '2026-11-18T03:12:45.120Z', job_id: 'siamraj-sql:OPL6908011' }];
     const r = await call({ from: '2026-11-16', to: '2026-11-18', detail: '1', user: 'd3d2bc64-fbc1-48da-8411-f7e789596a04', kind: 'manualPosted' });
-    expect(r.body.items).toEqual([{ day: '2026-11-18', title: 'OPL6908011', sub: 'Facebook Group', applicationId: null, requestNo: 'OPL6908011' }]);
+    expect(r.body.items).toEqual([
+      { day: '2026-11-18', title: 'OPL6908011', sub: 'Facebook Group', applicationId: null, requestNo: 'OPL6908011', at: '2026-11-18T03:12:45.120Z', jobId: 'siamraj-sql:OPL6908011' },
+    ]);
     expect(calls.at(-1)?.[1]).toEqual(['2026-11-16', '2026-11-18', 'd3d2bc64-fbc1-48da-8411-f7e789596a04']);
+  });
+});
+
+describe('GET /api/staff-activity?person=1 (แท็บงานรายคน 20 พ.ย. 2569)', () => {
+  const U = '5f4b2fcd-7f64-4bb8-92cf-7c118d9a0bef';
+  it('งานของคนเดียววันเดียว เทียบวันก่อน + 7 วัน + ช่องทาง + ใบไหน — ทุกยอดลงตัวกัน', async () => {
+    replyFor = (sql) =>
+      sql.includes('ev.user_id = $3::uuid')
+        ? [
+            { day: '2026-11-20', kind: 'links', n: 161 },
+            { day: '2026-11-20', kind: 'manualPosted', n: 125 },
+            { day: '2026-11-20', kind: 'scrap', n: 80 },
+            { day: '2026-11-20', kind: 'autopost', n: 2 },
+            { day: '2026-11-19', kind: 'links', n: 11 },
+            { day: '2026-11-19', kind: 'scrap', n: 6 },
+          ]
+        : sql.includes("'links'::text as kind")
+          ? [
+              { kind: 'links', label: 'Facebook · Facebook Group', n: 158, extra: null },
+              { kind: 'links', label: 'ไม่ระบุช่องทาง', n: 3, extra: null },
+              { kind: 'manualPosted', label: 'Facebook · Facebook Group', n: 125, extra: null },
+              { kind: 'scrap', label: 'rejected', n: 74, extra: null },
+              { kind: 'scrap', label: 'completed', n: 5, extra: null },
+              { kind: 'scrap', label: 'filled', n: 1, extra: null },
+              { kind: 'autopost', label: 'Clarissa Glady', n: 2, extra: 12 },
+            ]
+          : sql.includes("'clicks'::text as what")
+            ? [
+                { what: 'clicks', day: '2026-11-20', n: 819 },
+                { what: 'clicks', day: '2026-11-19', n: 897 },
+                { what: 'applicants', day: '2026-11-20', n: 42 },
+              ]
+            : [
+                { job: 'siamraj-sql:LMO6911008', kind: 'links', n: 161, kind_label: null },
+                { job: 'siamraj-sql:LMO6911008', kind: 'autopost', n: 2, kind_label: null },
+                { job: 'siamraj-pre:LBM6910008', kind: 'scrap', n: 80, kind_label: null },
+                { job: 'siamraj-sql:OPL6910061', kind: 'manualPosted', n: 125, kind_label: null },
+                { job: 'standalone:thai_executive', kind: 'clicks', n: 819, kind_label: 'ผู้บริหารคนไทย' },
+                { job: 'standalone:thai_executive', kind: 'applicants', n: 42, kind_label: 'ผู้บริหารคนไทย' },
+              ];
+    const r = await call({ from: '2026-11-14', to: '2026-11-20', person: '1', user: U, day: '2026-11-20' });
+    replyFor = null;
+    expect(r.status).toBe(200);
+    const p = r.body.person as {
+      prevDay: string;
+      week: Array<{ day: string; links: number }>;
+      cur: Record<string, number>;
+      prev: Record<string, number>;
+      channels: Record<string, Array<{ label: string; n: number }>>;
+      results: Record<string, number>;
+      jobs: Array<Record<string, string | number>>;
+    };
+    expect(p.prevDay).toBe('2026-11-19');
+    // 7 วันครบ วันว่าง = 0
+    expect(p.week.map((w) => [w.day, w.links])).toEqual([
+      ['2026-11-14', 0], ['2026-11-15', 0], ['2026-11-16', 0], ['2026-11-17', 0], ['2026-11-18', 0], ['2026-11-19', 11], ['2026-11-20', 161],
+    ]);
+    expect(p.cur).toEqual({ autopost: 2, scrap: 80, links: 161, manualPosted: 125, contacts: 0, appts: 0 });
+    expect(p.prev).toMatchObject({ links: 11, scrap: 6, manualPosted: 0 });
+    // ช่องทางรวมเท่ายอดของชนิดงาน · Scrap แยกผล (completed + filled = สำเร็จ)
+    const sum = (k: string) => p.channels[k].reduce((n, c) => n + c.n, 0);
+    for (const k of ['links', 'manualPosted', 'scrap', 'autopost']) expect(sum(k)).toBe(p.cur[k]);
+    expect(p.channels.scrap).toEqual([{ label: 'สำเร็จ', n: 6 }, { label: 'ไม่สำเร็จ', n: 74 }]);
+    expect(p.channels.autopost).toEqual([{ label: 'Clarissa Glady · 12 กลุ่ม', n: 2 }]);
+    expect(p.results).toEqual({ clicks: 819, clicksPrev: 897, applicants: 42, applicantsPrev: 0 });
+    // รายใบ: รวมเท่าแถวแม่ · ใบขอชั่วคราว/กล่องลอยมีป้ายบอก
+    const col = (k: string) => p.jobs.reduce((n, j) => n + Number(j[k]), 0);
+    expect([col('links'), col('manualPosted'), col('scrap'), col('autopost'), col('clicks'), col('applicants')]).toEqual([161, 125, 80, 2, 819, 42]);
+    expect(p.jobs.map((j) => j.label)).toEqual(['LMO6911008', 'OPL6910061', 'LBM6910008 · ใบขอชั่วคราว', 'กล่องลอย · ผู้บริหารคนไทย']);
+    // ทุกคำถามกรองด้วยคนที่ถาม
+    for (const c of calls.slice(-4)) expect(c[1]).toContain(U);
+  });
+  it('วันที่ดูอยู่นอกช่วง / ช่วงยาวเกิน / ไม่บอกคน = 400', async () => {
+    expect((await call({ from: '2026-11-14', to: '2026-11-20', person: '1', user: U, day: '2026-11-21' })).status).toBe(400);
+    expect((await call({ from: '2026-09-01', to: '2026-11-20', person: '1', user: U, day: '2026-11-20' })).status).toBe(400);
+    expect((await call({ from: '2026-11-14', to: '2026-11-20', person: '1', user: 'x', day: '2026-11-20' })).status).toBe(400);
   });
 });
 

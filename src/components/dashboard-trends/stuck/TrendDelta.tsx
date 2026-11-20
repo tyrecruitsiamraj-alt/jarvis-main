@@ -14,6 +14,7 @@ export default function TrendDelta({
   sense = 'good',
   from = false,
   pct = false,
+  zeroAsUp = false,
   className,
 }: {
   cur: number | null | undefined;
@@ -23,6 +24,8 @@ export default function TrendDelta({
   from?: boolean;
   /** ต่อท้าย (176.6%) */
   pct?: boolean;
+  /** เทียบจำนวนตรง ๆ (ไม่มี %) — ช่วงก่อน 0 = "เพิ่มขึ้น N" แทน "ใหม่" (แท็บงานรายคน 20 พ.ย. 2569) */
+  zeroAsUp?: boolean;
   className?: string;
 }) {
   const t = trendOf(cur, prev);
@@ -34,7 +37,9 @@ export default function TrendDelta({
       : t.kind === 'same'
         ? 'ทรงตัว'
         : t.kind === 'new'
-          ? from
+          ? zeroAsUp
+            ? `▲ เพิ่มขึ้น ${fmt(cur ?? 0)}`
+            : from
             ? 'ใหม่ ช่วงก่อน 0'
             : 'ใหม่'
           : `${t.kind === 'up' ? '▲ เพิ่มขึ้น' : '▼ ลดลง'} ${fmt(t.diff)}${pct ? ` (${t.pct.toLocaleString('th-TH')}%)` : ''}${from ? ` จาก ${fmt(t.prev)}` : ''}`;

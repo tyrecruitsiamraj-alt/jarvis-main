@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
 import { DASH } from '@/lib/designTokens';
@@ -34,7 +35,7 @@ import StuckAreaTable from '../stuck/StuckAreaTable';
 import V2Drawer, { type V2Pane } from './V2Drawer';
 import PostingProgress from './PostingProgress';
 import { Kpi, Pager, SectionTitle, fmt } from './V2Parts';
-import StaffActivityPanel from './StaffActivityPanel';
+import StaffPersonPanel from './StaffPersonPanel';
 import { ActivityFeed, OutreachTiles, TODO_ICONS, TodoList } from './PulseParts';
 import { fetchStaffActivity, fetchStaffActivityFeed } from '@/lib/staffActivityApi';
 import type { StaffActivityFeedItem, StaffActivityKind, StaffActivityRow } from '@/lib/staffActivity';
@@ -54,7 +55,26 @@ const monthText = (ym: string) => `${TH_MONTH[Number(ym.slice(5, 7)) - 1]} ${Str
 /** `compareMonths` = ปุ่มวันที่อยู่โหมดเทียบเดือน — ก้อนใบขอเป็นกราฟรายเดือน (เจ้าของ 20 พ.ย. 2569 Choice "ก้อนใบขอก่อน") */
 export default function RecruitOverviewV2({ data, compareMonths = false }: { data: RecruitOverviewResponse; compareMonths?: boolean }) {
   const navigate = useNavigate();
-  const [, setSearchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
+  /**
+   * แท็บของหน้าภาพรวม: ภาพรวม | งานรายคน (เจ้าของ 20 พ.ย. 2569 "ทำไว้อีกแท็บของ หน้าภาพรวม") · URL `ov=staff`
+   * กดชื่อคนในตารางรายคน = ไปแท็บงานรายคนของคนนั้น (แทนแผงข้างเดิม)
+   */
+  const tab: 'overview' | 'staff' = searchParams.get('ov') === 'staff' ? 'staff' : 'overview';
+  const rootRef = React.useRef<HTMLDivElement>(null);
+  const setTab = (t: 'overview' | 'staff') => {
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        if (t === 'staff') next.set('ov', 'staff');
+        else next.delete('ov');
+        return next;
+      },
+      { replace: true },
+    );
+    rootRef.current?.scrollIntoView?.({ block: 'start' });
+  };
+  const [staffWho, setStaffWho] = React.useState<string | null>(null);
   const win = data.window;
   /** BU ที่เทียบ — ล็อก BU เดียว = BU นั้นอย่างเดียว (ไม่ดึง BU นอกสิทธิ์มาเทียบ) */
   const bus = React.useMemo(() => {
@@ -244,15 +264,6 @@ export default function RecruitOverviewV2({ data, compareMonths = false }: { dat
     ),
     posts: <SoPostGroupsCard from={win.from} to={win.to} bu={data.bu} title="Autopost · รายการโพสต์" />,
     self: linkRows ? <SelfLinksPanel rows={linkRows} onOpenRequest={(jobId) => navigate(requestPathOfJobId(jobId))} /> : <Skeleton className="h-40 rounded-xl" />,
-    // กดชื่อในตารางรายคน = งานรายวันของคนนั้น (ตัวนับเดียวกับงานรายคนเดิม · กดเลขเปิดรายการได้)
-    ...Object.fromEntries(
-      (outreachPeople ?? [])
-        .filter((p) => p.userId)
-        .map((p) => [
-          `staff:${p.userId}`,
-          <StaffActivityPanel key={p.userId} from={win.from} to={win.to} bu={data.bu} rows={staff.key === filterKey ? staff.rows : null} error={staff.key === filterKey ? staff.error : null} onNames={openNames} fixedWho={p.userId as string} />,
-        ]),
-    ),
     // กดเลขโพสต์เองในตารางรายคน = แผงโพสต์เองของคนนั้น
     ...Object.fromEntries(
       (outreachPeople ?? []).map((p) => [
@@ -274,7 +285,18 @@ export default function RecruitOverviewV2({ data, compareMonths = false }: { dat
   const rateText = (rows: readonly StuckRequest[] | undefined, label: string, k: 'requested' | 'filled' | 'cancelled' | 'remaining') =>
     rows ? `${label} ${fmt(sumOf(rows, k))} อัตรา` : undefined;
   return (
-    <div className="space-y-8" data-testid="recruit-overview-v2">
+    <div data-testid="recruit-overview-v2" ref={rootRef} className="scroll-mt-20">
+      <Tabs value={tab} onValueChange={(v) => setTab(v === 'staff' ? 'staff' : 'overview')}>
+        <TabsList variant="glass" className="h-auto flex-wrap justify-start rounded-2xl" data-testid="ov-tabs">
+          <TabsTrigger value="overview" data-testid="ov-tab-overview">
+            ภาพรวม
+          </TabsTrigger>
+          <TabsTrigger value="staff" data-testid="ov-tab-staff">
+            งานรายคน
+          </TabsTrigger>
+        </TabsList>
+        {/* ภาพรวมค้างไว้ตอนสลับแท็บ (forceMount) — ตัวกรอง/เรื่องที่เลือกไว้ไม่หาย */}
+        <TabsContent value="overview" forceMount className="mt-6 space-y-8 data-[state=inactive]:hidden">
       {/* ── ต้องทำ (บนสุด · ณ ตอนนี้ ไม่ขึ้นกับช่วงวันที่) — แบบ Mobix (เจ้าของ 18 พ.ย. 2569)
           กด = แผงข้าง กราฟ BU + รายชื่อ/ใบขอ + ปุ่มทำทีละแถว ทำจากหน้านี้ได้เลย (เจ้าของ 19 พ.ย. 2569) ── */}
       <Card className="min-w-0 space-y-3 rounded-2xl p-5" data-testid="v2-todo-card">
@@ -386,7 +408,10 @@ export default function RecruitOverviewV2({ data, compareMonths = false }: { dat
         <OutreachPeopleTable
           people={outreachPeople}
           onPerson={(name) => push({ kind: 'embed', title: `โพสต์เอง / สร้างลิงก์ · ${name}`, embed: `self:${name}` })}
-          onStaff={(userId, name) => push({ kind: 'embed', title: `งานรายวัน · ${name}`, embed: `staff:${userId}` })}
+          onStaff={(userId) => {
+            setStaffWho(userId);
+            setTab('staff');
+          }}
           onIds={(title, ids) => push({ kind: 'story', title, ids: [...ids], key: `${viewKey}:person:${title}`, box: 'person' })}
         />
         {/* ปุ่มใต้การประกาศย้ายมาที่นี่ (เจ้าของ 19 พ.ย. 2569 "ย้ายไปไว้ในการสั่งงาน อันไหนไม่ซ้ำทำเพิ่ม") — Autopost/โพสต์เอง ซ้ำกับการ์ดข้างบน ถอดแล้ว */}
@@ -452,6 +477,23 @@ export default function RecruitOverviewV2({ data, compareMonths = false }: { dat
         />
         {feedOpen ? <ActivityFeed items={feed.key === filterKey ? feed.items : null} today={data.today} onPerson={(id, name) => openNames(name, [id])} /> : null}
       </Card>
+
+        </TabsContent>
+        <TabsContent value="staff" className="mt-6">
+          <Card className="min-w-0 rounded-2xl p-5" data-testid="v2-staff-person-card">
+            <StaffPersonPanel
+              rows={staff.key === filterKey ? staff.rows : null}
+              error={staff.key === filterKey ? staff.error : null}
+              anchor={win.to > data.today ? data.today : win.to}
+              bu={data.bu}
+              who={staffWho}
+              onWho={setStaffWho}
+              onOpenRequest={(jobId) => navigate(requestPathOfJobId(jobId))}
+              onNames={openNames}
+            />
+          </Card>
+        </TabsContent>
+      </Tabs>
 
       <V2Drawer
         stack={stack}

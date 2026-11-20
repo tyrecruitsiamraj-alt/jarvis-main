@@ -1,5 +1,5 @@
 import { apiFetch } from './apiFetch';
-import type { StaffActivityFeedItem, StaffActivityItem, StaffActivityKind, StaffActivityRow } from './staffActivity';
+import type { StaffActivityFeedItem, StaffActivityItem, StaffActivityKind, StaffActivityRow, StaffPersonDay } from './staffActivity';
 
 async function readError(r: Response, fallback: string): Promise<never> {
   const b = (await r.json().catch(() => ({}))) as { message?: string };
@@ -13,6 +13,15 @@ export async function fetchStaffActivity(q: { from: string; to: string; bu: stri
   const r = await apiFetch(`/api/staff-activity?${p.toString()}`);
   if (!r.ok) return readError(r, 'อ่านงานรายคนไม่ได้');
   return ((await r.json()) as { rows: StaffActivityRow[] }).rows;
+}
+
+/** งานของคนเดียววันเดียว เทียบวันก่อน + 7 วัน (from–to) · null = คนนอก BU ที่เห็น (แท็บงานรายคน 20 พ.ย. 2569) */
+export async function fetchStaffPersonDay(q: { from: string; to: string; day: string; user: string; bu: string | null }): Promise<StaffPersonDay | null> {
+  const p = new URLSearchParams({ from: q.from, to: q.to, person: '1', user: q.user, day: q.day });
+  if (q.bu) p.set('bu', q.bu);
+  const r = await apiFetch(`/api/staff-activity?${p.toString()}`);
+  if (!r.ok) return readError(r, 'อ่านงานรายคนไม่ได้');
+  return ((await r.json()) as { person: StaffPersonDay | null }).person;
 }
 
 /** รายการของช่องที่กด · day ว่าง = ทั้งช่วง */
