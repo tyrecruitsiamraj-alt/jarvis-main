@@ -25,7 +25,7 @@ describe('สมการใบขอ', () => {
     expect(sum(eq.carried, 'requested') + sum(eq.new, 'requested') - sum(rows, 'filled') - sum(rows, 'cancelled')).toBe(sum(eq.remaining, 'remaining'));
   });
   it('เลขใหญ่ = อัตรา ใบเป็นบรรทัดรอง (เจ้าของ 19 พ.ย. 2569 "ถ้าจะนับอัตราก็เอาอัตราขึ้น")', () => {
-    // 19 พ.ย. 2569 ค่ำ: สมการย้ายเข้าแผงใบขอ (เลือกเรื่องจากรายการ) — เลขใหญ่ = อัตรา · บรรทัดรอง = ใบ / ปิดครบ / ยกเลิกทั้งใบ
+    // 19 พ.ย. 2569 ค่ำ: สมการย้ายเข้าแผงใบขอ (เลือกเรื่องจากรายการ) — เลขใหญ่ = อัตรา · บรรทัดรอง = ใบ
     const src = readFileSync('src/components/dashboard-trends/v2/RequestBuPanel.tsx', 'utf8');
     for (const w of [
       "{ key: 'carried', label: 'ยอดยกมา', field: 'requested', rows: eq.carried",
@@ -33,11 +33,12 @@ describe('สมการใบขอ', () => {
       "{ key: 'filled', label: 'หาได้แล้ว', field: 'filled', rows: kept.filter((r) => r.filled > 0)",
       "{ key: 'cancelled', label: 'ยกเลิก', field: 'cancelled', rows: kept.filter((r) => r.cancelled > 0)",
       "{ key: 'remaining', label: 'เหลือหา', field: 'remaining', rows: eq.remaining",
-      'ปิดครบ ${fmt(eq.filled.filter(inBu).length)} ใบ',
-      'ยกเลิกทั้งใบ ${fmt(eq.cancelled.filter(inBu).length)} ใบ',
       'อัตรา · {subOf(topic)}',
     ])
       expect(src).toContain(w);
+    // 20 พ.ย. 2569: บรรทัดรองเป็น "N ใบ" ทุกเรื่อง ไม่มีปิดครบ/ยกเลิกทั้งใบปน ("เอาแค่ ปิดได้กี่อัตรา กี่ใบพอ")
+    expect(src).not.toContain('ปิดครบ ${');
+    expect(src).not.toContain('ยกเลิกทั้งใบ ${');
   });
   it('ใบขอชั่วคราวที่จบในช่วง: อัตราที่ไม่ได้คนเป็นยกเลิก ไม่หายจากสมการ', () => {
     const src = readFileSync('api/_handlers/recruit-stuck.ts', 'utf8');

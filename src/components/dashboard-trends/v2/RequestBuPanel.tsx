@@ -121,13 +121,11 @@ export default function RequestBuPanel({
   // สถานะยังไม่มา (เส้นใบขอยังโหลด) = โชว์เหลือหาไปก่อน
   const topic = topics.find((t) => t.key === topicKey) ?? topics.find((t) => t.key === 'remaining') ?? null;
 
-  /** ใบขอ/ปิดครบ/ยกเลิกทั้งใบ — บรรทัดรองของแต่ละเรื่อง (ปิดครบ = ใบที่จบเป็นปิดแล้ว ตัวเดียวกับการ์ดเดิม) */
-  const subOf = (t: Topic, onlyBu?: string | null) => {
-    const inBu = (r: StuckRequest) => !onlyBu || buKey(r) === onlyBu;
-    if (t.key === 'filled' && eq) return `ปิดครบ ${fmt(eq.filled.filter(inBu).length)} ใบ`;
-    if (t.key === 'cancelled' && eq) return `ยกเลิกทั้งใบ ${fmt(eq.cancelled.filter(inBu).length)} ใบ`;
-    return `${fmt(t.rows.filter(inBu).length)} ใบ`;
-  };
+  /**
+   * บรรทัดรอง = จำนวนใบของเรื่องนั้น แบบเดียวกันทุกเรื่อง — หาได้แล้ว = ใบที่ได้คนแล้ว · ยกเลิก = ใบที่มีอัตราถูกยกเลิก
+   * (เจ้าของ 20 พ.ย. 2569 "151 อัตรา ปิดครบ 57 ใบคือไร เอาแค่ ปิดได้กี่อัตรา กี่ใบพอ" — เดิมบอกใบปิดครบ/ยกเลิกทั้งใบ อ่านเป็น 151 อัตราจาก 57 ใบ)
+   */
+  const subOf = (t: Topic, onlyBu?: string | null) => `${fmt(t.rows.filter((r) => !onlyBu || buKey(r) === onlyBu).length)} ใบ`;
 
   // ไม่ระบุ BU ขึ้นเฉพาะเมื่อมีใบแบบนั้นจริง (BU อื่นอยู่เสมอ ว่าง = 0)
   // ลำดับคงที่ BU ใหญ่ซ้ายสุด (ภาพรวมจริง 19 พ.ย. 2569 ขึ้น SN DS LM LBA LBD ตามลำดับสิทธิ์ผู้ใช้)

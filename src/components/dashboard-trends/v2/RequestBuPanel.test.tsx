@@ -98,6 +98,9 @@ describe('RequestBuPanel', () => {
     expect(screen.getByTestId('req-bu-number-work_status_in_progress').textContent).toContain('13');
     fireEvent.click(screen.getByTestId('req-bu-number-remaining'));
     expect(screen.getByTestId('req-bu-total').textContent).toBe('15');
+    // ทุกแถวบอก "อัตรา · ใบ" แบบเดียวกัน — ไม่มีปิดครบ/ยกเลิกทั้งใบปน (เจ้าของ 20 พ.ย. 2569 "เอาแค่ ปิดได้กี่อัตรา กี่ใบพอ")
+    expect(screen.getByTestId('req-bu-number-cancelled').textContent).toBe('ยกเลิก1 · 1 ใบ');
+    expect(screen.getByTestId('req-bu-numbers').textContent).not.toMatch(/ปิดครบ|ยกเลิกทั้งใบ/);
   });
 
   it('แท่ง BU เรียง LBD ซ้ายสุดเสมอ ไม่ตามลำดับที่ส่งมา', () => {
