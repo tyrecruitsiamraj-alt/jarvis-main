@@ -86,6 +86,18 @@ function facts(over: Partial<{
 const state = (selection: BoardFilterState['selection'], dates: BoardFilterState['dates'] = null) =>
   ({ selection, dates }) as BoardFilterState;
 
+describe('สถานะทำงาน (เจ้าของ 20 พ.ย. 2569 "ให้เลือกสถานะใบขอได้หน่อย เช่น ดำเนินการสรรหา")', () => {
+  it('กรองด้วยสถานะทำงานของใบ · ไม่ตั้ง = กำลังดำเนินการสรรหา (ตัวตัดสินเดียวกับเมนูใบขอ) · ป้ายดำเนินการ = กำลังดำเนินการสรรหา', () => {
+    const doing = job({ work_status: 'in_progress' } as Partial<JobRequest>);
+    const none = job({ work_status: undefined } as Partial<JobRequest>);
+    const waiting = job({ work_status: 'waiting_inform' } as Partial<JobRequest>);
+    expect(applyBoardFilters([doing, none, waiting], state({ workStatus: ['in_progress'] }), facts())).toEqual([doing, none]);
+    expect(applyBoardFilters([doing, none, waiting], state({ workStatus: ['waiting_inform'] }), facts())).toEqual([waiting]);
+    expect(boardFacetValueLabel('workStatus', 'in_progress')).toBe('กำลังดำเนินการสรรหา');
+    expect(boardFacetValueLabel('workStatus', 'waiting_inform')).toBe('รอแจ้งเข้า');
+  });
+});
+
 describe('applyBoardFilters — OR ในหัวข้อ · AND ข้ามหัวข้อ', () => {
   const a = job({ unit_name: 'A', recruiter_name: 'คิว' });
   const b = job({ unit_name: 'B', recruiter_name: 'คิว' });
