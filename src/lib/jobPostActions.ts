@@ -27,7 +27,18 @@ export function jobPostLinkOrigin(link: { note: string | null; created_at: strin
 }
 
 export type JobPostLinkTotals = { links: number; clicks: number; applicants: number };
-export type JobPostScrapView = { orders: number; status: string | null; updated_at: string | null };
+/**
+ * Scrap ต่อใบ — นับคำสั่งแยกผล (เจ้าของ 20 พ.ย. 2569 "ทำไมไม่แจ้งเป็นตัวเลขเหมือนกับอันอื่นๆ")
+ * สำเร็จ (posted/completed/filled) + รอ (pending/in_progress) + ไม่สำเร็จ (rejected) + ยกเลิก = คำสั่งทั้งหมด
+ */
+export type JobPostScrapView = { orders: number; status: string | null; updated_at: string | null; done?: number; waiting?: number; failed?: number; cancelled?: number };
+export type ScrapOutcome = 'done' | 'waiting' | 'failed' | 'cancelled';
+export function scrapOutcomeOf(status: string): ScrapOutcome {
+  if (status === 'posted' || status === 'completed' || status === 'filled') return 'done';
+  if (status === 'rejected') return 'failed';
+  if (status === 'cancelled') return 'cancelled';
+  return 'waiting';
+}
 
 /** ยอดต่อใบสำหรับการ์ด */
 /**
@@ -43,7 +54,7 @@ export type JobPostActionsSummary = {
 export const EMPTY_JOB_POST_ACTIONS: JobPostActionsSummary = {
   autopost: { orders: 0, links: 0, clicks: 0, applicants: 0 },
   manual: { links: 0, posted: 0, clicks: 0, applicants: 0 },
-  scrap: { orders: 0, status: null, updated_at: null },
+  scrap: { orders: 0, status: null, updated_at: null, done: 0, waiting: 0, failed: 0, cancelled: 0 },
 };
 
 export type JobPostLinkInput = { job_id: string; note: string | null; created_at: string; hit_count: number; applicants: number; post_url?: string | null };
@@ -62,7 +73,9 @@ export function summarizeJobPostActions(links: readonly JobPostLinkInput[], orde
       autopostTimes.set(o.job_id, [...(autopostTimes.get(o.job_id) ?? []), new Date(o.created_at).getTime()]);
     } else {
       s.scrap.orders += 1;
-      if (!s.scrap.updated_at || o.created_at > s.scrap.updated_at) s.scrap = { orders: s.scrap.orders, status: o.status, updated_at: o.created_at };
+      const k = scrapOutcomeOf(o.status);
+      s.scrap[k] = (s.scrap[k] ?? 0) + 1;
+      if (!s.scrap.updated_at || o.created_at > s.scrap.updated_at) s.scrap = { ...s.scrap, status: o.status, updated_at: o.created_at };
     }
   }
   for (const l of links) {

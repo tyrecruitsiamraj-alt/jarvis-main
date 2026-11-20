@@ -52,16 +52,6 @@ function Cells({ cells }: { cells: Array<{ label: string; value: number | null; 
   );
 }
 
-/** ช่องเดียวความสูงเท่า `Cells` — Scrap บอกสถานะล่าสุด (เจ้าของเลือก "สถานะอย่างเดียว") */
-function StatusCell({ label, toneClass }: { label: string; toneClass: string }) {
-  return (
-    <span className="flex w-full flex-col items-center rounded-lg bg-muted/40 py-1">
-      <span className={cn('max-w-full truncate px-2 text-base font-medium', toneClass)}>{label}</span>
-      <span className="text-xs text-muted-foreground">สถานะล่าสุด</span>
-    </span>
-  );
-}
-
 /** บรรทัดล่างของกล่อง — มีหรือไม่มีก็กินที่ 1 บรรทัดเท่ากัน */
 function Foot({ text, className }: { text: string | null; className?: string }) {
   return <span className={cn('line-clamp-1 min-h-4 text-xs tabular-nums', className ?? 'text-muted-foreground')}>{text ?? '\u00a0'}</span>;
@@ -130,8 +120,22 @@ export default function BoardCardActions({
       </Box>
       {manualOnly ? null : (
       <Box testId="board-action-scrap" title="Scrap" right={dash ? '—' : a!.scrap.orders === 0 ? 'ยังไม่สั่ง' : `สั่ง ${th(a!.scrap.orders)} ครั้ง`} onClick={() => onOpen('scrap')}>
-        <StatusCell label={scrapView ? scrapView.label : dash ? '—' : 'ยังไม่สั่ง'} toneClass={scrapView ? TONE[scrapView.tone].value : 'text-muted-foreground'} />
-        <Foot text={scrapWhy} className={scrap?.status === 'rejected' ? TONE.danger.value : TONE.warn.value} />
+        {/* ตัวเลขแบบเดียวกับกล่องอื่น (เจ้าของ 20 พ.ย. 2569 "ทำไมไม่แจ้งเป็นตัวเลขเหมือนกับอันอื่นๆ") — เดิมช่องเดียวบอกสถานะล่าสุด */}
+        <Cells
+          cells={[
+            { label: 'สำเร็จ', value: dash ? null : (a!.scrap.done ?? 0), tone: 'success' },
+            { label: 'รอ', value: dash ? null : (a!.scrap.waiting ?? 0), tone: 'warn' },
+            { label: 'ไม่สำเร็จ', value: dash ? null : (a!.scrap.failed ?? 0), tone: 'danger' },
+          ]}
+        />
+        {/* บรรทัดล่าง: เหตุของคำสั่งล่าสุด (ไม่สำเร็จ/ค้าง) › สถานะล่าสุด · ยกเลิก N (ให้ช่องรวมกันเท่าที่สั่ง) */}
+        <Foot
+          text={
+            scrapWhy ??
+            (scrapView ? `ล่าสุด ${scrapView.label}${a?.scrap.cancelled ? ` · ยกเลิก ${th(a.scrap.cancelled)}` : ''}` : null)
+          }
+          className={scrapWhy ? (scrap?.status === 'rejected' ? TONE.danger.value : TONE.warn.value) : 'text-muted-foreground'}
+        />
       </Box>
       )}
     </div>

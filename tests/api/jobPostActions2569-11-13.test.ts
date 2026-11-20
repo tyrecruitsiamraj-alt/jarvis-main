@@ -25,7 +25,7 @@ describe('ยอดต่อใบ', () => {
     )[J];
     expect(s.autopost).toEqual({ orders: 1, links: 1, clicks: 3, applicants: 1 });
     expect(s.manual).toEqual({ links: 2, posted: 0, clicks: 7, applicants: 2 });
-    expect(s.scrap).toEqual({ orders: 2, status: 'in_progress', updated_at: '2026-11-05T00:00:00Z' });
+    expect(s.scrap).toEqual({ orders: 2, status: 'in_progress', updated_at: '2026-11-05T00:00:00Z', done: 0, waiting: 2, failed: 0, cancelled: 0 });
   });
   it('กองสถานะบนการ์ด 3 ช่อง บวกกัน = สั่งทั้งหมดเสมอ (SQ6909009 จริง 22 กลุ่ม)', () => {
     const counts = { posted: 2, pending_approval: 4, failed: 6, not_tried_machine: 4, not_tried_account: 6 };
