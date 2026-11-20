@@ -25,8 +25,8 @@ const COLS: Array<[keyof OutreachNumbers, string]> = [
   ['contacts', 'ลงผลติดต่อ'],
   ['appts', 'ลงนัด'],
 ];
-/** คอลัมน์ของลิงก์โพสต์เอง — กดแล้วเปิดลิงก์ของคนนั้น */
-const LINK_COLS = new Set<keyof OutreachNumbers>(['gen', 'posted', 'clicks', 'applicants']);
+/** คอลัมน์ของลิงก์โพสต์เอง — กดแล้วเปิดลิงก์ของคนนั้น · โพสต์แล้ว = งานรายวันของคนที่วาง (กดเหมือนกดชื่อ) */
+const LINK_COLS = new Set<keyof OutreachNumbers>(['gen', 'clicks', 'applicants']);
 
 export default function OutreachPeopleTable({
   people,
@@ -99,7 +99,11 @@ export default function OutreachPeopleTable({
                 ))}
                 {COLS.map(([k]) => (
                   <TableCell key={k} className={cn('text-right tabular-nums', p[k] === 0 && DASH.muted)}>
-                    {onPerson && p[k] > 0 && LINK_COLS.has(k) ? (
+                    {k === 'posted' && p[k] > 0 && p.userId && onStaff ? (
+                      <Button type="button" variant="link" size="sm" className="h-auto p-0 tabular-nums" onClick={() => onStaff(p.userId as string, p.name)} data-testid="v2-outreach-person-posted">
+                        {fmt(p[k])}
+                      </Button>
+                    ) : onPerson && p[k] > 0 && LINK_COLS.has(k) ? (
                       <Button type="button" variant="link" size="sm" className="h-auto p-0 tabular-nums" onClick={() => onPerson(p.name)} data-testid="v2-outreach-person-links">
                         {fmt(p[k])}
                       </Button>

@@ -41,6 +41,9 @@ describe('OutreachPeopleTable', () => {
     expect(within(irecruit).queryByRole('button', { name: 'ดึงจาก iRecruit' })).toBeNull();
     fireEvent.click(within(mai).getAllByTestId('v2-outreach-person-links')[0]);
     expect(onPerson).toHaveBeenCalledWith('ใหม่');
+    // โพสต์แล้ว = งานรายวันของคนที่วาง (กดเหมือนกดชื่อ)
+    fireEvent.click(within(mai).getByTestId('v2-outreach-person-posted'));
+    expect(onStaff).toHaveBeenCalledWith('u-9c3b7d', 'ใหม่');
     fireEvent.click(within(james).getByRole('button', { name: '2' }));
     expect(onIds).toHaveBeenCalledWith(expect.stringContaining('เจมส์'), ['app-1a', 'app-2b']);
   });

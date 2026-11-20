@@ -2,7 +2,10 @@
  * ═══ การสั่งงานรายคน (เจ้าของ 19 พ.ย. 2569 "ข้อมูลแค่นี้แบบ Action ไม่ได้หนิว่า Autopost เท่าไหร่ โพสต์เองเท่าไหร่
  * แล้วโพสต์เองอะเป็น Genlink หรือ โพสต์" · Choice ในการสั่งงาน คนละแถว) ═══
  * Autopost / Scrap = งานรายคน (`staff-activity` · ครั้งที่สั่ง / ใบที่สั่ง) · โพสต์เอง = ลิงก์รายลิงก์ (`ManualLinkRow` ชุดเดียวกับแผงโพสต์เอง)
- * แยก Gen link (ยังไม่วางลิงก์โพสต์) / โพสต์แล้ว · คลิก · กรอก ของลิงก์โพสต์เอง · จับคู่คนด้วยชื่อที่ขึ้นบนจอ (ชื่อเล่น)
+ * Gen link = ลิงก์โพสต์เองที่สร้างในช่วง (ของผู้รับผิดชอบลิงก์) · คลิก · กรอก ของลิงก์นั้น · จับคู่คนด้วยชื่อที่ขึ้นบนจอ (ชื่อเล่น)
+ * โพสต์แล้ว = ครั้งที่วางลิงก์โพสต์ ของคนที่วาง ในวันที่วาง (`staff-activity` manualPosted · ตัวเดียวกับงานรายวันเมื่อกดชื่อ)
+ * — เจ้าของ 20 พ.ย. 2569 "ลองโพสต์แต่ รีพอร์ตไม่ขึ้น … เก็บลิ้งค์แล้วด้วยนะแต่ไม่ขึ้นว่าวันนี้ทำไป": เดิมนับจากลิงก์ที่สร้างในช่วง
+ *   ⇒ วางโพสต์วันนี้บนลิงก์ที่ Gen ไว้วันก่อน ไม่ขึ้น และไปขึ้นเป็นของคนสร้างลิงก์
  */
 import type { ManualLinkRow } from './jobPostActions';
 import type { StaffActivityRow } from './staffActivity';
@@ -43,18 +46,18 @@ export function outreachByPerson(staff: readonly StaffActivityRow[], links: read
   for (const f of cohort) byBringer.set(bringerOf(f), [...(byBringer.get(bringerOf(f)) ?? []), f]);
   for (const [name, list] of byBringer) Object.assign(at(name), funnelOf(list));
   for (const r of staff) {
-    if (!r.autopost && !r.scrap && !r.contacts && !r.appts) continue;
+    if (!r.autopost && !r.scrap && !r.manualPosted && !r.contacts && !r.appts) continue;
     const p = at(r.name);
     p.userId = p.userId ?? r.userId;
     p.autopost += r.autopost;
     p.scrap += r.scrap;
+    p.posted += r.manualPosted;
     p.contacts += r.contacts;
     p.appts += r.appts;
   }
   for (const l of links) {
     const p = at(l.by);
-    if (l.posted) p.posted += 1;
-    else p.gen += 1;
+    p.gen += 1;
     p.clicks += l.clicks;
     p.applicants += l.applicants;
   }

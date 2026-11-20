@@ -13,16 +13,25 @@ const link = (by: string, p: Partial<ManualLinkRow>): ManualLinkRow => ({ linkId
 describe('การสั่งงานรายคน', () => {
   it('Autopost/Scrap จากงานรายคน (รวมหลายวัน) · โพสต์เองแยก Gen link / โพสต์แล้ว + คลิก/กรอก · คนที่ไม่ได้สั่งอะไรไม่ขึ้น · รวมลงตัว', () => {
     const rows = outreachByPerson(
-      [staff('เจมส์', { autopost: 3 }), staff('เจมส์', { autopost: 2, scrap: 1, day: '2026-11-19' }), staff('ครีม', { contacts: 6 })],
+      [staff('เจมส์', { autopost: 3 }), staff('เจมส์', { autopost: 2, scrap: 1, day: '2026-11-19' }), staff('ครีม', { contacts: 6 }), staff('ใหม่', { manualPosted: 1 })],
       [link('ใหม่', { posted: true, clicks: 10, applicants: 2 }), link('ใหม่', { clicks: 5 }), link('เจมส์', { clicks: 1 })],
     );
     // ไม่มีรายชื่อ = เรียงตามงานรวม (เจมส์ 7 · ครีม 6 · ใหม่ 2) · 19 พ.ย. 2569 รวมงานรายคนเข้ามา: คนที่ลงผลติดต่ออย่างเดียว (ครีม) ขึ้นด้วย
     expect(rows.map((r) => r.name)).toEqual(['เจมส์', 'ครีม', 'ใหม่']);
-    expect(rows[2]).toMatchObject({ autopost: 0, gen: 1, posted: 1, clicks: 15, applicants: 2 });
+    // Gen link = ลิงก์ที่สร้างทั้งหมด (2) · โพสต์แล้ว = ครั้งที่วางลิงก์โพสต์จากงานรายคน (1)
+    expect(rows[2]).toMatchObject({ autopost: 0, gen: 2, posted: 1, clicks: 15, applicants: 2 });
     expect(rows[0]).toMatchObject({ autopost: 5, scrap: 1, gen: 1, posted: 0, clicks: 1 });
     expect(rows[1]).toMatchObject({ contacts: 6, appts: 0 });
     expect(rows[1].userId).toBeTruthy();
-    expect(outreachTotals(rows)).toMatchObject({ autopost: 5, scrap: 1, gen: 2, posted: 1, clicks: 16, applicants: 2, contacts: 6 });
+    expect(outreachTotals(rows)).toMatchObject({ autopost: 5, scrap: 1, gen: 3, posted: 1, clicks: 16, applicants: 2, contacts: 6 });
+  });
+
+  it('🔴 วางลิงก์โพสต์วันนี้บนลิงก์ที่ Gen ไว้วันก่อน = ขึ้นเป็นงานวันนี้ของคนที่วาง (เจ้าของ 20 พ.ย. 2569 "เก็บลิ้งค์แล้วด้วยนะแต่ไม่ขึ้นว่าวันนี้ทำไป")', () => {
+    // ไม่มีลิงก์ที่สร้างวันนี้เลย · ใหม่วาง 2 · เจมส์วาง 61
+    const rows = outreachByPerson([staff('ใหม่', { manualPosted: 2, day: '2026-11-20' }), staff('เจมส์', { manualPosted: 61, day: '2026-11-20' })], []);
+    expect(rows.find((r) => r.name === 'ใหม่')).toMatchObject({ posted: 2, gen: 0 });
+    expect(rows.find((r) => r.name === 'เจมส์')).toMatchObject({ posted: 61 });
+    expect(outreachTotals(rows).posted).toBe(63);
   });
 
   it('รายชื่อของคนนั้น → สนใจ → นัด → มาจริง ใช้กล่องชุดเดียวกับรายชื่อเข้ามาไปถึงไหน · รวมทุกแถว = รายชื่อทั้งหมด (เจ้าของ "เจมส์รายชื่อทั้งหมดเท่าไหร่ ไปจนถึงนัดแล้วมา")', () => {
