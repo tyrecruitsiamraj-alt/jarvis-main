@@ -188,6 +188,8 @@ export default function RecruitOverviewV2({ data, compareMonths = false }: { dat
     const prev = prevCohortOf(data.apps ?? [], win, data.firstDay, data.generatedAt);
     return prev ? buildV2Model(data, undefined, prev) : null;
   }, [data, win]);
+  /** ช่วงก่อนของแท็บ Scale ลง — เลือก "ทั้งหมด" = ไม่เทียบ · รายชื่อช่วงก่อนไม่ครบ = cohort null ("เทียบไม่ได้") */
+  const scalePrev = React.useMemo(() => (win.all ? null : { from: win.prevFrom, to: win.prevTo, cohort: prevModel?.cohort ?? null }), [win.all, win.prevFrom, win.prevTo, prevModel]);
   const eq = reqRows ? stuckEquation(reqRows) : null;
   const openRows = eq?.remaining ?? [];
   /** การประกาศนับเฉพาะใบสถานะ กำลังดำเนินการสรรหา (เจ้าของ 19 พ.ย. 2569 "เอายอดไอนี่ดีกว่า ดำเนินการสรรหา") — ตัวแบ่งเดียวกับก้อนใบขอ · null = สถานะยังโหลด */
@@ -518,6 +520,8 @@ export default function RecruitOverviewV2({ data, compareMonths = false }: { dat
               staffError={staff.key === filterKey ? staff.error : null}
               requests={stuck.key === filterKey ? (stuck.data?.requests ?? null) : null}
               requestsError={stuck.key === filterKey ? stuck.error : null}
+              jobs={data.appJobs ?? null}
+              prev={scalePrev}
               from={win.from}
               to={win.to}
               today={data.today}

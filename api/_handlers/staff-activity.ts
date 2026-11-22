@@ -3,6 +3,7 @@
  * GET ...&feed=1 — ความเคลื่อนไหวล่าสุด 30 รายการในช่วง (ภาพรวมแบบ Mobix)
  * GET ...&detail=1&user=<uuid>&kind=<StaffActivityKind>&day=YYYY-MM-DD(ไม่ส่ง = ทั้งช่วง) — รายการของช่องที่กด
  * GET ...&person=1&user=<uuid>&day=YYYY-MM-DD — งานของคนเดียววันเดียว เทียบวันก่อน + 7 วัน (from–to) + ช่องทาง + ใบไหน + คลิก/กรอก (แท็บงานรายคน 20 พ.ย. 2569)
+ * GET ...&roster=1 — คนที่มีงานใน 60 วันล่าสุดนับถึง `to` + วันที่ทำล่าสุด (คนที่ช่วงนี้ไม่มีงานก็อยู่ · แท็บ Scale ลง 20 พ.ย. 2569)
  * อ่านอย่างเดียว · สิทธิ์เดียวกับภาพรวม (`job-applications`) · BU = แผนกของผู้ใช้ (ชุดเลือก BU เดียวกับภาพรวม)
  * แหล่ง: Autopost/Scrap = job_posting_requests · สร้างลิงก์ = recruit_posting_links · ติ๊กโพสต์เอง = recruit_posting_link_posts
  *        ลงผลติดต่อ/นัดได้ = application_contact_logs (วันที่บันทึก)
@@ -15,6 +16,7 @@ import { pickDashboardBuSet } from '../_lib/homeBuSql.js';
 import { STAFF_NAME_SQL } from '../_lib/staffNameSql.js';
 import {
   STAFF_ACTIVITY_KINDS,
+  STAFF_ROSTER_DAYS,
   emptyStaffKinds,
   ymdAddDays,
   type StaffActivityFeedItem,
@@ -25,6 +27,7 @@ import {
   type StaffPersonDay,
   type StaffPersonJob,
   type StaffPersonSub,
+  type StaffRosterRow,
 } from '../../src/lib/staffActivity.js';
 import { scrapOutcomeOf, type ScrapOutcome } from '../../src/lib/jobPostActions.js';
 
@@ -40,12 +43,12 @@ const HITS = tableInAppSchema('recruit_posting_link_hits');
 const CANCELLATIONS = tableInAppSchema('application_cancellations');
 const POSTING_KINDS = tableInAppSchema('recruit_posting_kinds');
 /** ผลของการติดต่อ 1 แถว — คำเดียวกันทั้งรายการที่กดและแถวย่อยของแท็บงานรายคน */
-const CONTACT_RESULT_SQL = `case when not c.ok then concat_ws(' · ', 'ติดต่อไม่ได้', c.reason_label) when c.appointment_at is not null then 'นัดได้'
+export const CONTACT_RESULT_SQL = `case when not c.ok then concat_ws(' · ', 'ติดต่อไม่ได้', c.reason_label) when c.appointment_at is not null then 'นัดได้'
             when c.reason_label is not null then concat_ws(' · ', 'นัดหมายไม่สำเร็จ', c.reason_label) else 'ติดต่อได้' end`;
 const APPS = tableInAppSchema('public_job_applications');
-const bkk = (col: string) => `(${col} at time zone 'Asia/Bangkok')::date`;
+export const bkk = (col: string) => `(${col} at time zone 'Asia/Bangkok')::date`;
 /** ลิงก์เป็นงานของผู้รับผิดชอบที่เลือกตอน Gen link › คนกด (190 · เจ้าของ 19 พ.ย. 2569) — คนกดจริงยังอยู่ที่ created_by_user_id */
-const LINK_OWNER = 'coalesce(l.responsible_user_id, l.created_by_user_id)';
+export const LINK_OWNER = 'coalesce(l.responsible_user_id, l.created_by_user_id)';
 
 /** เหตุการณ์ต่อชนิด: [ผู้ใช้, วัน] ในช่วง $1–$2 */
 const EVENTS: Record<StaffActivityKind, string> = {
@@ -76,6 +79,21 @@ async function loadRows(from: string, to: string, buSet: readonly string[] | nul
     m.set(key, cur);
   }
   return [...m.values()].sort((a, b) => b.day.localeCompare(a.day) || a.name.localeCompare(b.name, 'th'));
+}
+
+/** SQL ของคนที่มีงานในช่วง + วันทำล่าสุด (อ่านอย่างเดียว) · $1–$2 ช่วงวัน · $3 ชุด BU — งาน = `EVENTS` ชุดเดียวกับตารางรายคน */
+export function staffRosterSql(): string {
+  const union = STAFF_ACTIVITY_KINDS.map((k) => `select '${k}'::text as kind, e.* from (${EVENTS[k]}) e`).join('\nunion all\n');
+  return `with ev(kind, user_id, day) as (${union})
+     select u.id::text as user_id, ${STAFF_NAME_SQL('u', 'u.email')} as name, u.department_code as bu, to_char(max(ev.day), 'YYYY-MM-DD') as last_day
+       from ev join ${USERS} u on u.id = ev.user_id
+      where ($3::text[] is null or u.department_code = any($3::text[]))
+      group by 1, 2, 3`;
+}
+
+async function loadRoster(to: string, buSet: readonly string[] | null): Promise<StaffRosterRow[]> {
+  const { rows } = await dbQuery<{ user_id: string; name: string; bu: string | null; last_day: string }>(staffRosterSql(), [ymdAddDays(to, -(STAFF_ROSTER_DAYS - 1)), to, buSet ? [...buSet] : null]);
+  return rows.map((r) => ({ userId: r.user_id, name: r.name, bu: r.bu, lastDay: r.last_day })).sort((a, b) => a.name.localeCompare(b.name, 'th'));
 }
 
 /** ใบขอ/กล่องลอยของลิงก์ — คีย์เต็ม (`siamraj-sql:` · `siamraj-pre:` · `standalone:`) ใบขอชั่วคราวเลขซ้ำใบจริงได้ ห้ามใช้เลขเปล่า */
@@ -152,9 +170,9 @@ async function loadDetail(from: string, to: string, userId: string, kind: StaffA
   return rows.map((r) => ({ day: r.day, title: r.title, sub: r.sub, applicationId: r.application_id, requestNo: r.request_no, at: r.at ? new Date(r.at).toISOString() : null, jobId: r.job_id }));
 }
 
-const SCRAP_OUTCOME_LABEL: Record<ScrapOutcome, string> = { done: 'สำเร็จ', waiting: 'รอ', failed: 'ไม่สำเร็จ', cancelled: 'ยกเลิก' };
+export const SCRAP_OUTCOME_LABEL: Record<ScrapOutcome, string> = { done: 'สำเร็จ', waiting: 'รอ', failed: 'ไม่สำเร็จ', cancelled: 'ยกเลิก' };
 /** ช่องทางของลิงก์ = 2 ชั้นแรกของป้าย ("Facebook · Facebook Group · <ชื่อกลุ่ม>" → "Facebook · Facebook Group") */
-const CHANNEL_SQL = `coalesce(nullif(concat_ws(' · ', nullif(btrim(split_part(l.channel_label, ' · ', 1)), ''), nullif(btrim(split_part(l.channel_label, ' · ', 2)), '')), ''), 'ไม่ระบุช่องทาง')`;
+export const CHANNEL_SQL = `coalesce(nullif(concat_ws(' · ', nullif(btrim(split_part(l.channel_label, ' · ', 1)), ''), nullif(btrim(split_part(l.channel_label, ' · ', 2)), '')), ''), 'ไม่ระบุช่องทาง')`;
 /** ใบสมัครที่นับ — ตัด Lead และใบที่ยกเลิกข้อมูล (กติกาเดียวกับภาพรวม) */
 const APP_COUNTED = `not coalesce(a.is_lead, false) and not exists (select 1 from ${CANCELLATIONS} cx where cx.application_id = a.id)`;
 
@@ -303,6 +321,7 @@ export async function staffActivityHandler(req: AuthedReq, res: ApiRes) {
     res.setHeader?.('Cache-Control', 'no-store');
     if (buSet !== null && buSet.length === 0) return res.status(200).json({ rows: [] });
     if (String(one(req.query?.feed) ?? '') === '1') return res.status(200).json({ items: await loadFeed(from, to, buSet) });
+    if (String(one(req.query?.roster) ?? '') === '1') return res.status(200).json({ roster: await loadRoster(to, buSet) });
     if (String(one(req.query?.person) ?? '') === '1') {
       const user = String(one(req.query?.user) ?? '');
       const day = String(one(req.query?.day) ?? '');

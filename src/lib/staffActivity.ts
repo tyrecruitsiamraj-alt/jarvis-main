@@ -19,6 +19,13 @@ export const STAFF_ACTIVITY_LABEL: Record<StaffActivityKind, string> = {
 /** `login` = ชื่ออีเมลหน้า @ — ไว้แยกคนชื่อซ้ำในรายการเลือกคน (20 พ.ย. 2569) */
 export type StaffActivityRow = { userId: string; name: string; bu: string | null; day: string; login?: string } & Record<StaffActivityKind, number>;
 
+/**
+ * คนที่มีงานในช่วง `STAFF_ROSTER_DAYS` วันล่าสุด (นับถึงวันสุดท้ายของช่วงที่ดู) + วันที่ทำล่าสุด
+ * ตาราง "แยกตามคน" ของแท็บ Scale ลง ใช้ขึ้นคนที่ช่วงนี้ไม่มีงานเลย ("ใครไม่ทำอะไร หายไปกี่วัน" · เจ้าของ 20 พ.ย. 2569)
+ */
+export type StaffRosterRow = { userId: string; name: string; bu: string | null; lastDay: string };
+export const STAFF_ROSTER_DAYS = 60;
+
 /** ความเคลื่อนไหวล่าสุด — at = ISO · kind = คำบนจอ (สั่ง Autopost / สร้างลิงก์โพสต์เอง / ติดต่อสำเร็จ …) */
 export type StaffActivityFeedItem = { at: string; kind: string; who: string; subject: string | null; detail: string | null; applicationId: string | null; requestNo: string | null };
 

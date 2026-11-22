@@ -59,6 +59,7 @@ import { boardProvinceOf } from '../../src/lib/boardFilters.js';
 import { listSiamrajUnitRequests } from '../_lib/siamrajUnitRequests.js';
 import { getUnitAssignmentsMap } from '../_lib/siamrajUnitAssignments.js';
 import { publicJobTitle } from '../../src/lib/publicJobTitle.js';
+import { jobAreaOf, requiredGenderLabel } from '../../src/lib/matchProximity.js';
 import type { JobRequest } from '../../src/types/index.js';
 import { addDays } from '../../src/lib/trends/timeBuckets.js';
 import { monthWindow, rangeWindow } from '../../src/lib/recruitOverviewWindow.js';
@@ -192,6 +193,8 @@ export function factsSql(
          a.phone_e164, a.age,
          -- จังหวัดที่อยู่ที่ผู้สมัครกรอก (ไม่ใช่จังหวัดของงาน) — ภาพรวม v2 ตารางจังหวัด (17 พ.ย. 2569)
          nullif(btrim(a.province), '') as home_province,
+         -- อำเภอ/เขตที่อยู่ที่กรอก — เทียบกับที่ตั้งงานของใบขอ (แท็บ Scale ลง "ตรงเกณฑ์ใบขอ" · 20 พ.ย. 2569)
+         nullif(btrim(a.district), '') as home_district,
          -- เพศ · ทางเข้า (apply_page / irecruit) · คนคีย์ใบ — วิธีที่รายชื่อเข้ามา (ภาพรวม 17 พ.ย. 2569 · methodOf)
          a.gender, a.source as entry_source, nullif(btrim(a.created_by_name), '') as keyed_by,
          -- เหตุที่ระบบไม่ส่ง AI (ภาพรวม 8 เรื่อง 16 พ.ย. 2569 "ยังไม่ส่ง Ai เพราะอะไร") — คิดเป็นกองฝั่ง Node (aiBlockOf)
@@ -516,6 +519,7 @@ export function toFact(
     // เบอร์ไม่ซ้ำ (ภาพรวม v2) — ส่งเป็นรหัสย่อของเบอร์ ไม่ส่งเบอร์จริงออกหน้าเว็บ · ไม่ใช่คนไม่ซ้ำที่ยืนยันตัว
     phoneKey: phone ? createHash('sha256').update(`jarvis-ov2:${phone}`).digest('base64url').slice(0, 12) : null,
     homeProvince: text(r.home_province) ? canonProvinceName(String(text(r.home_province))) || text(r.home_province) : null,
+    homeDistrict: text(r.home_district),
     gender: r.gender === 'male' || r.gender === 'female' || r.gender === 'other' ? r.gender : null,
     method: methodOf(text(r.entry_source), text(r.link_code), sources ? postSourceOf(text(r.link_code), text(r.link_note), sources.autopostCodes) : null, text(r.keyed_by), text(r.channel_label)),
   };
@@ -804,6 +808,10 @@ export async function attachRequestRecruiters(rows: RecruitRequestRow[]): Promis
  * เจ้าหน้าที่ = `siamraj_unit_assignments.recruiter_name` คีย์เดียวกับหน้ากล่องงาน (ใบล่วงหน้าใช้ id เต็ม · ใบจริงใช้เลขที่ใบ)
  * ใบที่ไม่อยู่ในสำเนา = เลขที่ใบจาก id · ตำแหน่ง/หน่วยงานว่าง (ไม่เดา)
  */
+const positiveOrNull = (v: unknown): number | null => {
+  const n = Number(v);
+  return Number.isFinite(n) && n > 0 ? n : null;
+};
 export async function loadAppJobs(jobIds: readonly string[], jobs: ReadonlyMap<string, JobRequest>): Promise<Record<string, RecruitAppJob>> {
   const ids = [...new Set(jobIds.filter(Boolean))];
   const base = ids.map((id) => {
@@ -820,6 +828,11 @@ export async function loadAppJobs(jobIds: readonly string[], jobs: ReadonlyMap<s
       // ชื่อตำแหน่งแบบหน้าประกาศ (ตัวเดียวกับการ์ดงานสรรหา) — ตำแหน่ง ERP ส่วนมากขึ้นแค่ "พนักงาน"
       position: b.j ? trimOrNull(publicJobTitle(b.j)) : null,
       recruiter: trimOrNull(assigned.get(assignmentKeyOf(b.id, b.no))?.recruiter_name) ?? trimOrNull(b.j?.recruiter_name),
+      // เกณฑ์ของใบขอ (ที่ตั้งงาน · ช่วงอายุ · เพศ) — ใบที่ไม่อยู่ในสำเนา = ไม่รู้เกณฑ์ (null ไม่เดา)
+      area: b.j ? jobAreaOf(b.j) : null,
+      ageMin: positiveOrNull(b.j?.age_range_min),
+      ageMax: positiveOrNull(b.j?.age_range_max),
+      gender: b.j ? requiredGenderLabel(b.j.gender_requirement) : null,
     };
   }
   return out;

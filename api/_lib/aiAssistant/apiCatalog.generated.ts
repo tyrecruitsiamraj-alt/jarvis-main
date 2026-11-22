@@ -651,6 +651,25 @@ export const API_CATALOG: ApiCatalogEntry[] = [
   "reachesPeople": false
  },
  {
+  "path": "/api/exec-summary",
+  "file": "api/_handlers/exec-summary.ts",
+  "methods": [
+   "GET"
+  ],
+  "doc": "GET /api/exec-summary — สรุปงานสรรหาทั้งเส้นของช่วงที่เลือก เลขชุดเดียวกับแท็บ \"Scale ลง\" ของหน้าภาพรวม (ผู้ช่วย AI ใช้ตอบคำถามผู้บริหาร · เจ้าของ 20 พ.ย. 2569)\nใช้ตอบ: งานค้าง/เหลือหาเท่าไหร่ · เริ่มหายัง · หาแล้วได้คนเท่าไหร่ (รายชื่อ → AI โทรแล้ว → AI สนใจ → คนโทรต่อ ติดต่อได้ → นัดได้ → มา → แจ้งเข้า)\n  · คนที่ได้ตรงเกณฑ์ใบขอไหม (พื้นที่ · อายุ · เพศ) · ใครทำอะไร ได้อะไร ช่องทางไหน · รายชื่ออยู่ที่ใคร · BU ไหนทำเยอะ/ค้างเยอะ\n  · เพิ่มหรือลดจากช่วงก่อน · เทียบเดือน · ยกเลิกเพราะอะไร · หาครบใช้กี่วัน · ทันวันที่ลูกค้าต้องการกี่ % · ค่าปรับ · ลูกค้า/ตำแหน่งไหนเหลือหาเยอะ\nquery (ไม่ส่งเลย = เดือนนี้ถึงวันนี้ ทุก BU ที่ผู้ถามเห็น):\n  from, to = YYYY-MM-DD (ส่งคู่กัน · เทียบกับช่วงก่อนที่ยาวเท่ากัน) · month = YYYY-MM (ทั้งเดือน · เทียบเดือนก่อนถึงวันเดียวกัน)\n  bu = รหัส BU จากช่อง `bus` → ชั้น BU: ได้ people (รายคน: ทำล่าสุด · ไม่มีงานมากี่วัน · งาน · รายชื่อ · ทำ 100 งานได้กี่รายชื่อ · เทียบกับทีม) + hold (รายชื่ออยู่ที่ใคร)\n  who = ชื่อคนจาก people (ต้องส่ง bu ด้วย) → ชั้นคน: งานของคนนั้น + channels (รายชื่อที่หามา แยกช่องทาง)\n  day = YYYY-MM-DD → วันนั้นใครทำอะไร (dayPeople · เทียบกับวันก่อน)\n  box = ค่า key ของกล่องใน sections → กล่องนั้นแยกตามชั้นถัดไป (breakdown: ทั้งหมด → BU → คน/เจ้าหน้าที่สรรหา) · กล่องใบขอที่ชั้น BU ได้ requests (รายใบ)\nคืน: window (ช่วง + compareWith = เทียบกับอะไร) · level · bus · sections[].boxes[] { key, label, value, sub, prev } (prev = ค่าช่วงก่อน · null = เทียบไม่ได้ · ไม่มี = ไม่เทียบ)\n  · sections[0].equation = ยกมา + ขอใหม่ − หาได้แล้ว − ยกเลิก = เหลือหา · chain = ลำดับของเลขในช่อง chain ทุกที่ · byBu · months (ช่วงหลายเดือน)\n  · fit (ตรงเกณฑ์ใบขอ ไล่ตามขั้น) · next (คนในแต่ละขั้นไปไหนต่อ + เหตุผลที่ติดต่อไม่ได้/นัดไม่ได้) · cancelReasons · topCustomers · topPositions · informed (แจ้งเข้าใช้กี่วัน)\n🔴 เลขทุกตัวคิดด้วยตัวคิดของแท็บ (`src/lib/overviewScale.ts`) จาก 4 เส้นเดียวกับที่จอโหลด ด้วยสิทธิ์/BU ของผู้ถาม — ใช้เลขในนี้ตรง ๆ ห้ามบวกเองจากรายการของเส้นอื่น\nหน่วย: ใบขอ = อัตรา / ใบ · ผู้สมัคร = คน · งานที่ทำ = รายการ · อ่านอย่างเดียว · ไม่มีชื่อ/เบอร์ผู้สมัคร · ไทม์ไลน์ของใบขอใบเดียว = /api/request-timeline?jobs=<jobId>&events=1",
+  "query": [
+   "from",
+   "to",
+   "month",
+   "day",
+   "bu",
+   "who",
+   "box"
+  ],
+  "body": [],
+  "reachesPeople": true
+ },
+ {
   "path": "/api/follow",
   "file": "api/_handlers/follow.ts",
   "methods": [
@@ -1903,12 +1922,14 @@ export const API_CATALOG: ApiCatalogEntry[] = [
   ],
   "doc": "GET /api/recruit-overview?month=YYYY-MM | ?from=YYYY-MM-DD&to=YYYY-MM-DD (รายวัน/ช่วง · 5 ต.ค. 2569) — หน้า \"ภาพรวมงานสรรหา\" แบบ iRecruit (แท็บภาพรวมของกล่องงาน · 30 ก.ย. 2569)\n\nเจ้าของ: *\"ทำหน้าภาพรวมให้เหมือน iRecruit ต่อเลย\"* → Choice \"ทั้งหน้าเป็น iRecruit\" · \"เลือกเดือนแบบ iRecruit\" ·\nนับโทร/ติดต่อสำเร็จแบบ \"AI + คน\" แล้ว *\"บอกว่า มีกี่ใบที่ประกาศไป แล้วมีรายชื่อมาเท่าไหร่ Ai โทรไปให้ทั้งหมดเท่าไหร่\nเหลือสนใจแล้วคนมาโทรอีกเท่าไหร่ … ต้องบอกด้วยว่า กรอกมาวันนี้โดนโทรวันไหน จะนับเป็นวันต้องครบ 24 ชม\"*\n\n🔴 กติกาของเส้นนี้:\n1. **อ่านอย่างเดียว** · ไม่มีนิยามใหม่ — ทุกช่องต่อใบมาจาก `applicantOverviewSql.ts` (ตัวเดียวกับกล่องงาน/หน้าหลัก)\n2. ประชากร = ใบสมัครที่ไม่ใช่ Lead ตามวันกรอก + BU กลาง `appBuSql` (ชุดเดียวกับหน้าหลัก \"ระบบไปกี่ %\")\n   ผู้ใช้ผูกแผนก = BU ของตัวเองเสมอ (`loadMatchingBuScope`)\n3. **ไม่คืนชื่อ/เบอร์ผู้สมัคร** — ต่อใบมีแต่ข้อเท็จจริง · ชื่อเจ้าหน้าที่มีแค่ยอดรวมรายคน (อนุญาตบน Dashboard 15 ส.ค. 2569)\n4. ก้อนล้มแยกกัน — อ่านไม่ได้ = null + เหตุใน `errors` (ห้ามโชว์ 0 แทน)\n5. \"ใบที่ประกาศ\" ไม่ได้คิดที่เส้นนี้ — หน้าเว็บใช้เลขของหัวกล่องงานตรง ๆ (เจ้าของสั่ง 1 ต.ค. 2569:\n   *\"เปลี่ยนเป็น 7 เหมือนหัวกล่องงาน\"*) · เดิมนับใบที่ประกาศในเดือนจาก `job_public_releases` — ถอดแล้ว",
   "query": [
+   "todo",
+   "bu",
    "names",
    "month",
    "from",
    "to",
    "all",
-   "bu",
+   "cmp",
    "asof"
   ],
   "body": [
@@ -1977,6 +1998,7 @@ export const API_CATALOG: ApiCatalogEntry[] = [
   "body": [
    "daily",
    "errors",
+   "months",
    "today",
    "requests",
    "monthly"
@@ -2079,6 +2101,7 @@ export const API_CATALOG: ApiCatalogEntry[] = [
   ],
   "body": [
    "js",
+   "responsibleUserId",
    "postingId",
    "channelId",
    "channelLabel",
@@ -2096,7 +2119,6 @@ export const API_CATALOG: ApiCatalogEntry[] = [
    "positionName",
    "province",
    "responsibleName",
-   "responsibleUserId",
    "specificType",
    "formType",
    "channels",
@@ -2165,6 +2187,20 @@ export const API_CATALOG: ApiCatalogEntry[] = [
   "reachesPeople": false
  },
  {
+  "path": "/api/request-timeline",
+  "file": "api/_handlers/request-timeline.ts",
+  "methods": [
+   "GET"
+  ],
+  "doc": "GET /api/request-timeline?jobs=<id ใบขอเต็ม>,<id>,...(คั่นด้วยจุลภาค ไม่เกิน 30 ใบ)&events=1 — ใบขอทำอะไรไปแล้ว (แท็บ Scale ลง · เจ้าของ 20 พ.ย. 2569)\nผู้บริหารถามย้อนกลับ: ใบที่ปิดได้ ปิดเพราะทำอะไร · ใบที่ยกเลิก ทำอะไรไปแล้วบ้าง · ตั้งแต่ขอถึงวันนี้ ใครทำอะไรวันไหน\nid ใบขอ = คีย์เต็ม `siamraj-sql:<เลขที่ใบ>` หรือ `siamraj-pre:<เลขที่ใบ>` (ใบขอชั่วคราว) — ได้จาก `jobId` ของ `/api/recruit-stuck`\nต่อใบ (นับทุกช่วงเวลาของใบ ไม่ขึ้นกับช่วงวันที่): `done.work` = Gen link · โพสต์แล้ว · Autopost · Scrap · ลงผลติดต่อ · ลงนัด\n  `done.chain` = รายชื่อ → AI โทรแล้ว → AI สนใจ → คนโทรต่อ ติดต่อได้ → นัดได้ → มา → แจ้งเข้า (ตัวนับเดียวกับแท็บ Scale ลง)\n`events=1` = เหตุการณ์ไล่ตามวัน (วันไทย · ชนิด · ใครทำ · ช่องทาง/ผล · จำนวน) — ไม่มีชื่อ/เบอร์ผู้สมัคร\nอ่านอย่างเดียว · สิทธิ์เดียวกับภาพรวม (`job-applications`) · ใบนอก BU ที่ผู้ถามเห็น = null\nBU ของใบ = ไซต์ของใบขอ (`job_site_map`) › BU ของประกาศ › สมุดใบขอ ERP (ใบขอชั่วคราวที่ยังไม่มีประกาศ — ฝั่งเราไม่ได้เก็บ BU) · ไม่รู้ BU = ไม่เห็น",
+  "query": [
+   "jobs",
+   "events"
+  ],
+  "body": [],
+  "reachesPeople": false
+ },
+ {
   "path": "/api/role-permissions",
   "file": "api/_handlers/role-permissions.ts",
   "methods": [
@@ -2188,7 +2224,7 @@ export const API_CATALOG: ApiCatalogEntry[] = [
    "GET",
    "POST"
   ],
-  "doc": "/api/scrap-candidates — รายชื่อจาก Scrap (So Scraping) ของใบขอ (เจ้าของ 17 พ.ย. 2569 · ตรรกะ `api/_lib/scrapCandidates.ts`)\nGET ?job=<job id หรือเลขใบขอ> → รายชื่อของใบนั้น (แท็บ Scrap ในหน้าใบขอ)\nGET ?all=1                    → ทุกใบที่เห็นได้ (แท็บผู้สมัคร ▾ Scrap ของหน้างานสรรหา)\nGET ?counts=1                 → ยอดต่อเลขใบขอ (คอลัมน์ Scrap ของตารางใบขอ · 17 พ.ย. 2569)\nPOST { action: 'to_contact', job_id, candidate_ids } → สร้าง/ใช้ใบสมัครเดิม แล้วเก็บเข้าการติดต่อ (Lead) ของคนกด\nสิทธิ์ resource เดียวกับผู้สมัคร (`job-applications`) · ผู้ใช้ที่ล็อก BU เห็นเฉพาะใบขอใน BU ตัวเอง (`loadScopedJobIdSet`)\nAI ไม่โทรเอง: ใบสร้างในชื่อ So Scraping + เป็น Lead — ตัวส่งอัตโนมัติข้ามทั้งสองแบบ",
+  "doc": "/api/scrap-candidates — รายชื่อจาก Scrap (So Scraping) ของใบขอ (เจ้าของ 17 พ.ย. 2569 · ตรรกะ `api/_lib/scrapCandidates.ts`)\nGET ?job=<job id หรือเลขใบขอ> → รายชื่อของใบนั้น (แท็บ Scrap ในหน้าใบขอ)\nGET ?all=1                    → ทุกใบที่เห็นได้ (แท็บผู้สมัคร ▾ Scrap ของหน้างานสรรหา)\nGET ?counts=1                 → ยอดต่อเลขใบขอ + โทรแล้ว (คอลัมน์ โทร/Scrap ของตารางใบขอ · 17 · 19 พ.ย. 2569)\nPOST { action: 'to_contact', job_id, candidate_ids } → สร้าง/ใช้ใบสมัครเดิม แล้วเก็บเข้าการติดต่อ (Lead) ของคนกด\nสิทธิ์ resource เดียวกับผู้สมัคร (`job-applications`) · ผู้ใช้ที่ล็อก BU เห็นเฉพาะใบขอใน BU ตัวเอง (`loadScopedJobIdSet`)\nAI ไม่โทรเอง: ใบสร้างในชื่อ So Scraping + เป็น Lead — ตัวส่งอัตโนมัติข้ามทั้งสองแบบ",
   "query": [
    "counts",
    "all",
@@ -2431,16 +2467,18 @@ export const API_CATALOG: ApiCatalogEntry[] = [
   "methods": [
    "GET"
   ],
-  "doc": "GET /api/staff-activity?from=YYYY-MM-DD&to=YYYY-MM-DD&bu=LBD — งานรายคนต่อวัน (เจ้าของ 18 พ.ย. 2569)\nGET ...&feed=1 — ความเคลื่อนไหวล่าสุด 30 รายการในช่วง (ภาพรวมแบบ Mobix)\nGET ...&detail=1&user=<uuid>&kind=<StaffActivityKind>&day=YYYY-MM-DD(ไม่ส่ง = ทั้งช่วง) — รายการของช่องที่กด\nอ่านอย่างเดียว · สิทธิ์เดียวกับภาพรวม (`job-applications`) · BU = แผนกของผู้ใช้ (ชุดเลือก BU เดียวกับภาพรวม)\nแหล่ง: Autopost/Scrap = job_posting_requests · สร้างลิงก์ = recruit_posting_links · ติ๊กโพสต์เอง = recruit_posting_link_posts\n       ลงผลติดต่อ/นัดได้ = application_contact_logs (วันที่บันทึก)",
+  "doc": "GET /api/staff-activity?from=YYYY-MM-DD&to=YYYY-MM-DD&bu=LBD — งานรายคนต่อวัน (เจ้าของ 18 พ.ย. 2569)\nGET ...&feed=1 — ความเคลื่อนไหวล่าสุด 30 รายการในช่วง (ภาพรวมแบบ Mobix)\nGET ...&detail=1&user=<uuid>&kind=<StaffActivityKind>&day=YYYY-MM-DD(ไม่ส่ง = ทั้งช่วง) — รายการของช่องที่กด\nGET ...&person=1&user=<uuid>&day=YYYY-MM-DD — งานของคนเดียววันเดียว เทียบวันก่อน + 7 วัน (from–to) + ช่องทาง + ใบไหน + คลิก/กรอก (แท็บงานรายคน 20 พ.ย. 2569)\nGET ...&roster=1 — คนที่มีงานใน 60 วันล่าสุดนับถึง `to` + วันที่ทำล่าสุด (คนที่ช่วงนี้ไม่มีงานก็อยู่ · แท็บ Scale ลง 20 พ.ย. 2569)\nอ่านอย่างเดียว · สิทธิ์เดียวกับภาพรวม (`job-applications`) · BU = แผนกของผู้ใช้ (ชุดเลือก BU เดียวกับภาพรวม)\nแหล่ง: Autopost/Scrap = job_posting_requests · สร้างลิงก์ = recruit_posting_links · ติ๊กโพสต์เอง = recruit_posting_link_posts\n       ลงผลติดต่อ/นัดได้ = application_contact_logs (วันที่บันทึก)",
   "query": [
    "from",
    "to",
    "bu",
    "feed",
-   "detail",
+   "roster",
+   "person",
    "user",
-   "kind",
-   "day"
+   "day",
+   "detail",
+   "kind"
   ],
   "body": [],
   "reachesPeople": false

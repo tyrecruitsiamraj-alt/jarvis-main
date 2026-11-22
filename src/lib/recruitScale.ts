@@ -63,6 +63,11 @@ export function trendTone(t: Trend, sense: TrendSense): 'good' | 'bad' | null {
  */
 export const MANUAL_POSTED_SINCE = '2026-11-13';
 export const LINK_CLICKS_SINCE = '2026-11-10';
+/**
+ * ลิงก์สมัครเริ่มจำคนสร้างทีละลิงก์ 28 ต.ค. 2569 (migration 170) — ก่อนหน้านั้นลิงก์ไม่มีชื่อคนสร้าง
+ * ⇒ "Gen link" ที่นับเป็นงานของคน (งานรายคน) ของช่วงก่อนวันนี้เป็น 0 ทั้งที่มีการสร้างลิงก์ = เทียบไม่ได้ (เจอจากข้อมูลจริง 21 พ.ย. 2569: ขึ้น "เพิ่มขึ้น 3,366" จาก 0)
+ */
+export const LINK_CREATOR_SINCE = '2026-10-28';
 /** ปุ่มสั่ง Autopost ไป So Scraping ขึ้นเว็บ 20 ต.ค. 2569 — ช่วงก่อนหน้านั้นไม่มีทางมีคำสั่ง */
 export const SO_POST_SINCE = '2026-10-20';
 export const comparableSince = (prevFrom: string, since: string) => prevFrom >= since;

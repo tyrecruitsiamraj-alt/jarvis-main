@@ -62,6 +62,8 @@ import recruitOverviewHandler from './recruit-overview.js';
 import recruitStuckHandler from './recruit-stuck.js';
 import soPostGroupsHandler from './so-post-groups.js';
 import staffActivityHandler from './staff-activity.js';
+import requestTimelineHandler from './request-timeline.js';
+import execSummaryHandler from './exec-summary.js';
 import soPostSummaryHandler from './so-post-summary.js';
 import requestPipelineHandler from './request-pipeline.js';
 import { soScrapingAiCallHandler, soScrapingLeadsHandler } from './so-scraping-integration.js';
@@ -279,6 +281,10 @@ export const apiRoutes: Record<string, ApiHandler> = {
   '/api/recruit-stuck': recruitStuckHandler as ApiHandler,
   '/api/so-post-groups': soPostGroupsHandler as ApiHandler,
   '/api/staff-activity': staffActivityHandler as ApiHandler,
+  // ใบขอทำอะไรไปแล้ว ไล่ตามวัน (แท็บ Scale ลง 20 พ.ย. 2569) — อ่านอย่างเดียว
+  '/api/request-timeline': requestTimelineHandler as ApiHandler,
+  // สรุปงานสรรหาทั้งเส้น เลขชุดเดียวกับแท็บ Scale ลง — ผู้ช่วย AI ใช้ตอบคำถามผู้บริหาร (20 พ.ย. 2569) · อ่านอย่างเดียว
+  '/api/exec-summary': execSummaryHandler as ApiHandler,
   '/api/so-post-summary': soPostSummaryHandler as ApiHandler,
   '/api/request-pipeline': requestPipelineHandler as ApiHandler,
   '/api/integrations/so-scraping/leads': soScrapingLeadsHandler as ApiHandler,

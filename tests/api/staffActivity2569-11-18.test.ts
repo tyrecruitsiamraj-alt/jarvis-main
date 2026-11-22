@@ -54,6 +54,27 @@ describe('GET /api/staff-activity', () => {
   });
 });
 
+describe('GET /api/staff-activity?roster=1 (แท็บ Scale ลง 20 พ.ย. 2569 "ใครไม่ทำอะไร หายไปกี่วัน")', () => {
+  it('คนที่มีงานใน 60 วันล่าสุดนับถึงวันสุดท้ายของช่วง + วันทำล่าสุด — งานชุดเดียวกับตารางรายคน', async () => {
+    reply = [
+      { user_id: 'b', name: 'โอ๊ต', bu: 'LBD', last_day: '2026-10-28' },
+      { user_id: 'a', name: 'คิว', bu: 'LBD', last_day: '2026-11-20' },
+    ];
+    const r = await call({ from: '2026-11-20', to: '2026-11-20', roster: '1', bu: 'LBD' });
+    expect(r.status).toBe(200);
+    expect((r.body as { roster?: unknown[] }).roster).toEqual([
+      { userId: 'a', name: 'คิว', bu: 'LBD', lastDay: '2026-11-20' },
+      { userId: 'b', name: 'โอ๊ต', bu: 'LBD', lastDay: '2026-10-28' },
+    ]);
+    const [sql, params] = calls.at(-1) ?? ['', []];
+    // 60 วัน = 22 ก.ย. – 20 พ.ย.
+    expect(params).toEqual(['2026-09-22', '2026-11-20', ['LBD']]);
+    for (const t of ['job_posting_requests', 'recruit_posting_links', 'recruit_posting_link_posts', 'application_contact_logs']) expect(sql).toContain(t);
+    expect(sql).toContain('max(ev.day)');
+    expect(sql).not.toMatch(/\b(insert|update|delete)\b/i);
+  });
+});
+
 describe('GET /api/staff-activity?person=1 (แท็บงานรายคน 20 พ.ย. 2569)', () => {
   const U = '5f4b2fcd-7f64-4bb8-92cf-7c118d9a0bef';
   it('งานของคนเดียววันเดียว เทียบวันก่อน + 7 วัน + ช่องทาง + ใบไหน — ทุกยอดลงตัวกัน', async () => {

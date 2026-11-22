@@ -1,5 +1,5 @@
 import { apiFetch } from './apiFetch';
-import type { StaffActivityFeedItem, StaffActivityItem, StaffActivityKind, StaffActivityRow, StaffPersonDay } from './staffActivity';
+import type { StaffActivityFeedItem, StaffActivityItem, StaffActivityKind, StaffActivityRow, StaffPersonDay, StaffRosterRow } from './staffActivity';
 
 async function readError(r: Response, fallback: string): Promise<never> {
   const b = (await r.json().catch(() => ({}))) as { message?: string };
@@ -13,6 +13,15 @@ export async function fetchStaffActivity(q: { from: string; to: string; bu: stri
   const r = await apiFetch(`/api/staff-activity?${p.toString()}`);
   if (!r.ok) return readError(r, 'อ่านงานรายคนไม่ได้');
   return ((await r.json()) as { rows: StaffActivityRow[] }).rows;
+}
+
+/** คนที่มีงานใน 60 วันล่าสุดนับถึง `to` + วันที่ทำล่าสุด (แท็บ Scale ลง 20 พ.ย. 2569) */
+export async function fetchStaffRoster(q: { to: string; bu: string | null }): Promise<StaffRosterRow[]> {
+  const p = new URLSearchParams({ from: q.to, to: q.to, roster: '1' });
+  if (q.bu) p.set('bu', q.bu);
+  const r = await apiFetch(`/api/staff-activity?${p.toString()}`);
+  if (!r.ok) return readError(r, 'อ่านรายชื่อคนทำงานไม่ได้');
+  return ((await r.json()) as { roster: StaffRosterRow[] }).roster;
 }
 
 /** งานของคนเดียววันเดียว เทียบวันก่อน + 7 วัน (from–to) · null = คนนอก BU ที่เห็น (แท็บงานรายคน 20 พ.ย. 2569) */

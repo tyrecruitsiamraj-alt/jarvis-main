@@ -102,6 +102,8 @@ export type RecruitAppFact = {
   age?: number | null;
   /** จังหวัดที่อยู่ที่ผู้สมัครกรอก (ไม่ใช่จังหวัดของงาน) · null = ไม่ระบุ · ไม่มี = เส้นรุ่นเก่า */
   homeProvince?: string | null;
+  /** อำเภอ/เขตที่อยู่ที่ผู้สมัครกรอก · null = ไม่ระบุ — เทียบกับที่ตั้งงานของใบขอ (`applicantFit.ts`) */
+  homeDistrict?: string | null;
   /** เพศที่ผู้สมัครกรอก (ภาพรวม 17 พ.ย. 2569 "อายุเท่าไหร่ เพศอะไร") · null = ไม่ระบุ */
   gender?: 'male' | 'female' | 'other' | null;
   /** วิธีที่รายชื่อเข้ามา — คิดฝั่ง API (`methodOf`) · ชื่อบนจอ `APP_METHOD_LABEL` */
@@ -216,6 +218,13 @@ export type RecruitAppJob = {
   unitName: string | null;
   position: string | null;
   recruiter: string | null;
+  /** ที่ตั้งงานของใบขอ (`jobAreaOf`) · null/ไม่มี = ไม่รู้ (ใบไม่อยู่ในสำเนา หรือเส้นรุ่นเก่า) */
+  area?: { province: string | null; district: string | null } | null;
+  /** ช่วงอายุที่ใบขอกำหนด · null = ไม่กำหนด */
+  ageMin?: number | null;
+  ageMax?: number | null;
+  /** เพศที่ใบขอต้องการ ('ชาย' / 'หญิง') · null = ไม่กำหนด */
+  gender?: string | null;
 };
 
 export type RecruitOverviewResponse = {
