@@ -71,6 +71,16 @@ describe('ป๊อปผู้สมัคร: ข้อมูลผู้ส�
     renderPanel(app(), null);
     for (const label of ['ข้อมูลผู้สรรหา', 'ผู้รับผิดชอบ']) expect(fieldValue(label)).toBe('—');
   });
+
+  it('วันที่สมัคร บอกทั้งวันและเวลา (เจ้าของ 22 พ.ย. 2569 "สมัครก็ไม่ได้บอกเวลามา") · ไม่มีค่า = ขีด', () => {
+    const { unmount } = renderPanel(app({ created_at: '2026-11-21T02:04:00.000Z' }), null);
+    const expected = new Intl.DateTimeFormat('th-TH', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date('2026-11-21T02:04:00.000Z'));
+    expect(fieldValue('วันที่สมัคร')).toBe(expected);
+    expect(fieldValue('วันที่สมัคร')).toMatch(/\d{1,2}:\d{2}/);
+    unmount();
+    renderPanel(app({ created_at: '' }), null);
+    expect(fieldValue('วันที่สมัคร')).toBe('—');
+  });
 });
 
 describe('applicantResponsibleName', () => {

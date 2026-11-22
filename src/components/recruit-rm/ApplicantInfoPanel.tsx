@@ -8,6 +8,7 @@ import ApplicantAttachmentPanel from '@/components/recruit-rm/ApplicantAttachmen
 import { cn } from '@/lib/utils';
 import ApplicantTraceField, { useApplicantTrace } from '@/components/recruit-rm/ApplicantTraceField';
 import { EM_DASH } from '@/lib/displayFallback';
+import { formatDateTimeTh } from '@/lib/dateTh';
 import { APPLICATION_ORIGIN_LABEL, type PublicApplication, REFERRAL_SOURCE_LABEL } from '@/lib/publicApplicationsApi';
 import { applicantResponsibleName, applicationJobLabel } from '@/lib/recruitRm';
 import { getJobStaffApiCache, JOB_STAFF_ROSTER_CHANGED_EVENT, refreshJobStaffFromApi } from '@/lib/jobStaffRemote';
@@ -435,6 +436,12 @@ const ApplicantInfoPanel: React.FC<{
         )}
       </Field>
       <Field label="ที่มา">{a.origin ? APPLICATION_ORIGIN_LABEL[a.origin] : EM_DASH}</Field>
+      {/* วันและเวลาที่ใบเข้ามา (เจ้าของ 22 พ.ย. 2569 "สมัครก็ไม่ได้บอกเวลามา") — ค่าเดียวกับคอลัมน์ วันที่สมัคร ของตาราง แต่บอกเวลาด้วย */}
+      <Field label="วันที่สมัคร">
+        <span className="tabular-nums" data-testid="applicant-applied-at">
+          {a.created_at ? formatDateTimeTh(a.created_at) : EM_DASH}
+        </span>
+      </Field>
       <Field label="ไปถึงไหนแล้ว">
         <ApplicantTraceField trace={trace} />
       </Field>
