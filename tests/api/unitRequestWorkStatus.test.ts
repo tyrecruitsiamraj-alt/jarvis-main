@@ -101,7 +101,10 @@ describe('unitRequestWorkStatus', () => {
     expect(data.workStatusKpis.find((k) => k.id === 'work_status_total')?.value).toBe(9);
     expect(data.workStatusKpis.find((k) => k.id === 'work_status_waiting_inform')?.value).toBe(3);
     expect(data.workStatusKpis.find((k) => k.id === 'work_status_waiting_interview')?.value).toBe(4);
-    expect(data.workStatusKpis.find((k) => k.id === 'work_status_in_progress')?.value).toBe(2);
+    // 22 พ.ย. 2569: ใบ C (สถานะดำเนินการ) เป็นล่วงหน้าที่ยังไม่ถึงวันต้องการ ณ วันทดสอบ → กล่องล่วงหน้า · สองกล่องรวมกัน = 2 เท่าเดิม
+    const inProgress = data.workStatusKpis.find((k) => k.id === 'work_status_in_progress')?.value ?? 0;
+    const advance = data.workStatusKpis.find((k) => k.id === 'work_status_advance')?.value ?? 0;
+    expect(inProgress + advance).toBe(2);
     expect(data.kpis.find((k) => k.id === 'remaining')?.value).toBe(9);
   });
 });

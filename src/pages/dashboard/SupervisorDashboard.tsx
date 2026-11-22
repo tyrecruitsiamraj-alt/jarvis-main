@@ -28,6 +28,7 @@ import {
 import { buildCohortDrillDown, type CohortDrillKpi } from '@/lib/dashboard/cohortDrillDown';
 import { isPrequestJob } from '@/lib/publicJobVisibility';
 import { LEAD_AMOUNT_LABEL, NO_STATUS_LABEL, buildCohortLeadPanel, buildStatusLeadPanel, filterLeadPanel } from '@/lib/dashboard/statusLeadPanel';
+import { workStatusBoxIdOf } from '@/lib/dashboard/workStatusBox';
 import {
   buildLeadKindBreakdown,
   leadKindMismatchNote,
@@ -65,7 +66,6 @@ import {
 import { controlRecordToDashboardDetailItem } from '@/lib/dashboard/dashboardDetailDialog';
 import { unitOrganizationKey } from '@/lib/unitGroupName';
 import { sumJobPositionUnits } from '@/lib/jobPositionUnits';
-import { resolveUnitRequestWorkStatus } from '@/lib/unitRequestWorkStatus';
 import { JOB_STAFF_ROSTER_CHANGED_EVENT } from '@/lib/jobStaffRemote';
 import { navigateToUnitRequest } from '@/lib/jobNavigation';
 import {
@@ -94,6 +94,8 @@ const COHORT_KPI_IDS: readonly CohortDrillKpi[] = ['total_requests', 'closed', '
 const WORK_STATUS_OF_KPI: Record<string, string | null> = {
   work_status_total: null,
   work_status_in_progress: 'in_progress',
+  /** ล่วงหน้าที่ยังไม่ถึงวันต้องการ — แยกจากกำลังดำเนินการสรรหา (22 พ.ย. 2569 · `workStatusBoxIdOf`) */
+  work_status_advance: 'in_progress',
   work_status_on_hold: 'on_hold',
   work_status_evaluating: 'evaluating',
   work_status_waiting_inform: 'waiting_inform',
@@ -891,8 +893,9 @@ const SupervisorDashboard: React.FC = () => {
         ? stock
         : (() => {
             // ใบขอชั่วคราวอยู่ในกล่องตามสถานะของมัน (18 พ.ย. 2569 ถอดกล่องแยก) — รายการชุดเดียวกับเลขบนการ์ด
+            // กล่องไหนนับใบไหน ถามตัวเดียวกับเลขบนกล่อง (`workStatusBoxIdOf`) — กล่องล่วงหน้ากับกำลังดำเนินการสรรหาเป็นสถานะเดียวกัน แยกด้วยวันที่ต้องการ
             const target = WORK_STATUS_OF_KPI[kpiId];
-            return target == null ? stock : stock.filter((j) => resolveUnitRequestWorkStatus(j.work_status) === target);
+            return target == null ? stock : stock.filter((j) => workStatusBoxIdOf(j) === kpiId);
           })();
     return { kpiId, label: kpiId in WORK_STATUS_OF_KPI ? `สถานะ ${label}` : label, panel: buildStatusLeadPanel(jobs), amountLabel: LEAD_AMOUNT_LABEL.remaining, note: null };
   }, [statusPick, period, dateRange, jobsWithoutAgeFilter, cohortScope, jobById]);

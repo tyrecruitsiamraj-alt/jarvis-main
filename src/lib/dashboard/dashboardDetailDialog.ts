@@ -124,7 +124,9 @@ export function cohortRowToDashboardDetailItem(
     title: `${row.unitName ?? '—'} (${row.requestNoDisplay})`,
     subtitle: [
       leadLabel,
-      `เข้ามา ${formatYmdTh(row.requestDate)}`,
+      // 🔴 `row.requestDate` = วันอ้างอิงงวด = วันที่ต้องการคน (20 ส.ค. 2569) — เดิมขึ้นหลังคำว่า "เข้ามา" ทุกแถวจึงเป็นวันเดียวกับ "ต้องการ"
+      //    (เจ้าของ 22 พ.ย. 2569 "เข้ามา 1 พย ได้ไง") ⇒ โชว์วันที่กรอกใบจริง
+      row.submittedDate ? `กรอก ${formatYmdTh(row.submittedDate)}` : null,
       row.requiredDate ? `ต้องการ ${formatYmdTh(row.requiredDate)}` : null,
       row.requestActionName,
       buckets,

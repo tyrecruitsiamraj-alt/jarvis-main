@@ -159,6 +159,7 @@ describe('buildDashboardData', () => {
     expect(data.workStatusKpis.map((k) => k.id)).toEqual([
       'work_status_total',
       'work_status_in_progress',
+      'work_status_advance',
       'work_status_on_hold',
       'work_status_evaluating',
       'work_status_waiting_inform',
@@ -169,7 +170,9 @@ describe('buildDashboardData', () => {
       'work_status_daily_pay',
     ]);
     expect(data.workStatusKpis.find((k) => k.id === 'work_status_total')?.value).toBe(62);
-    expect(data.workStatusKpis.find((k) => k.id === 'work_status_in_progress')?.value).toBe(62);
+    // 22 พ.ย. 2569: ใบ 45 อัตรา (กรอก 2 ก.ค. ต้องการ 20 ก.ค. · วันนี้ 15 ก.ค.) เป็นล่วงหน้าที่ยังไม่ถึงวันต้องการ → กล่องล่วงหน้า · สองกล่องรวมกัน = เลขเดิม
+    expect(data.workStatusKpis.find((k) => k.id === 'work_status_in_progress')?.value).toBe(17);
+    expect(data.workStatusKpis.find((k) => k.id === 'work_status_advance')?.value).toBe(45);
     expect(data.kpis.find((k) => k.id === 'remaining')?.value).toBe(
       data.workStatusKpis.find((k) => k.id === 'work_status_total')?.value,
     );

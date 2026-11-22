@@ -83,6 +83,7 @@ import {
   UNIT_REQUEST_WORK_STATUS_LABELS,
   type UnitRequestWorkStatus,
 } from '@/lib/unitRequestWorkStatus';
+import { WORK_STATUS_ADVANCE_HINT, WORK_STATUS_ADVANCE_ID, WORK_STATUS_ADVANCE_LABEL, workStatusBoxIdOf } from '@/lib/dashboard/workStatusBox';
 import {
   jobToRequestControlRecord,
   jobsToRequestControlRecords,
@@ -574,6 +575,7 @@ function buildWorkStatusKpis(
   jobs: JobRequest[],
   periodLabel?: string | null,
   totalOverride?: { positions: number; requests: number },
+  today: Date = new Date(),
 ): DashboardKpi[] {
   const counts: Record<UnitRequestWorkStatus, number> = {
     in_progress: 0,
@@ -600,18 +602,25 @@ function buildWorkStatusKpis(
   // กำลังดำเนินการสรรหา แยกตามช่อง "ส่งคนแทน" ในหน้าใบขอ (เจ้าของ 18 พ.ย. 2569 "ย่อยให้หน่อยว่า ส่งคนแทน ไม่ส่งคนแทนอย่างละเท่าไหร่")
   // สามค่าเหมือนหน้าใบขอ — ยังไม่ระบุ ห้ามยุบเข้าไม่ส่ง · สามกองรวมกัน = เลขบนการ์ด
   const replacement = { yes: 0, no: 0, unset: 0 };
+  // ล่วงหน้าที่ยังไม่ถึงวันต้องการ แยกออกจากกำลังดำเนินการสรรหาเป็นกล่องของตัวเอง (เจ้าของ 22 พ.ย. 2569 · ตัวตัดสิน `workStatusBoxIdOf`)
+  const advance = { positions: 0, requests: 0 };
   // 🔴 18 พ.ย. 2569 เจ้าของ "แยกใบขอชั่วคราวออกมาทำไม ฉันสั่งไว้หรอ" — ใบขอชั่วคราวนับเข้ากล่องตามสถานะของมันเหมือนใบจริง
   //    (ถอดกล่องใบขอชั่วคราวแยกแล้ว · ตามข้อเคาะ 11 พ.ย. "นับรวมเหมือนหน้าหลัก")
   for (const j of jobs) {
     const status = resolveUnitRequestWorkStatus(j.work_status);
     const units = positionBreakdownFromJob(j).remainingPositions;
     if (units <= 0) continue;
+    if (workStatusBoxIdOf(j, today) === WORK_STATUS_ADVANCE_ID) {
+      advance.positions += units;
+      advance.requests += 1;
+      continue;
+    }
     counts[status] += units;
     requestCounts[status] += 1;
     if (status === 'in_progress') replacement[j.send_replacement === true ? 'yes' : j.send_replacement === false ? 'no' : 'unset'] += units;
   }
-  const leafTotal = Object.values(counts).reduce((s, n) => s + n, 0);
-  const leafRequests = Object.values(requestCounts).reduce((s, n) => s + n, 0);
+  const leafTotal = Object.values(counts).reduce((s, n) => s + n, 0) + advance.positions;
+  const leafRequests = Object.values(requestCounts).reduce((s, n) => s + n, 0) + advance.requests;
   // 🔴 QA 15 พ.ย. 2569: โหมดมีงวดยอด cohort รวมใบขอชั่วคราวแล้ว (11 พ.ย. "นับรวมเหมือนหน้าหลัก") แต่เดิมไม่หักกล่องใบขอชั่วคราว
   // ⇒ ใบชั่วคราว 11 ไปโผล่ซ้ำเป็น "ไม่มีสถานะ 11" · กล่องย่อยรวม 122 แต่ทั้งหมด 111 ⇒ หักทุกโหมด
   const total = totalOverride?.positions ?? leafTotal;
@@ -647,6 +656,15 @@ function buildWorkStatusKpis(
     {
       ...leaf('work_status_in_progress', 'กำลังดำเนินการสรรหา', 'in_progress'),
       description: `${scopeHint} · ส่งคนแทน ${replacement.yes.toLocaleString('th-TH')} + ไม่ส่งคนแทน ${replacement.no.toLocaleString('th-TH')} + ยังไม่ระบุ ${replacement.unset.toLocaleString('th-TH')} = ${counts.in_progress.toLocaleString('th-TH')} อัตรา · ${requestCounts.in_progress.toLocaleString('th-TH')} ใบ`,
+    },
+    {
+      id: WORK_STATUS_ADVANCE_ID,
+      label: WORK_STATUS_ADVANCE_LABEL,
+      value: advance.positions,
+      secondaryCount: advance.requests,
+      secondaryLabel: 'ใบขอ',
+      description: `${scopeHint} · ${WORK_STATUS_ADVANCE_HINT} · ${advance.positions.toLocaleString('th-TH')} อัตรา · ${advance.requests.toLocaleString('th-TH')} ใบ`,
+      trendPercent: null,
     },
     leaf('work_status_on_hold', UNIT_REQUEST_WORK_STATUS_LABELS.on_hold, 'on_hold'),
     leaf('work_status_evaluating', UNIT_REQUEST_WORK_STATUS_LABELS.evaluating, 'evaluating'),
@@ -1251,6 +1269,7 @@ export function buildDashboardData(
     period && cohortStock
       ? { positions: cohortStock.remainingPositions, requests: cohortStock.remainingRequestCount }
       : undefined,
+    today,
   );
   const remainingBridge =
     !period && cohortStock
