@@ -149,7 +149,7 @@ describe('GET /api/exec-summary', () => {
     expect(calls.money.map((c) => c.query)).toEqual([{ from: '2026-11-01', to: '2026-11-30' }, { from: '2026-10-01', to: '2026-10-20' }]);
     expect(calls.staff.map((c) => c.query)).toEqual(expect.arrayContaining([{ from: '2026-11-01', to: '2026-11-30' }, { from: '2026-10-01', to: '2026-10-20' }, { from: '2026-11-20', to: '2026-11-20', roster: '1' }]));
     for (const c of Object.values(calls).flat()) expect(c.cookie).toBe('jarvis_session=abc');
-    expect(r.body.window).toEqual({ from: '2026-11-01', to: '2026-11-30', days: 20, compareWith: '2026-10-01 ถึง 2026-10-20' });
+    expect(r.body.window).toEqual({ from: '2026-11-01', to: '2026-11-30', days: 20, text: '1–20 พ.ย. 2569', compareWith: '1–20 ต.ค. 2569' });
     expect([r.body.level, r.body.bus]).toEqual([['ทั้งหมด'], ['LBD', 'LBA']]);
     expect(r.body.sections[0].equation).toBe('ยกมา 0 + ขอใหม่ 8 − หาได้แล้ว 1 − ยกเลิก 0 = เหลือหา 7 อัตรา');
     // รายชื่อ = ใบที่กรอกในช่วง (ใบของช่วงก่อนไม่ปน) · เทียบช่วงก่อน
@@ -212,8 +212,8 @@ describe('GET /api/exec-summary', () => {
       'งานที่ทำ ตั้งแต่ขอ': { รวม: 6, 'Gen link': 4, ลงผลติดต่อ: 2 },
       'รายชื่อ ตั้งแต่ขอ': { รายชื่อ: 3, 'AI สนใจ': 1 },
     });
-    expect(r.body.request?.timeline).toEqual([{ วันที่: '2026-11-05', ทำอะไร: 'Gen link', จำนวน: '4 ลิงก์', ใคร: 'คิว', รายละเอียด: 'Facebook Group' }]);
-    expect([r.body.errors, r.body.window, 'sections' in r.body]).toEqual([[], { from: '2026-11-01', to: '2026-11-30', days: 20, compareWith: null }, false]);
+    expect(r.body.request?.timeline).toEqual([{ วันที่: '5 พ.ย. 2569', ทำอะไร: 'Gen link', จำนวน: '4 ลิงก์', ใคร: 'คิว', รายละเอียด: 'Facebook Group' }]);
+    expect([r.body.errors, r.body.window, 'sections' in r.body]).toEqual([[], { from: '2026-11-01', to: '2026-11-30', days: 20, text: '1–20 พ.ย. 2569', compareWith: null }, false]);
   });
 
   it('ใบที่จบก่อนช่วง = มีแต่งานที่ทำ บอกว่าไม่มียอดอัตรา · เลขที่ไม่มีจริง = ไม่เจอ (ไม่ตอบว่าใบนี้ไม่มีใครทำอะไร) · อ่านงานไม่ได้ = บอกเหตุ', async () => {
@@ -221,7 +221,7 @@ describe('GET /api/exec-summary', () => {
     expect(calls.timeline.at(-1)?.query).toEqual({ jobs: 'siamraj-sql:OPL6909095,siamraj-pre:OPL6909095', events: '1' });
     expect(Object.keys(old.body.request ?? {})).toEqual(['เลขที่ใบขอ', 'งานที่ทำ ตั้งแต่ขอ', 'รายชื่อ ตั้งแต่ขอ', 'timeline']);
     expect(old.body.request?.['งานที่ทำ ตั้งแต่ขอ']).toMatchObject({ รวม: 19 });
-    expect(old.body.errors).toEqual(['ใบ OPL6909095 ไม่อยู่ในใบขอของช่วง 2026-11-01 ถึง 2026-11-30 (จบก่อนช่วงนี้) — ไม่มียอดอัตราและเหตุผลยกเลิก มีเฉพาะงานที่ทำและรายชื่อ']);
+    expect(old.body.errors).toEqual(['ใบ OPL6909095 ไม่อยู่ในใบขอของช่วง 1–20 พ.ย. 2569 (จบก่อนช่วงนี้) — ไม่มียอดอัตราและเหตุผลยกเลิก มีเฉพาะงานที่ทำและรายชื่อ']);
     const none = await call({ request: 'OPL0000000' });
     expect([none.status, none.body.request, none.body.errors]).toEqual([200, null, ['ไม่เจอใบขอ OPL0000000 — ตรวจเลขที่ใบขออีกครั้ง (อักษรนำหน้าเลขที่ใบขอไม่ใช่ BU)']]);
     fail = { timeline: true };

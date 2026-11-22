@@ -11,7 +11,7 @@
  *   day = YYYY-MM-DD → วันนั้นใครทำอะไร (dayPeople · เทียบกับวันก่อน) · ส่งคู่กับ who = งานของคนนั้นวันนั้น
  *   box = ค่า key ของกล่องใน sections → กล่องนั้นแยกตามชั้นถัดไป (breakdown: ทั้งหมด → BU → คน/เจ้าหน้าที่สรรหา) · กล่องใบขอที่ชั้น BU ได้ requests (รายใบ)
  *   request = เลขที่ใบขอ (เช่น OPL6909095 · อักษรนำหน้าเลขที่ใบขอไม่ใช่ BU) → ใบนั้นใบเดียว: ยอดอัตรา · ยกเลิกเพราะอะไร · งานที่ทำตั้งแต่ขอ · รายชื่อตั้งแต่ขอ · timeline ไล่ตามวัน (ใครทำอะไร)
- * คืน: window (ช่วง + compareWith = เทียบกับอะไร) · level · bus · sections[].boxes[] { key, label, value, sub, prev, prevNote }
+ * คืน: window (text = ช่วงของเลขในผล เขียนแบบที่จอใช้ ปี พ.ศ. · compareWith = เทียบกับช่วงไหน · from/to = ค่าที่ใช้ส่งคำสั่ง) · level · bus · sections[].boxes[] { key, label, value, sub, prev, prevNote }
  *   (prev = ค่าช่วงก่อน · null = เทียบไม่ได้ เหตุอยู่ที่ prevNote · ไม่มีช่อง prev = กล่องนี้ไม่เทียบ) · sections[0].equation = ยกมา + ขอใหม่ − หาได้แล้ว − ยกเลิก = เหลือหา
  *   ทุกตารางเป็นแถวละก้อน หัวคอลัมน์เป็นคำเดียวกับจอ: byBu (แยกตาม BU) · people (ชั้นทั้งหมด = ทุกคนทุก BU แบบย่อ: BU ที่สังกัด · ทำล่าสุด · ไม่มีงานมากี่วัน · งานที่ทำ · รายชื่อที่หามารวมทุก BU)
  *   · hold (รายชื่ออยู่ที่ใคร รายคน · รับมาโทร = ยอดที่รับไปทั้งหมด) · waiting (รายชื่อค้างที่ใคร = รับไปแล้วยังไม่ลงผล รายคน · ว่าง = ไม่มีใครค้าง)
@@ -28,7 +28,7 @@ import recruitStuckHandler from './recruit-stuck.js';
 import staffActivityHandler from './staff-activity.js';
 import homeMoneyHandler from './home-money.js';
 import requestTimelineRoute from './request-timeline.js';
-import { buildExecRequest, buildExecSummary, type ExecRequestSummary, type ExecWindow } from '../../src/lib/execSummary.js';
+import { buildExecRequest, buildExecSummary, execWindow, type ExecRequestSummary, type ExecWindow } from '../../src/lib/execSummary.js';
 import {
   SCALE_ROOT,
   scaleBoxOf,
@@ -175,7 +175,7 @@ async function requestSummary(
     return { generatedAt, window, request: null, errors };
   }
   // อ่านใบขอของช่วงไม่ได้ = เหตุอยู่ใน errors แล้ว (ไม่ใช่ใบจบก่อนช่วง)
-  if (!hit && input.requests) errors.push(`ใบ ${bare} ไม่อยู่ในใบขอของช่วง ${window.from} ถึง ${window.to} (จบก่อนช่วงนี้) — ไม่มียอดอัตราและเหตุผลยกเลิก มีเฉพาะงานที่ทำและรายชื่อ`);
+  if (!hit && input.requests) errors.push(`ใบ ${bare} ไม่อยู่ในใบขอของช่วง ${window.text} (จบก่อนช่วงนี้) — ไม่มียอดอัตราและเหตุผลยกเลิก มีเฉพาะงานที่ทำและรายชื่อ`);
   const cancelReason = hit && input.money ? scaleStopReasonOf(scaleStopReasons(input), hit) : null;
   return buildExecRequest({ requestNo: bare, request: hit, job, cancelReason, nameOf, window, generatedAt, errors });
 }
@@ -213,7 +213,7 @@ export async function execSummaryHandler(req: AuthedReq, res: ApiRes) {
     const requestNo = one(req.query?.request);
     if (requestNo) {
       const namer = scaleStaffNamer([...(cur.staff ?? []), ...(prev?.staff ?? [])]);
-      const window: ExecWindow = { from: input.from, to: input.to, days: scaleDayCount(input), compareWith: null };
+      const window: ExecWindow = execWindow(input, scaleDayCount(input), null);
       return res.status(200).json(await requestSummary(req.headers, requestNo, input, namer, window, overview.generatedAt, loaded.errors));
     }
 

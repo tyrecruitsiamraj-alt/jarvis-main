@@ -11,6 +11,7 @@ import { STAFF_PERSON_KINDS, staffWorkTotal } from '@/lib/staffActivity';
 import { POSTING_STATE_LABEL, isPostingStarted, postingStateOf } from '@/lib/recruitPostingState';
 import { flowOf, recruiterLabelOf, type StuckRequest } from '@/lib/recruitStuck';
 import { REQUEST_FUNNEL_LABEL } from '@/lib/recruitRequestTab';
+import { rangeText } from '@/lib/periodPick';
 import { buildRequestTimeline, type RequestTimelineJob } from '@/lib/requestTimeline';
 import {
   SCALE_CHAIN,
@@ -71,7 +72,18 @@ export type ExecRow = Record<string, string | number | null>;
  * `prev` = ค่าช่วงก่อนของกล่องเดียวกัน · null = เทียบไม่ได้ (`prevNote` บอกเหตุถ้ารู้) · ไม่มีช่องนี้ = กล่องนี้ไม่เทียบ (สถานะ ณ ตอนนี้)
  */
 export type ExecBox = { key: ScaleBoxKey; label: string; value: number | null; text?: string; sub?: string; prev?: number | null; prevNote?: string };
-export type ExecWindow = { from: string; to: string; days: number; compareWith: string | null };
+/**
+ * `from`/`to` = ค่าที่ใช้ส่งคำสั่ง (ค.ศ.) · `text` = ช่วงของเลขในผลนี้ เขียนแบบที่จอใช้ (ปี พ.ศ.) ให้ผู้ช่วยยกไปตอบได้ทั้งคำ
+ * `compareWith` = เทียบกับช่วงไหน (แบบเดียวกัน) · null = ไม่เทียบ — ผู้ช่วยเคยตอบวันที่เป็นรูป 2026-11-22 ซึ่งจอไม่ใช้ (ถามบนเว็บจริง 22 พ.ย. 2569)
+ */
+export type ExecWindow = { from: string; to: string; days: number; text: string; compareWith: string | null };
+/** วันที่แบบที่จอใช้ ("20 พ.ย. 2569") — ตัวเดียวกับ `fullDay` ของแท็บ Scale ลง */
+const thaiDay = (ymd: string | null | undefined): string | null => (ymd ? rangeText(ymd, ymd) : null);
+/** ช่วงของผล: ถึงวันนี้ถ้าช่วงยังไม่จบ (เหมือนหัวจอ) · ชั้นวัน = วันนั้น */
+export function execWindow(input: Pick<ScaleInput, 'from' | 'to' | 'today'>, days: number, compareWith: string | null, day: string | null = null): ExecWindow {
+  const end = input.to > input.today ? input.today : input.to;
+  return { from: input.from, to: input.to, days, text: day ? rangeText(day, day) : rangeText(input.from, end < input.from ? input.from : end), compareWith };
+}
 export type ExecSummary = {
   generatedAt: string;
   /** ช่วงที่ใช้คิด + เทียบกับอะไร (ช่วงก่อนยาวเท่ากัน / วันก่อน) */
@@ -184,7 +196,7 @@ export function buildExecSummary(a: ExecSummaryArgs): ExecSummary {
 
   const out: ExecSummary = {
     generatedAt: a.generatedAt,
-    window: { from: input.from, to: input.to, days: scaleDayCount(input), compareWith: level.day ? (prevDay ? `วันก่อน ${prevDay}` : null) : prev ? `${prev.from} ถึง ${prev.to}` : null },
+    window: execWindow(input, scaleDayCount(input), level.day ? (prevDay ? `วันก่อน ${rangeText(prevDay, prevDay)}` : null) : prev ? rangeText(prev.from, prev.to) : null, level.day),
     level: scaleCrumbs(level).map((c) => c.label),
     bus,
     sections: sections.map((s) => ({
@@ -200,24 +212,29 @@ export function buildExecSummary(a: ExecSummaryArgs): ExecSummary {
           ...(b.format === 'text' && b.text ? { text: b.text } : {}),
           ...(b.sub ? { sub: b.sub } : {}),
           ...(c && c.state !== 'none' ? { prev: c.state === 'ok' && before ? (scaleBoxOf(before, b.key)?.value ?? null) : null } : {}),
-          ...(c?.state === 'na' && since && cmpFrom && cmpFrom < since ? { prevNote: `ระบบเริ่มนับเลขนี้ ${since} ช่วงก่อนยังไม่มีครบ` } : {}),
+          ...(c?.state === 'na' && since && cmpFrom && cmpFrom < since ? { prevNote: `ระบบเริ่มนับเลขนี้ ${rangeText(since, since)} ช่วงก่อนยังไม่มีครบ` } : {}),
         };
       }),
     })),
     errors,
   };
 
+  /** ตารางยาวเกิน = ส่งแถวบนสุด (เรียงมากสุด/ค้างนานสุดไว้แล้ว) และบอกว่ามีทั้งหมดกี่แถว — ไม่ตัดเงียบ ผู้ช่วยจะได้ไม่ตอบว่ามีแค่นี้ */
+  const top = <T>(name: string, rows: readonly T[], max: number): T[] => {
+    if (rows.length > max) errors.push(`${name} มี ${rows.length} แถว ส่งมา ${max} แถวแรก`);
+    return rows.slice(0, max);
+  };
   const holdOf = new Map<string, ScaleHoldRow[]>();
   const holdRows = (bu: string) => holdOf.get(bu) ?? (holdOf.set(bu, scaleHoldTable(input, bu).rows), holdOf.get(bu) ?? []);
   const waitRow = (r: ScaleHoldRow, bu?: string): ExecRow => ({ คน: r.name, ...(bu ? { BU: bu } : {}), [HOLD_LABEL.hWait]: r.wait, 'ค้างนานสุด (วัน)': r.oldestDays });
   if (level.day && !level.who) {
     const t = scaleDayTable(input, level);
-    out.dayPeople = t.rows.slice(0, 30).map((r) => ({ คน: r.name, BU: r.bu, รวม: r.sum, ...workRow(r.work) }));
+    out.dayPeople = top('ตารางใครทำอะไร', t.rows, 30).map((r) => ({ คน: r.name, BU: r.bu, รวม: r.sum, ...workRow(r.work) }));
   } else if (level.who) {
     if (!level.day) {
       const t = scaleChainTable(input, level);
       // แถวบอกขอบเขตของตัวเอง (BU ในชั้น / ทุก BU) — ห้ามปนกันเมื่อคนเดียวหารายชื่อให้หลาย BU
-      out.channels = t.rows.slice(0, 20).map((r) => ({ [t.by === 'group' ? 'กลุ่ม' : 'ช่องทาง']: r.label, BU: level.bu ?? 'ทุก BU', ...chainRow(r.chain) }));
+      out.channels = top(t.by === 'group' ? 'ตารางกลุ่ม' : 'ตารางช่องทาง', t.rows, 20).map((r) => ({ [t.by === 'group' ? 'กลุ่ม' : 'ช่องทาง']: r.label, BU: level.bu ?? 'ทุก BU', ...chainRow(r.chain) }));
     }
     if (!level.ch && !level.grp && !level.day) {
       const spots = scaleBusOfPerson(input, level.who, a.roster);
@@ -245,26 +262,22 @@ export function buildExecSummary(a: ExecSummaryArgs): ExecSummary {
     }));
     // ทุกคนของทุก BU แบบย่อ — ถามถึงคนที่ชั้นทั้งหมดได้เลย (คนที่ช่วงนี้ไม่มีงานก็อยู่) · ครบสายของคนนั้นส่ง who
     const namesAll = scaleNamesByBringer(input);
-    out.people = bus
+    const everyone = bus
       .flatMap((bu) => scalePeopleTable(input, bu, a.roster).rows.filter((r) => r.member && !r.source).map((r) => ({ bu, r })))
-      .sort((x, y) => (y.r.work ?? -1) - (x.r.work ?? -1) || y.r.chain[0] - x.r.chain[0] || x.r.name.localeCompare(y.r.name, 'th'))
-      .slice(0, 40)
-      .map(({ bu, r }) => ({ คน: r.name, BU: bu, ทำล่าสุด: r.lastDay, 'ไม่มีงานมา (วัน)': r.idleDays, งานที่ทำ: r.work, 'รายชื่อที่หามา (ทุก BU)': namesAll.get(r.name) ?? 0 }));
+      .sort((x, y) => (y.r.work ?? -1) - (x.r.work ?? -1) || y.r.chain[0] - x.r.chain[0] || x.r.name.localeCompare(y.r.name, 'th'));
+    out.people = top('ตารางคน', everyone, 40).map(({ bu, r }) => ({ คน: r.name, BU: bu, ทำล่าสุด: thaiDay(r.lastDay), 'ไม่มีงานมา (วัน)': r.idleDays, งานที่ทำ: r.work, 'รายชื่อที่หามา (ทุก BU)': namesAll.get(r.name) ?? 0 }));
     const held = bus.flatMap((bu) => holdRows(bu).map((r) => ({ bu, r })));
-    out.hold = [...held]
-      .sort((x, y) => y.r.all - x.r.all || x.r.name.localeCompare(y.r.name, 'th'))
-      .slice(0, 30)
-      .map(({ bu, r }) => holdRow(r, bu));
+    out.hold = top('ตารางรายชื่ออยู่ที่ใคร', [...held].sort((x, y) => y.r.all - x.r.all || x.r.name.localeCompare(y.r.name, 'th')), 30).map(({ bu, r }) => holdRow(r, bu));
     out.waiting = held
       .filter((x) => x.r.wait > 0)
       .sort((x, y) => y.r.wait - x.r.wait || (y.r.oldestDays ?? 0) - (x.r.oldestDays ?? 0) || x.r.name.localeCompare(y.r.name, 'th'))
       .map(({ bu, r }) => waitRow(r, bu));
   } else {
     const t = scalePeopleTable(input, level.bu, a.roster);
-    out.people = t.rows.slice(0, 30).map((r) => ({
+    out.people = top('ตารางแยกตามคน', t.rows, 30).map((r) => ({
       คน: r.name,
       ...(!r.member && !r.source ? { สังกัด: `นอก ${level.bu}` } : {}),
-      ทำล่าสุด: r.lastDay,
+      ทำล่าสุด: thaiDay(r.lastDay),
       'ไม่มีงานมา (วัน)': r.idleDays,
       งานที่ทำ: r.work,
       ...chainRow(r.chain),
@@ -272,9 +285,7 @@ export function buildExecSummary(a: ExecSummaryArgs): ExecSummary {
       ...(r.versus ? { เทียบกับทีม: SCALE_VERSUS_LABEL[r.versus] } : {}),
     }));
     out.peopleAverage = { คนทำงาน: t.average.people, งานที่ทำ: Math.round(t.average.work), ...chainRow(t.average.chain.map((v) => Math.round(v))) };
-    out.hold = holdRows(level.bu)
-      .slice(0, 30)
-      .map((r) => holdRow(r));
+    out.hold = top('ตารางรายชื่ออยู่ที่ใคร', holdRows(level.bu), 30).map((r) => holdRow(r));
     out.waiting = holdRows(level.bu)
       .filter((r) => r.wait > 0)
       .sort((x, y) => y.wait - x.wait || (y.oldestDays ?? 0) - (x.oldestDays ?? 0))
@@ -332,7 +343,7 @@ export function buildExecSummary(a: ExecSummaryArgs): ExecSummary {
     out.topPositions = scaleTopRequests(input, level.bu, 'position').map((r) => topRow('ตำแหน่ง', r));
   }
   const informed = scaleInformedRows(input, level);
-  if (informed.length) out.informed = informed.slice(0, 20).map((r) => ({ BU: r.bu, ช่องทาง: r.channel, ใครหามา: r.bringer, กรอกใบ: r.createdDay, แจ้งเข้า: r.informedDay, ใช้กี่วัน: r.days }));
+  if (informed.length) out.informed = top('ตารางแจ้งเข้า', informed, 20).map((r) => ({ BU: r.bu, ช่องทาง: r.channel, ใครหามา: r.bringer, กรอกใบ: thaiDay(r.createdDay), แจ้งเข้า: thaiDay(r.informedDay), ใช้กี่วัน: r.days }));
 
   // ── กล่องที่ขอ: แยกตามชั้นถัดไป + รายใบของกล่องใบขอ ──
   const picked = a.box ? scaleBoxOf(sections, a.box) : null;
@@ -346,18 +357,14 @@ export function buildExecSummary(a: ExecSummaryArgs): ExecSummary {
         box: picked.label,
         by: SCALE_CHILD_TITLE[bd.kind],
         total: bd.total,
-        rows: scaleBreakdownCompared(bd, prevBd, state)
-          .slice(0, 40)
-          .map((r) => ({ label: r.label, value: r.value, ...(r.text ? { text: r.text } : {}), ...(r.note ? { note: r.note } : {}), ...(r.before !== undefined ? { prev: r.before } : {}) })),
+        rows: top(`${picked.label} ${SCALE_CHILD_TITLE[bd.kind]}`, scaleBreakdownCompared(bd, prevBd, state), 40).map((r) => ({ label: r.label, value: r.value, ...(r.text ? { text: r.text } : {}), ...(r.note ? { note: r.note } : {}), ...(r.before !== undefined ? { prev: r.before } : {}) })),
       };
     }
     const role = scaleReqRoleOf(picked.key);
     if (role && level.bu) {
       const open = role === 'remaining' || role === 'idle';
       const reasons = scaleStopReasons(input);
-      out.requests = scaleRequestsOf(input, level, role)
-        .slice(0, 30)
-        .map((r) => {
+      out.requests = top(`รายใบ (${open ? 'ค้างนานสุดก่อน' : 'อัตรามากสุดก่อน'})`, scaleRequestsOf(input, level, role), 25).map((r) => {
           const reason = role === 'cancelled' ? scaleStopReasonOf(reasons, r) : null;
           return {
             เลขที่ใบขอ: r.requestNo,
@@ -461,7 +468,7 @@ export function buildExecRequest(a: {
       'งานที่ทำ ตั้งแต่ขอ': a.job ? { รวม: staffWorkTotal(a.job.done.work), ...workRow(a.job.done.work) } : null,
       'รายชื่อ ตั้งแต่ขอ': a.job ? chainRow(a.job.done.chain) : null,
       timeline: rows.map((e) => ({
-        วันที่: e.day,
+        วันที่: thaiDay(e.day),
         ทำอะไร: e.label,
         ...(e.n == null ? {} : { จำนวน: `${e.n} ${e.unit}` }),
         ...(e.who ? { ใคร: e.who } : {}),
