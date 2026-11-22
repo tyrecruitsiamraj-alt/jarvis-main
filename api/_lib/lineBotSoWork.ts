@@ -4,8 +4,11 @@
  * ① บอทส่งลิงก์ `/apply?job=…&lid=<LINE userId>&lsig=<HMAC-SHA256(lid) hex>` · หน้าสมัครส่ง lid/lsig มากับใบ
  *    ฝั่ง API ตรวจลายเซ็นด้วย secret ร่วม — ตรง = เก็บ `line_user_id` + `referral_source = 'line_oa'` · ไม่ตรง = ไม่เก็บ (ใบยังบันทึกปกติ)
  * ② ส่งใบสำเร็จ → POST {base_url}/jarvis/application · header `x-jarvis-signature` = HMAC-SHA256(body ทั้งก้อน) hex
- *    body `{ event: 'application.created', application_id, line_user_id, request_no, created_at (+07:00) }`
- *    ส่งเฉพาะใบที่มี line_user_id · ไม่ส่งชื่อ/เบอร์/ที่อยู่ · ส่งไม่สำเร็จ = จด log ไม่ทำใบสมัครล้ม
+ *    body `{ event: 'application.created', application_id, line_user_id, request_no, title_prefix, first_name, last_name,
+ *            application_url, created_at (+07:00) }`
+ *    ส่งเฉพาะใบที่มี line_user_id · ส่งไม่สำเร็จ = จด log ไม่ทำใบสมัครล้ม
+ *    🔴 22 พ.ย. 2569 ทีมบอทขอเพิ่ม ชื่อ + ลิงก์เปิดใบ (ทีมสรรหาเห็นแค่ชื่อ LINE ต้องไล่หาใบเอง) — ช่องที่ไม่มีค่าไม่ส่ง
+ *       ลิงก์ = หน้าผู้สมัครของ So Recruit (ต้องล็อกอิน + มีสิทธิ์ BU ถึงเปิดได้) · ยังไม่ส่ง เบอร์ / เลขบัตร / ที่อยู่
  * secret + URL ใส่ที่ ตั้งค่า › เชื่อมระบบภายนอก (ตาราง `app_outbound_api_keys` เข้ารหัสตัวเดียวกับ So Scraping)
  * ยังไม่ใส่ secret = ไม่ตรวจ ไม่เก็บ ไม่ส่งอะไรออกไป
  * ③ (เฟสถัดไป · ยังไม่ทำ) application.status_changed
@@ -15,6 +18,7 @@ import { dbQuery, isPgUndefinedTable } from './postgres.js';
 import { tableInAppSchema } from './schema.js';
 import { decryptApiKey, encryptApiKey } from './aiSettingsStore.js';
 import { logError, logInfo, logWarn } from './logger.js';
+import { applicantWorkLink } from '../../src/lib/recruitRm.js';
 
 const KEYS = tableInAppSchema('app_outbound_api_keys');
 export const LINE_BOT_KEY_NAME = 'line-bot-sowork';
@@ -106,19 +110,63 @@ export const requestNoOfJobId = (jobId: string | null | undefined): string | nul
   return t.replace(/^siamraj-(sql|pre):/, '') || null;
 };
 
-export function applicationCreatedBody(input: { applicationId: string; lineUserId: string; jobId: string | null; createdAt: Date }): string {
+export type LineBotApplicationInput = {
+  applicationId: string;
+  lineUserId: string;
+  jobId: string | null;
+  createdAt: Date;
+  titlePrefix?: string | null;
+  firstName?: string | null;
+  lastName?: string | null;
+  /** ต้นทางของหน้าเว็บ So Recruit (https://…) — ไม่รู้ = ไม่ส่งลิงก์ */
+  appBaseUrl?: string | null;
+};
+
+const nameText = (v: string | null | undefined): string | undefined => {
+  const t = (v ?? '').trim();
+  return t ? t.slice(0, 100) : undefined;
+};
+
+/**
+ * ลิงก์เปิดใบสมัครนี้ใน So Recruit — ทางเดียวกับที่หน้าเว็บใช้ (`applicantWorkLink` · แท็บผู้สมัคร + เปิดป๊อปของคนนี้)
+ * ต้องขึ้นต้น https:// ตามที่ทีมบอทกำหนด · ต้นทางไม่ใช่ https = ไม่ส่ง
+ */
+export function applicationUrlOf(appBaseUrl: string | null | undefined, applicationId: string): string | undefined {
+  const base = (appBaseUrl ?? '').trim().replace(/\/+$/, '');
+  return /^https:\/\/[^/\s]+$/.test(base) ? `${base}${applicantWorkLink(applicationId)}` : undefined;
+}
+
+/** ช่องที่ไม่มีค่า (undefined) ไม่อยู่ใน body — บอทรองรับการไม่ส่ง */
+export function applicationCreatedBody(input: LineBotApplicationInput): string {
   return JSON.stringify({
     event: 'application.created',
     application_id: input.applicationId,
     line_user_id: input.lineUserId,
     request_no: requestNoOfJobId(input.jobId),
+    title_prefix: nameText(input.titlePrefix),
+    first_name: nameText(input.firstName),
+    last_name: nameText(input.lastName),
+    application_url: applicationUrlOf(input.appBaseUrl, input.applicationId),
     created_at: bangkokIso(input.createdAt),
   });
 }
 
+/**
+ * ต้นทางของหน้าเว็บจากคำขอส่งใบสมัคร — ตั้ง APP_PUBLIC_URL ไว้ใช้ค่านั้น · ไม่ตั้งใช้ Origin ของคำขอเมื่อเป็นโฮสต์เดียวกับ API
+ * (ฟอร์มที่ฝังอยู่เว็บอื่นแล้วยิงข้ามโดเมนมา Origin จะเป็นเว็บนั้น — ไม่เอามาทำลิงก์)
+ */
+export function appBaseUrlOfRequest(headers: Record<string, string | string[] | undefined> | undefined): string | null {
+  const fixed = (process.env.APP_PUBLIC_URL || '').trim().replace(/\/+$/, '');
+  if (/^https:\/\//.test(fixed)) return fixed;
+  const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v)?.trim() ?? '';
+  const origin = one(headers?.origin);
+  const host = one(headers?.host);
+  return origin && host && origin === `https://${host}` ? origin : null;
+}
+
 /** แจ้งบอทว่าส่งใบสำเร็จ — ไม่โยน error (ใบสมัครบันทึกไปแล้ว) */
 export async function notifyLineBotApplicationCreated(
-  input: { applicationId: string; lineUserId: string; jobId: string | null; createdAt: Date },
+  input: LineBotApplicationInput,
   fetchImpl: typeof fetch = fetch,
 ): Promise<void> {
   try {

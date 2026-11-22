@@ -14,7 +14,7 @@ import { auditFromAnonymous } from '../../_lib/audit.js';
 import { applicantClientIp, lockAndFindRepeat } from '../../_lib/applicationRepeatGuard.js';
 import { repeatPublicMessage } from '../../../src/lib/applicationRepeat.js';
 import { recordApplicationConsent } from '../../_lib/applicationConsent.js';
-import { getLineBotConfig, notifyLineBotApplicationCreated, verifyLineUser } from '../../_lib/lineBotSoWork.js';
+import { appBaseUrlOfRequest, getLineBotConfig, notifyLineBotApplicationCreated, verifyLineUser } from '../../_lib/lineBotSoWork.js';
 
 /** คอลัมน์ที่ยังไม่ถูก migrate — pg ตอบ 42703 */
 function isUndefinedColumn(e: unknown): boolean {
@@ -249,7 +249,19 @@ export default async function handler(req: ApiReq, res: ApiRes) {
     }
     if (consented) await recordApplicationConsent([id], 'apply', null);
     // แจ้ง LINE Bot So Work ว่าส่งใบสำเร็จ — ไม่รอ ไม่ทำให้ใบล้ม (28 ต.ค. 2569)
-    if (lineUserId) void notifyLineBotApplicationCreated({ applicationId: id, lineUserId, jobId: v.jobId, createdAt: new Date() });
+    // 22 พ.ย. 2569 ทีมบอทขอ ชื่อ + ลิงก์เปิดใบ — ทีมสรรหากดจาก LINE แล้วเข้าใบนี้ใน So Recruit ได้เลย (ไม่ส่งเบอร์/เลขบัตร)
+    if (lineUserId) {
+      void notifyLineBotApplicationCreated({
+        applicationId: id,
+        lineUserId,
+        jobId: v.jobId,
+        createdAt: new Date(),
+        titlePrefix: v.titlePrefix,
+        firstName: v.firstName,
+        lastName: v.lastName,
+        appBaseUrl: appBaseUrlOfRequest(req.headers),
+      });
+    }
 
     /**
      * ส่งเข้าคิว AI โทร **อัตโนมัติทันทีที่กรอก** (เจ้าของเคาะ 15 ส.ค. 2569)
