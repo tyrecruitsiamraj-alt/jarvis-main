@@ -2,15 +2,19 @@
  * GET /api/exec-summary — สรุปงานสรรหาให้ผู้ช่วย AI (เจ้าของ 20 พ.ย. 2569 "ถ้าในจอตอบไม่ได้ ผู้ช่วย AI ต้องช่วยได้")
  * 🔴 ด่าน: อ่านจาก 4 เส้นเดียวกับจอ ด้วย header ของผู้ถาม (สิทธิ์/BU เดิม) · ช่วงเดียวกับจอ (เดือนนี้ + ช่วงก่อน) · อ่านไม่ได้ = บอกเหตุ ไม่ขึ้น 0
  * · ค่าที่ขอผิด (BU / ชื่อ / วัน / กล่อง) บอกตรง ๆ พร้อมค่าที่ใช้ได้ · อ่านอย่างเดียว
+ * · ถามถึงคนด้วยชื่ออย่างเดียว / ใบขอด้วยเลขที่ใบขออย่างเดียวได้ (ทดสอบผู้ช่วยบนเว็บจริง 22 พ.ย. 2569 — ตอบไม่ได้เพราะไม่รู้ BU / ไม่รู้ id ใบ)
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import type { RecruitAppFact } from '../../src/lib/recruitOverviewTypes';
 
+type Sub = 'overview' | 'stuck' | 'staff' | 'money' | 'timeline';
 type Call = { query: Record<string, string>; cookie: unknown };
-const calls: Record<'overview' | 'stuck' | 'staff' | 'money', Call[]> = { overview: [], stuck: [], staff: [], money: [] };
-let fail: Partial<Record<'overview' | 'stuck' | 'staff' | 'money', boolean>> = {};
+const calls: Record<Sub, Call[]> = { overview: [], stuck: [], staff: [], money: [], timeline: [] };
+let fail: Partial<Record<Sub, boolean>> = {};
 let lockedBu: string | null = null;
+/** มีใบขอชั่วคราวเลขเดียวกับใบขอจริงในชุด (ของจริงซ้ำกัน 64%) */
+let withTemp = false;
 
 const fact = (id: string, over: Partial<RecruitAppFact> = {}): RecruitAppFact => ({
   id,
@@ -79,7 +83,23 @@ vi.mock('../../api/_handlers/recruit-overview.js', () =>
   sub('overview', () => ({ window: WINDOW, today: '2026-11-20', firstDay: '2026-09-01', generatedAt: '2026-11-20T05:00:00.000Z', bu: lockedBu, apps: APPS, appJobs: {}, errors: {} })),
 );
 vi.mock('../../api/_handlers/recruit-stuck.js', () =>
-  sub('stuck', (q) => ({ requests: q.from === '2026-11-01' ? [req('OPL6911006', 'LBD', [0, 3, 1, 0, 2]), req('LAO6911027', 'LBA', [0, 5, 0, 0, 5])] : [req('OPL6910100', 'LBD', [9, 0, 0, 0, 9])] })),
+  sub('stuck', (q) => ({
+    requests:
+      q.from === '2026-11-01'
+        ? [req('OPL6911006', 'LBD', [0, 3, 1, 0, 2]), req('LAO6911027', 'LBA', [0, 5, 0, 0, 5]), ...(withTemp ? [{ ...req('OPL6911006', 'LBD', [0, 1, 0, 0, 1]), jobId: 'siamraj-pre:OPL6911006' }] : [])]
+        : [req('OPL6910100', 'LBD', [9, 0, 0, 0, 9])],
+  })),
+);
+const NO_WORK = { links: 0, manualPosted: 0, autopost: 0, scrap: 0, contacts: 0, appts: 0 };
+const TIMELINE: Record<string, unknown> = {
+  'siamraj-sql:OPL6911006': { done: { work: { ...NO_WORK, links: 4, contacts: 2 }, chain: [3, 2, 1, 1, 0, 0, 0] }, events: [{ day: '2026-11-05', kind: 'links', who: 'คิว', detail: 'Facebook Group', n: 4 }] },
+  // ใบที่ยกเลิกไปตั้งแต่เดือนก่อน — ไม่อยู่ในใบขอของช่วง แต่มีงานที่ทำ
+  'siamraj-sql:OPL6909095': { done: { work: { ...NO_WORK, links: 19 }, chain: [2, 2, 0, 0, 0, 0, 0] }, events: [{ day: '2026-09-20', kind: 'links', who: 'คิว', detail: 'Facebook Group', n: 19 }] },
+  'siamraj-pre:OPL6911006': { done: { work: { ...NO_WORK, scrap: 1 }, chain: [0, 0, 0, 0, 0, 0, 0] }, events: [] },
+};
+// ผู้ถามเห็นทุก BU: เลขที่ไม่มีจริงก็ได้ก้อนว่างกลับมา (ตัวจริงทำแบบนี้) — ต้องไม่ถูกตอบว่าเป็นใบที่ไม่มีใครทำอะไร
+vi.mock('../../api/_handlers/request-timeline.js', () =>
+  sub('timeline', (q) => ({ jobs: Object.fromEntries(q.jobs.split(',').map((id) => [id, TIMELINE[id] ?? { done: { work: NO_WORK, chain: [0, 0, 0, 0, 0, 0, 0] }, events: [] }])) })),
 );
 vi.mock('../../api/_handlers/staff-activity.js', () =>
   sub('staff', (q) => (q.roster === '1' ? { roster: [{ userId: 'x', name: 'โอ๊ต', bu: 'LBD', lastDay: '2026-10-28' }] } : { rows: q.from === '2026-11-01' ? [row('คิว', 'LBD', '2026-11-20', 5), row('ฟอร์ด', 'LBA', '2026-11-20', 4)] : [row('คิว', 'LBD', '2026-10-10', 2)] })),
@@ -89,7 +109,19 @@ vi.mock('../../api/_lib/http.js', async (o) => ({ ...(await o<object>()), withRb
 
 const { execSummaryHandler, clearExecSummaryCache } = await import('../../api/_handlers/exec-summary');
 
-type Body = { window: Record<string, unknown>; level: string[]; bus: string[]; sections: Array<{ title: string; equation?: string; boxes: Array<{ key: string; value: number | null; prev?: number | null }> }>; people?: Array<{ name: string }>; errors: string[]; message?: string; breakdown?: { rows: Array<{ label: string; value: number }> }; dayPeople?: unknown[] };
+type Body = {
+  window: Record<string, unknown>;
+  level: string[];
+  bus: string[];
+  sections: Array<{ title: string; equation?: string; boxes: Array<{ key: string; value: number | null; prev?: number | null }> }>;
+  people?: Array<Record<string, unknown>>;
+  alsoIn?: unknown;
+  errors: string[];
+  message?: string;
+  breakdown?: { rows: Array<{ label: string; value: number }> };
+  dayPeople?: unknown[];
+  request?: (Record<string, unknown> & { timeline: Array<Record<string, unknown>> }) | null;
+};
 async function call(query: Record<string, string>, method = 'GET', sub = 'u1') {
   let status = 0;
   let body: unknown = null;
@@ -103,6 +135,7 @@ beforeEach(() => {
   for (const k of Object.keys(calls) as Array<keyof typeof calls>) calls[k].length = 0;
   fail = {};
   lockedBu = null;
+  withTemp = false;
   clearExecSummaryCache();
 });
 
@@ -142,7 +175,7 @@ describe('GET /api/exec-summary', () => {
   it('ชั้น BU → คน → วัน → กล่อง · ค่าที่ขอผิดบอกตรง ๆ พร้อมค่าที่ใช้ได้ ไม่เดาให้', async () => {
     const bu = await call({ bu: 'lbd' });
     expect(bu.body.level).toEqual(['ทั้งหมด', 'LBD']);
-    expect(bu.body.people?.map((p) => p.name)).toEqual(['คิว', 'โอ๊ต']);
+    expect(bu.body.people?.map((p) => p.คน)).toEqual(['คิว', 'โอ๊ต']);
     expect((await call({ bu: 'LBD', who: 'คิว' })).body.level).toEqual(['ทั้งหมด', 'LBD', 'คิว']);
     const day = await call({ day: '2026-11-20' });
     expect([day.body.level, day.body.dayPeople?.length]).toEqual([['ทั้งหมด', '20 พ.ย.'], 2]);
@@ -151,8 +184,63 @@ describe('GET /api/exec-summary', () => {
     const wrong = await call({ bu: 'ZZ', who: 'ใครก็ไม่รู้', day: '2026-12-25', box: 'ไม่มี' });
     expect(wrong.status).toBe(200);
     expect(wrong.body.level).toEqual(['ทั้งหมด']);
-    expect(wrong.body.errors).toEqual(['ไม่มี BU ZZ ในช่วงนี้ — BU ที่มี: LBD, LBA', 'ดูรายคนต้องส่ง bu ด้วย', 'วันที่ 2026-12-25 อยู่นอกช่วง 2026-11-01 ถึง 2026-11-30', 'ชั้นนี้ไม่มีกล่อง ไม่มี — ใช้ค่า key จาก sections']);
+    expect(wrong.body.errors).toEqual(['ไม่มี BU ZZ ในช่วงนี้ — BU ที่มี: LBD, LBA', 'ไม่เจอ ใครก็ไม่รู้ — ชื่อที่มี: คิว, โอ๊ต, ฟอร์ด', 'วันที่ 2026-12-25 อยู่นอกช่วง 2026-11-01 ถึง 2026-11-30', 'ชั้นนี้ไม่มีกล่อง ไม่มี — ใช้ค่า key จาก sections']);
     expect((await call({ bu: 'LBD', who: 'ใครก็ไม่รู้' })).body.errors).toEqual(['ไม่เจอ ใครก็ไม่รู้ ใน LBD — ชื่อที่มี: คิว, โอ๊ต']);
+  });
+
+  it('ถามถึงคนด้วยชื่ออย่างเดียว = หา BU ที่คนนั้นสังกัดให้ (คนที่ช่วงนี้ไม่มีงานก็เจอ) · ส่ง bu มาด้วย = ดูเฉพาะ BU นั้น', async () => {
+    expect((await call({ who: 'คิว' })).body.level).toEqual(['ทั้งหมด', 'LBD', 'คิว']);
+    expect((await call({ who: ' ฟอร์ด ' })).body.level).toEqual(['ทั้งหมด', 'LBA', 'ฟอร์ด']);
+    expect((await call({ who: 'โอ๊ต' })).body.level).toEqual(['ทั้งหมด', 'LBD', 'โอ๊ต']);
+    expect((await call({ who: 'คิว', day: '2026-11-20' })).body.level).toEqual(['ทั้งหมด', 'LBD', 'คิว', '20 พ.ย.']);
+    const other = await call({ bu: 'LBA', who: 'คิว' });
+    expect([other.body.level, other.body.errors]).toEqual([['ทั้งหมด', 'LBA'], ['ไม่เจอ คิว ใน LBA — ชื่อที่มี: ฟอร์ด']]);
+  });
+
+  it('ถามถึงใบขอด้วยเลขที่ใบขออย่างเดียว = ใบนั้นใบเดียว: ยอดอัตรา + งานที่ทำตั้งแต่ขอ + ไทม์ไลน์ (อ่านด้วย header ของผู้ถาม)', async () => {
+    const r = await call({ request: ' opl 6911006 ', bu: 'ZZ' });
+    expect(r.status).toBe(200);
+    expect(calls.timeline.map((c) => [c.query, c.cookie])).toEqual([[{ jobs: 'siamraj-sql:OPL6911006', events: '1' }, 'jarvis_session=abc']]);
+    expect(r.body.request).toMatchObject({
+      เลขที่ใบขอ: 'OPL6911006',
+      BU: 'LBD',
+      เจ้าหน้าที่สรรหา: 'คิว',
+      'ใบขอ (อัตรา ตามช่วง)': { ยกมา: 0, ขอใหม่: 3, หาได้แล้ว: 1, ยกเลิก: 0, เหลือหา: 2 },
+      'งานที่ทำ ตั้งแต่ขอ': { รวม: 6, 'Gen link': 4, ลงผลติดต่อ: 2 },
+      'รายชื่อ ตั้งแต่ขอ': { รายชื่อ: 3, 'AI สนใจ': 1 },
+    });
+    expect(r.body.request?.timeline).toEqual([{ วันที่: '2026-11-05', ทำอะไร: 'Gen link', จำนวน: '4 ลิงก์', ใคร: 'คิว', รายละเอียด: 'Facebook Group' }]);
+    expect([r.body.errors, r.body.window, 'sections' in r.body]).toEqual([[], { from: '2026-11-01', to: '2026-11-30', days: 20, compareWith: null }, false]);
+  });
+
+  it('ใบที่จบก่อนช่วง = มีแต่งานที่ทำ บอกว่าไม่มียอดอัตรา · เลขที่ไม่มีจริง = ไม่เจอ (ไม่ตอบว่าใบนี้ไม่มีใครทำอะไร) · อ่านงานไม่ได้ = บอกเหตุ', async () => {
+    const old = await call({ request: 'OPL6909095' });
+    expect(calls.timeline.at(-1)?.query).toEqual({ jobs: 'siamraj-sql:OPL6909095,siamraj-pre:OPL6909095', events: '1' });
+    expect(Object.keys(old.body.request ?? {})).toEqual(['เลขที่ใบขอ', 'งานที่ทำ ตั้งแต่ขอ', 'รายชื่อ ตั้งแต่ขอ', 'timeline']);
+    expect(old.body.request?.['งานที่ทำ ตั้งแต่ขอ']).toMatchObject({ รวม: 19 });
+    expect(old.body.errors).toEqual(['ใบ OPL6909095 ไม่อยู่ในใบขอของช่วง 2026-11-01 ถึง 2026-11-30 (จบก่อนช่วงนี้) — ไม่มียอดอัตราและเหตุผลยกเลิก มีเฉพาะงานที่ทำและรายชื่อ']);
+    const none = await call({ request: 'OPL0000000' });
+    expect([none.status, none.body.request, none.body.errors]).toEqual([200, null, ['ไม่เจอใบขอ OPL0000000 — ตรวจเลขที่ใบขออีกครั้ง (อักษรนำหน้าเลขที่ใบขอไม่ใช่ BU)']]);
+    fail = { timeline: true };
+    const blind = await call({ request: 'OPL6911006' });
+    expect([blind.body.request?.['งานที่ทำ ตั้งแต่ขอ'], blind.body.request?.['ใบขอ (อัตรา ตามช่วง)'], blind.body.errors]).toEqual([null, { ยกมา: 0, ขอใหม่: 3, หาได้แล้ว: 1, ยกเลิก: 0, เหลือหา: 2 }, ['อ่านงานที่ทำกับใบนี้ไม่ได้ — มีแต่ยอดอัตราของใบ']]);
+    // ใบที่ไม่อยู่ในช่วง + อ่านงานไม่ได้ = ไม่เจอ (ไม่มีหลักฐานว่าใบมีจริง)
+    expect((await call({ request: 'OPL6909095' })).body.request).toBeNull();
+    // อ่านใบขอของช่วงไม่ได้ = บอกเหตุนั้น ไม่บอกว่าใบจบก่อนช่วง
+    clearExecSummaryCache();
+    fail = { stuck: true };
+    const noReqs = await call({ request: 'OPL6909095' });
+    expect([noReqs.body.request?.['งานที่ทำ ตั้งแต่ขอ'], noReqs.body.errors]).toEqual([expect.objectContaining({ รวม: 19 }), ['อ่านใบขอของช่วงนี้ไม่ได้ — กล่องใบขอไม่มีเลข']]);
+  });
+
+  it('ใบขอชั่วคราวเลขซ้ำใบขอจริง = แสดงใบขอจริง บอกว่ามีอีกใบ · ส่ง id เต็มของอีกใบ = ได้ใบนั้น', async () => {
+    withTemp = true;
+    const real = await call({ request: 'OPL6911006' });
+    expect(real.body.request?.['งานที่ทำ ตั้งแต่ขอ']).toMatchObject({ 'Gen link': 4 });
+    expect(real.body.errors).toEqual(['เลขที่ OPL6911006 มี 2 ใบ (ใบขอจริงกับใบขอชั่วคราวเลขซ้ำกัน) — ที่แสดงคือใบขอจริง · อีกใบดูด้วย request=siamraj-pre:OPL6911006']);
+    const temp = await call({ request: 'siamraj-pre:OPL6911006' });
+    expect(calls.timeline.at(-1)?.query).toEqual({ jobs: 'siamraj-pre:OPL6911006', events: '1' });
+    expect([temp.body.request?.['งานที่ทำ ตั้งแต่ขอ'], temp.body.request?.['ใบขอ (อัตรา ตามช่วง)'], temp.body.errors]).toEqual([{ รวม: 1, 'Gen link': 0, โพสต์แล้ว: 0, Scrap: 1, Autopost: 0, ลงผลติดต่อ: 0, ลงนัด: 0 }, { ยกมา: 0, ขอใหม่: 1, หาได้แล้ว: 0, ยกเลิก: 0, เหลือหา: 1 }, []]);
   });
 
   it('ผู้ใช้ที่ล็อก BU เดียว = เริ่มที่ชั้น BU นั้น ขอ BU อื่นไม่ได้', async () => {

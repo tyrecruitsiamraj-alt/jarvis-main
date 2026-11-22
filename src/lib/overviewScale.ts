@@ -15,7 +15,7 @@
 import type { RecruitAppFact, RecruitAppJob } from '@/lib/recruitOverviewTypes';
 import { STAFF_PERSON_KINDS, staffWorkTotal, emptyStaffKinds, type StaffActivityKind, type StaffActivityRow, type StaffKindCounts, type StaffRosterRow } from '@/lib/staffActivity';
 import { flowOf, recruiterLabelOf, type StuckRequest } from '@/lib/recruitStuck';
-import { isPostingStarted } from '@/lib/recruitPostingState';
+import { NOT_STARTED_STATES, POSTING_STATES, POSTING_STATE_LABEL, isPostingStarted, postingStateOf, type PostingState } from '@/lib/recruitPostingState';
 import type { MoneyRequest } from '@/lib/homeMoney';
 import { NO_REASON } from '@/lib/homeExec';
 import { PREQUEST_LEDGER_PREFIX, ledgerJobIdOf } from '@/lib/requestPenaltyLedger';
@@ -704,6 +704,32 @@ export function scalePeopleTable(
   };
 }
 
+export type ScalePersonBu = { bu: string; name: string; member: boolean; work: number | null; names: number };
+/**
+ * คนนี้อยู่ในตาราง "แยกตามคน" ของ BU ไหนบ้าง — ผู้ช่วย AI ถูกถามถึงคนโดยไม่รู้ BU (ทดสอบบนเว็บจริง 22 พ.ย. 2569 "เจมส์ทำอะไรไปบ้าง" ตอบไม่ได้)
+ * BU ที่สังกัดก่อน แล้วงานมากสุด · รายชื่อมากสุด · เทียบชื่อไม่สนตัวพิมพ์/ช่องว่างหัวท้าย · `name` = ชื่อตามตาราง
+ */
+export function scaleBusOfPerson(inp: ScaleInput, name: string, roster: readonly StaffRosterRow[] | null = null): ScalePersonBu[] {
+  const want = name.trim().toLowerCase();
+  if (!want) return [];
+  return scaleBus(inp)
+    .flatMap((bu): ScalePersonBu[] => {
+      const row = scalePeopleTable(inp, bu, roster).rows.find((r) => r.name.trim().toLowerCase() === want);
+      return row ? [{ bu, name: row.name, member: row.member, work: row.work, names: row.chain[0] }] : [];
+    })
+    .sort((a, b) => Number(b.member) - Number(a.member) || (b.work ?? -1) - (a.work ?? -1) || b.names - a.names);
+}
+
+/** รายชื่อที่แต่ละคนหามา รวมทุก BU — เท่ากับช่อง "รายชื่อ" ของคนนั้นในตาราง "แยกตามคน" ของทุก BU รวมกัน (มีเทสต์) */
+export function scaleNamesByBringer(inp: Pick<ScaleInput, 'cohort'>): Map<string, number> {
+  const m = new Map<string, number>();
+  for (const f of inp.cohort) {
+    const k = bringerOf(f);
+    m.set(k, (m.get(k) ?? 0) + 1);
+  }
+  return m;
+}
+
 export type ScaleHoldRow = { name: string; all: number; ok: number; fail: number; wait: number; okPct: number | null; oldestDays: number | null };
 export function scaleHoldTable(inp: ScaleInput, bu: string): { rows: ScaleHoldRow[]; total: ScaleHoldRow } {
   const held = scopeOf(inp, { ...SCALE_ROOT, bu }).held ?? [];
@@ -770,6 +796,29 @@ export function scaleRequestsOf(inp: ScaleInput, lv: ScaleLevel, role: ScaleReqR
     .filter((r) => scaleReqAmount(r, role) > 0 && (role !== 'idle' || !isPostingStarted(r)))
     .sort((a, b) => (aged ? (b.ageDays ?? -1) - (a.ageDays ?? -1) : scaleReqAmount(b, role) - scaleReqAmount(a, role)) || a.requestNo.localeCompare(b.requestNo));
 }
+
+export type ScalePostingRow = { key: PostingState; label: string; /** false = ยังไม่เริ่มหา */ started: boolean; count: number; positions: number; /** ใบที่มีคนกรอกแล้ว */ withNames: number };
+/**
+ * ใบที่เหลือหาของชั้น ออกไปหาคนถึงไหน — หลักฐานการออกหาคน 9 แบบ ใบละสถานะเดียว (`postingStateOf` · ตัวเดียวกับการ์ดสถานะของแท็บภาพรวม)
+ * แถวรวมกัน = กล่อง "เหลือหา (ใบ)" · แถวที่ `started` false รวมกัน = กล่อง "ยังไม่เริ่มหา (ใบ)" (มีเทสต์)
+ * `withNames` = ใบที่มีคนกรอกแล้ว (ทุกช่วงเวลาของใบ · ช่องเดียวกับที่ `postingStateOf` ใช้ตัดสิน) · null = ชั้นนี้ไม่มีเรื่องใบขอ
+ * (ผู้ช่วย AI ถูกถาม "ใบที่ประกาศไปแล้ว มีคนสมัครไหม" แล้วไม่มีเลขให้ตอบ · ทดสอบบนเว็บจริง 22 พ.ย. 2569)
+ */
+export function scalePostingStates(inp: ScaleInput, lv: ScaleLevel): ScalePostingRow[] | null {
+  if (!scopeOf(inp, lv).requests) return null;
+  const open = scaleRequestsOf(inp, lv, 'remaining');
+  return POSTING_STATES.map((key): ScalePostingRow => {
+    const rows = open.filter((r) => postingStateOf(r) === key);
+    return {
+      key,
+      label: POSTING_STATE_LABEL[key],
+      started: !NOT_STARTED_STATES.includes(key),
+      count: rows.length,
+      positions: rows.reduce((a, r) => a + scaleReqAmount(r, 'remaining'), 0),
+      withNames: rows.filter((r) => r.applications > 0).length,
+    };
+  });
+}
 const moneyJobKey = (r: Pick<MoneyRequest, 'requestNo'>): string => ledgerJobIdOf({ requestNo: r.requestNo, prequest: r.requestNo.startsWith(PREQUEST_LEDGER_PREFIX) }).toUpperCase();
 const stuckJobKey = (r: Pick<StuckRequest, 'jobId' | 'requestNo'>): string => (r.jobId ?? `siamraj-sql:${r.requestNo}`).trim().toUpperCase();
 /**
@@ -831,6 +880,18 @@ export function scaleDayTable(inp: ScaleInput, lv: ScaleLevel): { rows: ScaleDay
 }
 /** userId ของคน (ไว้ยิงรายการรายวัน) — ไม่มีงานในช่วง = null */
 export const scaleUserIdOf = (inp: ScaleInput, name: string): string | null => inp.staff?.find((r) => r.name === name)?.userId ?? null;
+/**
+ * ชื่อที่โชว์ของคนประกาศ — ทะเบียนประกาศจดอีเมลไว้: เทียบส่วนหน้า @ กับคนที่มีงาน (ชื่อเล่น) · ไม่เจอ = ส่วนหน้า @ (ไม่โชว์อีเมลเต็ม)
+ * ตัวเดียวของจอ (`ScalePanel`) และผู้ช่วย AI (`/api/exec-summary`)
+ */
+export function scaleStaffNamer(rows: ReadonlyArray<Pick<StaffActivityRow, 'login' | 'name'>>): (raw: string | null | undefined) => string | null {
+  const byLogin = new Map<string, string>();
+  for (const r of rows) if (r.login) byLogin.set(r.login.toLowerCase(), r.name);
+  return (raw) => {
+    const login = raw?.trim().split('@')[0] ?? '';
+    return login ? (byLogin.get(login.toLowerCase()) ?? login) : null;
+  };
+}
 
 /* ═══ เทียบช่วงก่อน ═══ */
 /** กล่องที่เป็นสถานะ ณ ตอนนี้ (ไม่มีค่าของ "ช่วงก่อน") หรือเป็นข้อความ — ไม่มีป้ายเพิ่ม/ลด */
@@ -841,6 +902,8 @@ const UP_IS_BAD: ReadonlySet<ScaleBoxKey> = new Set<ScaleBoxKey>(['reqPos', 'req
 const UP_IS_PLAIN: ReadonlySet<ScaleBoxKey> = new Set<ScaleBoxKey>(['reqCarry', 'reqNew', 'inPerDay', 'scrapOrders', 'fitDistrict', 'fitProvince', 'fitRegion', 'fitFar', 'fitUnknown']);
 /** เลขที่เพิ่งเริ่มนับ — ช่วงก่อนเริ่มก่อนวันนั้น = เทียบไม่ได้ (กติกาเดียวกับการ์ดการสั่งงานของภาพรวม) */
 const TREND_SINCE: Partial<Record<ScaleBoxKey, string>> = { wSum: MANUAL_POSTED_SINCE, wLinks: LINK_CREATOR_SINCE, wPosted: MANUAL_POSTED_SINCE, wScrap: SO_POST_SINCE, wAutopost: SO_POST_SINCE, scrapOrders: SO_POST_SINCE };
+/** วันที่ระบบเริ่มนับเลขของกล่องนี้ — null = นับมาตลอด (ผู้ช่วย AI ใช้บอกว่าเทียบช่วงก่อนไม่ได้เพราะอะไร) */
+export const scaleTrendSince = (key: ScaleBoxKey): string | null => TREND_SINCE[key] ?? null;
 /**
  * ป้ายเทียบช่วงก่อนของกล่อง — null = ไม่มีป้าย · `comparable` false = ขึ้น "เทียบไม่ได้" (ช่วงก่อนยังไม่เริ่มนับเลขนี้)
  */

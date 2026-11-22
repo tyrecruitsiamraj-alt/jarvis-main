@@ -53,6 +53,11 @@ import {
   SCALE_FIT_KEYS,
   scalePenaltyRows,
   scalePeopleTable,
+  scalePostingStates,
+  scaleBusOfPerson,
+  scaleNamesByBringer,
+  scaleStaffNamer,
+  scaleTrendSince,
   scaleSections,
   scaleTopRequests,
   scaleUserIdOf,
@@ -716,5 +721,47 @@ describe('เทียบช่วงก่อน · เทียบเดือ
     const next = scaleLevelToParams(p, at({ bu: 'LBD' }), null);
     expect(next.toString()).toBe('ov=scale&bu=LBD&sbu=LBD');
     expect(scaleMonthFromParams(new URLSearchParams('mon=2026-1'))).toBeNull();
+  });
+});
+
+describe('ของที่ผู้ช่วย AI ต้องใช้ตอบ (ทดสอบถามบนเว็บจริง 22 พ.ย. 2569 — 7 จาก 17 ข้อตอบไม่ได้/ตอบผิด)', () => {
+  it('ใบที่เหลือหา ออกไปหาคนถึงไหน: หลักฐาน 9 แบบ ใบละแบบเดียว — รวมกัน = เหลือหา (ใบ · อัตรา) · ที่ยังไม่เริ่ม = ยังไม่เริ่มหา (ใบ) ทุกชั้น', () => {
+    for (const lv of [at(), at({ bu: 'LBD' }), at({ bu: 'LBA' }), at({ bu: 'LM' }), at({ bu: 'LBD', who: 'คิว' })]) {
+      const rows = scalePostingStates(INPUT, lv) ?? [];
+      expect(rows.length).toBe(9);
+      expect(sumOf(rows.map((r) => r.count))).toBe(val(lv, 'reqCount'));
+      expect(sumOf(rows.map((r) => r.positions))).toBe(val(lv, 'reqPos'));
+      expect(sumOf(rows.filter((r) => !r.started).map((r) => r.count))).toBe(val(lv, 'reqIdle'));
+    }
+    expect((scalePostingStates(INPUT, at()) ?? []).filter((r) => r.count > 0).map((r) => [r.label, r.started, r.count, r.positions, r.withNames])).toEqual([
+      ['โพสต์แล้ว มีรายชื่อ', true, 1, 2, 1],
+      ['รอ Autopost', true, 1, 5, 0],
+      ['ไม่พบหลักฐานการออกหาคน', false, 3, 6, 0],
+    ]);
+    // ชั้นวัน ไม่มีเรื่องใบขอ · ใบขอยังโหลดไม่ได้ = ไม่มีก้อนนี้ (ไม่ใช่ 0)
+    expect(scalePostingStates(INPUT, at({ day: '2026-11-20' }))).toBeNull();
+    expect(scalePostingStates({ ...INPUT, requests: null }, at())).toBeNull();
+  });
+
+  it('หา BU ของคนจากชื่ออย่างเดียว: BU ที่สังกัดก่อน · ไม่สนช่องว่างหัวท้าย · คนที่ช่วงนี้ไม่มีงานก็เจอ · ไม่เจอ = ว่าง', () => {
+    expect(scaleBusOfPerson(INPUT, 'คิว')).toEqual([{ bu: 'LBD', name: 'คิว', member: true, work: val(at({ bu: 'LBD', who: 'คิว' }), 'wSum'), names: val(at({ bu: 'LBD', who: 'คิว' }), 'cNames') }]);
+    const cross: ScaleInput = { ...INPUT, cohort: [...COHORT, fact('app-77b20b1c', { bu: 'LBA', jobId: 'siamraj-sql:LAO6911027', bringer: 'คิว' })] };
+    expect(scaleBusOfPerson(cross, ' คิว ').map((x) => [x.bu, x.member, x.names])).toEqual([['LBD', true, val(at({ bu: 'LBD', who: 'คิว' }), 'cNames')], ['LBA', false, 1]]);
+    expect(scaleBusOfPerson(INPUT, 'โอ๊ต', [{ userId: 'a1f0c7d2-3b4e-4f5a-8c6d-7e8f9a0b1c2d', name: 'โอ๊ต', bu: 'LBD', lastDay: '2026-10-28' }])).toEqual([{ bu: 'LBD', name: 'โอ๊ต', member: true, work: 0, names: 0 }]);
+    expect([scaleBusOfPerson(INPUT, 'ไม่มีคนนี้'), scaleBusOfPerson(INPUT, '  ')]).toEqual([[], []]);
+    // รายชื่อรวมทุก BU ของแต่ละคน = ช่อง "รายชื่อ" ของคนนั้นในตารางแยกตามคนของทุก BU รวมกัน · ทุกคนรวมกัน = กล่องรายชื่อ
+    const all = scaleNamesByBringer(cross);
+    for (const [name, n] of all) expect([name, n]).toEqual([name, sumOf(scaleBusOfPerson(cross, name).map((x) => x.names))]);
+    expect(sumOf([...all.values()])).toBe(val(at(), 'cNames', cross));
+  });
+
+  it('ชื่อคนประกาศ: อีเมล → ชื่อเล่นของคนที่มีงาน · ไม่เจอ = ส่วนหน้า @ (ไม่โชว์อีเมลเต็ม) · ว่าง = null', () => {
+    const nameOf = scaleStaffNamer([{ login: 'Kiw.S', name: 'คิว' }, { name: 'คนไม่มี login' }]);
+    expect([nameOf('kiw.s@siamraj.example'), nameOf('someone@siamraj.example'), nameOf('  '), nameOf(null)]).toEqual(['คิว', 'someone', null, null]);
+  });
+
+  it('วันที่ระบบเริ่มนับเลขของกล่อง — ใช้บอกว่าเทียบช่วงก่อนไม่ได้เพราะอะไร (ตัวเดียวกับป้าย "เทียบไม่ได้" บนจอ)', () => {
+    expect([scaleTrendSince('wLinks'), scaleTrendSince('wSum'), scaleTrendSince('wScrap'), scaleTrendSince('cNames')]).toEqual(['2026-10-28', '2026-11-13', '2026-10-20', null]);
+    expect([scaleTrendOf('wLinks', '2026-10-27')?.comparable, scaleTrendOf('wLinks', '2026-10-28')?.comparable]).toEqual([false, true]);
   });
 });

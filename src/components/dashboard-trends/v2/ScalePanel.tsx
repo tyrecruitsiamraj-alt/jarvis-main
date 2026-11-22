@@ -80,6 +80,7 @@ import {
   scaleRequestFromParams,
   scaleRequestsOf,
   scaleSections,
+  scaleStaffNamer,
   scaleStopReasonOf,
   scaleStopReasons,
   scaleTopRequests,
@@ -450,15 +451,8 @@ export default function ScalePanel({ cohort, staff, staffError, requests, reques
       alive = false;
     };
   }, [openJob]);
-  /** ชื่อที่โชว์ของคนประกาศ — ทะเบียนประกาศจดอีเมลไว้: เทียบส่วนหน้า @ กับคนที่มีงาน (ชื่อเล่น) · ไม่เจอ = ส่วนหน้า @ (ไม่โชว์อีเมลเต็ม) */
-  const staffNameOf = React.useMemo(() => {
-    const byLogin = new Map<string, string>();
-    for (const r of [...(staff ?? []), ...(prevData.staff ?? [])]) if (r.login) byLogin.set(r.login.toLowerCase(), r.name);
-    return (raw: string | null | undefined): string | null => {
-      const login = raw?.trim().split('@')[0] ?? '';
-      return login ? (byLogin.get(login.toLowerCase()) ?? login) : null;
-    };
-  }, [staff, prevData.staff]);
+  /** ชื่อที่โชว์ของคนประกาศ (ชื่อเล่น ไม่โชว์อีเมล) — ตัวเดียวกับผู้ช่วย AI */
+  const staffNameOf = React.useMemo(() => scaleStaffNamer([...(staff ?? []), ...(prevData.staff ?? [])]), [staff, prevData.staff]);
   const requestRef = React.useRef<HTMLDivElement>(null);
   React.useEffect(() => {
     if (openJob) requestRef.current?.scrollIntoView?.({ block: 'start' });

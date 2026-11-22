@@ -1,14 +1,17 @@
 /**
  * สรุปงานสรรหาให้ผู้ช่วย AI (เจ้าของ 20 พ.ย. 2569 "ถ้าในจอตอบไม่ได้ ผู้ช่วย AI ต้องช่วยได้")
  * 🔴 ด่าน: เลขในสรุป = เลขของแท็บ Scale ลง ตัวต่อตัว (ไม่มีนิยามใหม่) · เทียบไม่ได้ = null ไม่ใช่ 0 · ไม่มี id/ชื่อผู้สมัคร · ไม่เกินเพดานผลอ่าน
+ * 🔴 ทุกตาราง = แถวละก้อน หัวคอลัมน์คำเดียวกับจอ ไม่มีแถวเลขเรียงตำแหน่ง (ผู้ช่วยเคยหยิบ "แจ้งเข้า" ไปตอบเป็น "รายชื่อ" · ทดสอบบนเว็บจริง 22 พ.ย. 2569)
  */
 import { describe, expect, it } from 'vitest';
 import type { RecruitAppFact, RecruitAppJob } from './recruitOverviewTypes';
 import type { StaffActivityRow } from './staffActivity';
 import type { StuckRequest } from './recruitStuck';
 import type { MoneyRequest } from './homeMoney';
-import { EXEC_SUMMARY_MAX, buildExecSummary, type ExecSummaryArgs } from './execSummary';
-import { SCALE_ROOT, scaleBoxOf, scaleSections, type ScaleBoxKey, type ScaleInput, type ScaleLevel } from './overviewScale';
+import { EXEC_REQUEST_ROWS, EXEC_SUMMARY_MAX, buildExecRequest, buildExecSummary, type ExecSummaryArgs } from './execSummary';
+import { SCALE_ROOT, scaleBoxOf, scaleSections, scaleStaffNamer, type ScaleBoxKey, type ScaleInput, type ScaleLevel } from './overviewScale';
+import { staffWorkTotal } from './staffActivity';
+import type { RequestEvent, RequestTimelineJob } from './requestTimeline';
 
 const fact = (id: string, over: Partial<RecruitAppFact> = {}): RecruitAppFact => ({
   id,
@@ -92,6 +95,12 @@ const at = (o: Partial<ScaleLevel> = {}): ScaleLevel => ({ ...SCALE_ROOT, ...o }
 const args = (o: Partial<ExecSummaryArgs> = {}): ExecSummaryArgs => ({ input: INPUT, prev: PREV, prevCohortOk: true, level: at(), box: null, roster: null, generatedAt: '2026-11-20T05:00:00.000Z', errors: [], ...o });
 const boxOf = (s: ReturnType<typeof buildExecSummary>, key: ScaleBoxKey) => s.sections.flatMap((x) => x.boxes).find((b) => b.key === key);
 
+const CHAIN_HEADS = ['รายชื่อ', 'AI โทรแล้ว', 'AI สนใจ', 'คนโทรต่อ ติดต่อได้', 'นัดได้', 'มา', 'แจ้งเข้า'];
+const chain = (v: number[]) => Object.fromEntries(CHAIN_HEADS.map((h, i) => [h, v[i]]));
+/** ไม่มีแถวเลขเรียงตำแหน่งเหลือในสรุป — ทุกเลขต้องมีป้ายกำกับ */
+const hasBareNumberArray = (v: unknown): boolean =>
+  Array.isArray(v) ? (v.length > 1 && v.every((x) => typeof x === 'number')) || v.some(hasBareNumberArray) : v != null && typeof v === 'object' ? Object.values(v).some(hasBareNumberArray) : false;
+
 describe('buildExecSummary — ชั้นทั้งหมด', () => {
   const s = buildExecSummary(args());
 
@@ -109,34 +118,92 @@ describe('buildExecSummary — ชั้นทั้งหมด', () => {
     expect([s.level, s.bus]).toEqual([['ทั้งหมด'], ['LBD', 'LBA']]);
   });
 
-  it('ค่าช่วงก่อน: มี = เลข · เลขที่เพิ่งเริ่มนับ = null · สถานะ ณ ตอนนี้ไม่มีช่อง prev', () => {
+  it('ค่าช่วงก่อน: มี = เลข · เลขที่เพิ่งเริ่มนับ = null พร้อมเหตุ · สถานะ ณ ตอนนี้ไม่มีช่อง prev', () => {
     expect(boxOf(s, 'cNames')).toMatchObject({ value: 4, prev: 1 });
     expect(boxOf(s, 'reqPos')).toMatchObject({ value: 7, prev: 9 });
     expect(boxOf(s, 'wLinks')).toMatchObject({ value: 12, prev: 7 });
-    expect(boxOf(s, 'wSum')).toMatchObject({ value: 14, prev: null });
+    expect('prevNote' in (boxOf(s, 'wLinks') ?? {})).toBe(false);
+    expect(boxOf(s, 'wSum')).toMatchObject({ value: 14, prev: null, prevNote: 'ระบบเริ่มนับเลขนี้ 2026-11-13 ช่วงก่อนยังไม่มีครบ' });
     // ช่วงก่อนที่เริ่มก่อนลิงก์จำคนสร้าง = Gen link เทียบไม่ได้ (ไม่ใช่เพิ่มขึ้นจาก 0)
-    expect(boxOf(buildExecSummary(args({ prev: { ...PREV, from: '2026-10-12' } })), 'wLinks')).toMatchObject({ value: 12, prev: null });
+    expect(boxOf(buildExecSummary(args({ prev: { ...PREV, from: '2026-10-12' } })), 'wLinks')).toMatchObject({ value: 12, prev: null, prevNote: 'ระบบเริ่มนับเลขนี้ 2026-10-28 ช่วงก่อนยังไม่มีครบ' });
     expect('prev' in (boxOf(s, 'reqIdle') ?? {})).toBe(false);
     expect('prev' in (boxOf(s, 'hAll') ?? {})).toBe(false);
-    // รายชื่อช่วงก่อนไม่ครบ / อ่านงานช่วงก่อนไม่ได้ = null (ไม่เทียบกับ 0)
+    // รายชื่อช่วงก่อนไม่ครบ / อ่านงานช่วงก่อนไม่ได้ = null (ไม่เทียบกับ 0) · ไม่ใช่เรื่องวันเริ่มนับ = ไม่มีเหตุกำกับ
     const blind = buildExecSummary(args({ prevCohortOk: false, prev: { ...PREV, staff: null } }));
     expect([boxOf(blind, 'cNames')?.prev, boxOf(blind, 'wLinks')?.prev, boxOf(blind, 'reqPos')?.prev]).toEqual([null, null, 9]);
+    expect([boxOf(blind, 'cNames')?.prevNote, boxOf(blind, 'wLinks')?.prevNote]).toEqual([undefined, undefined]);
     // ไม่มีช่วงก่อน (ปุ่ม "ทั้งหมด") = ไม่เทียบเลย
     const none = buildExecSummary(args({ prev: null, prevCohortOk: false }));
     expect([none.window.compareWith, 'prev' in (boxOf(none, 'cNames') ?? {})]).toEqual([null, false]);
   });
 
-  it('แยกตาม BU รวมกัน = กล่อง · คนในแต่ละขั้นไปไหนต่อ · ยกเลิกเพราะอะไร · ตรงเกณฑ์ใบขอ · แจ้งเข้า', () => {
-    expect(s.chain).toEqual(['รายชื่อ', 'AI โทรแล้ว', 'AI สนใจ', 'คนโทรต่อ ติดต่อได้', 'นัดได้', 'มา', 'แจ้งเข้า']);
-    expect(s.byBu?.map((r) => [r.bu, r.remainingPositions, r.work, r.chain[0]])).toEqual([['LBD', 2, 10, 3], ['LBA', 5, 4, 1]]);
-    expect(s.byBu?.reduce((a, r) => a + (r.work ?? 0), 0)).toBe(boxOf(s, 'wSum')?.value);
+  it('แยกตาม BU: หัวคอลัมน์คำเดียวกับจอ ทุกเลขมีป้าย · รวมกัน = กล่อง', () => {
+    const lbd = scaleSections(INPUT, at({ bu: 'LBD' }));
+    expect(s.byBu?.[0]).toEqual({
+      BU: 'LBD',
+      'เหลือหา (อัตรา)': 2,
+      'เหลือหา (ใบ)': 1,
+      'ยังไม่เริ่มหา (ใบ)': 0,
+      'AI สนใจ ยังไม่มีใครรับ': scaleBoxOf(lbd, 'hFree')?.value,
+      คนทำงาน: 1,
+      งานที่ทำ: 10,
+      ...chain([3, 3, 3, 1, 1, 1, 1]),
+    });
+    expect(s.byBu?.map((r) => [r.BU, r['เหลือหา (อัตรา)'], r.งานที่ทำ, r.รายชื่อ, r.แจ้งเข้า])).toEqual([['LBD', 2, 10, 3, 1], ['LBA', 5, 4, 1, 0]]);
+    expect(s.byBu?.reduce((a, r) => a + Number(r.งานที่ทำ ?? 0), 0)).toBe(boxOf(s, 'wSum')?.value);
+    expect(s.byBu?.reduce((a, r) => a + Number(r.รายชื่อ ?? 0), 0)).toBe(boxOf(s, 'cNames')?.value);
+    expect(s.byBu?.reduce((a, r) => a + Number(r['AI สนใจ ยังไม่มีใครรับ'] ?? 0), 0)).toBe(boxOf(s, 'hFree')?.value);
+    expect(hasBareNumberArray(s)).toBe(false);
+  });
+
+  it('ทุกคนของทุก BU แบบย่อ + รายชื่ออยู่ที่ใคร (ถามถึงคน/ค้างที่ใครได้ที่ชั้นทั้งหมด)', () => {
+    expect(s.people).toEqual([
+      { คน: 'คิว', BU: 'LBD', ทำล่าสุด: '2026-11-20', 'ไม่มีงานมา (วัน)': 0, งานที่ทำ: 10, 'รายชื่อที่หามา (ทุก BU)': 3 },
+      { คน: 'ฟอร์ด', BU: 'LBA', ทำล่าสุด: '2026-11-20', 'ไม่มีงานมา (วัน)': 0, งานที่ทำ: 4, 'รายชื่อที่หามา (ทุก BU)': 1 },
+    ]);
+    // คนที่หารายชื่อให้ BU อื่นด้วย = นับรวมทุก BU (ชั้นทั้งหมด = ทุก BU)
+    const crossAll = buildExecSummary(args({ input: { ...INPUT, cohort: [...COHORT, fact('app-77b20b1c', { bu: 'LBA', jobId: 'siamraj-sql:LAO6911027', bringer: 'คิว' })] } }));
+    expect(crossAll.people?.[0]).toMatchObject({ คน: 'คิว', BU: 'LBD', 'รายชื่อที่หามา (ทุก BU)': 4 });
+    // คนที่ช่วงนี้ไม่มีงาน (อยู่ในรายชื่อ 60 วัน) ก็ขึ้น
+    const roster = [{ userId: 'a1f0c7d2-3b4e-4f5a-8c6d-7e8f9a0b1c2d', name: 'โอ๊ต', bu: 'LBD', lastDay: '2026-10-28' }];
+    expect(buildExecSummary(args({ roster })).people?.at(-1)).toEqual({ คน: 'โอ๊ต', BU: 'LBD', ทำล่าสุด: '2026-10-28', 'ไม่มีงานมา (วัน)': 22, งานที่ทำ: 0, 'รายชื่อที่หามา (ทุก BU)': 0 });
+    expect(s.hold).toEqual([{ คน: 'แป๋ม', BU: 'LBD', รับมาโทร: 2, ติดต่อได้: 1, ติดต่อไม่ได้: 1, ยังไม่ลงผล: 0, 'ติดต่อได้ %': 50, 'ค้างนานสุด (วัน)': null }]);
+    expect(s.hold?.reduce((a, r) => a + Number(r.รับมาโทร), 0)).toBe(boxOf(s, 'hAll')?.value);
+  });
+
+  it('ใบที่เหลือหา ออกไปหาคนถึงไหน: รวมกัน = เหลือหา (ใบ) · ยังไม่เริ่ม = ยังไม่เริ่มหา (ใบ) · ยอดรวมบวกไว้ให้แล้ว', () => {
+    const requests = [
+      req('OPL6911006', 'LBD', 'คิว', [0, 3, 1, 0, 2], { applications: 2 }),
+      req('OPL6911007', 'LBD', 'คิว', [0, 1, 0, 0, 1]),
+      req('LAO6911027', 'LBA', 'ฟอร์ด', [0, 5, 0, 0, 5], { signals: { post: null, released: false, links: 0 } }),
+      req('OPL6910100', 'LBD', 'คิว', [2, 0, 0, 2, 0]),
+    ];
+    const p = buildExecSummary(args({ input: { ...INPUT, requests } }));
+    expect(p.posting?.summary).toEqual({ 'เหลือหา (ใบ)': 3, 'เริ่มหาแล้ว (ใบ)': 2, 'เริ่มหาแล้ว มีรายชื่อแล้ว (ใบ)': 1, 'เริ่มหาแล้ว ยังไม่มีรายชื่อ (ใบ)': 1, 'ยังไม่เริ่มหา (ใบ)': 1 });
+    expect([p.posting?.summary['เหลือหา (ใบ)'], p.posting?.summary['ยังไม่เริ่มหา (ใบ)']]).toEqual([boxOf(p, 'reqCount')?.value, boxOf(p, 'reqIdle')?.value]);
+    expect(p.posting?.rows.length).toBe(9);
+    expect(p.posting?.rows.filter((r) => Number(r.ใบ) > 0)).toEqual([
+      { หลักฐานการออกหาคน: 'โพสต์แล้ว มีรายชื่อ', เริ่มหา: 'เริ่มแล้ว', ใบ: 1, อัตรา: 2, 'มีรายชื่อแล้ว (ใบ)': 1 },
+      { หลักฐานการออกหาคน: 'โพสต์แล้ว ยังไม่มีรายชื่อ', เริ่มหา: 'เริ่มแล้ว', ใบ: 1, อัตรา: 1, 'มีรายชื่อแล้ว (ใบ)': 0 },
+      { หลักฐานการออกหาคน: 'ไม่พบหลักฐานการออกหาคน', เริ่มหา: 'ยังไม่เริ่มหา', ใบ: 1, อัตรา: 5, 'มีรายชื่อแล้ว (ใบ)': 0 },
+    ]);
+    expect(p.posting?.rows.reduce((a, r) => a + Number(r.อัตรา), 0)).toBe(boxOf(p, 'reqPos')?.value);
+    // ใบขอยังอ่านไม่ได้ / ชั้นวัน = ไม่มีก้อนนี้ (ไม่ขึ้น 0)
+    expect(buildExecSummary(args({ input: { ...INPUT, requests: null } })).posting).toBeUndefined();
+    expect(buildExecSummary(args({ level: at({ day: '2026-11-20' }) })).posting).toBeUndefined();
+  });
+
+  it('คนในแต่ละขั้นไปไหนต่อ · ยกเลิกเพราะอะไร · ตรงเกณฑ์ใบขอ · แจ้งเข้า · ลูกค้า · งานรายวัน', () => {
     expect(s.next?.find((n) => n.from === 'AI สนใจ')).toEqual({ from: 'AI สนใจ', total: 3, parts: [{ label: 'ติดต่อได้', value: 1 }, { label: 'ติดต่อไม่ได้', value: 1, reasons: 'ไม่รับสาย 1' }, { label: 'รอโทร', value: 1 }] });
-    expect(s.cancelReasons).toEqual([{ reason: 'ลูกค้าหาคนเองได้', positions: 2, requests: 1 }]);
-    expect(s.fit?.columns.length).toBe(7);
-    expect(s.fit?.stages[0]).toEqual({ stage: 'รายชื่อ', total: 4, cells: [1, 1, 0, 0, 2, 1, 0] });
-    expect(s.informed).toEqual([{ bu: 'LBD', channel: expect.any(String), bringer: 'คิว', createdDay: '2026-11-10', informedDay: '2026-11-18', days: 8 }]);
-    expect(s.topCustomers?.[0]).toMatchObject({ name: 'ธนาคารตัวอย่าง จำกัด (มหาชน)', remaining: 7 });
-    expect(s.days?.slice(-2)).toEqual([['2026-11-19', 3], ['2026-11-20', 11]]);
+    // นัดแล้วไม่มา ระบบไม่ได้เก็บเหตุผล = ไม่มีช่อง reasons (ผู้ช่วยต้องตอบว่าไม่ได้เก็บ ไม่ยกเหตุผลของขั้นอื่นมาแทน)
+    expect(s.next?.find((n) => n.from === 'นัดได้')?.parts.every((p) => !('reasons' in p))).toBe(true);
+    expect(s.cancelReasons).toEqual([{ ยกเลิกเพราะ: 'ลูกค้าหาคนเองได้', อัตรา: 2, ใบ: 1 }]);
+    expect(s.fit?.stages[0]).toEqual({ ขั้น: 'รายชื่อ', ทั้งหมด: 4, อำเภอเดียวกับงาน: 1, จังหวัดเดียวกับงาน: 1, ภาคเดียวกับงาน: 0, คนละภาคกับงาน: 0, เทียบพื้นที่ไม่ได้: 2, อายุไม่เข้าเกณฑ์: 1, เพศไม่ตรงใบขอ: 0 });
+    expect(s.fit?.areaUnknownWhy.reduce((a, w) => a + w.people, 0)).toBe(boxOf(s, 'fitUnknown')?.value);
+    expect(s.informed).toEqual([{ BU: 'LBD', ช่องทาง: expect.any(String), ใครหามา: 'คิว', กรอกใบ: '2026-11-10', แจ้งเข้า: '2026-11-18', ใช้กี่วัน: 8 }]);
+    expect(s.topCustomers?.[0]).toEqual({ ลูกค้า: 'ธนาคารตัวอย่าง จำกัด (มหาชน)', ขอใหม่: 8, หาได้แล้ว: 1, ยกเลิก: 2, 'เหลือหา (อัตรา)': 7, 'เหลือหา (ใบ)': 2, 'ค้างนานสุด (วัน)': 12 });
+    expect(s.topPositions?.[0]).toMatchObject({ ตำแหน่ง: 'ขับรถ', 'เหลือหา (อัตรา)': 7 });
+    expect([s.days?.['2026-11-19'], s.days?.['2026-11-20'], Object.keys(s.days ?? {}).length]).toEqual([3, 11, 20]);
     expect(s.months).toBeUndefined();
   });
 
@@ -148,27 +215,44 @@ describe('buildExecSummary — ชั้นทั้งหมด', () => {
 });
 
 describe('buildExecSummary — ชั้น BU · คน · วัน · กล่องที่ขอ', () => {
-  it('ชั้น BU: รายคน (คนที่ช่วงนี้ไม่มีงานก็อยู่) + รายชื่ออยู่ที่ใคร', () => {
+  it('ชั้น BU: รายคนครบสาย (คนที่ช่วงนี้ไม่มีงานก็อยู่) + รายชื่ออยู่ที่ใคร', () => {
     const roster = [{ userId: 'a1f0c7d2-3b4e-4f5a-8c6d-7e8f9a0b1c2d', name: 'โอ๊ต', bu: 'LBD', lastDay: '2026-10-28' }];
     const s = buildExecSummary(args({ level: at({ bu: 'LBD' }), roster }));
     expect(s.level).toEqual(['ทั้งหมด', 'LBD']);
     expect(s.byBu).toBeUndefined();
-    expect(s.people?.map((p) => [p.name, p.work, p.chain[0], p.lastDay, p.idleDays])).toEqual([['คิว', 10, 3, '2026-11-20', 0], ['โอ๊ต', 0, 0, '2026-10-28', 22]]);
-    expect(s.peopleAverage).toMatchObject({ people: 1, work: 10 });
-    expect(s.hold).toEqual([{ name: 'แป๋ม', all: 2, ok: 1, fail: 1, waiting: 0, okPct: 50, oldestDays: null }]);
+    expect(s.people?.[0]).toEqual({ คน: 'คิว', ทำล่าสุด: '2026-11-20', 'ไม่มีงานมา (วัน)': 0, งานที่ทำ: 10, ...chain([3, 3, 3, 1, 1, 1, 1]), 'ทำ 100 งาน ได้กี่รายชื่อ': 30 });
+    expect(s.people?.map((p) => [p.คน, p.งานที่ทำ, p.รายชื่อ, p.ทำล่าสุด, p['ไม่มีงานมา (วัน)']])).toEqual([['คิว', 10, 3, '2026-11-20', 0], ['โอ๊ต', 0, 0, '2026-10-28', 22]]);
+    expect(s.peopleAverage).toMatchObject({ คนทำงาน: 1, งานที่ทำ: 10, รายชื่อ: 3 });
+    expect(s.hold).toEqual([{ คน: 'แป๋ม', รับมาโทร: 2, ติดต่อได้: 1, ติดต่อไม่ได้: 1, ยังไม่ลงผล: 0, 'ติดต่อได้ %': 50, 'ค้างนานสุด (วัน)': null }]);
     expect(boxOf(s, 'cNames')?.value).toBe(scaleBoxOf(scaleSections(INPUT, at({ bu: 'LBD' })), 'cNames')?.value);
+    expect(hasBareNumberArray(s)).toBe(false);
+    // คนของ BU อื่นที่หารายชื่อให้ BU นี้ = บอกว่านอก BU
+    const cross = buildExecSummary(args({ input: { ...INPUT, cohort: [...COHORT, fact('app-77b20b1c', { bu: 'LBA', jobId: 'siamraj-sql:LAO6911027', bringer: 'คิว' })] }, level: at({ bu: 'LBA' }) }));
+    expect(cross.people?.find((p) => p.คน === 'คิว')).toMatchObject({ สังกัด: 'นอก LBA', งานที่ทำ: null, รายชื่อ: 1 });
   });
 
-  it('ชั้นคน: รายชื่อที่หามาแยกช่องทาง · ชั้นวัน: ใครทำอะไร เทียบกับวันก่อน', () => {
+  it('ชั้นคน: รายชื่อที่หามาแยกช่องทาง + ยอดรวมทุก BU เมื่อหาให้หลาย BU · ชั้นวัน: ใครทำอะไร เทียบกับวันก่อน', () => {
     const who = buildExecSummary(args({ level: at({ bu: 'LBD', who: 'คิว' }) }));
     expect(who.level).toEqual(['ทั้งหมด', 'LBD', 'คิว']);
-    expect(who.channels?.map((c) => c.chain[0]).reduce((a, n) => a + n, 0)).toBe(boxOf(who, 'cNames')?.value);
-    expect(who.people).toBeUndefined();
+    expect(who.channels?.every((c) => typeof c.ช่องทาง === 'string' && c.BU === 'LBD')).toBe(true);
+    expect(who.channels?.reduce((a, c) => a + Number(c.รายชื่อ), 0)).toBe(boxOf(who, 'cNames')?.value);
+    expect([who.people, who.allBus]).toEqual([undefined, undefined]);
+    const cross = buildExecSummary(args({ input: { ...INPUT, cohort: [...COHORT, fact('app-77b20b1c', { bu: 'LBA', jobId: 'siamraj-sql:LAO6911027', bringer: 'คิว', channelLabel: 'Webjob · Jobthai' })] }, level: at({ bu: 'LBD', who: 'คิว' }) }));
+    // กล่องของชั้นยังนับเฉพาะ LBD (เหมือนจอ) · ยอดรวมทุก BU อยู่ก้อนแยก และทุกทางบวกได้เท่ากัน
+    expect(boxOf(cross, 'cNames')?.value).toBe(3);
+    expect(cross.allBus?.byBu).toEqual([{ BU: 'LBD', รายชื่อ: 3 }, { BU: 'LBA', รายชื่อ: 1 }]);
+    expect(cross.allBus?.['รายชื่อรวมทุก BU']).toBe(4);
+    expect(cross.allBus?.channels.reduce((a, c) => a + Number(c.รายชื่อ), 0)).toBe(4);
+    expect(cross.allBus?.channels.map((c) => [c.ช่องทาง, c.BU])).toContainEqual(['Jobthai', 'ทุก BU']);
     const day = buildExecSummary(args({ level: at({ day: '2026-11-20' }) }));
     expect(day.window.compareWith).toBe('วันก่อน 2026-11-19');
-    expect(day.workKinds).toEqual(['Gen link', 'โพสต์แล้ว', 'Scrap', 'Autopost', 'ลงผลติดต่อ', 'ลงนัด']);
-    expect(day.dayPeople).toEqual([{ name: 'คิว', bu: 'LBD', sum: 7, kinds: [5, 0, 2, 0, 0, 0] }, { name: 'ฟอร์ด', bu: 'LBA', sum: 4, kinds: [4, 0, 0, 0, 0, 0] }]);
+    expect(day.dayPeople).toEqual([
+      { คน: 'คิว', BU: 'LBD', รวม: 7, 'Gen link': 5, โพสต์แล้ว: 0, Scrap: 2, Autopost: 0, ลงผลติดต่อ: 0, ลงนัด: 0 },
+      { คน: 'ฟอร์ด', BU: 'LBA', รวม: 4, 'Gen link': 4, โพสต์แล้ว: 0, Scrap: 0, Autopost: 0, ลงผลติดต่อ: 0, ลงนัด: 0 },
+    ]);
+    expect(day.dayPeople?.reduce((a, r) => a + Number(r.รวม), 0)).toBe(boxOf(day, 'wSum')?.value);
     expect(boxOf(day, 'wSum')).toMatchObject({ value: 11, prev: 3 });
+    expect(hasBareNumberArray(day)).toBe(false);
     // วันแรกของช่วง = ไม่มีวันก่อนในมือ
     const first = buildExecSummary(args({ level: at({ day: '2026-11-01' }) }));
     expect([first.window.compareWith, boxOf(first, 'wSum')?.prev]).toEqual([null, null]);
@@ -184,9 +268,9 @@ describe('buildExecSummary — ชั้น BU · คน · วัน · กล�
     });
     const cancelled = buildExecSummary(args({ level: at({ bu: 'LBD' }), box: 'reqCancelled' }));
     expect(cancelled.breakdown).toMatchObject({ by: 'แยกตามเจ้าหน้าที่สรรหา', total: 2, rows: [{ label: 'คิว', value: 2 }] });
-    expect(cancelled.requests).toEqual([{ requestNo: 'OPL6910100', jobId: 'siamraj-sql:OPL6910100', position: 'ขับรถ', unit: 'ธนาคารตัวอย่าง จำกัด (มหาชน)', amount: 2, ageDays: 12, recruiter: 'คิว', cancelReason: 'ลูกค้าหาคนเองได้' }]);
+    expect(cancelled.requests).toEqual([{ เลขที่ใบขอ: 'OPL6910100', ตำแหน่ง: 'ขับรถ', หน่วยงาน: 'ธนาคารตัวอย่าง จำกัด (มหาชน)', 'ยกเลิก (อัตรา)': 2, 'ค้าง (วัน)': 12, เจ้าหน้าที่สรรหา: 'คิว', ยกเลิกเพราะ: 'ลูกค้าหาคนเองได้' }]);
     const open = buildExecSummary(args({ level: at({ bu: 'LBD' }), box: 'reqPos' }));
-    expect(open.requests?.map((r) => [r.requestNo, r.amount, r.started])).toEqual([['OPL6911006', 2, true]]);
+    expect(open.requests?.map((r) => [r.เลขที่ใบขอ, r['เหลือหา (อัตรา)'], r.เริ่มหา])).toEqual([['OPL6911006', 2, 'เริ่มแล้ว']]);
     // ชั้นทั้งหมดยังไม่มีรายใบ (ต้องลงชั้น BU) · กล่องที่ไม่มีในชั้นนั้นบอกตรง ๆ
     expect(buildExecSummary(args({ box: 'reqPos' })).requests).toBeUndefined();
     expect(buildExecSummary(args({ level: at({ day: '2026-11-20' }), box: 'fine' })).errors).toEqual(['ชั้นนี้ไม่มีกล่อง fine']);
@@ -196,10 +280,10 @@ describe('buildExecSummary — ชั้น BU · คน · วัน · กล�
     const wide: ScaleInput = { ...INPUT, from: '2026-10-15', cohort: [...COHORT, fact('app-55aa0c01', { createdAt: '2026-10-20T03:00:00.000Z' })], staff: [...STAFF, row(Q, 'คิว', 'LBD', '2026-10-20', { links: 3 })] };
     const s = buildExecSummary(args({ input: wide, prev: null, prevCohortOk: false }));
     expect(s.months).toEqual([
-      { month: 'ต.ค. 69 · 15–31', work: 3, chain: [1, 0, 0, 0, 0, 0, 0] },
-      { month: 'พ.ย. 69 · 1–20', work: 14, chain: [4, 3, 3, 1, 1, 1, 1] },
+      { เดือน: 'ต.ค. 69 · 15–31', งานที่ทำ: 3, ...chain([1, 0, 0, 0, 0, 0, 0]) },
+      { เดือน: 'พ.ย. 69 · 1–20', งานที่ทำ: 14, ...chain([4, 3, 3, 1, 1, 1, 1]) },
     ]);
-    expect(s.months?.reduce((a, m) => a + (m.work ?? 0), 0)).toBe(boxOf(s, 'wSum')?.value);
+    expect(s.months?.reduce((a, m) => a + Number(m.งานที่ทำ ?? 0), 0)).toBe(boxOf(s, 'wSum')?.value);
   });
 
   it('ข้อมูลเยอะเกินเพดาน = ตัดก้อนรองออกและบอกไว้ ไม่ตัดเงียบ · กล่องเลขอยู่ครบ', () => {
@@ -211,6 +295,83 @@ describe('buildExecSummary — ชั้น BU · คน · วัน · กล�
     expect(JSON.stringify(s).length).toBeLessThanOrEqual(EXEC_SUMMARY_MAX);
     expect(s.errors.join(' ')).toContain('ข้อมูลเยอะเกิน ตัดก้อนนี้ออก');
     expect(s.sections.flatMap((x) => x.boxes).length).toBeGreaterThan(30);
-    expect(s.people?.length).toBe(30);
+    // ยังเกินหลังตัดก้อนรอง = ตัดท้ายตาราง แล้วบอกจำนวนแถวที่เหลือ (แถวบนสุด = มากสุด ยังอยู่)
+    expect(s.errors.join(' ')).toMatch(/ตารางยาวเกิน ตัดท้ายออก: .*people เหลือ \d+ แถวแรก/);
+    expect(s.people?.length).toBeGreaterThanOrEqual(5);
+    expect(s.people?.length).toBeLessThan(30);
+    // ชั้นทั้งหมดก็ไม่เกิน (ทุกคนแบบย่อ ไม่เกิน 40 แถว)
+    const top = buildExecSummary(args({ input: { ...INPUT, cohort: many, staff } }));
+    expect([JSON.stringify(top).length <= EXEC_SUMMARY_MAX, top.people?.length]).toEqual([true, 40]);
+  });
+});
+
+describe('buildExecRequest — ใบขอใบเดียว ทำอะไรไปแล้ว (ก้อนเดียวกับจอของแท็บ Scale ลง)', () => {
+  const WINDOW = { from: '2026-11-01', to: '2026-11-20', days: 20, compareWith: null };
+  const work = { links: 3, manualPosted: 2, autopost: 0, scrap: 1, contacts: 4, appts: 1 };
+  const events: RequestEvent[] = [
+    { day: '2026-10-05', kind: 'links', who: 'คิว', detail: 'Facebook Group', n: 3 },
+    { day: '2026-10-06', kind: 'names', who: null, detail: 'Facebook Group', n: 2 },
+    { day: '2026-10-07', kind: 'contacts', who: 'แป๋ม', detail: 'ติดต่อไม่ได้', n: 4 },
+  ];
+  const job: RequestTimelineJob = { done: { work, chain: [2, 2, 1, 0, 0, 0, 0] }, events };
+  const cancelledReq = req('OPL6910100', 'LBD', 'คิว', [2, 0, 0, 2, 0], {
+    day: '2026-10-01',
+    requested: 2,
+    releasedAt: '2026-10-02T03:00:00.000Z',
+    releasedBy: 'kiw.s@siamraj.example',
+    flow: { carryIn: 2, new: 0, filled: 0, cancelled: 2, remaining: 0, fillDays: [], cancelDays: [['2026-11-05', 2]] },
+  });
+  const nameOf = scaleStaffNamer([{ login: 'kiw.s', name: 'คิว' }]);
+  const base = { requestNo: 'OPL6910100', nameOf, window: WINDOW, generatedAt: '2026-11-20T05:00:00.000Z', errors: [] as string[] };
+
+  it('ใบในช่วง: ยอดอัตรา + ยกเลิกเพราะอะไร + งานที่ทำ/รายชื่อตั้งแต่ขอ + ไทม์ไลน์ เก่า → ใหม่ · ไม่มีอีเมลของคนประกาศ', () => {
+    const out = buildExecRequest({ ...base, request: cancelledReq, job, cancelReason: 'ลูกค้าหาคนเองได้' });
+    expect(out.request).toEqual({
+      เลขที่ใบขอ: 'OPL6910100',
+      BU: 'LBD',
+      ตำแหน่ง: 'ขับรถ',
+      หน่วยงาน: 'ธนาคารตัวอย่าง จำกัด (มหาชน)',
+      เจ้าหน้าที่สรรหา: 'คิว',
+      'ค้าง (วัน)': 12,
+      หลักฐานการออกหาคน: 'โพสต์แล้ว ยังไม่มีรายชื่อ',
+      ยกเลิกเพราะ: 'ลูกค้าหาคนเองได้',
+      'ใบขอ (อัตรา ตามช่วง)': { ยกมา: 2, ขอใหม่: 0, หาได้แล้ว: 0, ยกเลิก: 2, เหลือหา: 0 },
+      'งานที่ทำ ตั้งแต่ขอ': { รวม: staffWorkTotal(work), 'Gen link': 3, โพสต์แล้ว: 2, Scrap: 1, Autopost: 0, ลงผลติดต่อ: 4, ลงนัด: 1 },
+      'รายชื่อ ตั้งแต่ขอ': chain([2, 2, 1, 0, 0, 0, 0]),
+      timeline: [
+        { วันที่: '2026-10-01', ทำอะไร: 'ขอมา', จำนวน: '2 อัตรา' },
+        { วันที่: '2026-10-02', ทำอะไร: 'ประกาศ', ใคร: 'คิว' },
+        { วันที่: '2026-10-05', ทำอะไร: 'Gen link', จำนวน: '3 ลิงก์', ใคร: 'คิว', รายละเอียด: 'Facebook Group' },
+        { วันที่: '2026-10-06', ทำอะไร: 'รายชื่อเข้า', จำนวน: '2 คน', รายละเอียด: 'Facebook Group' },
+        { วันที่: '2026-10-07', ทำอะไร: 'ลงผลติดต่อ', จำนวน: '4 ครั้ง', ใคร: 'แป๋ม', รายละเอียด: 'ติดต่อไม่ได้' },
+        { วันที่: '2026-11-05', ทำอะไร: 'ยกเลิก', จำนวน: '2 อัตรา', รายละเอียด: 'ลูกค้าหาคนเองได้' },
+      ],
+    });
+    expect(out.errors).toEqual([]);
+    expect(JSON.stringify(out)).not.toContain('@');
+    expect(hasBareNumberArray(out)).toBe(false);
+  });
+
+  it('ใบที่จบก่อนช่วง (ไม่มีแถวใบขอ) = มีแต่งานที่ทำ/รายชื่อ/ไทม์ไลน์ ไม่แต่งยอดอัตรา · อ่านงานไม่ได้ = บอกเหตุ ไม่ขึ้น 0', () => {
+    const old = buildExecRequest({ ...base, request: null, job, cancelReason: null, errors: ['ใบ OPL6910100 ไม่อยู่ในใบขอของช่วง'] });
+    expect(Object.keys(old.request ?? {})).toEqual(['เลขที่ใบขอ', 'งานที่ทำ ตั้งแต่ขอ', 'รายชื่อ ตั้งแต่ขอ', 'timeline']);
+    expect(old.request?.timeline.map((e) => e.ทำอะไร)).toEqual(['Gen link', 'รายชื่อเข้า', 'ลงผลติดต่อ']);
+    expect(old.errors).toEqual(['ใบ OPL6910100 ไม่อยู่ในใบขอของช่วง']);
+    const blind = buildExecRequest({ ...base, request: cancelledReq, job: null, cancelReason: null });
+    expect([blind.request?.['งานที่ทำ ตั้งแต่ขอ'], blind.request?.['รายชื่อ ตั้งแต่ขอ']]).toEqual([null, null]);
+    expect(blind.request?.timeline.map((e) => e.ทำอะไร)).toEqual(['ขอมา', 'ประกาศ', 'ยกเลิก']);
+    expect(blind.errors).toEqual(['อ่านงานที่ทำกับใบนี้ไม่ได้ — มีแต่ยอดอัตราของใบ']);
+  });
+
+  it('ไทม์ไลน์ยาวมาก = ส่งแถวล่าสุด + หลักของใบครบ แล้วบอกว่าตัดไปกี่แถว · ไม่เกินเพดานผลอ่าน', () => {
+    const many: RequestEvent[] = Array.from({ length: 400 }, (_, i) => ({ day: `2026-10-${String(3 + (i % 28)).padStart(2, '0')}`, kind: 'contacts', who: `คนที่ ${i}`, detail: 'ติดต่อไม่ได้ เพราะไม่รับสายหลายครั้ง', n: 1 }));
+    const out = buildExecRequest({ ...base, request: cancelledReq, job: { done: job.done, events: many }, cancelReason: 'ลูกค้าหาคนเองได้' });
+    const marks = out.request?.timeline.filter((e) => ['ขอมา', 'ประกาศ', 'ยกเลิก'].includes(String(e.ทำอะไร))).length;
+    expect(marks).toBe(3);
+    expect((out.request?.timeline.length ?? 0) - 3).toBeLessThanOrEqual(EXEC_REQUEST_ROWS);
+    expect(JSON.stringify(out).length).toBeLessThanOrEqual(EXEC_SUMMARY_MAX + 300);
+    expect(out.errors.join(' ')).toMatch(/ไทม์ไลน์มี 403 แถว ส่งมา \d+ แถว \(ตัดแถวเก่าสุดออก \d+ แถว\)/);
+    // ยอดรวมยังครบ ไม่ขึ้นกับแถวที่ตัด
+    expect(out.request?.['งานที่ทำ ตั้งแต่ขอ']?.รวม).toBe(staffWorkTotal(work));
   });
 });
