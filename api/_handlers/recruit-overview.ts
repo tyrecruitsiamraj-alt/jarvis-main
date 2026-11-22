@@ -937,7 +937,7 @@ async function settle<T>(what: string, run: () => Promise<T>): Promise<Settled<T
 }
 
 /** ผลนัดยังไม่ migrate (089) = อ่านต่อได้ แค่ไม่มีผลนัด */
-async function loadFacts(params: unknown[], byJobs = false, cutoff: string | null = null): Promise<Row[]> {
+export async function loadFacts(params: unknown[], byJobs = false, cutoff: string | null = null): Promise<Row[]> {
   // ผล ณ วันสิ้นสุด (ภาพรวม v2) — cutoff เป็นพารามิเตอร์ตัวสุดท้าย
   const p = cutoff ? [...params, cutoff] : params;
   const sql = (q: string) => (cutoff ? asOfSql(q, `$${p.length}::timestamptz`) : q);

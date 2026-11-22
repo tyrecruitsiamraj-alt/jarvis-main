@@ -6,6 +6,9 @@
  * shadcn + utility ของ Tailwind เท่านั้น · สีจาก `TONE` (AI = กรมท่า · ทั้งสองทาง = เขียวหัวเป็ด · คน = ม่วง ชุดเดียวกับหน้า "ระบบไปกี่ %")
  */
 import React, { useEffect, useMemo, useState } from 'react';
+import TimeDrillSheet from '@/components/home-overview/TimeDrillSheet';
+import JourneyNamesDialog from '@/components/dashboard-trends/JourneyNamesDialog';
+import type { DrillBoxKey } from '@/lib/homeDrill';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -312,6 +315,9 @@ function StuckBoard({
 const loadingAny = (apps: unknown, appsError: unknown, payload: unknown, error: unknown) =>
   (apps === null && !appsError) || (payload === null && !error);
 
+/** แถวของแท็บสัดส่วนที่ไล่ 12 เดือนได้ → กล่องของแผง (`homeDrill`) · แถวอื่นเปิดแผงเดิม */
+const DRILL_OF_ROW: Partial<Record<string, DrillBoxKey>> = { prescreen: 'prescreen', afterPrescreen: 'afterPrescreen', appointment: 'appointment', apps: 'entry' };
+
 export default function ProportionTab({
   win,
   bu,
@@ -330,6 +336,9 @@ export default function ProportionTab({
   const [data, setData] = useState<{ key: string; d: ProportionPayload } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [panel, setPanel] = useState<OverviewPanel | null>(null);
+  /** แถวที่ไล่ 12 เดือนได้ (22 พ.ย. 2569) — กดแล้วเปิดแผงไล่เดือนก่อน สรุปแบบเดิมอยู่ปุ่มในแผง */
+  const [drill, setDrill] = useState<{ box: DrillBoxKey; rowKey: string } | null>(null);
+  const [names, setNames] = useState<{ title: string; ids: readonly string[] } | null>(null);
   useEffect(() => {
     let alive = true;
     setError(null);
@@ -389,12 +398,34 @@ export default function ProportionTab({
         <OverviewSection key={g.key} title={g.title} testId={`proportion-${g.key}`}>
           <ul>
             {g.rows.map((r) => (
-              <Row key={r.key} r={r} loading={loadingOf(g.key)} onOpen={(x) => setPanel(panelOf(x))} />
+              <Row key={r.key} r={r} loading={loadingOf(g.key)} onOpen={(x) => (DRILL_OF_ROW[x.key] ? setDrill({ box: DRILL_OF_ROW[x.key]!, rowKey: x.key }) : setPanel(panelOf(x)))} />
             ))}
           </ul>
         </OverviewSection>
       ))}
       <OverviewSheet panel={panel} onClose={() => setPanel(null)} />
+      <TimeDrillSheet
+        box={drill?.box ?? null}
+        bu={bu}
+        onClose={() => setDrill(null)}
+        onNames={(title, ids) => {
+          setDrill(null);
+          setNames({ title, ids });
+        }}
+        summary={
+          drill && rowOf(drill.rowKey)
+            ? {
+                label: 'สรุปช่วงวันที่บนหน้า',
+                onOpen: () => {
+                  const r = rowOf(drill.rowKey);
+                  setDrill(null);
+                  if (r) setPanel(panelOf(r));
+                },
+              }
+            : null
+        }
+      />
+      <JourneyNamesDialog open={names !== null} onOpenChange={(o) => !o && setNames(null)} title={names?.title ?? ''} ids={names?.ids ?? []} />
     </div>
   );
 }

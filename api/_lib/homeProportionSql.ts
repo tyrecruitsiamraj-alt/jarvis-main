@@ -97,37 +97,18 @@ export function proportionAppReasonsSql(): string {
 }
 
 /**
- * ทางเข้า: ใบสมัคร (ไม่นับที่ยกเลิกข้อมูล · ไม่นับ Lead ชุดเดียวกับการ์ดผู้สมัคร — ตรวจทั้งระบบ 10 พ.ย. 2569: 1,595 vs 1,633) ตามวันกรอก · ใบส่งคนแทนตามวันที่สร้างแถว (นับใบ ไม่ใช่สาย) · คำขอโพสต์
- * ใบสมัคร: `source = 'irecruit'` = ดึง iRecruit · คนสร้าง = So Scraping = ระบบ · มีชื่อคนสร้างอื่น = คนคีย์/นำเข้า · ไม่มี = กรอกเอง
+ * ทางเข้า: ใบสมัครในช่วง (ไม่นับที่ยกเลิกข้อมูล · ไม่นับ Lead ชุดเดียวกับการ์ดผู้สมัคร) จัดกลุ่มตามช่องดิบ
+ * แบ่งเป็นทางไหนที่ Node ด้วย `entryKindOf` (src/lib/homeEntryKind.ts) ที่เดียว — 22 พ.ย. 2569 แตกคนคีย์/นำเข้าตามช่องทาง
  */
-export function proportionEntrySql(): string {
+export function proportionEntryGroupsSql(): string {
   return `
-  select
-    (select count(*) filter (where a.source is distinct from 'irecruit' and a.created_by_name is null)::int
-       from ${APPS} a ${appBuJoin('a')}
-      where ($1::timestamptz is null or a.created_at >= $1::timestamptz) and a.created_at < $2::timestamptz
-        and ($3::text[] is null or ${appBuSql('a')} = any($3::text[]))
-        and not coalesce(a.is_lead, false)
-        and not exists (select 1 from ${CANCELLATIONS} x where x.application_id = a.id)) as self_apply,
-    (select count(*) filter (where a.source = 'irecruit')::int
-       from ${APPS} a ${appBuJoin('a')}
-      where ($1::timestamptz is null or a.created_at >= $1::timestamptz) and a.created_at < $2::timestamptz
-        and ($3::text[] is null or ${appBuSql('a')} = any($3::text[]))
-        and not coalesce(a.is_lead, false)
-        and not exists (select 1 from ${CANCELLATIONS} x where x.application_id = a.id)) as irecruit,
-    (select count(*) filter (where a.source is distinct from 'irecruit' and a.created_by_name = '${SO_SCRAPING_CREATED_BY}')::int
-       from ${APPS} a ${appBuJoin('a')}
-      where ($1::timestamptz is null or a.created_at >= $1::timestamptz) and a.created_at < $2::timestamptz
-        and ($3::text[] is null or ${appBuSql('a')} = any($3::text[]))
-        and not coalesce(a.is_lead, false)
-        and not exists (select 1 from ${CANCELLATIONS} x where x.application_id = a.id)) as so_scraping,
-    (select count(*) filter (where a.source is distinct from 'irecruit' and a.created_by_name is not null
-                               and a.created_by_name <> '${SO_SCRAPING_CREATED_BY}')::int
-       from ${APPS} a ${appBuJoin('a')}
-      where ($1::timestamptz is null or a.created_at >= $1::timestamptz) and a.created_at < $2::timestamptz
-        and ($3::text[] is null or ${appBuSql('a')} = any($3::text[]))
-        and not coalesce(a.is_lead, false)
-        and not exists (select 1 from ${CANCELLATIONS} x where x.application_id = a.id)) as staff_keyed`;
+  select a.source, a.created_by_name as created_by, split_part(coalesce(a.channel_label, ''), '·', 1) as channel_group, count(*)::int as n
+    from ${APPS} a ${appBuJoin('a')}
+   where ($1::timestamptz is null or a.created_at >= $1::timestamptz) and a.created_at < $2::timestamptz
+     and ($3::text[] is null or ${appBuSql('a')} = any($3::text[]))
+     and not coalesce(a.is_lead, false)
+     and not exists (select 1 from ${CANCELLATIONS} x where x.application_id = a.id)
+   group by 1, 2, 3`;
 }
 
 /**

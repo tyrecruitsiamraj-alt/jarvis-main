@@ -20,7 +20,7 @@ import {
   type ProportionRow,
 } from '../../src/lib/homeProportion';
 import type { RecruitAppFact } from '../../src/lib/recruitOverviewTypes';
-import { proportionAppReasonsSql, proportionEntrySql, proportionFollowRowsSql } from '../../api/_lib/homeProportionSql';
+import { proportionAppReasonsSql, proportionEntryGroupsSql, proportionFollowRowsSql } from '../../api/_lib/homeProportionSql';
 
 const read = (p: string) => readFileSync(p, 'utf8');
 
@@ -197,7 +197,7 @@ describe('โครงแผงของแต่ละเรื่อง (เ�
     const g = buildProportionGroups({ apps: null, payload: null });
     expect(g.map((x) => x.title)).toEqual(['งานสรรหา', 'ติดตามและดูแล', 'ทางเข้าของงาน']);
     expect(g.flatMap((x) => x.rows.map((r) => r.name))).toEqual([
-      'AI โทร Prescreen',
+      'โทร Prescreen',
       'โทรหลัง Prescreen',
       'นัดได้',
       'จับคู่งาน',
@@ -214,7 +214,7 @@ describe('โครงแผงของแต่ละเรื่อง (เ�
       to: '2026-10-28',
       bu: null,
       follow: null,
-      entry: { selfApply: 866, irecruit: 496, soScraping: 0, staffKeyed: 374 },
+      entry: { self: 866, irecruit: 496, soScraping: 0, staffWebjob: 300, staffFacebook: 50, staffTiktok: 20, staffOther: 4 },
       errors: {},
     };
     const entry = buildProportionGroups({ apps: [], payload }).find((x) => x.key === 'entry')!.rows;
@@ -262,8 +262,9 @@ describe('SQL + เส้น + หน้า', () => {
     expect(sql).toMatch(/and not \(/);
   });
   it('ทางเข้า: ไม่นับใบที่ยกเลิกข้อมูล · ไม่นับใบส่งคนแทน/โพสต์แล้ว', () => {
-    const sql = proportionEntrySql();
-    expect(sql.match(/not exists \(select 1 from .*application_cancellations/g)?.length).toBe(4);
+    const sql = proportionEntryGroupsSql();
+    expect(sql.match(/not exists \(select 1 from .*application_cancellations/g)?.length).toBe(1);
+    expect(sql).toContain('not coalesce(a.is_lead, false)');
     expect(sql).not.toContain('replace_sync');
     expect(sql).not.toContain('post_orders');
   });

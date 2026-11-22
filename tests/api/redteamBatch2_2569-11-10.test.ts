@@ -90,7 +90,10 @@ describe('อื่น ๆ', () => {
     expect(read('api/_handlers/home-presence.ts')).toContain("req.user.role === 'admin' ? { mode: 'all' }");
   });
   it('ทางเข้าระบบไม่นับ Lead ชุดเดียวกับการ์ดผู้สมัคร', () => {
-    expect(read('api/_lib/homeProportionSql.ts').match(/and not coalesce\(a\.is_lead, false\)/g)).toHaveLength(4);
+    // 22 พ.ย. 2569 รวมเป็นคิวรีจัดกลุ่มเดียว (แบ่งทางเข้าที่ Node `entryKindOf`) — ยังต้องตัด Lead
+    const sql = read('api/_lib/homeProportionSql.ts');
+    const entry = sql.slice(sql.indexOf('export function proportionEntryGroupsSql'), sql.indexOf('group by 1, 2, 3'));
+    expect(entry).toContain('and not coalesce(a.is_lead, false)');
   });
   it('ไฟล์สำรองที่มีข้อมูลลูกค้าไม่อยู่ใน repo', () => {
     expect(read('.gitignore')).toContain('scrub-locations-backup-*.json');

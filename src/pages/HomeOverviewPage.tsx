@@ -21,6 +21,8 @@ import PeriodPicker from '@/components/shared/PeriodPicker';
 import BuChoiceSelect from '@/components/shared/BuChoiceSelect';
 import ExecDrill, { useDrill } from '@/components/home-exec/ExecDrill';
 import JourneyNamesDialog from '@/components/dashboard-trends/JourneyNamesDialog';
+import TimeDrillSheet from '@/components/home-overview/TimeDrillSheet';
+import { isDrillBoxKey, type DrillBoxKey } from '@/lib/homeDrill';
 import FollowNamesDialog from '@/components/home-overview/FollowNamesDialog';
 import type { FollowBucketKey } from '@/lib/homeLumosSummary';
 import {
@@ -568,11 +570,25 @@ const HomeOverviewPage: React.FC<{
     setNames(null);
     setFollowNames(null);
     setBlockNames(null);
+    setDrillStep(null);
     drill.close();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- drill.close ตั้งค่าว่างเสมอ
   }, [dataKey]);
 
+  /**
+   * กดขั้นผู้สมัคร (และการ์ดผู้สมัคร) = แผงไล่ 12 เดือน → วัน → BU → เหตุผลก่อน (เจ้าของ 22 พ.ย. 2569 "อย่าพึ่งโชว์ข้อมูล")
+   * สรุปแบบเดิมของช่วงที่เลือก (แยกเจ้าหน้าที่ · ช่องทาง · ทางลัด) อยู่ปุ่ม "สรุปช่วงวันที่บนหน้า" ในแผง
+   */
+  const [drillStep, setDrillStep] = useState<{ box: DrillBoxKey; step: FunnelStep } | null>(null);
   const openStep = (s: FunnelStep) => {
+    if (isDrillBoxKey(s.key)) {
+      setPanel(null);
+      setDrillStep({ box: s.key, step: s });
+      return;
+    }
+    openStepSummary(s);
+  };
+  const openStepSummary = (s: FunnelStep) => {
     const staffRows = s.key === 'staff' || s.key === 'reached' ? (roNow?.staff ?? []).filter((x) => x.claimed + x.called > 0) : [];
     setPanel({
       // ผู้สมัคร (ขั้นแรก) มีกราฟเทียบ BU บนสุด — แผงกว้าง (10 พ.ย. 2569 "กดแล้วเป็นกราฟทุกการ์ด")
@@ -727,6 +743,18 @@ const HomeOverviewPage: React.FC<{
         title={followNames?.title ?? ''}
         q={winQ}
         bucket={followNames?.bucket ?? null}
+        contentStyle={v5 ? v5Style : undefined}
+      />
+      <TimeDrillSheet
+        box={drillStep?.box ?? null}
+        bu={bu}
+        onClose={() => setDrillStep(null)}
+        onNames={(title, ids) => {
+          setDrillStep(null);
+          openNames(title, ids);
+        }}
+        summary={drillStep ? { label: 'สรุปช่วงวันที่บนหน้า', onOpen: () => { const st = drillStep.step; setDrillStep(null); openStepSummary(st); } } : null}
+        go={drillStep ? { label: STEP_PAGE[drillStep.step.key].label, to: withRange(STEP_PAGE[drillStep.step.key].to, range) } : null}
         contentStyle={v5 ? v5Style : undefined}
       />
       <JourneyNamesDialog open={names !== null} onOpenChange={(o) => !o && setNames(null)} title={names?.title ?? ''} ids={names?.ids ?? []} contentStyle={v5 ? v5Style : undefined} />

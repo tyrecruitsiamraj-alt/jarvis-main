@@ -831,6 +831,19 @@ export const API_CATALOG: ApiCatalogEntry[] = [
   "reachesPeople": true
  },
  {
+  "path": "/api/home-drill",
+  "file": "api/_handlers/home-drill.ts",
+  "methods": [
+   "GET"
+  ],
+  "doc": "GET /api/home-drill?bu= — กดกล่องหน้าหลักแล้วไล่ 12 เดือน → รายวัน → BU → เหตุผล (เจ้าของ 22 พ.ย. 2569)\n\nใบสมัคร 12 เดือนล่าสุด (วันที่ 1 ของเดือนที่ย้อน 11 เดือน ถึงวันนี้ · วันที่กรอกตามเวลาไทย) จัดเข้าช่องของทุกกล่องที่ไล่เดือนได้\nด้วยตัวตัดสินเดียวกับเลขบนกล่อง — ขั้นผู้สมัคร 6 ขั้น · โทร Prescreen · โทรหลัง Prescreen · นัดได้ · ผู้สมัครเข้าระบบ\nคืนเป็นรหัสต่อใบ (`DrillPayload` ใน src/lib/homeDrill.ts) ไม่มีชื่อ/เบอร์ · หน้าเว็บนับเดือน/วัน/BU/เหตุผลเอง\nอ่านอย่างเดียว · BU ตามสิทธิ์ของคนที่เปิด (ชุดเดียวกับหน้าหลัก `pickDashboardBuSet`) · จำผลไว้ 2 นาทีต่อ BU",
+  "query": [
+   "bu"
+  ],
+  "body": [],
+  "reachesPeople": true
+ },
+ {
   "path": "/api/home-kpis",
   "file": "api/_handlers/home-kpis.ts",
   "methods": [

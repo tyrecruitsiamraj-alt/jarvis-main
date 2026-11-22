@@ -23,6 +23,7 @@ import type { TopicReport } from './homeTopicReport';
 import type { ToneKey } from './designTokens';
 import { aiStage, staffResultOf } from './recruitJourney';
 import { FOLLOW_DISPATCH_META, type FollowDispatchState } from './followDispatchState';
+import { ENTRY_KINDS, ENTRY_KIND_META, SYSTEM_ENTRY_KINDS, entryStaffTotal, entrySystemTotal, type EntryCounts } from './homeEntryKind';
 
 /** ช่องหนึ่งของขั้น · `stuck` = ค้างอยู่ ต้องมีคนทำ (ขึ้นในก้อน "งานที่ค้างอยู่" บนสุดของแท็บ) */
 export type LadderPart = { key: string; label: string; value: number; tone: ToneKey; stuck?: boolean };
@@ -402,6 +403,76 @@ function prescreenResultOf(a: RecruitAppFact): { talked: boolean; key: string } 
 }
 
 /**
+ * ใบหนึ่งใบอยู่ช่องไหนของแผง — ตัวตัดสินเดียวของแถวสรรหา 3 เรื่อง (22 พ.ย. 2569)
+ * แผงของแถว (`recruitProportionRows`) กับแผงไล่เดือน → วัน → BU → เหตุผล (`homeDrill`) เรียกชุดนี้ทั้งคู่ — เลขจึงเท่ากันเสมอ
+ */
+export type ProportionItem = { step: string; stepTitle: string; key: string; label: string; tone: ToneKey; stuck?: boolean };
+
+const TALKED_STEP = 'ติดต่อได้';
+const NOT_TALKED_STEP = 'ติดต่อไม่ได้';
+const WAITING_PARTS = [
+  { key: 'aiQueued', label: 'AI รอโทร', tone: 'info' },
+  { key: 'claimed', label: 'เจ้าหน้าที่เก็บไปแล้ว ยังไม่โทร', tone: 'violet', stuck: true },
+  { key: 'keyed', label: 'คนคีย์ / นำเข้า Excel รอคนโทร', tone: 'violet', stuck: true },
+] as const satisfies ReadonlyArray<{ key: string; label: string; tone: ToneKey; stuck?: boolean }>;
+const partOf = (list: ReadonlyArray<{ key: string; label: string; tone: ToneKey; stuck?: boolean }>, key: string) => list.find((p) => p.key === key)!;
+
+/** โทร Prescreen — ใบสมัครทุกใบอยู่ช่องเดียว: ติดต่อได้ · ติดต่อไม่ได้ · รอโทร · ไม่โทร (เหตุ) */
+export function prescreenItemOf(a: RecruitAppFact, fl: ProportionAppFlag | undefined, openJobIds: ReadonlySet<string> | null): ProportionItem {
+  if (a.calledByAi || a.calledByStaff) {
+    const r = prescreenResultOf(a);
+    const p = partOf(r.talked ? TALKED : NOT_TALKED, r.key);
+    return { step: r.talked ? 'talked' : 'notTalked', stepTitle: r.talked ? TALKED_STEP : NOT_TALKED_STEP, key: p.key, label: p.label, tone: p.tone };
+  }
+  const waiting = (key: (typeof WAITING_PARTS)[number]['key']): ProportionItem => ({ step: 'waiting', stepTitle: 'รอโทร', ...partOf(WAITING_PARTS, key) });
+  const notCalled = (label: string): ProportionItem => ({ step: 'notCalled', stepTitle: 'ไม่โทร', key: label, label, tone: label === UNKNOWN ? 'danger' : 'neutral', stuck: label === UNKNOWN });
+  const stage = aiStage(a);
+  if (stage === 'queued') return waiting('aiQueued');
+  if (fl?.claimed) return waiting('claimed');
+  if (stage === 'bad') return notCalled('เบอร์ผิด โทรไม่ได้');
+  if (stage === 'overAge') return notCalled('อายุ 58 ปีขึ้นไป ระบบไม่ส่ง AI');
+  if (stage === 'irecruit') return notCalled('ดึงจาก iRecruit AI ไม่โทรเอง');
+  // คนคีย์ / นำเข้า Excel = รอคนโทร ไม่ใช่ไม่โทร (เจ้าของ 29 ต.ค. 2569 "อันนี้ต้องบอกรอโทร")
+  if (fl?.reason === 'keyed') return waiting('keyed');
+  if (fl?.reason === 'block') return notCalled(fl.blockReason?.split(' — ')[0] || UNKNOWN);
+  if (fl?.reason) return notCalled(APP_NO_CALL_LABEL[fl.reason]);
+  if (openJobIds && a.jobId && !openJobIds.has(a.jobId)) return notCalled(APP_NO_CALL_LABEL.closed);
+  return notCalled(UNKNOWN);
+}
+
+const AFTER_WAIT_PARTS = [
+  { key: 'claimed', label: 'เก็บไปแล้ว ยังไม่โทร', tone: 'violet', stuck: true },
+  { key: 'nobody', label: 'ยังไม่มีใครเก็บ', tone: 'danger', stuck: true },
+] as const satisfies ReadonlyArray<{ key: string; label: string; tone: ToneKey; stuck?: boolean }>;
+
+/** โทรหลัง Prescreen — เฉพาะคนที่บอก AI ว่าสนใจ (ไม่ใช่ = null) */
+export function afterPrescreenItemOf(a: RecruitAppFact, fl: ProportionAppFlag | undefined): ProportionItem | null {
+  if (!(a.calledByAi && a.aiAnswer === 'said_yes')) return null;
+  const s = staffResultOf(a);
+  if (s === 'ok') return { step: 'talked', stepTitle: 'โทรไปแล้ว', key: 'ok', label: 'สนใจแล้วติดต่อได้', tone: 'success' };
+  if (s === 'fail') return { step: 'notTalked', stepTitle: 'โทรไปแล้ว', key: 'fail', label: 'ติดต่อไม่ได้', tone: 'danger' };
+  return { step: 'waiting', stepTitle: 'รอโทร', ...partOf(AFTER_WAIT_PARTS, fl?.claimed ? 'claimed' : 'nobody') };
+}
+
+const BOOKED_PARTS = [
+  { key: 'showed', label: 'มาตามนัด', tone: 'success' },
+  { key: 'noShow', label: 'ไม่มา', tone: 'danger' },
+  { key: 'upcoming', label: 'ยังไม่ถึงวันนัด', tone: 'info' },
+  { key: 'unrecorded', label: 'เลยวันนัดแล้ว ยังไม่ลงผล', tone: 'warn', stuck: true },
+] as const satisfies ReadonlyArray<{ key: string; label: string; tone: ToneKey; stuck?: boolean }>;
+
+/** นัดได้ — เฉพาะคนที่สนใจแล้วติดต่อได้ (ไม่ใช่ = null) */
+export function appointmentItemOf(a: RecruitAppFact, nowMs: number): ProportionItem | null {
+  if (!(a.calledByAi && a.aiAnswer === 'said_yes' && staffResultOf(a) === 'ok')) return null;
+  if (a.appointmentAt) {
+    const key = a.attendance === 'showed' ? 'showed' : a.attendance ? 'noShow' : Date.parse(a.appointmentAt) > nowMs ? 'upcoming' : 'unrecorded';
+    return { step: 'booked', stepTitle: 'นัดได้', ...partOf(BOOKED_PARTS, key) };
+  }
+  if (a.appointmentFailed === true) return { step: 'noBook', stepTitle: 'นัดไม่ได้', key: 'noBook', label: 'นัดไม่ได้', tone: 'danger' };
+  return { step: 'pendingBook', stepTitle: 'ยังไม่ลงนัด', key: 'pending', label: 'ติดต่อได้แล้ว ยังไม่ลงผลนัด', tone: 'warn', stuck: true };
+}
+
+/**
  * สรรหา 3 เรื่อง จากใบสมัครชุดเดียวกับหน้าหลัก (`ro.apps` · ช่วง/BU เดียวกัน)
  * `flags` = เหตุ/คนเก็บ จากฐาน · `openJobIds` = ใบขอที่เปิดอยู่ (null = อ่านไม่ได้ ⇒ ไม่เดาว่าปิด)
  */
@@ -424,23 +495,8 @@ export function recruitProportionRows(
     if (a.calledByAi && a.calledByStaff) both += 1;
     else if (a.calledByAi) ai += 1;
     else if (a.calledByStaff) staff += 1;
-    if (a.calledByAi || a.calledByStaff) {
-      const r = prescreenResultOf(a);
-      (r.talked ? talked : notTalked).push(r.key);
-      continue;
-    }
-    const stage = aiStage(a);
-    if (stage === 'queued') waiting.push('aiQueued');
-    else if (fl?.claimed) waiting.push('claimed');
-    else if (stage === 'bad') notCalled.push('เบอร์ผิด โทรไม่ได้');
-    else if (stage === 'overAge') notCalled.push('อายุ 58 ปีขึ้นไป ระบบไม่ส่ง AI');
-    else if (stage === 'irecruit') notCalled.push('ดึงจาก iRecruit AI ไม่โทรเอง');
-    // คนคีย์ / นำเข้า Excel = รอคนโทร ไม่ใช่ไม่โทร (เจ้าของ 29 ต.ค. 2569 "อันนี้ต้องบอกรอโทร")
-    else if (fl?.reason === 'keyed') waiting.push('keyed');
-    else if (fl?.reason === 'block') notCalled.push(fl.blockReason?.split(' — ')[0] || UNKNOWN);
-    else if (fl?.reason) notCalled.push(APP_NO_CALL_LABEL[fl.reason]);
-    else if (openJobIds && a.jobId && !openJobIds.has(a.jobId)) notCalled.push(APP_NO_CALL_LABEL.closed);
-    else notCalled.push(UNKNOWN);
+    const it = prescreenItemOf(a, fl, openJobIds);
+    (it.step === 'talked' ? talked : it.step === 'notTalked' ? notTalked : it.step === 'waiting' ? waiting : notCalled).push(it.key);
   }
   const called = ai + both + staff;
   const prescreen: Ladder = {
@@ -460,14 +516,7 @@ export function recruitProportionRows(
         key: 'waiting',
         title: 'รอโทร',
         value: waiting.length,
-        parts: tally(
-          [
-            { key: 'aiQueued', label: 'AI รอโทร', tone: 'info' },
-            { key: 'claimed', label: 'เจ้าหน้าที่เก็บไปแล้ว ยังไม่โทร', tone: 'violet', stuck: true },
-            { key: 'keyed', label: 'คนคีย์ / นำเข้า Excel รอคนโทร', tone: 'violet', stuck: true },
-          ],
-          waiting,
-        ),
+        parts: tally(WAITING_PARTS, waiting),
       },
       { key: 'notCalled', title: 'ไม่โทร', value: notCalled.length, parts: reasons(notCalled) },
     ],
@@ -475,12 +524,14 @@ export function recruitProportionRows(
   };
 
   // ── โทรหลัง Prescreen: คนที่บอก AI ว่าสนใจ ──
-  const interested = apps.filter((a) => a.calledByAi && a.aiAnswer === 'said_yes');
-  const ok = interested.filter((a) => staffResultOf(a) === 'ok');
-  const fail = interested.filter((a) => staffResultOf(a) === 'fail');
-  const afterWait = interested
-    .filter((a) => staffResultOf(a) === 'waiting')
-    .map((a) => (a.id && flagOf.get(a.id)?.claimed ? 'claimed' : 'nobody'));
+  const afterItems = apps.flatMap((a) => {
+    const it = afterPrescreenItemOf(a, a.id ? flagOf.get(a.id) : undefined);
+    return it ? [{ a, it }] : [];
+  });
+  const interested = afterItems.map((x) => x.a);
+  const ok = afterItems.filter((x) => x.it.key === 'ok').map((x) => x.a);
+  const fail = afterItems.filter((x) => x.it.key === 'fail').map((x) => x.a);
+  const afterWait = afterItems.filter((x) => x.it.step === 'waiting').map((x) => x.it.key);
   const afterCalled = ok.length + fail.length;
   const after: Ladder = {
     unit: 'คน',
@@ -498,13 +549,7 @@ export function recruitProportionRows(
         key: 'waiting',
         title: 'รอโทร',
         value: afterWait.length,
-        parts: tally(
-          [
-            { key: 'claimed', label: 'เก็บไปแล้ว ยังไม่โทร', tone: 'violet', stuck: true },
-            { key: 'nobody', label: 'ยังไม่มีใครเก็บ', tone: 'danger', stuck: true },
-          ],
-          afterWait,
-        ),
+        parts: tally(AFTER_WAIT_PARTS, afterWait),
       },
     ],
     checks: [],
@@ -512,9 +557,10 @@ export function recruitProportionRows(
 
   // ── นัดได้: จากที่ติดต่อสำเร็จทั้งหมด (เจ้าของ 29 ต.ค. 2569) ──
   const nowMs = Date.now();
-  const booked = ok.filter((a) => Boolean(a.appointmentAt));
-  const noBook = ok.filter((a) => !a.appointmentAt && a.appointmentFailed === true);
-  const pendingBook = ok.filter((a) => !a.appointmentAt && a.appointmentFailed !== true);
+  const apptItems = ok.map((a) => ({ a, it: appointmentItemOf(a, nowMs)! }));
+  const booked = apptItems.filter((x) => x.it.step === 'booked').map((x) => x.a);
+  const noBook = apptItems.filter((x) => x.it.step === 'noBook').map((x) => x.a);
+  const pendingBook = apptItems.filter((x) => x.it.step === 'pendingBook').map((x) => x.a);
   const showed = booked.filter((a) => a.attendance === 'showed');
   const passed = showed.filter((a) => a.screening === 'passed').length;
   const informed = showed.filter((a) => a.informed === true).length;
@@ -534,15 +580,8 @@ export function recruitProportionRows(
         title: 'นัดได้',
         value: booked.length,
         parts: tally(
-          [
-            { key: 'showed', label: 'มาตามนัด', tone: 'success' },
-            { key: 'noShow', label: 'ไม่มา', tone: 'danger' },
-            { key: 'upcoming', label: 'ยังไม่ถึงวันนัด', tone: 'info' },
-            { key: 'unrecorded', label: 'เลยวันนัดแล้ว ยังไม่ลงผล', tone: 'warn', stuck: true },
-          ],
-          booked.map((a) =>
-            a.attendance === 'showed' ? 'showed' : a.attendance ? 'noShow' : Date.parse(a.appointmentAt ?? '') > nowMs ? 'upcoming' : 'unrecorded',
-          ),
+          BOOKED_PARTS,
+          apptItems.filter((x) => x.it.step === 'booked').map((x) => x.it.key),
         ),
         sub: `มาแล้ว ผ่าน ${n(passed)} · แจ้งเข้า ERP ${n(informed)}`,
       },
@@ -562,7 +601,8 @@ export function recruitProportionRows(
   return [
     {
       key: 'prescreen',
-      name: 'AI โทร Prescreen',
+      // เจ้าของ 22 พ.ย. 2569 "Ai โทร Preescreen เปลี่ยนเป็น โทร Preescreen" — ในแถวมีทั้ง AI และคนโทร
+      name: 'โทร Prescreen',
       note: `ใบสมัคร ${n(apps.length)} ใบ`,
       ai,
       both,
@@ -655,12 +695,8 @@ export type ProportionPayload = {
   to: string | null;
   bu: string | null;
   follow: { starter: ProportionCallCounts; replacement: ProportionCallCounts; aftercare: ProportionCallCounts } | null;
-  entry: {
-    selfApply: number;
-    irecruit: number;
-    soScraping: number;
-    staffKeyed: number;
-  } | null;
+  /** ทางเข้าต่อทาง (`entryKindOf` · 22 พ.ย. 2569 แตกคนคีย์/นำเข้าตามช่องทาง) */
+  entry: EntryCounts | null;
   /** ใบสมัครที่ยังไม่มีเจ้าหน้าที่โทร: มีคนเก็บไว้ไหม + เหตุที่ AI ไม่โทร */
   apps?: ProportionAppFlag[] | null;
   errors: { follow?: string; entry?: string; apps?: string; aftercare?: string };
@@ -731,7 +767,9 @@ export function buildProportionGroups(input: {
   const recruit = recruitProportionRows(input.apps ?? [], input.payload?.apps ?? null, input.openJobIds ?? null);
   const f = input.payload?.follow;
   const e = input.payload?.entry;
-  const appsIn = e ? e.selfApply + e.irecruit + e.soScraping : 0;
+  const appsIn = e ? entrySystemTotal(e) : 0;
+  const staffIn = e ? entryStaffTotal(e) : 0;
+  const staffKinds = ENTRY_KINDS.filter((k) => !SYSTEM_ENTRY_KINDS.includes(k));
   return [
     { key: 'recruit', title: 'งานสรรหา', rows: [...recruit, matchingProportionRow(input.matchingReport ?? null)] },
     {
@@ -751,19 +789,17 @@ export function buildProportionGroups(input: {
           key: 'apps',
           name: 'ผู้สมัครเข้าระบบ',
           note: e
-            ? `สมัครเอง ${n(e.selfApply)} · ดึง iRecruit ${n(e.irecruit)}${e.soScraping ? ` · So Scraping ${n(e.soScraping)}` : ''} · คนคีย์/นำเข้า ${n(e.staffKeyed)}`
+            ? `สมัครเอง ${n(e.self)} · ดึง iRecruit ${n(e.irecruit)}${e.soScraping ? ` · So Scraping ${n(e.soScraping)}` : ''} · คนคีย์/นำเข้า ${n(staffIn)} (${staffKinds
+                .filter((k) => e[k] > 0)
+                .map((k) => `${ENTRY_KIND_META[k].short} ${n(e[k])}`)
+                .join(' · ') || '0'})`
             : 'ใบสมัคร',
           ai: appsIn,
           both: 0,
-          staff: e?.staffKeyed ?? 0,
+          staff: staffIn,
           none: 0,
           aiLabel: 'ระบบ',
-          parts: [
-            { key: 'self', label: 'สมัครเองผ่านลิงก์ / หน้าประกาศ', value: e?.selfApply ?? 0, tone: 'primary' },
-            { key: 'irecruit', label: 'ดึงจาก iRecruit', value: e?.irecruit ?? 0, tone: 'primary' },
-            { key: 'soScraping', label: 'So Scraping ส่งเข้ามา', value: e?.soScraping ?? 0, tone: 'primary' },
-            { key: 'staff', label: 'เจ้าหน้าที่คีย์ / นำเข้า Excel', value: e?.staffKeyed ?? 0, tone: 'violet' },
-          ],
+          parts: ENTRY_KINDS.map((k) => ({ key: k, label: ENTRY_KIND_META[k].label, value: e?.[k] ?? 0, tone: ENTRY_KIND_META[k].tone })),
         },
       ],
     },

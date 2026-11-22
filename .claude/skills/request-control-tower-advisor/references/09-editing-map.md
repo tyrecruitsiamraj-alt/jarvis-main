@@ -14515,3 +14515,21 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 - 22 พ.ย. 2569 (4): **ป๊อปผู้สมัคร แท็บข้อมูลผู้สมัคร มีช่อง "วันที่สมัคร" บอกวัน + เวลา** (เจ้าของ "สมัครก็ไม่ได้บอกเวลามา" · Choice "ป๊อปข้อมูลผู้สมัคร")
   · `ApplicantInfoPanel.tsx` ต่อจากช่อง "ที่มา" — `formatDateTimeTh(created_at)` ค่าเดียวกับคอลัมน์ วันที่สมัคร ของตาราง (ตารางยังเป็นวันที่อย่างเดียว) · ไม่มีค่า = ขีด
   · เทสต์ใน `ApplicantInfoPanel.recruiter.test.tsx`
+
+### 22 พ.ย. 2569 (5) — Dashboard แถว "ล่วงหน้า" แยกตามสถานะ
+เจ้าของ "ล่วงหน้าแยกออกมาแล้วเป็นอีกแถวที่บอกสถานะ แบบ ชะลอ เริ่มประเมิน รอแจ้งเข้า รอสัมภาษณ์ ฯลฯ" · Choice คงนิยาม "ยังไม่ถึงวันต้องการ"
+- `src/lib/dashboard/workStatusBox.ts` — `workStatusBoxIdOf` คืน `work_status_advance_<สถานะ>` สำหรับใบล่วงหน้าที่ยังไม่ถึงวันต้องการ (ทุกสถานะ) · `jobInWorkStatusBox` (กล่องรวมแถวล่วงหน้า = ทุกสถานะของแถว)
+- `buildWorkStatusKpis` คืน `{ main, advance }` → `DashboardData.workStatusKpis` (แถวบน) + `workStatusAdvanceKpis` (แถวล่วงหน้า) · "ทั้งหมด" บอกสมการ ถึงเวลาหาแล้ว + ล่วงหน้า
+- `DashboardShell.tsx` วางแถวล่วงหน้าใต้แถวบนในการ์ดเดียวกัน · `SupervisorDashboard.tsx` ใช้ `jobInWorkStatusBox` ตอนกดกล่อง
+- ⚠️ หน้าใบขอ/กล่องงานนับ "ล่วงหน้า" = ใบชนิดล่วงหน้าทุกใบ (รวมที่เลยวันต้องการแล้ว) — Dashboard นับเฉพาะยังไม่ถึงวัน เลขจึงต่างกันโดยตั้งใจ (เจ้าของเลือก 22 พ.ย.)
+- เทสต์ `tests/api/dashboardAdvanceBox2569-11-22.test.ts`
+
+### 22 พ.ย. 2569 (6) — หน้าหลัก: กดกล่องแล้วไล่ 12 เดือน → รายวัน → BU → เหตุผล + ผู้สมัครเข้าระบบแตกที่มา
+- `src/lib/homeDrill.ts` (pure) จัดใบเข้าช่องทุกกล่อง (ขั้นผู้สมัคร 6 ขั้น + โทร Prescreen / โทรหลัง Prescreen / นัดได้ / ผู้สมัครเข้าระบบ) ด้วยตัวตัดสินเดียวกับเลขบนกล่อง + ตัวนับฝั่งหน้าเว็บ (เดือน/วัน/BU/เหตุผล/รายชื่อ)
+- `api/_handlers/home-drill.ts` GET อ่านอย่างเดียว ใบสมัคร 12 เดือนแบบเบา (`loadFacts` + `toFact(r, null)` ไม่ดึงแจ้งเข้า ERP) จำ 2 นาที/BU · ลงทะเบียนใน registry
+- `src/components/home-overview/TimeDrillSheet.tsx` แผง (แท่ง 100% สี BU ชุด `buDot` · ตาราง BU ยอด+% · เหตุผลยอด+%) · ปุ่ม "สรุปช่วงวันที่บนหน้า" = แผงเดิม (ไม่ถอดของเดิม)
+- `homeProportion.ts` แยก `prescreenItemOf` / `afterPrescreenItemOf` / `appointmentItemOf` ให้แผงแถวกับแผงไล่เดือนใช้ตัวเดียวกัน
+- `src/lib/homeEntryKind.ts` ทางเข้า 7 ทาง (สมัครเอง · iRecruit · So Scraping · เว็บหางาน · Facebook · TikTok · อื่น) — `proportionEntryGroupsSql` ส่งช่องดิบ แบ่งที่ Node ที่เดียว
+- แถว "AI โทร Prescreen" เปลี่ยนชื่อเป็น "โทร Prescreen" (เจ้าของ 22 พ.ย.)
+- ยังไม่ทำ (รอบถัดไป): กล่องใบขอ/เงิน/ติดตาม/ดูแลหลังเริ่มงาน/จับคู่งาน ยังเปิดแผงเดิม
+- เทสต์ `tests/api/homeDrill2569-11-22.test.ts`

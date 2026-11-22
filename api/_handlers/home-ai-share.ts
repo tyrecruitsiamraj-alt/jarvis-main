@@ -36,7 +36,8 @@ import {
   FOLLOW_QUEUE_MATCH,
 } from '../_lib/homeAiShareSql.js';
 import { logWarn } from '../_lib/logger.js';
-import { proportionAftercarePeopleSql, proportionAppReasonsSql, proportionEntrySql, proportionFollowRowsSql } from '../_lib/homeProportionSql.js';
+import { proportionAftercarePeopleSql, proportionAppReasonsSql, proportionEntryGroupsSql, proportionFollowRowsSql } from '../_lib/homeProportionSql.js';
+import { summarizeEntry } from '../../src/lib/homeEntryKind.js';
 import { summarizeAftercarePeople, summarizeFollowLane, type AppNoCallReason, type ProportionPayload } from '../../src/lib/homeProportion.js';
 import { normalizeTrendBu } from '../../src/lib/trends/bu.js';
 import { AFTERCARE_TOPIC } from '../../src/lib/aftercareRounds.js';
@@ -695,7 +696,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
           bu,
           AFTERCARE_TOPIC,
         ]),
-        dbQuery<Record<string, number>>(proportionEntrySql(), [start, end, bu]),
+        dbQuery<{ source: string | null; created_by: string | null; channel_group: string | null; n: number }>(proportionEntryGroupsSql(), [start, end, bu]),
         dbQuery<{ id: string; job_id: string | null; claimed: boolean; reason: AppNoCallReason | null; block_reason: string | null }>(
           proportionAppReasonsSql(),
           [start, end, bu],
@@ -764,13 +765,8 @@ async function handler(req: AuthedReq, res: ApiRes) {
         body.errors.apps = 'โหลดเหตุที่ยังไม่โทรไม่ขึ้น';
       }
       if (er.status === 'fulfilled') {
-        const r = er.value.rows[0] ?? {};
-        body.entry = {
-          selfApply: r.self_apply ?? 0,
-          irecruit: r.irecruit ?? 0,
-          soScraping: r.so_scraping ?? 0,
-          staffKeyed: r.staff_keyed ?? 0,
-        };
+        // แบ่งทางเข้าที่ Node ตัวเดียวกับแผงไล่เดือน (`entryKindOf`) — 22 พ.ย. 2569 แตกคนคีย์/นำเข้าตามช่องทาง
+        body.entry = summarizeEntry(er.value.rows.map((r) => ({ source: r.source, createdBy: r.created_by, channelLabel: r.channel_group, n: r.n })));
       } else {
         logWarn('home-ai-share proportion entry failed', { error: errText(er.reason) });
         body.errors.entry = 'โหลดตัวเลขทางเข้าไม่ขึ้น';

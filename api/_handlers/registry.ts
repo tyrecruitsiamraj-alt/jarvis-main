@@ -142,6 +142,7 @@ import officeFloorHandler from './office-floor.js';
 import homeOverviewHandler from './home-overview.js';
 import teamOnlineHandler from './team-online.js';
 import homeAiShareHandler from './home-ai-share.js';
+import homeDrillHandler from './home-drill.js';
 import homePresenceHandler from './home-presence.js';
 import officeTeamHandler from './office-team.js';
 import callScriptsHandler from './call-scripts.js';
@@ -231,6 +232,7 @@ export const apiRoutes: Record<string, ApiHandler> = {
   '/api/team-online': teamOnlineHandler as ApiHandler,
   // หน้าหลัก "ระบบไปกี่ %" — AI โทร vs คนโทร (30 ก.ย. 2569 · ตัวนับ read-only ไม่มีข้อมูลบุคคล)
   '/api/home-ai-share': homeAiShareHandler as ApiHandler,
+  '/api/home-drill': homeDrillHandler as ApiHandler,
   // ใครอยู่ในระบบ ท้ายหน้าหลัก (30 ก.ย. 2569 · ชื่อคนเฉพาะหัวหน้า/ผู้ดูแล)
   '/api/home-presence': homePresenceHandler as ApiHandler,
   '/api/office-team': officeTeamHandler as ApiHandler,
