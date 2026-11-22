@@ -68,6 +68,7 @@ const req = (no: string, bu: string, flow: [number, number, number, number, numb
   remaining: flow[4],
   applications: 0,
   ageDays: 12,
+  released: true,
   signals: { post: 'posted', released: true, links: 1 },
   flow: { carryIn: flow[0], new: flow[1], filled: flow[2], cancelled: flow[3], remaining: flow[4], fillDays: [], cancelDays: [] },
 });
@@ -115,7 +116,7 @@ type Body = {
   bus: string[];
   sections: Array<{ title: string; equation?: string; boxes: Array<{ key: string; value: number | null; prev?: number | null }> }>;
   people?: Array<Record<string, unknown>>;
-  alsoIn?: unknown;
+  byBu?: Array<Record<string, unknown>>;
   errors: string[];
   message?: string;
   breakdown?: { rows: Array<{ label: string; value: number }> };
@@ -188,11 +189,13 @@ describe('GET /api/exec-summary', () => {
     expect((await call({ bu: 'LBD', who: 'ใครก็ไม่รู้' })).body.errors).toEqual(['ไม่เจอ ใครก็ไม่รู้ ใน LBD — ชื่อที่มี: คิว, โอ๊ต']);
   });
 
-  it('ถามถึงคนด้วยชื่ออย่างเดียว = หา BU ที่คนนั้นสังกัดให้ (คนที่ช่วงนี้ไม่มีงานก็เจอ) · ส่ง bu มาด้วย = ดูเฉพาะ BU นั้น', async () => {
-    expect((await call({ who: 'คิว' })).body.level).toEqual(['ทั้งหมด', 'LBD', 'คิว']);
-    expect((await call({ who: ' ฟอร์ด ' })).body.level).toEqual(['ทั้งหมด', 'LBA', 'ฟอร์ด']);
-    expect((await call({ who: 'โอ๊ต' })).body.level).toEqual(['ทั้งหมด', 'LBD', 'โอ๊ต']);
-    expect((await call({ who: 'คิว', day: '2026-11-20' })).body.level).toEqual(['ทั้งหมด', 'LBD', 'คิว', '20 พ.ย.']);
+  it('ถามถึงคนด้วยชื่ออย่างเดียว = คนนั้นรวมทุก BU + แยก BU (คนที่ช่วงนี้ไม่มีงานก็เจอ) · ส่ง bu มาด้วย = ดูเฉพาะ BU นั้น', async () => {
+    const q = await call({ who: 'คิว' });
+    expect([q.body.level, q.body.byBu]).toEqual([['ทั้งหมด', 'คิว'], [{ BU: 'LBD', สังกัด: 'สังกัด BU นี้', รายชื่อ: 2 }]]);
+    expect((await call({ who: ' ฟอร์ด ' })).body.level).toEqual(['ทั้งหมด', 'ฟอร์ด']);
+    expect((await call({ who: 'โอ๊ต' })).body.level).toEqual(['ทั้งหมด', 'โอ๊ต']);
+    expect((await call({ who: 'คิว', day: '2026-11-20' })).body.level).toEqual(['ทั้งหมด', 'คิว', '20 พ.ย.']);
+    expect((await call({ bu: 'LBD', who: 'คิว' })).body.level).toEqual(['ทั้งหมด', 'LBD', 'คิว']);
     const other = await call({ bu: 'LBA', who: 'คิว' });
     expect([other.body.level, other.body.errors]).toEqual([['ทั้งหมด', 'LBA'], ['ไม่เจอ คิว ใน LBA — ชื่อที่มี: ฟอร์ด']]);
   });

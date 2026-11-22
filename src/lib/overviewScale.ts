@@ -819,6 +819,28 @@ export function scalePostingStates(inp: ScaleInput, lv: ScaleLevel): ScalePostin
     };
   });
 }
+export type ScaleAnnounce = { open: number; notReleased: number; notReleasedWithApps: number; released: number; releasedWithApps: number; releasedNoApps: number };
+/**
+ * ใบที่เหลือหาของชั้น: ประกาศแล้ว / ยังไม่ประกาศ → มีคนกรอก / ไม่มีคนกรอก
+ * ตัวแบ่งเดียวกับการ์ด "ใบขอเข้ามา" (`buildRequestFunnel`: ช่อง `released` · `applications`) — "ประกาศ" ของเจ้าของ = ขึ้นหน้าประกาศ ไม่ใช่โพสต์
+ * ยังไม่ประกาศ + ประกาศแล้ว = กล่อง "เหลือหา (ใบ)" (มีเทสต์) · null = ชั้นนี้ไม่มีเรื่องใบขอ
+ * (ผู้ช่วยถูกถาม "ใบที่ประกาศไปแล้ว มีคนสมัครไหม" แล้วตอบจากแถว "โพสต์แล้ว" ของหลักฐานการออกหาคน ซึ่งเป็นคนละเรื่อง · ถามซ้ำบนเว็บจริง 22 พ.ย. 2569)
+ */
+export function scaleAnnounce(inp: ScaleInput, lv: ScaleLevel): ScaleAnnounce | null {
+  if (!scopeOf(inp, lv).requests) return null;
+  const open = scaleRequestsOf(inp, lv, 'remaining');
+  const released = open.filter((r) => r.released);
+  const hidden = open.filter((r) => !r.released);
+  const withApps = (list: readonly StuckRequest[]) => list.filter((r) => r.applications > 0).length;
+  return {
+    open: open.length,
+    notReleased: hidden.length,
+    notReleasedWithApps: withApps(hidden),
+    released: released.length,
+    releasedWithApps: withApps(released),
+    releasedNoApps: released.length - withApps(released),
+  };
+}
 const moneyJobKey = (r: Pick<MoneyRequest, 'requestNo'>): string => ledgerJobIdOf({ requestNo: r.requestNo, prequest: r.requestNo.startsWith(PREQUEST_LEDGER_PREFIX) }).toUpperCase();
 const stuckJobKey = (r: Pick<StuckRequest, 'jobId' | 'requestNo'>): string => (r.jobId ?? `siamraj-sql:${r.requestNo}`).trim().toUpperCase();
 /**

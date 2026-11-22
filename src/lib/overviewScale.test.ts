@@ -54,6 +54,7 @@ import {
   scalePenaltyRows,
   scalePeopleTable,
   scalePostingStates,
+  scaleAnnounce,
   scaleBusOfPerson,
   scaleNamesByBringer,
   scaleStaffNamer,
@@ -67,6 +68,7 @@ import {
   type ScaleReqRole,
 } from './overviewScale';
 import { NO_REASON } from './homeExec';
+import { buildRequestFunnel } from './recruitRequestTab';
 
 const fact = (id: string, over: Partial<RecruitAppFact> = {}): RecruitAppFact => ({
   id,
@@ -741,6 +743,20 @@ describe('ของที่ผู้ช่วย AI ต้องใช้ตอ
     // ชั้นวัน ไม่มีเรื่องใบขอ · ใบขอยังโหลดไม่ได้ = ไม่มีก้อนนี้ (ไม่ใช่ 0)
     expect(scalePostingStates(INPUT, at({ day: '2026-11-20' }))).toBeNull();
     expect(scalePostingStates({ ...INPUT, requests: null }, at())).toBeNull();
+  });
+
+  it('ประกาศแล้ว / ยังไม่ประกาศ → มีคนกรอก / ไม่มีคนกรอก: ตัวแบ่งเดียวกับการ์ดใบขอเข้ามา (`buildRequestFunnel`) · รวมกัน = เหลือหา (ใบ) ทุกชั้น', () => {
+    // ช่อง released ของจริงมาคู่กับ signals.released — ใบที่มีคนกรอกทั้งที่ยังไม่ประกาศก็มี (มาทางลิงก์อื่น)
+    const requests = REQUESTS.map((r) => ({ ...r, released: r.signals.released, applications: r.requestNo === 'OPL6910100' ? 2 : r.applications }));
+    const inp: ScaleInput = { ...INPUT, requests };
+    for (const lv of [at(), at({ bu: 'LBD' }), at({ bu: 'LBA' }), at({ bu: 'LM' }), at({ bu: 'LBD', who: 'คิว' })]) {
+      const a = scaleAnnounce(inp, lv);
+      expect([a?.open, (a?.released ?? 0) + (a?.notReleased ?? 0), (a?.releasedWithApps ?? 0) + (a?.releasedNoApps ?? 0)]).toEqual([val(lv, 'reqCount', inp), val(lv, 'reqCount', inp), a?.released]);
+    }
+    expect(scaleAnnounce(inp, at())).toEqual({ open: 5, notReleased: 4, notReleasedWithApps: 1, released: 1, releasedWithApps: 1, releasedNoApps: 0 });
+    const funnel = buildRequestFunnel(scaleRequestsOf(inp, at(), 'remaining')).active;
+    expect([funnel.requests, funnel.notReleased, funnel.notReleasedWithApps.requests, funnel.releasedWithApps, funnel.releasedNoApps]).toEqual([5, 4, 1, 1, 0]);
+    expect([scaleAnnounce(inp, at({ day: '2026-11-20' })), scaleAnnounce({ ...inp, requests: null }, at())]).toEqual([null, null]);
   });
 
   it('หา BU ของคนจากชื่ออย่างเดียว: BU ที่สังกัดก่อน · ไม่สนช่องว่างหัวท้าย · คนที่ช่วงนี้ไม่มีงานก็เจอ · ไม่เจอ = ว่าง', () => {

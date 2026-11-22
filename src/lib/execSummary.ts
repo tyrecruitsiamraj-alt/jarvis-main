@@ -10,6 +10,7 @@ import type { StaffKindCounts, StaffRosterRow } from '@/lib/staffActivity';
 import { STAFF_PERSON_KINDS, staffWorkTotal } from '@/lib/staffActivity';
 import { POSTING_STATE_LABEL, isPostingStarted, postingStateOf } from '@/lib/recruitPostingState';
 import { flowOf, recruiterLabelOf, type StuckRequest } from '@/lib/recruitStuck';
+import { REQUEST_FUNNEL_LABEL } from '@/lib/recruitRequestTab';
 import { buildRequestTimeline, type RequestTimelineJob } from '@/lib/requestTimeline';
 import {
   SCALE_CHAIN,
@@ -18,6 +19,7 @@ import {
   SCALE_HOLD,
   SCALE_ROOT,
   SCALE_VERSUS_LABEL,
+  scaleAnnounce,
   scaleBoxOf,
   scaleBreakdown,
   scaleBreakdownCompared,
@@ -79,15 +81,17 @@ export type ExecSummary = {
   /** BU ที่มีข้อมูลในช่วง (ค่าที่ส่ง `bu` ได้) */
   bus: string[];
   sections: Array<{ title: string; equation?: string; boxes: ExecBox[] }>;
-  /** ตาราง "แยกตาม BU" (ชั้นทั้งหมด) */
+  /** ชั้นทั้งหมด = ตาราง "แยกตาม BU" · ชั้นคนที่ไม่ระบุ BU = รายชื่อที่คนนั้นหามา แยก BU (รวมกัน = กล่องรายชื่อ) */
   byBu?: ExecRow[];
   /** ชั้น BU = ตาราง "แยกตามคน" ครบสาย (รายชื่อ = ที่หาให้ BU นี้) · ชั้นทั้งหมด = ทุกคนของทุก BU แบบย่อ (BU ที่สังกัด · งานที่ทำ · รายชื่อที่หามารวมทุก BU) */
   people?: ExecRow[];
   /** แถว "เฉลี่ยต่อคน" ของตารางแยกตามคน */
   peopleAverage?: ExecRow;
-  /** ตาราง "รายชื่ออยู่ที่ใคร" — ชั้นทั้งหมดมีคอลัมน์ BU */
+  /** ตาราง "รายชื่ออยู่ที่ใคร" — ชั้นทั้งหมดมีคอลัมน์ BU · `รับมาโทร` = ยอดที่รับไปทั้งหมด ไม่ใช่ยอดค้าง */
   hold?: ExecRow[];
-  /** รายชื่อที่คนนี้หาให้ BU ในชั้น แยกช่องทาง (ชั้นคน) — แถวบอก BU ไว้ */
+  /** รายชื่อค้างที่ใคร: คนที่รับไปแล้วยังไม่ลงผล (รวมกัน = กล่อง "ยังไม่ลงผล") · ว่าง = ไม่มีใครค้าง */
+  waiting?: ExecRow[];
+  /** รายชื่อที่คนนี้หามา แยกช่องทาง (ชั้นคน) — แถวบอกขอบเขตไว้ที่ช่อง BU (รหัส BU ในชั้น หรือ "ทุก BU") */
   channels?: ExecRow[];
   /** วันนั้นใครทำอะไร (ชั้นวัน) */
   dayPeople?: ExecRow[];
@@ -99,7 +103,9 @@ export type ExecSummary = {
   fit?: { stages: ExecRow[]; areaUnknownWhy: Array<{ reason: string; people: number }> };
   /** คนในแต่ละขั้นไปไหนต่อ (ช่องรวมกัน = total) · `reasons` มีเฉพาะช่องที่เจ้าหน้าที่ลงเหตุผล — ช่องที่ไม่มี = ระบบไม่ได้เก็บเหตุผล */
   next?: Array<{ from: string; total: number; parts: Array<{ label: string; value: number; reasons?: string }> }>;
-  /** ใบที่เหลือหา ออกไปหาคนถึงไหน ใบละสถานะเดียว · `summary` = ยอดรวมที่บวกไว้ให้แล้ว */
+  /** ใบที่เหลือหา: ประกาศแล้ว (มีคนกรอก / ไม่มีคนกรอก) · ยังไม่ประกาศ — ประกาศ = ขึ้นหน้าประกาศ · ประกาศแล้ว + ยังไม่ประกาศ = เหลือหา (ใบ) */
+  announce?: ExecRow;
+  /** ใบที่เหลือหา แยกตามหลักฐานการออกหาคน (โพสต์ · ลิงก์ · Autopost) ใบละสถานะเดียว — คนละเรื่องกับ "ประกาศ" · `summary` = ยอดรวมที่บวกไว้ให้แล้ว */
   posting?: { summary: ExecRow; rows: ExecRow[] };
   cancelReasons?: ExecRow[];
   topCustomers?: ExecRow[];
@@ -111,7 +117,7 @@ export type ExecSummary = {
   /** รายใบของกล่องใบขอที่ขอ (ต้องอยู่ชั้น BU ลงไป) — ดูใบเดียวต่อด้วย `request=<เลขที่ใบขอ>` */
   requests?: ExecRow[];
   /**
-   * ชั้นคน เมื่อคนนี้หารายชื่อให้หลาย BU: กล่อง/ช่องทางของชั้นนี้นับเฉพาะ BU ในชั้น (เหมือนจอ) — ก้อนนี้คือยอดรวมทุก BU
+   * ชั้นคนที่ระบุ BU เมื่อคนนี้หารายชื่อให้หลาย BU: กล่อง/ช่องทางของชั้นนี้นับเฉพาะ BU ในชั้น (เหมือนจอ) — ก้อนนี้คือยอดรวมทุก BU
    * `byBu` รวมกัน = `รายชื่อรวมทุก BU` = `channels` รวมกัน · ดูครบสายของ BU อื่นด้วย bu=<BU>&who=<ชื่อ>
    */
   allBus?: { 'รายชื่อรวมทุก BU': number; byBu: ExecRow[]; channels: ExecRow[] };
@@ -201,9 +207,31 @@ export function buildExecSummary(a: ExecSummaryArgs): ExecSummary {
     errors,
   };
 
+  const holdOf = new Map<string, ScaleHoldRow[]>();
+  const holdRows = (bu: string) => holdOf.get(bu) ?? (holdOf.set(bu, scaleHoldTable(input, bu).rows), holdOf.get(bu) ?? []);
+  const waitRow = (r: ScaleHoldRow, bu?: string): ExecRow => ({ คน: r.name, ...(bu ? { BU: bu } : {}), [HOLD_LABEL.hWait]: r.wait, 'ค้างนานสุด (วัน)': r.oldestDays });
   if (level.day && !level.who) {
     const t = scaleDayTable(input, level);
     out.dayPeople = t.rows.slice(0, 30).map((r) => ({ คน: r.name, BU: r.bu, รวม: r.sum, ...workRow(r.work) }));
+  } else if (level.who) {
+    if (!level.day) {
+      const t = scaleChainTable(input, level);
+      // แถวบอกขอบเขตของตัวเอง (BU ในชั้น / ทุก BU) — ห้ามปนกันเมื่อคนเดียวหารายชื่อให้หลาย BU
+      out.channels = t.rows.slice(0, 20).map((r) => ({ [t.by === 'group' ? 'กลุ่ม' : 'ช่องทาง']: r.label, BU: level.bu ?? 'ทุก BU', ...chainRow(r.chain) }));
+    }
+    if (!level.ch && !level.grp && !level.day) {
+      const spots = scaleBusOfPerson(input, level.who, a.roster);
+      // ไม่ระบุ BU = ทั้งชั้นนับรวมทุก BU ของคนนั้นอยู่แล้ว — แยก BU ให้ทานกับจอได้ทีละ BU (รวมกัน = กล่องรายชื่อ)
+      if (!level.bu) out.byBu = spots.map((x) => ({ BU: x.bu, สังกัด: x.member ? 'สังกัด BU นี้' : 'หารายชื่อให้ BU นี้', [SCALE_CHAIN[0].label]: x.names }));
+      else if (spots.length > 1) {
+        const t = scaleChainTable(input, { ...SCALE_ROOT, who: level.who });
+        out.allBus = {
+          'รายชื่อรวมทุก BU': t.total.chain[0],
+          byBu: spots.map((x) => ({ BU: x.bu, [SCALE_CHAIN[0].label]: x.names })),
+          channels: t.rows.slice(0, 20).map((r) => ({ ช่องทาง: r.label, BU: 'ทุก BU', ...chainRow(r.chain) })),
+        };
+      }
+    }
   } else if (!level.bu) {
     out.byBu = scaleBuTable(input).rows.map((r) => ({
       BU: r.bu,
@@ -222,12 +250,16 @@ export function buildExecSummary(a: ExecSummaryArgs): ExecSummary {
       .sort((x, y) => (y.r.work ?? -1) - (x.r.work ?? -1) || y.r.chain[0] - x.r.chain[0] || x.r.name.localeCompare(y.r.name, 'th'))
       .slice(0, 40)
       .map(({ bu, r }) => ({ คน: r.name, BU: bu, ทำล่าสุด: r.lastDay, 'ไม่มีงานมา (วัน)': r.idleDays, งานที่ทำ: r.work, 'รายชื่อที่หามา (ทุก BU)': namesAll.get(r.name) ?? 0 }));
-    out.hold = bus
-      .flatMap((bu) => scaleHoldTable(input, bu).rows.map((r) => ({ bu, r })))
+    const held = bus.flatMap((bu) => holdRows(bu).map((r) => ({ bu, r })));
+    out.hold = [...held]
       .sort((x, y) => y.r.all - x.r.all || x.r.name.localeCompare(y.r.name, 'th'))
       .slice(0, 30)
       .map(({ bu, r }) => holdRow(r, bu));
-  } else if (!level.who) {
+    out.waiting = held
+      .filter((x) => x.r.wait > 0)
+      .sort((x, y) => y.r.wait - x.r.wait || (y.r.oldestDays ?? 0) - (x.r.oldestDays ?? 0) || x.r.name.localeCompare(y.r.name, 'th'))
+      .map(({ bu, r }) => waitRow(r, bu));
+  } else {
     const t = scalePeopleTable(input, level.bu, a.roster);
     out.people = t.rows.slice(0, 30).map((r) => ({
       คน: r.name,
@@ -240,24 +272,13 @@ export function buildExecSummary(a: ExecSummaryArgs): ExecSummary {
       ...(r.versus ? { เทียบกับทีม: SCALE_VERSUS_LABEL[r.versus] } : {}),
     }));
     out.peopleAverage = { คนทำงาน: t.average.people, งานที่ทำ: Math.round(t.average.work), ...chainRow(t.average.chain.map((v) => Math.round(v))) };
-    out.hold = scaleHoldTable(input, level.bu)
-      .rows.slice(0, 30)
+    out.hold = holdRows(level.bu)
+      .slice(0, 30)
       .map((r) => holdRow(r));
-  } else if (!level.day) {
-    const t = scaleChainTable(input, level);
-    // แถวบอก BU ของตัวเอง — คนที่หารายชื่อให้หลาย BU มีอีกชุดใน `allBus.channels` (ทุก BU) ห้ามปนกัน
-    out.channels = t.rows.slice(0, 20).map((r) => ({ [t.by === 'group' ? 'กลุ่ม' : 'ช่องทาง']: r.label, BU: level.bu, ...chainRow(r.chain) }));
-  }
-  if (level.who && level.bu && !level.ch && !level.grp && !level.day) {
-    const spots = scaleBusOfPerson(input, level.who, a.roster);
-    if (spots.length > 1) {
-      const t = scaleChainTable(input, { ...SCALE_ROOT, who: level.who });
-      out.allBus = {
-        'รายชื่อรวมทุก BU': t.total.chain[0],
-        byBu: spots.map((x) => ({ BU: x.bu, [SCALE_CHAIN[0].label]: x.names })),
-        channels: t.rows.slice(0, 20).map((r) => ({ ช่องทาง: r.label, BU: 'ทุก BU', ...chainRow(r.chain) })),
-      };
-    }
+    out.waiting = holdRows(level.bu)
+      .filter((r) => r.wait > 0)
+      .sort((x, y) => y.wait - x.wait || (y.oldestDays ?? 0) - (x.oldestDays ?? 0))
+      .map((r) => waitRow(r));
   }
 
   if (!level.ch && !level.grp && input.staff) out.days = Object.fromEntries(scaleDaySeries(input, level).map((d) => [d.day, d.value]));
@@ -275,6 +296,17 @@ export function buildExecSummary(a: ExecSummaryArgs): ExecSummary {
   out.next = NEXT_KEYS.map((k) => ({ label: scaleBoxOf(sections, k)?.label ?? k, n: scaleNext(input, level, k) }))
     .filter((x): x is { label: string; n: NonNullable<ReturnType<typeof scaleNext>> } => Boolean(x.n))
     .map((x) => ({ from: x.label, total: x.n.total, parts: x.n.parts.map((p) => ({ label: p.label, value: p.value, ...(top3(p.reasons) ? { reasons: top3(p.reasons) } : {}) })) }));
+
+  const announce = scaleAnnounce(input, level);
+  if (announce)
+    out.announce = {
+      'เหลือหา (ใบ)': announce.open,
+      [REQUEST_FUNNEL_LABEL.released]: announce.released,
+      [REQUEST_FUNNEL_LABEL.releasedWithApps]: announce.releasedWithApps,
+      [REQUEST_FUNNEL_LABEL.releasedNoApps]: announce.releasedNoApps,
+      [REQUEST_FUNNEL_LABEL.notReleased]: announce.notReleased,
+      'ยังไม่ประกาศ แต่มีคนกรอกแล้ว': announce.notReleasedWithApps,
+    };
 
   const posting = level.day ? null : scalePostingStates(input, level);
   if (posting) {
