@@ -28,7 +28,7 @@ import {
 import { buildCohortDrillDown, type CohortDrillKpi } from '@/lib/dashboard/cohortDrillDown';
 import { isPrequestJob } from '@/lib/publicJobVisibility';
 import { LEAD_AMOUNT_LABEL, NO_STATUS_LABEL, buildCohortLeadPanel, buildStatusLeadPanel, filterLeadPanel } from '@/lib/dashboard/statusLeadPanel';
-import { workStatusBoxIdOf } from '@/lib/dashboard/workStatusBox';
+import { WORK_STATUS_ADVANCE_ID, advanceStatusBoxId, isAdvanceStatusBoxId, jobInWorkStatusBox } from '@/lib/dashboard/workStatusBox';
 import {
   buildLeadKindBreakdown,
   leadKindMismatchNote,
@@ -94,8 +94,8 @@ const COHORT_KPI_IDS: readonly CohortDrillKpi[] = ['total_requests', 'closed', '
 const WORK_STATUS_OF_KPI: Record<string, string | null> = {
   work_status_total: null,
   work_status_in_progress: 'in_progress',
-  /** ล่วงหน้าที่ยังไม่ถึงวันต้องการ — แยกจากกำลังดำเนินการสรรหา (22 พ.ย. 2569 · `workStatusBoxIdOf`) */
-  work_status_advance: 'in_progress',
+  /** แถวล่วงหน้า (ยังไม่ถึงวันต้องการ · 22 พ.ย. 2569 · `workStatusBox.ts`) — กล่องแรกของแถว = ล่วงหน้าทุกสถานะ */
+  [WORK_STATUS_ADVANCE_ID]: 'advance',
   work_status_on_hold: 'on_hold',
   work_status_evaluating: 'evaluating',
   work_status_waiting_inform: 'waiting_inform',
@@ -106,6 +106,9 @@ const WORK_STATUS_OF_KPI: Record<string, string | null> = {
   work_status_daily_pay: 'daily_pay',
   /** ใบ ERP ที่ไม่อยู่ใน feed — มีเฉพาะโหมดมีงวด (ยอด cohort เกินผลรวมสถานะ) */
   work_status_none: null,
+  ...Object.fromEntries(
+    ['in_progress', 'on_hold', 'evaluating', 'waiting_inform', 'waiting_interview', 'waiting_result', 'waiting_start', 'daily_work', 'daily_pay'].map((st) => [advanceStatusBoxId(st), st]),
+  ),
 };
 
 const DEMO_MODE = import.meta.env.VITE_DASHBOARD_DEMO === 'true';
@@ -837,7 +840,7 @@ const SupervisorDashboard: React.FC = () => {
   const pickId = searchParams.get('pick');
   const statusPick = useMemo(() => {
     if (!pickId) return null;
-    const all = [...data.kpis, ...(data.workStatusKpis ?? [])];
+    const all = [...data.kpis, ...(data.workStatusKpis ?? []), ...(data.workStatusAdvanceKpis ?? [])];
     const kpi = all.find((k) => k.id === pickId);
     return kpi ? { kpiId: pickId, label: kpi.label } : null;
   }, [pickId, data]);
@@ -895,9 +898,10 @@ const SupervisorDashboard: React.FC = () => {
             // ใบขอชั่วคราวอยู่ในกล่องตามสถานะของมัน (18 พ.ย. 2569 ถอดกล่องแยก) — รายการชุดเดียวกับเลขบนการ์ด
             // กล่องไหนนับใบไหน ถามตัวเดียวกับเลขบนกล่อง (`workStatusBoxIdOf`) — กล่องล่วงหน้ากับกำลังดำเนินการสรรหาเป็นสถานะเดียวกัน แยกด้วยวันที่ต้องการ
             const target = WORK_STATUS_OF_KPI[kpiId];
-            return target == null ? stock : stock.filter((j) => workStatusBoxIdOf(j) === kpiId);
+            return target == null ? stock : stock.filter((j) => jobInWorkStatusBox(j, kpiId));
           })();
-    return { kpiId, label: kpiId in WORK_STATUS_OF_KPI ? `สถานะ ${label}` : label, panel: buildStatusLeadPanel(jobs), amountLabel: LEAD_AMOUNT_LABEL.remaining, note: null };
+    const pickLabel = !(kpiId in WORK_STATUS_OF_KPI) ? label : isAdvanceStatusBoxId(kpiId) ? `ล่วงหน้า · ${label}` : `สถานะ ${label}`;
+    return { kpiId, label: pickLabel, panel: buildStatusLeadPanel(jobs), amountLabel: LEAD_AMOUNT_LABEL.remaining, note: null };
   }, [statusPick, period, dateRange, jobsWithoutAgeFilter, cohortScope, jobById]);
 
   const handleKpiClick = useCallback(

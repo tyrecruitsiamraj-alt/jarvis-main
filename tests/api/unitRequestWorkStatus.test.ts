@@ -99,12 +99,14 @@ describe('unitRequestWorkStatus', () => {
     ];
     const data = buildDashboardData(jobs, [], null, DEFAULT_DASHBOARD_FILTERS, new Date('2026-07-15'), undefined, [], jobs);
     expect(data.workStatusKpis.find((k) => k.id === 'work_status_total')?.value).toBe(9);
-    expect(data.workStatusKpis.find((k) => k.id === 'work_status_waiting_inform')?.value).toBe(3);
-    expect(data.workStatusKpis.find((k) => k.id === 'work_status_waiting_interview')?.value).toBe(4);
+    // 22 พ.ย. 2569 ค่ำ: ใบล่วงหน้าที่ยังไม่ถึงวันต้องการอยู่แถวล่วงหน้า (สถานะเดียวกัน) — นับสองแถวรวมกัน
+    const both = (status: string) =>
+      (data.workStatusKpis.find((k) => k.id === `work_status_${status}`)?.value ?? 0) +
+      (data.workStatusAdvanceKpis?.find((k) => k.id === `work_status_advance_${status}`)?.value ?? 0);
+    expect(both('waiting_inform')).toBe(3);
+    expect(both('waiting_interview')).toBe(4);
     // 22 พ.ย. 2569: ใบ C (สถานะดำเนินการ) เป็นล่วงหน้าที่ยังไม่ถึงวันต้องการ ณ วันทดสอบ → กล่องล่วงหน้า · สองกล่องรวมกัน = 2 เท่าเดิม
-    const inProgress = data.workStatusKpis.find((k) => k.id === 'work_status_in_progress')?.value ?? 0;
-    const advance = data.workStatusKpis.find((k) => k.id === 'work_status_advance')?.value ?? 0;
-    expect(inProgress + advance).toBe(2);
+    expect(both('in_progress')).toBe(2);
     expect(data.kpis.find((k) => k.id === 'remaining')?.value).toBe(9);
   });
 });

@@ -1,12 +1,12 @@
 /**
- * Dashboard: แยก "ล่วงหน้า" ออกจากกล่อง "กำลังดำเนินการสรรหา" (เจ้าของ 22 พ.ย. 2569)
+ * Dashboard: แยก "ล่วงหน้า" ออกจากกล่อง "กำลังดำเนินการสรรหา" (เจ้าของ 22 พ.ย. 2569) → ค่ำวันเดียวกันเป็นแถวของตัวเองแยกตามสถานะ
  * > "หน้า Dashboard แยกล่วงหน้าออกมาจากดำเนินการสรรหาให้ที" · Choice "กล่องใหม่ข้างกัน" + "ยังไม่ถึงวันต้องการ"
  * + ป๊อปรายการใบขอของ Dashboard เคยขึ้นวันที่ต้องการคนหลังคำว่า "เข้ามา" (เจ้าของ "เข้ามา 1 พย ได้ไง") → โชว์วันที่กรอกจริง
  */
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { buildDashboardData, DEFAULT_DASHBOARD_FILTERS } from '../../src/lib/dashboard/buildDashboardData';
-import { WORK_STATUS_ADVANCE_ID, workStatusBoxIdOf } from '../../src/lib/dashboard/workStatusBox';
+import { WORK_STATUS_ADVANCE_ID, advanceStatusBoxId, jobInWorkStatusBox, workStatusBoxIdOf } from '../../src/lib/dashboard/workStatusBox';
 import { cohortRowToDashboardDetailItem } from '../../src/lib/dashboard/dashboardDetailDialog';
 import type { CohortDrillRow } from '../../src/lib/dashboard/cohortDrillDown';
 import type { JobRequest } from '../../src/types';
@@ -42,72 +42,70 @@ const open = [
   job({ request_date: '2026-11-20', required_date: '2026-11-24', request_positions: 2 }),
   // ย้อนหลัง → กำลังดำเนินการสรรหา
   job({ request_date: '2026-11-15', required_date: '2026-11-05', request_positions: 1 }),
-  // สถานะอื่นที่เป็นล่วงหน้ายังไม่ถึงวัน → อยู่กล่องสถานะของมัน ไม่ถูกดึงออก
+  // สถานะอื่นที่เป็นล่วงหน้ายังไม่ถึงวัน → อยู่แถวล่วงหน้า ในกล่องสถานะของมัน
   job({ request_date: '2026-11-01', required_date: '2026-12-15', request_positions: 5, work_status: 'waiting_start' }),
   job({ request_date: '2026-11-01', required_date: '2026-12-15', request_positions: 2, work_status: 'on_hold' }),
 ];
 
-describe('กล่อง "ล่วงหน้า" แยกจาก "กำลังดำเนินการสรรหา"', () => {
+describe('แถว "ล่วงหน้า" แยกตามสถานะ (เจ้าของ 22 พ.ย. 2569 ค่ำ)', () => {
   const data = buildDashboardData(open, [], null, DEFAULT_DASHBOARD_FILTERS, TODAY);
-  const box = (id: string) => data.workStatusKpis.find((k) => k.id === id);
+  const main = (id: string) => data.workStatusKpis.find((k) => k.id === id);
+  const adv = (id: string) => data.workStatusAdvanceKpis?.find((k) => k.id === id);
+  const pair = (k?: { value: number; secondaryCount?: number | null }) => [k?.value, k?.secondaryCount];
 
-  it('ล่วงหน้า = ใบสถานะดำเนินการ ชนิดล่วงหน้า ที่ยังไม่ถึงวันต้องการ · ที่เหลืออยู่กำลังดำเนินการสรรหา', () => {
-    expect([box(WORK_STATUS_ADVANCE_ID)?.value, box(WORK_STATUS_ADVANCE_ID)?.secondaryCount]).toEqual([5, 2]);
-    expect([box('work_status_in_progress')?.value, box('work_status_in_progress')?.secondaryCount]).toEqual([8, 4]);
-    expect(box(WORK_STATUS_ADVANCE_ID)?.label).toBe('ล่วงหน้า');
-    expect(box(WORK_STATUS_ADVANCE_ID)?.description).toBe('ใบเปิดทั้งหมด · ยังไม่ถึงวันต้องการ · 5 อัตรา · 2 ใบ');
+  it('แถวล่วงหน้า = ใบล่วงหน้าที่ยังไม่ถึงวันต้องการ ทุกสถานะ · ที่เหลืออยู่แถวบน', () => {
+    expect(pair(adv(WORK_STATUS_ADVANCE_ID))).toEqual([12, 4]);
+    expect(pair(adv(advanceStatusBoxId('in_progress')))).toEqual([5, 2]);
+    expect(adv(advanceStatusBoxId('waiting_start'))?.value).toBe(5);
+    expect(adv(advanceStatusBoxId('on_hold'))?.value).toBe(2);
+    expect(pair(main('work_status_in_progress'))).toEqual([8, 4]);
+    expect(main('work_status_waiting_start')?.value).toBe(0);
+    expect(main('work_status_on_hold')?.value).toBe(0);
+    expect(adv(WORK_STATUS_ADVANCE_ID)?.description).toBe('ใบเปิดทั้งหมด · ยังไม่ถึงวันต้องการ · 12 อัตรา · 4 ใบ');
   });
 
-  it('สองกล่องรวมกัน = เลขเดิมของกำลังดำเนินการสรรหา · "ทั้งหมด" ไม่เปลี่ยน · ทุกกล่องรวมกัน = ทั้งหมด', () => {
-    const total = box('work_status_total');
-    const leaves = data.workStatusKpis.filter((k) => k.id !== 'work_status_total');
-    expect((box(WORK_STATUS_ADVANCE_ID)?.value ?? 0) + (box('work_status_in_progress')?.value ?? 0)).toBe(13);
-    expect([total?.value, total?.secondaryCount]).toEqual([20, 8]);
+  it('สองแถวรวมกัน = ทั้งหมด = การ์ดเหลือหา · "ทั้งหมด" บอกสมการ', () => {
+    const total = main('work_status_total');
+    const leaves = [
+      ...data.workStatusKpis.filter((k) => k.id !== 'work_status_total'),
+      ...(data.workStatusAdvanceKpis ?? []).filter((k) => k.id !== WORK_STATUS_ADVANCE_ID),
+    ];
+    expect(pair(total)).toEqual([20, 8]);
     expect(leaves.reduce((n, k) => n + k.value, 0)).toBe(20);
     expect(leaves.reduce((n, k) => n + (k.secondaryCount ?? 0), 0)).toBe(8);
-    expect(total?.description).toBe('ใบเปิดทั้งหมด · ผลรวมสถานะ = 20 อัตรา · 8 ใบ');
-    // เท่ากับการ์ดเหลือหา
+    expect(total?.description).toBe('ใบเปิดทั้งหมด · ถึงเวลาหาแล้ว 8 + ล่วงหน้า 12 = 20 อัตรา · 8 ใบ');
     expect(data.kpis.find((k) => k.id === 'remaining')?.value).toBe(20);
   });
 
-  it('สถานะอื่นไม่ถูกดึงออก แม้เป็นล่วงหน้าที่ยังไม่ถึงวัน', () => {
-    expect(box('work_status_waiting_start')?.value).toBe(5);
-    expect(box('work_status_on_hold')?.value).toBe(2);
-  });
-
-  it('ส่งคนแทน / ไม่ส่งคนแทน / ยังไม่ระบุ ของกำลังดำเนินการสรรหา รวมกัน = เลขบนกล่องหลังแยก', () => {
-    expect(box('work_status_in_progress')?.description).toBe('ใบเปิดทั้งหมด · ส่งคนแทน 4 + ไม่ส่งคนแทน 1 + ยังไม่ระบุ 3 = 8 อัตรา · 4 ใบ');
-  });
-
-  it('กล่องล่วงหน้าอยู่ถัดจากกำลังดำเนินการสรรหา และอยู่เสมอแม้เป็น 0', () => {
-    const ids = data.workStatusKpis.map((k) => k.id);
-    expect(ids.indexOf(WORK_STATUS_ADVANCE_ID)).toBe(ids.indexOf('work_status_in_progress') + 1);
+  it('แถวล่วงหน้ามีสถานะครบเท่าแถวบน ชื่อเดียวกัน และอยู่เสมอแม้เป็น 0', () => {
+    const mainLabels = data.workStatusKpis.filter((k) => k.id !== 'work_status_total').map((k) => k.label);
+    const advLabels = (data.workStatusAdvanceKpis ?? []).filter((k) => k.id !== WORK_STATUS_ADVANCE_ID).map((k) => k.label);
+    expect(advLabels).toEqual(mainLabels);
+    expect(data.workStatusAdvanceKpis?.[0]?.id).toBe(WORK_STATUS_ADVANCE_ID);
     const none = buildDashboardData([job({})], [], null, DEFAULT_DASHBOARD_FILTERS, TODAY);
-    expect(none.workStatusKpis.find((k) => k.id === WORK_STATUS_ADVANCE_ID)?.value).toBe(0);
+    expect(none.workStatusAdvanceKpis?.map((k) => k.value)).toEqual([0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
   });
 
-  it('รายการตอนกดกล่องใช้ตัวตัดสินเดียวกับเลขบนกล่อง — จำนวนใบต่อกล่องเท่ากัน', () => {
-    const byBox = new Map<string, { positions: number; requests: number }>();
-    for (const j of open) {
-      const id = workStatusBoxIdOf(j, TODAY);
-      const b = byBox.get(id) ?? { positions: 0, requests: 0 };
-      b.positions += j.request_positions ?? 0;
-      b.requests += 1;
-      byBox.set(id, b);
-    }
-    for (const k of data.workStatusKpis.filter((x) => x.id !== 'work_status_total')) {
-      expect([k.id, k.value, k.secondaryCount]).toEqual([k.id, byBox.get(k.id)?.positions ?? 0, byBox.get(k.id)?.requests ?? 0]);
+  it('ส่งคนแทน / ไม่ส่งคนแทน / ยังไม่ระบุ ของกำลังดำเนินการสรรหา ทั้งสองแถว รวมกัน = เลขบนกล่อง', () => {
+    expect(main('work_status_in_progress')?.description).toBe('ใบเปิดทั้งหมด · ส่งคนแทน 4 + ไม่ส่งคนแทน 1 + ยังไม่ระบุ 3 = 8 อัตรา · 4 ใบ');
+    expect(adv(advanceStatusBoxId('in_progress'))?.description).toBe('ใบเปิดทั้งหมด · ส่งคนแทน 3 + ไม่ส่งคนแทน 0 + ยังไม่ระบุ 2 = 5 อัตรา · 2 ใบ');
+  });
+
+  it('รายการตอนกดกล่องใช้ตัวตัดสินเดียวกับเลขบนกล่อง — ทุกกล่องทั้งสองแถว', () => {
+    for (const k of [...data.workStatusKpis.filter((x) => x.id !== 'work_status_total'), ...(data.workStatusAdvanceKpis ?? [])]) {
+      const inBox = open.filter((j) => jobInWorkStatusBox(j, k.id, TODAY));
+      expect([k.id, k.value, k.secondaryCount]).toEqual([k.id, inBox.reduce((n, j) => n + (j.request_positions ?? 0), 0), inBox.length]);
     }
     const page = readFileSync('src/pages/dashboard/SupervisorDashboard.tsx', 'utf8');
-    expect(page).toContain('stock.filter((j) => workStatusBoxIdOf(j) === kpiId)');
-    expect(page).toContain("work_status_advance: 'in_progress'");
+    expect(page).toContain('stock.filter((j) => jobInWorkStatusBox(j, kpiId))');
+    expect(page).toContain("[WORK_STATUS_ADVANCE_ID]: 'advance'");
   });
 
-  it('พอถึงวันต้องการ ใบย้ายจากล่วงหน้าไปกำลังดำเนินการสรรหาเอง', () => {
-    const j = job({ request_date: '2026-11-01', required_date: '2026-11-25' });
-    expect(workStatusBoxIdOf(j, new Date('2026-11-24T03:00:00Z'))).toBe(WORK_STATUS_ADVANCE_ID);
-    expect(workStatusBoxIdOf(j, new Date('2026-11-25T03:00:00Z'))).toBe('work_status_in_progress');
-    expect(workStatusBoxIdOf(j, new Date('2026-11-30T03:00:00Z'))).toBe('work_status_in_progress');
+  it('พอถึงวันต้องการ ใบย้ายจากแถวล่วงหน้าขึ้นแถวบนเอง (สถานะเดิม)', () => {
+    const j = job({ request_date: '2026-11-01', required_date: '2026-11-25', work_status: 'waiting_inform' });
+    expect(workStatusBoxIdOf(j, new Date('2026-11-24T03:00:00Z'))).toBe(advanceStatusBoxId('waiting_inform'));
+    expect(workStatusBoxIdOf(j, new Date('2026-11-25T03:00:00Z'))).toBe('work_status_waiting_inform');
+    expect(workStatusBoxIdOf(j, new Date('2026-11-30T03:00:00Z'))).toBe('work_status_waiting_inform');
   });
 });
 

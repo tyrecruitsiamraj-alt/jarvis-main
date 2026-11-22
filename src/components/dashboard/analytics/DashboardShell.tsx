@@ -348,13 +348,12 @@ const DashboardShell: React.FC<Props> = ({
                       ไปกองอยู่สถานะไหน ไม่ต้องอ่านเลขทีละใบแล้วเทียบในหัวเอง
                       (การ์ดตัวเดียวกับ KPI ด้านบนอยู่แล้ว — มันรองรับ `progressPercent` มาแต่แรก
                       แค่ไม่เคยถูกส่งค่าให้) */}
-                  <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
-                    {(() => {
-                      const list = data.workStatusKpis ?? [];
-                      // 🔴 QA 17 ต.ค. 2569: การ์ด "ทั้งหมด" (work_status_total) อยู่ในลิสต์เดียวกัน เดิมถูกบวกเป็นตัวหารด้วย
-                      // ⇒ ตัวหาร 2 เท่า ทุก % เหลือครึ่ง ("ทั้งหมด" ขึ้น 50% · ดำเนินการสรรหา 329/482 ขึ้น 34% แทน 68%)
-                      const total = workStatusPercentBase(list);
-                      return list.map((kpi) => (
+                  {(() => {
+                    const list = data.workStatusKpis ?? [];
+                    // 🔴 QA 17 ต.ค. 2569: การ์ด "ทั้งหมด" อยู่ในลิสต์เดียวกัน ห้ามบวกซ้ำเป็นตัวหาร — ตัวหาร = เลขของ "ทั้งหมด" (ทั้งสองแถว)
+                    const total = workStatusPercentBase(list);
+                    const tiles = (rows: typeof list) =>
+                      rows.map((kpi) => (
                         <DashboardKpiCard
                           key={kpi.id}
                           surface="tile"
@@ -364,8 +363,21 @@ const DashboardShell: React.FC<Props> = ({
                           onClick={onKpiClick ? () => onKpiClick(kpi.id, kpi.label, kpi.secondaryCount ?? null) : undefined}
                         />
                       ));
-                    })()}
-                  </div>
+                    const advance = data.workStatusAdvanceKpis ?? [];
+                    return (
+                      <>
+                        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">{tiles(list)}</div>
+                        {/* แถวล่วงหน้า (เจ้าของ 22 พ.ย. 2569 "ล่วงหน้าแยกออกมาแล้วเป็นอีกแถวที่บอกสถานะ") — ใบล่วงหน้าที่ยังไม่ถึงวันต้องการ
+                            แยกตามสถานะเดียวกับแถวบน · กล่องแรก = ล่วงหน้าทั้งแถว · สองแถวรวมกัน = ทั้งหมด */}
+                        {advance.length ? (
+                          <div className="mt-5 space-y-3" data-testid="dashboard-work-status-advance">
+                            <p className="text-base font-medium text-foreground">ล่วงหน้า · ยังไม่ถึงวันต้องการ</p>
+                            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">{tiles(advance)}</div>
+                          </div>
+                        ) : null}
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
 

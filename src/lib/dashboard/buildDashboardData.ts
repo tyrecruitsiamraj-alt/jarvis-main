@@ -83,7 +83,7 @@ import {
   UNIT_REQUEST_WORK_STATUS_LABELS,
   type UnitRequestWorkStatus,
 } from '@/lib/unitRequestWorkStatus';
-import { WORK_STATUS_ADVANCE_HINT, WORK_STATUS_ADVANCE_ID, WORK_STATUS_ADVANCE_LABEL, workStatusBoxIdOf } from '@/lib/dashboard/workStatusBox';
+import { WORK_STATUS_ADVANCE_HINT, WORK_STATUS_ADVANCE_ID, WORK_STATUS_ADVANCE_LABEL, advanceStatusBoxId, isAdvanceStatusBoxId, workStatusBoxIdOf } from '@/lib/dashboard/workStatusBox';
 import {
   jobToRequestControlRecord,
   jobsToRequestControlRecords,
@@ -571,76 +571,84 @@ export function openRemainingJobsOf(jobs: readonly JobRequest[]): JobRequest[] {
  *  ยอด cohort ที่เกินผลรวมสถานะ (ใบ ERP ที่ไม่อยู่ใน feed) ขึ้นเป็นกล่อง "ไม่มีสถานะ" ให้บวกกันลงตัว
  *  🔴 2 พ.ย. 2569 (เจ้าของ "เอา ใบขอชั่วคราวด้วย" หลังถามว่าทำไม เหลือหา 410 ≠ ทั้งหมด 374): โหมดทั้งหมด "ทั้งหมด" = ผลรวมสถานะ + ใบขอชั่วคราว
  *  = เท่าการ์ดเหลือหา · กล่องย่อยยังเป็นใบจริง บวกกล่องใบขอชั่วคราวข้างล่างแล้วลงตัว · โหมดมีงวดคงเดิม (เหลือหาเป็น cohort ERP ไม่มีใบชั่วคราวอยู่แล้ว) */
+const emptyStatusCounts = (): Record<UnitRequestWorkStatus, number> => ({
+  in_progress: 0,
+  on_hold: 0,
+  evaluating: 0,
+  waiting_inform: 0,
+  waiting_interview: 0,
+  waiting_result: 0,
+  waiting_start: 0,
+  daily_work: 0,
+  daily_pay: 0,
+});
+
+/** สถานะเรียงตามกล่องบนจอ (กำลังดำเนินการ → ชะลอ → … → จ่ายรายวัน) */
+const STATUS_BOX_ORDER: readonly UnitRequestWorkStatus[] = [
+  'in_progress',
+  'on_hold',
+  'evaluating',
+  'waiting_inform',
+  'waiting_interview',
+  'waiting_result',
+  'waiting_start',
+  'daily_work',
+  'daily_pay',
+];
+
+/**
+ * กล่องสถานะทำงานของ Dashboard — สองแถว (เจ้าของ 22 พ.ย. 2569)
+ * แถวบน `main` = ทั้งหมด + ใบที่ถึงเวลาหาแล้วแยกตามสถานะ · แถวล่าง `advance` = ล่วงหน้า (ยังไม่ถึงวันต้องการ) + แยกตามสถานะเดียวกัน
+ * ใบไหนอยู่แถวไหน = `workStatusBoxIdOf` ตัวเดียวกับรายการตอนกดกล่อง · สองแถวรวมกัน = ทั้งหมด
+ */
 function buildWorkStatusKpis(
   jobs: JobRequest[],
   periodLabel?: string | null,
   totalOverride?: { positions: number; requests: number },
   today: Date = new Date(),
-): DashboardKpi[] {
-  const counts: Record<UnitRequestWorkStatus, number> = {
-    in_progress: 0,
-    on_hold: 0,
-    evaluating: 0,
-    waiting_inform: 0,
-    waiting_interview: 0,
-    waiting_result: 0,
-    waiting_start: 0,
-    daily_work: 0,
-    daily_pay: 0,
-  };
-  const requestCounts: Record<UnitRequestWorkStatus, number> = {
-    in_progress: 0,
-    on_hold: 0,
-    evaluating: 0,
-    waiting_inform: 0,
-    waiting_interview: 0,
-    waiting_result: 0,
-    waiting_start: 0,
-    daily_work: 0,
-    daily_pay: 0,
-  };
-  // กำลังดำเนินการสรรหา แยกตามช่อง "ส่งคนแทน" ในหน้าใบขอ (เจ้าของ 18 พ.ย. 2569 "ย่อยให้หน่อยว่า ส่งคนแทน ไม่ส่งคนแทนอย่างละเท่าไหร่")
-  // สามค่าเหมือนหน้าใบขอ — ยังไม่ระบุ ห้ามยุบเข้าไม่ส่ง · สามกองรวมกัน = เลขบนการ์ด
-  const replacement = { yes: 0, no: 0, unset: 0 };
-  // ล่วงหน้าที่ยังไม่ถึงวันต้องการ แยกออกจากกำลังดำเนินการสรรหาเป็นกล่องของตัวเอง (เจ้าของ 22 พ.ย. 2569 · ตัวตัดสิน `workStatusBoxIdOf`)
-  const advance = { positions: 0, requests: 0 };
-  // 🔴 18 พ.ย. 2569 เจ้าของ "แยกใบขอชั่วคราวออกมาทำไม ฉันสั่งไว้หรอ" — ใบขอชั่วคราวนับเข้ากล่องตามสถานะของมันเหมือนใบจริง
-  //    (ถอดกล่องใบขอชั่วคราวแยกแล้ว · ตามข้อเคาะ 11 พ.ย. "นับรวมเหมือนหน้าหลัก")
+): { main: DashboardKpi[]; advance: DashboardKpi[] } {
+  const group = () => ({ positions: emptyStatusCounts(), requests: emptyStatusCounts(), replacement: { yes: 0, no: 0, unset: 0 } });
+  // กำลังดำเนินการสรรหา แยกตามช่อง "ส่งคนแทน" ในหน้าใบขอ (เจ้าของ 18 พ.ย. 2569) — สามค่าเหมือนหน้าใบขอ ยังไม่ระบุ ห้ามยุบเข้าไม่ส่ง
+  const main = group();
+  const advance = group();
+  // 🔴 18 พ.ย. 2569 เจ้าของ "แยกใบขอชั่วคราวออกมาทำไม ฉันสั่งไว้หรอ" — ใบขอชั่วคราวนับรวมตามสถานะ (ข้อเคาะ 11 พ.ย. "นับรวมเหมือนหน้าหลัก")
   for (const j of jobs) {
     const status = resolveUnitRequestWorkStatus(j.work_status);
     const units = positionBreakdownFromJob(j).remainingPositions;
     if (units <= 0) continue;
-    if (workStatusBoxIdOf(j, today) === WORK_STATUS_ADVANCE_ID) {
-      advance.positions += units;
-      advance.requests += 1;
-      continue;
-    }
-    counts[status] += units;
-    requestCounts[status] += 1;
-    if (status === 'in_progress') replacement[j.send_replacement === true ? 'yes' : j.send_replacement === false ? 'no' : 'unset'] += units;
+    const g = isAdvanceStatusBoxId(workStatusBoxIdOf(j, today)) ? advance : main;
+    g.positions[status] += units;
+    g.requests[status] += 1;
+    if (status === 'in_progress') g.replacement[j.send_replacement === true ? 'yes' : j.send_replacement === false ? 'no' : 'unset'] += units;
   }
-  const leafTotal = Object.values(counts).reduce((s, n) => s + n, 0) + advance.positions;
-  const leafRequests = Object.values(requestCounts).reduce((s, n) => s + n, 0) + advance.requests;
-  // 🔴 QA 15 พ.ย. 2569: โหมดมีงวดยอด cohort รวมใบขอชั่วคราวแล้ว (11 พ.ย. "นับรวมเหมือนหน้าหลัก") แต่เดิมไม่หักกล่องใบขอชั่วคราว
-  // ⇒ ใบชั่วคราว 11 ไปโผล่ซ้ำเป็น "ไม่มีสถานะ 11" · กล่องย่อยรวม 122 แต่ทั้งหมด 111 ⇒ หักทุกโหมด
+  const sumOf = (c: Record<UnitRequestWorkStatus, number>) => Object.values(c).reduce((s, n) => s + n, 0);
+  const mainTotal = sumOf(main.positions);
+  const mainRequests = sumOf(main.requests);
+  const advanceTotal = sumOf(advance.positions);
+  const advanceRequests = sumOf(advance.requests);
+  const leafTotal = mainTotal + advanceTotal;
+  const leafRequests = mainRequests + advanceRequests;
+  // 🔴 QA 15 พ.ย. 2569: โหมดมีงวดยอด cohort รวมใบขอชั่วคราวแล้ว ⇒ ส่วนที่เกินผลรวมสถานะขึ้นเป็น "ไม่มีสถานะ" (ไม่นับซ้ำ)
   const total = totalOverride?.positions ?? leafTotal;
   const totalRequests = totalOverride?.requests ?? leafRequests;
   const nonePositions = Math.max(total - leafTotal, 0);
   const noneRequests = Math.max(totalRequests - leafRequests, 0);
-  const scopeHint = periodLabel
-    ? `ใบเปิดในช่วงที่เลือก`
-    : `ใบเปิดทั้งหมด`;
-  const leaf = (id: string, label: string, status: UnitRequestWorkStatus): DashboardKpi => ({
+  const scopeHint = periodLabel ? `ใบเปิดในช่วงที่เลือก` : `ใบเปิดทั้งหมด`;
+  const n = (v: number) => v.toLocaleString('th-TH');
+  const leaf = (g: ReturnType<typeof group>, id: string, status: UnitRequestWorkStatus): DashboardKpi => ({
     id,
-    label,
-    value: counts[status],
-    secondaryCount: requestCounts[status],
+    label: status === 'in_progress' ? 'กำลังดำเนินการสรรหา' : UNIT_REQUEST_WORK_STATUS_LABELS[status],
+    value: g.positions[status],
+    secondaryCount: g.requests[status],
     secondaryLabel: 'ใบขอ',
-    description: `${scopeHint} · ${counts[status].toLocaleString('th-TH')} อัตรา · ${requestCounts[status].toLocaleString('th-TH')} ใบ`,
+    description:
+      status === 'in_progress'
+        ? `${scopeHint} · ส่งคนแทน ${n(g.replacement.yes)} + ไม่ส่งคนแทน ${n(g.replacement.no)} + ยังไม่ระบุ ${n(g.replacement.unset)} = ${n(g.positions.in_progress)} อัตรา · ${n(g.requests.in_progress)} ใบ`
+        : `${scopeHint} · ${n(g.positions[status])} อัตรา · ${n(g.requests[status])} ใบ`,
     trendPercent: null,
   });
 
-  return [
+  const mainKpis: DashboardKpi[] = [
     {
       id: 'work_status_total',
       label: 'ทั้งหมด',
@@ -649,31 +657,11 @@ function buildWorkStatusKpis(
       secondaryLabel: 'ใบขอ',
       description:
         nonePositions > 0
-          ? `${scopeHint} · สถานะ ${leafTotal.toLocaleString('th-TH')} + ไม่มีสถานะ ${nonePositions.toLocaleString('th-TH')} = ${total.toLocaleString('th-TH')} อัตรา · ${totalRequests.toLocaleString('th-TH')} ใบ`
-          : `${scopeHint} · ผลรวมสถานะ = ${total.toLocaleString('th-TH')} อัตรา · ${totalRequests.toLocaleString('th-TH')} ใบ`,
+          ? `${scopeHint} · ถึงเวลาหาแล้ว ${n(mainTotal)} + ล่วงหน้า ${n(advanceTotal)} + ไม่มีสถานะ ${n(nonePositions)} = ${n(total)} อัตรา · ${n(totalRequests)} ใบ`
+          : `${scopeHint} · ถึงเวลาหาแล้ว ${n(mainTotal)} + ล่วงหน้า ${n(advanceTotal)} = ${n(total)} อัตรา · ${n(totalRequests)} ใบ`,
       trendPercent: null,
     },
-    {
-      ...leaf('work_status_in_progress', 'กำลังดำเนินการสรรหา', 'in_progress'),
-      description: `${scopeHint} · ส่งคนแทน ${replacement.yes.toLocaleString('th-TH')} + ไม่ส่งคนแทน ${replacement.no.toLocaleString('th-TH')} + ยังไม่ระบุ ${replacement.unset.toLocaleString('th-TH')} = ${counts.in_progress.toLocaleString('th-TH')} อัตรา · ${requestCounts.in_progress.toLocaleString('th-TH')} ใบ`,
-    },
-    {
-      id: WORK_STATUS_ADVANCE_ID,
-      label: WORK_STATUS_ADVANCE_LABEL,
-      value: advance.positions,
-      secondaryCount: advance.requests,
-      secondaryLabel: 'ใบขอ',
-      description: `${scopeHint} · ${WORK_STATUS_ADVANCE_HINT} · ${advance.positions.toLocaleString('th-TH')} อัตรา · ${advance.requests.toLocaleString('th-TH')} ใบ`,
-      trendPercent: null,
-    },
-    leaf('work_status_on_hold', UNIT_REQUEST_WORK_STATUS_LABELS.on_hold, 'on_hold'),
-    leaf('work_status_evaluating', UNIT_REQUEST_WORK_STATUS_LABELS.evaluating, 'evaluating'),
-    leaf('work_status_waiting_inform', UNIT_REQUEST_WORK_STATUS_LABELS.waiting_inform, 'waiting_inform'),
-    leaf('work_status_waiting_interview', UNIT_REQUEST_WORK_STATUS_LABELS.waiting_interview, 'waiting_interview'),
-    leaf('work_status_waiting_result', UNIT_REQUEST_WORK_STATUS_LABELS.waiting_result, 'waiting_result'),
-    leaf('work_status_waiting_start', UNIT_REQUEST_WORK_STATUS_LABELS.waiting_start, 'waiting_start'),
-    leaf('work_status_daily_work', UNIT_REQUEST_WORK_STATUS_LABELS.daily_work, 'daily_work'),
-    leaf('work_status_daily_pay', UNIT_REQUEST_WORK_STATUS_LABELS.daily_pay, 'daily_pay'),
+    ...STATUS_BOX_ORDER.map((status) => leaf(main, `work_status_${status}`, status)),
     ...(nonePositions > 0
       ? [
           {
@@ -682,12 +670,25 @@ function buildWorkStatusKpis(
             value: nonePositions,
             secondaryCount: noneRequests,
             secondaryLabel: 'ใบขอ',
-            description: `${nonePositions.toLocaleString('th-TH')} อัตรา · ${noneRequests.toLocaleString('th-TH')} ใบ`,
+            description: `${n(nonePositions)} อัตรา · ${n(noneRequests)} ใบ`,
             trendPercent: null,
           } satisfies DashboardKpi,
         ]
       : []),
   ];
+  const advanceKpis: DashboardKpi[] = [
+    {
+      id: WORK_STATUS_ADVANCE_ID,
+      label: WORK_STATUS_ADVANCE_LABEL,
+      value: advanceTotal,
+      secondaryCount: advanceRequests,
+      secondaryLabel: 'ใบขอ',
+      description: `${scopeHint} · ${WORK_STATUS_ADVANCE_HINT} · ${n(advanceTotal)} อัตรา · ${n(advanceRequests)} ใบ`,
+      trendPercent: null,
+    },
+    ...STATUS_BOX_ORDER.map((status) => leaf(advance, advanceStatusBoxId(status), status)),
+  ];
+  return { main: mainKpis, advance: advanceKpis };
 }
 
 /** KPI ชุดสั้น: เข้ามา / ปิดแล้ว / ยกเลิก / คงเหลือ (ตำแหน่ง) */
@@ -1263,7 +1264,7 @@ export function buildDashboardData(
         )
       : stockKpis;
 
-  const workStatusKpis = buildWorkStatusKpis(
+  const workStatusRows = buildWorkStatusKpis(
     openRemainingJobs,
     period?.label ?? null,
     period && cohortStock
@@ -1291,7 +1292,8 @@ export function buildDashboardData(
 
   return {
     kpis,
-    workStatusKpis,
+    workStatusKpis: workStatusRows.main,
+    workStatusAdvanceKpis: workStatusRows.advance,
     remainingBridge,
     activityTrend,
     unitOverview: buildUnitOverview(openRemainingJobs, today),

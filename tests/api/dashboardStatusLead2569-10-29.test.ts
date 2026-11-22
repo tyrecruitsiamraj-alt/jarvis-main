@@ -160,7 +160,7 @@ describe('ใบขอชั่วคราวนับเข้ากล่อ�
     expect('prequestKpi' in data).toBe(false);
     const remaining = data.kpis.find((k) => k.id === 'remaining');
     expect([remaining?.value, remaining?.secondaryCount]).toEqual([total?.value, total?.secondaryCount]);
-    expect(total?.description).toBe('ใบเปิดทั้งหมด · ผลรวมสถานะ = 5 อัตรา · 2 ใบ');
+    expect(total?.description).toBe('ใบเปิดทั้งหมด · ถึงเวลาหาแล้ว 5 + ล่วงหน้า 0 = 5 อัตรา · 2 ใบ');
     expect(readFileSync('src/pages/dashboard/SupervisorDashboard.tsx', 'utf8')).not.toContain('PREQUEST_KPI_ID');
   });
 });
