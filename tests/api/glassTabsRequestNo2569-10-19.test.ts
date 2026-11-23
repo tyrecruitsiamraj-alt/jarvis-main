@@ -73,6 +73,8 @@ describe('รอบ 4 (เจ้าของ 19 ต.ค. 2569)', () => {
   });
   it('แถบเลื่อนอยู่ตลอด (กดทีม Online แล้วปุ่มไม่เด้ง)', () => {
     expect(read('src/main.tsx')).toContain('document.documentElement.classList.add("overflow-y-scroll")');
+    // 23 พ.ย. 2569 "กรองพอกดแล้วมันเลื่อน": เปิดช่องเลือกแล้ว body ห้ามเป็นกรอบเลื่อนซ้อน (ของที่ปักไว้หลุดตำแหน่ง)
+    expect(read('src/main.tsx')).toContain('document.body.classList.add("data-[scroll-locked]:!overflow-visible")');
   });
   it('ถอดการ์ด "งานอะไรเยอะ" · หัวหน้าใบขอไม่มีคำว่า จาก Siamraj', () => {
     expect(read('src/components/home-ai-share/HomeOnlineTab.tsx')).not.toContain('testId="online-types"');

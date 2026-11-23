@@ -17,5 +17,10 @@ installStaleChunkReload();
 // ตอนเนื้อหาสั้น (กำลังโหลด) แถบเลื่อนหาย หน้ากว้างขึ้น 6px แท็บที่ตัดแถวขยับขึ้นลง
 // (scrollbar-gutter บน html ใช้ไม่ได้เมื่อ overflow เป็น visible — วัดแล้วยังกว้าง 736 ⇒ ใช้ overflow-y-scroll)
 document.documentElement.classList.add("overflow-y-scroll");
+// ป๊อปของ Radix (ช่องเลือก · Dialog · เมนู) ล็อกจอด้วยการใส่ overflow:hidden ที่ body — ตัวเลื่อนของหน้าคือ html (บรรทัดบน)
+// body จึงกลายเป็นกรอบเลื่อนซ้อน ของที่ปักไว้ (sticky) หลุดกลับตำแหน่งเดิมทันทีที่เปิดช่องเลือก
+// (เจ้าของ 23 พ.ย. 2569 "กรองพอกดแล้วมันเลื่อน" — แผงตัวกรอง Dashboard กระโดดจาก y=80 ไป y=-515 ตอนเลื่อนจอลงมา 700px · วัดบนเว็บจริง)
+// ⇒ คง body เป็น overflow visible ตอนล็อก · การกันเลื่อนพื้นหลังของ Radix ทำที่ตัวดักล้อเมาส์/นิ้ว ไม่ได้พึ่ง overflow นี้
+document.body.classList.add("data-[scroll-locked]:!overflow-visible");
 
 createRoot(document.getElementById("root")!).render(<App />);
