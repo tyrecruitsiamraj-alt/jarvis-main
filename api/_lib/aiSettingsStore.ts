@@ -151,6 +151,16 @@ export async function targetForConnection(id: string, model?: string | null): Pr
   return c ? toTarget(c, model ?? null) : null;
 }
 
+/**
+ * ที่อยู่ Ollama ของบริษัทที่ตั้งไว้ในหน้า "AI ที่ใช้คิดงาน" (การเชื่อมต่อแบบ ollama ตัวแรก) — ไม่มี = null (ผู้เรียกถอยไปค่าในเซิร์ฟเวอร์)
+ * ตัวอ่านบัตรใช้ (23 พ.ย. 2569) · แก้ที่อยู่ได้จากหน้าจอ ไม่ต้อง deploy
+ */
+export async function savedOllamaBaseUrl(): Promise<string | null> {
+  const { conns } = await loadRaw();
+  const c = conns.find((x) => x.kind === 'ollama' && x.base_url);
+  return c ? c.base_url.replace(/\/+$/, '') : null;
+}
+
 export async function getAiSettingsView(): Promise<AiSettingsView> {
   invalidateAiSettings();
   const { conns, routes } = await loadRaw();

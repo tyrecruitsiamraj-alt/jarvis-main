@@ -7,6 +7,7 @@
  * - ไม่เขียนข้อความที่อ่านได้ลง log (มีเลขบัตร ชื่อ ที่อยู่)
  */
 import { getOllamaConfig } from '../ollamaClient.js';
+import { savedOllamaBaseUrl } from '../aiSettingsStore.js';
 import { logInfo } from '../logger.js';
 import { readOcrFields, serverOcrEngine, type OcrResult } from '../../../src/lib/documents/ocrFields.js';
 import type { UploadKind } from '../../../src/lib/documents/documentTypes.js';
@@ -21,13 +22,17 @@ export const SERVER_OCR_TIMEOUT_MS = 100_000;
 export const OCR_KEEP_ALIVE = '30m';
 const PROMPT = 'Extract all text from the image. Return plain text in natural reading order.';
 
-const baseUrl = (): string | null => getOllamaConfig()?.baseUrl ?? null;
+/** ที่อยู่ Ollama: การเชื่อมต่อที่ตั้งในหน้า "AI ที่ใช้คิดงาน" ก่อน (แก้จากหน้าจอได้) · ไม่มี = ค่าในเซิร์ฟเวอร์ */
+async function baseUrl(): Promise<string | null> {
+  const saved = await savedOllamaBaseUrl().catch(() => null);
+  return saved ?? getOllamaConfig()?.baseUrl ?? null;
+}
 
 export type OcrModelList = { ok: true; models: string[] } | { ok: false; error: string };
 
 /** รายชื่อโมเดลที่ใช้อ่านบัตรได้ (ตัด cloud ออก) — ใช้ทั้งหน้าตั้งค่าและตอนตรวจก่อนบันทึก */
 export async function listOcrModels(timeoutMs = 8_000): Promise<OcrModelList> {
-  const base = baseUrl();
+  const base = await baseUrl();
   if (!base) return { ok: false, error: 'ยังไม่ได้ตั้งเซิร์ฟเวอร์ AI ของบริษัท' };
   try {
     const r = await fetch(`${base}/api/tags`, { signal: AbortSignal.timeout(timeoutMs) });
@@ -58,18 +63,23 @@ export function plainOcrText(raw: string): string {
  * เปิดโมเดลรอไว้ตั้งแต่ผู้สมัครเปิดลิงก์ — ถึงตอนถ่ายบัตรโมเดลพร้อมแล้ว · ไม่รอผล ไม่ส่งภาพ (Ollama: generate ไม่มี prompt = โหลดโมเดลอย่างเดียว)
  */
 export function warmOcrModel(model: string): void {
-  const base = baseUrl();
-  if (!model || !base || isCloudModel(model)) return;
-  void fetch(`${base}/api/generate`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    signal: AbortSignal.timeout(120_000),
-    body: JSON.stringify({ model, keep_alive: OCR_KEEP_ALIVE }),
-  }).catch(() => undefined);
+  if (!model || isCloudModel(model)) return;
+  void baseUrl()
+    .then((base) =>
+      base
+        ? fetch(`${base}/api/generate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            signal: AbortSignal.timeout(120_000),
+            body: JSON.stringify({ model, keep_alive: OCR_KEEP_ALIVE }),
+          })
+        : undefined,
+    )
+    .catch(() => undefined);
 }
 
 export async function serverOcr(model: string, bytes: Buffer, kind: UploadKind): Promise<OcrResult> {
-  const base = baseUrl();
+  const base = await baseUrl();
   if (!model || !base) throw new ServerOcrUnavailable('ยังไม่ได้เลือกโมเดลอ่านบัตร');
   if (isCloudModel(model)) throw new ServerOcrUnavailable('โมเดลนี้ส่งข้อมูลออกนอกบริษัท ใช้อ่านบัตรไม่ได้');
   const started = Date.now();

@@ -75,3 +75,11 @@ describe('หน้าผู้สมัคร', () => {
     expect(src).toMatch(/if \(serverOcr\.current && state\) \{[\s\S]*readApplicantImageOnServer\(state\.inviteKey, fileId\)[\s\S]*return;[\s\S]*\} catch \{[\s\S]*\}\n {4}\}\n {4}try \{\n {6}const ocr = await loadOcr\(\);/);
   });
 });
+
+describe('ที่อยู่เซิร์ฟเวอร์ AI แก้จากหน้าจอได้', () => {
+  it('ใช้การเชื่อมต่อ Ollama ที่ตั้งในหน้า "AI ที่ใช้คิดงาน" ก่อน แล้วค่อยถอยไปค่าในเซิร์ฟเวอร์', () => {
+    const src = readFileSync('api/_lib/documents/serverOcr.ts', 'utf8');
+    expect(src).toContain('return saved ?? getOllamaConfig()?.baseUrl ?? null;');
+    expect(readFileSync('api/_lib/aiSettingsStore.ts', 'utf8')).toContain("const c = conns.find((x) => x.kind === 'ollama' && x.base_url);");
+  });
+});
