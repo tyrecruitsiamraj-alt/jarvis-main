@@ -115,8 +115,8 @@ describe('ประเภทฟอร์มการสมัคร', () => {
   });
 
   it('ป้ายไทยตรงกับระบบเดิม · ค่าที่อ่านไม่ออก (ประกาศเก่าก่อน migration) = ทั่วไป', () => {
-    expect(rmFormTypeLabel('rm')).toBe('ทั่วไป');
-    expect(rmFormTypeLabel('global')).toBe('แนบเอกสารได้');
-    expect(rmFormTypeLabel(null)).toBe('ทั่วไป');
+    expect(rmFormTypeLabel('rm')).toBe('ไม่ต้องแนบ');
+    expect(rmFormTypeLabel('global')).toBe('ให้แนบเอกสาร');
+    expect(rmFormTypeLabel(null)).toBe('ไม่ต้องแนบ');
   });
 });

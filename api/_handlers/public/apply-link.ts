@@ -59,6 +59,8 @@ export default async function handler(req: ApiReq, res: ApiRes) {
       contactPhone: posting.contactPhone,
       status,
       channelLabel: link.channelLabel,
+      // ฟอร์มมีช่องแนบเอกสาร — เลือกตอน Gen link (เจ้าของ 23 พ.ย. 2569 "ต้องมีให้เลือกตอน Gen ว่าแนบเอกสารไหม") · ค่าเก่า/ไม่เลือก = ไม่มีช่อง
+      attachDocuments: posting.formType === 'global',
     });
   } catch (e) {
     return handleApiError(res, e, 'public-apply-link');

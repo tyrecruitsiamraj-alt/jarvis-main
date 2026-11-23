@@ -33,6 +33,7 @@ import { RM_FORM_TYPES, RM_SPECIFIC_TYPES } from '@/lib/recruitRmMasters';
 import { createShortLink } from '@/lib/shortLinksApi';
 import SoGroupPicker from '@/components/jobs/SoGroupPicker';
 import LinkResponsibleField, { useLinkResponsible } from '@/components/jobs/LinkResponsibleField';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { fetchSoOptions } from '@/lib/jobPostingRequestsApi';
 import { isFacebookGroupChannel, jobBuOf, soGroupLinkKey, soGroupLinkLabel, soGroupLinkName, type SoOptGroup } from '@/lib/soScraping';
 import { normalizeTrendBu } from '@/lib/trends/bu';
@@ -411,6 +412,27 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
               {/* เจ้าหน้าที่สรรหาของลิงก์อยู่บนสุดของฟอร์ม ใต้ช่องทางที่จะส่ง (เจ้าของ 20 พ.ย. 2569 "ทำไมยังไม่มีให้เลือกเจ้าหน้าที่สรรหา"
                   → Choice เปลี่ยนชื่อ + ย้ายขึ้นบนสุด · เดิมชื่อ "ผู้รับผิดชอบ" อยู่ท้ายฟอร์มจนหาไม่เจอ) · ฟอร์มหนึ่งมีช่องนี้ช่องเดียว */}
               <LinkResponsibleField value={responsible.value} onChange={responsible.setValue} options={responsible.options} />
+              {/* ช่องแนบเอกสารในหน้าสมัคร — เลือกได้ทุกลิงก์ (เจ้าของ 23 พ.ย. 2569 "Genlink แบบแนบเอกสารไม่ได้ … ต้องมีให้เลือกตอน Gen ว่าแนบเอกสารไหม")
+                  เดิมอยู่ในส่วนที่ซ่อนตอน Gen จากใบขอ · ค่าที่เก็บยังเป็น form_type rm / global เดิม · ค่าเริ่ม = ไม่ต้องแนบ */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground">แนบเอกสาร</label>
+                <ToggleGroup
+                  type="single"
+                  variant="outline"
+                  size="sm"
+                  value={formType}
+                  onValueChange={(v) => v && setFormType(v)}
+                  className="flex-wrap justify-start"
+                  aria-label="แนบเอกสาร"
+                  data-testid="link-attach-docs"
+                >
+                  {RM_FORM_TYPES.map((f) => (
+                    <ToggleGroupItem key={f.code} value={f.code} data-testid={`link-attach-docs-${f.code}`}>
+                      {f.label}
+                    </ToggleGroupItem>
+                  ))}
+                </ToggleGroup>
+              </div>
               {/* เหลือแค่เลือกช่องทาง (เจ้าของ Choice 7 ต.ค. 2569) — ลิงก์ผูกใบขอ = หน้าลิงก์ใช้การ์ดเดียวกับ /apply
                   ช่องหัวข้อ/รายละเอียด/สถานที่/ค่าตอบแทน/ผู้ติดต่อ ไม่ขึ้นให้ผู้สมัครเห็นแล้ว · ค่าตั้งต้นจากใบขอยังบันทึกตามเดิม */}
               {channelOnly ? null : (
@@ -500,26 +522,6 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
                       emptyText="ไม่พบจังหวัด"
                       options={[{ value: '', label: 'ไม่ระบุ' }, ...THAI_PROVINCE_NAMES_SORTED.map((p) => ({ value: p, label: p }))]}
                     />
-                  </div>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-muted-foreground">ประเภทฟอร์มการสมัคร</label>
-                  <div className="flex flex-wrap gap-1.5">
-                    {RM_FORM_TYPES.map((f) => (
-                      <button
-                        key={f.code}
-                        type="button"
-                        onClick={() => setFormType(f.code)}
-                        className={
-                          formType === f.code
-                            ? 'rounded-full border border-primary bg-primary/10 px-3 py-1 text-xs font-medium text-primary'
-                            : 'rounded-full border border-border bg-background px-3 py-1 text-xs text-muted-foreground hover:bg-secondary'
-                        }
-                      >
-                        {f.label}
-                      </button>
-                    ))}
                   </div>
                 </div>
 
