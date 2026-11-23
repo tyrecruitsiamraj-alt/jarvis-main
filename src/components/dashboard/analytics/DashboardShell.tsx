@@ -13,6 +13,7 @@ import type { UnitRequestFilterState } from '@/hooks/useSiamrajUnitRequestFilter
 import type { DateRangeYmd } from '@/components/shared/DateRangeCalendarPicker';
 import DashboardFilterBar from './DashboardFilterBar';
 import DashboardWorkMonths from './DashboardWorkMonths';
+import { parseWorkDoneBoxId } from '@/lib/dashboard/workStatusBox';
 import type { WorkMonthRow } from '@/lib/dashboard/throughput';
 import DashboardKpiCard from './DashboardKpiCard';
 import DashboardChartSection from './DashboardChartSection';
@@ -355,6 +356,11 @@ const DashboardShell: React.FC<Props> = ({
                     const list = data.workStatusKpis ?? [];
                     // 🔴 QA 17 ต.ค. 2569: การ์ด "ทั้งหมด" อยู่ในลิสต์เดียวกัน ห้ามบวกซ้ำเป็นตัวหาร — ตัวหาร = เลขของ "ทั้งหมด" (ทั้งสองแถว)
                     const total = workStatusPercentBase(list);
+                    // สีพาสเทล 3 สีแยกเรื่อง (เจ้าของ 23 พ.ย. 2569): ใบขอทั้งหมด + แถวสถานะ (ยังต้องหา) = ฟ้า · ปิดแล้ว = เขียว · ยกเลิก = ชมพู
+                    const washOf = (id: string) => {
+                      const done = parseWorkDoneBoxId(id);
+                      return done ? (done.kind === 'filled' ? 'success' : 'danger') : 'info';
+                    };
                     // แถบสัดส่วนเทียบกล่องแรกของแถวนั้น (แถวบนสุด = ใบขอทั้งหมด · แถวสถานะ = ทั้งหมด)
                     const tiles = (rows: typeof list, base = total) =>
                       rows.map((kpi) => (
@@ -363,6 +369,7 @@ const DashboardShell: React.FC<Props> = ({
                           surface="tile"
                           kpi={kpi}
                           progressPercent={base > 0 ? Math.round((kpi.value / base) * 100) : 0}
+                          wash={washOf(kpi.id)}
                           selected={statusPick?.kpiId === kpi.id}
                           onClick={onKpiClick ? () => onKpiClick(kpi.id, kpi.label, kpi.secondaryCount ?? null) : undefined}
                         />

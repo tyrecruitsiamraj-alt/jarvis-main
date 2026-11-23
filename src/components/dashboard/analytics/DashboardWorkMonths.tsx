@@ -71,6 +71,8 @@ export default function DashboardWorkMonths({
                 dataKey={key}
                 fill={fill}
                 radius={[4, 4, 0, 0]}
+                // พาสเทล: สีเดียวกับกล่อง (ฟ้า · เขียว · ชมพู) แต่จางลง
+                fillOpacity={0.5}
                 animationDuration={CHART.animationDuration}
                 className={onMonthClick ? 'cursor-pointer' : undefined}
                 onClick={(d: { payload?: { month?: string } }) => (d?.payload?.month ? pick(d.payload.month) : undefined)}
@@ -100,10 +102,10 @@ export default function DashboardWorkMonths({
                 data-testid={`dashboard-work-month-${r.month}`}
               >
                 <TableCell className={cn('text-sm', DASH.cellStrong)}>{monthText(r.month)}</TableCell>
-                <TableCell className="text-right text-sm tabular-nums">{NUM.format(r.requested)}</TableCell>
+                <TableCell className={cn('text-right text-sm tabular-nums', TONE.info.value)}>{NUM.format(r.requested)}</TableCell>
                 <TableCell className={cn('text-right text-sm tabular-nums', TONE.success.value)}>{NUM.format(r.filled)}</TableCell>
                 <TableCell className={cn('text-right text-sm tabular-nums', TONE.danger.value)}>{NUM.format(r.cancelled)}</TableCell>
-                <TableCell className={cn('text-right text-sm tabular-nums', TONE.warn.value)}>{NUM.format(r.remaining)}</TableCell>
+                <TableCell className="text-right text-sm tabular-nums">{NUM.format(r.remaining)}</TableCell>
               </TableRow>
             ))}
           </TableBody>
