@@ -505,13 +505,31 @@ export function applicationUnitLabel(r: PublicApplication): string {
 }
 
 /**
- * "ผู้รับผิดชอบ" ของใบสมัคร = ทีม Online (เจ้าของ 16 ต.ค. 2569: *"ผู้รับผิดชอบ ก็ทีม online อะ ว่าน เจมส์"*)
+ * "คนนำเข้า" ของใบสมัคร (คำบนจอเดิม "ผู้รับผิดชอบ" · เจ้าของเปลี่ยนคำ 23 พ.ย. 2569) = ทีม Online (เจ้าของ 16 ต.ค. 2569: *"ผู้รับผิดชอบ ก็ทีม online อะ ว่าน เจมส์"*)
  * ผู้รับผิดชอบที่เลือกตอนคีย์/นำเข้า → ผู้รับผิดชอบของลิงก์ที่สมัครเข้ามา (ไม่ได้ตั้ง = คนสร้างลิงก์) · ไม่มีทั้งคู่ = null
  * 🔴 คนละคนกับ "ข้อมูลผู้สรรหา" = เจ้าหน้าที่สรรหาของใบขอ (คิว แบงค์ · คอลัมน์ "เจ้าของงาน")
  */
 export function applicantResponsibleName(r: Pick<PublicApplication, 'responsible_name' | 'posting_owner_name'>, jobRecruiter?: string | null): string | null {
   // ไม่มีทั้งคู่ (บอท LINE · สมัครเองหน้าเว็บ) = เจ้าหน้าที่สรรหาของใบขอ (เจ้าของ 19 พ.ย. 2569 Choice "เจ้าหน้าที่สรรหาของใบขอ")
   return (r.responsible_name || '').trim() || (r.posting_owner_name || '').trim() || (jobRecruiter || '').trim() || null;
+}
+
+/**
+ * "ข้อมูลผู้สรรหา" ของใบสมัคร (ที่เดียว · คอลัมน์เจ้าของงาน · ตัวกรอง · รายงาน · ป๊อป ใช้ตัวนี้)
+ * ที่แก้รายคน › เจ้าหน้าที่สรรหาของใบขอ › **กล่องลอย (ไม่มีใบขอ) = เจ้าหน้าที่สรรหาที่เลือกตอน Gen link**
+ * เจ้าของ 23 พ.ย. 2569 "Gen link ของกล่องลอย ทำไมไม่ทำให้เหมือนกล่องปกติ แค่ต้องเพิ่มชื่อเจ้าหน้าที่สรรหาเอง" ·
+ * Choice "ชื่อที่เลือกตอน Gen link" — เดิมกล่องลอยไม่มีใบขอให้ดึงชื่อ ช่องนี้จึงว่างทั้งที่เลือกชื่อไว้ตอน Gen link
+ * 🔴 ใบที่ผูกใบขอไม่ใช้ชื่อของลิงก์ (ใบขอเป็นตัวจริง) · ใช้เฉพาะชื่อที่ **เลือกไว้** (`link_recruiter_name`) ไม่ถอยไปคนกด Gen link —
+ *    ลิงก์เก่าคนกดคือทีม Online (ทานข้อมูลจริง 23 พ.ย. 2569: ทีมแก้รายคนจาก "ลิงก์ของทีม Online" เป็นสายสรรหา 200 กว่าคน) · ไม่ได้เลือก = ว่าง แก้รายคนตามเดิม
+ */
+export function applicantLinkRecruiter(r: Pick<PublicApplication, 'standalone_kind' | 'link_recruiter_name'>): string | null {
+  return r.standalone_kind ? (r.link_recruiter_name || '').trim() || null : null;
+}
+export function applicantRecruiterName(
+  r: Pick<PublicApplication, 'recruiter_name' | 'standalone_kind' | 'link_recruiter_name'>,
+  jobRecruiter?: string | null,
+): string | null {
+  return (r.recruiter_name || '').trim() || (jobRecruiter || '').trim() || applicantLinkRecruiter(r);
 }
 
 /**

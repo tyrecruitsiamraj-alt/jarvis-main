@@ -37,7 +37,7 @@ async function readError(r: Response, fallback: string): Promise<string> {
 /** `lane` = เฉพาะสายงานนั้น + ชื่อเล่น (`label`) — ฟอร์มเพิ่มผู้สมัครใช้ 'recruiter' (21 ต.ค. 2569) */
 export async function fetchResponsibleNames(lane?: string): Promise<Array<{ id: string; name: string; label?: string }>> {
   const r = await apiFetch(lane ? `/api/app-user-names?lane=${encodeURIComponent(lane)}` : '/api/app-user-names');
-  if (!r.ok) throw new Error(await readError(r, 'โหลดรายชื่อผู้รับผิดชอบไม่สำเร็จ'));
+  if (!r.ok) throw new Error(await readError(r, 'โหลดรายชื่อคนนำเข้าไม่สำเร็จ'));
   return parseResponsibleNames(await r.json());
 }
 

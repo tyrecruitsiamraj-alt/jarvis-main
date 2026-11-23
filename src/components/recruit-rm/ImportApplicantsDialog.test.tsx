@@ -89,7 +89,7 @@ describe('ImportApplicantsDialog', () => {
     const save = screen.getByRole('button', { name: /นำเข้า 1 คน/ });
     // 🔴 ต้องเลือกผู้รับผิดชอบ + ช่องทางก่อน (4 ต.ค. 2569) — สองช่องโผล่หลังเลือกไฟล์
     expect((save as HTMLButtonElement).disabled).toBe(true);
-    fireEvent.click(screen.getByRole('combobox', { name: 'ผู้รับผิดชอบ' }));
+    fireEvent.click(screen.getByRole('combobox', { name: 'คนนำเข้า' }));
     fireEvent.click(await screen.findByRole('option', { name: 'คุณเอ ทดสอบ' }));
     fireEvent.click(await screen.findByText('เลือกช่องทางทดสอบ'));
     // 🔴 PDPA (15 ต.ค. 2569) — ยังไม่ติ๊กยินยอม = กดนำเข้าไม่ได้

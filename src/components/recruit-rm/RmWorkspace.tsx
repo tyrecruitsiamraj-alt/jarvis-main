@@ -76,7 +76,7 @@ import { appointmentTimeOf } from '@/lib/appointmentTime';
 import { RM_BUCKET_LABEL, isRmBucket } from '@/lib/recruitRmOverviewApi';
 import { LEAD_VIEW_LABEL } from '@/lib/recruitLead';
 import { fetchCallHoldsByPhones, type CallHold } from '@/lib/callHoldsApi';
-import { RM_JOB_ALL_PARAM, RM_OPEN_PARAM, canHoldApplication } from '@/lib/recruitRm';
+import { RM_JOB_ALL_PARAM, RM_OPEN_PARAM, applicantRecruiterName, canHoldApplication } from '@/lib/recruitRm';
 import { choiceCountdown } from '@/lib/callChoiceGuard';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRolePermissions } from '@/contexts/RolePermissionsContext';
@@ -541,7 +541,8 @@ const RmWorkspace: React.FC<{
    * ใช้กับคอลัมน์เจ้าของงาน · ไฟล์รายงาน · ป๊อป
    */
   const recruiterOf = useMemo(
-    () => (r: PublicApplication) => (r.recruiter_name ?? '').trim() || jobRecruiterOf?.(r) || null,
+    // กล่องลอยไม่มีใบขอ = เจ้าหน้าที่สรรหาที่เลือกตอน Gen link (`applicantRecruiterName` · 23 พ.ย. 2569)
+    () => (r: PublicApplication) => applicantRecruiterName(r, jobRecruiterOf?.(r)),
     [jobRecruiterOf],
   );
   /** หน่วยงานจากใบขอ — ใบสมัครที่ไม่มี unit_name เคยโชว์ชื่อประกาศ/ตำแหน่งในคอลัมน์หน่วยงาน (QA 18 ต.ค. 2569) */

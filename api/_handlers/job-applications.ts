@@ -80,7 +80,7 @@ import { loadBoardPhoneSet } from '../_lib/applicationBoardLink.js';
 import { toE164Thai } from '../_lib/thaiPhone.js';
 import { logError, logWarn } from '../_lib/logger.js';
 import { loadStaffDisplay } from '../_lib/staffDisplay.js';
-import { linkOwnerSql } from '../_lib/recruitPostings.js';
+import { linkOwnerSql, linkRecruiterSql } from '../_lib/recruitPostings.js';
 
 const tbl = tableInAppSchema('public_job_applications');
 const queueTbl = tableInAppSchema('lumos_dispatch_queue');
@@ -127,6 +127,8 @@ type Row = {
   posting_owner_name?: string | null;
   standalone_kind?: string | null;
   standalone_kind_label?: string | null;
+  /** เจ้าหน้าที่สรรหาที่เลือกไว้ตอน Gen link (`linkRecruiterSql` · ไม่ได้เลือก = null) — ผู้สรรหาของผู้สมัครกล่องลอย */
+  link_recruiter_name?: string | null;
   channel_label: string | null;
   license_types: string[] | null;
   created_by_name: string | null;
@@ -227,6 +229,7 @@ function toApplication(r: Row, viewerId?: string, showClaimer = false) {
     posting_owner_name: r.posting_owner_name || undefined,
     standalone_kind: r.standalone_kind || undefined,
     standalone_kind_label: r.standalone_kind_label || undefined,
+    link_recruiter_name: r.link_recruiter_name || undefined,
     channel_label: r.channel_label || undefined,
     license_types: r.license_types && r.license_types.length > 0 ? r.license_types : undefined,
     created_by_name: r.created_by_name || undefined,
@@ -303,7 +306,8 @@ const POSTING_OWNER_SQL = `coalesce(
 const STANDALONE_KIND_SQL = `(select p.standalone_kind from ${tableInAppSchema('recruit_postings')} p where p.id = a.posting_id and p.job_id is null) as standalone_kind,
   (select coalesce(k.label, p.standalone_kind) from ${tableInAppSchema('recruit_postings')} p
      left join ${tableInAppSchema('recruit_posting_kinds')} k on k.code = p.standalone_kind
-    where p.id = a.posting_id and p.job_id is null) as standalone_kind_label`;
+    where p.id = a.posting_id and p.job_id is null) as standalone_kind_label,
+  ${linkRecruiterSql('a.link_id')} as link_recruiter_name`;
 
 const LIST_COLUMNS = `
   id, full_name, title_prefix, first_name, last_name, phone, age, gender,
@@ -366,7 +370,7 @@ const LIST_COLUMNS_NO_LEAD = `
   created_at,
   claimed_by, claimed_by_name, claimed_at,
   false as is_lead, null::text as lead_by, null::text as lead_by_name, null::timestamptz as lead_at,
-  null::text as standalone_kind, null::text as standalone_kind_label
+  null::text as standalone_kind, null::text as standalone_kind_label, null::text as link_recruiter_name
 `;
 
 /**
@@ -384,7 +388,7 @@ const LIST_COLUMNS_NO_CLAIM = `
   created_at,
   null::uuid as claimed_by, null::text as claimed_by_name, null::timestamptz as claimed_at,
   false as is_lead, null::text as lead_by, null::text as lead_by_name, null::timestamptz as lead_at,
-  null::text as standalone_kind, null::text as standalone_kind_label
+  null::text as standalone_kind, null::text as standalone_kind_label, null::text as link_recruiter_name
 `;
 
 /**
@@ -406,7 +410,7 @@ const LIST_COLUMNS_LEGACY = `
   created_at,
   null::uuid as claimed_by, null::text as claimed_by_name, null::timestamptz as claimed_at,
   false as is_lead, null::text as lead_by, null::text as lead_by_name, null::timestamptz as lead_at,
-  null::text as standalone_kind, null::text as standalone_kind_label
+  null::text as standalone_kind, null::text as standalone_kind_label, null::text as link_recruiter_name
 `;
 
 /** 42703 undefined_column — โค้ดใหม่ขึ้นก่อน migration 074 */

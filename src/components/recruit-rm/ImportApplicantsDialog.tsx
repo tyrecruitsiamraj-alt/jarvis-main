@@ -97,7 +97,7 @@ const ImportApplicantsDialog: React.FC<{
       .then(setStaff)
       .catch((e) => {
         setStaff([]);
-        setError(e instanceof Error ? e.message : 'โหลดรายชื่อผู้รับผิดชอบไม่สำเร็จ');
+        setError(e instanceof Error ? e.message : 'โหลดรายชื่อคนนำเข้าไม่สำเร็จ');
       });
   }, [open]);
 
@@ -312,14 +312,14 @@ const ImportApplicantsDialog: React.FC<{
             {fileBase64 ? (
               <div className="grid gap-3 sm:grid-cols-2" data-testid="import-shared">
                 <div className="space-y-1.5">
-                  <Label className="text-xs text-muted-foreground">ผู้รับผิดชอบรายชื่อชุดนี้</Label>
+                  <Label className="text-xs text-muted-foreground">คนนำเข้ารายชื่อชุดนี้</Label>
                   <Select value={responsible} onValueChange={setResponsible} disabled={saved || busy === 'saving'}>
-                    <SelectTrigger className="h-9 text-sm" aria-label="ผู้รับผิดชอบ">
+                    <SelectTrigger className="h-9 text-sm" aria-label="คนนำเข้า">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value={NO_STAFF} disabled>
-                        เลือกผู้รับผิดชอบ
+                        เลือกคนนำเข้า
                       </SelectItem>
                       {staff.map((u) => (
                         <SelectItem key={u.id} value={u.id}>
@@ -464,7 +464,7 @@ const ImportApplicantsDialog: React.FC<{
                   disabled={ready === 0 || busy !== null || !sharedPicked || !consent}
                   title={
                     !sharedPicked && fileBase64
-                      ? 'เลือกผู้รับผิดชอบและช่องทางก่อน'
+                      ? 'เลือกคนนำเข้าและช่องทางก่อน'
                       : !consent && fileBase64
                         ? PDPA_CONSENT_REQUIRED_MESSAGE_STAFF
                         : undefined

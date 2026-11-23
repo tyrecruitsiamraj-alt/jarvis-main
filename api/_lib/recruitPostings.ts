@@ -368,6 +368,18 @@ type PostingRow = {
  * ชื่อ = ชื่อเล่น → ชื่อเต็ม → ส่วนหน้าอีเมล
  * ใช้ทั้งรายการลิงก์ (`attachLinks`) และใบประวัติผู้สมัคร (`POSTING_OWNER_SQL` ใน job-applications) ⇒ สองที่บอกชื่อเดียวกันเสมอ
  */
+/**
+ * เจ้าหน้าที่สรรหาที่ **เลือกไว้** ตอน Gen link (190) — ชื่อเล่น › ชื่อเต็ม › ชื่อที่บันทึกไว้ · ลิงก์ที่ไม่ได้เลือก = null
+ * 🔴 ไม่ถอยไปคนกดสร้างลิงก์ (ต่างจาก `linkOwnerSql`) — ใช้เป็น "ข้อมูลผู้สรรหา" ของผู้สมัครกล่องลอย (23 พ.ย. 2569):
+ * ลิงก์เก่าคนกดคือทีม Online ถ้าถอยไปคนกด ผู้สมัคร 373 คนจะได้ชื่อทีม Online เป็นผู้สรรหา (ทานกับข้อมูลจริง 23 พ.ย. 2569)
+ */
+export function linkRecruiterSql(linkIdExpr: string): string {
+  return `(select coalesce(nullif(btrim(ru.nickname), ''), nullif(btrim(ru.full_name), ''), nullif(btrim(lk.responsible_name), ''))
+       from ${linksTable} lk
+       left join ${usersTable} ru on ru.id = lk.responsible_user_id
+      where lk.id = ${linkIdExpr})`;
+}
+
 export function linkOwnerSql(linkIdExpr: string, postingIdExpr: string): string {
   return `coalesce(
     (select coalesce(nullif(btrim(ru.nickname), ''), nullif(btrim(ru.full_name), ''), nullif(btrim(lk.responsible_name), ''),

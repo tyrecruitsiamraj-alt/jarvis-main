@@ -304,9 +304,9 @@ const AddApplicantDialog: React.FC<{
               />
             </div>
             <div className="space-y-1.5">
-              <label className={labelCls}>ผู้รับผิดชอบ</label>
+              <label className={labelCls}>คนนำเข้า</label>
               <FieldSelect
-                ariaLabel="ผู้รับผิดชอบ"
+                ariaLabel="คนนำเข้า"
                 value={responsible}
                 onChange={setResponsible}
                 options={[{ value: '', label: 'ไม่ระบุ' }, ...staff.map((u) => ({ value: u.id, label: u.label ?? u.name }))]}

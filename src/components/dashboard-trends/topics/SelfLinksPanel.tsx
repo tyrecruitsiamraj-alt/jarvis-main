@@ -124,7 +124,7 @@ export default function SelfLinksPanel({ rows, onOpenRequest }: { rows: readonly
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>ช่องทาง › กลุ่ม › ผู้รับผิดชอบ</TableHead>
+                <TableHead>ช่องทาง › กลุ่ม › เจ้าหน้าที่สรรหา</TableHead>
                 <TableHead className="text-right">ลิงก์</TableHead>
                 <TableHead className="text-right">คลิก</TableHead>
                 <TableHead className="text-right">กรอก</TableHead>
@@ -165,7 +165,7 @@ export default function SelfLinksPanel({ rows, onOpenRequest }: { rows: readonly
                 <TableHead className="text-right">กรอก</TableHead>
                 <TableHead>มาจากลิงก์ (กลุ่ม / ช่องทาง)</TableHead>
                 <TableHead>โพสต์แล้ว</TableHead>
-                <TableHead>ผู้รับผิดชอบ</TableHead>
+                <TableHead>เจ้าหน้าที่สรรหา</TableHead>
                 <TableHead>ใบขอ</TableHead>
                 <TableHead>วันที่สร้าง</TableHead>
                 <TableHead className="text-right">คลิก</TableHead>

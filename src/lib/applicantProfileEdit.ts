@@ -189,7 +189,7 @@ const LABEL: Record<ProfileKey, string> = {
   height_cm: 'ส่วนสูง',
   note: 'ความคิดเห็น',
   recruiter_name: 'ข้อมูลผู้สรรหา',
-  responsible_name: 'ผู้รับผิดชอบ',
+  responsible_name: 'คนนำเข้า',
   job_id: 'ตำแหน่งงาน',
 };
 

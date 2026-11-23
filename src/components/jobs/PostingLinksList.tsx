@@ -58,7 +58,7 @@ function LinkRow({ link, posting }: { link: RecruitPostingLink; posting: Recruit
         <span className="inline-flex items-center gap-1 tabular-nums">
           <UserPlus className="h-3.5 w-3.5" aria-hidden /> สมัครเข้ามา {NUM.format(link.applicationCount ?? 0)} คน
         </span>
-        <span>สร้าง {formatDateTimeTh(link.createdAt)}{owner ? ` · ผู้รับผิดชอบ ${owner}` : ''}</span>
+        <span>สร้าง {formatDateTimeTh(link.createdAt)}{owner ? ` · เจ้าหน้าที่สรรหา ${owner}` : ''}</span>
       </p>
     </li>
   );

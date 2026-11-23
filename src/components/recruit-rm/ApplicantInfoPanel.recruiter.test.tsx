@@ -53,7 +53,7 @@ describe('ป๊อปผู้สมัคร: ข้อมูลผู้ส�
   it('🔴 ข้อมูลผู้สรรหา = เจ้าหน้าที่สรรหาของใบขอ · ผู้รับผิดชอบ = ทีม Online ของลิงก์', () => {
     renderPanel(app({ posting_owner_name: 'เจ้าหน้าที่ออนไลน์ ก' }), 'เจ้าหน้าที่สรรหา ก');
     expect(fieldValue('ข้อมูลผู้สรรหา')).toBe('เจ้าหน้าที่สรรหา ก');
-    expect(fieldValue('ผู้รับผิดชอบ')).toBe('เจ้าหน้าที่ออนไลน์ ก');
+    expect(fieldValue('คนนำเข้า')).toBe('เจ้าหน้าที่ออนไลน์ ก');
     expect(screen.queryByText('ประเภทเจาะจง')).toBeNull();
   });
 
@@ -63,13 +63,25 @@ describe('ป๊อปผู้สมัคร: ข้อมูลผู้ส�
       null,
     );
     expect(fieldValue('ข้อมูลผู้สรรหา')).toBe('—');
-    expect(fieldValue('ผู้รับผิดชอบ')).toBe('คนคีย์ ก');
+    expect(fieldValue('คนนำเข้า')).toBe('คนคีย์ ก');
     expect(screen.queryByText('เจาะจง (ฟรี)')).toBeNull();
+  });
+
+  it('🔴 กล่องลอย (ไม่มีใบขอ): ข้อมูลผู้สรรหา = เจ้าหน้าที่สรรหาที่เลือกตอน Gen link · ไม่ได้เลือก = ว่าง · ผูกใบขอไม่ใช้ชื่อของลิงก์ (23 พ.ย. 2569)', () => {
+    const first = renderPanel(app({ standalone_kind: 'exec_th', link_recruiter_name: 'เจ้าหน้าที่สรรหา ข', posting_owner_name: 'เจ้าหน้าที่สรรหา ข' }), null);
+    expect(fieldValue('ข้อมูลผู้สรรหา')).toBe('เจ้าหน้าที่สรรหา ข');
+    first.unmount();
+    // ลิงก์เก่าของกล่องลอย: มีแต่คนกด (ทีม Online) ไม่ได้เลือกเจ้าหน้าที่สรรหา = ยังว่าง
+    const old = renderPanel(app({ standalone_kind: 'exec_th', posting_owner_name: 'เจ้าหน้าที่ออนไลน์ ก' }), null);
+    expect(fieldValue('ข้อมูลผู้สรรหา')).toBe('—');
+    old.unmount();
+    renderPanel(app({ link_recruiter_name: 'เจ้าหน้าที่สรรหา ข', posting_owner_name: 'เจ้าหน้าที่ออนไลน์ ก' }), null);
+    expect(fieldValue('ข้อมูลผู้สรรหา')).toBe('—');
   });
 
   it('ไม่มีข้อมูล = ขีด (ช่องไม่หาย)', () => {
     renderPanel(app(), null);
-    for (const label of ['ข้อมูลผู้สรรหา', 'ผู้รับผิดชอบ']) expect(fieldValue(label)).toBe('—');
+    for (const label of ['ข้อมูลผู้สรรหา', 'คนนำเข้า']) expect(fieldValue(label)).toBe('—');
   });
 
   it('วันที่สมัคร บอกทั้งวันและเวลา (เจ้าของ 22 พ.ย. 2569 "สมัครก็ไม่ได้บอกเวลามา") · ไม่มีค่า = ขีด', () => {
@@ -115,7 +127,8 @@ describe('ทุกจุดใช้ความหมายเดียวก�
     expect(ws).toContain('recruiterName={recruiterOf(profileApp)}');
     expect(ws).toContain('jobRecruiterName={jobRecruiterOf?.(profileApp) ?? null}');
     expect(ws).toContain('recruiterName={contactApp ? recruiterOf(contactApp) : null}');
-    expect(ws).toContain("(r.recruiter_name ?? '').trim() || jobRecruiterOf?.(r) || null");
+    // 23 พ.ย. 2569 ตัวเดียวทั้งระบบ: ที่แก้รายคน › ใบขอ › กล่องลอย = ชื่อที่เลือกตอน Gen link
+    expect(ws).toContain('applicantRecruiterName(r, jobRecruiterOf?.(r))');
     expect(ws.match(/downloadApplicantExport\(shown, \{ recruiterOf \}\)/g)?.length).toBe(2);
     expect(readFileSync('src/components/jobs/JobApplicantsDialog.tsx', 'utf8')).toContain(
       'recruiterName={job?.recruiter_name?.trim() || null}',
@@ -131,7 +144,7 @@ describe('ทุกจุดใช้ความหมายเดียวก�
   });
 
   it('ไฟล์รายงาน: ข้อมูลผู้สรรหา = ผู้สรรหาของใบขอ · ผู้รับผิดชอบ = ทีม Online · ไม่มีคอลัมน์ประเภทเจาะจง', () => {
-    expect(APPLICANT_EXPORT_HEADERS.slice(-2)).toEqual(['ข้อมูลผู้สรรหา', 'ผู้รับผิดชอบ']);
+    expect(APPLICANT_EXPORT_HEADERS.slice(-2)).toEqual(['ข้อมูลผู้สรรหา', 'คนนำเข้า']);
     expect(APPLICANT_EXPORT_HEADERS).not.toContain('ประเภทเจาะจง');
     const [row] = applicantExportRows([app({ posting_owner_name: 'เจ้าหน้าที่ออนไลน์ ก', specific_type: 'เจาะจง (ฟรี)' })], {
       recruiterOf: () => 'เจ้าหน้าที่สรรหา ก',

@@ -10,7 +10,9 @@ import ApplicantTraceField, { useApplicantTrace } from '@/components/recruit-rm/
 import { EM_DASH } from '@/lib/displayFallback';
 import { formatDateTimeTh } from '@/lib/dateTh';
 import { APPLICATION_ORIGIN_LABEL, type PublicApplication, REFERRAL_SOURCE_LABEL } from '@/lib/publicApplicationsApi';
-import { applicantResponsibleName, applicationJobLabel } from '@/lib/recruitRm';
+import { applicantLinkRecruiter,
+  applicantRecruiterName,
+  applicantResponsibleName, applicationJobLabel } from '@/lib/recruitRm';
 import { getJobStaffApiCache, JOB_STAFF_ROSTER_CHANGED_EVENT, refreshJobStaffFromApi } from '@/lib/jobStaffRemote';
 import SearchableSelect from '@/components/shared/SearchableSelect';
 import { fetchSiamrajUnitRequests } from '@/lib/siamrajUnitRequestsApi';
@@ -107,6 +109,8 @@ const ApplicantInfoPanel: React.FC<{
   const responsibleOptions = withCurrent(lane('online'), draft.responsible_name);
   const jobRecruiter = (jobRecruiterName === undefined ? recruiterName : jobRecruiterName)?.trim() || null;
   const linkOwner = (a.posting_owner_name ?? '').trim() || null;
+  /** กล่องลอย (ไม่มีใบขอ) — ผู้สรรหา = เจ้าหน้าที่สรรหาที่เลือกตอน Gen link (23 พ.ย. 2569) */
+  const linkRecruiter = jobRecruiter ? null : applicantLinkRecruiter(a);
   const set = <K extends keyof ProfileDraft>(key: K, value: ProfileDraft[K]) => onDraft({ ...draft, [key]: value });
   const educationOptions = draft.education && !PROFILE_EDUCATION_OPTIONS.includes(draft.education)
     ? [draft.education, ...PROFILE_EDUCATION_OPTIONS]
@@ -292,7 +296,9 @@ const ApplicantInfoPanel: React.FC<{
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value={NO_PREFIX}>{jobRecruiter ? `ตามใบขอ (${jobRecruiter})` : 'ตามใบขอ'}</SelectItem>
+              <SelectItem value={NO_PREFIX}>
+                {jobRecruiter ? `ตามใบขอ (${jobRecruiter})` : linkRecruiter ? `ตามลิงก์ (${linkRecruiter})` : 'ตามใบขอ'}
+              </SelectItem>
               {recruiterOptions.map((n) => (
                 <SelectItem key={n} value={n}>
                   {n}
@@ -301,17 +307,17 @@ const ApplicantInfoPanel: React.FC<{
             </SelectContent>
           </Select>
         ) : (
-          show((a.recruiter_name ?? '').trim() || recruiterName)
+          show(applicantRecruiterName(a, recruiterName))
         )}
       </Field>
-      <Field label="ผู้รับผิดชอบ">
+      <Field label="คนนำเข้า">
         {editing ? (
           <Select
             value={draft.responsible_name || NO_PREFIX}
             onValueChange={(v) => set('responsible_name', v === NO_PREFIX ? '' : v)}
             disabled={disabled}
           >
-            <SelectTrigger className="h-9 text-sm" aria-label="ผู้รับผิดชอบ">
+            <SelectTrigger className="h-9 text-sm" aria-label="คนนำเข้า">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

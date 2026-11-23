@@ -76,10 +76,10 @@ describe('API ตรวจผู้รับผิดชอบว่าเป็
     await expect(resolveLinkResponsible({ pickedUserId: '', actorUserId: ACTOR, scopeCodes: null })).resolves.toBeNull();
     await expect(resolveLinkResponsible({ pickedUserId: null, actorUserId: ACTOR, scopeCodes: null })).resolves.toBeNull();
     expect(dbQuery).not.toHaveBeenCalled();
-    await expect(resolveLinkResponsible({ pickedUserId: 'ว่าน', actorUserId: ACTOR, scopeCodes: null })).rejects.toThrow('ต้องเลือกผู้รับผิดชอบ');
+    await expect(resolveLinkResponsible({ pickedUserId: 'ว่าน', actorUserId: ACTOR, scopeCodes: null })).rejects.toThrow('ต้องเลือกเจ้าหน้าที่สรรหา');
     await expect(
       resolveLinkResponsible({ pickedUserId: '00000000-0000-0000-0000-0000000000ff', actorUserId: ACTOR, scopeCodes: null }),
-    ).rejects.toThrow('ต้องเลือกผู้รับผิดชอบ');
+    ).rejects.toThrow('ต้องเลือกเจ้าหน้าที่สรรหา');
   });
 
   it('คำถามฐาน: ยังใช้งาน · คนกดเอง หรือสายสรรหา/ทีม Online ที่มีชื่อเล่น ใน BU ที่คนกดเห็น (ชุดเดียวกับรายชื่อในฟอร์ม)', async () => {

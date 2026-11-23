@@ -123,7 +123,7 @@ export type RecruitPosting = {
  */
 export const LINK_RESPONSIBLE_LANES = ['recruiter', 'online'] as const;
 /** API ตอบ 400 ข้อความนี้เมื่อ id ที่ส่งมาไม่ใช่เจ้าหน้าที่ในรายชื่อ (ขึ้นต้น "ต้องเลือก" = ตัวจับ 400 ของ recruit-postings) */
-export const LINK_RESPONSIBLE_INVALID = 'ต้องเลือกผู้รับผิดชอบจากรายชื่อเจ้าหน้าที่';
+export const LINK_RESPONSIBLE_INVALID = 'ต้องเลือกเจ้าหน้าที่สรรหาจากรายชื่อ';
 
 /** เส้นทางสาธารณะของลิงก์ — ใช้ทั้งตอนสร้างและตอน resolve */
 export function applyLinkPath(code: string): string {

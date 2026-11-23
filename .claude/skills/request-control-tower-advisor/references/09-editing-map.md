@@ -14542,3 +14542,11 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 - `ProportionTab.tsx`: ช่วงก่อนโหลด 3 เส้นเดิม (`recruit-overview` · `home-ai-share?proportion=1` · `?report=matching`) ตอนเปิดแท็บ · ไม่มี API ใหม่ · ถอดป้ายสี (ชื่ออยู่ในช่องแล้ว) และเลข AI%/คน% ด้านขวา (คิดจากงานที่ทำแล้ว — ชนกับ % ในแถบที่คิดจากทั้งหมด) · ป้าย AI ทำหลัก/แบ่งกัน ยังใช้ `proportionPct` เดิม
 - ช่องในแถบกว้างตามเลขด้วย `grid-template-columns: minmax(max-content, Nfr)` — ช่องเล็กไม่แคบกว่าตัวหนังสือ · ช่องที่เป็น 0 อยู่ที่เดิม ไม่ลงสี
 - เทสต์ `tests/api/homeProportion2569-10-28.test.ts` (แถบ · เทียบช่วงก่อน · ช่วงก่อน · ชื่อแท็บ)
+
+### 23 พ.ย. 2569 (2) — กล่องลอย: ผู้สรรหาของผู้สมัคร = เจ้าหน้าที่สรรหาที่เลือกตอน Gen link · คำ "ผู้รับผิดชอบ" ของใบสมัคร → "คนนำเข้า"
+เจ้าของ "เลือกชื่อแล้วแต่ชื่อคนสรรหาไม่วิ่งไปตามกล่องใครกล่องมัน" · "Gen link ของกล่องลอย ทำไมไม่ทำให้เหมือนกล่องปกติ แค่ต้องเพิ่มชื่อเจ้าหน้าที่สรรหาเอง" · Choice "ชื่อที่เลือกตอน Gen link" · "ผู้รับผิดชอบเปลี่ยนชื่อเป็น คนนำเข้า"
+- ตัวตัดสินเดียว `applicantRecruiterName` (`src/lib/recruitRm.ts`): ที่แก้รายคน › เจ้าหน้าที่สรรหาของใบขอ › กล่องลอย = `link_recruiter_name` · ใช้ที่ `RmWorkspace.recruiterOf` (คอลัมน์เจ้าของงาน · ตัวกรองเจ้าหน้าที่สรรหา · รายงาน) และ `ApplicantInfoPanel` (ทุกป๊อป)
+- `link_recruiter_name` มาจาก `linkRecruiterSql` (`api/_lib/recruitPostings.ts`) ในชุดคอลัมน์ของ `/api/job-applications` — เฉพาะชื่อที่เลือกไว้ (`responsible_user_id` / `responsible_name` ของลิงก์ · migration 190)
+- 🔴 ห้ามถอยไปคนกด Gen link (`posting_owner_name`): ลิงก์ก่อน 19 พ.ย. คนกดคือทีม Online · ทานข้อมูลจริง 23 พ.ย. ทีมแก้รายคนจากลิงก์ของทีม Online เป็นสายสรรหา 234 คน · ใบที่ผูกใบขอไม่ใช้ชื่อของลิงก์
+- คำบนจอ: ช่องของใบสมัคร/ฟอร์มเพิ่ม/นำเข้า Excel/ไฟล์รายงาน = "คนนำเข้า" (วิธีหาชื่อเดิม `applicantResponsibleName`) · ลิงก์ (`PostingLinksList` · `SelfLinksPanel` · ข้อความ API) = "เจ้าหน้าที่สรรหา" คำเดียวกับช่องในฟอร์ม Gen link · "ผู้รับผิดชอบ" ของใบขอไม่เปลี่ยน · กติกาอยู่ `uiWords.ts`
+- เทสต์ `tests/api/floatingBoxRecruiter2569-11-23.test.ts` · `ApplicantInfoPanel.recruiter.test.tsx`

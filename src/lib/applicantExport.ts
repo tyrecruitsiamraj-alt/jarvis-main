@@ -30,7 +30,7 @@ export const APPLICANT_EXPORT_HEADERS = [
   'อายุ',
   'เพศ',
   'ข้อมูลผู้สรรหา',
-  'ผู้รับผิดชอบ',
+  'คนนำเข้า',
 ] as const;
 
 /** BOM ให้ Excel อ่านไทยถูก */
