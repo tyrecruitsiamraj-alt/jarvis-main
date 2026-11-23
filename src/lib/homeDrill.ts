@@ -20,7 +20,11 @@ import { ENTRY_KINDS, ENTRY_KIND_META, entryKindOf, type EntryRow } from './home
 export const DRILL_MONTHS = 12;
 
 /** กล่องที่กดแล้วไล่เดือนได้ — ขั้นผู้สมัคร 6 ขั้น (แท็บภาพรวม · การ์ดผู้สมัคร = applied) + แถวสรรหา/ทางเข้า (แท็บสัดส่วน) */
-export const DRILL_BOX_KEYS = ['applied', 'ai', 'interested', 'staff', 'reached', 'booked', 'prescreen', 'afterPrescreen', 'appointment', 'entry'] as const;
+export const DRILL_BOX_KEYS = ['applied', 'ai', 'interested', 'staff', 'reached', 'booked', 'prescreen', 'afterPrescreen', 'appointment', 'entry', 'reqNew', 'reqClosed', 'reqCancelled'] as const;
+/** กล่องใบขอ (เจ้าของ 23 พ.ย. 2569 ข้อ 2 "ทุกกล่องกดแล้วต้องเห็นหมด") — ชุดข้อมูลคนละชุดกับใบสมัคร (`?set=requests`) */
+export const REQUEST_DRILL_BOXES = ['reqNew', 'reqClosed', 'reqCancelled'] as const;
+export type DrillSet = 'applicants' | 'requests';
+export const drillSetOf = (box: DrillBoxKey): DrillSet => ((REQUEST_DRILL_BOXES as readonly string[]).includes(box) ? 'requests' : 'applicants');
 export type DrillBoxKey = (typeof DRILL_BOX_KEYS)[number];
 export const isDrillBoxKey = (v: unknown): v is DrillBoxKey => typeof v === 'string' && (DRILL_BOX_KEYS as readonly string[]).includes(v);
 
@@ -37,6 +41,8 @@ export type DrillPayload = {
   boxes: DrillBox[];
   /** ต่อใบ: [วันที่นับจาก from, ดัชนี BU, ดัชนีเหตุผลของกล่องตามลำดับ boxes … (-1 = ใบนี้ไม่อยู่ในกล่องนั้น)] */
   items: number[][];
+  /** ชุดใบขอ: ป้ายต่อ items (เลขที่ใบ · หน่วยงาน) ไว้ทำรายการใบ · ชุดใบสมัครไม่มี */
+  labels?: string[];
   /** id ของใบตามลำดับ items — เปิดรายชื่อ */
   ids: string[];
 };
@@ -83,6 +89,9 @@ const UNIT: Record<DrillBoxKey, string> = {
   afterPrescreen: 'คน',
   appointment: 'คน',
   entry: 'ใบ',
+  reqNew: 'ใบ',
+  reqClosed: 'ใบ',
+  reqCancelled: 'ใบ',
 };
 const PROPORTION_TITLE: Record<'prescreen' | 'afterPrescreen' | 'appointment' | 'entry', string> = {
   prescreen: 'โทร Prescreen',
@@ -283,6 +292,22 @@ export function drillIds(p: DrillPayload, box: DrillBoxKey, scope: DrillScope, r
   const out: string[] = [];
   p.items.forEach((it, i) => {
     if (set.has(it) && (want < 0 || it[2 + bi] === want)) out.push(p.ids[i]);
+  });
+  return out;
+}
+
+/** ชุดใบขอ: ใบของขอบเขตนี้ (id + ป้าย) ไว้ทำรายการใบ — ใบเดียวกันซ้ำในขอบเขตเดียว (เช่นปิดครบสองครั้ง) ขึ้นครั้งเดียว */
+export function drillLabeledIds(p: DrillPayload, box: DrillBoxKey, scope: DrillScope): Array<{ id: string; label: string }> {
+  const bi = boxIndexOf(p, box);
+  if (bi < 0) return [];
+  const set = new Set(scopedItems(p, box, scope));
+  const seen = new Set<string>();
+  const out: Array<{ id: string; label: string }> = [];
+  p.items.forEach((it, i) => {
+    const id = p.ids[i];
+    if (!set.has(it) || seen.has(id)) return;
+    seen.add(id);
+    out.push({ id, label: p.labels?.[i] ?? id });
   });
   return out;
 }

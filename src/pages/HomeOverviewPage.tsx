@@ -579,7 +579,18 @@ const HomeOverviewPage: React.FC<{
    * กดขั้นผู้สมัคร (และการ์ดผู้สมัคร) = แผงไล่ 12 เดือน → วัน → BU → เหตุผลก่อน (เจ้าของ 22 พ.ย. 2569 "อย่าพึ่งโชว์ข้อมูล")
    * สรุปแบบเดิมของช่วงที่เลือก (แยกเจ้าหน้าที่ · ช่องทาง · ทางลัด) อยู่ปุ่ม "สรุปช่วงวันที่บนหน้า" ในแผง
    */
-  const [drillStep, setDrillStep] = useState<{ box: DrillBoxKey; step: FunnelStep } | null>(null);
+  /** `step` = ขั้นผู้สมัคร · ไม่มี step = กล่องใบขอ (23 พ.ย. 2569 ข้อ 2) — `summary` = แผงเดิมของช่วงที่เลือก */
+  const [drillStep, setDrillStep] = useState<{ box: DrillBoxKey; step?: FunnelStep; summary?: () => void } | null>(null);
+  /** กล่องใบขอ ขอใหม่ · ปิดครบ · ยกเลิก = แผงไล่ 12 เดือนก่อน แผงเดิมอยู่ปุ่ม "สรุปช่วงวันที่บนหน้า" */
+  const openRequestDrill = (box: DrillBoxKey, summary: () => void) => {
+    setPanel(null);
+    setDrillStep({ box, summary });
+  };
+  const openCancelledSummary = () => {
+    const list = flowRows((f) => f.cancelledReq);
+    setPanel(null);
+    drill.open({ title: 'ยกเลิก', rows: list, expand: null, reasons: { unit: 'ใบ', items: reasonsOf(list, () => 1) } });
+  };
   const openStep = (s: FunnelStep) => {
     if (isDrillBoxKey(s.key)) {
       setPanel(null);
@@ -753,8 +764,26 @@ const HomeOverviewPage: React.FC<{
           setDrillStep(null);
           openNames(title, ids);
         }}
-        summary={drillStep ? { label: 'สรุปช่วงวันที่บนหน้า', onOpen: () => { const st = drillStep.step; setDrillStep(null); openStepSummary(st); } } : null}
-        go={drillStep ? { label: STEP_PAGE[drillStep.step.key].label, to: withRange(STEP_PAGE[drillStep.step.key].to, range) } : null}
+        summary={
+          drillStep
+            ? {
+                label: 'สรุปช่วงวันที่บนหน้า',
+                onOpen: () => {
+                  const { step, summary } = drillStep;
+                  setDrillStep(null);
+                  if (step) openStepSummary(step);
+                  else summary?.();
+                },
+              }
+            : null
+        }
+        go={
+          drillStep?.step
+            ? { label: STEP_PAGE[drillStep.step.key].label, to: withRange(STEP_PAGE[drillStep.step.key].to, range) }
+            : drillStep
+              ? { label: PAGE.requests.label, to: withRange(PAGE.requests.to, range) }
+              : null
+        }
         contentStyle={v5 ? v5Style : undefined}
       />
       <JourneyNamesDialog open={names !== null} onOpenChange={(o) => !o && setNames(null)} title={names?.title ?? ''} ids={names?.ids ?? []} contentStyle={v5 ? v5Style : undefined} />
@@ -859,20 +888,12 @@ const HomeOverviewPage: React.FC<{
                 <V5Card className="lg:col-span-2" title="ใบขอเข้า-ปิด" sub="รวมใบขอชั่วคราว" testId="v5-ledger">
                   <div className="grid grid-cols-2 gap-1 sm:grid-cols-5">
                     <V5EqCell label="ยกมา" value={flow?.carryInRequests} onClick={flow ? () => openList('ยกมา', flowRows((f) => f.carry)) : undefined} testId="v5-eq-carry" />
-                    <V5EqCell label="+ ขอใหม่" value={flow?.newRequests} onClick={flow ? openNew : undefined} testId="v5-eq-new" />
-                    <V5EqCell label="− ปิดครบ" value={flow?.closedRequests} onClick={flow ? () => openList('ปิดครบ', flowRows((f) => f.closed)) : undefined} testId="v5-eq-closed" />
+                    <V5EqCell label="+ ขอใหม่" value={flow?.newRequests} onClick={flow ? () => openRequestDrill('reqNew', openNew) : undefined} testId="v5-eq-new" />
+                    <V5EqCell label="− ปิดครบ" value={flow?.closedRequests} onClick={flow ? () => openRequestDrill('reqClosed', () => openList('ปิดครบ', flowRows((f) => f.closed))) : undefined} testId="v5-eq-closed" />
                     <V5EqCell
                       label="− ยกเลิก"
                       value={flow?.cancelledRequests}
-                      onClick={
-                        flow
-                          ? () => {
-                              const list = flowRows((f) => f.cancelledReq);
-                              setPanel(null);
-                              drill.open({ title: 'ยกเลิก', rows: list, expand: null, reasons: { unit: 'ใบ', items: reasonsOf(list, () => 1) } });
-                            }
-                          : undefined
-                      }
+                      onClick={flow ? () => openRequestDrill('reqCancelled', openCancelledSummary) : undefined}
                       testId="v5-eq-cancel"
                     />
                     <V5EqCell result label="= เหลือหา" value={flow?.remainingRequests} onClick={flow ? () => openList('เหลือหา', flowRows((f) => f.open)) : undefined} testId="v5-eq-remain" />
@@ -1146,23 +1167,15 @@ const HomeOverviewPage: React.FC<{
       <OverviewSection title="ใบขอ" sub="ใบ (อัตรา) · รวมใบขอชั่วคราว" testId="overview-requests">
         <div className="grid grid-cols-2 items-stretch gap-3 sm:grid-cols-5">
           <OverviewNode big label="ยกมา" value={flow?.carryInRequests} unit="ใบ" sub={flow ? `${NUM.format(flow.carryIn)} อัตรา` : undefined} onClick={flow ? () => openList('ยกมา', flowRows((f) => f.carry)) : undefined} testId="overview-req-carry" />
-          <OverviewNode big label="+ ขอใหม่" value={flow?.newRequests} unit="ใบ" sub={flow ? `${NUM.format(flow.newPositions)} อัตรา` : undefined} onClick={flow ? openNew : undefined} testId="overview-req-new" />
-          <OverviewNode big label="− ปิดครบ" value={flow?.closedRequests} unit="ใบ" emphasis="success" onClick={flow ? () => openList('ปิดครบ', flowRows((f) => f.closed)) : undefined} testId="overview-req-closed" />
+          <OverviewNode big label="+ ขอใหม่" value={flow?.newRequests} unit="ใบ" sub={flow ? `${NUM.format(flow.newPositions)} อัตรา` : undefined} onClick={flow ? () => openRequestDrill('reqNew', openNew) : undefined} testId="overview-req-new" />
+          <OverviewNode big label="− ปิดครบ" value={flow?.closedRequests} unit="ใบ" emphasis="success" onClick={flow ? () => openRequestDrill('reqClosed', () => openList('ปิดครบ', flowRows((f) => f.closed))) : undefined} testId="overview-req-closed" />
           <OverviewNode
             big
             label="− ยกเลิก"
             value={flow?.cancelledRequests}
             unit="ใบ"
             sub={flow ? `${NUM.format(flow.cancelled)} อัตรา` : undefined}
-            onClick={
-              flow
-                ? () => {
-                    const list = flowRows((f) => f.cancelledReq);
-                    setPanel(null);
-                    drill.open({ title: 'ยกเลิก', rows: list, expand: null, reasons: { unit: 'ใบ', items: reasonsOf(list, () => 1) } });
-                  }
-                : undefined
-            }
+            onClick={flow ? () => openRequestDrill('reqCancelled', openCancelledSummary) : undefined}
             testId="overview-req-cancel"
           />
           <OverviewNode big label="= เหลือหา" value={flow?.remainingRequests} unit="ใบ" variant="solid" sub={flow ? `${NUM.format(flow.remaining)} อัตรา` : undefined} onClick={flow ? () => openList('เหลือหา', flowRows((f) => f.open)) : undefined} testId="overview-req-remain" />

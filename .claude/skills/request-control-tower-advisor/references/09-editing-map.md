@@ -14569,3 +14569,12 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 - กด "ใบขอทั้งหมด" = `DashboardWorkMonths` (ใหม่) เทียบรายเดือน เข้ามา · ปิดแล้ว · ยกเลิก จาก `buildWorkMonths` (`throughput.ts` · เดือนของวันที่ต้องการคน · ทุกเดือนในช่วงอยู่ครบ) · กดแท่ง/แถว = ทั้งหน้าเป็นเดือนนั้น (`onMonthClick`)
 - กด ปิดแล้ว/ยกเลิก = รายการของช่วง (`buildCohortDrillDown`) · ชุดหลัก = ทุกใบ · ชุดล่วงหน้า = `isAdvanceNotDueRecord`
 - แถบสัดส่วนเทียบกล่องแรกของแถวนั้น · เทสต์ `tests/api/dashboardWorkDoneBoxes2569-11-23.test.ts`
+
+### 23 พ.ย. 2569 (6) — หน้าหลัก: กล่องใบขอ ขอใหม่ · ปิดครบ · ยกเลิก กดแล้วไล่ 12 เดือน → รายวัน → BU → เหตุผล (ข้อ 2 รอบแรก)
+- ใหม่ `src/lib/homeRequestDrill.ts` (pure) `buildRequestDrillPayload` — สมุดใบขอ (`buildPenaltyLedger`) → `DrillPayload` ชุดใบขอ · ตัวตัดสิน `requestFlowRole` ต่อเดือน ⇒ แท่งเดือน = สมการใบขอของเดือนนั้น (ทานฐานจริง 12/12 เดือน)
+  · ขอใหม่ = วันคีย์ · เหตุผลชนิดใบ · ปิดครบ/ยกเลิก = วันแรกในเดือนที่ใบหมดอัตรา · เหตุผล ทันวันที่ต้องการไหม / `stopReason` (ไม่กรอก = "ไม่ได้กรอกเหตุผล")
+  · หนึ่งเหตุการณ์ = หนึ่งแถว items (ใบเดียวอยู่ได้หลายกล่อง) · `labels` = เลขที่ · หน่วยงาน
+- `homeDrill.ts`: กล่อง `reqNew` `reqClosed` `reqCancelled` · `drillSetOf` · `drillLabeledIds` · `api/_handlers/home-drill.ts` `?set=requests` (สมุด + ตัวกรอง BU ชุดเดียวกับ `/api/home-money`) · `fetchHomeDrill(bu, set)`
+- `TimeDrillSheet`: โหลดชุดตามกล่อง · กล่องใบขอปุ่ม "ดูรายการใบ" → รายการเปิดหน้าใบขอ (`requestPathOfJobId`)
+- `HomeOverviewPage` สองโฉม: `openRequestDrill` · แผงเดิมอยู่ปุ่ม "สรุปช่วงวันที่บนหน้า" · ยังไม่ทำ: ยกมา/เหลือหา (ยอดคงค้าง ไม่ใช่เหตุการณ์) · เงิน · ติดตาม · ดูแลหลังเริ่มงาน · จับคู่งาน · AI และคนโทร
+- เทสต์ `tests/api/homeRequestDrill2569-11-23.test.ts`
