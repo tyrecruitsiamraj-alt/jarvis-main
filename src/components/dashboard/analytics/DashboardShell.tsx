@@ -356,20 +356,21 @@ const DashboardShell: React.FC<Props> = ({
                     const list = data.workStatusKpis ?? [];
                     // 🔴 QA 17 ต.ค. 2569: การ์ด "ทั้งหมด" อยู่ในลิสต์เดียวกัน ห้ามบวกซ้ำเป็นตัวหาร — ตัวหาร = เลขของ "ทั้งหมด" (ทั้งสองแถว)
                     const total = workStatusPercentBase(list);
-                    // สีพาสเทล 3 สีแยกเรื่อง (เจ้าของ 23 พ.ย. 2569): ใบขอทั้งหมด + แถวสถานะ (ยังต้องหา) = ฟ้า · ปิดแล้ว = เขียว · ยกเลิก = ชมพู
+                    // สีพาสเทลแยกเรื่อง (เจ้าของ 23 พ.ย. 2569): ใบขอทั้งหมด = เทา ("เอาสีอื่นไม่งั้นงงตีกับยังไม่ปิด") ·
+                    // ยังไม่ปิด + แถวสถานะ = ฟ้า · ปิดแล้ว = เขียว · ยกเลิก = ชมพู
                     const washOf = (id: string) => {
                       const done = parseWorkDoneBoxId(id);
                       return done ? (done.kind === 'filled' ? 'success' : 'danger') : 'info';
                     };
                     // แถบสัดส่วนเทียบกล่องแรกของแถวนั้น (แถวบนสุด = ใบขอทั้งหมด · แถวสถานะ = ทั้งหมด)
-                    const tiles = (rows: typeof list, base = total) =>
+                    const tiles = (rows: typeof list, base = total, totalId?: string) =>
                       rows.map((kpi) => (
                         <DashboardKpiCard
                           key={kpi.id}
                           surface="tile"
                           kpi={kpi}
                           progressPercent={base > 0 ? Math.round((kpi.value / base) * 100) : 0}
-                          wash={washOf(kpi.id)}
+                          wash={kpi.id === totalId ? 'neutral' : washOf(kpi.id)}
                           selected={statusPick?.kpiId === kpi.id}
                           onClick={onKpiClick ? () => onKpiClick(kpi.id, kpi.label, kpi.secondaryCount ?? null) : undefined}
                         />
@@ -378,19 +379,19 @@ const DashboardShell: React.FC<Props> = ({
                     const top = data.workStatusTopKpis ?? [];
                     const advanceTop = data.workStatusAdvanceTopKpis ?? [];
                     /**
-                     * แถวบน 4 กล่อง ใบขอทั้งหมด · ปิดแล้ว · ยกเลิก · ยังไม่ปิด (เจ้าของ 23 พ.ย. 2569 Choice แบบ ก)
-                     * "ยังไม่ปิด" = กล่องแรกของแถวสถานะเดิม (id เดิม กดแล้วเปิดรายการเดิม) ย้ายขึ้นมา · แถวสถานะเหลือแต่สถานะ = ยังไม่ปิดแยกลงมา
+                     * แถวบน 3 กล่อง ใบขอทั้งหมด · ปิดแล้ว · ยกเลิก · "ยังไม่ปิด" อยู่หัวแถวสถานะ (เจ้าของ 23 พ.ย. 2569
+                     * "ย้ายมาไว้กับพวก กำลังดำเนินการสรรหา จะได้รู้ว่าพวกนั้นรวมแล้วได้ยอดไหน") — กล่องแรกของแถวสถานะ (id เดิม) ใช้ชื่อ ยังไม่ปิด
                      */
                     const withOpen = (topRow: typeof list, rows: typeof list) =>
-                      topRow.length && rows.length ? { topRow: [...topRow, { ...rows[0], label: WORK_OPEN_LABEL }], rows: rows.slice(1) } : { topRow, rows };
+                      rows.length ? { topRow, rows: [{ ...rows[0], label: WORK_OPEN_LABEL }, ...rows.slice(1)] } : { topRow, rows };
                     const mainView = withOpen(top, list);
                     const advanceView = withOpen(advanceTop, advance);
                     return (
                       <>
-                        {/* แถวบนสุด ใบขอทั้งหมด · ปิดแล้ว · ยกเลิก (เจ้าของ 23 พ.ย. 2569) · ใต้ลงมาแถวสถานะแบบเดิม (ยังต้องหา) */}
+                        {/* แถวบนสุด ใบขอทั้งหมด · ปิดแล้ว · ยกเลิก (เจ้าของ 23 พ.ย. 2569) · ใต้ลงมาแถวสถานะ นำด้วย ยังไม่ปิด */}
                         {mainView.topRow.length ? (
-                          <div className="mb-3 grid grid-cols-2 gap-3 lg:grid-cols-4" data-testid="dashboard-work-top">
-                            {tiles(mainView.topRow, mainView.topRow[0]?.value ?? 0)}
+                          <div className="mb-3 grid grid-cols-2 gap-3 lg:grid-cols-3" data-testid="dashboard-work-top">
+                            {tiles(mainView.topRow, mainView.topRow[0]?.value ?? 0, mainView.topRow[0]?.id)}
                           </div>
                         ) : null}
                         <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">{tiles(mainView.rows, total)}</div>
@@ -400,8 +401,8 @@ const DashboardShell: React.FC<Props> = ({
                           <div className="mt-5 space-y-3" data-testid="dashboard-work-status-advance">
                             <p className="text-base font-medium text-foreground">ล่วงหน้า · ยังไม่ถึงวันต้องการ</p>
                             {advanceView.topRow.length ? (
-                              <div className="grid grid-cols-2 gap-3 lg:grid-cols-4" data-testid="dashboard-work-advance-top">
-                                {tiles(advanceView.topRow, advanceView.topRow[0]?.value ?? 0)}
+                              <div className="grid grid-cols-2 gap-3 lg:grid-cols-3" data-testid="dashboard-work-advance-top">
+                                {tiles(advanceView.topRow, advanceView.topRow[0]?.value ?? 0, advanceView.topRow[0]?.id)}
                               </div>
                             ) : null}
                             <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">{tiles(advanceView.rows, advance[0]?.value ?? 0)}</div>

@@ -1,6 +1,7 @@
 /**
  * Dashboard สถานะทำงาน (เจ้าของ 23 พ.ย. 2569):
  * 1) "มีอะไรที่สื่อว่าเป็นคงเหลือของใบขอทั้งหมดที่ยังต้องหาไหม" → "เอาเป็น ใบขอทั้งหมด ปิด ยกเลิก ยังไม่ปิด แล้วยังไม่ปิดนี่แหละแยกลงมา" (แบบ ก)
+ *    ภายหลังวันเดียวกัน: ยังไม่ปิดย้ายลงไปหัวแถวสถานะ · ใบขอทั้งหมดสีเทา
  * 2) กล่อง "ทั้งหมด" เคยขึ้น "ถึงเวลาหาแล้ว 18 + ล่วงหน้า 0 = 17" — กล่องสถานะนับจากใบใน feed คนละชุดกับยอด cohort
  *    ⇒ โหมดมีงวด แยกสถานะจากใบชุดเดียวกับยอด (`cohortRemainingByRequest`) ใบนอกชุดไม่นับ
  */
@@ -64,12 +65,14 @@ describe('🔴 กล่องสถานะบวกลงตัวกับ "
   });
 });
 
-describe('แถวบน 4 กล่อง: ใบขอทั้งหมด · ปิดแล้ว · ยกเลิก · ยังไม่ปิด (แบบ ก แทนหัวข้อคั่น)', () => {
+describe('แถวบน 3 กล่อง ใบขอทั้งหมด · ปิดแล้ว · ยกเลิก · ยังไม่ปิดอยู่หัวแถวสถานะ (เจ้าของ 23 พ.ย. 2569 "ย้ายมาไว้กับพวก กำลังดำเนินการสรรหา")', () => {
   const shell = readFileSync('src/components/dashboard/analytics/DashboardShell.tsx', 'utf8');
-  it('ยังไม่ปิด = กล่องแรกของแถวสถานะเดิมย้ายขึ้นมา (id เดิม) · แถวสถานะไม่มีเลขซ้ำ · ไม่มีหัวข้อคั่นแล้ว', () => {
+  it('ยังไม่ปิด = กล่องแรกของแถวสถานะ (id เดิม) · แถวบนไม่มียังไม่ปิด · ใบขอทั้งหมดสีเทา ไม่ตีกับยังไม่ปิด', () => {
     expect(shell).toContain('const mainView = withOpen(top, list);');
     expect(shell).toContain('const advanceView = withOpen(advanceTop, advance);');
+    expect(shell).toContain('rows: [{ ...rows[0], label: WORK_OPEN_LABEL }, ...rows.slice(1)]');
     expect(shell).not.toContain('remainHead');
-    expect(shell).toContain('lg:grid-cols-4');
+    expect(shell).toContain('lg:grid-cols-3" data-testid="dashboard-work-top"');
+    expect(shell).toContain("kpi.id === totalId ? 'neutral'");
   });
 });

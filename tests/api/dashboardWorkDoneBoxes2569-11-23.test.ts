@@ -76,9 +76,9 @@ describe('กล่องบนจอ', () => {
     const shell = readFileSync('src/components/dashboard/analytics/DashboardShell.tsx', 'utf8');
     expect(shell).toContain('data-testid="dashboard-work-top"');
     expect(shell).toContain('data-testid="dashboard-work-advance-top"');
-    // 23 พ.ย. 2569 แบบ ก: กล่องแรกของแถวสถานะย้ายขึ้นแถวบนเป็น "ยังไม่ปิด" · แถวสถานะเหลือแต่สถานะ
+    // 23 พ.ย. 2569: "ยังไม่ปิด" = หัวแถวสถานะ (เจ้าของ "ย้ายมาไว้กับพวก กำลังดำเนินการสรรหา")
     expect(shell).toContain('{tiles(mainView.rows, total)}');
-    expect(shell).toContain("topRow: [...topRow, { ...rows[0], label: WORK_OPEN_LABEL }], rows: rows.slice(1)");
+    expect(shell).toContain('rows: [{ ...rows[0], label: WORK_OPEN_LABEL }, ...rows.slice(1)]');
     expect(shell).toContain('statusPick?.months ? (');
     const page = readFileSync('src/pages/dashboard/SupervisorDashboard.tsx', 'utf8');
     expect(page).toContain('const months = buildWorkMonths(records, from, to, topTotal.advance ?');
