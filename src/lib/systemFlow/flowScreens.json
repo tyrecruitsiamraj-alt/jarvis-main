@@ -14175,7 +14175,7 @@
      "src": "src/pages/HomeOverviewPage.tsx:819"
     },
     {
-     "label": "สัดส่วน AI และคน",
+     "label": "แนวโน้มการโทร",
      "action": "tab",
      "target": "แท็บสัดส่วน (home-proportion-tab)",
      "api": "GET /api/home-ai-share?proportion=1 · GET /api/home-ai-share?report=matching",
@@ -14977,7 +14977,7 @@
   {
    "id": "home-proportion-tab",
    "kind": "tab",
-   "title": "สัดส่วน AI และคน",
+   "title": "แนวโน้มการโทร",
    "route": "/",
    "parent": "home-v5",
    "src": "src/components/home-overview/ProportionTab.tsx:315",

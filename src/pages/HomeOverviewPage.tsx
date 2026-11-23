@@ -846,7 +846,7 @@ const HomeOverviewPage: React.FC<{
             <TabsList variant="line" aria-label="เลือกมุมมอง">
               <TabsTrigger value="overview">ภาพรวม</TabsTrigger>
               <TabsTrigger value="proportion" data-testid="home-tab-proportion">
-                สัดส่วน AI และคน
+                แนวโน้มการโทร
               </TabsTrigger>
             </TabsList>
           </Tabs>
@@ -1051,12 +1051,12 @@ const HomeOverviewPage: React.FC<{
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-3">
           <h1 className="text-3xl font-medium text-foreground">หน้าหลัก</h1>
-          {/* แท็บ "สัดส่วน" (เจ้าของ 28 ต.ค. 2569 · ชื่อแท็บเจ้าของตั้งเอง) — ช่วง/BU ชุดเดียวกับภาพรวม */}
+          {/* แท็บ "แนวโน้มการโทร" (เดิม "สัดส่วน" 28 ต.ค. 2569 · เจ้าของเปลี่ยนชื่อ 23 พ.ย. 2569) — ช่วง/BU ชุดเดียวกับภาพรวม */}
           <Tabs value={tab} onValueChange={(v) => setTab(v === 'proportion' ? 'proportion' : 'overview')}>
             <TabsList variant="glass" aria-label="เลือกมุมมอง">
               <TabsTrigger value="overview">ภาพรวม</TabsTrigger>
               <TabsTrigger value="proportion" data-testid="home-tab-proportion">
-                สัดส่วน
+                แนวโน้มการโทร
               </TabsTrigger>
             </TabsList>
           </Tabs>

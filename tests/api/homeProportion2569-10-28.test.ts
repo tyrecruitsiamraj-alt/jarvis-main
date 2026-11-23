@@ -9,8 +9,11 @@ import {
   buildProportionGroups,
   ladderAddsUp,
   matchingProportionRow,
+  proportionBar,
   proportionCoverage,
+  proportionPrevWindow,
   proportionStuck,
+  proportionTrend,
   summarizeAftercarePeople,
   summarizeFollowLane,
   proportionPct,
@@ -268,37 +271,71 @@ describe('SQL + เส้น + หน้า', () => {
     expect(sql).not.toContain('replace_sync');
     expect(sql).not.toContain('post_orders');
   });
-  it('เส้น ?proportion=1 · หน้าหลักมีแท็บ "สัดส่วน" (ไม่ใช้คำว่า AI กับคน)', () => {
+  it('เส้น ?proportion=1 · แท็บชื่อ "แนวโน้มการโทร" ทั้งสองโฉม (เจ้าของเปลี่ยนชื่อ 23 พ.ย. 2569 · เดิม "สัดส่วน")', () => {
     expect(read('api/_handlers/home-ai-share.ts')).toContain('if (q.proportion !== undefined) {');
     const page = read('src/pages/HomeOverviewPage.tsx');
     expect(page).toContain('<TabsTrigger value="proportion" data-testid="home-tab-proportion">');
-    expect(page).toMatch(/>\s*สัดส่วน\s*</);
+    expect(page.match(/>\s*แนวโน้มการโทร\s*</g)?.length).toBe(2);
+    expect(page).not.toMatch(/>\s*สัดส่วน( AI และคน)?\s*</);
     expect(page).not.toContain('AI กับคน');
     expect(read('src/components/home-overview/ProportionTab.tsx')).not.toContain('AI กับคน');
   });
 });
 
-describe('หน้าตาแท็บสัดส่วน (เจ้าของ 29 ต.ค. 2569)', () => {
-  it('แต่ละแถวแบ่ง AI % กับ คน % (รวมกัน 100) · งานค้างเป็น Dropdown เลือกทีละเรื่อง มีแท่ง', () => {
+describe('หน้าตาแท็บ (เจ้าของ 29 ต.ค. 2569 · แถวเปลี่ยนเป็นแถบเดียว 23 พ.ย. 2569)', () => {
+  it('งานค้างเป็น Dropdown เลือกทีละเรื่อง มีแท่ง · แถวเป็นแถบเดียว ชื่อ + เลข + % อยู่ในช่อง · มีบรรทัดเทียบช่วงก่อน', () => {
     const tab = read('src/components/home-overview/ProportionTab.tsx');
-    expect(tab).toContain("side('คน', show ? `${100 - (pct ?? 0)}%` : '—', r.staff");
     expect(tab).toContain('data-testid="proportion-stuck-select"');
     expect(tab).toContain('function StuckBoard(');
     expect(tab).not.toContain('<ul className="flex flex-wrap gap-2">');
+    expect(tab).toContain('data-testid={`proportion-bar-${r.key}`}');
+    expect(tab).toContain('`${NUM.format(p.value)} · ${p.pct}%`');
+    expect(tab).toContain('data-testid={`proportion-trend-${r.key}`}');
+    // ช่องกว้างตามเลข แต่ไม่แคบกว่าตัวหนังสือ — ช่องเล็กยังอ่านได้
+    expect(tab).toContain('minmax(max-content,');
   });
 });
 
-describe('คนคีย์ / นำเข้า Excel = รอโทร (เจ้าของ 29 ต.ค. 2569 "อันนี้ต้องบอกรอโทร")', () => {
-  it('ใบที่คนคีย์ไม่อยู่ใน "ไม่โทร" แต่อยู่ "รอโทร" · รายชื่อยังบวกลงตัว', () => {
-    const id = (k: number) => `2222222${k}-1111-4111-8111-111111111111`;
-    const apps = [fact({ id: id(1), jobId: 'siamraj-sql:OPL6910099' }), fact({ id: id(2), jobId: 'siamraj-sql:OPL6910099', aiQueued: true })];
-    const flags = [{ id: id(1), jobId: 'siamraj-sql:OPL6910099', claimed: false, reason: 'keyed' as const, blockReason: null }];
-    const l = recruitProportionRows(apps, flags, new Set(['siamraj-sql:OPL6910099']))[0].ladder!;
-    expect(ladderAddsUp(l)).toBe(true);
-    expect(stepOf(l, 'waiting').parts.map((p) => [p.label, p.value])).toEqual([
-      ['AI รอโทร', 1],
-      ['คนคีย์ / นำเข้า Excel รอคนโทร', 1],
-    ]);
-    expect(stepOf(l, 'notCalled').value).toBe(0);
+describe('แถบของแถว — % ของทั้งหมด รวมกันได้ 100 (เจ้าของ 23 พ.ย. 2569)', () => {
+  const withNone = (ai: number, both: number, staff: number, none: number): ProportionRow => ({ ...row(ai, both, staff, none), noneLabel: 'ยังไม่มีใครโทร' });
+  it('AI รวมทั้งสองทาง · คน · ยังไม่มีใครทำ · เลขบวกกัน = ทั้งหมด · % รวม 100', () => {
+    const b = proportionBar(withNone(758, 302, 17, 624));
+    expect(b.total).toBe(1701);
+    expect(b.parts.map((p) => [p.key, p.value])).toEqual([['ai', 1060], ['staff', 17], ['none', 624]]);
+    expect(b.parts.reduce((t, p) => t + p.pct, 0)).toBe(100);
+    expect(b.parts.reduce((t, p) => t + p.value, 0)).toBe(b.total);
+  });
+  it('ช่องที่เป็น 0 ยังอยู่ (ไม่หาย) · ยังไม่มีงาน = 0% ทุกช่อง · ทางเข้าไม่มีช่องยังไม่มีใครทำ', () => {
+    expect(proportionBar(withNone(0, 0, 277, 199)).parts.map((p) => p.key)).toEqual(['ai', 'staff', 'none']);
+    expect(proportionBar(withNone(0, 0, 0, 0)).parts.map((p) => p.pct)).toEqual([0, 0, 0]);
+    expect(proportionBar(row(936, 0, 2275)).parts.map((p) => p.key)).toEqual(['ai', 'staff']);
+  });
+});
+
+describe('เทียบช่วงก่อน ท้ายแถว (เจ้าของ 23 พ.ย. 2569)', () => {
+  const r = (ai: number, staff: number, none: number, over: Partial<ProportionRow> = {}): ProportionRow => ({ ...row(ai, 0, staff, none), noneLabel: 'ยังไม่มีใครโทร', ...over });
+  it('เทียบ % AI ตัวเดียวกับในแถบ — เพิ่มขึ้น / ลดลง / ทรงตัว', () => {
+    expect(proportionTrend(r(82, 9, 9), r(75, 15, 10))).toEqual({ side: 'ai', nowPct: 82, prevPct: 75, diff: 7, dir: 'up' });
+    expect(proportionTrend(r(60, 30, 10), r(75, 15, 10))?.dir).toBe('down');
+    expect(proportionTrend(r(150, 30, 20), r(75, 15, 10))?.dir).toBe('flat');
+  });
+  it('แถวที่ AI ไม่ได้ทำทั้งสองช่วง เทียบฝั่งคน', () => {
+    expect(proportionTrend(r(0, 60, 40), r(0, 50, 50))).toEqual({ side: 'staff', nowPct: 60, prevPct: 50, diff: 10, dir: 'up' });
+  });
+  it('ช่วงก่อนไม่มีงาน / ยังไม่มีข้อมูลช่วงก่อน / แถวที่นับ ณ ตอนนี้ = เทียบไม่ได้ (ไม่ขึ้นว่าเพิ่มจาก 0)', () => {
+    expect(proportionTrend(r(82, 9, 9), r(0, 0, 0))).toBeNull();
+    expect(proportionTrend(r(82, 9, 9), null)).toBeNull();
+    expect(proportionTrend(r(82, 9, 9, { noPeriod: true }), r(75, 15, 10))).toBeNull();
+    const groups = buildProportionGroups({ apps: [], payload: null });
+    expect(groups.flatMap((g) => g.rows).filter((x) => x.noPeriod).map((x) => x.key)).toEqual(['aftercare']);
+  });
+  it('ช่วงก่อน: เดือนนี้ถึงวันนี้ เทียบเดือนก่อนวันที่ 1 ถึงวันเดียวกัน · ช่วงอื่นถอยเท่าความยาว · ทั้งหมด = ไม่มี', () => {
+    const now = new Date('2026-11-23T10:00:00+07:00');
+    expect(proportionPrevWindow({ from: '2026-11-01', to: '2026-11-23' }, now)).toEqual({ from: '2026-10-01', to: '2026-10-23', label: 'เดือนก่อน' });
+    expect(proportionPrevWindow({ from: '2026-10-01', to: '2026-10-31' }, now)).toEqual({ from: '2026-09-01', to: '2026-09-30', label: 'เดือนก่อน' });
+    expect(proportionPrevWindow({ from: '2026-11-17', to: '2026-11-23' }, now)).toMatchObject({ from: '2026-11-10', to: '2026-11-16' });
+    // เดือนที่จบไปแล้วแต่เลือกไม่ครบเดือน = ช่วงธรรมดา ไม่ใช่ "เดือนนี้ถึงวันนี้"
+    expect(proportionPrevWindow({ from: '2026-10-01', to: '2026-10-20' }, now)).toMatchObject({ from: '2026-09-11', to: '2026-09-30' });
+    expect(proportionPrevWindow({ from: null, to: null }, now)).toBeNull();
   });
 });

@@ -24,6 +24,8 @@ import type { ToneKey } from './designTokens';
 import { aiStage, staffResultOf } from './recruitJourney';
 import { FOLLOW_DISPATCH_META, type FollowDispatchState } from './followDispatchState';
 import { ENTRY_KINDS, ENTRY_KIND_META, SYSTEM_ENTRY_KINDS, entryStaffTotal, entrySystemTotal, type EntryCounts } from './homeEntryKind';
+import { previousBounds, roundToHundred, type AiShareWindow } from './homeAiShare';
+import { toYmdBangkok } from './dateTh';
 
 /** ช่องหนึ่งของขั้น · `stuck` = ค้างอยู่ ต้องมีคนทำ (ขึ้นในก้อน "งานที่ค้างอยู่" บนสุดของแท็บ) */
 export type LadderPart = { key: string; label: string; value: number; tone: ToneKey; stuck?: boolean };
@@ -725,6 +727,8 @@ export type ProportionRow = {
   ladder?: Ladder;
   /** แผงของแถวที่ไม่ใช่งานโทร (ทางเข้า) — แตกตามที่มา */
   parts?: LadderPart[];
+  /** นับ ณ ตอนนี้ ไม่ตามช่วงวันที่ (ดูแลหลังเริ่มงาน = คนที่ยังดูแลอยู่) ⇒ ไม่มีช่วงก่อนให้เทียบ */
+  noPeriod?: boolean;
 };
 
 export type ProportionGroup = { key: string; title: string; rows: ProportionRow[] };
@@ -749,6 +753,50 @@ export function proportionCoverage(r: Pick<ProportionRow, 'ai' | 'both' | 'staff
   const all = r.ai + r.both + r.staff + r.none;
   if (r.none <= 0 || all <= 0) return null;
   return Math.round(((r.ai + r.both) / all) * 100);
+}
+
+/**
+ * แถบของแถว (เจ้าของ 23 พ.ย. 2569 "กราฟมันดูยาก" → Choice "แถบเดียว เลขอยู่ในแถบ")
+ * AI (รวมทั้งสองทาง · นิยามเดิมของแท็บ) · คน · ยังไม่มีใครทำ — % ของ **ทั้งหมด** ปัดรวมกันได้ 100 · ทั้งหมด 0 = ทุกช่อง 0%
+ * ช่อง "ยังไม่มีใครทำ" ขึ้นเฉพาะแถวที่มีช่องนี้ (`noneLabel`) — ทางเข้าของงานไม่มี
+ */
+export type ProportionBarPart = { key: 'ai' | 'staff' | 'none'; value: number; pct: number };
+export function proportionBar(r: Pick<ProportionRow, 'ai' | 'both' | 'staff' | 'none' | 'noneLabel'>): { total: number; parts: ProportionBarPart[] } {
+  const hasNone = r.noneLabel !== undefined || r.none > 0;
+  const values = [r.ai + r.both, r.staff, ...(hasNone ? [r.none] : [])];
+  const pct = roundToHundred(values);
+  const keys = ['ai', 'staff', 'none'] as const;
+  return { total: values.reduce((t, v) => t + v, 0), parts: values.map((value, i) => ({ key: keys[i], value, pct: pct[i] })) };
+}
+
+/**
+ * เทียบช่วงก่อน ท้ายแถว (Choice เจ้าของ 23 พ.ย. 2569 "เทียบเดือนก่อนท้ายแถว") — เลข % ตัวเดียวกับในแถบ
+ * ฝั่งที่เทียบ = AI · แถวที่ AI ไม่ได้ทำทั้งสองช่วง (โทรหลัง Prescreen · นัดได้) เทียบฝั่งคน
+ * ช่วงก่อนไม่มีงาน / แถวที่นับ ณ ตอนนี้ = null (เทียบไม่ได้ · ห้ามขึ้นว่าเพิ่มจาก 0)
+ */
+export type ProportionTrend = { side: 'ai' | 'staff'; nowPct: number; prevPct: number; diff: number; dir: 'up' | 'down' | 'flat' };
+export function proportionTrend(now: ProportionRow, prev: ProportionRow | null | undefined): ProportionTrend | null {
+  if (!prev || now.noPeriod) return null;
+  const a = proportionBar(now);
+  const b = proportionBar(prev);
+  if (a.total <= 0 || b.total <= 0) return null;
+  const side = a.parts[0].value + b.parts[0].value > 0 ? 'ai' : 'staff';
+  const i = side === 'ai' ? 0 : 1;
+  const diff = a.parts[i].pct - b.parts[i].pct;
+  return { side, nowPct: a.parts[i].pct, prevPct: b.parts[i].pct, diff: Math.abs(diff), dir: diff > 0 ? 'up' : diff < 0 ? 'down' : 'flat' };
+}
+
+/**
+ * ช่วงก่อนของแท็บ — "เดือนนี้ถึงวันนี้" (ค่าตั้งต้นของหน้าหลัก) เทียบ **เดือนก่อน วันที่ 1 ถึงวันเดียวกัน** ·
+ * ช่วงอื่นใช้ตัวเดียวกับหน้า "ระบบไปกี่ %" (`previousBounds`) · ทั้งหมด = ไม่มีช่วงก่อน
+ */
+export function proportionPrevWindow(win: AiShareWindow, now: Date): { from: string; to: string; label: string } | null {
+  if (!win.from || !win.to) return null;
+  const monthToDate = win.from.endsWith('-01') && win.to.slice(0, 7) === win.from.slice(0, 7) && win.to >= toYmdBangkok(now);
+  const [y, m] = win.from.split('-').map(Number);
+  const monthEnd = new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
+  const p = previousBounds(monthToDate ? { ...win, to: monthEnd } : win, now);
+  return p ? { from: p.from, to: p.to, label: p.label } : null;
 }
 
 function followRow(key: string, name: string, c: ProportionCallCounts | undefined, unit: string): ProportionRow {
@@ -778,7 +826,7 @@ export function buildProportionGroups(input: {
       rows: [
         followRow('starter', 'ติดตามคนเริ่มงาน', f?.starter, 'สาย'),
         followRow('replacement', 'ติดตามส่งคนแทน', f?.replacement, 'สาย'),
-        followRow('aftercare', 'ดูแลหลังเริ่มงาน', f?.aftercare, 'คน'),
+        { ...followRow('aftercare', 'ดูแลหลังเริ่มงาน', f?.aftercare, 'คน'), noPeriod: true },
       ],
     },
     {

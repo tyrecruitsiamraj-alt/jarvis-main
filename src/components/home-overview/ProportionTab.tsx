@@ -2,10 +2,15 @@
  * แท็บ "สัดส่วน" หน้าหลัก (เจ้าของ 28 ต.ค. 2569) — แต่ละเรื่อง AI ทำกี่ % คนทำกี่ %
  * นิยาม/Choice อยู่หัว `src/lib/homeProportion.ts` · ไม่มีเลขรวมเลขเดียว · % = AI ได้โทร รวมที่คนตามต่อ
  * กดแถว = แผงข้าง: รายชื่อ = โทรแล้ว + รอโทร + ไม่โทร · ผลของที่โทรแล้ว · รอโทรแยกใครรอ · ไม่โทรเพราะอะไร
+ * 23 พ.ย. 2569 เจ้าของ "กราฟมันดูยาก" + เปลี่ยนชื่อแท็บเป็น "แนวโน้มการโทร": แถวเป็นแถบเดียว เลขอยู่ในแถบ + เทียบช่วงก่อนท้ายแถว
  * (Choice เจ้าของ "แท็บสัดส่วนอย่างเดียว" — แท็บภาพรวมคงเดิม)
- * shadcn + utility ของ Tailwind เท่านั้น · สีจาก `TONE` (AI = กรมท่า · ทั้งสองทาง = เขียวหัวเป็ด · คน = ม่วง ชุดเดียวกับหน้า "ระบบไปกี่ %")
+ * shadcn + utility ของ Tailwind เท่านั้น · สีจาก `TONE` (AI = กรมท่า รวมทั้งสองทาง · คน = ม่วง ชุดเดียวกับหน้า "ระบบไปกี่ %")
  */
 import React, { useEffect, useMemo, useState } from 'react';
+import { appsInWindow } from '@/lib/homeOverviewFunnel';
+import { fetchRecruitOverview } from '@/lib/recruitOverviewApi';
+import { RANGE_MAX_DAYS } from '@/lib/recruitOverviewWindow';
+import { daysBetween } from '@/lib/trends/timeBuckets';
 import TimeDrillSheet from '@/components/home-overview/TimeDrillSheet';
 import JourneyNamesDialog from '@/components/dashboard-trends/JourneyNamesDialog';
 import type { DrillBoxKey } from '@/lib/homeDrill';
@@ -20,17 +25,20 @@ import { AI_SHARE_CALLED_TONE } from '@/lib/homeAiShare';
 import {
   buildProportionGroups,
   ladderAddsUp,
-  proportionCoverage,
-  proportionPct,
+  proportionBar,
+  proportionPrevWindow,
   proportionStuck,
   proportionTag,
+  proportionTrend,
   PROPORTION_TAG_LABEL,
   type Ladder,
   type LadderPart,
+  type ProportionBarPart,
   type ProportionPayload,
   type ProportionRow,
   type ProportionStuck,
   type ProportionTag,
+  type ProportionTrend,
 } from '@/lib/homeProportion';
 import type { RecruitAppFact } from '@/lib/recruitOverviewTypes';
 import { friendlyErrorText } from '@/lib/friendlyError';
@@ -56,26 +64,6 @@ const GO: Record<string, OverviewPanel['go']> = {
   aftercare: { label: 'ดูแลหลังเริ่มงาน', to: '/aftercare' },
   apps: { label: 'งานสรรหา › ผู้สมัคร', to: '/jobs/board?view=list' },
 };
-
-function Legend() {
-  const item = (tone: ToneKey, label: string) => (
-    <span className="inline-flex items-center gap-1.5">
-      <span className={cn('h-2.5 w-2.5 rounded-sm', TONE[tone].dot)} aria-hidden />
-      {label}
-    </span>
-  );
-  return (
-    <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground" data-testid="proportion-legend">
-      {item(AI_SHARE_CALLED_TONE.ai, 'AI')}
-      {item(AI_SHARE_CALLED_TONE.both, 'ทั้งสองทาง')}
-      {item(AI_SHARE_CALLED_TONE.staff, 'คน')}
-      <span className="inline-flex items-center gap-1.5">
-        <span className="h-2.5 w-2.5 rounded-sm bg-muted" aria-hidden />
-        ยังไม่มีใครทำ
-      </span>
-    </div>
-  );
-}
 
 /** ช่องของขั้น — ชื่อ · เลข (ไม่มีช่อง = ขึ้นคำ ไม่หาย) */
 function Parts({ parts, unit, empty }: { parts: readonly LadderPart[]; unit: string; empty: string }) {
@@ -157,34 +145,41 @@ function panelOf(r: ProportionRow): OverviewPanel {
   };
 }
 
-function Row({ r, loading, onOpen }: { r: ProportionRow; loading: boolean; onOpen: (r: ProportionRow) => void }) {
-  const [shown, setShown] = useState(false);
-  useEffect(() => {
-    const t = window.setTimeout(() => setShown(true), 60);
-    return () => window.clearTimeout(t);
-  }, []);
-  const pct = proportionPct(r);
-  const coverage = proportionCoverage(r);
+/** สีของช่องในแถบ — AI กรมท่า · คน ม่วง (ชุดเดียวกับหน้า "ระบบไปกี่ %") · ยังไม่มีใครทำ = เทา · ช่องที่เป็น 0 ไม่ลงสี */
+const BAR_FILL: Record<ProportionBarPart['key'], string> = {
+  ai: cn(TONE[AI_SHARE_CALLED_TONE.ai].dot, 'text-white'),
+  staff: cn(TONE[AI_SHARE_CALLED_TONE.staff].dot, 'text-white'),
+  none: 'bg-muted text-foreground',
+};
+const DIR_WORD: Record<ProportionTrend['dir'], string> = { up: 'เพิ่มขึ้น', down: 'ลดลง', flat: 'ทรงตัว' };
+
+/** ช่วงก่อนของแถว — `row` ยังไม่มา = กำลังโหลด · `label` null = ช่วงที่เลือกไม่มีช่วงก่อน */
+type PrevOfRow = { label: string | null; loading: boolean; failed: boolean; row: ProportionRow | null };
+
+function trendText(r: ProportionRow, prev: PrevOfRow, aiWord: string): string {
+  if (!prev.label || r.noPeriod) return 'เทียบไม่ได้';
+  if (prev.loading) return `${prev.label} · กำลังโหลด`;
+  if (prev.failed) return `${prev.label} · โหลดไม่ขึ้น`;
+  const t = proportionTrend(r, prev.row);
+  if (!t) return `${prev.label} · เทียบไม่ได้`;
+  const who = t.side === 'ai' ? aiWord : 'คน';
+  return `${who} ${prev.label} ${t.prevPct}% · ${DIR_WORD[t.dir]}${t.dir === 'flat' ? '' : ` ${t.diff}`}`;
+}
+
+/**
+ * แถวของเรื่อง (เจ้าของ 23 พ.ย. 2569 "กราฟมันดูยาก" → Choice "แถบเดียว เลขอยู่ในแถบ" + "เทียบเดือนก่อนท้ายแถว")
+ * แถบเดียว 3 ช่อง ชื่อ + เลข + % อยู่ในช่อง · ช่องกว้างตามเลข แต่ไม่แคบกว่าตัวหนังสือ (ช่องเล็กยังอ่านได้) · ช่องอยู่ที่เดิมแม้เป็น 0
+ */
+function Row({ r, prev, loading, onOpen }: { r: ProportionRow; prev: PrevOfRow; loading: boolean; onOpen: (r: ProportionRow) => void }) {
   const tag = proportionTag(r);
-  const all = r.ai + r.both + r.staff + r.none;
-  const w = (v: number) => (shown && all > 0 ? `${(v / all) * 100}%` : '0%');
+  const bar = proportionBar(r);
   const aiWord = r.aiLabel ?? 'AI';
-  /** AI ได้โทร (รวมทั้งสองทาง · Choice เจ้าของ) กับ คนอย่างเดียว — สองฝั่งรวมกัน = 100% ของที่ทำแล้ว */
-  const aiCount = r.ai + r.both;
-  const show = !loading && pct !== null;
-  const side = (label: string, value: string, count: number, tone: ToneKey, testId: string) => (
-    <span className="min-w-[4.5rem] text-right" data-testid={testId}>
-      <span className={cn('block text-2xl font-medium leading-tight', show ? TONE[tone].value : 'text-muted-foreground')}>{value}</span>
-      <span className="block text-xs text-muted-foreground">
-        {label} {show ? NUM.format(count) : ''}
-      </span>
-    </span>
-  );
-  const extra = [
-    r.none ? `${r.noneLabel ?? 'ยังไม่มีใครทำ'} ${NUM.format(r.none)}` : null,
-    // AI ยังไม่ได้ทำเลย = ไม่ต้องบอก 0% ซ้ำกับเลขด้านขวา
-    coverage !== null && aiCount > 0 ? `${aiWord} ได้โทร ${coverage}% ของทั้งหมด` : null,
-  ].filter(Boolean);
+  const unit = r.ladder?.unit ?? '';
+  const labelOf = (k: ProportionBarPart['key']) => (k === 'ai' ? aiWord : k === 'staff' ? 'คน' : (r.noneLabel ?? 'ยังไม่มีใครทำ'));
+  // หน่วยอยู่ข้างเลข "ทั้งหมด" แล้ว — บรรทัดใต้ชื่อไม่ขึ้นหน่วยซ้ำ
+  const note = r.note === unit ? '' : unit && r.note.startsWith(`${unit} · `) ? r.note.slice(unit.length + 3) : r.note;
+  // มีงานแต่ยังไม่มีใครทำเลย = ป้ายใช้คำเดียวกับช่องในแถบ (ไม่ขึ้น "ยังไม่มีงาน" ข้างเลขทั้งหมดที่ไม่ใช่ 0)
+  const tagLabel = tag === 'empty' && bar.total > 0 ? labelOf('none') : PROPORTION_TAG_LABEL[tag].replace('AI ', aiWord === 'AI' ? 'AI ' : aiWord);
   return (
     <li className="border-t border-border first:border-t-0">
       {/* ปุ่มของ shadcn (ห้ามปั้นปุ่มเอง) — ghost ทั้งแถว กดแล้วเปิดแผงแตกตัวเลข */}
@@ -194,35 +189,45 @@ function Row({ r, loading, onOpen }: { r: ProportionRow; loading: boolean; onOpe
         disabled={loading}
         onClick={() => onOpen(r)}
         data-testid={`proportion-row-${r.key}`}
-        className="grid h-auto w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-x-6 gap-y-3 whitespace-normal rounded-xl px-3 py-4 text-left font-normal disabled:opacity-100 md:grid-cols-[minmax(0,1.3fr)_minmax(0,1.6fr)_auto]"
+        className="flex h-auto w-full flex-col items-stretch gap-2 whitespace-normal rounded-xl px-3 py-4 text-left font-normal disabled:opacity-100"
       >
-        <span className="min-w-0 space-y-1.5">
-          <span className="block font-medium text-foreground">{r.name}</span>
-          <span className="block text-xs tabular-nums text-muted-foreground">{r.note}</span>
-          <Badge variant="outline" className={cn('font-normal', TONE[TAG_TONE[tag]].soft, TONE[TAG_TONE[tag]].value)}>
-            {loading ? 'กำลังโหลด' : PROPORTION_TAG_LABEL[tag].replace('AI ', aiWord === 'AI' ? 'AI ' : aiWord)}
-          </Badge>
-        </span>
-        {/* AI | คน — เจ้าของ 29 ต.ค. 2569 "ต้องแบ่งว่า คนเท่าไหร่ Ai เท่าไหร่ด้วย" */}
-        <span className="flex items-start gap-5 tabular-nums md:order-3">
-          {side(aiWord, show ? `${pct}%` : '—', aiCount, AI_SHARE_CALLED_TONE.ai, `proportion-ai-${r.key}`)}
-          {side('คน', show ? `${100 - (pct ?? 0)}%` : '—', r.staff, AI_SHARE_CALLED_TONE.staff, `proportion-staff-${r.key}`)}
-        </span>
-        <span className="col-span-2 min-w-0 space-y-2 md:order-2 md:col-span-1">
-          <span className="flex h-3 w-full overflow-hidden rounded-full bg-muted" aria-hidden>
-            {(['ai', 'both', 'staff'] as const).map((k) => (
-              <span
-                key={k}
-                className={cn('block h-full transition-all duration-700 motion-reduce:transition-none', TONE[AI_SHARE_CALLED_TONE[k]].dot)}
-                style={{ width: w(r[k]) }}
-              />
-            ))}
+        <span className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+          <span className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+            <span className="font-medium text-foreground">{r.name}</span>
+            <Badge variant="outline" className={cn('font-normal', TONE[TAG_TONE[tag]].soft, TONE[TAG_TONE[tag]].value)}>
+              {loading ? 'กำลังโหลด' : tagLabel}
+            </Badge>
           </span>
-          {!loading && extra.length ? (
-            <span className="block text-xs tabular-nums text-muted-foreground" data-testid={`proportion-coverage-${r.key}`}>
-              {extra.join(' · ')}
+          <span className="shrink-0 text-sm tabular-nums text-muted-foreground" data-testid={`proportion-total-${r.key}`}>
+            ทั้งหมด <span className="text-lg font-medium text-foreground">{loading ? '—' : NUM.format(bar.total)}</span>
+            {unit ? ` ${unit}` : ''}
+          </span>
+        </span>
+        {note ? <span className="block text-xs tabular-nums text-muted-foreground">{note}</span> : null}
+        <span
+          className="grid h-12 w-full gap-0.5 overflow-hidden rounded-lg"
+          style={{
+            // กว้างตามเลข · ไม่แคบกว่าตัวหนังสือในช่อง · ยังไม่มีงานเลย = แบ่งเท่ากัน
+            gridTemplateColumns: bar.parts.map((p) => `minmax(max-content, ${loading || bar.total <= 0 ? 1 : p.value}fr)`).join(' '),
+          }}
+          data-testid={`proportion-bar-${r.key}`}
+        >
+          {bar.parts.map((p) => (
+            <span
+              key={p.key}
+              className={cn(
+                'flex min-w-0 flex-col justify-center whitespace-nowrap px-3 leading-tight',
+                !loading && p.value > 0 ? BAR_FILL[p.key] : 'bg-muted/50 text-muted-foreground',
+              )}
+              data-testid={`proportion-${p.key}-${r.key}`}
+            >
+              <span className="text-xs">{labelOf(p.key)}</span>
+              <span className="text-sm font-medium tabular-nums">{loading ? '—' : `${NUM.format(p.value)} · ${p.pct}%`}</span>
             </span>
-          ) : null}
+          ))}
+        </span>
+        <span className="block text-xs tabular-nums text-muted-foreground" data-testid={`proportion-trend-${r.key}`}>
+          {loading ? 'กำลังโหลด' : trendText(r, prev, aiWord)}
         </span>
       </Button>
     </li>
@@ -375,6 +380,45 @@ export default function ProportionTab({
     [apps, payload, matchingReport, openJobIds],
   );
   const stuck = useMemo(() => proportionStuck(groups), [groups]);
+  // ── ช่วงก่อน (เทียบท้ายแถว · 23 พ.ย. 2569) — โหลดชุดเดียวกับช่วงที่เลือก 3 เส้น อ่านอย่างเดียว · ล้ม = บอกว่าโหลดไม่ขึ้น ไม่เดาเลข ──
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- key = ช่วง/BU ที่เลือก
+  const prevWin = useMemo(() => proportionPrevWindow(win, new Date()), [key]);
+  const [prevData, setPrevData] = useState<{ key: string; apps: RecruitAppFact[]; payload: ProportionPayload; match: TopicReport | null } | null>(null);
+  const [prevFailed, setPrevFailed] = useState<string | null>(null);
+  useEffect(() => {
+    if (!prevWin) return;
+    let alive = true;
+    const q = { from: prevWin.from, to: prevWin.to, bu };
+    Promise.all([
+      fetchRecruitOverview(null, { from: q.from, to: q.to, all: daysBetween(q.from, q.to) + 1 > RANGE_MAX_DAYS }, bu),
+      fetchHomeProportion(q),
+      fetchTopicReport('matching', q)
+        .then((d) => d.report)
+        .catch(() => null),
+    ])
+      .then(([ro, p, m]) => {
+        if (alive) setPrevData({ key, apps: appsInWindow(ro.apps ?? [], q.from, q.to), payload: p, match: m });
+      })
+      .catch(() => {
+        if (alive) setPrevFailed(key);
+      });
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- key = ช่วง/BU ที่เลือก
+  }, [key]);
+  const prevNow = prevData?.key === key ? prevData : null;
+  const prevRows = useMemo(() => {
+    if (!prevNow) return null;
+    const g = buildProportionGroups({ apps: prevNow.apps, payload: prevNow.payload, matchingReport: prevNow.match, openJobIds });
+    return new Map(g.flatMap((x) => x.rows).map((r) => [r.key, r]));
+  }, [prevNow, openJobIds]);
+  const prevOf = (rowKey: string): PrevOfRow => ({
+    label: prevWin?.label ?? null,
+    loading: Boolean(prevWin) && !prevNow && prevFailed !== key,
+    failed: prevFailed === key,
+    row: prevRows?.get(rowKey) ?? null,
+  });
   const rowOf = (key: string) => groups.flatMap((g) => g.rows).find((r) => r.key === key);
   const allLoaded = !loadingAny(apps, appsError, payload, error);
   const errs = [error, appsError, payload?.errors.follow, payload?.errors.entry, payload?.errors.apps, payload?.errors.aftercare].filter(Boolean);
@@ -392,13 +436,12 @@ export default function ProportionTab({
           if (r) setPanel(panelOf(r));
         }}
       />
-      <Legend />
       {errs.length ? <p className={cn('text-sm', TONE.danger.value)}>{errs.join(' · ')}</p> : null}
       {groups.map((g) => (
         <OverviewSection key={g.key} title={g.title} testId={`proportion-${g.key}`}>
           <ul>
             {g.rows.map((r) => (
-              <Row key={r.key} r={r} loading={loadingOf(g.key)} onOpen={(x) => (DRILL_OF_ROW[x.key] ? setDrill({ box: DRILL_OF_ROW[x.key]!, rowKey: x.key }) : setPanel(panelOf(x)))} />
+              <Row key={r.key} r={r} prev={prevOf(r.key)} loading={loadingOf(g.key)} onOpen={(x) => (DRILL_OF_ROW[x.key] ? setDrill({ box: DRILL_OF_ROW[x.key]!, rowKey: x.key }) : setPanel(panelOf(x)))} />
             ))}
           </ul>
         </OverviewSection>
