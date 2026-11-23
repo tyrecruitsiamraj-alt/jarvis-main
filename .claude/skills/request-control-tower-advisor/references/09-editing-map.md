@@ -14627,3 +14627,10 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 - เพิ่มผู้สมัคร: กดไม่ได้เสมอพร้อมเหตุ `IRECRUIT_ADD_PENDING_REASON` จนกว่า iRecruit มีเส้นรับข้อมูล (ตอนนี้อ่านจาก iRecruit ได้อย่างเดียว) · ต่อ API แล้วให้ยิงผ่าน `document-packets action:'import'` ที่มีอยู่
 - 23 พ.ย. ตั้งค่าบนเว็บจริงแล้ว: LIFF ของ channel SO Recruit Docs ชี้ `/apply/documents` · ตั้งค่า › ส่งเอกสารผ่าน LINE ใส่ Channel ID + LIFF ID + ต้นฉบับ 5 ฉบับ · สวิตช์ยังปิด
 - เทสต์ `tests/api/rowDocsIrecruitButtons2569-11-23.test.ts` · `src/components/documents/SendDocumentsSection.test.tsx`
+
+### 23 พ.ย. 2569 (13) — เอกสารถอดจากแท็บงานสรรหา ไปเป็นเมนู "เอกสาร" (/documents)
+เจ้าของ "เอกสารถอดจากแท็บ เอาไปไว้ใน menu"
+- เมนูกลุ่มคลังข้อมูล ต่อจากงานสรรหา (`CONVEYOR_VAULT` key `documents` · `src/lib/soRecruitNav.ts`) · หน้า `src/pages/documents/DocumentsPage.tsx` (หัว = `vaultLabel('documents')`) ใช้ `DocumentsWorkspace` ตัวเดิม
+- ถอดแท็บ/สถานะ/ตัวโหลดสวิตช์ออกจาก `JobBoardView` + `StaffJobBoardPage` หมด · ลิงก์เก่า `/jobs/board?view=documents&…` (แจ้งเตือนที่ส่งไปแล้ว) → `<Navigate>` ไป `/documents?…` พร้อมรหัสเดิม
+- `documentsDeepLink` = `/documents?applicationId=&packetId=` (กระดิ่ง · ปุ่มเปิดชุดในกล่องส่งเอกสาร)
+- เทสต์ `tests/api/documentsMenu2569-11-23.test.ts`

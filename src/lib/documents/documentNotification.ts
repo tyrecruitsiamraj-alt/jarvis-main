@@ -9,15 +9,16 @@
 
 export const DOCUMENT_PACKET_NOTIFICATION_TYPE = 'document_packet_submitted';
 export const DOCUMENTS_VIEW = 'documents';
-export const DOCUMENTS_BOARD_PATH = '/jobs/board';
+/** หน้าเอกสาร (23 พ.ย. 2569 ย้ายจากแท็บ `/jobs/board?view=documents` มาเป็นเมนู) — ลิงก์เก่ายังพามาที่นี่ (StaffJobBoardPage) */
+export const DOCUMENTS_PATH = '/documents';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export const isUuid = (v: unknown): v is string => typeof v === 'string' && UUID.test(v);
 
 export function documentsDeepLink(applicationId: string, packetId?: string | null): string {
-  const q = new URLSearchParams({ view: DOCUMENTS_VIEW, applicationId });
+  const q = new URLSearchParams({ applicationId });
   if (packetId) q.set('packetId', packetId);
-  return `${DOCUMENTS_BOARD_PATH}?${q.toString()}`;
+  return `${DOCUMENTS_PATH}?${q.toString()}`;
 }
 
 /** อ่าน `applicationId` / `packetId` จาก URL — รหัสผิดรูป = ไม่มี (ไม่เอาไปเปิดอะไร) */

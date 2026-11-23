@@ -84,6 +84,7 @@ function LegacyPostingRedirect() {
 const FollowPage = lazyPage(() => import("@/pages/follow/FollowPage"));
 const AftercarePage = lazyPage(() => import("@/pages/aftercare/AftercarePage"));
 const SkillQuizPage = lazyPage(() => import("@/pages/skill-quiz/SkillQuizPage"));
+const DocumentsPage = lazyPage(() => import("@/pages/documents/DocumentsPage"));
 const SupervisorDashboard = lazyPage(() => import("@/pages/dashboard/SupervisorDashboard"));
 const AdminSettings = lazyPage(() => import("@/pages/settings/AdminSettings"));
 // Flow ระบบ — ผังปุ่มไหนกดแล้วไปไหน (13 พ.ย. 2569 · admin เท่านั้น)
@@ -172,6 +173,8 @@ const ProtectedRoutes = () => {
             {/* "ดูแลหลังเริ่มงาน" (Phase 7.3) — คนเข้ามาจากกล่อง "โทรครบแล้ว" บนหน้า Follow */}
             <Route path="/aftercare" element={<AftercarePage />} />
             <Route path="/skill-test" element={<SkillQuizPage />} />
+            {/* เอกสาร (23 พ.ย. 2569 ย้ายจากแท็บงานสรรหามาเป็นเมนู) */}
+            <Route path="/documents" element={<DocumentsPage />} />
             <Route path="/jobs" element={<Navigate to="/jobs/list" replace />} />
             <Route path="/jobs/overview" element={<JobDashboard />} />
             <Route path="/jobs/list" element={<JobListPage />} />

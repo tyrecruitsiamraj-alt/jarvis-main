@@ -1,7 +1,7 @@
 import React, { Suspense, useEffect, useMemo, useState } from 'react';
 import { lazyPage } from '@/lib/staleChunkReload';
-import { useSearchParams } from 'react-router-dom';
-import JobBoardView, { APPLICANT_PICKS, BOARD_VIEW_TABS, DOCUMENTS_VIEW_TAB, POSTING_PICKS, type BoardViewId } from '@/components/jobs/JobBoardView';
+import { Navigate, useSearchParams } from 'react-router-dom';
+import JobBoardView, { APPLICANT_PICKS, BOARD_VIEW_TABS, POSTING_PICKS, type BoardViewId } from '@/components/jobs/JobBoardView';
 import ScrapCandidatesPanel from '@/components/jobs/ScrapCandidatesPanel';
 import { SCRAP_REQUEST_PARAM } from '@/lib/scrapCandidatesApi';
 import { usePageTitle } from '@/hooks/usePageTitle';
@@ -17,7 +17,6 @@ import type { JobBoxKey } from '@/lib/jobBoxGroups';
 import { sumJobPositionUnits } from '@/lib/jobPositionUnits';
 import { PREQUEST_ID_PREFIX } from '@/lib/siamrajUnitRequestsApi';
 import type { BoardPublishedTotals } from '@/lib/boardRelease';
-import { fetchDocumentSettings } from '@/lib/documents/documentsStaffApi';
 
 /**
  * แท็บ Dashboard (28 ก.ย. 2569) — โหลดเมื่อกดเท่านั้น: กราฟ recharts + ข้อมูลย้อนหลังไม่ควรถ่วงกล่องงานที่คนเปิดทั้งวัน
@@ -30,7 +29,6 @@ const RecruitOverview = lazyPage(() => import('@/components/dashboard-trends/Rec
 const PreCheckPage = lazyPage(() => import('@/pages/matching/PreCheckPage'));
 const MatchingPage = lazyPage(() => import('@/pages/matching/MatchingPage'));
 /** แท็บเอกสาร (ส่งเอกสารผ่าน LINE · 22 พ.ย. 2569) — โหลดเมื่อเปิดแท็บ */
-const DocumentsWorkspace = lazyPage(() => import('@/components/documents/DocumentsWorkspace'));
 
 /**
  * บอร์ดรับสมัครฝั่งเจ้าหน้าที่ — สี่มุมมองในหน้าเดียว
@@ -52,7 +50,7 @@ const DocumentsWorkspace = lazyPage(() => import('@/components/documents/Documen
 
 const RM_VIEWS = ['list', 'contact', 'appointments'] as const;
 /** มุมที่ไม่ใช่กล่องงานและไม่ใช่ RM — แท็บ Dashboard */
-const EXTRA_VIEWS = ['dashboard', 'precheck', 'match', 'scrap', 'documents'] as const;
+const EXTRA_VIEWS = ['dashboard', 'precheck', 'match', 'scrap'] as const;
 
 /**
  * แท็บที่ถูกถอดออกแล้ว — ลิงก์เก่ามาถึงให้เปิดกล่องงานแทน แล้วล้าง `?view=` ทิ้ง
@@ -105,18 +103,7 @@ const StaffJobBoardPage: React.FC = () => {
     : 'board';
   const retiredView = (RETIRED_VIEWS as readonly string[]).includes(raw ?? '');
   // ชื่อแท็บเบราว์เซอร์ตามแท็บที่เปิด (QA 5 ต.ค. 2569)
-  usePageTitle([...POSTING_PICKS, ...APPLICANT_PICKS, ...BOARD_VIEW_TABS, DOCUMENTS_VIEW_TAB].find((t) => t.id === view)?.label ?? 'งานสรรหา');
-  /** แท็บเอกสารขึ้นเมื่อระบบส่งเอกสารเปิดอยู่ หรือมีเอกสารเดิมในสิทธิ์ (ระบบปิดและไม่เคยใช้ = แถบแท็บเหมือนเดิม) */
-  const [documentsTab, setDocumentsTab] = useState(false);
-  useEffect(() => {
-    let alive = true;
-    fetchDocumentSettings()
-      .then((s) => alive && setDocumentsTab(s.enabled || s.hasHistory))
-      .catch(() => undefined);
-    return () => {
-      alive = false;
-    };
-  }, []);
+  usePageTitle([...POSTING_PICKS, ...APPLICANT_PICKS, ...BOARD_VIEW_TABS].find((t) => t.id === view)?.label ?? 'งานสรรหา');
   /** ชื่อใบขอตามเลขใบขอ — แท็บ Scrap ใช้แสดงในตัวเลือกใบขอ (ชุดใบที่หน้านี้โหลดไว้แล้ว ไม่ยิงเส้นใหม่) */
   const requestTitleByNo = useMemo(() => {
     const m = new Map<string, string>();
@@ -168,6 +155,17 @@ const StaffJobBoardPage: React.FC = () => {
     setSearchParams(params);
   };
 
+  /**
+   * แท็บเอกสารย้ายไปเป็นเมนู "เอกสาร" (เจ้าของ 23 พ.ย. 2569) — ลิงก์เก่า `?view=documents&applicationId=&packetId=`
+   * (แจ้งเตือนในกระดิ่งที่ส่งไปแล้ว) พาไปหน้าใหม่พร้อมรหัสเดิม
+   */
+  if (raw === 'documents') {
+    const params = new URLSearchParams(searchParams);
+    params.delete('view');
+    const qs = params.toString();
+    return <Navigate to={qs ? `/documents?${qs}` : '/documents'} replace />;
+  }
+
   return (
     /* ระยะขอบเท่าหน้าอื่นทั้งระบบ — เดิมดึงขอบออก (-mx-*) เพื่อให้พื้นไล่สีเต็มจอ ซึ่งถอดไปแล้ว
        27 ก.ย. 2569 (เจ้าของ: "หน้ากล่องงานไม่เข้ากับหน้าอื่นๆเลย" → แบบ A หัว PageHeader ชุดเดียวกัน) */
@@ -195,7 +193,6 @@ const StaffJobBoardPage: React.FC = () => {
         closedDays={closed.days}
         onClosedDaysChange={closed.setDays}
         initialBox={legacyBox}
-        showDocumentsTab={documentsTab}
         onPublishedTotals={setBoardPublished}
         onImportJob={setImportJob}
         listHeaderActions={
@@ -220,10 +217,6 @@ const StaffJobBoardPage: React.FC = () => {
           ) : view === 'precheck' ? (
             <Suspense key={listRev} fallback={<p className="py-6 text-sm text-muted-foreground">กำลังเปิด Pre-Check…</p>}>
               <PreCheckPage embedded />
-            </Suspense>
-          ) : view === 'documents' ? (
-            <Suspense fallback={<p className="py-6 text-sm text-muted-foreground">กำลังเปิดเอกสาร…</p>}>
-              <DocumentsWorkspace key={listRev} />
             </Suspense>
           ) : view === 'dashboard' ? (
             <Suspense key={listRev} fallback={<p className="py-6 text-sm text-muted-foreground">กำลังเปิดภาพรวม…</p>}>

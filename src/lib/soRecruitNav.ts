@@ -26,6 +26,7 @@ import {
   CalendarDays,
   ClipboardCheck,
   ClipboardList,
+  FileText,
   Megaphone,
   PhoneCall,
   PhoneForwarded,
@@ -172,6 +173,19 @@ export const CONVEYOR_VAULT: VaultItem[] = [
     icon: LayoutGrid,
     functionId: 'unit_requests_read',
     match: [],
+  },
+  /**
+   * 🔴 **เอกสาร** (เจ้าของ 23 พ.ย. 2569 "เอกสารถอดจากแท็บ เอาไปไว้ใน menu") — ชุดเอกสารที่ผู้สมัครส่งผ่าน LINE
+   * เดิมเป็นแท็บท้ายแถบงานสรรหา · หน้าเดียวกับที่กระดิ่ง "ส่งเอกสารแล้ว" พามา
+   */
+  {
+    key: 'documents',
+    label: 'เอกสาร',
+    blurb: 'เอกสารที่ผู้สมัครส่งผ่าน LINE — ข้อมูล รูปบัตร PDF',
+    path: '/documents',
+    icon: FileText,
+    functionId: 'unit_requests_read',
+    match: ['/documents'],
   },
   {
     key: 'candidates',
@@ -398,3 +412,8 @@ export const HOME_TEAM_NAV: Array<{
    */
   { key: 'lumos', label: 'ทีม Lumos', blurb: 'AI โทรแทนทีม · ผลสายทั้งหมด', path: null },
 ];
+
+/** ชื่อเมนูคลังข้อมูลตามคีย์ — หัวหน้าจอใช้ตัวนี้ ชื่อหน้า = ชื่อเมนู */
+export function vaultLabel(key: string): string {
+  return CONVEYOR_VAULT.find((v) => v.key === key)?.label ?? '';
+}

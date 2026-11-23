@@ -94,10 +94,11 @@ describe('แจ้งเตือนเมื่อส่งเอกสาร�
   });
   it('ลิงก์ชี้ใบสมัคร + ชุดนั้นพอดี ไม่มีรหัสลิงก์ของผู้สมัคร', () => {
     const u = new URL(planDocumentPacketNotification(event)!.link, 'https://jarvis.test');
-    expect(u.pathname).toBe('/jobs/board');
-    expect(Object.fromEntries(u.searchParams)).toEqual({ view: 'documents', applicationId: event.applicationId, packetId: event.packetId });
+    // 23 พ.ย. 2569 หน้าเอกสารย้ายเป็นเมนู /documents (ลิงก์เก่า /jobs/board?view=documents ยังพามาที่นี่)
+    expect(u.pathname).toBe('/documents');
+    expect(Object.fromEntries(u.searchParams)).toEqual({ applicationId: event.applicationId, packetId: event.packetId });
     expect(parseDocumentsDeepLink(u.search)).toEqual({ applicationId: event.applicationId, packetId: event.packetId });
-    expect(documentsDeepLink(event.applicationId)).toBe(`/jobs/board?view=documents&applicationId=${event.applicationId}`);
+    expect(documentsDeepLink(event.applicationId)).toBe(`/documents?applicationId=${event.applicationId}`);
   });
   it('รหัสผิดรูปเอาไปทำลิงก์ไม่ได้ และอ่านจาก URL ก็ไม่รับ', () => {
     expect(() => planDocumentPacketNotification({ ...event, applicationId: 'https://evil.test' })).toThrow();

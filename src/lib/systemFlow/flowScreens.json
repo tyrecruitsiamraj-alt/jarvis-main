@@ -929,6 +929,45 @@
    ]
   },
   {
+   "id": "documents",
+   "kind": "page",
+   "title": "เอกสาร",
+   "route": "/documents",
+   "parent": null,
+   "src": "src/App.tsx:177 → src/pages/documents/DocumentsPage.tsx:11",
+   "controls": [
+    {
+     "label": "รายชื่อผู้สมัครที่ส่งลิงก์เอกสาร",
+     "action": "inline",
+     "target": "ตาราง 1 แถวต่อคน + ปุ่มกรองสถานะ",
+     "api": "GET /api/document-packets",
+     "effects": [],
+     "when": null,
+     "src": "src/components/documents/DocumentsWorkspace.tsx:136"
+    },
+    {
+     "label": "กดชื่อ",
+     "action": "popup",
+     "target": "แผงชุดเอกสาร (?applicationId=&packetId=)",
+     "api": "GET /api/document-packets?applicationId=",
+     "effects": [],
+     "when": null,
+     "src": "src/components/documents/DocumentsWorkspace.tsx:156"
+    },
+    {
+     "label": "บันทึกเลขที่ iRecruit",
+     "action": "api",
+     "target": "แผงชุดเอกสาร",
+     "api": "POST /api/document-packets action=import-record",
+     "effects": [
+      "ชุดเป็น นำเข้าแล้ว"
+     ],
+     "when": "ชุดที่ส่งแล้ว",
+     "src": "src/components/documents/DocumentPacketSheet.tsx:332"
+    }
+   ]
+  },
+  {
    "id": "dashboard",
    "kind": "page",
    "title": "Dashboard",
