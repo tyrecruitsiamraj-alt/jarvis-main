@@ -19,6 +19,9 @@ import { MyCallsSection } from '@/pages/matching/MyCallsPage';
 import AddApplicantDialog from '@/components/recruit-rm/AddApplicantDialog';
 import ImportApplicantsDialog from '@/components/recruit-rm/ImportApplicantsDialog';
 import ApplicantContactDialog from '@/components/recruit-rm/ApplicantContactDialog';
+import SendDocumentsSection from '@/components/documents/SendDocumentsSection';
+import { fetchDocumentSettings } from '@/lib/documents/documentsStaffApi';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
   EMPTY_RM_FILTERS,
   RM_ROW_ACTION_LABEL,
@@ -76,7 +79,7 @@ import { appointmentTimeOf } from '@/lib/appointmentTime';
 import { RM_BUCKET_LABEL, isRmBucket } from '@/lib/recruitRmOverviewApi';
 import { LEAD_VIEW_LABEL } from '@/lib/recruitLead';
 import { fetchCallHoldsByPhones, type CallHold } from '@/lib/callHoldsApi';
-import { RM_JOB_ALL_PARAM, RM_OPEN_PARAM, applicantRecruiterName, canHoldApplication } from '@/lib/recruitRm';
+import { IRECRUIT_ADD_PENDING_REASON, RM_JOB_ALL_PARAM, RM_OPEN_PARAM, applicantRecruiterName, canHoldApplication } from '@/lib/recruitRm';
 import { choiceCountdown } from '@/lib/callChoiceGuard';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRolePermissions } from '@/contexts/RolePermissionsContext';
@@ -253,6 +256,21 @@ const RmWorkspace: React.FC<{
   const [contactApp, setContactApp] = useState<PublicApplication | null>(null);
   /** ใบประวัติ (แท็บผู้สมัคร) — คนละป๊อปกับ `contactApp` ของแท็บการติดตาม */
   const [profileApp, setProfileApp] = useState<PublicApplication | null>(null);
+  /**
+   * ส่งเอกสารจากปุ่มบนแถวแท็บการติดต่อ (เจ้าของ 23 พ.ย. 2569 "ปุ่มอยู่ตรงหน้าเลยไม่ต้องกดเข้าไป")
+   * ป๊อปเล็กที่มีแค่กล่อง "ส่งเอกสาร" ตัวเดียวกับในข้อมูลผู้สมัคร (สร้างลิงก์ · คัดลอก · ใครเปิดลิงก์ · ส่งแล้ว)
+   */
+  const [docsApp, setDocsApp] = useState<PublicApplication | null>(null);
+  const [docsEnabled, setDocsEnabled] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    fetchDocumentSettings()
+      .then((s) => alive && setDocsEnabled(s.enabled))
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, []);
   const { user } = useAuth();
   const { isFunctionEnabled } = useRolePermissions();
   /** การติดต่อ "ทุกคน" — เฉพาะ role ที่เจ้าของเปิดสิทธิ์ (ค่าเริ่ม Admin + Supervisor · 10 พ.ย. 2569) · ตั้งค่า › สิทธิ์ฟังก์ชัน */
@@ -872,6 +890,15 @@ const RmWorkspace: React.FC<{
   }, [aiUnbound, jobs]);
 
   const onRowAction = (action: RmRowAction, row: PublicApplication) => {
+    if (action === 'docs') {
+      setDocsApp(row);
+      return;
+    }
+    // เพิ่มผู้สมัครเข้า iRecruit — ปุ่มกดไม่ได้จนกว่า iRecruit มีเส้นรับข้อมูล (กันไว้อีกชั้น ไม่ให้ตกไป "ยังไม่ได้ต่อ")
+    if (action === 'irecruit') {
+      say(IRECRUIT_ADD_PENDING_REASON);
+      return;
+    }
     // ส่ง AI โทรทีละแถว (4 ต.ค. 2569) — ผ่านป๊อปยืนยันรายชื่อเหมือนปุ่มรวม (ยิงสายจริง)
     if (action === 'ai') {
       askSendAi([row.id]);
@@ -1471,6 +1498,7 @@ const RmWorkspace: React.FC<{
                 onToggleRow={toggleRow}
                 onToggleAll={toggleAll}
                 onAction={onRowAction}
+                docsEnabled={docsEnabled}
                 holdByRef={holdByRef}
                 onAttendance={onAttendance}
                 unitOf={unitOf}
@@ -1592,6 +1620,15 @@ const RmWorkspace: React.FC<{
           }}
         />
       ) : null}
+
+      <Dialog open={Boolean(docsApp)} onOpenChange={(v) => !v && setDocsApp(null)}>
+        <DialogContent className="sm:max-w-lg" data-testid="row-send-documents">
+          <DialogHeader>
+            <DialogTitle>ส่งเอกสาร · {docsApp?.full_name}</DialogTitle>
+          </DialogHeader>
+          {docsApp ? <SendDocumentsSection applicationId={docsApp.id} autoCreate /> : null}
+        </DialogContent>
+      </Dialog>
 
       {/* dialog รายละเอียด + ติดต่อสำเร็จ/ไม่สำเร็จ + นัด (ลิสต์ข้อ 7 · 14 ส.ค. 2569) */}
       <ApplicantContactDialog

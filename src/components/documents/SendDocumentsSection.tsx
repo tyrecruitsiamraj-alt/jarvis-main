@@ -6,7 +6,7 @@
  * เห็นว่าใครเปิดลิงก์ (ชื่อ/รูป LINE · เวลา) ก่อนผู้สมัครส่งเอกสาร · ส่งแล้วกดเปิดชุดเอกสารได้ทันที
  * ไม่สร้างลิงก์เองตอนเปิดป๊อป · ระบบปิดอยู่และใบนี้ไม่เคยมีลิงก์ = ไม่แสดงอะไร (ป๊อปหน้าตาเดิม)
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Copy, Send } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -15,7 +15,7 @@ import { Input } from '@/components/ui/input';
 import { TONE } from '@/lib/designTokens';
 import { formatDateTimeTh } from '@/lib/dateTh';
 import { cn } from '@/lib/utils';
-import { DOCUMENT_STATUS_LABEL, invitationStateLabel } from '@/lib/documents/documentStatus';
+import { DOCUMENT_STATUS_LABEL, SUBMITTED_STATUSES, invitationStateLabel } from '@/lib/documents/documentStatus';
 import { documentsDeepLink } from '@/lib/documents/documentNotification';
 import { createDocumentLink, fetchApplicationDocuments, revokeDocumentLink, type ApplicationDocuments } from '@/lib/documents/documentsStaffApi';
 import type { InvitationView } from '@/lib/documents/documentViews';
@@ -44,8 +44,15 @@ function LineOpener({ line }: { line: NonNullable<InvitationView['line']> }) {
   );
 }
 
-export default function SendDocumentsSection({ applicationId }: { applicationId: string }) {
+/**
+ * `autoCreate` (ปุ่ม "ส่งเอกสาร" บนแถวแท็บการติดต่อ · 23 พ.ย. 2569 เจ้าของ "กดปุ่มส่งเอกสาร จากนั้นจะมีลิงก์ให้เอาไปส่ง"):
+ * เปิดมาแล้วยังไม่มีลิงก์ที่ใช้ได้ และยังไม่เคยส่งเอกสาร = สร้างลิงก์ + คัดลอกให้ทันทีครั้งเดียว
+ * (ป๊อปข้อมูลผู้สมัครไม่ส่งค่านี้ — แค่เปิดดูต้องไม่สร้างลิงก์)
+ */
+export default function SendDocumentsSection({ applicationId, autoCreate = false }: { applicationId: string; autoCreate?: boolean }) {
   const navigate = useNavigate();
+  const autoDone = useRef(false);
+  const createRef = useRef<(() => Promise<void>) | null>(null);
   const [data, setData] = useState<ApplicationDocuments | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -64,6 +71,15 @@ export default function SendDocumentsSection({ applicationId }: { applicationId:
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    if (!autoCreate || autoDone.current || !data?.feature) return;
+    autoDone.current = true;
+    const first = data.invitations?.[0] ?? null;
+    const usable = first && !first.revokedAt && !first.submittedAt && Date.parse(first.expiresAt) > Date.now();
+    const submitted = data.status != null && SUBMITTED_STATUSES.includes(data.status);
+    if (data.feature.enabled && data.feature.ready && !usable && !submitted) void createRef.current?.();
+  }, [autoCreate, data]);
 
   if (loadError && !data) {
     return (
@@ -112,6 +128,8 @@ export default function SendDocumentsSection({ applicationId }: { applicationId:
       setBusy(false);
     }
   };
+
+  createRef.current = create;
 
   const revoke = async (id: string) => {
     setBusy(true);

@@ -71,7 +71,7 @@ describe('ส่งทั้งหมดที่แมท = เฉพาะ AI 
 describe('ปุ่มส่ง AI โทรบนแถวผู้สมัครมีคำ', () => {
   it('worded ทุกแถว', () => {
     const t = read('src/components/recruit-rm/RmTable.tsx');
-    expect(t).toContain("const worded = (tab === 'appointments' && a === 'rule') || a === 'ai';");
-    expect(t).toContain("a === 'ai' ? 'ส่ง AI โทร' : 'บันทึกผล'");
+    expect(t).toContain("const worded = (tab === 'appointments' && a === 'rule') || a === 'ai' || a === 'docs' || a === 'irecruit';");
+    expect(t).toContain("a === 'ai' ? 'ส่ง AI โทร' : a === 'rule' ? 'บันทึกผล'");
   });
 });

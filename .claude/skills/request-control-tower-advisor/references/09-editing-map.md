@@ -14619,3 +14619,11 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 - 🔴 บั๊กในรูปเจ้าของ: "ถึงเวลาหาแล้ว 18 + ล่วงหน้า 0 = 17" — โหมดมีงวด ยอดรวมมาจาก cohort (ERP) แต่กล่องสถานะนับใบใน feed ด้วยกติกาวันคนละแบบ ใบที่ ERP ปิดแล้วแต่ feed ยังเปิดถูกนับเกิน
   ⇒ `cohortRemainingByRequest` + `throughputKeysOfJob` (`throughput.ts`) · `buildWorkStatusKpis(..., cohortUnitsByKey)` ใช้อัตราต่อใบจาก cohort กับใบเปิดทั้ง feed · ใบใน cohort ที่ไม่อยู่ใน feed = ไม่มีสถานะ (ไม่มีทางเกินยอดแล้ว)
 - เทสต์ `tests/api/dashboardOpenBox2569-11-23.test.ts` · `tests/api/dashboardWorkDoneBoxes2569-11-23.test.ts`
+
+### 23 พ.ย. 2569 (12) — ปุ่มบนแถว: แท็บการติดต่อ "ส่งเอกสาร" · แท็บติดตามนัดหมาย "เพิ่มผู้สมัคร" (รอ API iRecruit)
+เจ้าของ "กดปุ่มส่งเอกสารที่หน้าติดตาม … ปุ่มอยู่ตรงหน้าเลยไม่ต้องกดเข้าไป" → "แท็บการติดต่อมีปุ่มส่งเอกสาร แท็บติดตามนัดหมายมีปุ่ม เพิ่มผู้สมัครที่จะยิง Api ไป irecruit" · "ทำปุ่มไว้รอ ฉันรอ Api อยู่"
+- `RmRowAction` เพิ่ม `docs` · `irecruit` (`src/lib/recruitRm.ts` · `RM_ROW_ACTIONS.contact` / `.appointments`) · ปุ่มมีคำ (`RmTable`)
+- ส่งเอกสาร: `RmWorkspace` เปิดป๊อปเล็ก (`row-send-documents`) ที่มีแค่ `SendDocumentsSection autoCreate` — ยังไม่มีลิงก์ที่ใช้ได้และยังไม่เคยส่ง = สร้างลิงก์ + คัดลอกทันทีครั้งเดียว · ป๊อปข้อมูลผู้สมัครไม่ส่ง autoCreate (เปิดดูต้องไม่สร้างลิงก์) · ระบบปิด = ปุ่มกดไม่ได้พร้อมเหตุ (`DOCS_DISABLED_REASON`)
+- เพิ่มผู้สมัคร: กดไม่ได้เสมอพร้อมเหตุ `IRECRUIT_ADD_PENDING_REASON` จนกว่า iRecruit มีเส้นรับข้อมูล (ตอนนี้อ่านจาก iRecruit ได้อย่างเดียว) · ต่อ API แล้วให้ยิงผ่าน `document-packets action:'import'` ที่มีอยู่
+- 23 พ.ย. ตั้งค่าบนเว็บจริงแล้ว: LIFF ของ channel SO Recruit Docs ชี้ `/apply/documents` · ตั้งค่า › ส่งเอกสารผ่าน LINE ใส่ Channel ID + LIFF ID + ต้นฉบับ 5 ฉบับ · สวิตช์ยังปิด
+- เทสต์ `tests/api/rowDocsIrecruitButtons2569-11-23.test.ts` · `src/components/documents/SendDocumentsSection.test.tsx`

@@ -1,6 +1,6 @@
 import React from 'react';
 import { SCREENING_LABEL, SCREENING_RESULTS, SCREENING_TONE, canRecordScreening, type ScreeningResult } from '@/lib/appointmentScreening';
-import { BookmarkPlus, Bot, Phone, PhoneCall, Eye, ClipboardCheck, ListChecks, UserMinus, Undo2, FileText, RotateCcw } from 'lucide-react';
+import { BookmarkPlus, Bot, Phone, PhoneCall, Eye, ClipboardCheck, ListChecks, UserMinus, Undo2, FileText, RotateCcw, Send, UserPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { appointmentTimeOf } from '@/lib/appointmentTime';
 import { cn } from '@/lib/utils';
@@ -23,6 +23,9 @@ import {
 import {
   RM_ROW_ACTIONS,
   rmRowActionLabel,
+  RM_ROW_ACTION_LABEL,
+  DOCS_DISABLED_REASON,
+  IRECRUIT_ADD_PENDING_REASON,
   applicationAddressLabel,
   applicationJobLabel,
   applicationUnitLabel,
@@ -138,6 +141,8 @@ const ACTION_ICON: Record<RmRowAction, typeof Phone> = {
   remove: UserMinus,
   release: Undo2,
   restore: RotateCcw,
+  docs: Send,
+  irecruit: UserPlus,
 };
 
 /** แท็บการติดต่อใช้ไอคอนชุด iRecruit (call · rule · person_remove) — 4 ต.ค. 2569 */
@@ -154,6 +159,8 @@ const RmTable: React.FC<{
   onToggleRow: (id: string) => void;
   onToggleAll: () => void;
   onAction: (action: RmRowAction, row: PublicApplication) => void;
+  /** ระบบส่งเอกสารเปิดอยู่ไหม — ปิด = ปุ่มส่งเอกสารกดไม่ได้พร้อมบอกเหตุ */
+  docsEnabled?: boolean;
   /** ล็อกโทรที่มีอยู่ (คีย์ = application id) — ไว้โชว์ 🔒 และกันกด "โทร" ซ้ำ */
   holdByRef?: Record<string, CallHold>;
   /** บันทึกผลติดตามนัด มา/ไม่มา (แท็บนัดหมาย · migration 089) */
@@ -170,7 +177,7 @@ const RmTable: React.FC<{
    */
   extraRows?: React.ReactNode;
   extraRowCount?: number;
-}> = ({ tab, rows, selectedIds, onToggleRow, onToggleAll, onAction, holdByRef = {}, onAttendance, recruiterOf, actionsOverride, unitOf, extraRows, extraRowCount = 0 }) => {
+}> = ({ tab, rows, selectedIds, onToggleRow, onToggleAll, onAction, docsEnabled = false, holdByRef = {}, onAttendance, recruiterOf, actionsOverride, unitOf, extraRows, extraRowCount = 0 }) => {
   const actions = actionsOverride ?? RM_ROW_ACTIONS[tab];
   /**
    * 🔴 แท็บผู้สมัครใช้ชุดคอลัมน์ที่เจ้าของสั่งเอง (30 ก.ย. 2569 · Choice "เอาตามที่ฉันสั่ง"):
@@ -606,11 +613,20 @@ const RmTable: React.FC<{
                             label = 'ส่ง AI ใหม่';
                           }
                         }
+                        // ส่งเอกสาร (23 พ.ย. 2569) — ระบบปิด = กดไม่ได้พร้อมบอกเหตุ · เพิ่มผู้สมัครเข้า iRecruit = รอ API กดไม่ได้เสมอ
+                        if (a === 'docs' && !docsEnabled) {
+                          disabled = true;
+                          label = DOCS_DISABLED_REASON;
+                        }
+                        if (a === 'irecruit') {
+                          disabled = true;
+                          label = IRECRUIT_ADD_PENDING_REASON;
+                        }
                         // แท็บนัดหมาย: ปุ่มเปิดบันทึกผลมีคำ (QA 18 ต.ค. 2569 — กฎปุ่มต้องมีคำ)
                         // ส่ง AI ใหม่ (19 ต.ค. 2569) — สายเดิมเงียบเกิน 24 ชม. ปุ่มมีคำให้เห็นชัด
                         const resend = a === 'ai' && silentAi && !disabled;
                         // ปุ่มส่ง AI โทรมีคำเสมอ (QA 15 พ.ย. 2569) — เดิมเป็นไอคอนเปล่าวางติดปุ่มเก็บ Lead/ดูรายละเอียด กดสั่งโทรจริงพลาดได้
-                        const worded = (tab === 'appointments' && a === 'rule') || a === 'ai';
+                        const worded = (tab === 'appointments' && a === 'rule') || a === 'ai' || a === 'docs' || a === 'irecruit';
                         // ปุ่มกลมไม่มีกรอบ สีเทา แบบ iRecruit (rm-action-btn) — ใช้ Button ของ shadcn
                         return (
                           <Button
@@ -631,7 +647,7 @@ const RmTable: React.FC<{
                             }
                           >
                             <Icon aria-hidden />
-                            {worded ? (resend ? 'ส่ง AI ใหม่' : a === 'ai' ? 'ส่ง AI โทร' : 'บันทึกผล') : null}
+                            {worded ? (resend ? 'ส่ง AI ใหม่' : a === 'ai' ? 'ส่ง AI โทร' : a === 'rule' ? 'บันทึกผล' : RM_ROW_ACTION_LABEL[a]) : null}
                           </Button>
                         );
                       })}

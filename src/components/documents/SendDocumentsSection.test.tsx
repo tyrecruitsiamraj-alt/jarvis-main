@@ -96,3 +96,52 @@ describe('ส่งเอกสาร ในป๊อปผู้สมัคร
     expect(screen.queryByTestId('create-document-link')).toBeNull();
   });
 });
+
+describe('ปุ่ม "ส่งเอกสาร" บนแถวแท็บการติดต่อ (autoCreate · เจ้าของ 23 พ.ย. 2569 "กดปุ่มส่งเอกสาร จากนั้นจะมีลิงก์ให้เอาไปส่ง")', () => {
+  const mountAuto = () =>
+    render(
+      <MemoryRouter>
+        <SendDocumentsSection applicationId={APP} autoCreate />
+      </MemoryRouter>,
+    );
+
+  it('ยังไม่มีลิงก์ = สร้างลิงก์ + คัดลอกให้ทันทีครั้งเดียว (ไม่ต้องกดซ้ำในป๊อป)', async () => {
+    let created = false;
+    vi.stubGlobal('fetch', (input: string, init?: RequestInit) => {
+      calls.push({ url: input, method: (init?.method ?? 'GET').toUpperCase() });
+      if (init?.method === 'POST') {
+        created = true;
+        return json({ invitationId: INV, revision: 1, url: URL_, expiresAt: link().expiresAt }, 201);
+      }
+      return json(state(created ? { status: 'not_opened', invitations: [link()] } : {}));
+    });
+    mountAuto();
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith(URL_));
+    expect(calls.filter((c) => c.method === 'POST')).toHaveLength(1);
+  });
+
+  it('มีลิงก์ที่ยังใช้ได้ หรือส่งเอกสารแล้ว = ไม่สร้างใหม่เอง', async () => {
+    for (const st of [state({ status: 'opened', invitations: [link()] }), state({ status: 'ready', invitations: [link({ submittedAt: '2026-11-22T04:00:00.000Z', packetId: 'p1' })] })]) {
+      calls = [];
+      vi.stubGlobal('fetch', (input: string, init?: RequestInit) => {
+        calls.push({ url: input, method: (init?.method ?? 'GET').toUpperCase() });
+        return json(st);
+      });
+      const view = mountAuto();
+      await screen.findByTestId('send-documents');
+      await new Promise((r) => setTimeout(r, 30));
+      expect(calls.every((c) => c.method === 'GET')).toBe(true);
+      view.unmount();
+    }
+  });
+
+  it('ระบบปิด = ไม่สร้างลิงก์', async () => {
+    vi.stubGlobal('fetch', (input: string, init?: RequestInit) => {
+      calls.push({ url: input, method: (init?.method ?? 'GET').toUpperCase() });
+      return json(state({ feature: { enabled: false, ready: true, problem: null } }));
+    });
+    mountAuto();
+    await new Promise((r) => setTimeout(r, 50));
+    expect(calls.every((c) => c.method === 'GET')).toBe(true);
+  });
+});

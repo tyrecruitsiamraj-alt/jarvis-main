@@ -78,7 +78,7 @@ beforeEach(() => {
 
 describe('ปุ่มของแท็บการติดตาม', () => {
   it('🔴 เหลือ 3 ปุ่ม: โทร (จดเวลา) · ดูรายละเอียด · ลบออก — ไม่มีเก็บ Lead/เก็บไปโทรเอง', () => {
-    expect(RM_ROW_ACTIONS.contact).toEqual(['dial', 'view', 'release']);
+    expect(RM_ROW_ACTIONS.contact).toEqual(['dial', 'view', 'docs', 'release']); // 23 พ.ย. 2569 ส่งเอกสาร
     expect(RM_ROW_ACTION_LABEL.dial).toBe('กดโทร (จดเวลา)');
     expect(RM_ROW_ACTION_LABEL.release).toBe('ลบออก — ส่งกลับแท็บผู้สมัคร');
   });
@@ -87,7 +87,7 @@ describe('ปุ่มของแท็บการติดตาม', () => {
     expect(RM_ROW_ACTIONS.candidates).toEqual(['bookmark', 'call', 'ai', 'view']);
     // "เอาออกจากรายการ" ไม่เคยต่อกับระบบ — ถอดออก (QA 5 ต.ค. 2569)
     // 7 ต.ค. 2569: ถอดเก็บไปโทรเอง (ปุ่มที่กดไม่ได้ทุกแถวของใบคีย์เอง)
-    expect(RM_ROW_ACTIONS.appointments).toEqual(['rule']);
+    expect(RM_ROW_ACTIONS.appointments).toEqual(['rule', 'irecruit']); // 23 พ.ย. 2569 เพิ่มผู้สมัคร (รอ API iRecruit)
   });
 
   it('หน้าเว็บยิงเส้นเดียว choice=release แล้วโหลดใหม่ — ไม่ยิงปลดจอง/ถอด Lead/คืนล็อกแยกกันเอง', () => {
