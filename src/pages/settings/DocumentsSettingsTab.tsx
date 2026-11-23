@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { TONE } from '@/lib/designTokens';
 import { formatDateTimeTh } from '@/lib/dateTh';
@@ -89,6 +90,9 @@ function TemplateRow({ t, onUploaded }: { t: NonNullable<DocumentSettingsView['t
   );
 }
 
+/** ค่าใน Select (Radix ใช้ค่าว่างไม่ได้) = อ่านในมือถือผู้สมัคร */
+const OCR_ON_PHONE = 'phone';
+
 const DocumentsSettingsTab: React.FC = () => {
   const id = useId();
   const [s, setS] = useState<DocumentSettingsView | null>(null);
@@ -98,6 +102,7 @@ const DocumentsSettingsTab: React.FC = () => {
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<{ ok: boolean; text: string } | null>(null);
   const [copied, setCopied] = useState(false);
+  const [ocr, setOcr] = useState(OCR_ON_PHONE);
   const endpoint = `${window.location.origin}/apply/documents`;
 
   const load = useCallback(async () => {
@@ -106,6 +111,7 @@ const DocumentsSettingsTab: React.FC = () => {
       setS(v);
       setChannel(v.lineChannelId ?? '');
       setLiff(v.liffId ?? '');
+      setOcr(v.ocrModel || OCR_ON_PHONE);
       setLoadError(null);
     } catch (e) {
       setLoadError(e instanceof Error ? e.message : 'อ่านค่าไม่ได้');
@@ -196,6 +202,40 @@ const DocumentsSettingsTab: React.FC = () => {
         </div>
       </section>
 
+      <section className="space-y-2" data-testid="documents-ocr">
+        <h4 className="text-sm font-medium text-foreground">อ่านบัตรประชาชน · ใบขับขี่</h4>
+        <div className="flex flex-wrap items-end gap-2">
+          <div className="min-w-0 flex-1 space-y-1.5 sm:max-w-sm">
+            <Label htmlFor={`${id}-ocr`}>อ่านด้วย</Label>
+            <Select value={ocr} onValueChange={setOcr} disabled={busy}>
+              <SelectTrigger id={`${id}-ocr`} data-testid="documents-ocr-model">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={OCR_ON_PHONE}>มือถือผู้สมัคร</SelectItem>
+                {(s.ocrModels ?? []).map((m) => (
+                  <SelectItem key={m} value={m}>
+                    เซิร์ฟเวอร์บริษัท · {m}
+                  </SelectItem>
+                ))}
+                {s.ocrModel && !(s.ocrModels ?? []).includes(s.ocrModel) ? <SelectItem value={s.ocrModel}>เซิร์ฟเวอร์บริษัท · {s.ocrModel}</SelectItem> : null}
+              </SelectContent>
+            </Select>
+          </div>
+          <Button
+            type="button"
+            size="sm"
+            disabled={busy || ocr === (s.ocrModel || OCR_ON_PHONE)}
+            onClick={() => void save({ ocrModel: ocr === OCR_ON_PHONE ? '' : ocr }, 'บันทึกแล้ว')}
+          >
+            บันทึก
+          </Button>
+        </div>
+        <p className={cn('text-sm', ocrStatus(s).tone)} data-testid="documents-ocr-status">
+          {ocrStatus(s).text}
+        </p>
+      </section>
+
       <section className="space-y-2">
         <h4 className="text-sm font-medium text-foreground">ต้นฉบับเอกสาร</h4>
         <ul className="divide-y divide-border rounded-xl border border-border">
@@ -219,5 +259,13 @@ const DocumentsSettingsTab: React.FC = () => {
     </Card>
   );
 };
+
+/** สถานะตัวอ่านบัตร — โมเดลที่เลือกไว้หายจากเซิร์ฟเวอร์ต้องเห็นบนจอ (บทเรียน 30 ต.ค. 2569) */
+function ocrStatus(s: DocumentSettingsView): { text: string; tone: string } {
+  if (!s.ocrModel) return { text: 'อ่านในมือถือผู้สมัคร', tone: 'text-muted-foreground' };
+  if (s.ocrError) return { text: `${s.ocrError} ตอนนี้อ่านในมือถือแทน`, tone: TONE.warn.value };
+  if (!(s.ocrModels ?? []).includes(s.ocrModel)) return { text: `ไม่พบ ${s.ocrModel} บนเซิร์ฟเวอร์ AI แล้ว ตอนนี้อ่านในมือถือแทน`, tone: TONE.danger.value };
+  return { text: 'พร้อมใช้ · ภาพละราว 40 วินาที', tone: TONE.success.value };
+}
 
 export default DocumentsSettingsTab;

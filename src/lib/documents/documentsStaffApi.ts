@@ -64,12 +64,16 @@ export type DocumentSettingsView = {
   mock?: boolean;
   lineChannelId?: string;
   liffId?: string;
+  /** โมเดลอ่านบัตรบนเซิร์ฟเวอร์ Ollama ของบริษัท ('' = อ่านในมือถือ) · รายชื่อจากเซิร์ฟเวอร์จริง ไม่รวม :cloud */
+  ocrModel?: string;
+  ocrModels?: string[];
+  ocrError?: string | null;
   irecruitConnected?: boolean;
   outbox?: { pending: number; failed: number };
   templates?: { docType: DocId; title: string; version: number | null; pages: number; updatedAt: string | null; updatedByName: string | null }[];
 };
 export const fetchDocumentSettings = () => get<DocumentSettingsView>('/api/document-settings');
-export const saveDocumentSettings = (patch: { enabled?: boolean; lineChannelId?: string; liffId?: string }) =>
+export const saveDocumentSettings = (patch: { enabled?: boolean; lineChannelId?: string; liffId?: string; ocrModel?: string }) =>
   send<{ ok: true }>('/api/document-settings', 'PUT', patch);
 export const uploadDocumentTemplate = (docType: DocId, pages: string[]) =>
   send<{ id: string; version: number; pageCount: number }>('/api/document-settings', 'POST', { action: 'template', docType, pages });

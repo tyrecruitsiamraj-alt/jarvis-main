@@ -161,3 +161,16 @@ describe('บัตรจำลองแบบบัตรจริง (OCR ใ�
     expect(r.fields).toMatchObject({ licenseNumber: '65001234', licenseIssued: '2022-03-01', licenseExpiry: '2029-03-01', nationalId: '1103700456783' });
   });
 });
+
+describe('ข้อความจากโมเดลบนเซิร์ฟเวอร์ (typhoon-ocr · 23 พ.ย. 2569)', () => {
+  it('บัตรประชาชน: วันที่พิมพ์อยู่เหนือป้าย วันออกบัตร / วันบัตรหมดอายุ', () => {
+    const d = readOcrFields('เลขประจำตัวประชาชน 0 0000 12345 67 9\n10 ม.ค. 2563\nวันออกบัตร\n14 ม.ค. 2573\nวันบัตรหมดอายุ\n', 'id', 90);
+    expect(d.fields.idIssued).toBe('2020-01-10');
+    expect(d.fields.idExpiry).toBe('2030-01-14');
+  });
+  it('ใบขับขี่: เลข "ฉบับที่" · ประเภทตัดที่ป้ายถัดไปเมื่อหลายช่องมาในบรรทัดเดียว', () => {
+    const d = readOcrFields('ใบอนุญาตขับรถยนต์ส่วนบุคคล\nฉบับที่ 65001234\nประเภท รถยนต์ส่วนบุคคล เกิดวันที่ 15 ม.ค. 2538 Date of Birth 15 Jan. 1995\nวันที่อนุญาต 1 มี.ค. 2565\n', 'license', 90);
+    expect(d.fields.licenseNumber).toBe('65001234');
+    expect(d.fields.licenseType).toBe('รถยนต์ส่วนบุคคล');
+  });
+});

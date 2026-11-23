@@ -11,6 +11,15 @@ import type { UploadKind } from './documentTypes';
 export const OCR_ENGINE = 'Tesseract.js 6.0.1';
 export const OCR_TEXT_MAX = 30_000;
 
+/**
+ * ตัวอ่านที่ยอมรับ (23 พ.ย. 2569): Tesseract ในมือถือผู้สมัคร · หรือโมเดลบนเซิร์ฟเวอร์ Ollama ของบริษัท (`Ollama · <ชื่อโมเดล>`)
+ * เป็นแค่ป้ายบอกที่มาของข้อความที่อ่านได้ — ผู้สมัครตรวจแก้ทุกช่องเองก่อนส่งเหมือนเดิม
+ */
+export type OcrEngine = typeof OCR_ENGINE | `Ollama · ${string}`;
+export const serverOcrEngine = (model: string): OcrEngine => `Ollama · ${model}`;
+export const isOcrEngine = (v: unknown): v is OcrEngine =>
+  v === OCR_ENGINE || (typeof v === 'string' && /^Ollama · [\w.:/@-]{1,80}$/.test(v));
+
 export type OcrFields = {
   prefix?: string;
   firstName?: string;
@@ -28,7 +37,7 @@ export type OcrFields = {
 };
 
 export type OcrResult = {
-  engine: typeof OCR_ENGINE;
+  engine: OcrEngine;
   confidence: number;
   text: string;
   fields: OcrFields;
@@ -95,8 +104,17 @@ function labeled(lines: string[], labels: RegExp): string | undefined {
     const m = lines[i].match(labels);
     if (m) {
       // วันที่อยู่บรรทัดเดียวกับป้าย หรือบรรทัดถัดไป (เฉพาะบรรทัดถัดไปที่ไม่มีป้ายวันที่ของตัวเอง)
+      const rest = lines[i].slice((m.index || 0) + m[0].length);
+      const sameLine = date(rest);
+      if (sameLine) return sameLine;
+      // บัตรประชาชนจริงพิมพ์วันที่ไว้ "เหนือ" ป้าย (วันออกบัตร / วันบัตรหมดอายุ) — ป้ายอยู่ลำพัง + บรรทัดก่อนหน้าเป็นวันที่ล้วน = ใช้บรรทัดก่อนหน้า
+      const prev = lines[i - 1] || '';
+      if (rest.trim() === '' && prev.length <= 24 && !DATE_LABEL.test(prev)) {
+        const above = date(prev);
+        if (above) return above;
+      }
       const next = lines[i + 1] || '';
-      const found = date(lines[i].slice((m.index || 0) + m[0].length)) || (DATE_LABEL.test(next) ? undefined : date(next));
+      const found = DATE_LABEL.test(next) ? undefined : date(next);
       if (found) return found;
     }
   }
@@ -115,7 +133,7 @@ const LINE_FIXES: [RegExp, string][] = [
   [/^วันสินอายุ/, 'วันสิ้นอายุ'],
 ];
 
-export function readOcrFields(raw: string, kind: UploadKind, confidence: number): OcrResult {
+export function readOcrFields(raw: string, kind: UploadKind, confidence: number, engine: OcrEngine = OCR_ENGINE): OcrResult {
   const text = normalText(raw).slice(0, OCR_TEXT_MAX);
   const forMatching = thaiForMatching(text);
   const lines = forMatching
@@ -199,10 +217,12 @@ export function readOcrFields(raw: string, kind: UploadKind, confidence: number)
     if (road) address.road = road[1];
     if (!address.subdistrictId) warnings.push('ที่อยู่บางส่วนอ่านไม่ได้หรือจับคู่ไม่ชัด เลือกจังหวัด อำเภอ และตำบลเอง');
   } else if (kind === 'license') {
-    const number = lines.map((l) => l.match(/(?:เลขที่ใบ(?:อนุญาต|ขับขี่)|เลขที่|License\s*(?:No\.?|Number))\s*[:：]?\s*([A-Z0-9-]{5,20})/i)).find(Boolean);
+    // ใบขับขี่รุ่นใหม่พิมพ์ "ฉบับที่ / No."
+    const number = lines.map((l) => l.match(/(?:เลขที่ใบ(?:อนุญาต|ขับขี่)|เลขที่|ฉบับที่|License\s*(?:No\.?|Number)|\bNo\.)\s*[:：]?\s*([A-Z0-9-]{5,20})/i)).find(Boolean);
     if (number) fields.licenseNumber = number[1];
     const type = lines.map((l) => l.match(/(?:ประเภท|Type)\s*[:：]?\s*(.{2,80})/i)).find(Boolean);
-    if (type) fields.licenseType = type[1].trim();
+    // ตัดที่ป้ายถัดไป — ตัวอ่านบางตัวคืนหลายช่องมาในบรรทัดเดียว ("ประเภท รถยนต์ส่วนบุคคล เกิดวันที่ …")
+    if (type) fields.licenseType = type[1].split(/\s+(?=เกิดวันที่|วันเกิด|Date\b|วันที่|วันสิ้นอายุ|วันหมดอายุ|เลขประจำตัว|ชื่อ|Name\b|ฉบับที่|No\.)/i)[0].trim().slice(0, 60);
     // OCR อ่าน "ญ" เป็น "ณ" บ่อย ("วันที่อนุณาต")
     fields.licenseIssued = labeled(lines, /(?:วันที่อนุ[ญณ]าต|วันอนุ[ญณ]าต|วันที่ออกบัตร|วันออกบัตร|Date\s*of\s*Issue)\s*[:：]?/i);
     fields.licenseExpiry = labeled(lines, /(?:วันสิ้นอายุ|วันหมดอายุ|วันที่หมดอายุ|Date\s*of\s*Expiry)\s*[:：]?/i);
@@ -212,7 +232,7 @@ export function readOcrFields(raw: string, kind: UploadKind, confidence: number)
     warnings.push('ทะเบียนบ้านใช้เป็นภาพประกอบ ไม่เขียนทับข้อมูลบุคคลที่อ่านจากบัตรประชาชน');
   }
   return {
-    engine: OCR_ENGINE,
+    engine,
     confidence: Number.isFinite(confidence) ? confidence : 0,
     text,
     fields,

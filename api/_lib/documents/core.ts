@@ -107,8 +107,9 @@ export const bangkokToday = (at: Date = new Date()): string => BKK_DAY.format(at
 export const iso = (v: unknown): string | null => (v ? new Date(v as string | Date).toISOString() : null);
 
 // ─── ค่าที่ตั้งจากหน้าจอ ──────────────────────────────────────────────────────
-export type DocumentSettings = { enabled: boolean; lineChannelId: string; liffId: string };
-const DEFAULT_SETTINGS: DocumentSettings = { enabled: false, lineChannelId: '', liffId: '' };
+/** ocrModel = โมเดลอ่านบัตรบนเซิร์ฟเวอร์ Ollama ของบริษัท · '' = อ่านในมือถือผู้สมัคร (Tesseract) อย่างเดียว (23 พ.ย. 2569) */
+export type DocumentSettings = { enabled: boolean; lineChannelId: string; liffId: string; ocrModel: string };
+const DEFAULT_SETTINGS: DocumentSettings = { enabled: false, lineChannelId: '', liffId: '', ocrModel: '' };
 export const LINE_CHANNEL_RE = /^\d{6,20}$/;
 export const LIFF_ID_RE = /^\d{6,20}-[A-Za-z0-9_-]{4,40}$/;
 export const LINK_TTL_HOURS = 24;
@@ -132,6 +133,7 @@ export async function getDocumentSettings(): Promise<DocumentSettings> {
         enabled: v.enabled === true,
         lineChannelId: typeof v.lineChannelId === 'string' ? v.lineChannelId : '',
         liffId: typeof v.liffId === 'string' ? v.liffId : '',
+        ocrModel: typeof v.ocrModel === 'string' ? v.ocrModel : '',
       };
     }
   } catch (e) {

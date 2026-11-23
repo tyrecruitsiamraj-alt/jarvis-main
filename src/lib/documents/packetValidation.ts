@@ -24,7 +24,7 @@ import {
   type SenderRelation,
   type UploadKind,
 } from './documentTypes';
-import { OCR_ENGINE, OCR_TEXT_MAX, type OcrFields, type OcrResult } from './ocrFields';
+import { OCR_TEXT_MAX, isOcrEngine, type OcrFields, type OcrResult } from './ocrFields';
 import { formatAddress, validateAddress, type ThaiAddress } from './thaiAddress';
 import { validateUploadList } from './uploadValidation';
 
@@ -89,7 +89,7 @@ const ADDRESS_KEYS: (keyof ThaiAddress)[] = ['house', 'moo', 'soi', 'road', 'pro
 function cleanOcrResult(raw: unknown): OcrResult | null {
   if (!raw || typeof raw !== 'object') return null;
   const r = raw as Record<string, unknown>;
-  if (r.engine !== OCR_ENGINE || typeof r.text !== 'string') return null;
+  if (!isOcrEngine(r.engine) || typeof r.text !== 'string') return null;
   const fields: OcrFields = {};
   const rf = (r.fields && typeof r.fields === 'object' ? r.fields : {}) as Record<string, unknown>;
   for (const k of OCR_FIELD_KEYS) if (typeof rf[k] === 'string' && (rf[k] as string).length <= 150) fields[k] = rf[k] as string;
@@ -97,7 +97,7 @@ function cleanOcrResult(raw: unknown): OcrResult | null {
   const address = {} as ThaiAddress;
   for (const k of ADDRESS_KEYS) address[k] = typeof ra[k] === 'string' ? (ra[k] as string).slice(0, 80) : '';
   return {
-    engine: OCR_ENGINE,
+    engine: r.engine,
     confidence: typeof r.confidence === 'number' && Number.isFinite(r.confidence) ? Math.max(0, Math.min(100, r.confidence)) : 0,
     text: r.text.slice(0, OCR_TEXT_MAX),
     fields,

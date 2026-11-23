@@ -7,6 +7,8 @@
  * GET  ?action=state&k=                       → สถานะปัจจุบัน (ฉบับร่างที่แนบไว้ · ส่งแล้วหรือยัง)
  * POST { action:'upload', k, kind, dataBase64 } → แนบภาพ (ฉบับร่าง) kind = id | license | house
  * GET  ?action=file&k=&id=                    → ภาพของลิงก์ตัวเอง
+ * POST { action:'ocr', k, id }                → อ่านบัตร/ใบขับขี่ที่แนบไว้ด้วยโมเดลบนเซิร์ฟเวอร์ Ollama ของบริษัท (23 พ.ย. 2569)
+ *                                               ยังไม่ตั้งโมเดล/อ่านไม่ได้ = 503 ocr_unavailable → หน้าผู้สมัครใช้ตัวอ่านในมือถือแทน
  * GET  ?action=template&k=&doc=&page=         → ต้นฉบับเอกสารของบริษัท (อ่านก่อนตอบ)
  * POST { action:'submit', k, …ชุดเอกสาร }      → ส่งชุด (ธุรกรรมเดียว · กดซ้ำได้ชุดเดิม)
  * GET  ?action=receipt&k=                     → ใบรับของชุดที่ส่งแล้ว
@@ -33,6 +35,7 @@ import {
 } from '../../_lib/documents/applicant.js';
 import { getActiveTemplatePage } from '../../_lib/documents/templates.js';
 import { packetPdf } from '../../_lib/documents/pdf.js';
+import { ServerOcrUnavailable, serverOcr, warmOcrModel } from '../../_lib/documents/serverOcr.js';
 import { isDocId } from '../../../src/lib/documents/documentTypes.js';
 import { UPLOAD_MAX_BYTES } from '../../../src/lib/documents/uploadValidation.js';
 
@@ -75,11 +78,15 @@ export default async function handler(req: ApiReq, res: ApiRes) {
       if (action === 'config') {
         if (!rateLimitOrReject(req, res, 'public-docs-config', 240, TEN_MIN)) return;
         const s = await getDocumentSettings();
-        return res.status(200).json({ enabled: s.enabled, liffId: s.liffId, mock: isLineMockAllowed() });
+        return res.status(200).json({ enabled: s.enabled, liffId: s.liffId, mock: isLineMockAllowed(), serverOcr: s.ocrModel !== '' });
       }
       if (!rateLimitOrReject(req, res, 'public-docs-get', 900, TEN_MIN)) return;
       const ctx = await loadApplicantContext(req, str(req.query?.k));
-      if (action === 'state') return res.status(200).json(await applicantStateOf(ctx));
+      if (action === 'state') {
+        const st = await applicantStateOf(ctx);
+        if (!st.submitted) void getDocumentSettings().then((s) => warmOcrModel(s.ocrModel)).catch(() => undefined);
+        return res.status(200).json(st);
+      }
       if (action === 'file') {
         const f = await applicantFile(ctx, str(req.query?.id));
         return sendBytes(res, f.bytes, f.mime, `${f.kind.replace(':', '-')}.${EXT[f.mime] ?? 'bin'}`);
@@ -117,6 +124,8 @@ export default async function handler(req: ApiReq, res: ApiRes) {
       if (!rateLimitOrReject(req, res, 'public-docs-session', 40, TEN_MIN)) return;
       const opened = await openInvitation(body.invitation, body.idToken);
       res.setHeader?.('Set-Cookie', opened.cookie);
+      // เปิดโมเดลอ่านบัตรรอไว้ (ไม่รอผล) — ถึงตอนถ่ายบัตรไม่ต้องรอเปิดโมเดล
+      if (!opened.state.submitted) void getDocumentSettings().then((s) => warmOcrModel(s.ocrModel)).catch(() => undefined);
       return res.status(200).json(opened.state);
     }
 
@@ -131,6 +140,20 @@ export default async function handler(req: ApiReq, res: ApiRes) {
       if (!/^[A-Za-z0-9+/=]+$/.test(b64)) return sendError(res, 400, 'invalid_image', 'ไฟล์เสีย ถ่ายใหม่แล้วแนบอีกครั้ง');
       const saved = await saveDraftUpload(ctx, body.kind, Buffer.from(b64, 'base64'));
       return res.status(201).json(saved);
+    }
+    if (body.action === 'ocr') {
+      if (!rateLimitOrReject(req, res, 'public-docs-ocr', 30, TEN_MIN)) return;
+      const ctx = await loadApplicantContext(req, k);
+      const { ocrModel } = await getDocumentSettings();
+      if (!ocrModel) return sendError(res, 503, 'ocr_unavailable', 'ยังไม่ได้ตั้งโมเดลอ่านบัตร');
+      const f = await applicantFile(ctx, body.id);
+      if (f.kind !== 'id' && f.kind !== 'license') return sendError(res, 400, 'bad_request', 'อ่านได้เฉพาะบัตรประชาชนกับใบขับขี่');
+      try {
+        return res.status(200).json(await serverOcr(ocrModel, f.bytes, f.kind));
+      } catch (e) {
+        if (e instanceof ServerOcrUnavailable) return sendError(res, 503, 'ocr_unavailable', e.message);
+        throw e;
+      }
     }
     if (body.action === 'submit') {
       if (!rateLimitOrReject(req, res, 'public-docs-submit', 30, TEN_MIN)) return;

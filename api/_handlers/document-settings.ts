@@ -3,7 +3,8 @@
  *
  * GET                                              → ทุกคน: เปิดใช้ไหม · พร้อมไหม · มีงานเอกสารในสิทธิ์ไหม / admin: + LINE · ต้นฉบับ 5 ประเภท · คิวแจ้งเตือนที่ค้าง
  * GET  ?template=<เอกสาร>&page=                    → admin: ดูต้นฉบับรุ่นที่ใช้อยู่
- * PUT  { enabled?, lineChannelId?, liffId? }       → admin: เปิด/ปิด · ตั้ง LINE Login Channel ID กับ LIFF ID (ไม่ใช่ความลับ ไม่มี token)
+ * PUT  { enabled?, lineChannelId?, liffId?, ocrModel? } → admin: เปิด/ปิด · ตั้ง LINE Login Channel ID กับ LIFF ID (ไม่ใช่ความลับ ไม่มี token)
+ *                                                  · ocrModel = โมเดลอ่านบัตรบน Ollama ของบริษัท ('' = อ่านในมือถือ) ต้องอยู่ในรายชื่อจริง ห้าม :cloud
  * POST { action:'template', docType, pages:[base64…] } → admin: อัปโหลดต้นฉบับรุ่นใหม่ของเอกสาร 1 ประเภท (ทุกหน้าเรียงตามลำดับ · PNG/JPG)
  *
  * เปิดใช้ได้เมื่อครบ: LINE · ต้นฉบับ 5 ประเภท · ฐานข้อมูลอัปเดตแล้ว · ปิด = หยุดสร้างลิงก์ใหม่/ผู้สมัครเปิดลิงก์ไม่ได้ ของที่ส่งแล้วยังดูได้
@@ -26,6 +27,7 @@ import { TEMPLATE_MAX_PAGES, checkTemplatePage, getActiveTemplatePage, saveTempl
 import { hasDocumentHistory, irecruitExportConfigured } from '../_lib/documents/staff.js';
 import { outboxBacklog } from '../_lib/documents/outbox.js';
 import { DOC_TYPES, isDocId } from '../../src/lib/documents/documentTypes.js';
+import { isCloudModel, listOcrModels } from '../_lib/documents/serverOcr.js';
 
 const one = (v: unknown) => (Array.isArray(v) ? v[0] : v);
 
@@ -48,13 +50,17 @@ async function handler(req: AuthedReq, res: ApiRes) {
       const readiness = await documentReadiness();
       const base = { enabled: readiness.enabled, ready: readiness.ready, hasHistory: await hasDocumentHistory(req.user).catch(() => false) };
       if (!isAdmin) return res.status(200).json(base);
-      const [settings, templates, backlog] = await Promise.all([getDocumentSettings(), listActiveTemplates().catch(() => []), outboxBacklog()]);
+      const [settings, templates, backlog, ocrModels] = await Promise.all([getDocumentSettings(), listActiveTemplates().catch(() => []), outboxBacklog(), listOcrModels()]);
       return res.status(200).json({
         ...base,
         problems: readiness.problems,
         mock: readiness.mock,
         lineChannelId: settings.lineChannelId,
         liffId: settings.liffId,
+        // โมเดลอ่านบัตร: รายชื่อจากเซิร์ฟเวอร์จริงทุกครั้ง · โมเดลที่เลือกไว้แต่หายจากเซิร์ฟเวอร์ = ขึ้นสถานะให้เห็น
+        ocrModel: settings.ocrModel,
+        ocrModels: ocrModels.ok ? ocrModels.models : [],
+        ocrError: ocrModels.ok ? null : ocrModels.error,
         irecruitConnected: irecruitExportConfigured(),
         outbox: backlog,
         templates: DOC_TYPES.map((d) => {
@@ -78,6 +84,16 @@ async function handler(req: AuthedReq, res: ApiRes) {
         const v = body.liffId.trim();
         if (v && !LIFF_ID_RE.test(v)) return sendError(res, 400, 'bad_request', 'LIFF ID หน้าตาแบบ 1234567890-AbCdEfGh');
         patch.liffId = v;
+      }
+      if (typeof body.ocrModel === 'string') {
+        const v = body.ocrModel.trim();
+        if (v) {
+          if (isCloudModel(v)) return sendError(res, 400, 'bad_request', 'โมเดลนี้ส่งข้อมูลออกนอกบริษัท ใช้อ่านบัตรไม่ได้');
+          const list = await listOcrModels();
+          if (!list.ok) return sendError(res, 503, 'ocr_unavailable', list.error);
+          if (!list.models.includes(v)) return sendError(res, 400, 'bad_request', 'ไม่พบโมเดลนี้บนเซิร์ฟเวอร์ AI');
+        }
+        patch.ocrModel = v;
       }
       if (Object.keys(patch).length) await saveDocumentSettings(patch, actor);
       if (typeof body.enabled === 'boolean') {

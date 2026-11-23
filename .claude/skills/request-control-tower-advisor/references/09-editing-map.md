@@ -14652,3 +14652,11 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 ### 23 พ.ย. 2569 (16) — ผู้สมัครจาก Scrap ที่ซ่อนชื่อ = "ผู้สมัครซ่อนชื่อ"
 - So Scraping เพิ่ม `"so-candidate-data".candidates.name_hidden` · `loadRaw` อ่านแบบกันฐานที่ยังไม่มีคอลัมน์ (`to_jsonb(c)->>'name_hidden'`)
 - ชื่อบนจอ + ชื่อตอนเก็บเข้าการติดต่อมาจาก `scrapDisplayName` (`src/lib/scrapCandidates.ts`) ที่เดียว · ไม่มีชื่อแบบอื่นยัง "ไม่มีชื่อ" · เทสต์ `tests/api/scrapNameHidden2569-11-23.test.ts`
+
+### 23 พ.ย. 2569 (17) — อ่านบัตรด้วยโมเดลบนเซิร์ฟเวอร์ Ollama ของบริษัท
+- `api/_lib/documents/serverOcr.ts`: รายชื่อโมเดลจาก `/api/tags` (ตัด `:cloud` — ส่งข้อมูลออกนอกบริษัท) · `serverOcr` ส่งภาพไป `/api/chat` (ข้อความ → `readOcrFields` ตัวเดิม) · `warmOcrModel` เปิดโมเดลรอตอนผู้สมัครเปิดลิงก์ (keep_alive 30m) · ไม่ log ข้อความที่อ่านได้
+- ตั้งค่า › ส่งเอกสารผ่าน LINE › "อ่านบัตรประชาชน · ใบขับขี่" (`documents-ocr`) เลือกโมเดลจากเซิร์ฟเวอร์จริง ('' = อ่านในมือถือ) · โมเดลหายจากเซิร์ฟเวอร์ขึ้นสถานะแดง · เก็บใน `document_settings.value.ocrModel`
+- หน้าผู้สมัคร `read()`: `config.serverOcr` = ขอ `action:'ocr'` ก่อน · ล้ม/ช้าเกิน 100 วิ = Tesseract ในมือถือแบบเดิม · ผลมีป้าย `engine = Ollama · <โมเดล>` (`isOcrEngine` ใน packetValidation)
+- ตัวแยกช่อง: วันที่พิมพ์เหนือป้าย (บัตรจริง) · ใบขับขี่ "ฉบับที่" · ประเภทตัดที่ป้ายถัดไป
+- เทสต์ `tests/api/serverOcr2569-11-23.test.ts` · `tests/integration/documents/serverOcr.test.ts` · `src/lib/documents/ocrFields.test.ts`
+- ⚠️ เซิร์ฟเวอร์ AI เปิดโมเดลได้ทีละตัว ระบบอื่นสลับโมเดลบ่อย = เปิดใหม่ 35–70 วิ (วัด 23 พ.ย.: เปิดค้างอยู่ บัตรละ 1.5–6 วิ)

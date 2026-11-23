@@ -24,6 +24,7 @@ import {
   fetchApplicantReceipt,
   fetchApplicantState,
   openApplicantSession,
+  readApplicantImageOnServer,
   submitApplicantPacket,
   uploadApplicantImage,
 } from '@/lib/documents/applicantDocumentsApi';
@@ -74,6 +75,8 @@ export default function ApplicantDocumentsPage() {
   const [receipt, setReceipt] = useState<Receipt | null>(null);
   const [answers, setAnswers] = useState<Record<string, string> | null>(null);
   const blobs = useRef<Partial<Record<UploadKind, Blob>>>({});
+  /** อ่านบัตรด้วยโมเดลบนเซิร์ฟเวอร์ของบริษัทก่อน (ตั้งไว้ที่หน้าตั้งค่า · 23 พ.ย. 2569) — ล้มเมื่อไหร่ใช้ตัวอ่านในมือถือ */
+  const serverOcr = useRef(false);
   const today = useMemo(() => toYmdBangkok(new Date()), []);
   const setForm = useCallback((update: (f: ApplicantForm) => ApplicantForm) => setFormRaw(update), []);
 
@@ -117,6 +120,7 @@ export default function ApplicantDocumentsPage() {
         const config = await fetchApplicantConfig();
         if (!alive) return;
         if (!config.enabled) return stop('ระบบส่งเอกสารปิดอยู่ ติดต่อเจ้าหน้าที่ที่ส่งลิงก์นี้', false);
+        serverOcr.current = config.serverOcr === true;
         // โหลดหน้าใหม่ระหว่างกรอก: ใช้รอบเดิมต่อ (คุกกี้) ไม่ต้องขอ LINE ซ้ำ · มีลิงก์ใหม่บนแถบที่อยู่ = เปิดลิงก์นั้น
         const k = inviteFromUrl() ? null : readOpenedKey();
         let opened = k ? await fetchApplicantState(k).catch(() => null) : null;
@@ -182,6 +186,16 @@ export default function ApplicantDocumentsPage() {
   );
 
   const read = async (kind: UploadKind, fileId: string, blob: Blob) => {
+    if (serverOcr.current && state) {
+      setWork({ kind, text: 'กำลังอ่านข้อมูลจากภาพ อาจใช้เวลาราว 1 นาที…' });
+      try {
+        const result = await readApplicantImageOnServer(state.inviteKey, fileId);
+        setForm((f) => setSlotOcr(f, kind, fileId, result));
+        return;
+      } catch {
+        // เซิร์ฟเวอร์อ่านไม่ได้/ช้าเกิน → อ่านในมือถือต่อ ผู้สมัครไม่ต้องทำอะไรเพิ่ม
+      }
+    }
     try {
       const ocr = await loadOcr();
       const result = await ocr.recognizeDocument(blob, kind, (text) => setWork({ kind, text }));
