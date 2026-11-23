@@ -27,6 +27,7 @@ import { startIrecruitImportWorker } from '../api/_lib/irecruitApplicantImport.t
 import { startSoScrapingNoticeWorker } from '../api/_lib/soScrapingNotices.ts';
 import { startIrecruitLateReminderWorker } from '../api/_lib/irecruitLateReminder.ts';
 import { startRequestDailySnapshotWorker } from '../api/_lib/requestDailySnapshot.ts';
+import { startDocumentOutboxWorker } from '../api/_lib/documents/outbox.ts';
 import { loadOpenStuckRequestsAll, loadOpenWorkStatusesAll } from '../api/_handlers/recruit-stuck.ts';
 import { startUnitRequestKeepWarm } from '../api/_lib/unitRequestCache.ts';
 import { preferIpv4 } from '../api/_lib/netPreferIpv4.ts';
@@ -258,6 +259,11 @@ server.listen(port, '127.0.0.1', () => {
    * ปิดด้วย IRECRUIT_LATE_REMINDER_ENABLED=false
    */
   startIrecruitLateReminderWorker();
+  /**
+   * คิวแจ้งเตือน "ผู้สมัครส่งเอกสารแล้ว" (22 พ.ย. 2569) — ส่งปกติเกิดทันทีหลังชุดบันทึก ตัวนี้เก็บเฉพาะที่ค้าง
+   * คิวว่าง = ไม่ถามฐาน · ปิดด้วย DOCUMENT_OUTBOX_WORKER_ENABLED=false
+   */
+  startDocumentOutboxWorker();
   /**
    * อุ่นสำเนาใบขอไว้ก่อนหมดอายุ ระหว่างที่มีคนใช้งาน (เจ้าของ 8 ต.ค. 2569 "หน้าอื่นที่ช้าไล่แก้ให้เร็วด้วย")
    * ไม่มีคนใช้เกินครึ่งชั่วโมง = หยุดถามระบบงานหลัก · ปิดด้วย UNIT_REQUEST_KEEP_WARM_ENABLED=false

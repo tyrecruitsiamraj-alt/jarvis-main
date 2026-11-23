@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/dialog';
 import DateSelectDmyBe from '@/components/shared/DateSelectDmyBe';
 import ApplicantInfoPanel from '@/components/recruit-rm/ApplicantInfoPanel';
+import SendDocumentsSection from '@/components/documents/SendDocumentsSection';
 import ApplicantPhoneFix from '@/components/recruit-rm/ApplicantPhoneFix';
 import {
   AppointmentsTable,
@@ -779,6 +780,8 @@ export default function ApplicantContactDialog({
             recruiterName={recruiterName}
             jobRecruiterName={jobRecruiterName === undefined ? recruiterName : jobRecruiterName}
           />
+          {/* ส่งเอกสารผ่าน LINE (เจ้าของ 22 พ.ย. 2569) — สร้างลิงก์เมื่อกดเท่านั้น · ระบบปิดและไม่เคยส่ง = ไม่แสดง */}
+          <SendDocumentsSection applicationId={a.id} />
           {/* ยกเลิกข้อมูลผู้สมัคร (รูป iRecruit · Choice "ซ่อนจากรายชื่อหลัก กู้คืนได้" 4 ต.ค. 2569) */}
           {mode === 'profile' && !a.cancelled_at ? (
             <div className={cn('space-y-3 rounded-xl border p-3', TONE.danger.soft)} data-testid="cancel-applicant">

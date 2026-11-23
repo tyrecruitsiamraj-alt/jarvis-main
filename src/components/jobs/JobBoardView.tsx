@@ -233,6 +233,8 @@ export type JobBoardViewProps = {
   onClosedDaysChange?: (days: number) => void;
   /** กล่องที่ให้เลือกไว้ตั้งแต่เปิดหน้า — รองรับลิงก์เก่า `?view=closed` / `?view=cancelled` */
   initialBox?: JobBoxKey | null;
+  /** ขึ้นแท็บ "เอกสาร" ท้ายแถบ (ระบบส่งเอกสารเปิดอยู่ หรือมีเอกสารเดิมในสิทธิ์) */
+  showDocumentsTab?: boolean;
   /**
    * ส่งยอด "ประกาศ" ของกล่องงานทั้งก้อนให้หน้าแม่ (แท็บภาพรวมใช้เลขเดียวกับหัว · 1 ต.ค. 2569)
    * `null` = ตัวเลขยังบอกไม่ได้ (ทะเบียนยังโหลดไม่ครบ/พัง) — ห้ามแปลงเป็น 0
@@ -246,7 +248,7 @@ export type JobBoardViewProps = {
  * **กล่องบนหน้ากล่องงาน** ที่กดแล้วกรองในหน้าเดิม เหมือนกล่องอื่นทุกกล่อง
  * ลิงก์เก่า `?view=closed` / `?view=cancelled` ถูกแปลงเป็นกล่องที่ `StaffJobBoardPage`
  */
-export type BoardViewId = 'board' | 'match' | 'list' | 'scrap' | 'contact' | 'appointments' | 'dashboard' | 'precheck';
+export type BoardViewId = 'board' | 'match' | 'list' | 'scrap' | 'contact' | 'appointments' | 'dashboard' | 'precheck' | 'documents';
 
 /**
  * แท็บแรก "โพสต์ประกาศ ▾" เลือกได้สองงาน (เจ้าของ 11 พ.ย. 2569 "จับคู่งานย้ายไปไว้กับ โพสต์ประกาศ แบบกดแล้วมีลูกศรให้เลือก"
@@ -295,6 +297,12 @@ export const BOARD_VIEW_TABS: ReadonlyArray<{ id: BoardViewId; label: string }> 
   // กรองในหน้าเดิม · ลิงก์เก่า ?view=closed/cancelled แปลงเป็นกล่องให้แล้ว
 ];
 
+/**
+ * แท็บ "เอกสาร" (ส่งเอกสารผ่าน LINE · 22 พ.ย. 2569) — ต่อท้ายแถบ ขึ้นเฉพาะตอนระบบส่งเอกสารเปิดอยู่หรือมีเอกสารเดิมในสิทธิ์
+ * (ระบบปิด = แถบแท็บเหมือนเดิมทุกอย่าง) · ลิงก์จากกระดิ่ง `?view=documents` เปิดได้เสมอ · เนื้ออยู่ที่ StaffJobBoardPage (lazy)
+ */
+export const DOCUMENTS_VIEW_TAB: { id: BoardViewId; label: string } = { id: 'documents', label: 'เอกสาร' };
+
 const JobBoardView: React.FC<JobBoardViewProps> = ({
   jobs,
   loading,
@@ -318,6 +326,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
   onClosedDaysChange,
   initialBox = null,
   onPublishedTotals,
+  showDocumentsTab = false,
 }) => {
   const [searchParams, setSearchParams] = useSearchParams();
   /**
@@ -1397,7 +1406,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
    * ⇒ ถอดการ์ดกรมท่าทึบ (PageHeroStrip) · ถอดพื้นไล่สี + กรอบกว้าง max-w-6xl ของฝั่งเจ้าหน้าที่
    * (หน้าสมัครสาธารณะยังเป็นหัวแบบหน้าปกนิตยสารเหมือนเดิม — คนละกลุ่มคนดู)
    */
-  const staffTitle = [...POSTING_PICKS, ...APPLICANT_PICKS, ...BOARD_VIEW_TABS].find((t) => t.id === view)?.label ?? 'งานสรรหา';
+  const staffTitle = [...POSTING_PICKS, ...APPLICANT_PICKS, ...BOARD_VIEW_TABS].find((t) => t.id === view)?.label ?? (view === DOCUMENTS_VIEW_TAB.id ? DOCUMENTS_VIEW_TAB.label : 'งานสรรหา');
   /** แถบแท็บล้นบนมือถือ — เลื่อนให้เห็นแท็บที่เปิดอยู่ (QA รอบ 2 ข้อ 32) */
   const staffTabsRef = React.useRef<HTMLDivElement | null>(null);
   useEffect(() => {
@@ -1486,6 +1495,17 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
             </button>
           );
         })}
+        {showDocumentsTab || view === DOCUMENTS_VIEW_TAB.id ? (
+          <button
+            type="button"
+            onClick={() => onViewChange(DOCUMENTS_VIEW_TAB.id)}
+            aria-current={view === DOCUMENTS_VIEW_TAB.id ? 'page' : undefined}
+            className={glassTabClass(view === DOCUMENTS_VIEW_TAB.id)}
+            data-testid="board-tab-documents"
+          >
+            {DOCUMENTS_VIEW_TAB.label}
+          </button>
+        ) : null}
       </div>
     ) : null;
 

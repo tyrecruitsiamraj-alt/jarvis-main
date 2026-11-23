@@ -173,7 +173,7 @@ describe('กระดิ่งแยกแจ้งเตือน So Scraping 
     expect(lib).toContain("type = any($3::text[]) and created_at > now() - interval '14 days'");
     expect(lib).toContain('[...PINNED_NOTIFICATION_TYPES]');
     const panel = read('src/components/notifications/NotificationPanel.tsx');
-    expect(panel).toContain("const shown = notificationsOfTab(notifications, tab);");
+    expect(panel).toContain("const loaded = notificationsOfTab(notifications, tab);");
     expect(panel).toContain("'ยังไม่มีแจ้งเตือนจาก So Scraping'");
     expect(read('src/contexts/NotificationContext.tsx')).toContain('return capKeepingPinned(merged, MAX_NOTIFICATIONS);');
   });

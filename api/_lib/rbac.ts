@@ -80,7 +80,9 @@ export type ApiResource =
   | 'recruit-reasons'
   | 'recruit-job-titles'
   | 'recruit-postings'
-  | 'skill-quiz';
+  | 'skill-quiz'
+  /** ตั้งค่าส่งเอกสารผ่าน LINE (22 พ.ย. 2569) — อ่านทุกคน (หน้าเว็บต้องรู้ว่าเปิดใช้ไหม) · แก้เฉพาะ admin */
+  | 'document-settings';
 
 /**
  * Minimum role per API resource and HTTP method.
@@ -237,6 +239,7 @@ export function minimumRoleFor(
       return 'staff';
 
     case 'call-followup-policy':
+    case 'document-settings':
       if (isRead) return 'staff';
       return 'admin';
 

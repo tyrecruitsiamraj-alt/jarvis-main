@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useCallback, useEffect } fr
 import { Notification } from '@/types/notification';
 import { MAX_NOTIFICATIONS } from '@/hooks/useJobFeedNotifications';
 import { apiFetch } from '@/lib/apiFetch';
-import { capKeepingPinned } from '@/lib/notificationTabs';
+import { capKeepingPinned, nextNotificationPoll } from '@/lib/notificationTabs';
 
 interface NotificationContextType {
   notifications: Notification[];
@@ -10,6 +10,8 @@ interface NotificationContextType {
   markAsRead: (id: string) => void;
   markAllAsRead: () => void;
   addNotification: (n: Omit<Notification, 'id' | 'timestamp' | 'read'>) => void;
+  /** ดึงกล่องขาเข้าจาก server สำเร็จแล้วอย่างน้อยรอบหนึ่ง — ตัวเด้ง toast รอให้จริงก่อน (ของเก่าไม่เด้ง) */
+  serverReady: boolean;
 }
 
 const NotificationContext = createContext<NotificationContextType | null>(null);
@@ -46,11 +48,12 @@ function fromServer(it: ServerNotification): Notification {
 }
 
 /** ดึงกล่องขาเข้าจาก server ทุก 1 นาที — เหตุการณ์ฝั่ง server (ผลโทร AI · ชุดรออนุมัติ)
- *  เกิดตอนไม่มีใครเปิดหน้าจอ ต้องมีคนไปเก็บมาเด้งเอง ไม่งั้นจบเงียบเหมือนเดิม */
-const POLL_MS = 60_000;
+ *  เกิดตอนไม่มีใครเปิดหน้าจอ ต้องมีคนไปเก็บมาเด้งเอง ไม่งั้นจบเงียบเหมือนเดิม
+ *  🔴 22 พ.ย. 2569: มีผู้สมัครเปิดลิงก์ส่งเอกสารของฉันค้างอยู่ = ถามทุก 10 วินาที (`fastUntil` · `nextNotificationPoll`) */
 
 export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [serverReady, setServerReady] = useState(false);
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
@@ -66,12 +69,19 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
   useEffect(() => {
     let stopped = false;
+    let timer: number | undefined;
+    let fastUntil: string | null = null;
     const pull = async () => {
       try {
         const r = await apiFetch('/api/notifications');
         if (!r.ok) return; // ยังไม่ล็อกอิน/ตารางยังไม่มี — เงียบไว้ รอบหน้าค่อยลอง
-        const data = (await r.json()) as { items?: ServerNotification[] };
-        if (!stopped && Array.isArray(data.items)) mergeServer(data.items);
+        const data = (await r.json()) as { items?: ServerNotification[]; fastUntil?: string | null };
+        if (stopped) return;
+        fastUntil = typeof data.fastUntil === 'string' ? data.fastUntil : null;
+        if (Array.isArray(data.items)) {
+          mergeServer(data.items);
+          setServerReady(true);
+        }
       } catch {
         /* เครือข่ายสะดุด — รอบหน้าค่อยลอง */
       }
@@ -80,18 +90,22 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
      * แท็บซ่อนอยู่ไม่ต้องดึง — กลับมาเห็นจอเมื่อไหร่ดึงทันที (เจ้าของ 2 พ.ย. 2569 "งั้นทำเลย" หลังมีคนทัก CPU สูง)
      * ตอนแท็บซ่อนไม่มีเสียง/ป๊อปบนเครื่องอยู่แล้ว ⇒ ไม่มีอะไรหาย · แพตเทิร์นเดียวกับ useUnitRequestsFeed
      */
-    void pull();
-    const timer = window.setInterval(() => {
-      if (document.visibilityState === 'hidden') return;
-      void pull();
-    }, POLL_MS);
+    const loop = () => {
+      timer = window.setTimeout(async () => {
+        if (document.visibilityState !== 'hidden') await pull();
+        if (!stopped) loop();
+      }, nextNotificationPoll(fastUntil, Date.now()));
+    };
+    void pull().then(() => {
+      if (!stopped) loop();
+    });
     const onVisible = () => {
       if (document.visibilityState === 'visible') void pull();
     };
     document.addEventListener('visibilitychange', onVisible);
     return () => {
       stopped = true;
-      window.clearInterval(timer);
+      window.clearTimeout(timer);
       document.removeEventListener('visibilitychange', onVisible);
     };
   }, [mergeServer]);
@@ -137,7 +151,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   }, []);
 
   return (
-    <NotificationContext.Provider value={{ notifications, unreadCount, markAsRead, markAllAsRead, addNotification }}>
+    <NotificationContext.Provider value={{ notifications, unreadCount, markAsRead, markAllAsRead, addNotification, serverReady }}>
       {children}
     </NotificationContext.Provider>
   );

@@ -1,15 +1,18 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
-import { Bell, Briefcase, CheckCircle2, CheckCheck, PhoneCall, Flag, ClipboardCheck, Megaphone } from 'lucide-react';
+import { Bell, Briefcase, CheckCircle2, CheckCheck, PhoneCall, Flag, ClipboardCheck, Megaphone, FileCheck2 } from 'lucide-react';
 import {
+  DOCUMENT_NOTIFICATION_TYPE,
+  NOTIFICATION_TABS,
   NOTIFICATION_TAB_LABEL,
   SO_NOTIFICATION_TYPE,
   notificationsOfTab,
   type NotificationTab,
 } from '@/lib/notificationTabs';
+import { apiFetch } from '@/lib/apiFetch';
 import { useNotifications } from '@/contexts/NotificationContext';
-import { NotificationType } from '@/types/notification';
+import { NotificationType, type Notification } from '@/types/notification';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
@@ -23,7 +26,10 @@ const typeConfig: Partial<Record<NotificationType, { icon: React.ElementType; co
   needs_human: { icon: Flag, color: 'text-destructive bg-destructive/10' },
   batch_pending: { icon: ClipboardCheck, color: 'text-amber-600 bg-amber-500/10 dark:text-amber-300' },
   [SO_NOTIFICATION_TYPE]: { icon: Megaphone, color: 'text-primary bg-primary/10' },
+  [DOCUMENT_NOTIFICATION_TYPE]: { icon: FileCheck2, color: 'text-primary bg-primary/10' },
 };
+
+type HistoryRow = { id: number; type: string; title: string; body: string | null; link: string | null; createdAt: string; readAt: string | null };
 
 const fallbackType = { icon: Bell, color: 'text-muted-foreground bg-secondary' };
 
@@ -33,8 +39,39 @@ const NotificationPanel: React.FC = () => {
   const [open, setOpen] = React.useState(false);
   /** แท็บ "สั่งโพสต์ · Scrap" แยกแจ้งเตือน So Scraping ไม่ให้จมใต้ "AI ยังไม่โทร" (เจ้าของ 20 ต.ค. 2569) */
   const [tab, setTab] = React.useState<NotificationTab>('all');
-  const shown = notificationsOfTab(notifications, tab);
+  /**
+   * แท็บ "เอกสาร" (22 พ.ย. 2569) — ขึ้นเมื่อมีแจ้งเตือนผู้สมัครส่งเอกสาร · แจ้งเตือนเก่ากว่าที่แผงโชว์ กด "ดูก่อนหน้านี้" ดึงทีละหน้า
+   * (ยังไม่อ่านอยู่ครบเสมอ — เซิร์ฟเวอร์ดึงแยกให้ ไม่ถูกแจ้งเตือนอื่นดันตก)
+   */
+  const tabs = NOTIFICATION_TABS.filter((t) => t !== 'docs' || tab === 'docs' || notifications.some((n) => n.type === DOCUMENT_NOTIFICATION_TYPE));
+  const [history, setHistory] = React.useState<{ items: Notification[]; nextBefore: number | null; loading: boolean; error: boolean }>({ items: [], nextBefore: null, loading: false, error: false });
+  const loaded = notificationsOfTab(notifications, tab);
+  const shown = tab === 'docs' ? [...loaded, ...history.items.filter((h) => !loaded.some((n) => n.id === h.id))] : loaded;
   const unreadOf = (t: NotificationTab) => notificationsOfTab(notifications, t).filter((n) => !n.read).length;
+  const oldestLoadedId = () => {
+    const ids = shown.map((n) => Number(n.id.replace(/^srv-/, ''))).filter((v) => Number.isInteger(v) && v > 0);
+    return ids.length ? Math.min(...ids) : null;
+  };
+  const loadOlder = async () => {
+    const before = history.nextBefore ?? oldestLoadedId();
+    setHistory((h) => ({ ...h, loading: true, error: false }));
+    try {
+      const r = await apiFetch(`/api/notifications?history=${DOCUMENT_NOTIFICATION_TYPE}&limit=20${before ? `&before=${before}` : ''}`);
+      if (!r.ok) throw new Error(String(r.status));
+      const data = (await r.json()) as { items: HistoryRow[]; nextBefore: number | null };
+      setHistory((h) => ({
+        items: [
+          ...h.items,
+          ...data.items.map((it) => ({ id: `srv-${it.id}`, type: it.type, title: it.title, message: it.body || '', timestamp: it.createdAt, read: Boolean(it.readAt), link: it.link || undefined })),
+        ],
+        nextBefore: data.nextBefore,
+        loading: false,
+        error: false,
+      }));
+    } catch {
+      setHistory((h) => ({ ...h, loading: false, error: true }));
+    }
+  };
 
   /**
    * 🔴 ปิดแผงก่อนพาไป (20 ต.ค. 2569) — เดิมแผงค้างเปิด แล้วตอนป๊อปปลายทาง (เช่น ป๊อปประกาศจาก `?posting=`) เปิด
@@ -85,7 +122,7 @@ const NotificationPanel: React.FC = () => {
           )}
         </div>
         <div className="flex gap-2 border-b border-border px-4 py-2" role="tablist" aria-label="ชนิดการแจ้งเตือน">
-          {(['all', 'so'] as const).map((t) => {
+          {tabs.map((t) => {
             const unread = unreadOf(t);
             return (
               <Button
@@ -107,7 +144,7 @@ const NotificationPanel: React.FC = () => {
         <div className="max-h-80 overflow-y-auto">
           {shown.length === 0 ? (
             <div className="p-6 text-center text-muted-foreground text-sm">
-              {tab === 'so' ? 'ยังไม่มีแจ้งเตือนจาก So Scraping' : 'ไม่มีการแจ้งเตือน — จะแจ้งเมื่อมีใบขอใหม่หรืองานปิดแล้ว'}
+              {tab === 'so' ? 'ยังไม่มีแจ้งเตือนจาก So Scraping' : tab === 'docs' ? 'ยังไม่มีแจ้งเตือนเอกสาร' : 'ไม่มีการแจ้งเตือน — จะแจ้งเมื่อมีใบขอใหม่หรืองานปิดแล้ว'}
             </div>
           ) : (
             shown.map((n) => {
@@ -147,6 +184,13 @@ const NotificationPanel: React.FC = () => {
               );
             })
           )}
+          {tab === 'docs' && (history.nextBefore !== null || history.items.length === 0) ? (
+            <div className="px-4 py-3">
+              <Button type="button" variant="outline" size="xs" disabled={history.loading} onClick={() => void loadOlder()} data-testid="notif-docs-older">
+                {history.loading ? 'กำลังโหลด…' : history.error ? 'โหลดไม่ได้ ลองอีกครั้ง' : 'ดูก่อนหน้านี้'}
+              </Button>
+            </div>
+          ) : null}
         </div>
       </PopoverContent>
     </Popover>

@@ -7,7 +7,7 @@
  */
 import { dbQuery, isPgUndefinedTable } from './postgres.js';
 import { tableInAppSchema } from './schema.js';
-import { PINNED_NOTIFICATION_TYPES } from '../../src/lib/notificationTabs.js';
+import { KEEP_UNREAD_NOTIFICATION_TYPES, PINNED_NOTIFICATION_TYPES } from '../../src/lib/notificationTabs.js';
 
 const notifTable = tableInAppSchema('app_notifications');
 const usersTable = tableInAppSchema('users');
@@ -92,9 +92,16 @@ export async function listMyNotifications(
            where recipient_user_id = $1 and type = any($3::text[]) and created_at > now() - interval '14 days'
            order by created_at desc
            limit 50)
+         union
+         -- เอกสารที่ผู้สมัครส่งแล้วแต่ยังไม่อ่าน: อยู่ครบเสมอ ไม่ถูกแจ้งเตือนอื่นดันตก ไม่หมดตามเวลา (22 พ.ย. 2569)
+         (select id, type, title, body, link, created_at, read_at
+            from ${notifTable}
+           where recipient_user_id = $1 and type = any($4::text[]) and read_at is null
+           order by created_at desc
+           limit 200)
        ) x
        order by created_at desc`,
-      [userId, Math.min(Math.max(limit, 1), 100), [...PINNED_NOTIFICATION_TYPES]],
+      [userId, Math.min(Math.max(limit, 1), 100), [...PINNED_NOTIFICATION_TYPES], [...KEEP_UNREAD_NOTIFICATION_TYPES]],
     );
     const items = rows.map((r) => ({
       id: r.id,
@@ -108,6 +115,32 @@ export async function listMyNotifications(
     return { items, unread: items.filter((i) => !i.readAt).length };
   } catch (e) {
     if (isPgUndefinedTable(e)) return { items: [], unread: 0 };
+    throw e;
+  }
+}
+
+/**
+ * ประวัติแจ้งเตือนของฉันทีละหน้า (ชนิดเดียว) — เลื่อนดูเก่ากว่าที่แผงกระดิ่งโชว์ได้ · `beforeId` = รหัสแถวสุดท้ายของหน้าก่อน
+ */
+export async function listNotificationHistory(
+  userId: string,
+  input: { type: string; beforeId?: number | null; limit?: number },
+): Promise<{ items: AppNotification[]; nextBefore: number | null }> {
+  const limit = Math.min(Math.max(input.limit ?? 20, 1), 50);
+  try {
+    const { rows } = await dbQuery<{ id: number; type: string; title: string; body: string | null; link: string | null; created_at: string; read_at: string | null }>(
+      `select id, type, title, body, link, created_at, read_at from ${notifTable}
+        where recipient_user_id = $1 and type = $2 and ($3::bigint is null or id < $3::bigint)
+        order by id desc limit $4`,
+      [userId, input.type, input.beforeId ?? null, limit + 1],
+    );
+    const page = rows.slice(0, limit);
+    return {
+      items: page.map((r) => ({ id: Number(r.id), type: r.type, title: r.title, body: r.body, link: r.link, createdAt: r.created_at, readAt: r.read_at })),
+      nextBefore: rows.length > limit ? Number(page[page.length - 1].id) : null,
+    };
+  } catch (e) {
+    if (isPgUndefinedTable(e)) return { items: [], nextBefore: null };
     throw e;
   }
 }

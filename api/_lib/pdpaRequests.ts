@@ -14,6 +14,7 @@ import { toE164Thai } from './thaiPhone.js';
 import { stopOpenInterviewCalls, suppressPhone } from './callFollowup.js';
 import { cancelFollowScope } from './followCancelScope.js';
 import { logError, logInfo } from './logger.js';
+import { eraseDocumentsForApplications } from './documents/erase.js';
 import {
   PDPA_ERASED_NAME,
   pdpaStopsCalls,
@@ -209,6 +210,8 @@ export async function erasePdpaPerson(requestId: string, byName: string): Promis
     const count = async (sql: string, params: unknown[]) => (await client.query(sql, params)).rowCount ?? 0;
 
     const out: Record<string, number> = {};
+    // ใบสมัครของคนนี้ — จดรหัสไว้ก่อนล้างเบอร์ (งานส่งเอกสารผูกด้วยรหัสใบสมัคร)
+    const { rows: appRows } = await client.query<{ id: string }>(`select id from ${APPS} where ${key9('phone')} = $1`, [k]);
     // ใบสมัคร: เหลืออายุ เพศ ตำแหน่ง สถานะ ช่องทาง (ตัวเลขสถิติ)
     out.applications = await count(
       `update ${APPS}
@@ -243,13 +246,17 @@ export async function erasePdpaPerson(requestId: string, byName: string): Promis
     out.aftercare += await count(`delete from ${AFTERCARE_PEOPLE} where phone_e164 = $1`, [e164]);
     out.selection = await count(`delete from ${SELECTION} where phone_e164 = $1`, [e164]);
     out.holds = await count(`update ${HOLDS} set candidate_name = null, result_note = null, result_detail = null where phone_e164 = $1`, [e164]);
+    // ส่งเอกสารผ่าน LINE: ภาพ · ข้อมูลในชุด · บัญชี LINE · ชื่อในแจ้งเตือน (22 พ.ย. 2569)
+    const docs = await eraseDocumentsForApplications(client, appRows.map((r) => r.id), PDPA_ERASED_NAME);
+    out.documentPackets = docs.documentPackets;
+    out.documentFiles = docs.documentFiles;
     // ตัวคำขอเอง: เก็บแค่เบอร์ (ผูกกับบัญชีห้ามโทร) ชื่อ/รายละเอียดล้าง
     await client.query(
       `update ${REQUESTS}
           set full_name = $2, detail = null, client_ip = null, status = 'done',
               done_at = now(), done_by_name = $3, done_note = $4
         where id = $1`,
-      [requestId, PDPA_ERASED_NAME, byName, `ลบแล้ว · ใบสมัคร ${out.applications} · สายติดตาม ${out.follows} · สาย AI ${out.calls}`],
+      [requestId, PDPA_ERASED_NAME, byName, `ลบแล้ว · ใบสมัคร ${out.applications} · สายติดตาม ${out.follows} · สาย AI ${out.calls} · ชุดเอกสาร ${out.documentPackets}`],
     );
     logInfo('pdpa.erase.done', { requestId, ...out });
     return out;

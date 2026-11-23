@@ -24,6 +24,8 @@ const PrivacyRequestPage = lazyPage(() => import("@/pages/public/PrivacyRequestP
 const PublicSkillQuizPage = lazyPage(() => import("@/pages/public/PublicSkillQuizPage"));
 const PublicSkillQuizEntryPage = lazyPage(() => import("@/pages/public/PublicSkillQuizEntryPage"));
 const ShortLinkRedirectPage = lazyPage(() => import("@/pages/public/ShortLinkRedirectPage"));
+// ผู้สมัครส่งเอกสารจากลิงก์ที่เจ้าหน้าที่ส่งให้ใน LINE (22 พ.ย. 2569) — โหลดแยก (OCR + ข้อมูลที่อยู่ทั้งประเทศ) ไม่ถ่วงหน้าอื่น
+const ApplicantDocumentsPage = lazyPage(() => import("@/pages/public/ApplicantDocumentsPage"));
 // ผู้ช่วย AI มุมขวาล่าง (13 พ.ย. 2569) — admin + supervisor · ทุกหน้าหลังล็อกอิน · โหลดแยก ไม่ถ่วงหน้าแรก
 const AiChat = lazyPage(() => import("@/components/ai/AiChat"));
 const MagicLinkVerifyPage = lazyPage(() => import("@/pages/MagicLinkVerifyPage"));
@@ -267,6 +269,15 @@ const App = () => (
                     element={
                       <PublicApplyLayout kicker="แบบทดสอบพนักงาน" hideFooter>
                         <PublicSkillQuizPage />
+                      </PublicApplyLayout>
+                    }
+                  />
+                  {/* ส่งเอกสารผ่าน LINE — ไม่ต้องล็อกอิน สิทธิ์มาจากลิงก์ + บัญชี LINE (22 พ.ย. 2569) */}
+                  <Route
+                    path="/apply/documents"
+                    element={
+                      <PublicApplyLayout kicker="ส่งเอกสาร" hideFooter>
+                        <ApplicantDocumentsPage />
                       </PublicApplyLayout>
                     }
                   />

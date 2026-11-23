@@ -17,6 +17,9 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import type { PublicApplication } from '@/lib/publicApplicationsApi';
 
 const saveContactLog = vi.fn();
+
+// กล่อง "ส่งเอกสาร" (22 พ.ย. 2569) มีเทสต์ของตัวเอง (`SendDocumentsSection.test.tsx`) — ในป๊อปนี้แทนด้วยป้ายเปล่า
+vi.mock('@/components/documents/SendDocumentsSection', () => ({ default: () => <div data-testid="send-documents-stub" /> }));
 const updateApplicationProfile = vi.fn();
 const recordAppointmentAttendance = vi.fn();
 const setApplicationCancelled = vi.fn();

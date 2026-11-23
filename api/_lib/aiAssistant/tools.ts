@@ -23,6 +23,8 @@ const BLOCKED: { re: RegExp; why: string }[] = [
   { re: /^\/api\/integrations\//, why: 'เส้นของระบบอื่น' },
   { re: /^\/api\/lumos\/(interview|reminder)\//, why: 'เส้นที่ Lumos เรียกเข้ามา' },
   { re: /^\/api\/(health|short-links\/resolve)$/, why: 'ไม่ใช่คำสั่งของผู้ใช้' },
+  // เอกสารผู้สมัคร = บัตรประชาชน ที่อยู่ ลายเซ็น — ไม่ส่งออกไปให้ AI ภายนอก (22 พ.ย. 2569)
+  { re: /^\/api\/document-(invitations|packets|settings)$/, why: 'เอกสารผู้สมัครมีข้อมูลบัตรประชาชน เปิดดูเองที่แท็บเอกสาร' },
 ];
 
 /**

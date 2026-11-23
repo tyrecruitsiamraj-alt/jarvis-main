@@ -1,0 +1,24 @@
+{
+  "repository": "https://github.com/kongvut/thai-province-data",
+  "commit": "07319ed40eb3440c9a1b17cc48fa223340ddce55",
+  "downloadedOn": "2026-11-20",
+  "license": "MIT",
+  "sha256": "db749c2513d5343d3950f8f7a22710d65e23a5812a810283275b3815e7144f91",
+  "provinces": 77,
+  "districts": 928,
+  "subdistricts": 7436,
+  "excludedEmptyDistricts": [
+    {
+      "province": "ราชบุรี",
+      "id": "7074",
+      "name": "ท้องถิ่นเทศบาลตำบลบ้านฆ้อง",
+      "reason": "Source has no subdistricts; municipal entity cannot form a complete province/district/subdistrict selection"
+    },
+    {
+      "province": "สงขลา",
+      "id": "9077",
+      "name": "ท้องถิ่นเทศบาลตำบลสำนักขาม",
+      "reason": "Source has no subdistricts; municipal entity cannot form a complete province/district/subdistrict selection"
+    }
+  ]
+}

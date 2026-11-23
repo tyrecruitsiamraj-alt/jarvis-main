@@ -12,6 +12,7 @@ import { shouldShowPasswordUi } from '@/lib/authConfig';
 import NotificationPanel from '@/components/notifications/NotificationPanel';
 import JobNotificationWatcher from '@/components/notifications/JobNotificationWatcher';
 import ClaimIdleAlertDialog from '@/components/notifications/ClaimIdleAlertDialog';
+import DocumentNotificationToaster from '@/components/notifications/DocumentNotificationToaster';
 import { BrandMark, BrandTitle } from '@/components/shared/BrandMark';
 import AppNavDrawer from '@/components/layout/AppNavDrawer';
 import StageBanner from '@/components/layout/StageBanner';
@@ -138,6 +139,8 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       {/* เตือนหัวหน้าทันทีเมื่อระบบถอดชื่อที่เก็บไว้แล้วไม่โทร (Phase 5.8) —
           อ่านจากกล่องขาเข้าที่ poll อยู่แล้ว ไม่ยิง query ใหม่ · เด้งครั้งเดียวต่อใบ */}
       <ClaimIdleAlertDialog />
+      {/* ผู้สมัครส่งเอกสารแล้ว — toast กดเปิดชุดนั้น (22 พ.ย. 2569) */}
+      <DocumentNotificationToaster />
 
       {/* Top header — จอใหญ่ (lg+) */}
       <header className="hidden lg:flex items-center justify-between gap-2 2xl:gap-4 px-3 xl:px-4 2xl:px-8 py-3 border-b border-border bg-background sticky top-0 z-40">

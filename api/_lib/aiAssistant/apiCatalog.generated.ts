@@ -616,6 +616,71 @@ export const API_CATALOG: ApiCatalogEntry[] = [
   "reachesPeople": false
  },
  {
+  "path": "/api/document-invitations",
+  "file": "api/_handlers/document-invitations.ts",
+  "methods": [
+   "GET",
+   "POST"
+  ],
+  "doc": "/api/document-invitations — ปุ่ม \"ส่งเอกสาร\" ในข้อมูลผู้สมัคร (เจ้าของ 22 พ.ย. 2569)\n\nGET  ?applicationId=                        → สถานะเอกสารของใบสมัครนี้ + ลิงก์ที่เคยสร้าง + บัญชี LINE ที่เปิดแต่ละลิงก์\nPOST { applicationId }                      → สร้างลิงก์เฉพาะใบสมัครนี้ (อายุ 24 ชม.) คืนลิงก์ให้เจ้าหน้าที่คัดลอกไปส่ง LINE เอง\nPOST { action:'revoke', invitationId }      → ยกเลิกลิงก์ที่ยังไม่ได้ส่งเอกสาร\n\nระบบไม่ส่งข้อความ LINE ให้ · ลิงก์เต็มคืนครั้งเดียวตอนสร้าง (ฐานเก็บแค่แฮช) · สิทธิ์ BU เดียวกับใบสมัคร",
+  "query": [
+   "applicationId"
+  ],
+  "body": [
+   "js",
+   "action",
+   "invitationId",
+   "applicationId"
+  ],
+  "reachesPeople": false
+ },
+ {
+  "path": "/api/document-packets",
+  "file": "api/_handlers/document-packets.ts",
+  "methods": [
+   "GET",
+   "POST"
+  ],
+  "doc": "/api/document-packets — แท็บ \"เอกสาร\" ของงานสรรหา: รายการ · ชุดที่ผู้สมัครส่ง · ไฟล์ · PDF (เจ้าของ 22 พ.ย. 2569)\n\nGET  (ไม่มีรหัส) ?page=&pageSize=&status=&q=&bu=   → รายการผู้สมัครที่มีลิงก์ส่งเอกสาร (1 แถวต่อคน) + จำนวนต่อสถานะ\nGET  ?applicationId=[&packetId=]                 → รายละเอียด: ลิงก์ทุกอัน บัญชี LINE ที่เปิด ชุดที่ส่ง (ระบุ packetId = เปิดชุดนั้น)\nGET  ?file=<รหัสไฟล์>                             → ภาพในชุดที่ส่งแล้ว\nGET  ?pdf=<เอกสาร>&packetId=[&download=1]         → PDF ของเอกสารฉบับนั้นจากชุดนั้น\nGET  ?template=<เอกสาร>&page=&packetId=           → ต้นฉบับรุ่นที่ผู้สมัครอ่าน\nPOST { action:'flag', packetId, note } / 'unflag' → ติดธงขอให้แก้ / เอาออก\nPOST { action:'ack', packetId, note }             → รับทราบเรื่องที่ต้องดู (คุยกับผู้สมัครแล้ว)\nPOST { action:'import', packetId, department, idempotencyKey }      → นำเข้า iRecruit ผ่านตัวต่อ (เมื่อเชื่อมแล้ว)\nPOST { action:'import-record', packetId, department, externalId }  → HR คีย์ใน iRecruit เอง แล้วบันทึกเลขที่\nPOST { action:'import-resolve', attemptId, externalId? | notFound } → รอบที่ไม่รู้ผล: บอกผลหลังตรวจ\n\nสิทธิ์ BU เดียวกับใบสมัคร ตรวจทุกคำขอรวมไฟล์และ PDF · ส่งเอกสารไม่ทำให้นำเข้าเอง ต้อง HR กด · อ่านแจ้งเตือน ≠ ตรวจเอกสารแล้ว",
+  "query": [],
+  "body": [
+   "js",
+   "action",
+   "packetId",
+   "note",
+   "department",
+   "idempotencyKey",
+   "externalId",
+   "attemptId",
+   "notFound"
+  ],
+  "reachesPeople": false
+ },
+ {
+  "path": "/api/document-settings",
+  "file": "api/_handlers/document-settings.ts",
+  "methods": [
+   "GET",
+   "POST",
+   "PUT"
+  ],
+  "doc": "/api/document-settings — ตั้งค่า › ส่งเอกสารผ่าน LINE (เจ้าของ 22 พ.ย. 2569)\n\nGET                                              → ทุกคน: เปิดใช้ไหม · พร้อมไหม · มีงานเอกสารในสิทธิ์ไหม / admin: + LINE · ต้นฉบับ 5 ประเภท · คิวแจ้งเตือนที่ค้าง\nGET  ?template=<เอกสาร>&page=                    → admin: ดูต้นฉบับรุ่นที่ใช้อยู่\nPUT  { enabled?, lineChannelId?, liffId? }       → admin: เปิด/ปิด · ตั้ง LINE Login Channel ID กับ LIFF ID (ไม่ใช่ความลับ ไม่มี token)\nPOST { action:'template', docType, pages:[base64…] } → admin: อัปโหลดต้นฉบับรุ่นใหม่ของเอกสาร 1 ประเภท (ทุกหน้าเรียงตามลำดับ · PNG/JPG)\n\nเปิดใช้ได้เมื่อครบ: LINE · ต้นฉบับ 5 ประเภท · ฐานข้อมูลอัปเดตแล้ว · ปิด = หยุดสร้างลิงก์ใหม่/ผู้สมัครเปิดลิงก์ไม่ได้ ของที่ส่งแล้วยังดูได้",
+  "query": [
+   "template",
+   "page"
+  ],
+  "body": [
+   "js",
+   "lineChannelId",
+   "liffId",
+   "enabled",
+   "action",
+   "pages",
+   "docType"
+  ],
+  "reachesPeople": false
+ },
+ {
   "path": "/api/employees",
   "file": "api/_handlers/employees.ts",
   "methods": [
@@ -1720,8 +1785,12 @@ export const API_CATALOG: ApiCatalogEntry[] = [
    "GET",
    "PATCH"
   ],
-  "doc": "GET   /api/notifications          → { items, unread } กล่องขาเข้าของฉัน\nPATCH /api/notifications { ids? } → ทำเครื่องหมายอ่านแล้ว (ไม่ส่ง ids = อ่านหมด)\n\nทุก role อ่านได้ — เห็นเฉพาะของตัวเอง (คีย์จาก token ไม่รับ userId จากภายนอก)",
-  "query": [],
+  "doc": "GET   /api/notifications          → { items, unread, fastUntil } กล่องขาเข้าของฉัน\n      fastUntil = ถึงเวลานี้ให้หน้าเว็บถามถี่ขึ้น (มีผู้สมัครเปิดลิงก์ส่งเอกสารของฉันอยู่ ยังไม่ส่ง) · null = รอบปกติ\nGET   /api/notifications?history=<ชนิด>&before=<id>&limit= → ประวัติของชนิดนั้นทีละหน้า { items, nextBefore }\nPATCH /api/notifications { ids? } → ทำเครื่องหมายอ่านแล้ว (ไม่ส่ง ids = อ่านหมด)\n\nทุก role อ่านได้ — เห็นเฉพาะของตัวเอง (คีย์จาก token ไม่รับ userId จากภายนอก)",
+  "query": [
+   "history",
+   "before",
+   "limit"
+  ],
   "body": [
    "js"
   ],
@@ -1802,6 +1871,32 @@ export const API_CATALOG: ApiCatalogEntry[] = [
    "days"
   ],
   "body": [],
+  "reachesPeople": false
+ },
+ {
+  "path": "/api/public/applicant-documents",
+  "file": "api/_handlers/public/applicant-documents.ts",
+  "methods": [
+   "GET",
+   "POST"
+  ],
+  "doc": "/api/public/applicant-documents — หน้าส่งเอกสารของผู้สมัคร (ไม่ต้องมีบัญชี Jarvis · เจ้าของ 22 พ.ย. 2569)\n\nGET  ?action=config                         → เปิดใช้อยู่ไหม + LIFF ID (ยังไม่ต้องมีสิทธิ์)\nPOST { action:'session', invitation, idToken } → ตรวจลิงก์ + ให้ LINE ยืนยันบัญชี → ผูกบัญชีกับลิงก์ จดการเปิด ออกคุกกี้ของรอบนี้\nต่อจากนี้ทุกคำขอใช้คุกกี้ (HttpOnly) + k = คีย์ของลิงก์ที่เปิดอยู่:\nGET  ?action=state&k=                       → สถานะปัจจุบัน (ฉบับร่างที่แนบไว้ · ส่งแล้วหรือยัง)\nPOST { action:'upload', k, kind, dataBase64 } → แนบภาพ (ฉบับร่าง) kind = id | license | house\nGET  ?action=file&k=&id=                    → ภาพของลิงก์ตัวเอง\nGET  ?action=template&k=&doc=&page=         → ต้นฉบับเอกสารของบริษัท (อ่านก่อนตอบ)\nPOST { action:'submit', k, …ชุดเอกสาร }      → ส่งชุด (ธุรกรรมเดียว · กดซ้ำได้ชุดเดิม)\nGET  ?action=receipt&k=                     → ใบรับของชุดที่ส่งแล้ว\nGET  ?action=pdf&k=&doc=                    → PDF ของเอกสารในชุดตัวเอง\n\n🔴 ไม่ส่งข้อความ LINE ไม่ใช้ Messaging API · ไม่พิมพ์รหัสลิงก์/ID token/คุกกี้ ลง log · ทุกคำตอบ no-store",
+  "query": [
+   "action",
+   "k",
+   "id",
+   "doc",
+   "page"
+  ],
+  "body": [
+   "js",
+   "action",
+   "invitation",
+   "idToken",
+   "k",
+   "dataBase64",
+   "kind"
+  ],
   "reachesPeople": false
  },
  {

@@ -14561,3 +14561,15 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 ### 23 พ.ย. 2569 (4) — เปิดช่องเลือกแล้วแผงที่ปักไว้กระโดด ("กรองพอกดแล้วมันเลื่อน")
 - ต้นเหตุ: ตัวเลื่อนของหน้าคือ `html` · Radix ใส่ `overflow:hidden` ที่ `body` ตอนเปิด Select/Dialog ⇒ body เป็นกรอบเลื่อนซ้อน ของ `sticky` หลุดตำแหน่ง
 - แก้ที่ `src/main.tsx`: `document.body.classList.add("data-[scroll-locked]:!overflow-visible")` (utility ของ Tailwind · ไม่มี CSS ใหม่) · มีผลทุกหน้า ห้ามถอด
+
+### 23 พ.ย. 2569 (5) — ส่งเอกสารผ่าน LINE (ผู้สมัครถ่ายบัตร · ตอบเอกสาร 5 ฉบับ · เซ็น · HR ดูชุดที่ส่ง)
+เจ้าของ 22 พ.ย. 2569 (ชุดส่งต่อของ Codex) · เจ้าหน้าที่กด "ส่งเอกสาร" ในป๊อปผู้สมัคร → ได้ลิงก์เฉพาะคน (24 ชม.) คัดลอกไปส่ง LINE เอง · ระบบไม่ส่งข้อความ LINE ให้
+- ฐาน: `migrations/195_applicant_documents.sql` (เพิ่มอย่างเดียว · ไม่มี FK ไป users · ใบสมัคร FK restrict) · ต้นฉบับเอกสารบริษัทเก็บในฐาน ห้ามวางใน `public/` (repo เป็น public)
+- เส้น API: `document-invitations` (สร้าง/ยกเลิกลิงก์) · `document-packets` (แท็บเอกสาร · ภาพ · PDF · ติดธง · รับทราบ · บันทึกเลขที่ iRecruit) · `document-settings` (admin) · `public/applicant-documents` (หน้าผู้สมัคร · คุกกี้ HttpOnly + คีย์ลิงก์) · ตรรกะอยู่ `api/_lib/documents/` (core เข้ารหัส/รหัสลิงก์ · applicant · staff · outbox กระดิ่ง · pdf · signature · templates · erase PDPA · line ตรวจ ID token)
+- 🔴 สิทธิ์ BU ตรวจที่เซิร์ฟเวอร์ทุกคำขอ รวมภาพและ PDF · ห้ามพิมพ์รหัสลิงก์/session/ID token/ภาพ/ข้อมูลในชุดลง log · กุญแจเข้ารหัสจาก `AUTH_JWT_SECRET` (เปลี่ยนค่า = ใส่ค่าเดิมที่ `DOCUMENT_KEY_FALLBACK_SECRETS`)
+- หน้าจอ: `src/pages/public/ApplicantDocumentsPage.tsx` (`/apply/documents` · 4 ขั้น) · `src/components/documents/` (`SendDocumentsSection` ในป๊อปผู้สมัคร · `DocumentsWorkspace` + `DocumentPacketSheet` แท็บ "เอกสาร" · `ApplicantSteps` · `AddressFields` · `ThaiDateSelect` · `SignaturePad` · `DocumentUploadCard`) · `src/pages/settings/DocumentsSettingsTab.tsx` · กระดิ่ง `DocumentNotificationToaster`
+- OCR ทำบนเครื่องผู้สมัคร (Tesseract.js · ภาษาไทย/อังกฤษที่ `public/ocr/lang` พร้อมไฟล์สัญญาอนุญาต) · แปลงข้อความ → ช่อง `src/lib/documents/ocrFields.ts`: อ่านไม่ชัด = เว้นว่าง ห้ามเดา · เลข 13 หลักหลายชุด/ชื่อแยกไม่ได้/ตำบลซ้ำ = ไม่เลือกให้
+  - 23 พ.ย. ทดสอบกับบัตรจำลองแบบบัตรจริง: ชื่อ-นามสกุลอังกฤษบรรทัดเดียว · ป้าย "วันบัตรหมดอายุ" · "ต." อ่านเป็น "3." (จับชื่อตำบลเปล่าในอำเภอที่ได้แล้ว ตัดชื่ออำเภอออกก่อน) · "อนุญาต" อ่านเป็น "อนุณาต"
+- PDF ฟอนต์ Kanit ฝังจาก `api/_assets/fonts` (มี OFL) · ภาพซ้ำกันสามใบ = ส่งไม่ได้
+- เทสต์: `tests/api/applicantDocuments*.test.ts` · `src/lib/documents/*.test.ts` · `src/components/documents/*.test.tsx` · ฐานจริงของงานนี้ `tests/integration/documents` รันด้วย `DOCS_TEST_DATABASE_URL=<ฐานทดสอบในเครื่อง> npx vitest run -c vitest.integration.config.ts` (ไม่มีตัวแปร = ข้าม · ห้ามชี้ฐานจริง)
+- ยังไม่ได้: ลองกับ LINE จริงบนมือถือ (ต้องตั้ง LINE Login channel + LIFF ก่อน) · iRecruit ยังไม่เชื่อม (HR คีย์เองแล้วบันทึกเลขที่) · คู่มือตั้งค่า `docs/applicant-documents.md`

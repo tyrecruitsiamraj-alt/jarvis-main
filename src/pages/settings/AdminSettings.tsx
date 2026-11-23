@@ -13,6 +13,7 @@ import { Users, Shield, Link2, MessageCircle, Database, FileText, Palette, ListC
   ShieldCheck,
   Trash2,
   Gauge,
+  FileSignature,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import BrandingAppearanceTab from '@/pages/settings/BrandingAppearanceTab';
@@ -29,6 +30,7 @@ import CallRetryTab from '@/pages/settings/CallRetryTab';
 import ApplyLinksTab from '@/pages/settings/ApplyLinksTab';
 import LineIdsTab from '@/pages/settings/LineIdsTab';
 import PdpaRequestsTab from '@/pages/settings/PdpaRequestsTab';
+import DocumentsSettingsTab from '@/pages/settings/DocumentsSettingsTab';
 import ApplicationAutoMoveTab from '@/pages/settings/ApplicationAutoMoveTab';
 import SystemHealthTab from '@/pages/settings/SystemHealthTab';
 import NavMenuTab from '@/pages/settings/NavMenuTab';
@@ -116,6 +118,7 @@ const TAB_ICON: Record<SettingsTab, React.ElementType> = {
   aiSettings: Cpu,
   callSuppression: PhoneOff,
   integrations: Plug,
+  documents: FileSignature,
   pdpaRequests: ShieldCheck,
   applyLinks: Link2,
   lineIds: MessageCircle,
@@ -858,6 +861,7 @@ const AdminSettings: React.FC = () => {
         {activeTab === 'aiSettings' && <AiSettingsTab />}
         {activeTab === 'callSuppression' && <CallSuppressionTab />}
         {activeTab === 'integrations' && <IntegrationKeysTab />}
+        {activeTab === 'documents' && <DocumentsSettingsTab />}
         {activeTab === 'pdpaRequests' && <PdpaRequestsTab />}
         {activeTab === 'autoMove' && <ApplicationAutoMoveTab />}
         {activeTab === 'health' && <SystemHealthTab />}

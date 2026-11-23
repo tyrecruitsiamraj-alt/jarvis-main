@@ -10,10 +10,13 @@ const read = (p: string) => fs.readFileSync(path.resolve(__dirname, '../../', p)
 describe('กระดิ่งแจ้งเตือน', () => {
   it('รอบ 1 นาทีข้ามตอนแท็บซ่อน · กลับมาเห็นจอดึงทันที · ถอด listener ตอนเลิกใช้', () => {
     const src = read('src/contexts/NotificationContext.tsx');
-    expect(src).toContain("if (document.visibilityState === 'hidden') return;");
+    // 22 พ.ย. 2569 รอบเป็น setTimeout ต่อกัน (เร็วขึ้นเป็น 10 วิ ตอนมีคนเปิดลิงก์ส่งเอกสาร) — แท็บซ่อนยังข้ามเหมือนเดิม
+    expect(src).toContain("if (document.visibilityState !== 'hidden') await pull();");
     expect(src).toContain("document.addEventListener('visibilitychange', onVisible);");
     expect(src).toContain("document.removeEventListener('visibilitychange', onVisible);");
-    expect(src).toContain('const POLL_MS = 60_000;');
+    const tabs = read('src/lib/notificationTabs.ts');
+    expect(tabs).toContain('export const NOTIFICATION_POLL_MS = 60_000;');
+    expect(src).toContain('nextNotificationPoll(fastUntil, Date.now())');
   });
 
   it('migration เพิ่มดัชนีอย่างเดียว ตรงกับ order by created_at desc ของคนเดียว', () => {

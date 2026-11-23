@@ -27,6 +27,7 @@ export const SETTINGS_TAB_IDS = [
   'aiSettings',
   'callSuppression',
   'integrations',
+  'documents',
   'pdpaRequests',
   'applyLinks',
   'lineIds',
@@ -56,6 +57,7 @@ export const SETTINGS_TAB_LABEL: Record<SettingsTabId, string> = {
   aiSettings: 'AI ที่ใช้คิดงาน',
   callSuppression: 'บัญชีห้ามโทร',
   integrations: 'เชื่อมระบบภายนอก',
+  documents: 'ส่งเอกสารผ่าน LINE',
   pdpaRequests: 'คำขอข้อมูลส่วนบุคคล',
   applyLinks: 'ลิงก์หน้าสมัคร',
   lineIds: 'แอดไลน์ประจำ BU',
@@ -80,6 +82,7 @@ export const SETTINGS_TAB_HINT: Record<SettingsTabId, string> = {
   aiSettings: 'เลือกเจ้า AI และโมเดลที่ใช้จับคู่งานและอ่านใบขอ',
   callSuppression: 'เบอร์ที่ AI ไม่โทรถึงชั่วคราว — ดูเหตุผลและปลดได้',
   integrations: 'key ของ So Scraping · ออกใหม่ / ยกเลิก',
+  documents: 'เปิดใช้ · LINE Login · ต้นฉบับเอกสาร 5 ฉบับ',
   pdpaRequests: 'ขอดู ขอแก้ ขอลบข้อมูล (PDPA) · โทรยืนยันตัวตนแล้วทำต่อ',
   applyLinks: 'ลิงก์ /apply แยก BU · ล็อกตำแหน่ง',
   lineIds: 'ID LINE ที่ขึ้นท้ายข้อความประกาศ แยก BU',
@@ -108,7 +111,7 @@ export const SETTINGS_GROUP_TABS: Record<SettingsGroupId, readonly SettingsTabId
   // ทีมสรรหา/คัดสรร/OPL/Online ถอดแล้ว (เจ้าของ 19 ต.ค. 2569) — รายชื่อเจ้าหน้าที่มาจากหน้าผู้ใช้งานที่เดียว
   people: ['users', 'roles'],
   look: ['appearance', 'navMenu'],
-  automation: ['lumosMode', 'callRetry', 'callScripts', 'aiSettings', 'callSuppression', 'autoMove', 'matchWeights', 'integrations'],
+  automation: ['lumosMode', 'callRetry', 'callScripts', 'aiSettings', 'callSuppression', 'autoMove', 'matchWeights', 'integrations', 'documents'],
   data: ['workStatus', 'leadRules', 'reference', 'applyLinks', 'lineIds', 'pdpaRequests'],
   monitor: ['health', 'audit'],
 };

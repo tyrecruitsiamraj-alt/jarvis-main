@@ -39,6 +39,10 @@ import publicChannelsHandler from './public/channels.js';
 import publicClickHandler from './public/click.js';
 import publicPrivacyRequestHandler from './public/privacy-request.js';
 import publicSkillQuizHandler from './public/skill-quiz.js';
+import publicApplicantDocumentsHandler from './public/applicant-documents.js';
+import documentInvitationsHandler from './document-invitations.js';
+import documentPacketsHandler from './document-packets.js';
+import documentSettingsHandler from './document-settings.js';
 import skillQuizHandler from './skill-quiz.js';
 import jobPostActionsHandler from './job-post-actions.js';
 import pdpaRequestsHandler from './pdpa-requests.js';
@@ -311,6 +315,11 @@ export const apiRoutes: Record<string, ApiHandler> = {
   // สถานะระบบ (ยามเฝ้า) — ไฟ 4 ดวง + สวิตช์ + ของค้าง · admin เท่านั้น
   '/api/system-health': systemHealthHandler as ApiHandler,
   '/api/job-application-document': jobApplicationDocumentHandler as ApiHandler,
+  // ส่งเอกสารผ่าน LINE (22 พ.ย. 2569) — ปุ่มส่งเอกสาร · แท็บเอกสาร · ตั้งค่า · หน้าของผู้สมัคร (ไม่ต้องล็อกอิน)
+  '/api/document-invitations': documentInvitationsHandler as ApiHandler,
+  '/api/document-packets': documentPacketsHandler as ApiHandler,
+  '/api/document-settings': documentSettingsHandler as ApiHandler,
+  '/api/public/applicant-documents': publicApplicantDocumentsHandler as ApiHandler,
   '/api/short-links': shortLinksHandler as ApiHandler,
   '/api/short-links/resolve': shortLinksResolveHandler as ApiHandler,
   '/api/request-control/demand-forecast': requestControlForecastHandler as ApiHandler,
