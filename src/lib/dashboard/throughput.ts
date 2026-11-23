@@ -251,6 +251,39 @@ export function sumThroughputInRange(
   return { requested, closed, remaining, closedSamePeriod, closedBacklog };
 }
 
+/**
+ * หาได้แล้ว / ยกเลิก ของ cohort แยกสองแถวของ "สถานะทำงาน" (เจ้าของ 23 พ.ย. 2569 "เพิ่มปิดได้กับยกเลิกมาที")
+ * แถวล่วงหน้า = กติกาเดียวกับใบเปิด (`isAdvanceBeforeRequiredDate`): ชนิดล่วงหน้า + วันต้องการยังไม่ถึง
+ * 🔴 สองแถวรวมกันต้องเท่า `sumCohortStockByRequestDate` (ตัวนับเดียวกัน · อัตราที่ยกเลิกไม่นับเป็นหาได้)
+ */
+export type WorkDoneKind = 'filled' | 'cancelled';
+export type CohortDoneCounts = { positions: number; requests: number };
+export type CohortDoneSplit = Record<WorkDoneKind, { main: CohortDoneCounts; advance: CohortDoneCounts }>;
+
+export function isAdvanceNotDueRecord(r: Pick<ThroughputRecord, 'leadKind' | 'requiredDate'>, todayYmd: string): boolean {
+  const required = (r.requiredDate ?? '').slice(0, 10);
+  return r.leadKind === 'advance' && required.length === 10 && required > todayYmd;
+}
+
+export function sumCohortDoneByAdvance(records: ThroughputRecord[], from: string, to: string, todayYmd: string): CohortDoneSplit {
+  const cell = () => ({ positions: 0, ids: new Set<string>() });
+  const acc = { filled: { main: cell(), advance: cell() }, cancelled: { main: cell(), advance: cell() } };
+  for (const r of records) {
+    if (!inYmdRange(r.requestDate, from, to)) continue;
+    const kind = resolveKind(r);
+    if (kind === 'remaining') continue;
+    const c = acc[kind][isAdvanceNotDueRecord(r, todayYmd) ? 'advance' : 'main'];
+    c.positions += r.positionUnits;
+    const id = r.requestNo?.trim();
+    if (id) c.ids.add(id);
+  }
+  const out = (c: ReturnType<typeof cell>): CohortDoneCounts => ({ positions: c.positions, requests: c.ids.size });
+  return {
+    filled: { main: out(acc.filled.main), advance: out(acc.filled.advance) },
+    cancelled: { main: out(acc.cancelled.main), advance: out(acc.cancelled.advance) },
+  };
+}
+
 /** cohort ตามเดือน/ช่วงที่เปิดใบ — รวมปิดแล้ว (ไม่ใช่แค่ใบเปิดใน feed) */
 export function sumCohortStockByRequestDate(
   records: ThroughputRecord[],

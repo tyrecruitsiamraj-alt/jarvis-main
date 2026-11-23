@@ -14550,3 +14550,14 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 - 🔴 ห้ามถอยไปคนกด Gen link (`posting_owner_name`): ลิงก์ก่อน 19 พ.ย. คนกดคือทีม Online · ทานข้อมูลจริง 23 พ.ย. ทีมแก้รายคนจากลิงก์ของทีม Online เป็นสายสรรหา 234 คน · ใบที่ผูกใบขอไม่ใช้ชื่อของลิงก์
 - คำบนจอ: ช่องของใบสมัคร/ฟอร์มเพิ่ม/นำเข้า Excel/ไฟล์รายงาน = "คนนำเข้า" (วิธีหาชื่อเดิม `applicantResponsibleName`) · ลิงก์ (`PostingLinksList` · `SelfLinksPanel` · ข้อความ API) = "เจ้าหน้าที่สรรหา" คำเดียวกับช่องในฟอร์ม Gen link · "ผู้รับผิดชอบ" ของใบขอไม่เปลี่ยน · กติกาอยู่ `uiWords.ts`
 - เทสต์ `tests/api/floatingBoxRecruiter2569-11-23.test.ts` · `ApplicantInfoPanel.recruiter.test.tsx`
+
+### 23 พ.ย. 2569 (3) — Dashboard สถานะทำงาน: กล่อง "หาได้แล้ว" · "ยกเลิก" ต่อท้ายแถวบนและแถวล่วงหน้า
+เจ้าของ "เพิ่มปิดได้กับยกเลิกมาที" (ชี้ทั้งสองแถว) · คำบนกล่องใช้ "หาได้แล้ว" (คำของระบบสำหรับอัตราที่หาได้ ไม่ใช่ปิดครบใบขอ)
+- เลข = ยอดตามช่วงตัวเดียวกับการ์ด หาได้แล้ว/ยกเลิก: `sumCohortDoneByAdvance` (`src/lib/dashboard/throughput.ts`) แยกแถวด้วย `isAdvanceNotDueRecord` (ชนิดล่วงหน้า + วันต้องการยังไม่ถึง = กติกาเดียวกับใบเปิด) · สองแถวรวมกัน = `sumCohortStockByRequestDate`
+- อยู่คนละชุดกับกล่องสถานะ: `DashboardData.workStatusDoneKpis` / `workStatusAdvanceDoneKpis` (id `work_done_*` · `workStatusBox.ts`) ⇒ ไม่เข้าสมการของ "ทั้งหมด" และไม่เป็นตัวหารของแถบสัดส่วน
+- กดกล่อง = แผงเดียวกับกล่องสถานะ (`statusPickPanel`) รายการจาก `buildCohortDrillDown` ชุดเดียวกับเลข · โหลดยอดตามช่วงไม่ขึ้น = "—"
+- เทสต์ `tests/api/dashboardWorkDoneBoxes2569-11-23.test.ts`
+
+### 23 พ.ย. 2569 (4) — เปิดช่องเลือกแล้วแผงที่ปักไว้กระโดด ("กรองพอกดแล้วมันเลื่อน")
+- ต้นเหตุ: ตัวเลื่อนของหน้าคือ `html` · Radix ใส่ `overflow:hidden` ที่ `body` ตอนเปิด Select/Dialog ⇒ body เป็นกรอบเลื่อนซ้อน ของ `sticky` หลุดตำแหน่ง
+- แก้ที่ `src/main.tsx`: `document.body.classList.add("data-[scroll-locked]:!overflow-visible")` (utility ของ Tailwind · ไม่มี CSS ใหม่) · มีผลทุกหน้า ห้ามถอด

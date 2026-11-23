@@ -22,7 +22,7 @@ import { sumJobPositionUnits, jobPositionUnits } from '@/lib/jobPositionUnits';
 import { pickUnitOrganizationDisplayName, NO_SITE_CODE_LABEL } from '@/lib/unitGroupName';
 import { buildPriorityWorkQueue } from '@/lib/dashboard/priorityWorkQueue';
 import { jobRequestDateYmd } from '@/components/shared/DateRangeCalendarPicker';
-import { toYmdLocal } from '@/lib/dateTh';
+import { toYmdBangkok, toYmdLocal } from '@/lib/dateTh';
 import { dashboardCohortYmd } from '@/lib/jobUrgency';
 import { buildRemainingBridge } from '@/lib/dashboard/remainingBridge';
 import { kpiTrendWindow, withKpiTrend } from '@/lib/dashboard/kpiTrend';
@@ -50,6 +50,8 @@ import {
   jobsToThroughputRecords,
   sumThroughputInRange,
   sumCohortStockByRequestDate,
+  sumCohortDoneByAdvance,
+  type CohortDoneSplit,
   buildStockKpisFromCohort,
   type ThroughputRecord,
 } from './throughput';
@@ -83,7 +85,7 @@ import {
   UNIT_REQUEST_WORK_STATUS_LABELS,
   type UnitRequestWorkStatus,
 } from '@/lib/unitRequestWorkStatus';
-import { WORK_STATUS_ADVANCE_HINT, WORK_STATUS_ADVANCE_ID, WORK_STATUS_ADVANCE_LABEL, advanceStatusBoxId, isAdvanceStatusBoxId, workStatusBoxIdOf } from '@/lib/dashboard/workStatusBox';
+import { WORK_DONE_LABEL, workDoneBoxId, WORK_STATUS_ADVANCE_HINT, WORK_STATUS_ADVANCE_ID, WORK_STATUS_ADVANCE_LABEL, advanceStatusBoxId, isAdvanceStatusBoxId, workStatusBoxIdOf } from '@/lib/dashboard/workStatusBox';
 import {
   jobToRequestControlRecord,
   jobsToRequestControlRecords,
@@ -691,6 +693,24 @@ function buildWorkStatusKpis(
   return { main: mainKpis, advance: advanceKpis };
 }
 
+/** กล่อง หาได้แล้ว · ยกเลิก ต่อท้ายสองแถวของสถานะทำงาน — ยอดตามช่วงตัวเดียวกับการ์ด หาได้แล้ว/ยกเลิก */
+function buildWorkDoneKpis(done: CohortDoneSplit, scopeHint: string): { main: DashboardKpi[]; advance: DashboardKpi[] } {
+  const n = (v: number) => v.toLocaleString('th-TH');
+  const box = (kind: 'filled' | 'cancelled', advance: boolean): DashboardKpi => {
+    const c = done[kind][advance ? 'advance' : 'main'];
+    return {
+      id: workDoneBoxId(kind, advance),
+      label: WORK_DONE_LABEL[kind],
+      value: c.positions,
+      secondaryCount: c.requests,
+      secondaryLabel: 'ใบขอ',
+      description: `${scopeHint} · ${n(c.positions)} อัตรา · ${n(c.requests)} ใบ`,
+      trendPercent: null,
+    };
+  };
+  return { main: [box('filled', false), box('cancelled', false)], advance: [box('filled', true), box('cancelled', true)] };
+}
+
 /** KPI ชุดสั้น: เข้ามา / ปิดแล้ว / ยกเลิก / คงเหลือ (ตำแหน่ง) */
 function buildStockKpis(jobs: JobRequest[], _periodLabel?: string | null): DashboardKpi[] {
   let requestPositions = 0;
@@ -1272,6 +1292,10 @@ export function buildDashboardData(
       : undefined,
     today,
   );
+  const workDone = buildWorkDoneKpis(
+    sumCohortDoneByAdvance(throughputRecords, periodFrom, periodTo, toYmdBangkok(today)),
+    period ? 'ต้องการคนในช่วงที่เลือก' : 'ต้องการคนในช่วงแนวโน้ม',
+  );
   const remainingBridge =
     !period && cohortStock
       ? buildRemainingBridge(
@@ -1294,6 +1318,8 @@ export function buildDashboardData(
     kpis,
     workStatusKpis: workStatusRows.main,
     workStatusAdvanceKpis: workStatusRows.advance,
+    workStatusDoneKpis: workDone.main,
+    workStatusAdvanceDoneKpis: workDone.advance,
     remainingBridge,
     activityTrend,
     unitOverview: buildUnitOverview(openRemainingJobs, today),

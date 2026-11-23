@@ -28,7 +28,9 @@ import {
 import { buildCohortDrillDown, type CohortDrillKpi } from '@/lib/dashboard/cohortDrillDown';
 import { isPrequestJob } from '@/lib/publicJobVisibility';
 import { LEAD_AMOUNT_LABEL, NO_STATUS_LABEL, buildCohortLeadPanel, buildStatusLeadPanel, filterLeadPanel } from '@/lib/dashboard/statusLeadPanel';
-import { WORK_STATUS_ADVANCE_ID, advanceStatusBoxId, isAdvanceStatusBoxId, jobInWorkStatusBox } from '@/lib/dashboard/workStatusBox';
+import { WORK_STATUS_ADVANCE_ID, advanceStatusBoxId, isAdvanceStatusBoxId, jobInWorkStatusBox, parseWorkDoneBoxId } from '@/lib/dashboard/workStatusBox';
+import { isAdvanceNotDueRecord } from '@/lib/dashboard/throughput';
+import { toYmdBangkok } from '@/lib/dateTh';
 import {
   buildLeadKindBreakdown,
   leadKindMismatchNote,
@@ -631,6 +633,11 @@ const SupervisorDashboard: React.FC = () => {
       kpis: throughputMissing
         ? built.kpis.map((k) => (THROUGHPUT_KPI_IDS.has(k.id) ? { ...k, unavailable: true } : k))
         : built.kpis,
+      // หาได้แล้ว/ยกเลิก ของสถานะทำงานมาจากยอดตามช่วงเหมือนกัน — โหลดไม่ขึ้น = "—" ไม่ใช่ 0
+      workStatusDoneKpis: throughputMissing ? built.workStatusDoneKpis?.map((k) => ({ ...k, unavailable: true })) : built.workStatusDoneKpis,
+      workStatusAdvanceDoneKpis: throughputMissing
+        ? built.workStatusAdvanceDoneKpis?.map((k) => ({ ...k, unavailable: true }))
+        : built.workStatusAdvanceDoneKpis,
       workQueue: sortWorkQueue(built.workQueue, sortKey, sortDir),
       // โหมดทั้งหมด: ทับด้วยชุดที่รวมใบปิดที่โหลด on-demand แล้ว (ถ้ายังไม่โหลดก็ใช้ของเดิม)
       recruiterOverview: recruiterOverviewAllMode ?? built.recruiterOverview,
@@ -840,7 +847,13 @@ const SupervisorDashboard: React.FC = () => {
   const pickId = searchParams.get('pick');
   const statusPick = useMemo(() => {
     if (!pickId) return null;
-    const all = [...data.kpis, ...(data.workStatusKpis ?? []), ...(data.workStatusAdvanceKpis ?? [])];
+    const all = [
+      ...data.kpis,
+      ...(data.workStatusKpis ?? []),
+      ...(data.workStatusAdvanceKpis ?? []),
+      ...(data.workStatusDoneKpis ?? []),
+      ...(data.workStatusAdvanceDoneKpis ?? []),
+    ];
     const kpi = all.find((k) => k.id === pickId);
     return kpi ? { kpiId: pickId, label: kpi.label } : null;
   }, [pickId, data]);
@@ -871,6 +884,26 @@ const SupervisorDashboard: React.FC = () => {
      * ไม่มี throughput (โหลดไม่ทัน) ให้ถอยไปใบใน feed
      */
     const cohortReady = cohortScope.records.length > 0;
+    // หาได้แล้ว/ยกเลิก ของสถานะทำงาน = รายการชุดเดียวกับการ์ด หาได้แล้ว/ยกเลิก ตัดเหลือแถวของกล่อง (ล่วงหน้า = ยังไม่ถึงวันต้องการ)
+    const done = parseWorkDoneBoxId(kpiId);
+    if (done) {
+      const { from, to, records } = cohortScope;
+      const todayYmd = toYmdBangkok(new Date());
+      const cohortKind = done.kind === 'filled' ? 'closed' : 'cancelled';
+      const drill = buildCohortDrillDown(
+        records.filter((r) => isAdvanceNotDueRecord(r, todayYmd) === done.advance),
+        from,
+        to,
+        cohortKind,
+      );
+      const panel = buildCohortLeadPanel(drill.rows, (row) => {
+        const feedJob = (row.jobId ? jobById.get(row.jobId) : undefined) ?? jobById.get(row.requestNo);
+        if (feedJob && !isPrequestJob(feedJob)) return { job: feedJob, inFeed: true };
+        return { job: row.jobId ? ({ id: row.jobId, externalId: row.requestNo, source: 'siamraj' } as JobRequest) : null, inFeed: false };
+      });
+      const note = drill.positionsWithoutRequestNo > 0 ? `ไม่มีเลขที่ใบ ${drill.positionsWithoutRequestNo.toLocaleString('th-TH')} อัตรา` : null;
+      return { kpiId, label: done.advance ? `ล่วงหน้า · ${label}` : label, panel, amountLabel: LEAD_AMOUNT_LABEL[cohortKind], note };
+    }
     const statusFromCohort = Boolean(period) && cohortReady && (kpiId === 'work_status_total' || kpiId === 'work_status_none');
     const cohortKpi = statusFromCohort ? 'remaining' : COHORT_KPI_IDS.find((k) => k === kpiId);
     if (cohortKpi && (cohortKpi !== 'remaining' || period)) {
@@ -919,6 +952,11 @@ const SupervisorDashboard: React.FC = () => {
       const togglePick = () => setStatusPick(pickId === kpiId ? null : kpiId);
       if (cohortReady && (kpiId === 'total_requests' || kpiId === 'closed' || kpiId === 'cancelled')) {
         togglePick();
+        return;
+      }
+      // หาได้แล้ว/ยกเลิก ของสถานะทำงาน — แผงเดียวกับกล่องสถานะ · ยอดตามช่วงยังไม่มา = ไม่เปิดแผงว่าง
+      if (parseWorkDoneBoxId(kpiId)) {
+        if (cohortReady) togglePick();
         return;
       }
       if (kpiId === 'remaining' && (period ? cohortReady : true)) {

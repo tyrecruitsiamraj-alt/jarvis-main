@@ -37,3 +37,16 @@ export function jobInWorkStatusBox(job: JobRequest, boxId: string, today: Date =
   const own = workStatusBoxIdOf(job, today);
   return boxId === WORK_STATUS_ADVANCE_ID ? isAdvanceStatusBoxId(own) : own === boxId;
 }
+
+/**
+ * กล่อง "หาได้แล้ว" / "ยกเลิก" ต่อท้ายสองแถวของสถานะทำงาน (เจ้าของ 23 พ.ย. 2569 "เพิ่มปิดได้กับยกเลิกมาที")
+ * เลขมาจากยอดตามช่วงตัวเดียวกับการ์ด หาได้แล้ว/ยกเลิก (`sumCohortDoneByAdvance`) — ไม่ใช่ใบเปิด จึงไม่อยู่ในสมการของกล่อง "ทั้งหมด"
+ * คำบนกล่อง = "หาได้แล้ว" (คำของระบบสำหรับอัตราที่หาได้ · ไม่ใช่ "ปิดครบใบขอ")
+ */
+export type WorkDoneBox = { kind: 'filled' | 'cancelled'; advance: boolean };
+export const WORK_DONE_LABEL: Record<WorkDoneBox['kind'], string> = { filled: 'หาได้แล้ว', cancelled: 'ยกเลิก' };
+export const workDoneBoxId = (kind: WorkDoneBox['kind'], advance: boolean): string => `work_done_${advance ? 'advance_' : ''}${kind}`;
+export function parseWorkDoneBoxId(id: string): WorkDoneBox | null {
+  const m = /^work_done_(advance_)?(filled|cancelled)$/.exec(id);
+  return m ? { kind: m[2] as WorkDoneBox['kind'], advance: Boolean(m[1]) } : null;
+}

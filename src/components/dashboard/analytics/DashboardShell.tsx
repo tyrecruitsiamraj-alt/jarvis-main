@@ -12,6 +12,7 @@ import type { DashboardActivityTrendPoint, DashboardData, DashboardFilters, Dash
 import type { UnitRequestFilterState } from '@/hooks/useSiamrajUnitRequestFilters';
 import type { DateRangeYmd } from '@/components/shared/DateRangeCalendarPicker';
 import DashboardFilterBar from './DashboardFilterBar';
+import { parseWorkDoneBoxId } from '@/lib/dashboard/workStatusBox';
 import DashboardKpiCard from './DashboardKpiCard';
 import DashboardChartSection from './DashboardChartSection';
 import DashboardHeroStrip from './DashboardHeroStrip';
@@ -358,7 +359,8 @@ const DashboardShell: React.FC<Props> = ({
                           key={kpi.id}
                           surface="tile"
                           kpi={kpi}
-                          progressPercent={total > 0 ? Math.round((kpi.value / total) * 100) : 0}
+                          // หาได้แล้ว/ยกเลิก เป็นยอดตามช่วง ไม่ใช่ส่วนของใบเปิด — ไม่มีแถบสัดส่วน
+                          progressPercent={parseWorkDoneBoxId(kpi.id) ? null : total > 0 ? Math.round((kpi.value / total) * 100) : 0}
                           selected={statusPick?.kpiId === kpi.id}
                           onClick={onKpiClick ? () => onKpiClick(kpi.id, kpi.label, kpi.secondaryCount ?? null) : undefined}
                         />
@@ -366,13 +368,13 @@ const DashboardShell: React.FC<Props> = ({
                     const advance = data.workStatusAdvanceKpis ?? [];
                     return (
                       <>
-                        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">{tiles(list)}</div>
+                        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">{tiles([...list, ...(data.workStatusDoneKpis ?? [])])}</div>
                         {/* แถวล่วงหน้า (เจ้าของ 22 พ.ย. 2569 "ล่วงหน้าแยกออกมาแล้วเป็นอีกแถวที่บอกสถานะ") — ใบล่วงหน้าที่ยังไม่ถึงวันต้องการ
                             แยกตามสถานะเดียวกับแถวบน · กล่องแรก = ล่วงหน้าทั้งแถว · สองแถวรวมกัน = ทั้งหมด */}
                         {advance.length ? (
                           <div className="mt-5 space-y-3" data-testid="dashboard-work-status-advance">
                             <p className="text-base font-medium text-foreground">ล่วงหน้า · ยังไม่ถึงวันต้องการ</p>
-                            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">{tiles(advance)}</div>
+                            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">{tiles([...advance, ...(data.workStatusAdvanceDoneKpis ?? [])])}</div>
                           </div>
                         ) : null}
                       </>
