@@ -23,7 +23,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { toast } from '@/hooks/use-toast';
 import { useUnitRequestsFeed } from '@/hooks/useUnitRequestsFeed';
 import { navigateToUnitRequest, shouldOpenInNewTabFromEvent } from '@/lib/jobNavigation';
-import { ChevronRight, SlidersHorizontal } from 'lucide-react';
+import { ChevronRight, Search, SlidersHorizontal } from 'lucide-react';
 import Term from '@/components/shared/Term';
 import JobUrgencyBadge from '@/components/jobs/JobUrgencyBadge';
 import UnitRequestReplacementBadge from '@/components/jobs/UnitRequestReplacementBadge';
@@ -86,6 +86,7 @@ import { friendlyErrorText } from '@/lib/friendlyError';
 import LoadErrorNotice from '@/components/shared/LoadErrorNotice';
 import { boardScrapPathOfRequest, fetchScrapCountsByRequest, type ScrapCountsByRequest } from '@/lib/scrapCandidatesApi';
 import { Button } from '@/components/ui/button';
+import BulkScrapDialog from '@/components/jobs/BulkScrapDialog';
 import { requestNoMatchesSearch } from '@/lib/siamrajRequestNo';
 import { getTotalPages } from '@/lib/pagination';
 import {
@@ -326,6 +327,8 @@ const JobListPage: React.FC = () => {
 
   /** กางเองเมื่อมีตัวกรองติดอยู่ — ไม่งั้นเลขน้อยลงโดยไม่มีอะไรบอกว่าเพราะอะไร */
   const [filtersOpen, setFiltersOpen] = useState(false);
+  /** ป๊อป Scrap ทั้งหน้า (เจ้าของ 23 พ.ย. 2569 "Scraping ทีเดียวได้ทั้งหน้า") — ใบ = แถวที่ตารางแสดงอยู่ */
+  const [bulkScrapOpen, setBulkScrapOpen] = useState(false);
   useEffect(() => {
     if (activeFilterCount > 0) setFiltersOpen(true);
   }, [activeFilterCount]);
@@ -635,6 +638,17 @@ const JobListPage: React.FC = () => {
         actions={
           // ช่องค้นหาอยู่คู่ปุ่มรีเฟรชบนหัวหน้า — ของที่ใช้บ่อยสุดอยู่ใกล้มือ ไม่ต้องเลื่อนหาในกล่องตัวกรอง
           <div className="flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setBulkScrapOpen(true)}
+              disabled={paginated.length === 0}
+              data-testid="job-list-bulk-scrap"
+            >
+              <Search aria-hidden />
+              Scrap ทั้งหน้า
+            </Button>
             {/* ทางถอยตอนไม่มีแถบบน — ปกติช่องค้นหาอยู่แถบบนซ้ายกระดิ่งแล้ว */}
             {searchInHeader ? null : (
               <div className="w-full min-w-0 max-w-[200px] sm:max-w-[280px]">
@@ -654,6 +668,8 @@ const JobListPage: React.FC = () => {
           </div>
         }
       />
+
+      <BulkScrapDialog open={bulkScrapOpen} onOpenChange={setBulkScrapOpen} jobs={paginated} />
 
       {/* แถบ หน่วยงาน · จับคู่กับงาน · การติดต่อ ถอดแล้ว (เจ้าของ 11 พ.ย. 2569 "เอาออกจากหน้า ใบขอ") — จับคู่/การติดต่ออยู่หน้างานสรรหา */}
       <div className="px-4 md:px-6 space-y-4">

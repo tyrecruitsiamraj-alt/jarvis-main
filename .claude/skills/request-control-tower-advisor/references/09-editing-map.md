@@ -14578,3 +14578,16 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 - `TimeDrillSheet`: โหลดชุดตามกล่อง · กล่องใบขอปุ่ม "ดูรายการใบ" → รายการเปิดหน้าใบขอ (`requestPathOfJobId`)
 - `HomeOverviewPage` สองโฉม: `openRequestDrill` · แผงเดิมอยู่ปุ่ม "สรุปช่วงวันที่บนหน้า" · ยังไม่ทำ: ยกมา/เหลือหา (ยอดคงค้าง ไม่ใช่เหตุการณ์) · เงิน · ติดตาม · ดูแลหลังเริ่มงาน · จับคู่งาน · AI และคนโทร
 - เทสต์ `tests/api/homeRequestDrill2569-11-23.test.ts`
+
+### 23 พ.ย. 2569 (7) — Gen link เลือกได้ว่าหน้าสมัครมีช่องแนบเอกสารไหม
+เจ้าของ "Genlink แบบแนบเอกสารไม่ได้ หน้าสมัครงานไม่มีช่องให้แปะไฟล์ ต้องมีให้เลือกตอน Gen ว่าแนบเอกสารไหมด้วย"
+- ค่าเดิม `recruit_postings.form_type` (rm = ไม่ต้องแนบ · global = ให้แนบเอกสาร · `RM_FORM_TYPES`) ไม่ต้องเพิ่มคอลัมน์ · ช่องเลือกย้ายออกจากส่วนที่ซ่อนตอน Gen จากใบขอ (`channelOnly`) มาอยู่ใต้ "เจ้าหน้าที่สรรหา" ใน `GenApplyLinkDialog` (ToggleGroup · testid `link-attach-docs`) · ค่าเริ่ม = ไม่ต้องแนบ
+- `/api/public/apply-link` คืน `attachDocuments` (form_type = global) → `PublicPostingApplyPage` → `PublicApplyDialog.showDocument` = `doc=1` ของลิงก์ตั้งค่า หรือ `attachDocuments` · ลิงก์เก่า = ไม่มีช่อง (ตามข้อเคาะ 28 ต.ค.)
+- เทสต์ `tests/api/genLinkAttachDocs2569-11-23.test.ts`
+
+### 23 พ.ย. 2569 (8) — หน้าใบขอ: ปุ่ม "Scrap ทั้งหน้า" ใส่ได้ว่าใบละกี่ Resume
+เจ้าของ "หน้าใบขอ ให้ Scraping ทีเดียวได้ทั้งหน้า โดยสามารถระบุได้ว่าจะเอาใบขอละกี่ Resume พอเลือกแล้วก็เอาเด้ง Pop up ให้เลือกเหมือนเวลา Scrap ปกติ"
+- ปุ่มบนหัว `JobListPage` → `src/components/jobs/BulkScrapDialog.tsx` · ใบ = แถวที่ตารางแสดงอยู่ (`paginated` · ตัวกรอง + หน้าที่เปิด) ตรึงไว้ตอนเปิดป๊อป
+- ข้อ 1-2-3 เหมือนป๊อปใบเดียว (`OrderPostButton`): บัญชี JobThai/JobBKK · ใบละกี่ Resume (= `scrape_target`) · เครื่อง · ส่งทีละใบด้วย `createJobPostingRequest` เส้นเดิม · ใบไหนไม่สำเร็จบอกรายใบ กดส่งใบที่เหลือได้ (ใบที่สำเร็จไม่ส่งซ้ำ)
+- ด่าน `src/lib/bulkScrap.ts`: ใบสั่งได้ = `soScrapMissing` ว่าง + ไม่มี Scrap ที่ So Scraping กำลังทำ (`fetchBoardJobPostings` + `soStatusView.open`) · รวมทั้งหน้าต้องไม่เกินโควต้าที่เว็บเหลือวันนี้ · ค่าเริ่มต่อใบ = แบ่งโควต้าเท่า ๆ กัน ไม่เกิน 20 (ไม่รู้โควต้า = 10)
+- เทสต์ `tests/api/bulkScrap2569-11-23.test.ts`
