@@ -16,6 +16,9 @@ if (HAS_DB) {
     throw new Error('DOCS_TEST_DATABASE_URL ต้องเป็นฐานทดสอบบนเครื่องนี้ (localhost · ชื่อฐานลงท้าย _docs หรือ _test)');
   }
   process.env.DATABASE_URL = url;
+  // 🔴 23 พ.ย. 2569: ตัวโหลดค่าของระบบ (api/_lib/env.ts) อ่าน .env.local แล้วเขียนทับ DATABASE_URL —
+  // รันจากโฟลเดอร์ที่ .env.local ชี้ฐานจริง เทสต์เคยล้างตารางของฐานจริง · ปิดตัวโหลดนั้น + resetAll เช็กฐานที่ต่อจริงก่อนล้าง
+  process.env.JARVIS_SKIP_LOCAL_ENV = '1';
   process.env.PGSCHEMA = 'jarvis_rm';
   process.env.PG_SSL = 'false';
   process.env.AUTH_JWT_SECRET = 'integration-test-secret-not-used-anywhere-else-0123456789';

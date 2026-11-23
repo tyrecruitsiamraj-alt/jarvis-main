@@ -1001,6 +1001,18 @@ export const API_CATALOG: ApiCatalogEntry[] = [
   "reachesPeople": true
  },
  {
+  "path": "/api/integrations/irecruit/applicant-documents",
+  "file": "api/_handlers/irecruit-documents.ts",
+  "methods": [
+   "GET",
+   "POST"
+  ],
+  "doc": "═══ iRecruit → Jarvis: ดึงเอกสารที่ผู้สมัครส่งผ่าน LINE (เจ้าของ 23 พ.ย. 2569 \"irecruit จะเรียกโหลดรูป\") ═══\n\n/api/integrations/irecruit/applicant-documents · ยืนยันตัว: header `x-api-key` (key ชื่อ `irecruit` ตัวเดียวกับผลแบบทดสอบ\n· ออก/ยกเลิกได้ที่ ตั้งค่า › เชื่อมระบบภายนอก)\n\nGET  ?national_id=1234567890123                         → ชุดเอกสารล่าสุดของเลขบัตรนี้ (ข้อมูล · ที่อยู่ · คำตอบเอกสาร · รายการรูป/PDF)\nGET  ?national_id=…&file=<file_id>                      → รูป (image/jpeg · image/png)\nGET  ?national_id=…&pdf=<doc>&packet_id=<packet_id>     → PDF ของเอกสารฉบับนั้น\nPOST { national_id, packet_id, irecruit_applicant_no, department? } → บันทึกว่านำเข้า iRecruit แล้ว (ชุดขึ้น \"นำเข้าแล้ว\")\n\nไม่พบเลขบัตร = 404 · ดึงได้เฉพาะคนที่ iRecruit มีเลขบัตร (ไม่มีเส้นไล่รายการทุกคน) · ห้าม cache\nเอกสารสำหรับทีม iRecruit: docs/irecruit-documents-api.md",
+  "query": [],
+  "body": [],
+  "reachesPeople": false
+ },
+ {
   "path": "/api/integrations/irecruit/skill-results",
   "file": "api/_handlers/irecruit-integration.ts",
   "methods": [

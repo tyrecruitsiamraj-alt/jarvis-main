@@ -28,7 +28,7 @@ export async function eraseDocumentsForApplications(
     );
     const { rows: packets } = await client.query<{ id: string }>(
       `update ${T.packets}
-          set erased_at = now(), person_name = $2, payload_enc = '', line_user_id = '', line_display_name = '', line_picture_url = null,
+          set erased_at = now(), person_name = $2, payload_enc = '', line_user_id = '', line_display_name = '', line_picture_url = null, national_id_hash = null,
               client_ip = null, user_agent = null, review_note = null, attention_ack_note = null
         where application_id = any($1::uuid[]) and erased_at is null
         returning id`,

@@ -30,6 +30,7 @@ import {
   recordEvent,
   sha256Hex,
   type ActiveTemplate,
+  nationalIdDigests,
 } from './core.js';
 import { verifyLineIdToken, type VerifiedLineProfile } from './line.js';
 import { checkDrawnSignature } from './signature.js';
@@ -393,8 +394,9 @@ export async function submitPacket(ctx: ApplicantContext, body: unknown, req: Ap
       `insert into ${T.packets}
          (invitation_id, application_id, job_id, job_label, department_code, revision, form_version, notice_version,
           template_versions, person_name, payload_enc, payload_key_id, payload_hash, signature_method, signature_hash,
-          attention, line_user_id, line_display_name, line_picture_url, line_verified_at, sender_relation, client_ip, user_agent)
-       values ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11, $12, $13, $14, $15, $16::jsonb, $17, $18, $19, $20, $21, $22, $23)
+          attention, line_user_id, line_display_name, line_picture_url, line_verified_at, sender_relation, client_ip, user_agent,
+          national_id_hash)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11, $12, $13, $14, $15, $16::jsonb, $17, $18, $19, $20, $21, $22, $23, $24)
        returning id, submitted_at`,
       [
         inv.id,
@@ -420,6 +422,8 @@ export async function submitPacket(ctx: ApplicantContext, body: unknown, req: Ap
         packet.senderRelation,
         resolveClientIp(req),
         (resolveUserAgent(req) ?? '').slice(0, 300) || null,
+        // iRecruit ดึงด้วยเลขบัตร (23 พ.ย. 2569 · migration 196) — เก็บแค่แฮช ย้อนเป็นเลขบัตรไม่ได้
+        nationalIdDigests(packet.person.nationalId)[0],
       ],
     );
     const packetId = ins[0].id;

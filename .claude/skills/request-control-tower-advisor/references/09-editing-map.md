@@ -14641,3 +14641,14 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 - `AppNavDrawer` รับ `prefs` (จาก `AppLayout`) แล้ว `applyNavPreferences` กับสองกลุ่ม — ชื่อ · ลำดับในกลุ่ม · ซ่อน · คีย์ = path เดิม (ค่าที่ตั้งไว้แล้วยังใช้ได้) · `applyNavPreferences`/`moveNavItem` เป็น generic
 - `NavMenuTab` แสดงสองกลุ่มเหมือนแถบ ย้ายขึ้น/ลงในกลุ่ม (shadcn `Input` / `Button`)
 - เทสต์ `tests/api/navMenuRealMenu2569-11-23.test.ts`
+
+### 23 พ.ย. 2569 (15) — iRecruit ดึงเอกสารที่ผู้สมัครส่งผ่าน LINE ด้วยเลขบัตรประชาชน
+- เส้น `GET/POST /api/integrations/irecruit/applicant-documents` (`api/_handlers/irecruit-documents.ts` · `withIntegrationKey('irecruit')` กุญแจเดียวกับผลแบบทดสอบ) · ตรรกะ `api/_lib/documents/irecruitPull.ts`
+- GET `?national_id=` = ชุดล่าสุดของเลขบัตรนั้น (ข้อมูล · ที่อยู่ · คำตอบ 5 ฉบับ · ลิงก์รูป/PDF) · `&file=` / `&pdf=&packet_id=` โหลดได้เฉพาะคู่กับเลขบัตรเจ้าของ · POST แจ้งเลขที่ iRecruit กลับ = ชุดขึ้น "นำเข้าแล้ว"
+- ค้นด้วย `document_packets.national_id_hash` (HMAC ด้วยกุญแจระบบ ย้อนเป็นเลขบัตรไม่ได้ · migration 196) · ชุดก่อนมีคอลัมน์ = ถอดรหัสเทียบทีละชุด · ล้างตาม PDPA ล้างค่านี้ด้วย
+- สเปกส่งทีม iRecruit `docs/irecruit-documents-api.md` · เทสต์ `tests/integration/documents/irecruitPull.test.ts`
+- 🔴 เทสต์ที่ล้างตาราง: harness ตั้ง `JARVIS_SKIP_LOCAL_ENV=1` + `resetAll` เรียก `assertLocalTestDb()` ก่อนล้าง (23 พ.ย. เคยล้างฐานจริงเพราะ `api/_lib/env.ts` อ่าน .env.local ทับ DATABASE_URL) · เทสต์คุม `tests/api/integrationDbGuard2569-11-23.test.ts`
+
+### 23 พ.ย. 2569 (16) — ผู้สมัครจาก Scrap ที่ซ่อนชื่อ = "ผู้สมัครซ่อนชื่อ"
+- So Scraping เพิ่ม `"so-candidate-data".candidates.name_hidden` · `loadRaw` อ่านแบบกันฐานที่ยังไม่มีคอลัมน์ (`to_jsonb(c)->>'name_hidden'`)
+- ชื่อบนจอ + ชื่อตอนเก็บเข้าการติดต่อมาจาก `scrapDisplayName` (`src/lib/scrapCandidates.ts`) ที่เดียว · ไม่มีชื่อแบบอื่นยัง "ไม่มีชื่อ" · เทสต์ `tests/api/scrapNameHidden2569-11-23.test.ts`

@@ -89,7 +89,7 @@ describe('ยืนยันตัว + ลงทะเบียน', () => {
   });
   it('อยู่ในทะเบียน API + ออกกุญแจได้จากหน้า ตั้งค่า › เชื่อมระบบภายนอก', () => {
     expect(readFileSync('api/_handlers/registry.ts', 'utf8')).toContain("'/api/integrations/irecruit/skill-results': irecruitSkillResultsHandler");
-    expect(INTEGRATIONS.find((i) => i.name === 'irecruit')?.endpoints).toEqual(['/api/integrations/irecruit/skill-results']);
+    expect(INTEGRATIONS.find((i) => i.name === 'irecruit')?.endpoints).toEqual(['/api/integrations/irecruit/skill-results', '/api/integrations/irecruit/applicant-documents']); // 23 พ.ย. 2569 + เอกสาร
   });
   it('ลิงก์ใบผลเปิดใบนั้นได้ตรง ๆ (?open=)', () => {
     expect(readFileSync('src/pages/skill-quiz/SkillQuizPage.tsx', 'utf8')).toContain("params.get('open')");

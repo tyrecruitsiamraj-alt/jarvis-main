@@ -6,7 +6,7 @@
  * 🔴 กุญแจเข้ารหัสมาจาก AUTH_JWT_SECRET (แบบเดียวกับเลขบัตรของแบบทดสอบ `piiCipher.ts`) — เปลี่ยนค่านี้แล้วเอกสารเดิมเปิดไม่ได้
  *    จนกว่าจะใส่ค่าเดิมไว้ที่ DOCUMENT_KEY_FALLBACK_SECRETS (คั่นด้วย ,) · ทุกแถวจด key_id ไว้ให้รู้ว่าเข้ารหัสด้วยกุญแจไหน
  */
-import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto';
+import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes } from 'node:crypto';
 import type { PoolClient } from 'pg';
 import { dbQuery, isPgUndefinedTable } from '../postgres.js';
 import { tableInAppSchema } from '../schema.js';
@@ -248,4 +248,12 @@ export async function staffDisplayName(userId: string, email: string): Promise<s
   } catch {
     return email.split('@')[0];
   }
+}
+
+/**
+ * แฮชเลขบัตรประชาชนไว้ค้นชุดเอกสาร (iRecruit ดึงด้วยเลขบัตร · 23 พ.ย. 2569) — HMAC ด้วยกุญแจระบบ ย้อนเป็นเลขบัตรไม่ได้
+ * ตัวแรก = กุญแจปัจจุบัน (ใช้ตอนบันทึก) · ที่เหลือ = กุญแจเก่า (ใช้ตอนค้น ชุดที่บันทึกก่อนเปลี่ยนกุญแจยังหาเจอ)
+ */
+export function nationalIdDigests(nationalId: string): string[] {
+  return keys().map(({ key }) => createHmac('sha256', key).update(`national-id:${nationalId}`).digest('hex'));
 }

@@ -20,7 +20,21 @@ export { HAS_DB, settingsHandler, invitationsHandler, packetsHandler, notificati
 
 export type TestUser = { id: string; email: string; role: string; cookie: string };
 
+/**
+ * 🔴 ก่อนล้างตาราง ถามฐานเองว่าคือใคร (23 พ.ย. 2569 เทสต์เคยล้างฐานจริงเพราะตัวโหลดค่าเขียนทับ DATABASE_URL)
+ * ต้องเป็นฐานชื่อลงท้าย _docs/_test บนเครื่องนี้เท่านั้น — ไม่ตรง = หยุดทันที ไม่ล้างอะไร
+ */
+export async function assertLocalTestDb(): Promise<void> {
+  const { rows } = await dbQuery<{ db: string; addr: string | null }>(`select current_database() as db, inet_server_addr()::text as addr`);
+  const db = rows[0]?.db ?? '';
+  const addr = (rows[0]?.addr ?? '').replace(/\/\d+$/, '');
+  if (!/(_docs|_test)$/.test(db) || !['', '127.0.0.1', '::1'].includes(addr)) {
+    throw new Error(`ไม่ใช่ฐานทดสอบในเครื่อง (${db} @ ${addr || 'socket'}) — หยุด ไม่ล้างตาราง`);
+  }
+}
+
 export async function resetAll(): Promise<void> {
+  await assertLocalTestDb();
   await dbQuery(
     `truncate ${T.imports}, ${T.outbox}, ${T.packets}, ${T.blobs}, ${T.files}, ${T.sessions}, ${T.events}, ${T.invitations},
               ${T.templatePages}, ${T.templates}, ${T.settings}, ${T.notifications} restart identity cascade`,
