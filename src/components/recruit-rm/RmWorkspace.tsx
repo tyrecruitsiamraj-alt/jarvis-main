@@ -6,6 +6,7 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { useSearchParams } from 'react-router-dom';
 import { CalendarDays, ChevronDown, ChevronRight, Download, FileSpreadsheet, RotateCcw, X } from 'lucide-react';
 import FilterChips from '@/components/shared/FilterChips';
+import RmKpiStrip from '@/components/recruit-rm/RmKpiStrip';
 import FilterChipsDropdown from '@/components/shared/FilterChipsDropdown';
 import { cn } from '@/lib/utils';
 import { DASH, TONE } from '@/lib/designTokens';
@@ -58,12 +59,15 @@ import { ATTENDANCE_LABEL, type AttendanceResult } from '@/lib/appointmentAttend
 import { SCREENING_LABEL, isScreeningResult, type ScreeningResult } from '@/lib/appointmentScreening';
 import {
   APPOINTMENT_CHIPS,
+  APPOINTMENT_KPI_IDS,
+  APPOINTMENT_KPI_TONE,
+  appointmentEquation,
   appointmentChipCount,
   buildAppointmentBoard,
   isInAppointmentChip,
   type AppointmentChip,
 } from '@/lib/appointmentBoard';
-import { CONTACT_CHIPS, isInContactChip, type ContactChip } from '@/lib/recruitRm';
+import { CONTACT_CHIPS, CONTACT_KPI_TONE, contactEquation, isInContactChip, type ContactChip } from '@/lib/recruitRm';
 import {
   RM_APPOINTMENT_SCOPES,
   RM_APPOINTMENT_SCOPE_LABEL,
@@ -1081,7 +1085,25 @@ const RmWorkspace: React.FC<{
         </div>
       ) : null}
       {!bucket && tab === 'contact' ? (
-        <div className="mt-4 flex flex-wrap items-center gap-2">
+        <div className="mt-4 space-y-2">
+          {/* กล่องเลข 5 กล่อง + สมการ (แบบร่างรอบ 4 · เจ้าของ "ทำเลย" 23 พ.ย. 2569) — แทนชิปกรองเดิม ข้อมูลชุดเดียวกัน */}
+          <RmKpiStrip
+            testId="contact-kpi"
+            ariaLabel="กรองการติดต่อ"
+            value={contactChip}
+            onChange={(next) => {
+              setContactChip(next);
+              setPage(1);
+              setSelectedIds([]);
+            }}
+            items={CONTACT_CHIPS.map((c) => ({
+              ...c,
+              tone: CONTACT_KPI_TONE[c.id],
+              count: loading ? null : loadError ? 'unknown' : contactChipCounts[c.id],
+            }))}
+            equation={loading || loadError ? null : contactEquation(contactChipCounts)}
+          />
+        <div className="flex flex-wrap items-center gap-2">
           {/* ของฉัน / ทุกคน (เจ้าของ 10 พ.ย. 2569 "ใครเก็บไปแล้วยังไม่โทรบ้าง") — แบบเดียวกับแท็บติดตามนัดหมาย · มุมมอง Lead/ยกเลิกไม่มีปุ่มนี้ */}
           {canSeeEveryoneContact && !leadView && !cancelledView ? (
             <ToggleGroup
@@ -1106,20 +1128,30 @@ const RmWorkspace: React.FC<{
               ))}
             </ToggleGroup>
           ) : null}
-          <FilterChips
-            ariaLabel="กรองการติดต่อ"
-            value={contactChip}
-            onChange={(next) => {
-              setContactChip(next);
-              setPage(1);
-              setSelectedIds([]);
-            }}
-            chips={CONTACT_CHIPS.map((c) => ({ ...c, count: loading ? null : loadError ? 'unknown' : contactChipCounts[c.id] }))}
-          />
+        </div>
         </div>
       ) : null}
       {!bucket && tab === 'appointments' ? (
-        <div className="mt-4 flex flex-wrap items-center gap-2">
+        <div className="mt-4 space-y-2">
+          {/* กล่องเลข 5 กล่อง + สมการ นัดทั้งหมด = รอผล + มา + ไม่มา (แบบร่างรอบ 4 · 23 พ.ย. 2569) · ชิปรองอยู่แถวล่าง */}
+          <RmKpiStrip
+            testId="appointment-kpi"
+            ariaLabel="กรองผลนัด"
+            value={appointmentChip}
+            onChange={(next) => {
+              setAppointmentChip(next);
+              setPage(1);
+              setSelectedIds([]);
+            }}
+            items={APPOINTMENT_KPI_IDS.map((id) => ({
+              id,
+              label: APPOINTMENT_CHIPS.find((c) => c.id === id)?.label ?? id,
+              tone: APPOINTMENT_KPI_TONE[id],
+              count: loading ? null : loadError ? 'unknown' : appointmentChipCount(appointmentBoard, id),
+            }))}
+            equation={loading || loadError ? null : appointmentEquation(appointmentBoard)}
+          />
+        <div className="flex flex-wrap items-center gap-2">
           {/* ของฉัน / ทุกคน (QA รอบ 2 ข้อ 4 · Choice 10 ต.ค. 2569) — supervisor ขึ้นไปเท่านั้น · ToggleGroup ของ shadcn
               ขนาด xs เท่าชิปข้าง ๆ · มุมมอง Lead/ยกเลิก มีเงื่อนไขของตัวเอง ไม่มีปุ่มนี้ */}
           {canSeeEveryoneAppointments(user?.role) && !leadView && !cancelledView ? (
@@ -1153,7 +1185,7 @@ const RmWorkspace: React.FC<{
               setPage(1);
               setSelectedIds([]);
             }}
-            chips={APPOINTMENT_CHIPS.map((c) => ({
+            chips={APPOINTMENT_CHIPS.filter((c) => !APPOINTMENT_KPI_IDS.includes(c.id)).map((c) => ({
               id: c.id,
               label: c.label,
               // โหลดล้ม = "—" เหมือนแท็บอื่น (QA 17 ต.ค. 2569: เดิมขึ้น 0)
@@ -1171,6 +1203,7 @@ const RmWorkspace: React.FC<{
             <CalendarDays aria-hidden /> รายวัน
             <ChevronDown className={cn('transition-transform', showAppointmentDays && 'rotate-180')} aria-hidden />
           </Button>
+        </div>
         </div>
       ) : null}
 

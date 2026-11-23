@@ -131,6 +131,15 @@ function AiAnswerCell({ r }: { r: PublicApplication }) {
   );
 }
 
+/** บรรทัดใต้หน่วยงาน: ตำแหน่ง · เลขใบขอ (ใบขอ ERP / ใบขอชั่วคราว) — ไม่มีทั้งคู่ = null */
+function jobLine(r: PublicApplication): string | null {
+  const position = (r.job_title || r.position_interest || '').replace(/\p{Extended_Pictographic}/gu, '').trim();
+  const unit = (r.unit_name ?? '').trim();
+  const m = /^siamraj-(?:sql|pre):(.+)$/.exec(r.job_id ?? '');
+  const parts = [position && position !== unit ? position : '', m ? m[1] : ''].filter(Boolean);
+  return parts.length ? parts.join(' · ') : null;
+}
+
 const ACTION_ICON: Record<RmRowAction, typeof Phone> = {
   bookmark: BookmarkPlus,
   call: Phone,
@@ -186,6 +195,29 @@ const RmTable: React.FC<{
    * แท็บการติดตาม/ติดตามนัดหมายยังชุดเดิม (ต้องเห็นเบอร์ตอนโทร)
    */
   const ownerColumns = tab === 'candidates';
+  /** ช่อง "นัด" = วันเวลานัด (เลยวันนัดสีเตือน) · สถานที่ · ลงงาน · นัดโดย */
+  const appointmentCell = (r: PublicApplication) => {
+    const ymd = r.appointment_at ? toYmdBangkok(new Date(r.appointment_at)) : null;
+    // เลยวันนัดแล้วยังไม่ลงผล = สีเตือน + "เลยวันนัด" (QA รอบ 3 ข้อ 23)
+    const overdue = Boolean(ymd && ymd < toYmdBangkok(new Date()) && !r.attendance_result);
+    const time = appointmentTimeOf(r.appointment_at);
+    return (
+      <td className="px-1.5 py-2" title={r.appointment_job || undefined}>
+        <span className="flex flex-col gap-0.5">
+          <span className={cn('whitespace-nowrap tabular-nums', overdue ? TONE.orange.value : DASH.cell)}>
+            {ymd ? formatYmdTh(ymd) : EM_DASH}
+            {time ? ` ${time} น.` : ''}
+            {overdue ? ' · เลยวันนัด' : ''}
+          </span>
+          <span className={cn('line-clamp-2 min-w-32 break-words text-xs', DASH.cellMuted)}>
+            {[r.appointment_place, r.appointment_job ? `ลงงาน ${r.appointment_job}` : '', r.appointment_at ? `นัดโดย ${r.appointment_by || EM_DASH}` : '']
+              .filter(Boolean)
+              .join(' · ') || EM_DASH}
+          </span>
+        </span>
+      </td>
+    );
+  };
   /** ปุ่มบันทึกผลนัด มาแล้ว/ไม่มา — ตั้งแต่วันนัด (เวลาไทย) เป็นต้นไป · กดซ้ำเพื่อแก้ได้ (append-only ล่าสุดชนะ) */
   const attendanceButtons = (r: PublicApplication, stacked = false) =>
     r.appointment_at && canRecordAttendance(r.appointment_at, new Date()) ? (
@@ -245,7 +277,9 @@ const RmTable: React.FC<{
    * 🔴 ว่างแล้วตารางห้ามหาย (กติกา 1 ต.ค. 2569 · QA 5 ต.ค. 2569 เจอว่าตารางหายเหลือย่อหน้า)
    * ⇒ หัวตารางอยู่เสมอ + แถวเดียว "ไม่พบใบสมัคร" · จำนวนคอลัมน์ต้องตรงกับหัวข้างล่าง
    */
-  const colCount = 1 + (ownerColumns ? 11 : 5) + (tab === 'appointments' ? 1 : 0) + (tab === 'contact' ? 1 : 0) + 1;
+  /** แท็บติดตามนัดหมาย (แบบร่างรอบ 4 · เจ้าของ "ทำเลย" 23 พ.ย. 2569): ผู้สมัคร · หน่วยงาน·ใบขอ · นัด · สถานะ · ผลนัด · ทำงาน (ไม่มีที่อยู่/สมัคร) */
+  const apptColumns = tab === 'appointments';
+  const colCount = 1 + (ownerColumns ? 11 : apptColumns ? 3 : 5) + (apptColumns ? 2 : 0) + (tab === 'contact' ? 1 : 0) + 1;
 
   return (
     <div className={cn('overflow-hidden rounded-xl border', DASH.card)}>
@@ -288,9 +322,9 @@ const RmTable: React.FC<{
               ) : (
                 <>
                   <th className={cn(STICKY_NAME, 'px-1.5 py-2 font-medium', DASH.stickyHead)}>ผู้สมัคร</th>
-                  <th className="px-1.5 py-2 font-medium">ที่อยู่</th>
-                  <th className="px-1.5 py-2 font-medium">หน่วยงาน</th>
-                  <th className="px-1.5 py-2 font-medium">สมัคร</th>
+                  {apptColumns ? null : <th className="px-1.5 py-2 font-medium">ที่อยู่</th>}
+                  <th className="px-1.5 py-2 font-medium">หน่วยงาน · ใบขอ</th>
+                  {apptColumns ? <th className="px-1.5 py-2 font-medium">นัด</th> : <th className="px-1.5 py-2 font-medium">สมัคร · ช่องทาง</th>}
                   {/* สถานะ 5 คำ ทั้งแท็บการติดต่อ + ติดตามนัดหมาย (เจ้าของ Choice 18 พ.ย. 2569) */}
                   <th className="px-1.5 py-2 font-medium">สถานะ</th>
                 </>
@@ -300,7 +334,7 @@ const RmTable: React.FC<{
                   "นัด" = วันนัด + นัดที่ไหน/ลงใบไหน (ลิสต์ข้อ 9) ในช่องเดียว */}
               {/* ผลติดตามนัด มา/ไม่มา (migration 089) อยู่บรรทัดล่างของช่องเดียวกัน — เดิมเป็นคอลัมน์แยก
                   (แท็บนี้กว้างเกินช่องข้างแถบกรอง ~180px ที่จอ 1280 · 28 ก.ย. 2569) */}
-              {tab === 'appointments' ? <th className="px-1.5 py-2 font-medium">นัด · มา/ไม่มา</th> : null}
+              {apptColumns ? <th className="px-1.5 py-2 font-medium">ผลนัด</th> : null}
               {/* stamp "โทรตอนไหน" — เฉพาะแท็บการติดต่อ (เจ้าของสั่ง 14 ส.ค. 2569:
                   "ปุ่มโทร เพื่อ Stamp ว่าโทรตอนไหน") · กดปุ่มโทร = จับ hold (heldAt =
                   เวลาที่กด) · มีผลแล้ว = last_call_at (เวลาบันทึกผลล่าสุด) */}
@@ -308,7 +342,7 @@ const RmTable: React.FC<{
                 <th className="px-1.5 py-2 font-medium">โทรล่าสุด</th>
               ) : null}
               {/* มือถือ: คอลัมน์ปุ่มติดขวา ไม่ต้องปัดหา (QA รอบ 2 ข้อ 30) */}
-              <th className="px-1.5 py-2 text-right font-medium max-lg:sticky max-lg:right-0 max-lg:bg-card">ตัวเลือก</th>
+              <th className="px-1.5 py-2 text-right font-medium max-lg:sticky max-lg:right-0 max-lg:bg-card">{ownerColumns ? 'ตัวเลือก' : 'ทำงาน'}</th>
             </tr>
           </thead>
           <tbody>
@@ -344,8 +378,12 @@ const RmTable: React.FC<{
               const unitCell = (
                 <td className={cn('px-1.5 py-2', DASH.cell)} title={applicationJobLabel(r)}>
                   <span className="flex min-w-32 items-start gap-1.5">
-                    <span className="line-clamp-3 break-words">
-                      {dashIfEmpty((r.unit_name ?? '').trim() ? applicationUnitLabel(r) : (unitOf?.(r) ?? applicationUnitLabel(r)))}
+                    <span className="flex flex-col gap-0.5">
+                      <span className="line-clamp-3 break-words">
+                        {dashIfEmpty((r.unit_name ?? '').trim() ? applicationUnitLabel(r) : (unitOf?.(r) ?? applicationUnitLabel(r)))}
+                      </span>
+                      {/* ตำแหน่ง · เลขใบขอ (แบบร่างรอบ 4) — ไม่มีทั้งคู่ไม่ขึ้นบรรทัดนี้ */}
+                      {ownerColumns ? null : jobLine(r) ? <span className={cn('line-clamp-2 break-words text-xs', DASH.cellMuted)}>{jobLine(r)}</span> : null}
                     </span>
                     {r.has_document ? (
                       <FileText className={cn('h-3.5 w-3.5 shrink-0', DASH.muted)} aria-label="มีเอกสารแนบ" />
@@ -485,16 +523,19 @@ const RmTable: React.FC<{
                           <ChoiceCountdownChip r={r} now={now} />
                         </span>
                       </td>
-                      {addressCell}
+                      {apptColumns ? null : addressCell}
                       {unitCell}
+                      {apptColumns ? appointmentCell(r) : null}
                       {/* สมัคร = วันที่สมัคร / ผ่านมาแล้วกี่วัน · ช่องทาง
                           ⚠️ created_at ที่หายไปทำให้ .slice พังทั้งหน้า — gate ก่อนเสมอ
                           ห้าม .slice(0,10) ตรง ๆ = วันที่ฝั่ง UTC · ใบกรอกเที่ยงคืน–07:00 น. ไทยจะถอยไป 1 วัน
                           · ผ่านมาแล้วกี่วันนับตามปฏิทินกรุงเทพ (ใบเมื่อวานสามทุ่ม = "1 วัน" ตั้งแต่เช้านี้) */}
+                      {apptColumns ? null : (
                       <td className="px-1.5 py-2 whitespace-nowrap">
                         <span className="flex flex-col gap-0.5">
-                          <span className={cn('tabular-nums', DASH.cell)}>
-                            {r.created_at ? formatYmdTh(toYmdBangkok(new Date(r.created_at))) : EM_DASH}
+                          {/* วันที่ + เวลาสมัคร (เจ้าของ 23 พ.ย. 2569 "บอกแต่วันที่สมัครไม่บอกเวลาสมัครหรอ") */}
+                          <span className={cn('tabular-nums', DASH.cell)} data-testid="rm-applied-at">
+                            {r.created_at ? formatDateTimeTh(r.created_at) : EM_DASH}
                           </span>
                           <span className={cn('text-xs tabular-nums', DASH.cellMuted)}>
                             {daysAppliedText(r.created_at, now)}
@@ -504,44 +545,17 @@ const RmTable: React.FC<{
                           </span>
                         </span>
                       </td>
+                      )}
                       <td className="px-1.5 py-2">
                         <ProcessCell r={r} />
                       </td>
                     </>
                   )}
-                  {tab === 'appointments' ? (
-                    <td className="px-1.5 py-2" title={r.appointment_job || undefined}>
-                      {/* วันนัดเก็บเป็น ISO เต็ม (เที่ยงวันไทย) — ตัดเอาเฉพาะวันที่ฝั่งไทย
-                          ห้าม .slice(0,10) ตรง ๆ เพราะนั่นคือวันที่ฝั่ง UTC */}
-                      <span className="flex flex-col gap-0.5">
-                        {/* เลยวันนัดแล้วยังไม่ลงผล = สีเตือน + "เลยวันนัด" (QA รอบ 3 ข้อ 23 · เดิมหน้าตาเหมือนนัดปกติ) */}
-                        {(() => {
-                          const ymd = r.appointment_at ? toYmdBangkok(new Date(r.appointment_at)) : null;
-                          const overdue = Boolean(ymd && ymd < toYmdBangkok(new Date()) && !r.attendance_result);
-                          return (
-                            <span className={cn('whitespace-nowrap tabular-nums', overdue ? TONE.orange.value : DASH.cell)}>
-                              {ymd ? formatYmdTh(ymd) : EM_DASH}
-                              {/* เวลานัด (21 ต.ค. 2569) · นัดเก่าไม่มีเวลา */}
-                              {appointmentTimeOf(r.appointment_at) ? ` ${appointmentTimeOf(r.appointment_at)} น.` : ''}
-                              {overdue ? ' · เลยวันนัด' : ''}
-                            </span>
-                          );
-                        })()}
-                        <span className={cn('line-clamp-2 min-w-32 break-words text-xs', DASH.cellMuted)}>
-                          {/* "ลงงาน …" นำหน้า — เดิม "หาล่วงหน้า" ลอยใต้วันที่ไม่รู้ว่าคืออะไร (QA 18 ต.ค. 2569) */}
-                          {r.appointment_place || r.appointment_job
-                            ? `${r.appointment_place ?? ''}${r.appointment_place && r.appointment_job ? ' · ' : ''}${r.appointment_job ? `ลงงาน ${r.appointment_job}` : ''}`
-                            : EM_DASH}
-                        </span>
-                        {/* คนนัด = บัญชีที่ล็อกอินตอนบันทึกนัด (เจ้าของ 20 ต.ค. 2569 — เจ้าของใบขออาจไม่ใช่คนนัด) */}
-                        {r.appointment_at ? (
-                          <span className={cn('whitespace-nowrap text-xs', DASH.cellMuted)}>นัดโดย {r.appointment_by || EM_DASH}</span>
-                        ) : null}
-                        {/* ผลติดตามนัด (089): ปุ่มคู่โผล่ตั้งแต่วันนัด (เวลาไทย) เป็นต้นไป
-                            กดซ้ำเพื่อแก้ได้ (append-only ล่าสุดชนะ) — ปุ่มที่เลือกอยู่ติดสีเต็ม
-                            ยังไม่ถึงวันนัด = ไม่มีบรรทัดนี้ */}
-                        {/* มือถือย้ายปุ่มคู่ไปช่องตัวเลือก (ติดขวา) — เดิมต้องปัดจอถึงเห็น (QA 17 ต.ค. 2569) */}
-                        <span className="max-sm:hidden">{attendanceButtons(r)}</span>
+                  {apptColumns ? (
+                    <td className="px-1.5 py-2">
+                      {/* ผลนัด: มาแล้ว/ไม่มา → ผ่าน/ไม่ผ่าน โผล่ตั้งแต่วันนัด · ยังไม่ถึงวันนัดบอกว่าลงได้เมื่อไหร่ · มือถือย้ายไปช่องทำงาน */}
+                      <span className="max-sm:hidden">
+                        {attendanceButtons(r) ?? (r.appointment_at ? <span className={cn('text-xs', DASH.cellMuted)}>ลงผลได้ตั้งแต่วันนัด</span> : EM_DASH)}
                       </span>
                     </td>
                   ) : null}
@@ -626,7 +640,8 @@ const RmTable: React.FC<{
                         // ส่ง AI ใหม่ (19 ต.ค. 2569) — สายเดิมเงียบเกิน 24 ชม. ปุ่มมีคำให้เห็นชัด
                         const resend = a === 'ai' && silentAi && !disabled;
                         // ปุ่มส่ง AI โทรมีคำเสมอ (QA 15 พ.ย. 2569) — เดิมเป็นไอคอนเปล่าวางติดปุ่มเก็บ Lead/ดูรายละเอียด กดสั่งโทรจริงพลาดได้
-                        const worded = (tab === 'appointments' && a === 'rule') || a === 'ai' || a === 'docs' || a === 'irecruit';
+                        // แท็บการติดต่อ: ปุ่มมีคำทุกปุ่ม (แบบร่างรอบ 4 · 23 พ.ย. 2569) — โทร · ดำเนินการ · ส่งเอกสาร · ถอย Lead
+                        const worded = tab === 'contact' || (tab === 'appointments' && a === 'rule') || a === 'ai' || a === 'docs' || a === 'irecruit';
                         // ปุ่มกลมไม่มีกรอบ สีเทา แบบ iRecruit (rm-action-btn) — ใช้ Button ของ shadcn
                         return (
                           <Button
@@ -647,7 +662,7 @@ const RmTable: React.FC<{
                             }
                           >
                             <Icon aria-hidden />
-                            {worded ? (resend ? 'ส่ง AI ใหม่' : a === 'ai' ? 'ส่ง AI โทร' : a === 'rule' ? 'บันทึกผล' : RM_ROW_ACTION_LABEL[a]) : null}
+                            {worded ? (resend ? 'ส่ง AI ใหม่' : a === 'ai' ? 'ส่ง AI โทร' : a === 'rule' ? 'ลงผล' : tab === 'contact' ? rmRowActionLabel(tab, a) : RM_ROW_ACTION_LABEL[a]) : null}
                           </Button>
                         );
                       })}

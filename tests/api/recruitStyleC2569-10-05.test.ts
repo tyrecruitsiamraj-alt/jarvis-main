@@ -64,7 +64,9 @@ describe('แถวเครื่องมือรายแท็บ', () => {
 
 describe('ชิปกรองหัวแท็บ (แทนกล่องตัวเลข)', () => {
   it('ทุกแท็บของ RmWorkspace ใช้ FilterChips ตัวเดียวกัน · ถัง drill-down ไม่มีชิป', () => {
-    expect(WS.match(/<FilterChips/g)?.length).toBe(3);
+    // 23 พ.ย. 2569 แบบร่างรอบ 4: การติดต่อ/นัดหมาย ใช้กล่องเลข RmKpiStrip (ข้อมูลชุดเดียวกับชิป) · นัดหมายเหลือชิปรอง 1 แถว
+    expect(WS.match(/<FilterChips/g)?.length).toBe(2);
+    expect(WS.match(/<RmKpiStrip/g)?.length).toBe(2);
     expect(WS).toContain("!bucket && tab === 'candidates'");
     expect(WS).toContain("!bucket && tab === 'contact'");
     expect(WS).toContain("!bucket && tab === 'appointments'");

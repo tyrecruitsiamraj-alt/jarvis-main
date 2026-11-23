@@ -4,6 +4,7 @@ import { isOverAge } from '@/lib/applicantAge';
 import { aiQueueStatusOf } from '@/lib/applicantAiQueueStatus';
 import { isInterestedApplicant, isNotInterestedApplicant } from '@/lib/applicantCallOutcome';
 import type { UserRole } from '@/types';
+import type { ToneKey } from '@/lib/designTokens';
 /**
  * งานสรรหา (RM) — นิยามกลางของหน้า `/recruit/rm`
  *
@@ -680,7 +681,8 @@ export const DOCS_DISABLED_REASON = 'ระบบส่งเอกสารป�
  */
 export const RM_CONTACT_ACTION_LABEL: Partial<Record<RmRowAction, string>> = {
   dial: 'โทร',
-  view: 'ดำเนินการ',
+  /** แบบร่างรอบ 4 (เจ้าของ "ทำเลย" 23 พ.ย. 2569) — เดิม "ดำเนินการ" · เปิดป๊อปลงผลติดต่อ/นัดหมาย */
+  view: 'ลงผล',
   release: 'ถอย Lead',
 };
 
@@ -718,4 +720,19 @@ export function canHoldApplication(row: {
     return { ok: false, reason: 'ใบคีย์เองที่ไม่ผูกใบขอ เก็บไปโทรเองไม่ได้' };
   }
   return { ok: true };
+}
+
+/** สีกล่องเลขแท็บการติดต่อ (แบบร่างรอบ 4 · 23 พ.ย. 2569) — เขียว = ติดต่อได้ · แดง = ติดต่อไม่ได้ · เหลือง = ยังไม่โทร */
+export const CONTACT_KPI_TONE: Record<ContactChip, ToneKey> = {
+  all: 'neutral',
+  uncalled: 'warn',
+  called: 'info',
+  ok: 'success',
+  fail: 'danger',
+};
+
+/** สมการใต้กล่องเลข — ทั้งหมด = ยังไม่โทร + โทรแล้ว · โทรแล้ว = ติดต่อได้ + ติดต่อไม่ได้ (นิยามใน `isInContactChip`) */
+export function contactEquation(c: Record<ContactChip, number>): string {
+  const n = (x: number) => x.toLocaleString('th-TH');
+  return `ทั้งหมด ${n(c.all)} = ยังไม่โทร ${n(c.uncalled)} + โทรแล้ว ${n(c.called)} · โทรแล้ว ${n(c.called)} = ติดต่อได้ ${n(c.ok)} + ติดต่อไม่ได้ ${n(c.fail)}`;
 }

@@ -9,6 +9,7 @@
  */
 import { isAttendanceResult, type AttendanceResult } from './appointmentAttendance';
 import { toYmdBangkok } from './dateTh';
+import type { ToneKey } from './designTokens';
 
 export type AppointmentBoardRow = {
   appointment_at?: string | null;
@@ -146,4 +147,25 @@ export function isInAppointmentChip(
   if (chip === 'passed') return result === 'showed' && r.screening_result === 'passed';
   if (chip === 'not_passed') return result === 'showed' && r.screening_result === 'not_passed';
   return result === null || result === 'rescheduled';
+}
+
+/** กล่องเลขหัวแท็บติดตามนัดหมาย (แบบร่างรอบ 4 · 23 พ.ย. 2569) — ที่เหลือ (เลยวันนัด · ผ่าน · ไม่ผ่าน) เป็นชิปแถวล่าง */
+export const APPOINTMENT_KPI_IDS: readonly AppointmentChip[] = ['all', 'pending', 'showed', 'no_show', 'today'];
+
+export const APPOINTMENT_KPI_TONE: Record<AppointmentChip, ToneKey> = {
+  all: 'neutral',
+  pending: 'warn',
+  showed: 'success',
+  no_show: 'danger',
+  today: 'primary',
+  overdue: 'danger',
+  passed: 'success',
+  not_passed: 'danger',
+};
+
+/** สมการใต้กล่องเลข — นัดทั้งหมด = รอผล (รวมเลื่อนนัด) + มา + ไม่มา · ผลรวมนี้คุมด้วยเทสต์ของ `buildAppointmentBoard` */
+export function appointmentEquation(board: AppointmentBoard): string {
+  const t = board.total;
+  const n = (x: number) => x.toLocaleString('th-TH');
+  return `นัดทั้งหมด ${n(t.total)} = รอผล ${n(t.pending + t.rescheduled)} + มา ${n(t.showed)} + ไม่มา ${n(t.noShow)}`;
 }

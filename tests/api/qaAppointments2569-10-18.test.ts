@@ -13,7 +13,8 @@ describe('คำเดียว มา / ไม่มา', () => {
     expect(ATTENDANCE_LABEL.no_show).toBe('ไม่มา');
     const t = read('src/components/recruit-rm/RmTable.tsx');
     expect(t).not.toContain("'มาแล้ว'");
-    expect(t).toContain('นัด · มา/ไม่มา');
+    // 23 พ.ย. 2569 แบบร่างรอบ 4: แยกเป็นคอลัมน์ "นัด" กับ "ผลนัด"
+    expect(t).toContain('>ผลนัด</th>');
     expect(read('src/components/recruit-rm/ApplicantContactDialog.tsx')).not.toMatch(/ติดตามสำเร็จ|ติดตามไม่สำเร็จ/);
   });
 });
@@ -48,7 +49,7 @@ describe('สถานะจอ + มือถือ + ปุ่ม', () => {
     expect(read('src/components/jobs/JobBoardView.tsx')).toContain('const t = window.setTimeout(run, 400);');
   });
   it('ปุ่มบันทึกผล/รีเฟรชมีคำ · ของฉัน/ทุกคน ตัวที่เลือกทึบ', () => {
-    expect(read('src/components/recruit-rm/RmTable.tsx')).toContain("const worded = (tab === 'appointments' && a === 'rule') || a === 'ai' || a === 'docs' || a === 'irecruit';");
+    expect(read('src/components/recruit-rm/RmTable.tsx')).toContain("const worded = tab === 'contact' || (tab === 'appointments' && a === 'rule') || a === 'ai' || a === 'docs' || a === 'irecruit';");
     // ปุ่มรีเฟรชถอดทุกหน้า (เจ้าของ 11 พ.ย. 2569 "เกะกะ" · "ทุกหน้าเลยนะ")
     expect(read('src/components/jobs/JobBoardView.tsx')).not.toContain('รีเฟรช</Button>');
     expect(read('src/components/ui/toggle.tsx')).toContain('data-[state=on]:bg-primary');

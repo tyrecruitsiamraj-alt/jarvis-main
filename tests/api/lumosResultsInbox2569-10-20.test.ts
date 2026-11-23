@@ -44,7 +44,7 @@ describe('แท็บติดตามนัดหมาย: เจ้าห�
     expect(sql).toContain('left join ${usersTable} u on u.id = c.created_by');
     expect(sql).toContain("nullif(btrim(u.nickname), '')");
     expect(read('api/_handlers/job-applications.ts')).toContain('appointment_by = fromLog.by');
-    expect(read('src/components/recruit-rm/RmTable.tsx')).toContain('นัดโดย {r.appointment_by || EM_DASH}');
+    expect(read('src/components/recruit-rm/RmTable.tsx')).toContain('`นัดโดย ${r.appointment_by || EM_DASH}`');
   });
 });
 
