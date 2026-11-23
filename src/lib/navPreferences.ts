@@ -48,10 +48,13 @@ export function normalizeNavPreferences(raw: unknown): NavPreferences {
  * ใช้ index เดิมเป็นลำดับตั้งต้น แล้วให้ `order` ที่ตั้งไว้ทับเฉพาะตัวที่ตั้ง
  * ⚠️ เรียงต้อง **stable**: ลำดับเท่ากันให้ยึด index เดิม ไม่งั้นเมนูสลับที่เองทุกครั้งที่โหลด
  */
-export function applyNavPreferences(
-  items: DockNavItem[],
+/** เมนูที่จัดได้ — ต้องมีแค่ path (คีย์) กับชื่อ · ใช้ได้ทั้งเมนูแถบซ้าย (สายพาน/คลังข้อมูล) และรายการเก่า */
+type NavLike = { path: string; label: string };
+
+export function applyNavPreferences<T extends NavLike = DockNavItem>(
+  items: T[],
   prefs: NavPreferences | null | undefined,
-): DockNavItem[] {
+): T[] {
   const p = prefs ?? {};
   return items
     .map((item, index) => {
@@ -72,8 +75,8 @@ export function applyNavPreferences(
  * ย้ายเมนูขึ้น/ลง 1 ขั้น แล้วคืน preferences ชุดใหม่ — **เขียน `order` ให้ทุกตัว**
  * เพราะถ้าเขียนเฉพาะสองตัวที่สลับ ตัวที่เหลือยังใช้ index เดิมซึ่งอาจชนกันจนสลับมั่ว
  */
-export function moveNavItem(
-  items: DockNavItem[],
+export function moveNavItem<T extends NavLike>(
+  items: T[],
   prefs: NavPreferences,
   path: string,
   direction: -1 | 1,

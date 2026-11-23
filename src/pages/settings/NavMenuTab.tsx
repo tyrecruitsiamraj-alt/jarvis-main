@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
-import { DOCK_NAV_ITEMS } from '@/components/layout/bottom-nav/dockNavConfig';
+import { Input } from '@/components/ui/input';
+import { navMenuGroups } from '@/lib/soRecruitNav';
 import {
   applyNavPreferences,
   moveNavItem,
@@ -11,7 +12,6 @@ import {
 } from '@/lib/navPreferences';
 import { fetchNavPreferences, saveNavPreferences } from '@/lib/navPreferencesApi';
 import { NAV_PREFERENCES_CHANGED_EVENT } from '@/lib/navPreferencesEvent';
-import { filterByMinimumRole } from '@/lib/rbac';
 import { TONE } from '@/lib/designTokens';
 import { cn } from '@/lib/utils';
 import { ArrowDown, ArrowUp, Eye, EyeOff, LoaderCircle, RotateCcw, Save } from 'lucide-react';
@@ -59,8 +59,12 @@ const NavMenuTab: React.FC = () => {
     });
   }, []);
 
-  const baseItems = useMemo(() => filterByMinimumRole(DOCK_NAV_ITEMS, 'admin'), []);
-  const preview = useMemo(() => applyNavPreferences(baseItems, prefs), [baseItems, prefs]);
+  /**
+   * 23 พ.ย. 2569 (เจ้าของ "หน้าตั้งค่าที่จัดเมนูไม่เห็นจัดได้จริง") — รายการ = เมนูจริงในแถบซ้าย แยกสองกลุ่มเหมือนแถบ
+   * เดิมเป็นรายการเมนูชุดเก่า 6 อันที่แถบซ้ายไม่อ่านลำดับ/ชื่อ · ย้ายลำดับได้ในกลุ่มของตัวเอง
+   */
+  const groups = useMemo(() => navMenuGroups(), []);
+  const baseItems = useMemo(() => groups.flatMap((g) => g.items), [groups]);
   const dirty = JSON.stringify(prefs) !== JSON.stringify(saved);
 
   const save = async () => {
@@ -105,61 +109,66 @@ const NavMenuTab: React.FC = () => {
         </p>
       ) : null}
 
-      <ul className="space-y-1.5">
-        {preview.map((item, index) => {
-          const o = prefs[item.path];
-          return (
-            <li
-              key={item.path}
-              className="flex flex-wrap items-center gap-2 rounded-xl border border-border/70 bg-card px-3 py-2"
-            >
-              <span className="font-mono text-xs tabular-nums text-muted-foreground">
-                {index + 1}.
-              </span>
-              <input
-                value={o?.label ?? item.label}
-                disabled={!isAdmin}
-                onChange={(e) => setPrefs(renameNavItem(prefs, item.path, e.target.value))}
-                aria-label={`ชื่อเมนูของ ${item.path}`}
-                className="jarvis-soft-field min-h-[36px] w-40 text-sm"
-              />
-              <span className="font-mono text-[11px] text-muted-foreground">{item.path}</span>
-              <div className="ml-auto flex items-center gap-1">
-                <button
-                  type="button"
-                  disabled={!isAdmin || index === 0}
-                  onClick={(e) => pressAndKeep(`${item.path}:up`, e, moveNavItem(baseItems, prefs, item.path, -1))}
-                  data-keep={`${item.path}:up`}
-                  aria-label="ย้ายขึ้น"
-                  className={cn('rounded-lg border p-1.5 disabled:opacity-30', TONE.neutral.outline)}
-                >
-                  <ArrowUp className="h-3.5 w-3.5" />
-                </button>
-                <button
-                  type="button"
-                  disabled={!isAdmin || index === preview.length - 1}
-                  onClick={(e) => pressAndKeep(`${item.path}:down`, e, moveNavItem(baseItems, prefs, item.path, 1))}
-                  data-keep={`${item.path}:down`}
-                  aria-label="ย้ายลง"
-                  className={cn('rounded-lg border p-1.5 disabled:opacity-30', TONE.neutral.outline)}
-                >
-                  <ArrowDown className="h-3.5 w-3.5" />
-                </button>
-                <button
-                  type="button"
-                  disabled={!isAdmin}
-                  onClick={(e) => pressAndKeep(`${item.path}:hidden`, e, toggleNavItemHidden(prefs, item.path))}
-                  data-keep={`${item.path}:hidden`}
-                  aria-label="ซ่อนเมนูนี้"
-                  className={cn('rounded-lg border p-1.5 disabled:opacity-30', TONE.neutral.outline)}
-                >
-                  <Eye className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            </li>
-          );
-        })}
-      </ul>
+      {groups.map((g) => {
+        const shown = applyNavPreferences(g.items, prefs);
+        return (
+          <section key={g.key} className="space-y-1.5" data-testid={`nav-menu-group-${g.key}`}>
+            <p className="text-xs font-medium text-muted-foreground">{g.label}</p>
+            <ul className="space-y-1.5">
+              {shown.map((item, index) => {
+                const o = prefs[item.path];
+                return (
+                  <li key={item.path} className="flex flex-wrap items-center gap-2 rounded-xl border border-border/70 bg-card px-3 py-2" data-testid="nav-menu-row">
+                    <item.icon className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+                    <Input
+                      value={o?.label ?? item.label}
+                      disabled={!isAdmin}
+                      onChange={(e) => setPrefs(renameNavItem(prefs, item.path, e.target.value))}
+                      aria-label={`ชื่อเมนูของ ${item.path}`}
+                      className="h-9 w-56 text-sm"
+                    />
+                    <div className="ml-auto flex items-center gap-1">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="iconXs"
+                        disabled={!isAdmin || index === 0}
+                        onClick={(e) => pressAndKeep(`${item.path}:up`, e, moveNavItem(g.items, prefs, item.path, -1))}
+                        data-keep={`${item.path}:up`}
+                        aria-label={`ย้าย ${item.label} ขึ้น`}
+                      >
+                        <ArrowUp aria-hidden />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="iconXs"
+                        disabled={!isAdmin || index === shown.length - 1}
+                        onClick={(e) => pressAndKeep(`${item.path}:down`, e, moveNavItem(g.items, prefs, item.path, 1))}
+                        data-keep={`${item.path}:down`}
+                        aria-label={`ย้าย ${item.label} ลง`}
+                      >
+                        <ArrowDown aria-hidden />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="iconXs"
+                        disabled={!isAdmin}
+                        onClick={(e) => pressAndKeep(`${item.path}:hidden`, e, toggleNavItemHidden(prefs, item.path))}
+                        data-keep={`${item.path}:hidden`}
+                        aria-label={`ซ่อน ${item.label}`}
+                      >
+                        <Eye aria-hidden />
+                      </Button>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        );
+      })}
 
       {/* เมนูที่ถูกซ่อน — ต้องเห็นเสมอ ไม่งั้นซ่อนแล้วหาทางเอากลับไม่เจอ */}
       {baseItems.filter((i) => prefs[i.path]?.hidden).length > 0 ? (

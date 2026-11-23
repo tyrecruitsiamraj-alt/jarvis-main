@@ -14634,3 +14634,10 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 - ถอดแท็บ/สถานะ/ตัวโหลดสวิตช์ออกจาก `JobBoardView` + `StaffJobBoardPage` หมด · ลิงก์เก่า `/jobs/board?view=documents&…` (แจ้งเตือนที่ส่งไปแล้ว) → `<Navigate>` ไป `/documents?…` พร้อมรหัสเดิม
 - `documentsDeepLink` = `/documents?applicationId=&packetId=` (กระดิ่ง · ปุ่มเปิดชุดในกล่องส่งเอกสาร)
 - เทสต์ `tests/api/documentsMenu2569-11-23.test.ts`
+
+### 23 พ.ย. 2569 (14) — ตั้งค่า › จัดเมนู คุมแถบเมนูซ้ายจริง
+เจ้าของ "หน้าตั้งค่าที่จัดเมนูไม่เห็นจัดได้จริง" — เดิมหน้าจัดเมนูแก้ `DOCK_NAV_ITEMS` (รายการเก่า 6 อัน) แต่ `AppNavDrawer` ไม่อ่านลำดับ/ชื่อ อ่านแค่ซ่อน 6 เมนู · งานสรรหา/เอกสาร/แบบทดสอบจัดไม่ได้
+- ชุดเมนูเดียว `navMenuGroups()` (`soRecruitNav.ts`): สายพานงาน (ไม่มีจับคู่งาน) + คลังข้อมูล · หน้าหลักอยู่บนสุดเสมอ ไม่อยู่ในรายการ
+- `AppNavDrawer` รับ `prefs` (จาก `AppLayout`) แล้ว `applyNavPreferences` กับสองกลุ่ม — ชื่อ · ลำดับในกลุ่ม · ซ่อน · คีย์ = path เดิม (ค่าที่ตั้งไว้แล้วยังใช้ได้) · `applyNavPreferences`/`moveNavItem` เป็น generic
+- `NavMenuTab` แสดงสองกลุ่มเหมือนแถบ ย้ายขึ้น/ลงในกลุ่ม (shadcn `Input` / `Button`)
+- เทสต์ `tests/api/navMenuRealMenu2569-11-23.test.ts`

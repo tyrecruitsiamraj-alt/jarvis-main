@@ -417,3 +417,19 @@ export const HOME_TEAM_NAV: Array<{
 export function vaultLabel(key: string): string {
   return CONVEYOR_VAULT.find((v) => v.key === key)?.label ?? '';
 }
+
+/**
+ * ═══ เมนูที่หน้า ตั้งค่า › จัดเมนู คุมได้ — ชุดเดียวกับแถบเมนูซ้ายจริง (เจ้าของ 23 พ.ย. 2569 "หน้าตั้งค่าที่จัดเมนูไม่เห็นจัดได้จริง") ═══
+ * เดิมหน้าจัดเมนูแก้รายการเมนูชุดเก่า (`DOCK_NAV_ITEMS` 6 อัน) แต่แถบซ้ายไม่อ่านลำดับ/ชื่อ อ่านแค่ซ่อนบางอัน
+ * ⇒ สองกลุ่มตามแถบซ้าย ย้ายลำดับในกลุ่ม · เปลี่ยนชื่อ · ซ่อน (`applyNavPreferences` คีย์ = path ตามเดิม ค่าที่ตั้งไว้แล้วยังใช้ได้)
+ * "หน้าหลัก" อยู่บนสุดเสมอ ไม่อยู่ในรายการ · "จับคู่งาน" ไม่มีในเมนู (เข้าจากโพสต์ประกาศ ▾)
+ */
+export type NavMenuItem = { key: string; path: string; label: string; icon: LucideIcon };
+export type NavMenuGroup = { key: 'steps' | 'vault'; label: string; items: NavMenuItem[] };
+export function navMenuGroups(): NavMenuGroup[] {
+  const pick = (x: { key: string; path: string; label: string; icon: LucideIcon }): NavMenuItem => ({ key: x.key, path: x.path, label: x.label, icon: x.icon });
+  return [
+    { key: 'steps', label: 'สายพานงาน', items: CONVEYOR_STEPS.filter((s) => s.key !== 'matching').map(pick) },
+    { key: 'vault', label: 'คลังข้อมูล', items: CONVEYOR_VAULT.map(pick) },
+  ];
+}

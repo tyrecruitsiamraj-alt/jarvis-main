@@ -16,12 +16,10 @@ import DocumentNotificationToaster from '@/components/notifications/DocumentNoti
 import { BrandMark, BrandTitle } from '@/components/shared/BrandMark';
 import AppNavDrawer from '@/components/layout/AppNavDrawer';
 import StageBanner from '@/components/layout/StageBanner';
-import { DOCK_NAV_ITEMS } from '@/components/layout/bottom-nav/dockNavConfig';
-import { applyNavPreferences, type NavPreferences } from '@/lib/navPreferences';
+import type { NavPreferences } from '@/lib/navPreferences';
 import { fetchNavPreferences } from '@/lib/navPreferencesApi';
 import { NAV_PREFERENCES_CHANGED_EVENT } from '@/lib/navPreferencesEvent';
 import { Switch } from '@/components/ui/switch';
-import { filterByMinimumRole } from '@/lib/rbac';
 import { useRolePermissions } from '@/contexts/RolePermissionsContext';
 import { loadThemeMode, resolveTheme, setThemeMode } from '@/lib/theme';
 import { HeaderSearchProvider, HeaderSearchSlot } from '@/contexts/HeaderSearchContext';
@@ -53,10 +51,6 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       window.removeEventListener(NAV_PREFERENCES_CHANGED_EVENT, onChanged);
     };
   }, []);
-  const navItems = applyNavPreferences(
-    filterByMinimumRole(DOCK_NAV_ITEMS, user?.role),
-    navPrefs,
-  );
   const showJobBoardMenu = isFunctionEnabled('unit_requests_read');
   const showSettings = isFunctionEnabled('settings_access');
   const [navOpen, setNavOpen] = useState(false);
@@ -274,7 +268,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       <AppNavDrawer
         open={navOpen}
         onClose={() => setNavOpen(false)}
-        items={navItems}
+        prefs={navPrefs}
         showJobBoard={showJobBoardMenu}
         showSettings={showSettings}
         userName={user?.full_name}

@@ -14,7 +14,8 @@ import { useUiV2 } from '@/lib/uiV2';
 import { useAuthConfig } from '@/hooks/useAuthConfig';
 import { shouldShowPasswordUi } from '@/lib/authConfig';
 import { BrandMark, BrandTitle } from '@/components/shared/BrandMark';
-import { resolveDockNavTarget, type DockNavItem } from '@/components/layout/bottom-nav/dockNavConfig';
+import { resolveDockNavTarget } from '@/components/layout/bottom-nav/dockNavConfig';
+import { applyNavPreferences, type NavPreferences } from '@/lib/navPreferences';
 import {
   CONVEYOR_HOME,
   CONVEYOR_STEPS,
@@ -29,7 +30,8 @@ const groupLabelClass =
 type Props = {
   open: boolean;
   onClose: () => void;
-  items: DockNavItem[];
+  /** ค่าจากหน้า ตั้งค่า › จัดเมนู (ชื่อ · ลำดับ · ซ่อน · คีย์ = path) — 23 พ.ย. 2569 แถบนี้อ่านครบแล้ว */
+  prefs: NavPreferences;
   showJobBoard: boolean;
   showSettings: boolean;
   userName?: string;
@@ -41,7 +43,7 @@ type Props = {
 const AppNavDrawer: React.FC<Props> = ({
   open,
   onClose,
-  items,
+  prefs,
   showJobBoard,
   showSettings,
   userName,
@@ -53,41 +55,19 @@ const AppNavDrawer: React.FC<Props> = ({
   // ล็อกเข้าทาง Microsoft = ซ่อนเมนูเปลี่ยนรหัสผ่าน (เงื่อนไขเดียวกับแถบบน/หน้า Login)
   const showPasswordUi = shouldShowPasswordUi(useAuthConfig());
 
-  /**
-   * เมนูที่แอดมินซ่อนไว้ที่หน้าตั้งค่า — ยังต้องมีผลกับโครงใหม่
-   * (ลำดับกับชื่อไม่รับแล้ว เพราะเลขขั้นผูกกับหัวหน้าจอทุกหน้า · ดูคอมเมนต์ที่ <nav>)
-   *
-   * ⚠️ `applyNavPreferences` **กรองของที่ซ่อนออกไปแล้ว** ก่อนส่งมาที่นี่
-   * ⇒ ตรวจจาก "หายไปจากลิสต์" ไม่ใช่จากธง `hidden` (ซึ่งไม่มีในชนิดข้อมูลนี้)
-   * ขั้นที่ไม่มีเมนูเดิมคู่กัน (ขั้น 2/3/4) ไม่มีอะไรให้ซ่อน — โชว์เสมอ
-   */
-  const OWNER_DOCK_PATH: Record<string, string> = {
-    requests: '/jobs/list',
-    follow: '/follow',
-    aftercare: '/aftercare',
-    candidates: '/matching/candidates',
-    wl: '/wl',
-    dashboard: '/dashboard',
-  };
   const uiV2 = useUiV2();
-  const visiblePaths = React.useMemo(() => new Set(items.map((i) => i.path)), [items]);
-  const shown = (key: string) => {
-    const owner = OWNER_DOCK_PATH[key];
-    return owner === undefined || visiblePaths.has(owner);
-  };
   /**
    * 🔴 "จับคู่งาน" ไม่อยู่ในเมนู (เจ้าของ 15 ต.ค. 2569: *"จับคู่งานอยู่ในแท็บ ใบขอ งั้น menu ก็เอา จับคู่งานออก"*)
-   * ขั้นยังอยู่ใน CONVEYOR_STEPS (ชื่อหัวหน้า/แถบ "ต่อไป:"/หน้าหลักใช้) · เข้าได้จาก "โพสต์ประกาศ ▾" หน้างานสรรหา (แท็บบนหน้าใบขอถอดแล้ว 11 พ.ย. 2569)
-   * อยู่หน้าจับคู่งาน = เมนู "ใบขอ" ติดไฮไลต์แทน
+   * ขั้นยังอยู่ใน CONVEYOR_STEPS (ชื่อหัวหน้า/แถบ "ต่อไป:"/หน้าหลักใช้) · อยู่หน้าจับคู่งาน = เมนู "ใบขอ" ติดไฮไลต์แทน
+   * 🔴 23 พ.ย. 2569 (เจ้าของ "หน้าตั้งค่าที่จัดเมนูไม่เห็นจัดได้จริง") — ชื่อ · ลำดับในกลุ่ม · ซ่อน มาจากหน้า ตั้งค่า › จัดเมนู ทุกเมนู
+   * (เดิมอ่านแค่การซ่อน 6 เมนูของรายการเก่า ลำดับ/ชื่อที่ตั้งไม่มีผล) · ชุดเมนูเดียวกับหน้าจัดเมนู = `navMenuGroups`
    */
-  const visibleSteps = CONVEYOR_STEPS.filter(
-    (s) =>
-      s.key !== 'matching' &&
-      shown(s.key) &&
-      (s.key === 'requests' || !s.path.startsWith('/jobs/board') || showJobBoard),
+  const visibleSteps = applyNavPreferences(
+    CONVEYOR_STEPS.filter((s) => s.key !== 'matching' && (s.key === 'requests' || !s.path.startsWith('/jobs/board') || showJobBoard)),
+    prefs,
   );
   const matchingPaths = CONVEYOR_STEPS.find((s) => s.key === 'matching')?.match ?? [];
-  const visibleVault = CONVEYOR_VAULT.filter((v) => shown(v.key));
+  const visibleVault = applyNavPreferences(CONVEYOR_VAULT, prefs);
 
   useEffect(() => {
     if (!open) return;
@@ -154,9 +134,7 @@ const AppNavDrawer: React.FC<Props> = ({
         {/*
           🔴 **เมนูหลักของทั้งระบบอยู่ที่นี่ที่เดียวแล้ว** (27 ส.ค. 2569 ถอดแถบติดซ้ายออก
           ตามที่เจ้าของสั่งให้กลับไปเป็น burger เพื่อไม่ให้กินพื้นที่) — ทั้งจอเล็กและจอใหญ่
-          🔴 **ลำดับขั้นห้ามสลับ** เพราะเลข "ขั้นที่ N" ผูกกับหัวหน้าจอทุกหน้า
-          ⇒ ที่นี่จึงไม่ใช้ลำดับจาก `items` (navPreferences) เหมือนเดิม แต่ยัง
-          **เคารพการซ่อนของแอดมิน**: เมนูที่แอดมินซ่อนไว้จะไม่โผล่ (ดู hiddenPaths)
+          ชื่อ · ลำดับในกลุ่ม · ซ่อน ตามหน้า ตั้งค่า › จัดเมนู (23 พ.ย. 2569 · เลขขั้นถอดแล้วตั้งแต่ 28 ส.ค. 2569 ลำดับจึงย้ายได้)
         */}
         <nav className="flex-1 space-y-1 overflow-y-auto p-3" aria-label="เมนูหลัก">
           <div className={groupLabelClass}>งานของฉัน</div>
