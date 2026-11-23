@@ -41,12 +41,23 @@ export function jobInWorkStatusBox(job: JobRequest, boxId: string, today: Date =
 /**
  * กล่อง "หาได้แล้ว" / "ยกเลิก" ต่อท้ายสองแถวของสถานะทำงาน (เจ้าของ 23 พ.ย. 2569 "เพิ่มปิดได้กับยกเลิกมาที")
  * เลขมาจากยอดตามช่วงตัวเดียวกับการ์ด หาได้แล้ว/ยกเลิก (`sumCohortDoneByAdvance`) — ไม่ใช่ใบเปิด จึงไม่อยู่ในสมการของกล่อง "ทั้งหมด"
- * คำบนกล่อง = "หาได้แล้ว" (คำของระบบสำหรับอัตราที่หาได้ · ไม่ใช่ "ปิดครบใบขอ")
  */
 export type WorkDoneBox = { kind: 'filled' | 'cancelled'; advance: boolean };
-export const WORK_DONE_LABEL: Record<WorkDoneBox['kind'], string> = { filled: 'หาได้แล้ว', cancelled: 'ยกเลิก' };
+// คำบนกล่อง = "ปิดแล้ว" (เจ้าของเลือกเอง 23 พ.ย. 2569 · นับอัตราที่หาคนได้แล้ว)
+export const WORK_DONE_LABEL: Record<WorkDoneBox['kind'], string> = { filled: 'ปิดแล้ว', cancelled: 'ยกเลิก' };
 export const workDoneBoxId = (kind: WorkDoneBox['kind'], advance: boolean): string => `work_done_${advance ? 'advance_' : ''}${kind}`;
 export function parseWorkDoneBoxId(id: string): WorkDoneBox | null {
   const m = /^work_done_(advance_)?(filled|cancelled)$/.exec(id);
   return m ? { kind: m[2] as WorkDoneBox['kind'], advance: Boolean(m[1]) } : null;
+}
+
+/**
+ * แถวบนสุดของสถานะทำงาน (เจ้าของ 23 พ.ย. 2569 "แยกมาเป็น 3 กล่องว่า ทั้งหมดเท่าไหร่ ปิดแล้วเท่าไหร่ ยกเลิกเท่าไหร่"):
+ * ใบขอทั้งหมด · ปิดแล้ว · ยกเลิก — ใบขอทั้งหมด = "ทั้งหมด" ของแถวสถานะ (ยังต้องหา) + ปิดแล้ว + ยกเลิก
+ * แถวล่วงหน้าแบบเดียวกัน · กด "ใบขอทั้งหมด" = เทียบรายเดือน · กด ปิดแล้ว/ยกเลิก = รายการใบของช่วง
+ */
+export const WORK_TOP_TOTAL_LABEL = 'ใบขอทั้งหมด';
+export const workTopTotalId = (advance: boolean): string => (advance ? 'work_top_advance_total' : 'work_top_total');
+export function parseWorkTopTotalId(id: string): { advance: boolean } | null {
+  return id === 'work_top_total' ? { advance: false } : id === 'work_top_advance_total' ? { advance: true } : null;
 }

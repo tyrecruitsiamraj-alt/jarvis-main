@@ -59,6 +59,8 @@ export type PublicApplyDialogProps = {
     title: string;
     /** ช่องทางของลิงก์ที่ Gen (6 ต.ค. 2569) — มีค่า = ช่อง "เห็นประกาศจากช่องทางไหน" ล็อกตามลิงก์ เลือกเองไม่ได้ */
     channelLabel?: string | null;
+    /** ฟอร์มมีช่องแนบเอกสาร — เลือกตอน Gen link (เจ้าของ 23 พ.ย. 2569) */
+    attachDocuments?: boolean;
   } | null;
 };
 
@@ -126,8 +128,8 @@ const PublicApplyDialog: React.FC<PublicApplyDialogProps> = ({ open, job, onClos
   const lockedSource = referralSourceOfChannel(lockedChannel);
   const channelRequired = !lockedChannel && channels.length > 0;
   const [file, setFile] = useState<File | null>(null);
-  // ลิงก์จาก ตั้งค่า › ลิงก์หน้าสมัคร ที่เลือก "ไม่มีช่องแนบเอกสาร" (`doc=0` · 27 ต.ค. 2569) = ไม่มีช่องนี้
-  const showDocument = applyLinkShowsDocument(searchParams);
+  // ช่องแนบเอกสาร: ลิงก์ ตั้งค่า › ลิงก์หน้าสมัคร ที่ใส่ `doc=1` (27 ต.ค. 2569) หรือลิงก์ Gen ที่เลือก "มีช่องแนบเอกสาร" (23 พ.ย. 2569)
+  const showDocument = applyLinkShowsDocument(searchParams) || posting?.attachDocuments === true;
   const [note, setNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);

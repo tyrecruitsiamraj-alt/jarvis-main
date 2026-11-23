@@ -12,7 +12,9 @@ import type { DashboardActivityTrendPoint, DashboardData, DashboardFilters, Dash
 import type { UnitRequestFilterState } from '@/hooks/useSiamrajUnitRequestFilters';
 import type { DateRangeYmd } from '@/components/shared/DateRangeCalendarPicker';
 import DashboardFilterBar from './DashboardFilterBar';
+import DashboardWorkMonths from './DashboardWorkMonths';
 import { parseWorkDoneBoxId } from '@/lib/dashboard/workStatusBox';
+import type { WorkMonthRow } from '@/lib/dashboard/throughput';
 import DashboardKpiCard from './DashboardKpiCard';
 import DashboardChartSection from './DashboardChartSection';
 import DashboardHeroStrip from './DashboardHeroStrip';
@@ -78,7 +80,8 @@ type Props = {
   onKpiClick?: (kpiId: string, label: string, expectedRequests?: number | null) => void;
   /** กล่องที่กดอยู่ (29 ต.ค. 2569 · สถานะทำงาน / ใบขอชั่วคราว / เข้ามา หาได้แล้ว ยกเลิก คงเหลือ)
    *  — การ์ดเร่งด่วนเปลี่ยนเป็นใบของกล่องนี้ · null = การ์ดเดิม */
-  statusPick?: { kpiId: string; label: string; panel: StatusLeadPanel; amountLabel: string; note?: string | null } | null;
+  /** `months` = กด "ใบขอทั้งหมด" ของสถานะทำงาน → เทียบรายเดือนแทนรายการใบ (23 พ.ย. 2569) */
+  statusPick?: { kpiId: string; label: string; panel: StatusLeadPanel; amountLabel: string; note?: string | null; months?: WorkMonthRow[] } | null;
   onStatusPickClear?: () => void;
   onOpenJob?: (job: JobRequest) => void;
   /** กราฟ ทั้งหมด/ฉุกเฉิน/ล่วงหน้า (18 ส.ค. 2569) — ไม่ส่ง = ไม่แสดงกราฟ (เช่นโหมด demo) */
@@ -353,28 +356,41 @@ const DashboardShell: React.FC<Props> = ({
                     const list = data.workStatusKpis ?? [];
                     // 🔴 QA 17 ต.ค. 2569: การ์ด "ทั้งหมด" อยู่ในลิสต์เดียวกัน ห้ามบวกซ้ำเป็นตัวหาร — ตัวหาร = เลขของ "ทั้งหมด" (ทั้งสองแถว)
                     const total = workStatusPercentBase(list);
-                    const tiles = (rows: typeof list) =>
+                    // สีพาสเทล 3 สีแยกเรื่อง (เจ้าของ 23 พ.ย. 2569): ใบขอทั้งหมด + แถวสถานะ (ยังต้องหา) = ฟ้า · ปิดแล้ว = เขียว · ยกเลิก = ชมพู
+                    const washOf = (id: string) => {
+                      const done = parseWorkDoneBoxId(id);
+                      return done ? (done.kind === 'filled' ? 'success' : 'danger') : 'info';
+                    };
+                    // แถบสัดส่วนเทียบกล่องแรกของแถวนั้น (แถวบนสุด = ใบขอทั้งหมด · แถวสถานะ = ทั้งหมด)
+                    const tiles = (rows: typeof list, base = total) =>
                       rows.map((kpi) => (
                         <DashboardKpiCard
                           key={kpi.id}
                           surface="tile"
                           kpi={kpi}
-                          // หาได้แล้ว/ยกเลิก เป็นยอดตามช่วง ไม่ใช่ส่วนของใบเปิด — ไม่มีแถบสัดส่วน
-                          progressPercent={parseWorkDoneBoxId(kpi.id) ? null : total > 0 ? Math.round((kpi.value / total) * 100) : 0}
+                          progressPercent={base > 0 ? Math.round((kpi.value / base) * 100) : 0}
+                          wash={washOf(kpi.id)}
                           selected={statusPick?.kpiId === kpi.id}
                           onClick={onKpiClick ? () => onKpiClick(kpi.id, kpi.label, kpi.secondaryCount ?? null) : undefined}
                         />
                       ));
                     const advance = data.workStatusAdvanceKpis ?? [];
+                    const top = data.workStatusTopKpis ?? [];
+                    const advanceTop = data.workStatusAdvanceTopKpis ?? [];
                     return (
                       <>
-                        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">{tiles([...list, ...(data.workStatusDoneKpis ?? [])])}</div>
+                        {/* แถวบนสุด ใบขอทั้งหมด · ปิดแล้ว · ยกเลิก (เจ้าของ 23 พ.ย. 2569) · ใต้ลงมาแถวสถานะแบบเดิม (ยังต้องหา) */}
+                        {top.length ? <div className="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-3" data-testid="dashboard-work-top">{tiles(top, top[0]?.value ?? 0)}</div> : null}
+                        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">{tiles(list)}</div>
                         {/* แถวล่วงหน้า (เจ้าของ 22 พ.ย. 2569 "ล่วงหน้าแยกออกมาแล้วเป็นอีกแถวที่บอกสถานะ") — ใบล่วงหน้าที่ยังไม่ถึงวันต้องการ
                             แยกตามสถานะเดียวกับแถวบน · กล่องแรก = ล่วงหน้าทั้งแถว · สองแถวรวมกัน = ทั้งหมด */}
                         {advance.length ? (
                           <div className="mt-5 space-y-3" data-testid="dashboard-work-status-advance">
                             <p className="text-base font-medium text-foreground">ล่วงหน้า · ยังไม่ถึงวันต้องการ</p>
-                            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">{tiles([...advance, ...(data.workStatusAdvanceDoneKpis ?? [])])}</div>
+                            {advanceTop.length ? (
+                              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3" data-testid="dashboard-work-advance-top">{tiles(advanceTop, advanceTop[0]?.value ?? 0)}</div>
+                            ) : null}
+                            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">{tiles(advance, advance[0]?.value ?? 0)}</div>
                           </div>
                         ) : null}
                       </>
@@ -385,7 +401,15 @@ const DashboardShell: React.FC<Props> = ({
 
               {/* กราฟ ทั้งหมด/ฉุกเฉิน/ล่วงหน้า — วางใต้การ์ด KPI ให้เห็นทันทีโดยไม่ต้องกางแผง
                   (เจ้าของสั่ง 18 ส.ค. 2569) · เลขชุดเดียวกับการ์ด「เข้ามา」 เปลี่ยนตามตัวกรองเอง */}
-              {statusPick ? (
+              {statusPick?.months ? (
+                <DashboardWorkMonths
+                  key={statusPick.kpiId}
+                  label={statusPick.label}
+                  rows={statusPick.months}
+                  onMonthClick={onMonthClick}
+                  onClear={() => onStatusPickClear?.()}
+                />
+              ) : statusPick ? (
                 <DashboardStatusLeadPanel
                   key={statusPick.kpiId}
                   label={statusPick.label}

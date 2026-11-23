@@ -315,9 +315,9 @@ export type DashboardData = {
   workStatusKpis: DashboardKpi[];
   /** แถวล่วงหน้า (ยังไม่ถึงวันต้องการ) แยกตามสถานะเดียวกับแถวบน — กล่องแรก = ล่วงหน้าทั้งแถว (22 พ.ย. 2569 · `workStatusBox.ts`) */
   workStatusAdvanceKpis?: DashboardKpi[];
-  /** หาได้แล้ว · ยกเลิก ต่อท้ายแถวบน / แถวล่วงหน้า (ยอดตามช่วง · ไม่อยู่ในสมการของ "ทั้งหมด" · 23 พ.ย. 2569) */
-  workStatusDoneKpis?: DashboardKpi[];
-  workStatusAdvanceDoneKpis?: DashboardKpi[];
+  /** แถวบนสุด ใบขอทั้งหมด · ปิดแล้ว · ยกเลิก ของสถานะทำงาน / ของแถวล่วงหน้า (23 พ.ย. 2569) */
+  workStatusTopKpis?: DashboardKpi[];
+  workStatusAdvanceTopKpis?: DashboardKpi[];
   /** โหมดทั้งหมด: ยังเปิดในช่วง → เหลือหา แตกส่วนต่างให้เห็น (31 ต.ค. 2569 · `remainingBridge.ts`) */
   remainingBridge?: RemainingBridge;
   activityTrend: DashboardActivityTrendPoint[];

@@ -235,6 +235,8 @@ export type PublicPostingInfo = {
   contactPhone: string | null;
   status: 'open' | 'closed';
   channelLabel: string | null;
+  /** ฟอร์มมีช่องแนบเอกสาร (เลือกตอน Gen link · 23 พ.ย. 2569) · ไม่มีค่า = ไม่มีช่อง */
+  attachDocuments?: boolean;
   /** ใบงานรูปเดียวกับการ์ดหน้า /apply (6 ต.ค. 2569) · null = ใบไม่ผ่านด่าน/ไม่มีใบ ⇒ ใช้การ์ดประกาศ */
   job?: JobRequest | null;
 };

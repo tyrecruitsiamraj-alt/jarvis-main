@@ -28,8 +28,8 @@ import {
 import { buildCohortDrillDown, type CohortDrillKpi } from '@/lib/dashboard/cohortDrillDown';
 import { isPrequestJob } from '@/lib/publicJobVisibility';
 import { LEAD_AMOUNT_LABEL, NO_STATUS_LABEL, buildCohortLeadPanel, buildStatusLeadPanel, filterLeadPanel } from '@/lib/dashboard/statusLeadPanel';
-import { WORK_STATUS_ADVANCE_ID, advanceStatusBoxId, isAdvanceStatusBoxId, jobInWorkStatusBox, parseWorkDoneBoxId } from '@/lib/dashboard/workStatusBox';
-import { isAdvanceNotDueRecord } from '@/lib/dashboard/throughput';
+import { WORK_STATUS_ADVANCE_ID, advanceStatusBoxId, isAdvanceStatusBoxId, jobInWorkStatusBox, parseWorkDoneBoxId, parseWorkTopTotalId } from '@/lib/dashboard/workStatusBox';
+import { buildWorkMonths, isAdvanceNotDueRecord } from '@/lib/dashboard/throughput';
 import { toYmdBangkok } from '@/lib/dateTh';
 import {
   buildLeadKindBreakdown,
@@ -633,11 +633,11 @@ const SupervisorDashboard: React.FC = () => {
       kpis: throughputMissing
         ? built.kpis.map((k) => (THROUGHPUT_KPI_IDS.has(k.id) ? { ...k, unavailable: true } : k))
         : built.kpis,
-      // หาได้แล้ว/ยกเลิก ของสถานะทำงานมาจากยอดตามช่วงเหมือนกัน — โหลดไม่ขึ้น = "—" ไม่ใช่ 0
-      workStatusDoneKpis: throughputMissing ? built.workStatusDoneKpis?.map((k) => ({ ...k, unavailable: true })) : built.workStatusDoneKpis,
-      workStatusAdvanceDoneKpis: throughputMissing
-        ? built.workStatusAdvanceDoneKpis?.map((k) => ({ ...k, unavailable: true }))
-        : built.workStatusAdvanceDoneKpis,
+      // แถวบนสุด ใบขอทั้งหมด · ปิดแล้ว · ยกเลิก มาจากยอดตามช่วงเหมือนกัน — โหลดไม่ขึ้น = "—" ไม่ใช่ 0
+      workStatusTopKpis: throughputMissing ? built.workStatusTopKpis?.map((k) => ({ ...k, unavailable: true })) : built.workStatusTopKpis,
+      workStatusAdvanceTopKpis: throughputMissing
+        ? built.workStatusAdvanceTopKpis?.map((k) => ({ ...k, unavailable: true }))
+        : built.workStatusAdvanceTopKpis,
       workQueue: sortWorkQueue(built.workQueue, sortKey, sortDir),
       // โหมดทั้งหมด: ทับด้วยชุดที่รวมใบปิดที่โหลด on-demand แล้ว (ถ้ายังไม่โหลดก็ใช้ของเดิม)
       recruiterOverview: recruiterOverviewAllMode ?? built.recruiterOverview,
@@ -851,8 +851,8 @@ const SupervisorDashboard: React.FC = () => {
       ...data.kpis,
       ...(data.workStatusKpis ?? []),
       ...(data.workStatusAdvanceKpis ?? []),
-      ...(data.workStatusDoneKpis ?? []),
-      ...(data.workStatusAdvanceDoneKpis ?? []),
+      ...(data.workStatusTopKpis ?? []),
+      ...(data.workStatusAdvanceTopKpis ?? []),
     ];
     const kpi = all.find((k) => k.id === pickId);
     return kpi ? { kpiId: pickId, label: kpi.label } : null;
@@ -884,14 +884,22 @@ const SupervisorDashboard: React.FC = () => {
      * ไม่มี throughput (โหลดไม่ทัน) ให้ถอยไปใบใน feed
      */
     const cohortReady = cohortScope.records.length > 0;
-    // หาได้แล้ว/ยกเลิก ของสถานะทำงาน = รายการชุดเดียวกับการ์ด หาได้แล้ว/ยกเลิก ตัดเหลือแถวของกล่อง (ล่วงหน้า = ยังไม่ถึงวันต้องการ)
+    // ใบขอทั้งหมด (แถวบนสุด) = เทียบรายเดือน เข้ามา · ปิดแล้ว · ยกเลิก (23 พ.ย. 2569) · ชุดล่วงหน้า = เฉพาะใบที่ยังไม่ถึงวันต้องการ
+    const topTotal = parseWorkTopTotalId(kpiId);
+    if (topTotal) {
+      const { from, to, records } = cohortScope;
+      const todayYmd = toYmdBangkok(new Date());
+      const months = buildWorkMonths(records, from, to, topTotal.advance ? (r) => isAdvanceNotDueRecord(r, todayYmd) : undefined);
+      return { kpiId, label: topTotal.advance ? `ล่วงหน้า · ${label}` : label, panel: buildStatusLeadPanel([]), amountLabel: 'อัตรา', note: null, months };
+    }
+    // ปิดแล้ว/ยกเลิก = รายการชุดเดียวกับการ์ด หาได้แล้ว/ยกเลิก · ชุดหลัก = ทุกใบ · ชุดล่วงหน้า = เฉพาะใบที่ยังไม่ถึงวันต้องการ
     const done = parseWorkDoneBoxId(kpiId);
     if (done) {
       const { from, to, records } = cohortScope;
       const todayYmd = toYmdBangkok(new Date());
       const cohortKind = done.kind === 'filled' ? 'closed' : 'cancelled';
       const drill = buildCohortDrillDown(
-        records.filter((r) => isAdvanceNotDueRecord(r, todayYmd) === done.advance),
+        done.advance ? records.filter((r) => isAdvanceNotDueRecord(r, todayYmd)) : records,
         from,
         to,
         cohortKind,
@@ -955,7 +963,7 @@ const SupervisorDashboard: React.FC = () => {
         return;
       }
       // หาได้แล้ว/ยกเลิก ของสถานะทำงาน — แผงเดียวกับกล่องสถานะ · ยอดตามช่วงยังไม่มา = ไม่เปิดแผงว่าง
-      if (parseWorkDoneBoxId(kpiId)) {
+      if (parseWorkDoneBoxId(kpiId) || parseWorkTopTotalId(kpiId)) {
         if (cohortReady) togglePick();
         return;
       }

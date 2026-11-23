@@ -18,6 +18,11 @@ type Props = {
    * ไม่ส่ง = การ์ดขาวเดิม (หน้าอื่นที่ใช้กล่องนี้ไม่เปลี่ยน)
    */
   surface?: 'card' | 'tile';
+  /**
+   * สีพื้นพาสเทลของกล่อง (`TONE[x].wash`) — การ์ดสถานะทำงานของ Dashboard ใช้ 3 สีแยกเรื่อง
+   * (เจ้าของ 23 พ.ย. 2569 "ขอสีพาสเทลอ่อนๆสวยๆ ขอสีไม่เยอะ 3 สีแยกเรื่องก็พอ") · ไม่ส่ง = ตามเดิม
+   */
+  wash?: ToneKey;
 };
 
 /**
@@ -51,6 +56,7 @@ const DashboardKpiCard: React.FC<Props> = ({
   progressPercent = null,
   selected = false,
   surface = 'card',
+  wash,
 }) => {
   const tile = surface === 'tile';
   const trend = kpi.trendPercent;
@@ -78,7 +84,7 @@ const DashboardKpiCard: React.FC<Props> = ({
         'w-full p-4 text-left transition-colors',
         tile ? 'rounded-xl' : 'rounded-2xl shadow-sm',
         selected && 'ring-2 ring-ring',
-        solid && tone ? tone.solid : (tone?.tile ?? (tile ? 'bg-muted/50 hover:bg-muted' : NEUTRAL_TILE)),
+        wash ? TONE[wash].wash : solid && tone ? tone.solid : (tone?.tile ?? (tile ? 'bg-muted/50 hover:bg-muted' : NEUTRAL_TILE)),
         onClick ? 'cursor-pointer' : 'cursor-default',
       )}
     >
@@ -110,7 +116,7 @@ const DashboardKpiCard: React.FC<Props> = ({
           aria-hidden
         >
           <span
-            className={cn('block h-full rounded-full', solid ? 'bg-white/90' : (tone?.dot ?? 'bg-slate-400'))}
+            className={cn('block h-full rounded-full', solid ? 'bg-white/90' : wash ? cn(TONE[wash].dot, 'opacity-60') : (tone?.dot ?? 'bg-slate-400'))}
             style={{ width: `${Math.min(100, Math.max(0, progressPercent))}%` }}
           />
         </div>

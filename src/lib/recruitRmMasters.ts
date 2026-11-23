@@ -92,8 +92,9 @@ export const RM_EDUCATION_LEVELS = [
  * ค่าที่เก็บลงฐานคือ 'rm' / 'global' ตรงกับระบบเดิม เพื่อเทียบข้ามระบบได้
  */
 export const RM_FORM_TYPES = [
-  { code: 'rm', label: 'ทั่วไป' },
-  { code: 'global', label: 'แนบเอกสารได้' },
+  // ป้ายตามที่ผู้สมัครเห็น (เจ้าของ 23 พ.ย. 2569 เลือกตอน Gen ว่าแนบเอกสารไหม) — ค่าที่เก็บยังเป็น rm / global
+  { code: 'rm', label: 'ไม่ต้องแนบ' },
+  { code: 'global', label: 'ให้แนบเอกสาร' },
 ] as const;
 
 export type RmFormType = (typeof RM_FORM_TYPES)[number]['code'];
@@ -103,7 +104,7 @@ export function isRmFormType(v: unknown): v is RmFormType {
 }
 
 export function rmFormTypeLabel(code: string | null | undefined): string {
-  return RM_FORM_TYPES.find((f) => f.code === code)?.label ?? 'ทั่วไป';
+  return RM_FORM_TYPES.find((f) => f.code === code)?.label ?? 'ไม่ต้องแนบ';
 }
 
 /** เพศตามระบบเดิม (M/F) — ฝั่งเราเก็บ male/female ต้องแปลงตอนบันทึก */

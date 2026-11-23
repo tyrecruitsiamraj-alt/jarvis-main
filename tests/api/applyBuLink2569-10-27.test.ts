@@ -28,7 +28,7 @@ describe('ลิงก์ /apply แยก BU', () => {
     expect(applyLinkShowsDocument(new URLSearchParams('bu=LBD'))).toBe(false);
     expect(applyLinkShowsDocument(new URLSearchParams('bu=LBD&doc=0'))).toBe(false);
     const dlg = readFileSync('src/components/jobs/PublicApplyDialog.tsx', 'utf8');
-    expect(dlg).toContain('const showDocument = applyLinkShowsDocument(searchParams);');
+    expect(dlg).toContain('const showDocument = applyLinkShowsDocument(searchParams) || posting?.attachDocuments === true;');
     expect(dlg).toContain('{showDocument ? (');
     expect(readFileSync('src/pages/settings/ApplyLinksTab.tsx', 'utf8')).toContain("{ value: '0', label: 'ไม่มีช่องแนบเอกสาร' }");
   });

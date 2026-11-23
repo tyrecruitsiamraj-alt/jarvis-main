@@ -14562,7 +14562,37 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 - ต้นเหตุ: ตัวเลื่อนของหน้าคือ `html` · Radix ใส่ `overflow:hidden` ที่ `body` ตอนเปิด Select/Dialog ⇒ body เป็นกรอบเลื่อนซ้อน ของ `sticky` หลุดตำแหน่ง
 - แก้ที่ `src/main.tsx`: `document.body.classList.add("data-[scroll-locked]:!overflow-visible")` (utility ของ Tailwind · ไม่มี CSS ใหม่) · มีผลทุกหน้า ห้ามถอด
 
-### 23 พ.ย. 2569 (5) — ส่งเอกสารผ่าน LINE (ผู้สมัครถ่ายบัตร · ตอบเอกสาร 5 ฉบับ · เซ็น · HR ดูชุดที่ส่ง)
+### 23 พ.ย. 2569 (5) — สถานะทำงาน: แถวบนสุด ใบขอทั้งหมด · ปิดแล้ว · ยกเลิก (แทนกล่องต่อท้ายของรอบ (3))
+เจ้าของ "แยกมาเป็น 3 กล่องว่า ทั้งหมดเท่าไหร่ ปิดแล้วเท่าไหร่ ยกเลิกเท่าไหร่ ทั้งหมดก็จะแยกลงมาเป็นแบบเดิม" · Choice: กล่องแรกของแถวสถานะคงชื่อ "ทั้งหมด" (ยังต้องหา) · กล่องใหญ่ = "ใบขอทั้งหมด" · คำ "ปิดแล้ว" ตามที่เจ้าของพิมพ์
+- `buildWorkTopKpis` (`buildDashboardData.ts`) → `DashboardData.workStatusTopKpis` (ทุกใบ รวมล่วงหน้า) / `workStatusAdvanceTopKpis` (เฉพาะแถวล่วงหน้า) · id `work_top_total` / `work_top_advance_total` + `work_done_*` (`workStatusBox.ts`)
+- ใบขอทั้งหมด = กล่องแรกของแถวสถานะ (ยังต้องหา · ไม่เปลี่ยน) + ปิดแล้ว + ยกเลิก · ใบนับไม่ซ้ำ ใบเปิด ∪ `cohortDoneRequestKeys` (โหมดมีงวด = ใบของ cohort)
+- กด "ใบขอทั้งหมด" = `DashboardWorkMonths` (ใหม่) เทียบรายเดือน เข้ามา · ปิดแล้ว · ยกเลิก จาก `buildWorkMonths` (`throughput.ts` · เดือนของวันที่ต้องการคน · ทุกเดือนในช่วงอยู่ครบ) · กดแท่ง/แถว = ทั้งหน้าเป็นเดือนนั้น (`onMonthClick`)
+- กด ปิดแล้ว/ยกเลิก = รายการของช่วง (`buildCohortDrillDown`) · ชุดหลัก = ทุกใบ · ชุดล่วงหน้า = `isAdvanceNotDueRecord`
+- แถบสัดส่วนเทียบกล่องแรกของแถวนั้น · เทสต์ `tests/api/dashboardWorkDoneBoxes2569-11-23.test.ts`
+
+### 23 พ.ย. 2569 (6) — หน้าหลัก: กล่องใบขอ ขอใหม่ · ปิดครบ · ยกเลิก กดแล้วไล่ 12 เดือน → รายวัน → BU → เหตุผล (ข้อ 2 รอบแรก)
+- ใหม่ `src/lib/homeRequestDrill.ts` (pure) `buildRequestDrillPayload` — สมุดใบขอ (`buildPenaltyLedger`) → `DrillPayload` ชุดใบขอ · ตัวตัดสิน `requestFlowRole` ต่อเดือน ⇒ แท่งเดือน = สมการใบขอของเดือนนั้น (ทานฐานจริง 12/12 เดือน)
+  · ขอใหม่ = วันคีย์ · เหตุผลชนิดใบ · ปิดครบ/ยกเลิก = วันแรกในเดือนที่ใบหมดอัตรา · เหตุผล ทันวันที่ต้องการไหม / `stopReason` (ไม่กรอก = "ไม่ได้กรอกเหตุผล")
+  · หนึ่งเหตุการณ์ = หนึ่งแถว items (ใบเดียวอยู่ได้หลายกล่อง) · `labels` = เลขที่ · หน่วยงาน
+- `homeDrill.ts`: กล่อง `reqNew` `reqClosed` `reqCancelled` · `drillSetOf` · `drillLabeledIds` · `api/_handlers/home-drill.ts` `?set=requests` (สมุด + ตัวกรอง BU ชุดเดียวกับ `/api/home-money`) · `fetchHomeDrill(bu, set)`
+- `TimeDrillSheet`: โหลดชุดตามกล่อง · กล่องใบขอปุ่ม "ดูรายการใบ" → รายการเปิดหน้าใบขอ (`requestPathOfJobId`)
+- `HomeOverviewPage` สองโฉม: `openRequestDrill` · แผงเดิมอยู่ปุ่ม "สรุปช่วงวันที่บนหน้า" · ยังไม่ทำ: ยกมา/เหลือหา (ยอดคงค้าง ไม่ใช่เหตุการณ์) · เงิน · ติดตาม · ดูแลหลังเริ่มงาน · จับคู่งาน · AI และคนโทร
+- เทสต์ `tests/api/homeRequestDrill2569-11-23.test.ts`
+
+### 23 พ.ย. 2569 (7) — Gen link เลือกได้ว่าหน้าสมัครมีช่องแนบเอกสารไหม
+เจ้าของ "Genlink แบบแนบเอกสารไม่ได้ หน้าสมัครงานไม่มีช่องให้แปะไฟล์ ต้องมีให้เลือกตอน Gen ว่าแนบเอกสารไหมด้วย"
+- ค่าเดิม `recruit_postings.form_type` (rm = ไม่ต้องแนบ · global = ให้แนบเอกสาร · `RM_FORM_TYPES`) ไม่ต้องเพิ่มคอลัมน์ · ช่องเลือกย้ายออกจากส่วนที่ซ่อนตอน Gen จากใบขอ (`channelOnly`) มาอยู่ใต้ "เจ้าหน้าที่สรรหา" ใน `GenApplyLinkDialog` (ToggleGroup · testid `link-attach-docs`) · ค่าเริ่ม = ไม่ต้องแนบ
+- `/api/public/apply-link` คืน `attachDocuments` (form_type = global) → `PublicPostingApplyPage` → `PublicApplyDialog.showDocument` = `doc=1` ของลิงก์ตั้งค่า หรือ `attachDocuments` · ลิงก์เก่า = ไม่มีช่อง (ตามข้อเคาะ 28 ต.ค.)
+- เทสต์ `tests/api/genLinkAttachDocs2569-11-23.test.ts`
+
+### 23 พ.ย. 2569 (8) — หน้าใบขอ: ปุ่ม "Scrap ทั้งหน้า" ใส่ได้ว่าใบละกี่ Resume
+เจ้าของ "หน้าใบขอ ให้ Scraping ทีเดียวได้ทั้งหน้า โดยสามารถระบุได้ว่าจะเอาใบขอละกี่ Resume พอเลือกแล้วก็เอาเด้ง Pop up ให้เลือกเหมือนเวลา Scrap ปกติ"
+- ปุ่มบนหัว `JobListPage` → `src/components/jobs/BulkScrapDialog.tsx` · ใบ = แถวที่ตารางแสดงอยู่ (`paginated` · ตัวกรอง + หน้าที่เปิด) ตรึงไว้ตอนเปิดป๊อป
+- ข้อ 1-2-3 เหมือนป๊อปใบเดียว (`OrderPostButton`): บัญชี JobThai/JobBKK · ใบละกี่ Resume (= `scrape_target`) · เครื่อง · ส่งทีละใบด้วย `createJobPostingRequest` เส้นเดิม · ใบไหนไม่สำเร็จบอกรายใบ กดส่งใบที่เหลือได้ (ใบที่สำเร็จไม่ส่งซ้ำ)
+- ด่าน `src/lib/bulkScrap.ts`: ใบสั่งได้ = `soScrapMissing` ว่าง + ไม่มี Scrap ที่ So Scraping กำลังทำ (`fetchBoardJobPostings` + `soStatusView.open`) · รวมทั้งหน้าต้องไม่เกินโควต้าที่เว็บเหลือวันนี้ · ค่าเริ่มต่อใบ = แบ่งโควต้าเท่า ๆ กัน ไม่เกิน 20 (ไม่รู้โควต้า = 10)
+- เทสต์ `tests/api/bulkScrap2569-11-23.test.ts`
+
+### 23 พ.ย. 2569 (9) — ส่งเอกสารผ่าน LINE (ผู้สมัครถ่ายบัตร · ตอบเอกสาร 5 ฉบับ · เซ็น · HR ดูชุดที่ส่ง)
 เจ้าของ 22 พ.ย. 2569 (ชุดส่งต่อของ Codex) · เจ้าหน้าที่กด "ส่งเอกสาร" ในป๊อปผู้สมัคร → ได้ลิงก์เฉพาะคน (24 ชม.) คัดลอกไปส่ง LINE เอง · ระบบไม่ส่งข้อความ LINE ให้
 - ฐาน: `migrations/195_applicant_documents.sql` (เพิ่มอย่างเดียว · ไม่มี FK ไป users · ใบสมัคร FK restrict) · ต้นฉบับเอกสารบริษัทเก็บในฐาน ห้ามวางใน `public/` (repo เป็น public)
 - เส้น API: `document-invitations` (สร้าง/ยกเลิกลิงก์) · `document-packets` (แท็บเอกสาร · ภาพ · PDF · ติดธง · รับทราบ · บันทึกเลขที่ iRecruit) · `document-settings` (admin) · `public/applicant-documents` (หน้าผู้สมัคร · คุกกี้ HttpOnly + คีย์ลิงก์) · ตรรกะอยู่ `api/_lib/documents/` (core เข้ารหัส/รหัสลิงก์ · applicant · staff · outbox กระดิ่ง · pdf · signature · templates · erase PDPA · line ตรวจ ID token)

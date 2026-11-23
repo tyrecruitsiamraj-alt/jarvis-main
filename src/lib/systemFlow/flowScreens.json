@@ -1730,7 +1730,7 @@
      "src": "src/components/jobs/GenApplyLinkDialog.tsx:460-505 · LinkResponsibleField.tsx"
     },
     {
-     "label": "ประเภทฟอร์มการสมัคร: ทั่วไป / แนบเอกสารได้",
+     "label": "แนบเอกสาร: ไม่ต้องแนบ / ให้แนบเอกสาร",
      "action": "filter",
      "target": "เลือกประเภทฟอร์ม",
      "api": null,

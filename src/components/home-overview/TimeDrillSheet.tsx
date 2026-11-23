@@ -17,10 +17,13 @@ import { TONE, type ToneKey } from '@/lib/designTokens';
 import { cn } from '@/lib/utils';
 import { trendBuLabel } from '@/lib/trends/bu';
 import { fetchHomeDrill } from '@/lib/homeDrillApi';
+import { requestPathOfJobId } from '@/lib/jobNavigation';
 import {
   drillBuShares,
   drillDayBars,
   drillIds,
+  drillLabeledIds,
+  drillSetOf,
   drillMonthBars,
   drillReasonRows,
   monthLabel,
@@ -157,15 +160,23 @@ export default function TimeDrillSheet({
   const [payload, setPayload] = useState<DrillPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [scope, setScope] = useState<DrillScope>({});
+  /** กล่องใบขอ: รายการใบที่กด "ดูรายการใบ" (เปลี่ยนขอบเขต = ปิดรายการ) */
+  const [requestList, setRequestList] = useState<Array<{ id: string; label: string }> | null>(null);
+  const isRequestSet = box ? drillSetOf(box) === 'requests' : false;
 
   useEffect(() => {
     setScope({});
   }, [box]);
   useEffect(() => {
+    setRequestList(null);
+  }, [box, scope.month, scope.day, scope.bu]);
+  useEffect(() => {
     if (!box) return;
     let alive = true;
     setError(null);
-    fetchHomeDrill(bu)
+    // ชุดข้อมูลตามกล่อง: ใบสมัคร หรือใบขอ — สลับกล่องคนละชุดต้องไม่โชว์ชุดเก่าค้าง
+    setPayload(null);
+    fetchHomeDrill(bu, drillSetOf(box))
       .then((p) => alive && setPayload(p))
       .catch((e: unknown) => alive && setError(e instanceof Error ? e.message : 'โหลดข้อมูล 12 เดือนไม่ขึ้น'));
     return () => {
@@ -315,10 +326,16 @@ export default function TimeDrillSheet({
                 type="button"
                 variant="outline"
                 disabled={scopeTotal === 0}
-                onClick={() => box && payload && onNames(namesTitle, drillIds(payload, box, { ...timeScope, bu: scope.bu ?? null }))}
+                onClick={() => {
+                  if (!box || !payload) return;
+                  const sc = { ...timeScope, bu: scope.bu ?? null };
+                  // กล่องใบขอ = รายการใบ (เปิดหน้าใบขอได้) · กล่องผู้สมัคร = รายชื่อเดิม
+                  if (isRequestSet) setRequestList(drillLabeledIds(payload, box, sc));
+                  else onNames(namesTitle, drillIds(payload, box, sc));
+                }}
                 data-testid="drill-names"
               >
-                ดูรายชื่อ {NUM.format(scopeTotal)} {unit}
+                {isRequestSet ? 'ดูรายการใบ' : 'ดูรายชื่อ'} {NUM.format(scopeTotal)} {unit}
               </Button>
               {summary ? (
                 <Button type="button" variant="outline" onClick={summary.onOpen} data-testid="drill-summary">
@@ -326,6 +343,27 @@ export default function TimeDrillSheet({
                 </Button>
               ) : null}
             </div>
+            {requestList ? (
+              <section className="space-y-2" data-testid="drill-request-list">
+                <p className="text-sm font-medium text-foreground">
+                  {namesTitle} · {NUM.format(requestList.length)} ใบ
+                </p>
+                <ul className="max-h-80 divide-y divide-border overflow-y-auto rounded-xl border border-border">
+                  {requestList.map((r) => (
+                    <li key={r.id}>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        className="h-auto w-full justify-start whitespace-normal rounded-none px-3 py-2 text-left text-sm font-normal"
+                        onClick={() => navigate(requestPathOfJobId(r.id))}
+                      >
+                        {r.label}
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ) : null}
             {go ? (
               <Button type="button" className="w-full" onClick={() => navigate(go.to)} data-testid="drill-go">
                 ไปหน้าเต็ม · {go.label}
