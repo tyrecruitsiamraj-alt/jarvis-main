@@ -120,6 +120,18 @@ export function scrapSplitName(full: string | null | undefined, first?: string |
   return { first: parts[0] ?? '', last: parts.slice(1).join(' ') };
 }
 
+/**
+ * ชื่อที่ขึ้นบนจอ (เจ้าของ 23 พ.ย. 2569) — ไม่มีชื่อ + เจ้าของเรซูเม่ซ่อนชื่อบน JobThai (`candidates.name_hidden`) = "ผู้สมัครซ่อนชื่อ"
+ * (คนกลุ่มนี้มีเบอร์เสมอ) · ไม่มีชื่อแบบอื่น = "ไม่มีชื่อ" เหมือนเดิม · ใช้เป็นชื่อตอนเก็บเข้าการติดต่อด้วย (ห้ามว่าง)
+ */
+export const SCRAP_NAME_HIDDEN = 'ผู้สมัครซ่อนชื่อ';
+export const SCRAP_NAME_MISSING = 'ไม่มีชื่อ';
+export function scrapDisplayName(full: string | null | undefined, first: string | null | undefined, last: string | null | undefined, nameHidden: boolean | null | undefined): string {
+  const name = (full ?? '').trim() || [first, last].filter(Boolean).join(' ').trim();
+  if (name) return name;
+  return nameHidden === true ? SCRAP_NAME_HIDDEN : SCRAP_NAME_MISSING;
+}
+
 /** สถานะคนนี้ในฝั่ง Jarvis (จับคู่ด้วยเบอร์ในใบขอเดียวกัน) */
 export type ScrapInJarvis = { application_id: string; is_lead: boolean; lead_by_name: string | null } | null;
 

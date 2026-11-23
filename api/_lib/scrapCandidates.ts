@@ -14,6 +14,7 @@ import { CALLED_SQL } from './applicantOverviewSql.js';
 import {
   scrapAge,
   scrapChannelLabel,
+  scrapDisplayName,
   scrapGender,
   scrapPhone10,
   scrapResultOf,
@@ -43,6 +44,8 @@ type RawRow = {
   score: number | string | null;
   reasons: unknown;
   found_at: Date | string | null;
+  /** เจ้าของเรซูเม่ซ่อนชื่อบน JobThai (So Scraping เพิ่ม 23 พ.ย. 2569) */
+  name_hidden: boolean | null;
 };
 
 async function loadRaw(requestNos: string[], candidateIds: string[] | null = null): Promise<RawRow[]> {
@@ -52,7 +55,8 @@ async function loadRaw(requestNos: string[], candidateIds: string[] | null = nul
             tc.candidate_id::text as candidate_id, upper(t.source_request_no) as request_no,
             c.full_name, c.first_name, c.last_name, c.phone, c.age::text as age, c.gender, c.province,
             cs.platform, tc.qualification_status as status, tc.qualification_score as score,
-            tc.qualification_reasons as reasons, coalesce(tc.first_matched_at, cs.first_seen_at) as found_at
+            tc.qualification_reasons as reasons, coalesce(tc.first_matched_at, cs.first_seen_at) as found_at,
+            coalesce((to_jsonb(c)->>'name_hidden')::boolean, false) as name_hidden
        from ${CAND}.scrape_tasks t
        join ${CAND}.scrape_task_candidates tc on tc.task_id = t.id
        join ${CAND}.candidates c on c.id = tc.candidate_id
@@ -97,7 +101,7 @@ export function requestNoOfJobId(jobId: string): string | null {
 
 function toRow(r: RawRow, inJarvis: Map<string, ScrapInJarvis>): ScrapCandidateRow {
   const phone = scrapPhone10(r.phone);
-  const name = (r.full_name ?? '').trim() || [r.first_name, r.last_name].filter(Boolean).join(' ').trim() || 'ไม่มีชื่อ';
+  const name = scrapDisplayName(r.full_name, r.first_name, r.last_name, r.name_hidden);
   const reasons = Array.isArray(r.reasons) ? r.reasons.map(String).filter(Boolean) : [];
   const platform: ScrapPlatform = r.platform === 'jobbkk' || r.platform === 'jobthai' ? r.platform : null;
   return {
