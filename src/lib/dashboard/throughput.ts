@@ -5,6 +5,7 @@ import type { DashboardActivityTrendPoint, DashboardKpi } from '@/lib/dashboard/
 import { computeJobUrgency } from '@/lib/jobUrgency';
 import type { RequestLeadKind } from '@/lib/requestLeadKind';
 import { TH_MONTH_SHORT } from '@/lib/periodPick';
+import { PREQUEST_LEDGER_PREFIX } from '@/lib/requestPenaltyLedger';
 
 export type ThroughputRecord = {
   /** เลขที่ใบขอ**ดิบ** — คีย์จัดกลุ่มของ drill-down · ห้ามตัดนำหน้าทิ้ง (เลขท้ายซ้ำข้าม BU) */
@@ -194,14 +195,15 @@ export function jobsToThroughputRecords(jobs: JobRequest[], today = new Date()):
  */
 export function filterThroughputByDepartment(
   records: ThroughputRecord[],
-  departmentFilter: string,
+  departmentFilter: readonly string[],
 ): ThroughputRecord[] {
-  const want = departmentFilter.trim().toUpperCase();
-  if (!want || want === 'ALL') return records;
+  // 23 พ.ย. 2569 เลือกได้หลาย BU — [] = ทั้งหมด
+  const want = new Set(departmentFilter.map((d) => d.trim().toUpperCase()).filter((d) => d && d !== 'ALL'));
+  if (want.size === 0) return records;
   return records.filter((r) => {
     const code = r.departmentCode?.trim().toUpperCase();
     if (!code) return true;
-    return code === want;
+    return want.has(code);
   });
 }
 
@@ -377,6 +379,33 @@ export function sumCohortStockByRequestDate(
     cancelledRequestCount: cancelledIds.size,
     remainingRequestCount: remainingIds.size,
   };
+}
+
+/**
+ * อัตราที่ยังต้องหาต่อใบ ของใบที่ต้องการคนในช่วง — ชุดเดียวกับ `sumCohortStockByRequestDate` (ผลรวม = `remainingPositions`)
+ * ใช้แยกกล่องสถานะทำงานให้มาจากใบชุดเดียวกับกล่อง "ทั้งหมด" (23 พ.ย. 2569 เจ้าของเห็น "ถึงเวลาหาแล้ว 18 + ล่วงหน้า 0 = 17")
+ * คีย์ = `requestNo` ของ record (ใบขอชั่วคราวมีคำนำหน้า) · จับกับใบด้วย `throughputKeysOfJob`
+ */
+export function cohortRemainingByRequest(records: ThroughputRecord[], from: string, to: string): Map<string, number> {
+  const out = new Map<string, number>();
+  for (const r of records) {
+    if (!inYmdRange(r.requestDate, from, to) || resolveKind(r) !== 'remaining') continue;
+    const id = r.requestNo?.trim();
+    if (!id) continue;
+    out.set(id, (out.get(id) ?? 0) + r.positionUnits);
+  }
+  return out;
+}
+
+/**
+ * คีย์ที่เป็นไปได้ของใบใน feed เทียบกับ `requestNo` ของ throughput (เรียงจากแน่นอนสุด) — ใบ ERP = เลขที่ใบ · ใบขอชั่วคราว = คำนำหน้า + เลขที่ใบ
+ * ลองทุกรหัสแบบ `buildRequestKeySet` (บางเส้นตั้ง externalId บางเส้นไม่ได้ตั้ง) · ใบขอชั่วคราวห้ามใช้เลขเปล่า (ซ้ำใบจริงได้)
+ */
+export function throughputKeysOfJob(j: Pick<JobRequest, 'id' | 'request_no'> & { externalId?: string | null }): string[] {
+  const id = (j.id || '').trim();
+  if (id.startsWith('siamraj-pre:')) return [`${PREQUEST_LEDGER_PREFIX}${id.slice('siamraj-pre:'.length).trim()}`];
+  const out = [(j.externalId || '').trim(), id.startsWith('siamraj-sql:') ? id.slice('siamraj-sql:'.length).trim() : '', (j.request_no || '').trim()];
+  return [...new Set(out.filter(Boolean))];
 }
 
 export function buildStockKpisFromCohort(

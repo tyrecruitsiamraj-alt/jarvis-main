@@ -202,18 +202,18 @@ describe('filterThroughputByDepartment', () => {
   ];
 
   it('keeps every record when no BU is selected', () => {
-    expect(filterThroughputByDepartment(records, 'all')).toHaveLength(4);
-    expect(filterThroughputByDepartment(records, '')).toHaveLength(4);
+    expect(filterThroughputByDepartment(records, [])).toHaveLength(4);
+    expect(filterThroughputByDepartment(records, [''])).toHaveLength(4);
   });
 
   it('matches BU case-insensitively', () => {
-    const lbd = filterThroughputByDepartment(records, 'LBD');
+    const lbd = filterThroughputByDepartment(records, ['LBD']);
     expect(lbd.map((r) => r.requestNo)).toEqual(['a', 'c', 'd']);
-    expect(filterThroughputByDepartment(records, 'sn').map((r) => r.requestNo)).toEqual(['b', 'd']);
+    expect(filterThroughputByDepartment(records, ['sn']).map((r) => r.requestNo)).toEqual(['b', 'd']);
   });
 
   it('keeps rows without a BU code — ห้ามตัดข้อมูลที่ระบุ BU ไม่ได้ออกเงียบ ๆ', () => {
-    const sn = filterThroughputByDepartment(records, 'SN');
+    const sn = filterThroughputByDepartment(records, ['SN']);
     expect(sn.some((r) => r.requestNo === 'd')).toBe(true);
   });
 });

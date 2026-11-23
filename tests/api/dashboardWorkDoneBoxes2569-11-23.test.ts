@@ -76,7 +76,9 @@ describe('กล่องบนจอ', () => {
     const shell = readFileSync('src/components/dashboard/analytics/DashboardShell.tsx', 'utf8');
     expect(shell).toContain('data-testid="dashboard-work-top"');
     expect(shell).toContain('data-testid="dashboard-work-advance-top"');
-    expect(shell).toContain('<div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">{tiles(list)}</div>');
+    // 23 พ.ย. 2569 แบบ ก: กล่องแรกของแถวสถานะย้ายขึ้นแถวบนเป็น "ยังไม่ปิด" · แถวสถานะเหลือแต่สถานะ
+    expect(shell).toContain('{tiles(mainView.rows, total)}');
+    expect(shell).toContain("topRow: [...topRow, { ...rows[0], label: WORK_OPEN_LABEL }], rows: rows.slice(1)");
     expect(shell).toContain('statusPick?.months ? (');
     const page = readFileSync('src/pages/dashboard/SupervisorDashboard.tsx', 'utf8');
     expect(page).toContain('const months = buildWorkMonths(records, from, to, topTotal.advance ?');
@@ -112,14 +114,14 @@ describe('แถวบนสุด ใบขอทั้งหมด · ปิ�
     expect(pair(top[1])).toEqual([3, 2]);
     expect(pair(top[2])).toEqual([1, 1]);
     expect(top[0].value).toBe(8 + top[1].value + top[2].value);
-    expect(top[0].description).toBe('ทั้งหมด 8 + ปิดแล้ว 3 + ยกเลิก 1 = 12 อัตรา · 3 ใบ');
+    expect(top[0].description).toBe('ยังไม่ปิด 8 + ปิดแล้ว 3 + ยกเลิก 1 = 12 อัตรา · 3 ใบ');
   });
   it('ล่วงหน้าแบบเดียวกัน: ใบขอทั้งหมด = ล่วงหน้า (ยังต้องหา) + ปิดแล้ว + ยกเลิก ของแถวนั้น', () => {
     expect(data.workStatusAdvanceKpis?.[0]?.value).toBe(3);
     expect(pair(advTop[0])).toEqual([4, 1]);
     expect(pair(advTop[1])).toEqual([1, 1]);
     expect(pair(advTop[2])).toEqual([0, 0]);
-    expect(advTop[0].description).toBe('ล่วงหน้า 3 + ปิดแล้ว 1 + ยกเลิก 0 = 4 อัตรา · 1 ใบ');
+    expect(advTop[0].description).toBe('ยังไม่ปิด 3 + ปิดแล้ว 1 + ยกเลิก 0 = 4 อัตรา · 1 ใบ');
   });
 });
 

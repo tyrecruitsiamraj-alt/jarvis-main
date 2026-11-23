@@ -52,6 +52,8 @@ import {
   sumCohortStockByRequestDate,
   sumCohortDoneByAdvance,
   cohortDoneRequestKeys,
+  cohortRemainingByRequest,
+  throughputKeysOfJob,
   type CohortDoneSplit,
   buildStockKpisFromCohort,
   type ThroughputRecord,
@@ -86,7 +88,7 @@ import {
   UNIT_REQUEST_WORK_STATUS_LABELS,
   type UnitRequestWorkStatus,
 } from '@/lib/unitRequestWorkStatus';
-import { WORK_DONE_LABEL, WORK_TOP_TOTAL_LABEL, workDoneBoxId, workTopTotalId, WORK_STATUS_ADVANCE_HINT, WORK_STATUS_ADVANCE_ID, WORK_STATUS_ADVANCE_LABEL, advanceStatusBoxId, isAdvanceStatusBoxId, workStatusBoxIdOf } from '@/lib/dashboard/workStatusBox';
+import { WORK_DONE_LABEL, WORK_OPEN_LABEL, WORK_TOP_TOTAL_LABEL, workDoneBoxId, workTopTotalId, WORK_STATUS_ADVANCE_HINT, WORK_STATUS_ADVANCE_ID, WORK_STATUS_ADVANCE_LABEL, advanceStatusBoxId, isAdvanceStatusBoxId, workStatusBoxIdOf } from '@/lib/dashboard/workStatusBox';
 import {
   jobToRequestControlRecord,
   jobsToRequestControlRecords,
@@ -609,15 +611,27 @@ function buildWorkStatusKpis(
   periodLabel?: string | null,
   totalOverride?: { positions: number; requests: number },
   today: Date = new Date(),
+  /**
+   * โหมดมีงวด: อัตราที่ยังต้องหาต่อใบจากชุดเดียวกับ `totalOverride` (`cohortRemainingByRequest`) — ใบนอกชุด = ไม่นับ
+   * 🔴 23 พ.ย. 2569 เดิมนับจากใบใน feed ด้วยกติกาวันคนละแบบ ⇒ "ถึงเวลาหาแล้ว 18 + ล่วงหน้า 0 = 17" บวกไม่ลงตัว
+   */
+  cohortUnitsByKey?: Map<string, number>,
 ): { main: DashboardKpi[]; advance: DashboardKpi[] } {
   const group = () => ({ positions: emptyStatusCounts(), requests: emptyStatusCounts(), replacement: { yes: 0, no: 0, unset: 0 } });
   // กำลังดำเนินการสรรหา แยกตามช่อง "ส่งคนแทน" ในหน้าใบขอ (เจ้าของ 18 พ.ย. 2569) — สามค่าเหมือนหน้าใบขอ ยังไม่ระบุ ห้ามยุบเข้าไม่ส่ง
   const main = group();
   const advance = group();
   // 🔴 18 พ.ย. 2569 เจ้าของ "แยกใบขอชั่วคราวออกมาทำไม ฉันสั่งไว้หรอ" — ใบขอชั่วคราวนับรวมตามสถานะ (ข้อเคาะ 11 พ.ย. "นับรวมเหมือนหน้าหลัก")
+  const usedKeys = new Set<string>();
   for (const j of jobs) {
     const status = resolveUnitRequestWorkStatus(j.work_status);
-    const units = positionBreakdownFromJob(j).remainingPositions;
+    let units: number;
+    if (cohortUnitsByKey) {
+      const key = throughputKeysOfJob(j).find((k) => cohortUnitsByKey.has(k));
+      if (!key || usedKeys.has(key)) continue;
+      usedKeys.add(key);
+      units = cohortUnitsByKey.get(key) ?? 0;
+    } else units = positionBreakdownFromJob(j).remainingPositions;
     if (units <= 0) continue;
     const g = isAdvanceStatusBoxId(workStatusBoxIdOf(j, today)) ? advance : main;
     g.positions[status] += units;
@@ -715,7 +729,7 @@ function buildWorkTopKpis(
     const cancelled = doneOf('cancelled', advance);
     const total = rest.positions + filled.positions + cancelled.positions;
     const req = advance ? requests.advance : requests.all;
-    const restLabel = advance ? WORK_STATUS_ADVANCE_LABEL : 'ทั้งหมด';
+    const restLabel = WORK_OPEN_LABEL;
     const box = (kind: 'filled' | 'cancelled', c: { positions: number; requests: number }): DashboardKpi => ({
       id: workDoneBoxId(kind, advance),
       label: WORK_DONE_LABEL[kind],
@@ -1315,13 +1329,16 @@ export function buildDashboardData(
         )
       : stockKpis;
 
+  // โหมดมีงวด: กล่องสถานะแยกจากใบชุดเดียวกับยอด "ทั้งหมด" (cohort) · ใบใน cohort ที่ไม่อยู่ใน feed = ไม่มีสถานะ
+  const cohortUnits = period && cohortStock ? cohortRemainingByRequest(throughputRecords, periodFrom, periodTo) : undefined;
   const workStatusRows = buildWorkStatusKpis(
-    openRemainingJobs,
+    cohortUnits ? openJobSet : openRemainingJobs,
     period?.label ?? null,
     period && cohortStock
       ? { positions: cohortStock.remainingPositions, requests: cohortStock.remainingRequestCount }
       : undefined,
     today,
+    cohortUnits,
   );
   // แถวบนสุด ใบขอทั้งหมด · ปิดแล้ว · ยกเลิก (23 พ.ย. 2569) — ใบนับไม่ซ้ำ: ใบเปิด ∪ ใบที่จบในช่วง · โหมดมีงวด = ใบของช่วง
   const todayYmd = toYmdBangkok(today);

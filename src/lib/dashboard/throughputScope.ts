@@ -21,12 +21,13 @@ import type { ThroughputRecord } from '@/lib/dashboard/throughput';
 
 /** ตัวกรองที่ ERP ไม่รู้จัก — ติดตัวใดตัวหนึ่ง = ต้องกรองด้วยรายการเลขที่ใบ */
 export type ScopeFilterState = {
-  unitFilter: string;
-  jobSubtypeFilter: string;
-  recruiterFilter: string;
-  screenerFilter: string;
-  oplFilter: string;
-  urgencyFilter: string;
+  /** 23 พ.ย. 2569 เลือกได้หลายค่า — [] = ทั้งหมด */
+  unitFilter: readonly string[];
+  jobSubtypeFilter: readonly string[];
+  recruiterFilter: readonly string[];
+  screenerFilter: readonly string[];
+  oplFilter: readonly string[];
+  urgencyFilter: readonly string[];
   noteFilter: string;
   ageDaysFilter: string;
   statusFilter: string;
@@ -40,12 +41,12 @@ export type ScopeFilterState = {
  */
 export function needsRequestScopeFilter(f: ScopeFilterState): boolean {
   return (
-    f.unitFilter !== 'all' ||
-    f.jobSubtypeFilter !== 'all' ||
-    f.recruiterFilter !== 'all' ||
-    f.screenerFilter !== 'all' ||
-    f.oplFilter !== 'all' ||
-    f.urgencyFilter !== 'all' ||
+    f.unitFilter.length > 0 ||
+    f.jobSubtypeFilter.length > 0 ||
+    f.recruiterFilter.length > 0 ||
+    f.screenerFilter.length > 0 ||
+    f.oplFilter.length > 0 ||
+    f.urgencyFilter.length > 0 ||
     f.noteFilter !== 'all' ||
     f.ageDaysFilter !== 'all' ||
     f.statusFilter !== 'all'
@@ -124,22 +125,23 @@ export const UNASSIGNED_FILTER_VALUE = 'unassigned';
  */
 export function assigneeRequestKeys(
   assignees: UnitAssignee[],
-  filters: { recruiterFilter: string; screenerFilter: string; oplFilter: string },
+  filters: { recruiterFilter: readonly string[]; screenerFilter: readonly string[]; oplFilter: readonly string[] },
 ): Set<string> | null {
-  const picks: Array<[keyof UnitAssignee, string]> = [];
-  if (filters.recruiterFilter !== 'all') picks.push(['recruiter_name', filters.recruiterFilter]);
-  if (filters.screenerFilter !== 'all') picks.push(['screener_name', filters.screenerFilter]);
-  if (filters.oplFilter !== 'all') picks.push(['opl_name', filters.oplFilter]);
+  // 23 พ.ย. 2569 เลือกได้หลายคนต่อบทบาท = ตรงคนใดคนหนึ่งในบทบาทนั้น · หลายบทบาท = ต้องตรงทุกบทบาท
+  const picks: Array<[keyof UnitAssignee, Set<string>]> = [];
+  if (filters.recruiterFilter.length > 0) picks.push(['recruiter_name', new Set(filters.recruiterFilter.map((v) => v.trim()))]);
+  if (filters.screenerFilter.length > 0) picks.push(['screener_name', new Set(filters.screenerFilter.map((v) => v.trim()))]);
+  if (filters.oplFilter.length > 0) picks.push(['opl_name', new Set(filters.oplFilter.map((v) => v.trim()))]);
   if (picks.length === 0) return null;
   // ถังพิเศษ "ยังไม่ถูก Assign" ตอบจากตารางนี้ไม่ได้
-  if (picks.some(([, v]) => v === UNASSIGNED_FILTER_VALUE)) return null;
+  if (picks.some(([, v]) => v.has(UNASSIGNED_FILTER_VALUE))) return null;
 
   const out = new Set<string>();
   for (const a of assignees) {
     const key = (a.request_no || '').trim();
     if (!key) continue;
     // เลือกหลายบทบาทพร้อมกัน = ต้องตรงทุกบทบาท (เหมือน filterUnitRequests)
-    const ok = picks.every(([field, want]) => (a[field] || '').trim() === want.trim());
+    const ok = picks.every(([field, want]) => want.has((a[field] || '').trim()));
     if (ok) out.add(key);
   }
   return out;

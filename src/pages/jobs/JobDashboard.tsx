@@ -83,9 +83,9 @@ const JobDashboard: React.FC = () => {
   const { filteredJobs: scopedJobs } = filterApi;
 
   useEffect(() => {
-    if (filters.jobSubtypeFilter === 'all') return;
-    const stillValid = filterApi.jobSubtypeOptions.some((o) => o.value === filters.jobSubtypeFilter);
-    if (!stillValid) patchFilters({ jobSubtypeFilter: 'all' });
+    if (filters.jobSubtypeFilter.length === 0) return;
+    const valid = filters.jobSubtypeFilter.filter((v) => filterApi.jobSubtypeOptions.some((o) => o.value === v));
+    if (valid.length !== filters.jobSubtypeFilter.length) patchFilters({ jobSubtypeFilter: valid });
   }, [filters.departmentFilter, filters.jobSubtypeFilter, filterApi.jobSubtypeOptions, patchFilters]);
 
   const closedJobs = useMemo(() => scopedJobs.filter((j) => j.status === 'closed'), [scopedJobs]);
@@ -113,8 +113,10 @@ const JobDashboard: React.FC = () => {
   };
 
   const filterSummary =
-    filters.departmentFilter !== 'all'
-      ? filterApi.departmentOptions.find((o) => o.value === filters.departmentFilter)?.label.replace(/\s*\(\d+\)$/, '')
+    filters.departmentFilter.length > 0
+      ? filters.departmentFilter
+          .map((d) => filterApi.departmentOptions.find((o) => o.value === d)?.label.replace(/\s*\(\d+\)$/, '') ?? d)
+          .join(' · ')
       : null;
 
   return (

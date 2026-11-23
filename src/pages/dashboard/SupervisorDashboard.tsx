@@ -185,9 +185,9 @@ const SupervisorDashboard: React.FC = () => {
   useEffect(() => {
     if (!lockedDepartmentCode) return;
     setUnitFilters((prev) =>
-      prev.departmentFilter === lockedDepartmentCode
+      prev.departmentFilter.length === 1 && prev.departmentFilter[0] === lockedDepartmentCode
         ? prev
-        : { ...prev, departmentFilter: lockedDepartmentCode },
+        : { ...prev, departmentFilter: [lockedDepartmentCode] },
     );
   }, [lockedDepartmentCode]);
 
@@ -435,17 +435,16 @@ const SupervisorDashboard: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (unitFilters.jobSubtypeFilter === 'all') return;
-    const stillValid = filterApi.jobSubtypeOptions.some((o) => o.value === unitFilters.jobSubtypeFilter);
-    if (!stillValid) setUnitFilters((prev) => ({ ...prev, jobSubtypeFilter: 'all' }));
+    // ตัดเฉพาะค่าที่เลือกไว้แล้วไม่มีในตัวเลือกแล้ว (แบบหน้าใบขอ)
+    if (unitFilters.jobSubtypeFilter.length === 0) return;
+    const valid = unitFilters.jobSubtypeFilter.filter((v) => filterApi.jobSubtypeOptions.some((o) => o.value === v));
+    if (valid.length !== unitFilters.jobSubtypeFilter.length) setUnitFilters((prev) => ({ ...prev, jobSubtypeFilter: valid }));
   }, [unitFilters.departmentFilter, unitFilters.jobSubtypeFilter, filterApi.jobSubtypeOptions]);
 
   useEffect(() => {
-    if (unitFilters.unitFilter === 'all') return;
-    const stillValid = filterApi.unitOptions.some(
-      (o) => unitOrganizationKey(o) === unitOrganizationKey(unitFilters.unitFilter),
-    );
-    if (!stillValid) setUnitFilters((prev) => ({ ...prev, unitFilter: 'all' }));
+    if (unitFilters.unitFilter.length === 0) return;
+    const valid = unitFilters.unitFilter.filter((v) => filterApi.unitOptions.some((o) => unitOrganizationKey(o) === unitOrganizationKey(v)));
+    if (valid.length !== unitFilters.unitFilter.length) setUnitFilters((prev) => ({ ...prev, unitFilter: valid }));
   }, [unitFilters.departmentFilter, unitFilters.jobSubtypeFilter, unitFilters.unitFilter, filterApi.unitOptions]);
 
   const patchFilters = useCallback((patch: Partial<DashboardFilters>) => {
@@ -531,9 +530,9 @@ const SupervisorDashboard: React.FC = () => {
     const byAssignee = assigneeRequestKeys(assignees, unitFilters);
     const byJob = buildRequestKeySet([...jobsWithoutAgeFilter, ...scopedClosedJobs]);
     const needsJobLevel =
-      unitFilters.unitFilter !== 'all' ||
-      unitFilters.jobSubtypeFilter !== 'all' ||
-      unitFilters.urgencyFilter !== 'all' ||
+      unitFilters.unitFilter.length > 0 ||
+      unitFilters.jobSubtypeFilter.length > 0 ||
+      unitFilters.urgencyFilter.length > 0 ||
       unitFilters.noteFilter !== 'all' ||
       unitFilters.ageDaysFilter !== 'all' ||
       unitFilters.statusFilter !== 'all';
@@ -558,9 +557,9 @@ const SupervisorDashboard: React.FC = () => {
     const byDept = filterThroughputByDepartment(previousThroughput.records, unitFilters.departmentFilter);
     if (!needsRequestScopeFilter(unitFilters)) return byDept;
     const needsJobLevel =
-      unitFilters.unitFilter !== 'all' ||
-      unitFilters.jobSubtypeFilter !== 'all' ||
-      unitFilters.urgencyFilter !== 'all' ||
+      unitFilters.unitFilter.length > 0 ||
+      unitFilters.jobSubtypeFilter.length > 0 ||
+      unitFilters.urgencyFilter.length > 0 ||
       unitFilters.noteFilter !== 'all' ||
       unitFilters.ageDaysFilter !== 'all' ||
       unitFilters.statusFilter !== 'all';
@@ -578,9 +577,9 @@ const SupervisorDashboard: React.FC = () => {
     let scoped: ThroughputRecord[] | null = byDept;
     if (needsRequestScopeFilter(unitFilters)) {
       const needsJobLevel =
-        unitFilters.unitFilter !== 'all' ||
-        unitFilters.jobSubtypeFilter !== 'all' ||
-        unitFilters.urgencyFilter !== 'all' ||
+        unitFilters.unitFilter.length > 0 ||
+        unitFilters.jobSubtypeFilter.length > 0 ||
+        unitFilters.urgencyFilter.length > 0 ||
         unitFilters.noteFilter !== 'all' ||
         unitFilters.ageDaysFilter !== 'all' ||
         unitFilters.statusFilter !== 'all';

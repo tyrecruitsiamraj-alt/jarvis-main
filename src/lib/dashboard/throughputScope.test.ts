@@ -10,12 +10,12 @@ import { assigneeRequestKeys, UNASSIGNED_FILTER_VALUE } from '@/lib/dashboard/th
 import type { ThroughputRecord } from '@/lib/dashboard/throughput';
 
 const allAll: ScopeFilterState = {
-  unitFilter: 'all',
-  jobSubtypeFilter: 'all',
-  recruiterFilter: 'all',
-  screenerFilter: 'all',
-  oplFilter: 'all',
-  urgencyFilter: 'all',
+  unitFilter: [],
+  jobSubtypeFilter: [],
+  recruiterFilter: [],
+  screenerFilter: [],
+  oplFilter: [],
+  urgencyFilter: [],
   noteFilter: 'all',
   ageDaysFilter: 'all',
   statusFilter: 'all',
@@ -35,15 +35,15 @@ describe('needsRequestScopeFilter', () => {
   });
 
   it('🔴 เลือกเจ้าหน้าที่สรรหา/คัดสรร/OPL = ต้องกรอง', () => {
-    expect(needsRequestScopeFilter({ ...allAll, recruiterFilter: 'คิว' })).toBe(true);
-    expect(needsRequestScopeFilter({ ...allAll, screenerFilter: 'ตี้' })).toBe(true);
-    expect(needsRequestScopeFilter({ ...allAll, oplFilter: 'เอ' })).toBe(true);
+    expect(needsRequestScopeFilter({ ...allAll, recruiterFilter: ['คิว'] })).toBe(true);
+    expect(needsRequestScopeFilter({ ...allAll, screenerFilter: ['ตี้'] })).toBe(true);
+    expect(needsRequestScopeFilter({ ...allAll, oplFilter: ['เอ'] })).toBe(true);
   });
 
   it('ตัวกรองอื่นก็ต้องกรองเหมือนกัน', () => {
-    expect(needsRequestScopeFilter({ ...allAll, unitFilter: 'ฮอนด้า' })).toBe(true);
-    expect(needsRequestScopeFilter({ ...allAll, jobSubtypeFilter: 'driver' })).toBe(true);
-    expect(needsRequestScopeFilter({ ...allAll, urgencyFilter: 'urgent' })).toBe(true);
+    expect(needsRequestScopeFilter({ ...allAll, unitFilter: ['ฮอนด้า'] })).toBe(true);
+    expect(needsRequestScopeFilter({ ...allAll, jobSubtypeFilter: ['driver'] })).toBe(true);
+    expect(needsRequestScopeFilter({ ...allAll, urgencyFilter: ['urgent'] })).toBe(true);
     expect(needsRequestScopeFilter({ ...allAll, noteFilter: 'has' })).toBe(true);
     expect(needsRequestScopeFilter({ ...allAll, ageDaysFilter: '1-7' })).toBe(true);
     expect(needsRequestScopeFilter({ ...allAll, statusFilter: 'closed' })).toBe(true);
@@ -132,36 +132,41 @@ describe('assigneeRequestKeys — กรองตามเจ้าหน้า�
     { request_no: 'B1', recruiter_name: 'กร', screener_name: null, opl_name: null, online_name: null },
     { request_no: '  ', recruiter_name: 'คิว', screener_name: null, opl_name: null, online_name: null },
   ];
-  const base = { recruiterFilter: 'all', screenerFilter: 'all', oplFilter: 'all' };
+  const base = { recruiterFilter: [], screenerFilter: [], oplFilter: [] };
 
   it('ไม่เลือกใคร = null (ไม่ต้องกรอง)', () => {
     expect(assigneeRequestKeys(rows, base)).toBeNull();
   });
 
   it('🔴 เลือก "คิว" ได้ใบของคิวทั้งหมด รวมใบที่ปิดไปแล้ว', () => {
-    const keys = assigneeRequestKeys(rows, { ...base, recruiterFilter: 'คิว' });
+    const keys = assigneeRequestKeys(rows, { ...base, recruiterFilter: ['คิว'] });
     expect([...(keys ?? [])].sort()).toEqual(['A1', 'A2']);
   });
 
   it('เลือกสองบทบาทพร้อมกัน = ต้องตรงทั้งคู่', () => {
-    const keys = assigneeRequestKeys(rows, { ...base, recruiterFilter: 'คิว', screenerFilter: 'ครีม' });
+    const keys = assigneeRequestKeys(rows, { ...base, recruiterFilter: ['คิว'], screenerFilter: ['ครีม'] });
     expect([...(keys ?? [])]).toEqual(['A2']);
   });
 
   it('เลขที่ใบว่างไม่ถูกเก็บ', () => {
-    const keys = assigneeRequestKeys(rows, { ...base, recruiterFilter: 'คิว' });
+    const keys = assigneeRequestKeys(rows, { ...base, recruiterFilter: ['คิว'] });
     expect(keys?.has('')).toBe(false);
     expect(keys?.has('  ')).toBe(false);
   });
 
   it('🔴 "ยังไม่ถูก Assign" ตอบจากตารางนี้ไม่ได้ → null ให้ถอยไปใช้ชุดจาก jobs', () => {
     expect(
-      assigneeRequestKeys(rows, { ...base, recruiterFilter: UNASSIGNED_FILTER_VALUE }),
+      assigneeRequestKeys(rows, { ...base, recruiterFilter: [UNASSIGNED_FILTER_VALUE] }),
     ).toBeNull();
   });
 
+  it('เลือกหลายคนในบทบาทเดียว (23 พ.ย. 2569) = ใบของคนใดคนหนึ่ง', () => {
+    const keys = assigneeRequestKeys(rows, { ...base, recruiterFilter: ['คิว', 'กร'] });
+    expect([...(keys ?? [])].sort()).toEqual(['A1', 'A2', 'B1']);
+  });
+
   it('ไม่มีใครตรง = set ว่าง (ไม่ใช่ null — null แปลว่าไม่กรอง)', () => {
-    const keys = assigneeRequestKeys(rows, { ...base, recruiterFilter: 'ไม่มีคนนี้' });
+    const keys = assigneeRequestKeys(rows, { ...base, recruiterFilter: ['ไม่มีคนนี้'] });
     expect(keys).not.toBeNull();
     expect(keys?.size).toBe(0);
   });

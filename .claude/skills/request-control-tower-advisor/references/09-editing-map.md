@@ -14603,3 +14603,19 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 - PDF ฟอนต์ Kanit ฝังจาก `api/_assets/fonts` (มี OFL) · ภาพซ้ำกันสามใบ = ส่งไม่ได้
 - เทสต์: `tests/api/applicantDocuments*.test.ts` · `src/lib/documents/*.test.ts` · `src/components/documents/*.test.tsx` · ฐานจริงของงานนี้ `tests/integration/documents` รันด้วย `DOCS_TEST_DATABASE_URL=<ฐานทดสอบในเครื่อง> npx vitest run -c vitest.integration.config.ts` (ไม่มีตัวแปร = ข้าม · ห้ามชี้ฐานจริง)
 - ยังไม่ได้: ลองกับ LINE จริงบนมือถือ (ต้องตั้ง LINE Login channel + LIFF ก่อน) · iRecruit ยังไม่เชื่อม (HR คีย์เองแล้วบันทึกเลขที่) · คู่มือตั้งค่า `docs/applicant-documents.md`
+
+### 23 พ.ย. 2569 (10) — Dashboard: ตัวกรองเลือกได้หลายอัน
+เจ้าของ "ฟิลเตอร์ทำให้เลือกได้หลายอันหน่อย" (ชี้ช่องเจ้าหน้าที่สรรหาในแผงตัวกรอง Dashboard)
+- `UnitRequestFilterState` 7 ช่องเป็นรายการ (แผนก · ลักษณะงานย่อย · หน่วยงาน · สรรหา · คัดสรร · OPL · สถานะใบขอ) · [] = ทั้งหมด · หมายเหตุ/วันผ่านมา/สถานะ ยังช่องเดียว
+- กรองด้วย `matchesAny*` / `filterUnitRequestsByAny*` ชุดเดียวกับหน้าใบขอ · หน้าจอ `UnitRequestFilterFields` ใช้ `FilterMultiSelect` (มีผลทั้ง /dashboard และ /jobs/overview)
+- ยอดเข้า/ปิด/ยกเลิก: `filterThroughputByDepartment` รับหลาย BU · `assigneeRequestKeys` หลายคนในบทบาทเดียว = คนใดคนหนึ่ง หลายบทบาท = ต้องตรงทุกบทบาท
+- ค่าที่จำไว้ใน sessionStorage รุ่นเก่าเป็นข้อความเดียว → `normalizeUnitRequestFilters`
+- เทสต์ `tests/api/dashboardMultiFilter2569-11-23.test.ts` · `src/lib/dashboard/throughputScope.test.ts`
+
+### 23 พ.ย. 2569 (11) — สถานะทำงาน: แถวบน 4 กล่อง ใบขอทั้งหมด · ปิดแล้ว · ยกเลิก · ยังไม่ปิด + กล่องสถานะบวกลงตัวกับยอดรวม
+เจ้าของ "มีอะไรที่สื่อว่าเป็นคงเหลือของใบขอทั้งหมดที่ยังต้องหาไหม" → "เอาเป็น ใบขอทั้งหมด ปิด ยกเลิก ยังไม่ปิด แล้วยังไม่ปิดนี่แหละแยกลงมา" → Choice แบบ ก (แถวสถานะไม่มีเลขซ้ำ)
+- `DashboardShell.withOpen`: กล่องแรกของแถวสถานะ (ทั้งหมด / ล่วงหน้า · id เดิม กดแล้วเปิดรายการเดิม) ย้ายขึ้นแถวบนเป็นกล่องที่ 4 ป้าย `WORK_OPEN_LABEL` = "ยังไม่ปิด" · แถวสถานะเหลือแต่สถานะ · ทั้งชุดหลักและล่วงหน้า · ข้อมูล `workStatusKpis` ไม่เปลี่ยน (ตัวหาร/ตัวกดใช้ id เดิม)
+- สมการใต้ "ใบขอทั้งหมด" = "ยังไม่ปิด X + ปิดแล้ว Y + ยกเลิก Z" (`buildWorkTopKpis`)
+- 🔴 บั๊กในรูปเจ้าของ: "ถึงเวลาหาแล้ว 18 + ล่วงหน้า 0 = 17" — โหมดมีงวด ยอดรวมมาจาก cohort (ERP) แต่กล่องสถานะนับใบใน feed ด้วยกติกาวันคนละแบบ ใบที่ ERP ปิดแล้วแต่ feed ยังเปิดถูกนับเกิน
+  ⇒ `cohortRemainingByRequest` + `throughputKeysOfJob` (`throughput.ts`) · `buildWorkStatusKpis(..., cohortUnitsByKey)` ใช้อัตราต่อใบจาก cohort กับใบเปิดทั้ง feed · ใบใน cohort ที่ไม่อยู่ใน feed = ไม่มีสถานะ (ไม่มีทางเกินยอดแล้ว)
+- เทสต์ `tests/api/dashboardOpenBox2569-11-23.test.ts` · `tests/api/dashboardWorkDoneBoxes2569-11-23.test.ts`

@@ -1,5 +1,6 @@
 import React from 'react';
 import { FilterSelect } from '@/components/shared/FilterSelect';
+import { FilterMultiSelect } from '@/components/shared/FilterMultiSelect';
 import { cn } from '@/lib/utils';
 import {
   AGE_DAYS_FILTER_OPTIONS,
@@ -108,130 +109,99 @@ const UnitRequestFilterFields: React.FC<Props> = ({
               : 'grid-cols-1 sm:grid-cols-2',
         )}
       >
+        {/* 7 ช่องเลือกได้หลายค่า (เจ้าของ 23 พ.ย. 2569 "ฟิลเตอร์ทำให้เลือกได้หลายอันหน่อย") — ตัวเดียวกับหน้าใบขอ (`FilterMultiSelect`) */}
         {siamrajPrimary ? (
-          <FilterSelect
+          <FilterMultiSelect
             id={`${idPrefix}-department`}
             label={lockedDepartmentCode ? `แผนก (ล็อก ${lockedDepartmentCode})` : 'แผนก'}
-            value={lockedDepartmentCode || filters.departmentFilter}
+            summaryNoun="แผนก"
+            values={lockedDepartmentCode ? [lockedDepartmentCode] : filters.departmentFilter}
+            disabled={Boolean(lockedDepartmentCode)}
             onChange={(v) => {
               if (lockedDepartmentCode) return;
               onChange({ departmentFilter: v });
             }}
-            disabled={Boolean(lockedDepartmentCode)}
-            selectClassName={selectClassName}
-          >
-            {lockedDepartmentCode ? (
-              <option value={lockedDepartmentCode}>{lockedDepartmentCode}</option>
-            ) : (
-              departmentOptions.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))
-            )}
-          </FilterSelect>
+            options={
+              lockedDepartmentCode
+                ? [{ value: lockedDepartmentCode, label: lockedDepartmentCode }]
+                : departmentOptions.filter((o) => o.value !== 'all').map((o) => ({ value: o.value, label: o.label }))
+            }
+            className={selectClassName}
+          />
         ) : null}
 
         {siamrajPrimary ? (
-          <FilterSelect
+          <FilterMultiSelect
             id={`${idPrefix}-subtype`}
             label="ลักษณะงานย่อย"
-            value={filters.jobSubtypeFilter}
+            summaryNoun="ลักษณะงาน"
+            values={filters.jobSubtypeFilter}
             onChange={(v) => onChange({ jobSubtypeFilter: v })}
-            selectClassName={selectClassName}
-          >
-            {jobSubtypeOptions.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </FilterSelect>
+            options={jobSubtypeOptions.filter((o) => o.value !== 'all').map((o) => ({ value: o.value, label: o.label }))}
+            className={selectClassName}
+          />
         ) : null}
 
         {showUnitFilter && unitOptions.length > 0 ? (
-          <FilterSelect
+          <FilterMultiSelect
             id={`${idPrefix}-unit`}
             label="หน่วยงาน"
-            value={filters.unitFilter}
+            summaryNoun="หน่วยงาน"
+            values={filters.unitFilter}
             onChange={(v) => onChange({ unitFilter: v })}
-            selectClassName={selectClassName}
-          >
-            <option value="all">ทั้งหมด</option>
-            {unitOptions.map((u) => (
-              <option key={u} value={u}>
-                {u}
-              </option>
-            ))}
-          </FilterSelect>
+            options={unitOptions.map((u) => ({ value: u, label: u }))}
+            className={selectClassName}
+          />
         ) : null}
 
-        <FilterSelect
+        <FilterMultiSelect
           id={`${idPrefix}-recruiter`}
           label="เจ้าหน้าที่สรรหา"
-          value={filters.recruiterFilter}
+          summaryNoun="คน"
+          values={filters.recruiterFilter}
           onChange={(v) => onChange({ recruiterFilter: v })}
-          selectClassName={selectClassName}
-        >
-          <option value="all">ทั้งหมด</option>
-          <option value={STAFF_ASSIGNEE_UNASSIGNED}>
-            {STAFF_ASSIGNEE_UNASSIGNED_LABEL} ({unassignedRecruiterCount})
-          </option>
-          {recruiters.map((r) => (
-            <option key={r} value={r}>
-              {r}
-            </option>
-          ))}
-        </FilterSelect>
+          options={[
+            { value: STAFF_ASSIGNEE_UNASSIGNED, label: `${STAFF_ASSIGNEE_UNASSIGNED_LABEL} (${unassignedRecruiterCount})` },
+            ...recruiters.map((r) => ({ value: r, label: r })),
+          ]}
+          className={selectClassName}
+        />
 
-        <FilterSelect
+        <FilterMultiSelect
           id={`${idPrefix}-screener`}
           label="เจ้าหน้าที่คัดสรร"
-          value={filters.screenerFilter}
+          summaryNoun="คน"
+          values={filters.screenerFilter}
           onChange={(v) => onChange({ screenerFilter: v })}
-          selectClassName={selectClassName}
-        >
-          <option value="all">ทั้งหมด</option>
-          <option value={STAFF_ASSIGNEE_UNASSIGNED}>
-            {STAFF_ASSIGNEE_UNASSIGNED_LABEL} ({unassignedScreenerCount})
-          </option>
-          {screeners.map((s) => (
-            <option key={s} value={s}>
-              {s}
-            </option>
-          ))}
-        </FilterSelect>
+          options={[
+            { value: STAFF_ASSIGNEE_UNASSIGNED, label: `${STAFF_ASSIGNEE_UNASSIGNED_LABEL} (${unassignedScreenerCount})` },
+            ...screeners.map((n) => ({ value: n, label: n })),
+          ]}
+          className={selectClassName}
+        />
 
-        <FilterSelect
+        <FilterMultiSelect
           id={`${idPrefix}-opl`}
           label="เจ้าหน้าที่ OPL"
-          value={filters.oplFilter}
+          summaryNoun="คน"
+          values={filters.oplFilter}
           onChange={(v) => onChange({ oplFilter: v })}
-          selectClassName={selectClassName}
-        >
-          <option value="all">ทั้งหมด</option>
-          <option value={STAFF_ASSIGNEE_UNASSIGNED}>
-            {STAFF_ASSIGNEE_UNASSIGNED_LABEL} ({unassignedOplCount})
-          </option>
-          {opls.map((n) => (
-            <option key={n} value={n}>
-              {n}
-            </option>
-          ))}
-        </FilterSelect>
+          options={[
+            { value: STAFF_ASSIGNEE_UNASSIGNED, label: `${STAFF_ASSIGNEE_UNASSIGNED_LABEL} (${unassignedOplCount})` },
+            ...opls.map((n) => ({ value: n, label: n })),
+          ]}
+          className={selectClassName}
+        />
 
-        <FilterSelect
+        <FilterMultiSelect
           id={`${idPrefix}-urgency`}
           label="สถานะใบขอ"
-          value={filters.urgencyFilter}
-          onChange={(v) => onChange({ urgencyFilter: v as UrgencyFilter })}
-          selectClassName={selectClassName}
-        >
-          {URGENCY_FILTER_OPTIONS.map((o) => (
-            <option key={o.value} value={o.value} title={o.hint}>
-              {o.label}
-            </option>
-          ))}
-        </FilterSelect>
+          summaryNoun="สถานะ"
+          values={filters.urgencyFilter}
+          onChange={(v) => onChange({ urgencyFilter: v as UrgencyFilter[] })}
+          options={URGENCY_FILTER_OPTIONS.filter((o) => o.value !== 'all').map((o) => ({ value: o.value, label: o.label }))}
+          className={selectClassName}
+        />
 
         {showNoteFilter ? (
           <FilterSelect

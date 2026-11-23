@@ -57,6 +57,11 @@ export function parseWorkDoneBoxId(id: string): WorkDoneBox | null {
  * แถวล่วงหน้าแบบเดียวกัน · กด "ใบขอทั้งหมด" = เทียบรายเดือน · กด ปิดแล้ว/ยกเลิก = รายการใบของช่วง
  */
 export const WORK_TOP_TOTAL_LABEL = 'ใบขอทั้งหมด';
+/**
+ * กล่องที่ 4 ของแถวบน (เจ้าของ 23 พ.ย. 2569 "เอาเป็น ใบขอทั้งหมด ปิด ยกเลิก ยังไม่ปิด แล้วยังไม่ปิดนี่แหละแยกลงมา" · Choice แบบ ก)
+ * = กล่องแรกของแถวสถานะเดิม (ทั้งหมด / ล่วงหน้า) ย้ายขึ้นมา ⇒ แถวสถานะเหลือแต่สถานะ ไม่มีเลขซ้ำ
+ */
+export const WORK_OPEN_LABEL = 'ยังไม่ปิด';
 export const workTopTotalId = (advance: boolean): string => (advance ? 'work_top_advance_total' : 'work_top_total');
 export function parseWorkTopTotalId(id: string): { advance: boolean } | null {
   return id === 'work_top_total' ? { advance: false } : id === 'work_top_advance_total' ? { advance: true } : null;

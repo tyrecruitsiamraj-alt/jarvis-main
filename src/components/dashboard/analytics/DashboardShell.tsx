@@ -13,7 +13,7 @@ import type { UnitRequestFilterState } from '@/hooks/useSiamrajUnitRequestFilter
 import type { DateRangeYmd } from '@/components/shared/DateRangeCalendarPicker';
 import DashboardFilterBar from './DashboardFilterBar';
 import DashboardWorkMonths from './DashboardWorkMonths';
-import { parseWorkDoneBoxId } from '@/lib/dashboard/workStatusBox';
+import { WORK_OPEN_LABEL, parseWorkDoneBoxId } from '@/lib/dashboard/workStatusBox';
 import type { WorkMonthRow } from '@/lib/dashboard/throughput';
 import DashboardKpiCard from './DashboardKpiCard';
 import DashboardChartSection from './DashboardChartSection';
@@ -377,20 +377,34 @@ const DashboardShell: React.FC<Props> = ({
                     const advance = data.workStatusAdvanceKpis ?? [];
                     const top = data.workStatusTopKpis ?? [];
                     const advanceTop = data.workStatusAdvanceTopKpis ?? [];
+                    /**
+                     * แถวบน 4 กล่อง ใบขอทั้งหมด · ปิดแล้ว · ยกเลิก · ยังไม่ปิด (เจ้าของ 23 พ.ย. 2569 Choice แบบ ก)
+                     * "ยังไม่ปิด" = กล่องแรกของแถวสถานะเดิม (id เดิม กดแล้วเปิดรายการเดิม) ย้ายขึ้นมา · แถวสถานะเหลือแต่สถานะ = ยังไม่ปิดแยกลงมา
+                     */
+                    const withOpen = (topRow: typeof list, rows: typeof list) =>
+                      topRow.length && rows.length ? { topRow: [...topRow, { ...rows[0], label: WORK_OPEN_LABEL }], rows: rows.slice(1) } : { topRow, rows };
+                    const mainView = withOpen(top, list);
+                    const advanceView = withOpen(advanceTop, advance);
                     return (
                       <>
                         {/* แถวบนสุด ใบขอทั้งหมด · ปิดแล้ว · ยกเลิก (เจ้าของ 23 พ.ย. 2569) · ใต้ลงมาแถวสถานะแบบเดิม (ยังต้องหา) */}
-                        {top.length ? <div className="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-3" data-testid="dashboard-work-top">{tiles(top, top[0]?.value ?? 0)}</div> : null}
-                        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">{tiles(list)}</div>
+                        {mainView.topRow.length ? (
+                          <div className="mb-3 grid grid-cols-2 gap-3 lg:grid-cols-4" data-testid="dashboard-work-top">
+                            {tiles(mainView.topRow, mainView.topRow[0]?.value ?? 0)}
+                          </div>
+                        ) : null}
+                        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">{tiles(mainView.rows, total)}</div>
                         {/* แถวล่วงหน้า (เจ้าของ 22 พ.ย. 2569 "ล่วงหน้าแยกออกมาแล้วเป็นอีกแถวที่บอกสถานะ") — ใบล่วงหน้าที่ยังไม่ถึงวันต้องการ
                             แยกตามสถานะเดียวกับแถวบน · กล่องแรก = ล่วงหน้าทั้งแถว · สองแถวรวมกัน = ทั้งหมด */}
                         {advance.length ? (
                           <div className="mt-5 space-y-3" data-testid="dashboard-work-status-advance">
                             <p className="text-base font-medium text-foreground">ล่วงหน้า · ยังไม่ถึงวันต้องการ</p>
-                            {advanceTop.length ? (
-                              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3" data-testid="dashboard-work-advance-top">{tiles(advanceTop, advanceTop[0]?.value ?? 0)}</div>
+                            {advanceView.topRow.length ? (
+                              <div className="grid grid-cols-2 gap-3 lg:grid-cols-4" data-testid="dashboard-work-advance-top">
+                                {tiles(advanceView.topRow, advanceView.topRow[0]?.value ?? 0)}
+                              </div>
                             ) : null}
-                            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">{tiles(advance, advance[0]?.value ?? 0)}</div>
+                            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">{tiles(advanceView.rows, advance[0]?.value ?? 0)}</div>
                           </div>
                         ) : null}
                       </>

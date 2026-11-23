@@ -2,14 +2,14 @@ import { useMemo } from 'react';
 import type { JobRequest } from '@/types';
 import {
   departmentFilterOptions,
-  filterUnitRequestsByDepartment,
-  filterUnitRequestsByJobSubtype,
+  filterUnitRequestsByAnyDepartment,
+  filterUnitRequestsByAnyJobSubtype,
   jobSubtypeFilterOptions,
 } from '@/lib/siamrajUnitFilters';
 import {
   matchesAgeDaysFilter,
+  matchesAnyUrgencyFilter,
   matchesNoteFilter,
-  matchesUrgencyFilter,
   type AgeDaysFilter,
   type NoteFilter,
   type UrgencyFilter,
@@ -21,42 +21,63 @@ import {
   countUnassignedRecruiters,
   countUnassignedScreeners,
   countUnassignedOpls,
-  matchesRecruiterFilter,
-  matchesScreenerFilter,
-  matchesOplFilter,
+  matchesAnyRecruiterFilter,
+  matchesAnyScreenerFilter,
+  matchesAnyOplFilter,
 } from '@/lib/jobStaffNames';
 import {
   groupedUnitFilterOptions,
-  matchesUnitOrganizationFilter,
+  matchesAnyUnitOrganizationFilter,
 } from '@/lib/unitGroupName';
 
 export type UnitRequestStatusFilter = 'all' | 'active' | 'closed';
 
+/**
+ * 🔴 7 ช่องเลือกได้หลายค่า (เจ้าของ 23 พ.ย. 2569 "ฟิลเตอร์ทำให้เลือกได้หลายอันหน่อย") — [] = ทั้งหมด
+ * ตัวกรองแบบเดียวกับหน้าใบขอ (`matchesAny*`) · ค่าเก่าที่จำไว้เป็นข้อความเดียวแปลงที่ `normalizeUnitRequestFilters`
+ */
 export type UnitRequestFilterState = {
-  unitFilter: string;
-  departmentFilter: string;
-  jobSubtypeFilter: string;
-  recruiterFilter: string;
-  screenerFilter: string;
-  oplFilter: string;
-  urgencyFilter: UrgencyFilter;
+  unitFilter: string[];
+  departmentFilter: string[];
+  jobSubtypeFilter: string[];
+  recruiterFilter: string[];
+  screenerFilter: string[];
+  oplFilter: string[];
+  urgencyFilter: UrgencyFilter[];
   noteFilter: NoteFilter;
   ageDaysFilter: AgeDaysFilter;
   statusFilter: UnitRequestStatusFilter;
 };
 
 export const UNIT_REQUEST_FILTER_DEFAULTS: UnitRequestFilterState = {
-  unitFilter: 'all',
-  departmentFilter: 'all',
-  jobSubtypeFilter: 'all',
-  recruiterFilter: 'all',
-  screenerFilter: 'all',
-  oplFilter: 'all',
-  urgencyFilter: 'all',
+  unitFilter: [],
+  departmentFilter: [],
+  jobSubtypeFilter: [],
+  recruiterFilter: [],
+  screenerFilter: [],
+  oplFilter: [],
+  urgencyFilter: [],
   noteFilter: 'all',
   ageDaysFilter: 'all',
   statusFilter: 'all',
 };
+
+const MULTI_KEYS = ['unitFilter', 'departmentFilter', 'jobSubtypeFilter', 'recruiterFilter', 'screenerFilter', 'oplFilter', 'urgencyFilter'] as const;
+
+/** ค่าที่อ่านจากที่จำไว้ (รุ่นเก่าเป็นข้อความเดียว 'all' / 'ชื่อ') → รายการ · ค่าแปลก = ทั้งหมด */
+function toList(v: unknown): string[] {
+  if (Array.isArray(v)) return v.filter((x): x is string => typeof x === 'string' && x !== '' && x !== 'all');
+  if (typeof v === 'string' && v !== '' && v !== 'all') return [v];
+  return [];
+}
+export function normalizeUnitRequestFilters(raw: Partial<Record<keyof UnitRequestFilterState, unknown>> | null | undefined): UnitRequestFilterState {
+  const out = { ...UNIT_REQUEST_FILTER_DEFAULTS, ...(raw ?? {}) } as UnitRequestFilterState;
+  for (const k of MULTI_KEYS) (out as Record<string, unknown>)[k] = toList(raw?.[k]);
+  return out;
+}
+
+/** มีตัวกรองช่องนี้อยู่ไหม */
+export const hasPick = (v: readonly string[]) => v.length > 0;
 
 type OmitFilters = Partial<Record<keyof UnitRequestFilterState, true>>;
 
@@ -82,15 +103,15 @@ export function filterUnitRequests(
   const f = effectiveFilters(filters, omit);
   const unitScopeNames = jobs.map((j) => j.unit_name);
 
-  let list = siamrajPrimary ? filterUnitRequestsByDepartment(jobs, f.departmentFilter) : jobs;
-  if (siamrajPrimary) list = filterUnitRequestsByJobSubtype(list, f.jobSubtypeFilter);
+  let list = siamrajPrimary ? filterUnitRequestsByAnyDepartment(jobs, f.departmentFilter) : jobs;
+  if (siamrajPrimary) list = filterUnitRequestsByAnyJobSubtype(list, f.jobSubtypeFilter);
 
   return list.filter((j) => {
-    if (f.unitFilter !== 'all' && !matchesUnitOrganizationFilter(j.unit_name, f.unitFilter, unitScopeNames)) return false;
-    if (!matchesRecruiterFilter(j, f.recruiterFilter)) return false;
-    if (!matchesScreenerFilter(j, f.screenerFilter)) return false;
-    if (!matchesOplFilter(j, f.oplFilter)) return false;
-    if (!matchesUrgencyFilter(j, f.urgencyFilter)) return false;
+    if (!matchesAnyUnitOrganizationFilter(j.unit_name, f.unitFilter, unitScopeNames)) return false;
+    if (!matchesAnyRecruiterFilter(j, f.recruiterFilter)) return false;
+    if (!matchesAnyScreenerFilter(j, f.screenerFilter)) return false;
+    if (!matchesAnyOplFilter(j, f.oplFilter)) return false;
+    if (!matchesAnyUrgencyFilter(j, f.urgencyFilter)) return false;
     if (!matchesNoteFilter(j, f.noteFilter)) return false;
     if (!matchesAgeDaysFilter(j, f.ageDaysFilter)) return false;
     if (f.statusFilter === 'all') return true;
@@ -111,7 +132,7 @@ export function useSiamrajUnitRequestFilters(
   );
 
   const departmentScopedJobs = useMemo(
-    () => (siamrajPrimary ? filterUnitRequestsByDepartment(jobs, filters.departmentFilter) : jobs),
+    () => (siamrajPrimary ? filterUnitRequestsByAnyDepartment(jobs, filters.departmentFilter) : jobs),
     [jobs, siamrajPrimary, filters.departmentFilter],
   );
 
@@ -123,7 +144,7 @@ export function useSiamrajUnitRequestFilters(
   const subtypeScopedJobs = useMemo(
     () =>
       siamrajPrimary
-        ? filterUnitRequestsByJobSubtype(departmentScopedJobs, filters.jobSubtypeFilter)
+        ? filterUnitRequestsByAnyJobSubtype(departmentScopedJobs, filters.jobSubtypeFilter)
         : departmentScopedJobs,
     [departmentScopedJobs, siamrajPrimary, filters.jobSubtypeFilter],
   );
@@ -155,27 +176,27 @@ export function useSiamrajUnitRequestFilters(
 
   const recruiterFilterScope = useMemo(() => {
     return subtypeScopedJobs.filter((j) => {
-      if (filters.unitFilter !== 'all' && !matchesUnitOrganizationFilter(j.unit_name, filters.unitFilter, unitScopeNames)) return false;
-      if (!matchesScreenerFilter(j, filters.screenerFilter)) return false;
-      if (!matchesOplFilter(j, filters.oplFilter)) return false;
+      if (!matchesAnyUnitOrganizationFilter(j.unit_name, filters.unitFilter, unitScopeNames)) return false;
+      if (!matchesAnyScreenerFilter(j, filters.screenerFilter)) return false;
+      if (!matchesAnyOplFilter(j, filters.oplFilter)) return false;
       return true;
     });
   }, [subtypeScopedJobs, filters.unitFilter, filters.screenerFilter, filters.oplFilter, unitScopeNames]);
 
   const screenerFilterScope = useMemo(() => {
     return subtypeScopedJobs.filter((j) => {
-      if (filters.unitFilter !== 'all' && !matchesUnitOrganizationFilter(j.unit_name, filters.unitFilter, unitScopeNames)) return false;
-      if (!matchesRecruiterFilter(j, filters.recruiterFilter)) return false;
-      if (!matchesOplFilter(j, filters.oplFilter)) return false;
+      if (!matchesAnyUnitOrganizationFilter(j.unit_name, filters.unitFilter, unitScopeNames)) return false;
+      if (!matchesAnyRecruiterFilter(j, filters.recruiterFilter)) return false;
+      if (!matchesAnyOplFilter(j, filters.oplFilter)) return false;
       return true;
     });
   }, [subtypeScopedJobs, filters.unitFilter, filters.recruiterFilter, filters.oplFilter, unitScopeNames]);
 
   const oplFilterScope = useMemo(() => {
     return subtypeScopedJobs.filter((j) => {
-      if (filters.unitFilter !== 'all' && !matchesUnitOrganizationFilter(j.unit_name, filters.unitFilter, unitScopeNames)) return false;
-      if (!matchesRecruiterFilter(j, filters.recruiterFilter)) return false;
-      if (!matchesScreenerFilter(j, filters.screenerFilter)) return false;
+      if (!matchesAnyUnitOrganizationFilter(j.unit_name, filters.unitFilter, unitScopeNames)) return false;
+      if (!matchesAnyRecruiterFilter(j, filters.recruiterFilter)) return false;
+      if (!matchesAnyScreenerFilter(j, filters.screenerFilter)) return false;
       return true;
     });
   }, [subtypeScopedJobs, filters.unitFilter, filters.recruiterFilter, filters.screenerFilter, unitScopeNames]);

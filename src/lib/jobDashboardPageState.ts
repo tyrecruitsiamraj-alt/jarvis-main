@@ -1,5 +1,6 @@
 import {
   UNIT_REQUEST_FILTER_DEFAULTS,
+  normalizeUnitRequestFilters,
   type UnitRequestFilterState,
 } from '@/hooks/useSiamrajUnitRequestFilters';
 
@@ -11,11 +12,8 @@ export function loadJobDashboardFilters(): JobDashboardFilters {
   try {
     const raw = sessionStorage.getItem(STORAGE_KEY);
     if (!raw) return { ...UNIT_REQUEST_FILTER_DEFAULTS };
-    const parsed = JSON.parse(raw) as Partial<JobDashboardFilters>;
-    return {
-      ...UNIT_REQUEST_FILTER_DEFAULTS,
-      ...parsed,
-    };
+    // ค่าที่จำไว้รุ่นก่อน 23 พ.ย. 2569 เป็นข้อความเดียว — แปลงเป็นรายการ
+    return normalizeUnitRequestFilters(JSON.parse(raw));
   } catch {
     return { ...UNIT_REQUEST_FILTER_DEFAULTS };
   }
