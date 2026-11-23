@@ -51,6 +51,7 @@ import {
   sumThroughputInRange,
   sumCohortStockByRequestDate,
   sumCohortDoneByAdvance,
+  cohortDoneRequestKeys,
   type CohortDoneSplit,
   buildStockKpisFromCohort,
   type ThroughputRecord,
@@ -85,7 +86,7 @@ import {
   UNIT_REQUEST_WORK_STATUS_LABELS,
   type UnitRequestWorkStatus,
 } from '@/lib/unitRequestWorkStatus';
-import { WORK_DONE_LABEL, workDoneBoxId, WORK_STATUS_ADVANCE_HINT, WORK_STATUS_ADVANCE_ID, WORK_STATUS_ADVANCE_LABEL, advanceStatusBoxId, isAdvanceStatusBoxId, workStatusBoxIdOf } from '@/lib/dashboard/workStatusBox';
+import { WORK_DONE_LABEL, WORK_TOP_TOTAL_LABEL, workDoneBoxId, workTopTotalId, WORK_STATUS_ADVANCE_HINT, WORK_STATUS_ADVANCE_ID, WORK_STATUS_ADVANCE_LABEL, advanceStatusBoxId, isAdvanceStatusBoxId, workStatusBoxIdOf } from '@/lib/dashboard/workStatusBox';
 import {
   jobToRequestControlRecord,
   jobsToRequestControlRecords,
@@ -693,12 +694,29 @@ function buildWorkStatusKpis(
   return { main: mainKpis, advance: advanceKpis };
 }
 
-/** กล่อง หาได้แล้ว · ยกเลิก ต่อท้ายสองแถวของสถานะทำงาน — ยอดตามช่วงตัวเดียวกับการ์ด หาได้แล้ว/ยกเลิก */
-function buildWorkDoneKpis(done: CohortDoneSplit, scopeHint: string): { main: DashboardKpi[]; advance: DashboardKpi[] } {
+/**
+ * แถวบนสุดของสถานะทำงาน: ใบขอทั้งหมด · ปิดแล้ว · ยกเลิก (เจ้าของ 23 พ.ย. 2569) — ชุดหลัก = ทุกใบ (รวมล่วงหน้า) · ชุดล่วงหน้า = เฉพาะแถวล่วงหน้า
+ * ใบขอทั้งหมด = "ทั้งหมด"/"ล่วงหน้า" ของแถวสถานะ (ยังต้องหา) + ปิดแล้ว + ยกเลิก · ปิดแล้ว/ยกเลิก = ยอดตามช่วงตัวเดียวกับการ์ดด้านบนของหน้า
+ */
+function buildWorkTopKpis(
+  done: CohortDoneSplit,
+  open: { all: { positions: number; requests: number }; advance: { positions: number; requests: number } },
+  requests: { all: number; advance: number },
+  scopeHint: string,
+): { main: DashboardKpi[]; advance: DashboardKpi[] } {
   const n = (v: number) => v.toLocaleString('th-TH');
-  const box = (kind: 'filled' | 'cancelled', advance: boolean): DashboardKpi => {
-    const c = done[kind][advance ? 'advance' : 'main'];
-    return {
+  const doneOf = (kind: 'filled' | 'cancelled', advance: boolean) =>
+    advance
+      ? done[kind].advance
+      : { positions: done[kind].main.positions + done[kind].advance.positions, requests: done[kind].main.requests + done[kind].advance.requests };
+  const group = (advance: boolean): DashboardKpi[] => {
+    const rest = advance ? open.advance : open.all;
+    const filled = doneOf('filled', advance);
+    const cancelled = doneOf('cancelled', advance);
+    const total = rest.positions + filled.positions + cancelled.positions;
+    const req = advance ? requests.advance : requests.all;
+    const restLabel = advance ? WORK_STATUS_ADVANCE_LABEL : 'ทั้งหมด';
+    const box = (kind: 'filled' | 'cancelled', c: { positions: number; requests: number }): DashboardKpi => ({
       id: workDoneBoxId(kind, advance),
       label: WORK_DONE_LABEL[kind],
       value: c.positions,
@@ -706,9 +724,22 @@ function buildWorkDoneKpis(done: CohortDoneSplit, scopeHint: string): { main: Da
       secondaryLabel: 'ใบขอ',
       description: `${scopeHint} · ${n(c.positions)} อัตรา · ${n(c.requests)} ใบ`,
       trendPercent: null,
-    };
+    });
+    return [
+      {
+        id: workTopTotalId(advance),
+        label: WORK_TOP_TOTAL_LABEL,
+        value: total,
+        secondaryCount: req,
+        secondaryLabel: 'ใบขอ',
+        description: `${restLabel} ${n(rest.positions)} + ปิดแล้ว ${n(filled.positions)} + ยกเลิก ${n(cancelled.positions)} = ${n(total)} อัตรา · ${n(req)} ใบ`,
+        trendPercent: null,
+      },
+      box('filled', filled),
+      box('cancelled', cancelled),
+    ];
   };
-  return { main: [box('filled', false), box('cancelled', false)], advance: [box('filled', true), box('cancelled', true)] };
+  return { main: group(false), advance: group(true) };
 }
 
 /** KPI ชุดสั้น: เข้ามา / ปิดแล้ว / ยกเลิก / คงเหลือ (ตำแหน่ง) */
@@ -1292,8 +1323,23 @@ export function buildDashboardData(
       : undefined,
     today,
   );
-  const workDone = buildWorkDoneKpis(
-    sumCohortDoneByAdvance(throughputRecords, periodFrom, periodTo, toYmdBangkok(today)),
+  // แถวบนสุด ใบขอทั้งหมด · ปิดแล้ว · ยกเลิก (23 พ.ย. 2569) — ใบนับไม่ซ้ำ: ใบเปิด ∪ ใบที่จบในช่วง · โหมดมีงวด = ใบของช่วง
+  const todayYmd = toYmdBangkok(today);
+  const doneKeys = cohortDoneRequestKeys(throughputRecords, periodFrom, periodTo, todayYmd);
+  const statusTotal = workStatusRows.main[0];
+  const advanceRest = workStatusRows.advance[0];
+  const openIds = openRemainingJobs.map((j) => String(j.id));
+  const advanceOpenIds = openRemainingJobs.filter((j) => isAdvanceStatusBoxId(workStatusBoxIdOf(j, today))).map((j) => String(j.id));
+  const workTop = buildWorkTopKpis(
+    sumCohortDoneByAdvance(throughputRecords, periodFrom, periodTo, todayYmd),
+    {
+      all: { positions: statusTotal.value, requests: statusTotal.secondaryCount ?? 0 },
+      advance: { positions: advanceRest.value, requests: advanceRest.secondaryCount ?? 0 },
+    },
+    {
+      all: period && cohortStock ? cohortStock.requestCount : new Set([...openIds, ...doneKeys.all]).size,
+      advance: new Set([...advanceOpenIds, ...doneKeys.advance]).size,
+    },
     period ? 'ต้องการคนในช่วงที่เลือก' : 'ต้องการคนในช่วงแนวโน้ม',
   );
   const remainingBridge =
@@ -1318,8 +1364,8 @@ export function buildDashboardData(
     kpis,
     workStatusKpis: workStatusRows.main,
     workStatusAdvanceKpis: workStatusRows.advance,
-    workStatusDoneKpis: workDone.main,
-    workStatusAdvanceDoneKpis: workDone.advance,
+    workStatusTopKpis: workTop.main,
+    workStatusAdvanceTopKpis: workTop.advance,
     remainingBridge,
     activityTrend,
     unitOverview: buildUnitOverview(openRemainingJobs, today),

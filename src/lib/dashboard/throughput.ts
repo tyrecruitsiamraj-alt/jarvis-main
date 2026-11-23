@@ -284,6 +284,55 @@ export function sumCohortDoneByAdvance(records: ThroughputRecord[], from: string
   };
 }
 
+/** คีย์ใบ (id เต็ม › เลขที่ใบ) ของใบที่มีอัตราปิดแล้ว/ยกเลิกในช่วง — นับ "ใบขอทั้งหมด" ไม่ให้ซ้ำกับใบเปิด */
+export function cohortDoneRequestKeys(records: ThroughputRecord[], from: string, to: string, todayYmd: string): { all: string[]; advance: string[] } {
+  const all = new Set<string>();
+  const advance = new Set<string>();
+  for (const r of records) {
+    if (!inYmdRange(r.requestDate, from, to) || resolveKind(r) === 'remaining') continue;
+    const key = r.jobId?.trim() || r.requestNo?.trim();
+    if (!key) continue;
+    all.add(key);
+    if (isAdvanceNotDueRecord(r, todayYmd)) advance.add(key);
+  }
+  return { all: [...all], advance: [...advance] };
+}
+
+/**
+ * เทียบรายเดือนของกล่อง "ใบขอทั้งหมด" (เจ้าของ 23 พ.ย. 2569 "กดทั้งหมดก็เทียบเดือนให้ดูว่าเดือนไหนเข้าเยอะ เดือนไหนปิดเยอะ ยกเลิกเยอะ")
+ * เดือน = เดือนของวันอ้างอิงใบ (`requestDate` = วันที่ต้องการคน · ตัวเดียวกับการ์ด เข้ามา/ปิดแล้ว/ยกเลิก)
+ * ทุกเดือนในช่วงอยู่ครบแม้เป็น 0 · ต่อเดือน เข้ามา = ปิดแล้ว + ยกเลิก + เหลือหา · ผลรวมปิดแล้ว/ยกเลิก = กล่องด้านบน
+ */
+export type WorkMonthRow = { month: string; requested: number; filled: number; cancelled: number; remaining: number };
+export function buildWorkMonths(records: ThroughputRecord[], from: string, to: string, filter?: (r: ThroughputRecord) => boolean): WorkMonthRow[] {
+  const rows = new Map<string, WorkMonthRow>();
+  const start = from.slice(0, 7);
+  const end = to.slice(0, 7);
+  let [y, m] = start.split('-').map(Number);
+  for (let guard = 0; guard < 400 && Number.isFinite(y) && Number.isFinite(m); guard += 1) {
+    const key = `${y}-${String(m).padStart(2, '0')}`;
+    if (key > end) break;
+    rows.set(key, { month: key, requested: 0, filled: 0, cancelled: 0, remaining: 0 });
+    m += 1;
+    if (m > 12) {
+      m = 1;
+      y += 1;
+    }
+  }
+  for (const r of records) {
+    if (!inYmdRange(r.requestDate, from, to) || (filter && !filter(r))) continue;
+    const row = rows.get(r.requestDate.slice(0, 7));
+    if (!row) continue;
+    const units = Number(r.positionUnits) || 0;
+    row.requested += units;
+    const kind = resolveKind(r);
+    if (kind === 'filled') row.filled += units;
+    else if (kind === 'cancelled') row.cancelled += units;
+    else row.remaining += units;
+  }
+  return [...rows.values()];
+}
+
 /** cohort ตามเดือน/ช่วงที่เปิดใบ — รวมปิดแล้ว (ไม่ใช่แค่ใบเปิดใน feed) */
 export function sumCohortStockByRequestDate(
   records: ThroughputRecord[],

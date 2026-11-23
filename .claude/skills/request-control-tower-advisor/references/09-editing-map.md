@@ -14561,3 +14561,11 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 ### 23 พ.ย. 2569 (4) — เปิดช่องเลือกแล้วแผงที่ปักไว้กระโดด ("กรองพอกดแล้วมันเลื่อน")
 - ต้นเหตุ: ตัวเลื่อนของหน้าคือ `html` · Radix ใส่ `overflow:hidden` ที่ `body` ตอนเปิด Select/Dialog ⇒ body เป็นกรอบเลื่อนซ้อน ของ `sticky` หลุดตำแหน่ง
 - แก้ที่ `src/main.tsx`: `document.body.classList.add("data-[scroll-locked]:!overflow-visible")` (utility ของ Tailwind · ไม่มี CSS ใหม่) · มีผลทุกหน้า ห้ามถอด
+
+### 23 พ.ย. 2569 (5) — สถานะทำงาน: แถวบนสุด ใบขอทั้งหมด · ปิดแล้ว · ยกเลิก (แทนกล่องต่อท้ายของรอบ (3))
+เจ้าของ "แยกมาเป็น 3 กล่องว่า ทั้งหมดเท่าไหร่ ปิดแล้วเท่าไหร่ ยกเลิกเท่าไหร่ ทั้งหมดก็จะแยกลงมาเป็นแบบเดิม" · Choice: กล่องแรกของแถวสถานะคงชื่อ "ทั้งหมด" (ยังต้องหา) · กล่องใหญ่ = "ใบขอทั้งหมด" · คำ "ปิดแล้ว" ตามที่เจ้าของพิมพ์
+- `buildWorkTopKpis` (`buildDashboardData.ts`) → `DashboardData.workStatusTopKpis` (ทุกใบ รวมล่วงหน้า) / `workStatusAdvanceTopKpis` (เฉพาะแถวล่วงหน้า) · id `work_top_total` / `work_top_advance_total` + `work_done_*` (`workStatusBox.ts`)
+- ใบขอทั้งหมด = กล่องแรกของแถวสถานะ (ยังต้องหา · ไม่เปลี่ยน) + ปิดแล้ว + ยกเลิก · ใบนับไม่ซ้ำ ใบเปิด ∪ `cohortDoneRequestKeys` (โหมดมีงวด = ใบของ cohort)
+- กด "ใบขอทั้งหมด" = `DashboardWorkMonths` (ใหม่) เทียบรายเดือน เข้ามา · ปิดแล้ว · ยกเลิก จาก `buildWorkMonths` (`throughput.ts` · เดือนของวันที่ต้องการคน · ทุกเดือนในช่วงอยู่ครบ) · กดแท่ง/แถว = ทั้งหน้าเป็นเดือนนั้น (`onMonthClick`)
+- กด ปิดแล้ว/ยกเลิก = รายการของช่วง (`buildCohortDrillDown`) · ชุดหลัก = ทุกใบ · ชุดล่วงหน้า = `isAdvanceNotDueRecord`
+- แถบสัดส่วนเทียบกล่องแรกของแถวนั้น · เทสต์ `tests/api/dashboardWorkDoneBoxes2569-11-23.test.ts`
