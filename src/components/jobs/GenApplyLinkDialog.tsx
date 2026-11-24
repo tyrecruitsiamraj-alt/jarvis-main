@@ -37,6 +37,8 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { fetchSoOptions } from '@/lib/jobPostingRequestsApi';
 import { isFacebookGroupChannel, jobBuOf, soGroupLinkKey, soGroupLinkLabel, soGroupLinkName, type SoOptGroup } from '@/lib/soScraping';
 import { normalizeTrendBu } from '@/lib/trends/bu';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { APP_DEPARTMENT_CODES } from '@/lib/departmentCodes';
 
 export type GenApplyLinkDialogProps = {
   /**
@@ -143,7 +145,16 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
   const [boxResponsible, setBoxResponsible] = useState<string | null>(null);
   const responsible = useLinkResponsible(open ? `${job?.id ?? ''}|${standalone?.kind ?? ''}` : null, boxResponsible);
   const standaloneKind = standalone?.kind ?? null;
-  const standaloneDept = standalone?.departmentCode ?? null;
+  /**
+   * BU ของกล่องลอย — เลือกเองทุกครั้ง (เจ้าของ 24 พ.ย. 2569 · เดิมกล่องใหม่ได้ LBD ให้เอง ⇒ ผู้สมัครพนักงานสวน 8 คนไปอยู่ LBD)
+   * กล่องที่เคยมีประกาศ = ใส่ BU ของประกาศล่าสุดไว้ให้ (เปลี่ยนได้) · กล่องใหม่ = ว่าง ต้องเลือกก่อน Gen link
+   */
+  const [pickedBu, setPickedBu] = useState('');
+  useEffect(() => {
+    setPickedBu(standalone?.departmentCode ?? '');
+  }, [open, standalone?.kind, standalone?.departmentCode]);
+  const standaloneDept = standalone ? pickedBu || null : null;
+  const missingBu = Boolean(standalone) && !standaloneDept;
   useEffect(() => {
     setBoxResponsible(null);
     if (!open || job || !standaloneKind) return;
@@ -287,14 +298,14 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
   };
 
   const submit = async () => {
-    if (saving || missingGroup) return;
+    if (saving || missingGroup || missingBu) return;
     setSaving(true);
     setError(null);
     try {
       const body: CreatePostingBody = {
         jobId: job?.id ?? null,
         standaloneKind: job ? null : standalone?.kind ?? null,
-        departmentCode: job ? job.department_code ?? null : standalone?.departmentCode ?? null,
+        departmentCode: job ? job.department_code ?? null : standaloneDept,
         title,
         detail: detail || null,
         locationText: locationText || null,
@@ -364,7 +375,7 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
                       <div className="space-y-1.5 pt-1">
                         <SoGroupPicker
                           groups={soGroups}
-                          jobBu={job ? jobBuOf(job) : normalizeTrendBu(standalone?.departmentCode)}
+                          jobBu={job ? jobBuOf(job) : normalizeTrendBu(standaloneDept)}
                           jobSector={job ? jobUnitSectorOf(job) : null}
                           value={groupPick}
                           onChange={setGroupPick}
@@ -408,6 +419,25 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
             </div>
           ) : (
             <>
+              {standalone ? (
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-muted-foreground" htmlFor="genlink-bu">
+                    BU <span className="text-destructive">*</span>
+                  </label>
+                  <Select value={pickedBu} onValueChange={setPickedBu}>
+                    <SelectTrigger id="genlink-bu" className="w-40" data-testid="genlink-bu">
+                      <SelectValue placeholder="เลือก BU" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {APP_DEPARTMENT_CODES.map((bu) => (
+                        <SelectItem key={bu} value={bu}>
+                          {bu}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : null}
               {standalone ? channelSection : null}
               {/* เจ้าหน้าที่สรรหาของลิงก์อยู่บนสุดของฟอร์ม ใต้ช่องทางที่จะส่ง (เจ้าของ 20 พ.ย. 2569 "ทำไมยังไม่มีให้เลือกเจ้าหน้าที่สรรหา"
                   → Choice เปลี่ยนชื่อ + ย้ายขึ้นบนสุด · เดิมชื่อ "ผู้รับผิดชอบ" อยู่ท้ายฟอร์มจนหาไม่เจอ) · ฟอร์มหนึ่งมีช่องนี้ช่องเดียว */}
@@ -506,7 +536,7 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
                   <JobTitleField
                     value={positionName}
                     onChange={setPositionName}
-                    departmentCode={job?.department_code ?? standalone?.departmentCode ?? null}
+                    departmentCode={job?.department_code ?? standaloneDept}
                     labelClassName="text-xs font-medium text-muted-foreground"
                   />
                   <div className="space-y-1.5">
@@ -530,6 +560,11 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
               {standalone ? null : channelSection}
 
               {error ? <p className="text-xs text-red-600">{error}</p> : null}
+              {missingBu ? (
+                <p className={cn('text-xs', TONE.warn.value)} data-testid="genlink-need-bu">
+                  เลือก BU ก่อน Gen link
+                </p>
+              ) : null}
               {missingGroup ? (
                 <p className={cn('text-xs', TONE.warn.value)} data-testid="genlink-need-group">
                   เลือกกลุ่ม Facebook อย่างน้อย 1 กลุ่ม
@@ -573,7 +608,7 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
               <button
                 type="button"
                 onClick={() => void submit()}
-                disabled={saving || !title.trim() || missingGroup}
+                disabled={saving || !title.trim() || missingGroup || missingBu}
                 className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-2.5 text-sm font-medium text-primary-foreground disabled:opacity-60"
               >
                 {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Link2 className="h-4 w-4" />}

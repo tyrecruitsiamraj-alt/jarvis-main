@@ -214,6 +214,18 @@ export async function updateRecruitPosting(
   return (await readJsonSafe<RecruitPosting>(r)) as RecruitPosting;
 }
 
+/** ย้าย BU ของประกาศลอย + ผู้สมัครที่มาจากประกาศนี้ (24 พ.ย. 2569) — คืนประกาศหลังย้าย + จำนวนผู้สมัครที่ย้าย */
+export async function moveRecruitPostingBu(id: string, departmentCode: string): Promise<{ posting: RecruitPosting; moved: number }> {
+  const r = await apiFetch('/api/recruit/postings', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id, departmentCode }),
+  });
+  if (!r.ok) throw new Error(await readErrorMessage(r, 'ย้าย BU ไม่สำเร็จ'));
+  const d = (await readJsonSafe<RecruitPosting & { movedApplications?: number }>(r)) as RecruitPosting & { movedApplications?: number };
+  return { posting: d, moved: Number(d?.movedApplications) || 0 };
+}
+
 export async function setPostingStatus(id: string, status: 'open' | 'closed'): Promise<void> {
   const r = await apiFetch('/api/recruit/postings', {
     method: 'PATCH',

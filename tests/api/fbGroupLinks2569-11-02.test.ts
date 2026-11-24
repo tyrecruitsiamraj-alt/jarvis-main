@@ -52,7 +52,8 @@ describe('Gen link ช่องทาง Facebook Group = กลุ่มละ�
     expect(src).toContain('soGroupLinkLabel(recruitChannelLabel(c), soGroupLinkName(g, soGroups ?? []))');
     expect(src).not.toContain('isFacebookGroupChannel(c.name) && pickedGroups.length > 0');
     expect(src).toContain('const missingGroup = fbGroupChannels.length > 0 && pickedGroups.length === 0;');
-    expect(src).toContain('disabled={saving || !title.trim() || missingGroup}');
+    // 24 พ.ย. 2569 กล่องลอยต้องเลือก BU ด้วย (standalonePostingBu2569-11-24)
+    expect(src).toContain('disabled={saving || !title.trim() || missingGroup || missingBu}');
     expect(src).toContain('เลือกกลุ่ม Facebook อย่างน้อย 1 กลุ่ม');
   });
 });

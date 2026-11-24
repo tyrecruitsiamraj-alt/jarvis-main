@@ -1,7 +1,10 @@
 import { cn } from '@/lib/utils';
 import React, { useEffect, useState } from 'react';
 import type { RecruitPosting } from '@/lib/recruitPostings';
-import { updateRecruitPosting, type UpdatePostingBody } from '@/lib/recruitPostingsApi';
+import { moveRecruitPostingBu, updateRecruitPosting, type UpdatePostingBody } from '@/lib/recruitPostingsApi';
+import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { APP_DEPARTMENT_CODES } from '@/lib/departmentCodes';
 import {
   Dialog,
   DialogContent,
@@ -31,8 +34,8 @@ export type EditPostingDialogProps = {
 /**
  * แก้เนื้อหาประกาศรับสมัคร (mockup rev.3 ข้อ 04 — ปุ่ม "แก้ไข" บนการ์ด)
  *
- * แก้ได้เฉพาะสิ่งที่ผู้สมัครเห็น — ประเภทกล่อง/BU/ใบขอที่ผูกไว้ **แก้ที่นี่ไม่ได้**
- * เพราะเป็นตัวกำหนดสิทธิ์การมองเห็น (กันย้ายประกาศข้าม BU) อยากย้ายให้ปิดแล้วสร้างใหม่
+ * แก้ได้เฉพาะสิ่งที่ผู้สมัครเห็น — ประเภทกล่อง/ใบขอที่ผูกไว้ **แก้ที่นี่ไม่ได้**
+ * BU: ประกาศลอยย้ายได้ด้วยปุ่ม "ย้าย BU" (24 พ.ย. 2569 · ผู้สมัครย้ายตาม · server เช็กสิทธิ์ทั้ง BU เดิมและ BU ใหม่) · ผูกใบขอ = BU ตามใบขอ
  * ช่องทาง/ลิงก์ก็ไม่แก้ที่นี่ — ลิงก์ที่ปล่อยออกไปแล้วต้องใช้ได้ต่อ เพิ่มช่องทางใหม่ทำที่ "สร้างลิงก์"
  */
 const EditPostingDialog: React.FC<EditPostingDialogProps> = ({ posting, onClose, onSaved, embedded = false }) => {
@@ -45,6 +48,11 @@ const EditPostingDialog: React.FC<EditPostingDialogProps> = ({ posting, onClose,
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState<number | null>(null);
+  /** ย้าย BU ของประกาศลอย (24 พ.ย. 2569) — เลือกแล้วต้องกดยืนยันอีกครั้ง เพราะผู้สมัครย้ายตามไปด้วย */
+  const [bu, setBu] = useState('');
+  const [buConfirm, setBuConfirm] = useState(false);
+  const [buBusy, setBuBusy] = useState(false);
+  const [buMsg, setBuMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   useEffect(() => {
     if (!posting) return;
@@ -57,7 +65,28 @@ const EditPostingDialog: React.FC<EditPostingDialogProps> = ({ posting, onClose,
     setSalaryText(posting.salaryText ?? '');
     setContactName(posting.contactName ?? '');
     setContactPhone(posting.contactPhone ?? '');
+    setBu(posting.departmentCode ?? '');
+    setBuConfirm(false);
+    setBuMsg(null);
   }, [posting]);
+
+  const moveBu = async () => {
+    if (!posting || buBusy || !bu) return;
+    setBuBusy(true);
+    setBuMsg(null);
+    try {
+      const { posting: updated, moved } = await moveRecruitPostingBu(posting.id, bu);
+      setBuMsg({ ok: true, text: `ย้ายไป ${bu} แล้ว · ผู้สมัคร ${moved.toLocaleString('th-TH')} คนย้ายตาม` });
+      setBuConfirm(false);
+      onSaved?.(updated);
+    } catch (e) {
+      setBuMsg({ ok: false, text: e instanceof Error ? e.message : 'ย้าย BU ไม่สำเร็จ' });
+    } finally {
+      setBuBusy(false);
+    }
+  };
+  const isStandalone = Boolean(posting && !posting.jobId);
+  const buChanged = isStandalone && Boolean(bu) && bu !== (posting?.departmentCode ?? '');
 
   const submit = async () => {
     if (!posting || saving) return;
@@ -136,6 +165,58 @@ const EditPostingDialog: React.FC<EditPostingDialogProps> = ({ posting, onClose,
               />
             </div>
           </div>
+
+          {/* BU ของประกาศลอย — ผูกใบขอแล้ว BU ตามใบขอ ไม่มีช่องนี้ */}
+          {isStandalone ? (
+            <div className="space-y-1.5 rounded-xl border border-border p-3" data-testid="posting-bu">
+              <label className="text-xs font-medium text-muted-foreground" htmlFor="posting-bu-select">
+                BU
+              </label>
+              <div className="flex flex-wrap items-center gap-2">
+                <Select
+                  value={bu}
+                  onValueChange={(v) => {
+                    setBu(v);
+                    setBuConfirm(false);
+                    setBuMsg(null);
+                  }}
+                >
+                  <SelectTrigger id="posting-bu-select" className="w-32">
+                    <SelectValue placeholder="เลือก BU" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {APP_DEPARTMENT_CODES.map((c) => (
+                      <SelectItem key={c} value={c}>
+                        {c}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {buConfirm ? (
+                  <>
+                    <Button type="button" size="sm" disabled={buBusy} onClick={() => void moveBu()} data-testid="posting-bu-confirm">
+                      {buBusy ? <Loader2 className="animate-spin" /> : null}
+                      ย้ายเลย
+                    </Button>
+                    <Button type="button" size="sm" variant="outline" disabled={buBusy} onClick={() => setBuConfirm(false)}>
+                      ยกเลิก
+                    </Button>
+                  </>
+                ) : (
+                  <Button type="button" size="sm" variant="outline" disabled={!buChanged} onClick={() => setBuConfirm(true)} data-testid="posting-bu-move">
+                    ย้าย BU
+                  </Button>
+                )}
+              </div>
+              <p className={cn('min-h-4 text-[11px]', buMsg ? (buMsg.ok ? TONE.success.value : TONE.danger.value) : 'text-muted-foreground')}>
+                {buMsg
+                  ? buMsg.text
+                  : buConfirm
+                    ? `ย้ายประกาศนี้และผู้สมัคร ${(posting?.applicationCount ?? 0).toLocaleString('th-TH')} คนจาก ${posting?.departmentCode ?? 'ไม่ระบุ'} ไป ${bu}`
+                    : ''}
+              </p>
+            </div>
+          ) : null}
 
           {posting && posting.links.length > 0 ? (
             <p className={`rounded-xl px-3 py-2 text-[11px] ${TONE.neutral.soft} ${TONE.neutral.value}`}>

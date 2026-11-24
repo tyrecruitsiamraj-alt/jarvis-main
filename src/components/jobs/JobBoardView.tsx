@@ -177,9 +177,6 @@ function staffAssigneeLine(j: JobRequest): string | null {
   return parts.length > 0 ? parts.join(' · ') : null;
 }
 
-/** BU ตั้งต้นของกล่องลอยที่ยังไม่มีประกาศ — ผู้ใช้แก้ได้ในฟอร์ม (ชุดเดียวกับ RecruitBoardTools) */
-const BOARD_DEFAULT_BU = 'LBD';
-
 /** สีกล่องลอยต่อประเภท (mockup rev.3 ข้อ 04) — ม่วง/ม่วง/ฟ้า/ส้ม/เขียว · ประเภทที่เพิ่มจากหน้าเว็บ = เทา */
 const STANDALONE_KIND_TONE: Record<string, ToneKey> = {
   thai_executive: 'violet',
@@ -2249,7 +2246,8 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
                   setGenStandalone({
                     kind: k.code,
                     kindLabel: k.label,
-                    departmentCode: s.bus[0] ?? BOARD_DEFAULT_BU,
+                    // ไม่มีประกาศเดิม = ว่าง ให้คนเลือก BU เองในป๊อป (24 พ.ย. 2569 เดิมใส่ LBD ให้เอง)
+                    departmentCode: s.bus[0] ?? '',
                   });
                 return (
                   <Card

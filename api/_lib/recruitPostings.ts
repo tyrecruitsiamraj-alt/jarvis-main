@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { recordDailyLinkHit } from './postingLinkHits.js';
 
-import { dbQuery, isPgUniqueViolation } from './postgres.js';
+import { dbQuery, dbTransaction, isPgUniqueViolation } from './postgres.js';
 import { tableInAppSchema } from './schema.js';
 import { isActivePostingKind } from './recruitPostingKinds.js';
 import {
@@ -871,7 +871,7 @@ const POSTING_FIELD_MAX: Record<keyof UpdatePostingPatch, number> = {
  * แก้ได้เฉพาะ "เนื้อหาที่ผู้สมัครเห็น" — **jobId / standaloneKind / departmentCode แก้ไม่ได้**
  * เพราะสามตัวนั้นเป็นตัวกำหนดสิทธิ์การมองเห็น (BU scope) ถ้าเปิดให้แก้ จะย้ายประกาศ
  * ข้าม BU ได้ผ่านการ PATCH ทั้งที่ตอนสร้างมีการกันไว้แล้วที่ handler
- * อยากย้าย BU ให้ปิดประกาศเดิมแล้วสร้างใหม่
+ * ย้าย BU ของประกาศลอยใช้ `moveStandalonePostingBu` (เส้นแยก เช็กสิทธิ์ BU ปลายทาง + จด audit · 24 พ.ย. 2569)
  *
  * ส่งฟิลด์ไหนมาแก้เฉพาะฟิลด์นั้น (undefined = ไม่แตะ) · title ว่างไม่ได้
  * คืน null เมื่อไม่มีฟิลด์ให้แก้ หรือหา id ไม่เจอ
@@ -906,6 +906,37 @@ export async function updateRecruitPosting(
   if (rows.length === 0) return null;
   // อ่านกลับผ่าน getRecruitPosting เพื่อให้ได้ links + applicationCount ครบเหมือนเส้นอื่น
   return getRecruitPosting(id);
+}
+
+/**
+ * ย้าย BU ของประกาศลอย (ไม่ผูกใบขอ) พร้อมผู้สมัครที่มาจากประกาศนี้ — เจ้าของ 24 พ.ย. 2569
+ * (กล่องใหม่เคยถูกตั้ง LBD ให้เอง ⇒ ผู้สมัครพนักงานสวนไปอยู่ LBD ทีม LM มองไม่เห็น · แก้ได้จากหน้าจอแทนการแก้ฐานมือ)
+ * ประกาศผูกใบขอย้ายไม่ได้ (BU ตามใบขอ) · ธุรกรรมเดียว · ผู้สมัครที่ถูกย้ายไป BU อื่นแล้ว (ไม่ใช่ BU เดิมของประกาศ) ไม่แตะ
+ * คนเรียกเช็กสิทธิ์ BU ต้นทาง/ปลายทาง + จด audit
+ */
+export async function moveStandalonePostingBu(
+  id: string,
+  toBu: string,
+): Promise<{ from: string | null; to: string; applications: number } | null> {
+  return dbTransaction(async (client) => {
+    const cur = await client.query<{ job_id: string | null; department_code: string | null }>(
+      `SELECT job_id, department_code FROM ${postingsTable} WHERE id = $1 FOR UPDATE`,
+      [id],
+    );
+    const p = cur.rows[0];
+    if (!p) return null;
+    if (p.job_id) throw new Error('ประกาศที่ผูกใบขอ ใช้ BU ตามใบขอ ย้ายไม่ได้');
+    const from = p.department_code;
+    if ((from || '').toUpperCase() === toBu) return { from, to: toBu, applications: 0 };
+    await client.query(`UPDATE ${postingsTable} SET department_code = $2, updated_at = now() WHERE id = $1`, [id, toBu]);
+    const apps = await client.query(
+      `UPDATE ${applicationsTable} a SET department_code = $2
+        WHERE (a.posting_id = $1 OR a.link_id IN (SELECT l.id FROM ${linksTable} l WHERE l.posting_id = $1))
+          AND a.department_code IS NOT DISTINCT FROM $3`,
+      [id, toBu, from],
+    );
+    return { from, to: toBu, applications: apps.rowCount ?? 0 };
+  });
 }
 
 export async function setPostingStatus(id: string, status: 'open' | 'closed'): Promise<boolean> {

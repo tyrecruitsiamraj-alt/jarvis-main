@@ -14676,3 +14676,11 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 - Dashboard: throughput SQL ส่ง `stopCode`/`stopReason` → `cohortDrillDown` → `statusLeadPanel` (`rawRequestNo`) → `DashboardStatusLeadPanel` กล่องยกเลิก (ดูจาก `amountLabel === LEAD_AMOUNT_LABEL.cancelled` ไม่แตะ SupervisorDashboard) แสดง `DashboardCancelReasons.tsx` (3 กลุ่ม + รายเหตุผล + ปุ่มใส่เหตุผลบนแถว)
 - หน้าหลัก/ภาพรวม/ผู้ช่วย AI: `home-money` เรียก `withCancelReasonTags` (อ่านสดทุกครั้ง สมุด ERP แคช 10 นาที) · ledger SQL ส่ง `stopCode`
 - ตั้งค่า › เหตุผลยกเลิกใบขอ (`src/pages/settings/CancelReasonsTab.tsx` · แท็บ `cancelReasons` กลุ่มข้อมูลอ้างอิง)
+
+### 24 พ.ย. 2569 (2) — BU ของกล่องลอย: เลือกตอน Gen link + ย้ายได้จากป๊อปแก้ไขประกาศ
+- ต้นเหตุ: `JobBoardView` ใส่ `BOARD_DEFAULT_BU = 'LBD'` ให้กล่องที่ยังไม่มีประกาศ ⇒ "รับสมัครพนักงานสวน" ผู้สมัคร 8 คนไปอยู่ LBD (แก้ฐานตามเจ้าของสั่งแล้ว) · ถอดค่าตั้งต้นออก
+- `GenApplyLinkDialog`: ช่อง BU (`genlink-bu`) ของกล่องลอย · กล่องที่มีประกาศแล้วใส่ BU เดิมไว้ให้ · ว่าง = Gen link ไม่ได้ (`missingBu`)
+- `validatePostingInput` (`src/lib/recruitPostings.ts`): ประกาศลอยต้องเป็น BU จริง (`isAppDepartmentCode`)
+- ย้าย BU: PATCH `/api/recruit/postings` `{id, departmentCode}` → `moveStandalonePostingBu` (`api/_lib/recruitPostings.ts` · ธุรกรรมเดียว · ผู้สมัครของประกาศที่ยังอยู่ BU เดิมย้ายตาม · ผูกใบขอย้ายไม่ได้) · ต้องมีสิทธิ์ BU ปลายทาง · audit `recruit_posting.move_bu`
+- `EditPostingDialog`: ส่วน BU (`posting-bu`) เฉพาะประกาศลอย · กด "ย้าย BU" แล้วต้องกด "ย้ายเลย" อีกครั้ง
+- เทสต์ `tests/api/standalonePostingBu2569-11-24.test.ts`

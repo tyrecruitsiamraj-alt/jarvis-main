@@ -4,6 +4,7 @@
  * โค้ดชุดนี้ถูก import จากทั้ง `src/` และ `api/` เจตนาให้เป็นแหล่งความจริงเดียว
  * (แพตเทิร์นเดียวกับ `matchingListFilter.ts` ที่รัน 2 ฝั่ง)
  */
+import { isAppDepartmentCode } from './departmentCodes';
 
 /**
  * ประเภทของ "กล่องลอย" — ประกาศที่ไม่ได้ผูกกับใบขอจาก ERP
@@ -151,8 +152,9 @@ export function validatePostingInput(input: {
   if (!isStandalonePostingKind(input.standaloneKind)) {
     return 'ประกาศที่ไม่ผูกใบขอ ต้องเลือกประเภทกล่อง';
   }
-  if (!(input.departmentCode || '').trim()) {
+  if (!isAppDepartmentCode(input.departmentCode)) {
     // ไม่มีใบขอให้ดึง BU มา ถ้าปล่อยว่างจะกลายเป็นประกาศที่ทุกแผนกเห็น
+    // · 24 พ.ย. 2569 ต้องเป็น BU จริง (เดิมหน้าเว็บใส่ LBD ให้เองเมื่อกล่องใหม่ ⇒ "รับสมัครพนักงานสวน" ไปอยู่ LBD 8 คน)
     return 'ประกาศที่ไม่ผูกใบขอ ต้องเลือก BU';
   }
   return null;

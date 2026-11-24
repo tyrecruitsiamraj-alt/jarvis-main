@@ -17,8 +17,11 @@ import {
   resolveLinkResponsible,
   setPostingStatus,
   updateRecruitPosting,
+  moveStandalonePostingBu,
   type UpdatePostingPatch,
 } from '../_lib/recruitPostings.js';
+import { auditFromAuthed } from '../_lib/audit.js';
+import { normalizeAppDepartmentCode } from '../../src/lib/departmentCodes.js';
 
 function isPlainObject(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
@@ -154,6 +157,25 @@ async function handler(req: AuthedReq, res: ApiRes) {
       if (!(await canAccessPosting(posting.jobId, posting.departmentCode, req, scope))) {
         return sendError(res, 404, 'Not found', 'ไม่พบประกาศนี้');
       }
+      // ย้าย BU ของประกาศลอย + ผู้สมัครที่มาจากประกาศนี้ (เจ้าของ 24 พ.ย. 2569) — ต้องเห็นทั้ง BU เดิม (เช็กข้างบนแล้ว) และ BU ใหม่
+      if ('departmentCode' in body) {
+        const toBu = normalizeAppDepartmentCode(typeof body.departmentCode === 'string' ? body.departmentCode : null);
+        if (!toBu) return sendError(res, 400, 'Bad request', 'ต้องเลือก BU');
+        if (scope.mode !== 'all' && !(scope.mode === 'code' && scope.codes.includes(toBu))) {
+          return sendError(res, 403, 'Forbidden', `ย้ายไป ${toBu} ไม่ได้ ไม่มีสิทธิ์ BU นี้`);
+        }
+        const moved = await moveStandalonePostingBu(id, toBu);
+        if (!moved) return sendError(res, 404, 'Not found', 'ไม่พบประกาศนี้');
+        await auditFromAuthed(req, {
+          action: 'recruit_posting.move_bu',
+          entityType: 'recruit_posting',
+          entityId: id,
+          before: { department_code: moved.from },
+          after: { department_code: moved.to, applications_moved: moved.applications },
+        });
+        const after = await getRecruitPosting(id);
+        return res.status(200).json({ ...(after ?? posting), movedApplications: moved.applications });
+      }
       // แก้เนื้อหาประกาศ — ส่งฟิลด์ไหนมาแก้เฉพาะฟิลด์นั้น (mockup rev.3 ข้อ 04)
       // BU/ใบขอของประกาศแก้ที่นี่ไม่ได้ตามกติกาใน updateRecruitPosting
       const patch: UpdatePostingPatch = {};
@@ -186,7 +208,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
     return sendError(res, 405, 'Method not allowed');
   } catch (e) {
     const msg = e instanceof Error ? e.message : '';
-    if (/ต้องระบุ|ต้องเลือก|ยาวเกิน|ไม่สำเร็จ/.test(msg)) return sendError(res, 400, 'Bad request', msg);
+    if (/ต้องระบุ|ต้องเลือก|ยาวเกิน|ไม่สำเร็จ|ย้ายไม่ได้/.test(msg)) return sendError(res, 400, 'Bad request', msg);
     return handleApiError(res, e, 'recruit-postings', { userId: req.user?.sub });
   }
 }
