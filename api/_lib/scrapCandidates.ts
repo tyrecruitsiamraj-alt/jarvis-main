@@ -5,6 +5,7 @@
  * "เก็บเข้าการติดต่อ" = สร้างใบสมัครด้วย Journey เดียวกับคอมเมนต์จาก So Scraping (กันซ้ำ 14 วัน `lockAndFindRepeat`)
  * แล้วเก็บเป็น Lead ของคนกด (คำสั่งเดียวกับปุ่ม "เก็บเข้า Lead" ของแท็บผู้สมัคร)
  */
+import type { QueryResultRow } from 'pg';
 import { dbQuery, dbTransaction } from './postgres.js';
 import { tableInAppSchema } from './schema.js';
 import { lockAndFindRepeat } from './applicationRepeatGuard.js';
@@ -29,6 +30,23 @@ import {
 const CAND = '"so-candidate-data"';
 const APPS = tableInAppSchema('public_job_applications');
 
+/**
+ * อ่านตารางของ So Scraping แบบมีเวลาหยุดรอ (บทเรียน 24 พ.ย. 2569) — So Scraping ค้าง UPDATE 21 นาที ตัวเพิ่มคอลัมน์รอคิว
+ * คำสั่งอ่านรายชื่อ Scrap ของเรา 13 ตัวรอตาม ช่องต่อฐานเต็ม ทั้งบริษัทล็อกอิน Jarvis ไม่ได้
+ * ⇒ ธุรกรรมอ่านอย่างเดียว · รอล็อกไม่เกิน 2 วิ · คำสั่งไม่เกิน 8 วิ — เกินแล้วล้ม (หน้าแท็บ Scrap บอกว่าอ่านไม่ได้) ไม่ค้างทั้งระบบ
+ */
+export const SCRAP_READ_LOCK_TIMEOUT = '2s';
+export const SCRAP_READ_STATEMENT_TIMEOUT = '8s';
+async function scrapRead<T extends QueryResultRow>(text: string, params?: unknown[]): Promise<{ rows: T[] }> {
+  return dbTransaction(async (client) => {
+    await client.query('set transaction read only');
+    await client.query(`set local lock_timeout = '${SCRAP_READ_LOCK_TIMEOUT}'`);
+    await client.query(`set local statement_timeout = '${SCRAP_READ_STATEMENT_TIMEOUT}'`);
+    const r = await client.query<T>(text, params);
+    return { rows: r.rows };
+  });
+}
+
 type RawRow = {
   candidate_id: string;
   request_no: string;
@@ -50,7 +68,7 @@ type RawRow = {
 
 async function loadRaw(requestNos: string[], candidateIds: string[] | null = null): Promise<RawRow[]> {
   if (requestNos.length === 0) return [];
-  const { rows } = await dbQuery<RawRow>(
+  const { rows } = await scrapRead<RawRow>(
     `select distinct on (t.source_request_no, tc.candidate_id)
             tc.candidate_id::text as candidate_id, upper(t.source_request_no) as request_no,
             c.full_name, c.first_name, c.last_name, c.phone, c.age::text as age, c.gender, c.province,
@@ -132,7 +150,7 @@ export async function listScrapCandidates(requestNos: string[]): Promise<ScrapCa
 
 /** เลขใบขอที่ So Scraping มีรายชื่อ + ยอดรวม — ให้แท็บรวมรู้ว่าต้องอ่านใบไหน */
 export async function listScrapRequestNos(): Promise<Array<{ request_no: string; total: number }>> {
-  const { rows } = await dbQuery<{ request_no: string; total: string }>(
+  const { rows } = await scrapRead<{ request_no: string; total: string }>(
     `select upper(t.source_request_no) as request_no, count(distinct tc.candidate_id)::text as total
        from ${CAND}.scrape_tasks t
        join ${CAND}.scrape_task_candidates tc on tc.task_id = t.id
@@ -150,7 +168,7 @@ export async function listScrapRequestNos(): Promise<Array<{ request_no: string;
  */
 export async function listScrapCalledCounts(requestNos: readonly string[]): Promise<Record<string, number>> {
   if (requestNos.length === 0) return {};
-  const { rows } = await dbQuery<{ request_no: string; phone: string | null }>(
+  const { rows } = await scrapRead<{ request_no: string; phone: string | null }>(
     `select distinct upper(t.source_request_no) as request_no, c.phone
        from ${CAND}.scrape_tasks t
        join ${CAND}.scrape_task_candidates tc on tc.task_id = t.id
