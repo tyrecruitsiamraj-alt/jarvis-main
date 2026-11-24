@@ -1,10 +1,8 @@
 import { cn } from '@/lib/utils';
 import React, { useEffect, useState } from 'react';
 import type { RecruitPosting } from '@/lib/recruitPostings';
-import { moveRecruitPostingBu, updateRecruitPosting, type UpdatePostingBody } from '@/lib/recruitPostingsApi';
-import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { APP_DEPARTMENT_CODES } from '@/lib/departmentCodes';
+import { updateRecruitPosting, type UpdatePostingBody } from '@/lib/recruitPostingsApi';
+import PostingBuMover from '@/components/jobs/PostingBuMover';
 import {
   Dialog,
   DialogContent,
@@ -48,11 +46,6 @@ const EditPostingDialog: React.FC<EditPostingDialogProps> = ({ posting, onClose,
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState<number | null>(null);
-  /** ย้าย BU ของประกาศลอย (24 พ.ย. 2569) — เลือกแล้วต้องกดยืนยันอีกครั้ง เพราะผู้สมัครย้ายตามไปด้วย */
-  const [bu, setBu] = useState('');
-  const [buConfirm, setBuConfirm] = useState(false);
-  const [buBusy, setBuBusy] = useState(false);
-  const [buMsg, setBuMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   useEffect(() => {
     if (!posting) return;
@@ -65,28 +58,8 @@ const EditPostingDialog: React.FC<EditPostingDialogProps> = ({ posting, onClose,
     setSalaryText(posting.salaryText ?? '');
     setContactName(posting.contactName ?? '');
     setContactPhone(posting.contactPhone ?? '');
-    setBu(posting.departmentCode ?? '');
-    setBuConfirm(false);
-    setBuMsg(null);
   }, [posting]);
 
-  const moveBu = async () => {
-    if (!posting || buBusy || !bu) return;
-    setBuBusy(true);
-    setBuMsg(null);
-    try {
-      const { posting: updated, moved } = await moveRecruitPostingBu(posting.id, bu);
-      setBuMsg({ ok: true, text: `ย้ายไป ${bu} แล้ว · ผู้สมัคร ${moved.toLocaleString('th-TH')} คนย้ายตาม` });
-      setBuConfirm(false);
-      onSaved?.(updated);
-    } catch (e) {
-      setBuMsg({ ok: false, text: e instanceof Error ? e.message : 'ย้าย BU ไม่สำเร็จ' });
-    } finally {
-      setBuBusy(false);
-    }
-  };
-  const isStandalone = Boolean(posting && !posting.jobId);
-  const buChanged = isStandalone && Boolean(bu) && bu !== (posting?.departmentCode ?? '');
 
   const submit = async () => {
     if (!posting || saving) return;
@@ -166,55 +139,10 @@ const EditPostingDialog: React.FC<EditPostingDialogProps> = ({ posting, onClose,
             </div>
           </div>
 
-          {/* BU ของประกาศลอย — ผูกใบขอแล้ว BU ตามใบขอ ไม่มีช่องนี้ */}
-          {isStandalone ? (
-            <div className="space-y-1.5 rounded-xl border border-border p-3" data-testid="posting-bu">
-              <label className="text-xs font-medium text-muted-foreground" htmlFor="posting-bu-select">
-                BU
-              </label>
-              <div className="flex flex-wrap items-center gap-2">
-                <Select
-                  value={bu}
-                  onValueChange={(v) => {
-                    setBu(v);
-                    setBuConfirm(false);
-                    setBuMsg(null);
-                  }}
-                >
-                  <SelectTrigger id="posting-bu-select" className="w-32">
-                    <SelectValue placeholder="เลือก BU" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {APP_DEPARTMENT_CODES.map((c) => (
-                      <SelectItem key={c} value={c}>
-                        {c}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {buConfirm ? (
-                  <>
-                    <Button type="button" size="sm" disabled={buBusy} onClick={() => void moveBu()} data-testid="posting-bu-confirm">
-                      {buBusy ? <Loader2 className="animate-spin" /> : null}
-                      ย้ายเลย
-                    </Button>
-                    <Button type="button" size="sm" variant="outline" disabled={buBusy} onClick={() => setBuConfirm(false)}>
-                      ยกเลิก
-                    </Button>
-                  </>
-                ) : (
-                  <Button type="button" size="sm" variant="outline" disabled={!buChanged} onClick={() => setBuConfirm(true)} data-testid="posting-bu-move">
-                    ย้าย BU
-                  </Button>
-                )}
-              </div>
-              <p className={cn('min-h-4 text-[11px]', buMsg ? (buMsg.ok ? TONE.success.value : TONE.danger.value) : 'text-muted-foreground')}>
-                {buMsg
-                  ? buMsg.text
-                  : buConfirm
-                    ? `ย้ายประกาศนี้และผู้สมัคร ${(posting?.applicationCount ?? 0).toLocaleString('th-TH')} คนจาก ${posting?.departmentCode ?? 'ไม่ระบุ'} ไป ${bu}`
-                    : ''}
-              </p>
+          {/* BU ของประกาศลอย (24 พ.ย. 2569) — ผูกใบขอแล้ว BU ตามใบขอ ไม่มีส่วนนี้ */}
+          {posting && !posting.jobId ? (
+            <div className="rounded-xl border border-border p-3">
+              <PostingBuMover posting={posting} onMoved={onSaved} />
             </div>
           ) : null}
 

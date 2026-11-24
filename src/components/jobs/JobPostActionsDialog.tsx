@@ -16,6 +16,9 @@ import { soStatusView, soStuckLine } from '@/lib/soScraping';
 import { fetchJobPostActionsDetail, type JobPostActionsDetail } from '@/lib/jobPostActionsApi';
 import type { BoardActionTab } from './BoardCardActions';
 import { postGroupBuckets } from '@/lib/jobPostActions';
+import { fetchRecruitPostings } from '@/lib/recruitPostingsApi';
+import type { RecruitPosting } from '@/lib/recruitPostings';
+import PostingBuMover from './PostingBuMover';
 
 const PAGE = 10;
 const th = (n: number) => n.toLocaleString('th-TH');
@@ -80,6 +83,25 @@ export function JobPostActionsPanel({
     };
   }, [jobId, reloadKey]);
   useEffect(() => setPage(1), [tab, statusPick, manualPick, jobId]);
+  /**
+   * ประกาศของกล่องลอยนี้ + BU ของแต่ละประกาศ (เจ้าของ 24 พ.ย. 2569) — ย้าย BU ได้ที่นี่ (`PostingBuMover`)
+   * เดิมกล่องใหม่ได้ LBD ให้เอง ผู้สมัครไปอยู่ผิด BU · ทางเข้าแก้ประกาศลอยอื่นไม่มีบนจอ
+   */
+  const standaloneKind = jobId.startsWith('standalone:') ? jobId.slice('standalone:'.length) : null;
+  const [boxPostings, setBoxPostings] = useState<RecruitPosting[] | null>(null);
+  const [boxRev, setBoxRev] = useState(0);
+  useEffect(() => setBoxPostings(null), [standaloneKind]);
+  useEffect(() => {
+    // โหลดซ้ำหลังย้าย BU ไม่ล้างรายการก่อน — บรรทัดผลของแถวที่เพิ่งกดยังอยู่ (จอไม่ขยับ)
+    if (!standaloneKind) return;
+    let alive = true;
+    fetchRecruitPostings({ standaloneOnly: true })
+      .then((list) => alive && setBoxPostings(list.filter((p) => p.standaloneKind === standaloneKind)))
+      .catch(() => alive && setBoxPostings([]));
+    return () => {
+      alive = false;
+    };
+  }, [standaloneKind, boxRev, reloadKey]);
 
   const groups = d?.groups;
   const counts = useMemo(() => {
@@ -132,6 +154,31 @@ export function JobPostActionsPanel({
 
   return (
     <div className="space-y-3">
+        {standaloneKind ? (
+          <div className="space-y-2" data-testid="standalone-postings">
+            <p className="text-sm font-medium">ประกาศของกล่องนี้</p>
+            {boxPostings === null ? (
+              <p className={cn('text-sm', DASH.sub)}>กำลังโหลด…</p>
+            ) : boxPostings.length === 0 ? (
+              <p className={cn('text-sm', DASH.sub)}>ยังไม่มีประกาศ</p>
+            ) : (
+              <ul className="divide-y divide-border rounded-xl border border-border">
+                {boxPostings.map((p) => (
+                  <li key={p.id} className="flex flex-wrap items-start justify-between gap-2 px-3 py-2" data-testid="standalone-posting-row">
+                    <div className="min-w-0">
+                      <p className="text-sm">{p.title}</p>
+                      <p className={cn('text-xs', DASH.sub)}>
+                        {p.createdByName ? `${p.createdByName} · ` : ''}
+                        {formatDateTimeTh(p.createdAt)} · ผู้สมัคร {th(p.applicationCount ?? 0)} คน
+                      </p>
+                    </div>
+                    <PostingBuMover posting={p} onMoved={() => setBoxRev((n) => n + 1)} />
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        ) : null}
         <div className={cn('grid gap-2', standalone ? 'sm:grid-cols-1' : 'sm:grid-cols-3')} role="tablist" data-testid="job-actions-boxes">
           {boxes.map((x) => (
             <Button

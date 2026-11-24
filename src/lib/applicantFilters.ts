@@ -28,6 +28,8 @@ import {
   applicantProcessOf,
 } from '@/lib/applicantProcess';
 import { RM_LICENSE_TYPES } from '@/lib/recruitRmMasters';
+import { APP_DEPARTMENT_CODES } from '@/lib/departmentCodes';
+import { APPLICANT_AREA_LABEL, APPLICANT_AREA_ORDER, type ApplicantArea } from '@/lib/applicantArea';
 import {
   UNSPECIFIED,
   applyFacetDefs,
@@ -61,7 +63,9 @@ export type ApplicantFacetKey =
   | 'education'
   | 'days'
   | 'channel'
-  | 'gender';
+  | 'gender'
+  | 'bu'
+  | 'area';
 
 /**
  * ของที่ต้องรู้ตอนคิดค่า — แท็บ (หัวข้อนัดหมายโผล่เฉพาะแท็บนัด) + เวลาปัจจุบัน (ส่งเข้ามาให้เทสต์ได้) +
@@ -71,6 +75,8 @@ export type ApplicantFacetFacts = {
   tab: RmTab;
   now: Date;
   recruiterOf?: (r: PublicApplication) => string | null;
+  /** ผู้สมัครอยู่ใกล้งานแค่ไหน (`applicantArea.ts` · 24 พ.ย. 2569) — หน้ารู้จากใบขอที่โหลดไว้ · ไม่ส่ง = ไม่มีหัวข้อนี้ */
+  areaOf?: (r: PublicApplication) => ApplicantArea;
 };
 
 export type ApplicantFilterState = FacetState<ApplicantFacetKey>;
@@ -353,6 +359,24 @@ const FACETS: readonly Def[] = [
     values: (r) => [trimOr(subChannelOf(r.channel_label, r.referral_source))],
   },
   {
+    /** BU ของใบสมัคร (เจ้าของ 24 พ.ย. 2569 "หน้าผู้สมัครให้แยกดูแบบ Bu ได้") — ใบขอ = BU ของใบขอ · กล่องลอย = BU ของประกาศ */
+    key: 'bu',
+    label: 'BU',
+    ui: 'check',
+    order: [...APP_DEPARTMENT_CODES],
+    values: (r) => [trimOr(r.department_code)],
+  },
+  {
+    /** ใกล้งานแค่ไหน (Choice 24 พ.ย. 2569 "ยังขึ้นในรายชื่อ แต่บอกว่าไกลแค่ไหน") — ตัวคิด `applicantArea.ts` */
+    key: 'area',
+    label: 'ใกล้งานแค่ไหน',
+    ui: 'check',
+    order: [...APPLICANT_AREA_ORDER],
+    labelOf: (v) => APPLICANT_AREA_LABEL[v as ApplicantArea] ?? v,
+    available: (facts) => Boolean(facts.areaOf),
+    values: (r, facts) => [facts.areaOf ? facts.areaOf(r) : UNSPECIFIED],
+  },
+  {
     key: 'gender',
     label: 'เพศ',
     ui: 'check',
@@ -450,6 +474,7 @@ export function buildApplicantFacets(
  * ⚠️ "หน่วยงาน" ยังคีย์ด้วย `job_id` (ปุ่ม "ดูรายชื่อ" จากการ์ดกล่องงานติ๊กใบขอให้) — แค่คำบนจอเป็นชื่อหน่วยงาน
  */
 export const RECRUIT_TAB_FACETS: readonly ApplicantFacetKey[] = [
+  'bu',
   'recruiter',
   'step',
   'status',
@@ -458,6 +483,7 @@ export const RECRUIT_TAB_FACETS: readonly ApplicantFacetKey[] = [
   'aiStatus',
   'job',
   'province',
+  'area',
   'days',
   'position',
   'age',
@@ -487,6 +513,7 @@ export const APPLICANT_PRIMARY_FACETS: readonly ApplicantFacetKey[] = [
   'apptWhen',
   'apptPlace',
   'attendance',
+  'bu',
   'recruiter',
   // ขั้นตอน/สถานะ/สถานะการติดต่อ ขึ้นต้นแบบ iRecruit (4 ต.ค. 2569)
   'step',
@@ -495,6 +522,7 @@ export const APPLICANT_PRIMARY_FACETS: readonly ApplicantFacetKey[] = [
   'call',
   'job',
   'province',
+  'area',
   'days',
 ];
 export const APPLICANT_FACET_ATTACH: Partial<Record<ApplicantFacetKey, ApplicantFacetKey>> = {

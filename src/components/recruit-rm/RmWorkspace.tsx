@@ -1,3 +1,4 @@
+import { applicantAreaOf, sortByApplicantArea, type ApplicantArea } from '@/lib/applicantArea';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { GlassTabIndicator, glassTabClass, glassTabsListClass } from '@/components/ui/tabs';
 import { createPortal } from 'react-dom';
@@ -576,9 +577,21 @@ const RmWorkspace: React.FC<{
     );
     return (r: PublicApplication) => (r.job_id ? (idx.get(r.job_id) ?? null) : null);
   }, [jobs]);
+  /**
+   * ผู้สมัครอยู่ใกล้งานแค่ไหน (เจ้าของ 24 พ.ย. 2569 · `applicantArea.ts`) — ใบขอที่หน้าโหลดไว้ · กล่องลอยใช้ที่ตั้งของประกาศ
+   * ใบขอยังโหลดไม่ขึ้น = ไม่มีหัวข้อ/ป้ายนี้ (ไม่เดาว่าไกล)
+   */
+  const areaOf = useMemo(() => {
+    if (!jobs || jobs.length === 0) return undefined;
+    const idx = buildJobKeyIndex(
+      jobs.map((j) => [j.id, j] as const),
+      (existing) => existing,
+    );
+    return (r: PublicApplication): ApplicantArea => applicantAreaOf(r, r.job_id ? idx.get(r.job_id) : null);
+  }, [jobs]);
   const applicantFacts = useMemo<ApplicantFacetFacts>(
-    () => ({ tab, now: new Date(), recruiterOf }),
-    [tab, recruiterOf],
+    () => ({ tab, now: new Date(), recruiterOf, areaOf }),
+    [tab, recruiterOf, areaOf],
   );
   const commitApplicantFilters = (next: ApplicantFilterState) => {
     setSearchParams((prev) => writeApplicantFilterState(prev, next), { replace: true });
@@ -620,10 +633,12 @@ const RmWorkspace: React.FC<{
     return base.filter((r) => isInRmListView(r, listView));
   }, [rows, tab, keyword, listView, bucket, rmFilters, everyoneContact, jobAll]);
 
-  const filtered = useMemo(
-    () => (bucket ? baseFiltered : applyApplicantFilters(baseFiltered, applicantFilterState, applicantFacts)),
-    [bucket, baseFiltered, applicantFilterState, applicantFacts],
-  );
+  const filtered = useMemo(() => {
+    if (bucket) return baseFiltered;
+    const out = applyApplicantFilters(baseFiltered, applicantFilterState, applicantFacts);
+    // รายชื่อคนที่สนใจ: คนใกล้งานขึ้นก่อน ไม่ตัดใครทิ้ง (Choice 24 พ.ย. 2569) · ระดับเดียวกันคงลำดับเดิม
+    return tab === 'candidates' && listView === 'interested' && areaOf ? sortByApplicantArea(out, areaOf) : out;
+  }, [bucket, baseFiltered, applicantFilterState, applicantFacts, tab, listView, areaOf]);
   const applicantFacets = useMemo(
     () => (bucket ? [] : buildApplicantFacets(baseFiltered, applicantFilterState, applicantFacts)),
     [bucket, baseFiltered, applicantFilterState, applicantFacts],
@@ -1536,6 +1551,7 @@ const RmWorkspace: React.FC<{
                 onAttendance={onAttendance}
                 unitOf={unitOf}
                 recruiterOf={recruiterOf}
+                areaOf={areaOf}
                 actionsOverride={cancelledView ? ['view', 'restore'] : undefined}
                 extraRows={
                   currentPage === 1 && matchShown.length > 0 ? (

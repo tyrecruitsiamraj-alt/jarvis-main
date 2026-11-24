@@ -129,6 +129,10 @@ type Row = {
   standalone_kind_label?: string | null;
   /** เจ้าหน้าที่สรรหาที่เลือกไว้ตอน Gen link (`linkRecruiterSql` · ไม่ได้เลือก = null) — ผู้สรรหาของผู้สมัครกล่องลอย */
   link_recruiter_name?: string | null;
+  /** BU ของใบ + ที่ตั้งงานของกล่องลอย (24 พ.ย. 2569) · ชั้นคอลัมน์เก่า = undefined */
+  department_code?: string | null;
+  posting_province?: string | null;
+  posting_location?: string | null;
   channel_label: string | null;
   license_types: string[] | null;
   created_by_name: string | null;
@@ -230,6 +234,9 @@ function toApplication(r: Row, viewerId?: string, showClaimer = false) {
     standalone_kind: r.standalone_kind || undefined,
     standalone_kind_label: r.standalone_kind_label || undefined,
     link_recruiter_name: r.link_recruiter_name || undefined,
+    department_code: r.department_code?.trim().toUpperCase() || undefined,
+    posting_province: r.posting_province || undefined,
+    posting_location: r.posting_location || undefined,
     channel_label: r.channel_label || undefined,
     license_types: r.license_types && r.license_types.length > 0 ? r.license_types : undefined,
     created_by_name: r.created_by_name || undefined,
@@ -307,7 +314,11 @@ const STANDALONE_KIND_SQL = `(select p.standalone_kind from ${tableInAppSchema('
   (select coalesce(k.label, p.standalone_kind) from ${tableInAppSchema('recruit_postings')} p
      left join ${tableInAppSchema('recruit_posting_kinds')} k on k.code = p.standalone_kind
     where p.id = a.posting_id and p.job_id is null) as standalone_kind_label,
-  ${linkRecruiterSql('a.link_id')} as link_recruiter_name`;
+  ${linkRecruiterSql('a.link_id')} as link_recruiter_name,
+  a.department_code,
+  (select p.province from ${tableInAppSchema('recruit_postings')} p where p.id = a.posting_id and p.job_id is null) as posting_province,
+  (select p.location_text from ${tableInAppSchema('recruit_postings')} p where p.id = a.posting_id and p.job_id is null) as posting_location`;
+// ↑ BU ของใบ (ตัวกรอง BU หน้าผู้สมัคร) + ที่ตั้งงานของกล่องลอย (ป้ายความใกล้ `applicantArea.ts`) — เจ้าของ 24 พ.ย. 2569
 
 const LIST_COLUMNS = `
   id, full_name, title_prefix, first_name, last_name, phone, age, gender,

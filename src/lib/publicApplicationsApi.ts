@@ -125,6 +125,11 @@ export type PublicApplication = {
   posting_owner_name?: string;
   /** เจ้าหน้าที่สรรหาที่เลือกไว้ตอน Gen link (ไม่ได้เลือก = ไม่มี) — ผู้สรรหาของผู้สมัครกล่องลอย (23 พ.ย. 2569) */
   link_recruiter_name?: string;
+  /** BU ของใบ (ตัวกรอง BU หน้าผู้สมัคร · 24 พ.ย. 2569) */
+  department_code?: string;
+  /** ที่ตั้งงานของกล่องลอย — ป้ายความใกล้ (`applicantArea.ts`) · ผูกใบขอ = ใช้ที่ตั้งของใบขอแทน */
+  posting_province?: string;
+  posting_location?: string;
   /** สมัครผ่านประกาศกล่องลอย (ไม่ผูกใบขอ) = รหัส/ชื่อประเภทกล่อง (16 พ.ย. 2569 · ปุ่ม "ดูรายชื่อ" บนการ์ดกล่องลอย) */
   standalone_kind?: string;
   standalone_kind_label?: string;

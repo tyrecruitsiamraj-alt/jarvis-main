@@ -14684,3 +14684,10 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 - ย้าย BU: PATCH `/api/recruit/postings` `{id, departmentCode}` → `moveStandalonePostingBu` (`api/_lib/recruitPostings.ts` · ธุรกรรมเดียว · ผู้สมัครของประกาศที่ยังอยู่ BU เดิมย้ายตาม · ผูกใบขอย้ายไม่ได้) · ต้องมีสิทธิ์ BU ปลายทาง · audit `recruit_posting.move_bu`
 - `EditPostingDialog`: ส่วน BU (`posting-bu`) เฉพาะประกาศลอย · กด "ย้าย BU" แล้วต้องกด "ย้ายเลย" อีกครั้ง
 - เทสต์ `tests/api/standalonePostingBu2569-11-24.test.ts`
+
+### 24 พ.ย. 2569 (3) — หน้าผู้สมัคร: ตัวกรอง BU + ใกล้งานแค่ไหน (คนใกล้ขึ้นก่อน)
+- "สนใจ" มาจากคำตอบ AI อย่างเดียว (บทถามสะดวกเดินทางแล้ว) ⇒ ไม่ตัดใคร แค่บอกระดับ + เรียง · ตัวคิด `src/lib/applicantArea.ts` (ใช้ `areaRankOf`/`jobAreaOf` ตัวเดียวกับจับคู่)
+- ที่ตั้งงาน: ใบขอที่หน้าโหลด (`buildJobKeyIndex`) · กล่องลอย = `posting_province`/`posting_location` ที่ `job-applications` ส่งมาใหม่ (+ `department_code`) ใน `STANDALONE_KIND_SQL`
+- `applicantFilters.ts`: หัวข้อ `bu` (บนสุด) + `area` (ต่อจากจังหวัด · มีเมื่อหน้าส่ง `areaOf`) · `RmWorkspace` เรียงรายชื่อคนสนใจด้วย `sortByApplicantArea` · `RmTable` บรรทัดใต้ที่อยู่ (`applicant-area`)
+- เทสต์ `tests/api/applicantArea2569-11-24.test.ts`
+- (แก้ต่อ 24 พ.ย.) ป๊อปแก้ไขประกาศของกล่องลอยไม่มีทางเข้าบนจอ (`PostingLinksList`/`ApplyLinksPanel` ไม่ได้ถูกใช้) ⇒ ส่วนย้าย BU แยกเป็น `src/components/jobs/PostingBuMover.tsx` · วางในป๊อป "ทำอะไรไปแล้ว" ของการ์ดกล่องลอย (`JobPostActionsDialog` หัวข้อ "ประกาศของกล่องนี้") + `EditPostingDialog`

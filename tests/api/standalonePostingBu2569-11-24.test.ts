@@ -47,9 +47,14 @@ describe('ย้าย BU ของประกาศลอย', () => {
     // ผู้สมัครย้ายตามเฉพาะคนที่ยังอยู่ BU เดิมของประกาศ
     expect(lib).toContain('AND a.department_code IS NOT DISTINCT FROM $3');
   });
-  it('ป๊อปแก้ไขประกาศ: ปุ่ม "ย้าย BU" ต้องกดยืนยันอีกครั้ง', () => {
-    const e = read('src/components/jobs/EditPostingDialog.tsx');
-    expect(e).toContain('data-testid="posting-bu-move"');
-    expect(e).toContain('data-testid="posting-bu-confirm"');
+  it('ปุ่ม "ย้าย BU" ต้องกดยืนยันอีกครั้ง · อยู่ในป๊อป "ทำอะไรไปแล้ว" ของการ์ดกล่องลอย (ทางเข้าที่กดได้จริง) + ป๊อปแก้ไขประกาศ', () => {
+    const m = read('src/components/jobs/PostingBuMover.tsx');
+    expect(m).toContain('data-testid="posting-bu-move"');
+    expect(m).toContain('data-testid="posting-bu-confirm"');
+    expect(m).toContain('if (posting.jobId) return null;');
+    const a = read('src/components/jobs/JobPostActionsDialog.tsx');
+    expect(a).toContain('<PostingBuMover posting={p}');
+    expect(a).toContain("list.filter((p) => p.standaloneKind === standaloneKind)");
+    expect(read('src/components/jobs/EditPostingDialog.tsx')).toContain('<PostingBuMover posting={posting}');
   });
 });

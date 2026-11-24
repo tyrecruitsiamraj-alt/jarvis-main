@@ -215,6 +215,7 @@ describe('ใบขอที่สมัคร — คีย์ด้วย job_
       'apptWhen',
       'apptPlace',
       'attendance',
+      'bu',
       'recruiter',
       'step',
       'status',
@@ -222,6 +223,7 @@ describe('ใบขอที่สมัคร — คีย์ด้วย job_
       'call',
       'job',
       'province',
+      'area',
       'days',
     ]);
     expect(APPLICANT_FACET_ATTACH).toEqual({ district: 'province' });
@@ -282,7 +284,8 @@ describe('ตัวกรองแท็บผู้สมัคร + การ�
     expect(applicantPrimaryFacets('contact')).toEqual(RECRUIT_TAB_FACETS);
     expect(applicantPrimaryFacets('appointments')).toEqual(APPLICANT_PRIMARY_FACETS);
     expect(RECRUIT_TAB_FACETS).toEqual([
-      'recruiter', 'step', 'status', 'contactState', 'call', 'aiStatus', 'job', 'province', 'days', 'position', 'age', 'education', 'channel', 'gender',
+      // BU บนสุด + ใกล้งานแค่ไหนต่อจากจังหวัด (เจ้าของ 24 พ.ย. 2569 · applicantArea2569-11-24)
+      'bu', 'recruiter', 'step', 'status', 'contactState', 'call', 'aiStatus', 'job', 'province', 'area', 'days', 'position', 'age', 'education', 'channel', 'gender',
     ]);
     for (const tab of ['candidates', 'contact'] as const) {
       const f = buildApplicantFacets(rows, state({ province: ['ลพบุรี'] }), facts({ tab }));

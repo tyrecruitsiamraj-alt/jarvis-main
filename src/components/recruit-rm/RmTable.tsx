@@ -40,6 +40,7 @@ import {
 import type { CallHold } from '@/lib/callHoldsApi';
 import { choiceCountdown } from '@/lib/callChoiceGuard';
 import { greetingHeardText } from '@/lib/greetingCall';
+import { APPLICANT_AREA_LABEL, type ApplicantArea } from '@/lib/applicantArea';
 import { aiQueueStatusOf } from '@/lib/applicantAiQueueStatus';
 import { rmRowStatusOf } from '@/lib/applicantAiAnswerText';
 import { PROCESS_STATE_LABEL, PROCESS_STATE_TONE, PROCESS_STEP_LABEL, applicantProcessOf } from '@/lib/applicantProcess';
@@ -178,6 +179,8 @@ const RmTable: React.FC<{
   unitOf?: (r: PublicApplication) => string | null;
   /** เจ้าของงาน = เจ้าหน้าที่สรรหาของใบขอที่สมัคร (ตัวเดียวกับหัวข้อกรอง "เจ้าหน้าที่สรรหา") */
   recruiterOf?: (r: PublicApplication) => string | null;
+  /** ใกล้งานแค่ไหน (`applicantArea.ts` · 24 พ.ย. 2569) — บรรทัดใต้ที่อยู่ · ไม่ส่ง = ไม่มีบรรทัดนี้ */
+  areaOf?: (r: PublicApplication) => ApplicantArea;
   /** ปุ่มต่อแถวแทนชุดของแท็บ — มุมมอง "ดูที่ยกเลิก" ใช้ ดูรายละเอียด + กู้คืน (4 ต.ค. 2569) */
   actionsOverride?: RmRowAction[];
   /**
@@ -186,7 +189,7 @@ const RmTable: React.FC<{
    */
   extraRows?: React.ReactNode;
   extraRowCount?: number;
-}> = ({ tab, rows, selectedIds, onToggleRow, onToggleAll, onAction, docsEnabled = false, holdByRef = {}, onAttendance, recruiterOf, actionsOverride, unitOf, extraRows, extraRowCount = 0 }) => {
+}> = ({ tab, rows, selectedIds, onToggleRow, onToggleAll, onAction, docsEnabled = false, holdByRef = {}, onAttendance, recruiterOf, areaOf, actionsOverride, unitOf, extraRows, extraRowCount = 0 }) => {
   const actions = actionsOverride ?? RM_ROW_ACTIONS[tab];
   /**
    * 🔴 แท็บผู้สมัครใช้ชุดคอลัมน์ที่เจ้าของสั่งเอง (30 ก.ย. 2569 · Choice "เอาตามที่ฉันสั่ง"):
@@ -364,6 +367,14 @@ const RmTable: React.FC<{
               const addressCell = (
                 <td className={cn('px-1.5 py-2', DASH.cell)} title={address || undefined}>
                   <span className="line-clamp-3 min-w-28 break-words">{dashIfEmpty(address)}</span>
+                  {areaOf ? (
+                    <span
+                      className={cn('mt-0.5 block text-xs', areaOf(r) === 'far' ? TONE.warn.value : DASH.cellMuted)}
+                      data-testid="applicant-area"
+                    >
+                      {APPLICANT_AREA_LABEL[areaOf(r)]}
+                    </span>
+                  ) : null}
                   {heard ? (
                     <span
                       className={cn('mt-1 block w-fit rounded-md px-1.5 py-0.5 text-xs', TONE.info.chip)}
