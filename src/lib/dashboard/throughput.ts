@@ -36,6 +36,9 @@ export type ThroughputRecord = {
   requestActionCode?: string;
   /** ค่าจาก classifyLifecycleKind / classifyLifecycleKindFromAction */
   lifecycleKind?: 'resignation' | 'replacement' | 'increase_headcount' | 'new_site' | 'other';
+  /** รหัส/ชื่อเหตุผลที่หยุดใบใน ERP — แยกเหตุผลตอนกดเลขยกเลิก (`requestCancelReason.ts` · 24 พ.ย. 2569) */
+  stopCode?: string | null;
+  stopReason?: string | null;
 };
 
 export type ThroughputSummary = {

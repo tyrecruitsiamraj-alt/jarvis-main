@@ -93,6 +93,7 @@ import matchingListHandler from './matching-list.js';
 import brandingHandler from './branding.js';
 import matchPriorityWeightsHandler from './match-priority-weights.js';
 import workStatusMasterHandler from './work-status-master.js';
+import requestCancelReasonsHandler from './request-cancel-reasons.js';
 import followHandler from './follow.js';
 import followStaffContactsHandler from './follow-staff-contacts.js';
 import followTopicsHandler from './follow-topics.js';
@@ -256,6 +257,7 @@ export const apiRoutes: Record<string, ApiHandler> = {
   '/api/branding': brandingHandler as ApiHandler,
   '/api/match-priority-weights': matchPriorityWeightsHandler as ApiHandler,
   '/api/work-status-master': workStatusMasterHandler as ApiHandler,
+  '/api/request-cancel-reasons': requestCancelReasonsHandler as ApiHandler,
   '/api/public/jobs': publicJobsHandler as ApiHandler,
   '/api/public/apply': publicApplyHandler as ApiHandler,
   '/api/public/apply-link': publicApplyLinkHandler as ApiHandler,

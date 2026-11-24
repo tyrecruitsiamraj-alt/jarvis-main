@@ -33,6 +33,11 @@ export type StatusLeadRow = {
   required: string | null;
   /** อัตราของกล่องที่กด (สถานะ/คงเหลือ = ที่ยังต้องหา · เข้ามา = ที่ขอ · หาได้ · ยกเลิก) */
   amount: number;
+  /** เลขที่ใบขอดิบของ ERP — คีย์ของเหตุผลยกเลิกที่ทีมใส่ · null = ไม่ใช่ใบ ERP */
+  rawRequestNo?: string | null;
+  /** เหตุผลที่หยุดใบใน ERP (มีเฉพาะแผงจาก throughput) */
+  stopCode?: string | null;
+  stopReason?: string | null;
 };
 
 export type StatusLeadPanel = {
@@ -127,6 +132,9 @@ export function buildCohortLeadPanel(
       kind: r.leadKind,
       required: r.requiredDate,
       amount: r.positions,
+      rawRequestNo: r.requestNo,
+      stopCode: r.stopCode ?? null,
+      stopReason: r.stopReason ?? null,
     };
   });
   return finish(rows);

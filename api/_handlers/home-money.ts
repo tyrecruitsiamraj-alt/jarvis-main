@@ -13,6 +13,7 @@
 import { withRbac, sendError, handleApiError, type ApiRes, type AuthedReq } from '../_lib/http.js';
 import { loadMatchingBuScope, loadUserDepartmentScope } from '../_lib/departmentScope.js';
 import { loadPenaltyLedgerRaw, LEDGER_SINCE } from '../_lib/siamrajPenaltyLedgerSql.js';
+import { withCancelReasonTags } from '../_lib/requestCancelReasons.js';
 import { buildPenaltyLedger } from '../../src/lib/requestPenaltyLedger.js';
 import { buildHomeMoney } from '../../src/lib/homeMoney.js';
 import { buildBuTrend, countsToBuTrend, dayBuckets, monthBuckets, type BuTrendResponse } from '../../src/lib/homeBuTrend.js';
@@ -143,7 +144,8 @@ async function handler(req: AuthedReq, res: ApiRes) {
     const raw = await loadPenaltyLedgerRaw(departmentScope);
     // 🔴 BU ของสมุดเป็นรหัสยาวจากไซต์ (LML · DSL · SNJ) แต่ตัวเลือกเป็นรหัสสั้น (LM · DS · SN) — แปลงก่อนเทียบ
     //    (31 ต.ค. 2569 เดิมเทียบตรง ⇒ ใบ LM/DS/SN หลุดจากหน้าหลักทั้งหมด · ขอใหม่ 163 ไม่เท่ากล่องประกาศ 183)
-    const scoped = raw.rows.filter((r) => inBuSet(normalizeTrendBu(r.bu), buSet));
+    // เหตุผลยกเลิกที่ทีมใส่เอง (24 พ.ย. 2569) — อ่านสดทุกครั้ง สมุด ERP แคชอยู่แต่ใส่แล้วต้องเห็นทันที
+    const scoped = await withCancelReasonTags(raw.rows.filter((r) => inBuSet(normalizeTrendBu(r.bu), buSet)));
     const [replacements, owners, aftercareUpcoming, sendReplacement] = await Promise.all([
       loadReplacements([...new Set(scoped.map((r) => r.site))]),
       loadOwners([...new Set(scoped.map((r) => r.requestNo))]),

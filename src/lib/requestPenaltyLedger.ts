@@ -44,6 +44,8 @@ export type PenaltyRequestRow = {
   endYmd: string | null;
   /** เหตุผลที่หยุดใบจาก ERP (`st_ms_stop_by`) · null = ไม่ได้กรอก/ยังเปิด */
   stopReason?: string | null;
+  /** รหัสเหตุผลใน ERP · ว่าง/16 = ทีมใส่เหตุผลทับได้ (`requestCancelReason.ts`) — `stopReason` เป็นของทีมแล้วถ้าทีมใส่ */
+  stopCode?: string | null;
   workDays: string | null;
   finePerDay: number;
   deductPerDay: number;

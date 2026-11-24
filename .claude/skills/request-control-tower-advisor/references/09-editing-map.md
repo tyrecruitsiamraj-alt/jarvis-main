@@ -14667,3 +14667,12 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 - นัดหมาย: `APPOINTMENT_KPI_IDS` (นัดทั้งหมด · รอผล · มา · ไม่มา · นัดวันนี้) · ที่เหลือ (เลยวันนัด · ผ่าน · ไม่ผ่าน) เป็นชิปแถวล่าง · สมการ `appointmentEquation` (`src/lib/appointmentBoard.ts`) รอผลรวมเลื่อนนัด
 - `RmTable`: วันที่สมัครมีเวลา (`formatDateTimeTh`) · หัว "หน่วยงาน · ใบขอ" + บรรทัดสอง ตำแหน่ง · เลขใบขอ (`jobLine`) · "สมัคร · ช่องทาง" · "ทำงาน" · แท็บนัดหมายตัดที่อยู่/สมัคร แยกคอลัมน์ "นัด" (`appointmentCell`) กับ "ผลนัด" · ปุ่มแท็บการติดต่อมีคำทุกปุ่ม · "ดำเนินการ"/"บันทึกผล" → "ลงผล"
 - เทสต์ `tests/api/contactAppointmentKpi2569-11-23.test.ts`
+
+### 24 พ.ย. 2569 — เหตุผลยกเลิกใบขอ (ได้คนแล้ว / ยกเลิกจริง / ไม่ได้กรอกเหตุผล)
+- สมการใบขอคงเดิม (ยังนับใน "ยกเลิก") · เจ้าของเคาะ "คงไว้ในยกเลิก แยกตอนกดดู" · ตัวตัดสินที่เดียว `src/lib/requestCancelReason.ts` (เทสต์ `tests/api/requestCancelReason2569-11-24.test.ts`)
+- ตาราง migration 197: `request_cancel_reasons` (รายการกลาง · ตั้งต้น 11 ข้อจาก ERP `st_ms_stop_by` · `got_person` = นับว่าได้คนแล้ว · ลบไม่ได้ เลิกใช้แทน) + `request_cancel_reason_tags` (ใบละ 1 เหตุผล คีย์เลขดิบ ERP · ประวัติใน audit_logs)
+- ใส่ได้เฉพาะใบที่ ERP ไม่มีรหัสเหตุผล หรือรหัส 16 "ยกเลิกโดย-สยามราช" (`OVERRIDABLE_ERP_CODES`) — server ถาม ERP ตรงก่อนบันทึก
+- เส้น `/api/request-cancel-reasons` (`api/_handlers/request-cancel-reasons.ts` · ฐาน `api/_lib/requestCancelReasons.ts`) · rbac: อ่าน + PUT ใส่บนใบ = staff · POST/PATCH รายการกลาง = admin
+- Dashboard: throughput SQL ส่ง `stopCode`/`stopReason` → `cohortDrillDown` → `statusLeadPanel` (`rawRequestNo`) → `DashboardStatusLeadPanel` กล่องยกเลิก (ดูจาก `amountLabel === LEAD_AMOUNT_LABEL.cancelled` ไม่แตะ SupervisorDashboard) แสดง `DashboardCancelReasons.tsx` (3 กลุ่ม + รายเหตุผล + ปุ่มใส่เหตุผลบนแถว)
+- หน้าหลัก/ภาพรวม/ผู้ช่วย AI: `home-money` เรียก `withCancelReasonTags` (อ่านสดทุกครั้ง สมุด ERP แคช 10 นาที) · ledger SQL ส่ง `stopCode`
+- ตั้งค่า › เหตุผลยกเลิกใบขอ (`src/pages/settings/CancelReasonsTab.tsx` · แท็บ `cancelReasons` กลุ่มข้อมูลอ้างอิง)

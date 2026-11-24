@@ -76,6 +76,8 @@ export type ApiResource =
   | 'lumos-dispatch'
   | 'job-applications'
   | 'work-status-master'
+  /** เหตุผลยกเลิกใบขอ (24 พ.ย. 2569) — อ่าน + ใส่บนใบ (PUT) ทุกคน · แก้รายการกลาง admin */
+  | 'request-cancel-reasons'
   | 'recruit-channels'
   | 'recruit-reasons'
   | 'recruit-job-titles'
@@ -193,6 +195,11 @@ export function minimumRoleFor(
 
     case 'recruit-postings':
       return 'staff';
+
+    case 'request-cancel-reasons':
+      // ทุกคนใส่เหตุผลบนใบได้ (เจ้าของ 24 พ.ย. 2569 Choice "ทุกคนใส่บนใบได้ · Admin แก้รายการกลาง")
+      if (isRead || m === 'PUT') return 'staff';
+      return 'admin';
 
     case 'work-status-master':
       // อ่านได้ทุกคน (dropdown สถานะทำงานทั้งระบบใช้) — เพิ่ม/แก้/ลบเฉพาะ admin

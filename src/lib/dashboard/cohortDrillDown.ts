@@ -49,6 +49,9 @@ export type CohortDrillRow = {
   filledPositions: number;
   cancelledPositions: number;
   remainingPositions: number;
+  /** รหัส/ชื่อเหตุผลที่หยุดใบใน ERP — กดเลขยกเลิกแล้วแยกเหตุผล (`requestCancelReason.ts` · 24 พ.ย. 2569) */
+  stopCode?: string | null;
+  stopReason?: string | null;
 };
 
 export type CohortDrillResult = {
@@ -121,9 +124,14 @@ export function buildCohortDrillDown(
         filledPositions: 0,
         cancelledPositions: 0,
         remainingPositions: 0,
+        stopCode: (r.stopCode || '').trim() || null,
+        stopReason: (r.stopReason || '').trim() || null,
       };
       byRequest.set(key, row);
     }
+    // เหตุผลเป็นของทั้งใบ — แถวแรกอาจเป็นส่วนที่ยังเปิด ให้แถวไหนก็ได้ที่มีค่าเติม
+    if (!row.stopCode && r.stopCode) row.stopCode = r.stopCode.trim() || null;
+    if (!row.stopReason && r.stopReason) row.stopReason = r.stopReason.trim() || null;
 
     // ใบเดียวกันมาหลายแถว (ปิด/ยกเลิก/คงเหลือ) — วันที่เปิดใบใช้วันแรกสุดเสมอ
     if (r.requestDate < row.requestDate) row.requestDate = r.requestDate;

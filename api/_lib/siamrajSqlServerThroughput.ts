@@ -63,6 +63,9 @@ export type SiamrajThroughputRecord = {
   requestActionName?: string;
   requestActionCode?: string;
   lifecycleKind?: 'resignation' | 'replacement' | 'increase_headcount' | 'new_site' | 'other';
+  /** รหัส/ชื่อเหตุผลที่หยุดใบใน ERP (`st_ms_stop_by`) — กดเลขยกเลิกบน Dashboard แล้วแยกเหตุผล (24 พ.ย. 2569) */
+  stopCode?: string | null;
+  stopReason?: string | null;
 };
 
 type SqlThroughputRow = {
@@ -86,6 +89,8 @@ type SqlThroughputRow = {
   request_action_code: string | null;
   request_action_name: string | null;
   requester_name: string | null;
+  stop_code: string | null;
+  stop_reason: string | null;
 };
 
 /** ขอบเขต BU/ไซต์จาก env — ส่งออกให้คิวรีใบแจ้งเข้าของ Dashboard แนวโน้มใช้ชุดเดียวกัน (ยอดต้องตรงกัน) */
@@ -176,6 +181,8 @@ function mapThroughputRow(
     requestActionName,
     requestActionCode,
     lifecycleKind,
+    stopCode: (row.stop_code || '').trim() || null,
+    stopReason: (row.stop_reason || '').trim() || null,
   };
   const out: SiamrajThroughputRecord[] = [];
 
@@ -306,7 +313,9 @@ export async function listSiamrajSqlServerThroughput(options: {
       END AS has_inform,
       A.request_code AS request_action_code,
       (SELECT TOP 1 z.request_name FROM st_ms_request z WHERE z.request_code = A.request_code) AS request_action_name,
-      (SELECT TOP 1 z.fname + ' ' + z.lname FROM hr_staff z WHERE z.staff_id = A.do_id) AS requester_name
+      (SELECT TOP 1 z.fname + ' ' + z.lname FROM hr_staff z WHERE z.staff_id = A.do_id) AS requester_name,
+      RTRIM(A.stop_code) AS stop_code,
+      (SELECT TOP 1 RTRIM(z.stop_by_name) FROM st_ms_stop_by z WHERE z.stop_by_code = A.stop_code) AS stop_reason
     FROM st_request_head A
     INNER JOIN ms_site SS ON A.site_code = SS.site_code
     LEFT JOIN (

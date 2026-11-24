@@ -69,6 +69,7 @@ type ReqSqlRow = {
   need_ymd: string | null;
   end_ymd: string | null;
   stop_reason: string | null;
+  stop_code: string | null;
   work_date: string | null;
   fine: number | null;
   deduct: number | null;
@@ -130,6 +131,8 @@ export async function loadPenaltyLedgerRaw(scope: DepartmentScope): Promise<Pena
               END AS ended_full,
               -- เหตุผลที่หยุดใบ (st_ms_stop_by) — กดกล่องยกเลิกแล้วแยกเหตุผล (เจ้าของ 25 ต.ค. 2569)
               (SELECT TOP 1 RTRIM(z.stop_by_name) FROM st_ms_stop_by z WHERE z.stop_by_code = A.stop_code) AS stop_reason,
+              -- รหัสเหตุผล — ตัดสินว่าทีมใส่เหตุผลทับได้ไหม (ว่าง / 16 ยกเลิกโดย-สยามราช · requestCancelReason.ts · 24 พ.ย. 2569)
+              RTRIM(A.stop_code) AS stop_code,
               B.work_date,
               -- สัญญาให้ส่งคนแทนได้ไหม + ภายในกี่ชั่วโมง (27 ต.ค. 2569 · ส่งคนแทน = ไม่โดนปรับ)
               RTRIM(ISNULL(B.is_replace, '')) AS is_replace,
@@ -206,6 +209,7 @@ export async function loadPenaltyLedgerRaw(scope: DepartmentScope): Promise<Pena
       needYmd: r.need_ymd,
       endYmd: r.end_ymd,
       stopReason: (r.stop_reason ?? '').trim() || null,
+      stopCode: (r.stop_code ?? '').trim() || null,
       workDays: r.work_date,
       finePerDay: Number(r.fine) || 0,
       deductPerDay: Number(r.deduct) || 0,

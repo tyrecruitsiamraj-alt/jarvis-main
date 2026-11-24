@@ -6,7 +6,10 @@ import { cn } from '@/lib/utils';
 import { DASH, TONE } from '@/lib/designTokens';
 import { formatYmdDmyBe } from '@/lib/dateTh';
 import { REQUEST_LEAD_KIND_HINT, REQUEST_LEAD_KIND_LABEL, REQUEST_LEAD_KIND_TONE, type RequestLeadKind } from '@/lib/requestLeadKind';
-import { NO_KEYER, STATUS_LEAD_ORDER, buildKeyerRows, type StatusLeadPanel } from '@/lib/dashboard/statusLeadPanel';
+import { LEAD_AMOUNT_LABEL, NO_KEYER, STATUS_LEAD_ORDER, buildKeyerRows, type StatusLeadPanel, type StatusLeadRow } from '@/lib/dashboard/statusLeadPanel';
+import { CANCEL_GROUP_LABEL, cancelReasonBreakdown, cancelTagKey, effectiveCancelReason, type CancelReasonGroup, type EffectiveCancelReason } from '@/lib/requestCancelReason';
+import { useCancelReasons } from '@/lib/requestCancelReasonsApi';
+import { CancelReasonCell, CancelReasonSummary } from '@/components/dashboard/analytics/DashboardCancelReasons';
 import type { JobRequest } from '@/types';
 
 /**
@@ -39,13 +42,41 @@ export default function DashboardStatusLeadPanel({
   const [kind, setKind] = useState<RequestLeadKind | null>(null);
   const [person, setPerson] = useState<string | null>(null);
   const [shown, setShown] = useState(PAGE);
+  /**
+   * กล่องยกเลิก (หัวคอลัมน์ = "ยกเลิก") → แยกเหตุผล + ใส่เหตุผลบนใบ (เจ้าของ 24 พ.ย. 2569 · `requestCancelReason.ts`)
+   * ดูจากหัวคอลัมน์ เพราะตัวเลือกกล่องอยู่ที่หน้า Dashboard (ไม่ต้องแตะหน้านั้น)
+   */
+  const cancelMode = amountLabel === LEAD_AMOUNT_LABEL.cancelled;
+  const cancelData = useCancelReasons(cancelMode);
+  const [reasonGroup, setReasonGroup] = useState<CancelReasonGroup | null>(null);
+  const [reasonLabel, setReasonLabel] = useState<string | null>(null);
+  const reasonOf = useMemo(() => {
+    const out = new Map<string, EffectiveCancelReason>();
+    if (!cancelMode) return out;
+    const masters = cancelData.data?.reasons ?? [];
+    const tags = new Map((cancelData.data?.tags ?? []).map((t) => [cancelTagKey(t.requestNo), t]));
+    for (const r of panel.rows) {
+      out.set(r.key, effectiveCancelReason({ code: r.stopCode, name: r.stopReason }, r.rawRequestNo ? tags.get(cancelTagKey(r.rawRequestNo)) : null, masters));
+    }
+    return out;
+  }, [cancelMode, cancelData.data, panel.rows]);
+  const reasonOfRow = (r: StatusLeadRow) => reasonOf.get(r.key) as EffectiveCancelReason;
+  const breakdown = useMemo(
+    () => (cancelMode ? cancelReasonBreakdown(panel.rows.map((r) => ({ reason: reasonOf.get(r.key) as EffectiveCancelReason, positions: r.amount }))) : null),
+    [cancelMode, panel.rows, reasonOf],
+  );
   /** กดกล่องแล้วแผงอยู่ไกลลงไป — เลื่อนจอมาให้เห็น (QA 30 ต.ค. 2569 · แผง remount ทุกครั้งที่เปลี่ยนกล่อง) */
   const rootRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     rootRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }, []);
   const keyers = useMemo(() => buildKeyerRows(panel.rows), [panel.rows]);
-  const rows = panel.rows.filter((r) => (!kind || r.kind === kind) && (!person || (r.submittedBy || NO_KEYER) === person));
+  const rows = panel.rows.filter(
+    (r) =>
+      (!kind || r.kind === kind) &&
+      (!person || (r.submittedBy || NO_KEYER) === person) &&
+      (!cancelMode || ((!reasonGroup || reasonOfRow(r).group === reasonGroup) && (!reasonLabel || reasonOfRow(r).label === reasonLabel))),
+  );
   const visible = rows.slice(0, shown);
   const max = Math.max(1, ...STATUS_LEAD_ORDER.map((k) => panel.kinds[k].positions));
 
@@ -105,6 +136,20 @@ export default function DashboardStatusLeadPanel({
         })}
       </ul>
 
+      {breakdown ? (
+        <CancelReasonSummary
+          breakdown={breakdown}
+          group={reasonGroup}
+          reason={reasonLabel}
+          error={cancelData.error}
+          onGroup={(g) => {
+            setReasonGroup(g);
+            setShown(PAGE);
+          }}
+          onReason={setReasonLabel}
+        />
+      ) : null}
+
       <div className="space-y-2">
         <p className="text-sm font-medium">ใครคีย์ใบขอพวกนี้</p>
         <div className="max-h-72 overflow-auto rounded-xl border border-border" data-testid="dashboard-status-lead-keyers">
@@ -153,9 +198,10 @@ export default function DashboardStatusLeadPanel({
 
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm font-medium">
-          {[kind ? REQUEST_LEAD_KIND_LABEL[kind] : 'ทุกชนิด', person].filter(Boolean).join(' · ')} · {NUM.format(rows.length)} ใบ
+          {[kind ? REQUEST_LEAD_KIND_LABEL[kind] : 'ทุกชนิด', person, reasonLabel ?? (reasonGroup ? CANCEL_GROUP_LABEL[reasonGroup] : null)].filter(Boolean).join(' · ')} ·{' '}
+          {NUM.format(rows.length)} ใบ
         </p>
-        {kind || person ? (
+        {kind || person || reasonGroup || reasonLabel ? (
           <Button
             type="button"
             variant="outline"
@@ -163,6 +209,8 @@ export default function DashboardStatusLeadPanel({
             onClick={() => {
               setKind(null);
               setPerson(null);
+              setReasonGroup(null);
+              setReasonLabel(null);
               setShown(PAGE);
             }}
           >
@@ -172,7 +220,7 @@ export default function DashboardStatusLeadPanel({
       </div>
       {/* เลื่อนดูในกล่อง (เจ้าของ "ทำเป็น pagination ไม่ก็ให้เลื่อนลงได้ แบบนี้ยาวไป") */}
       <div className="max-h-96 overflow-auto rounded-xl border border-border" data-testid="dashboard-status-lead-list">
-        <Table className="min-w-[56rem]">
+        <Table className={cancelMode ? 'min-w-[68rem]' : 'min-w-[56rem]'}>
           <TableHeader className="sticky top-0 z-10 bg-card">
             <TableRow className={DASH.tableHead}>
               <TableHead className="text-xs">ใบขอ</TableHead>
@@ -183,12 +231,13 @@ export default function DashboardStatusLeadPanel({
               <TableHead className="text-xs">เร่งด่วน</TableHead>
               <TableHead className="text-xs">ต้องการคน</TableHead>
               <TableHead className="text-right text-xs">{amountLabel}</TableHead>
+              {cancelMode ? <TableHead className="text-xs">เหตุผล</TableHead> : null}
             </TableRow>
           </TableHeader>
           <TableBody>
             {rows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className={cn('py-4 text-center text-sm', DASH.muted)}>
+                <TableCell colSpan={cancelMode ? 9 : 8} className={cn('py-4 text-center text-sm', DASH.muted)}>
                   ไม่มีใบขอ
                 </TableCell>
               </TableRow>
@@ -219,6 +268,17 @@ export default function DashboardStatusLeadPanel({
                   </TableCell>
                   <TableCell className="whitespace-nowrap text-sm tabular-nums">{formatYmdDmyBe(r.required)}</TableCell>
                   <TableCell className="text-right text-sm font-medium tabular-nums">{NUM.format(r.amount)}</TableCell>
+                  {cancelMode ? (
+                    <TableCell className="text-sm">
+                      <CancelReasonCell
+                        requestNo={r.rawRequestNo ?? null}
+                        displayNo={r.requestNo}
+                        reason={reasonOfRow(r)}
+                        masters={cancelData.data?.reasons ?? []}
+                        onSaved={cancelData.reload}
+                      />
+                    </TableCell>
+                  ) : null}
                 </TableRow>
               );
             })}

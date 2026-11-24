@@ -664,7 +664,7 @@ export const API_CATALOG: ApiCatalogEntry[] = [
    "POST",
    "PUT"
   ],
-  "doc": "/api/document-settings — ตั้งค่า › ส่งเอกสารผ่าน LINE (เจ้าของ 22 พ.ย. 2569)\n\nGET                                              → ทุกคน: เปิดใช้ไหม · พร้อมไหม · มีงานเอกสารในสิทธิ์ไหม / admin: + LINE · ต้นฉบับ 5 ประเภท · คิวแจ้งเตือนที่ค้าง\nGET  ?template=<เอกสาร>&page=                    → admin: ดูต้นฉบับรุ่นที่ใช้อยู่\nPUT  { enabled?, lineChannelId?, liffId? }       → admin: เปิด/ปิด · ตั้ง LINE Login Channel ID กับ LIFF ID (ไม่ใช่ความลับ ไม่มี token)\nPOST { action:'template', docType, pages:[base64…] } → admin: อัปโหลดต้นฉบับรุ่นใหม่ของเอกสาร 1 ประเภท (ทุกหน้าเรียงตามลำดับ · PNG/JPG)\n\nเปิดใช้ได้เมื่อครบ: LINE · ต้นฉบับ 5 ประเภท · ฐานข้อมูลอัปเดตแล้ว · ปิด = หยุดสร้างลิงก์ใหม่/ผู้สมัครเปิดลิงก์ไม่ได้ ของที่ส่งแล้วยังดูได้",
+  "doc": "/api/document-settings — ตั้งค่า › ส่งเอกสารผ่าน LINE (เจ้าของ 22 พ.ย. 2569)\n\nGET                                              → ทุกคน: เปิดใช้ไหม · พร้อมไหม · มีงานเอกสารในสิทธิ์ไหม / admin: + LINE · ต้นฉบับ 5 ประเภท · คิวแจ้งเตือนที่ค้าง\nGET  ?template=<เอกสาร>&page=                    → admin: ดูต้นฉบับรุ่นที่ใช้อยู่\nPUT  { enabled?, lineChannelId?, liffId?, ocrModel? } → admin: เปิด/ปิด · ตั้ง LINE Login Channel ID กับ LIFF ID (ไม่ใช่ความลับ ไม่มี token)\n                                                 · ocrModel = โมเดลอ่านบัตรบน Ollama ของบริษัท ('' = อ่านในมือถือ) ต้องอยู่ในรายชื่อจริง ห้าม :cloud\nPOST { action:'template', docType, pages:[base64…] } → admin: อัปโหลดต้นฉบับรุ่นใหม่ของเอกสาร 1 ประเภท (ทุกหน้าเรียงตามลำดับ · PNG/JPG)\n\nเปิดใช้ได้เมื่อครบ: LINE · ต้นฉบับ 5 ประเภท · ฐานข้อมูลอัปเดตแล้ว · ปิด = หยุดสร้างลิงก์ใหม่/ผู้สมัครเปิดลิงก์ไม่ได้ ของที่ส่งแล้วยังดูได้",
   "query": [
    "template",
    "page"
@@ -673,6 +673,7 @@ export const API_CATALOG: ApiCatalogEntry[] = [
    "js",
    "lineChannelId",
    "liffId",
+   "ocrModel",
    "enabled",
    "action",
    "pages",
@@ -1893,7 +1894,7 @@ export const API_CATALOG: ApiCatalogEntry[] = [
    "GET",
    "POST"
   ],
-  "doc": "/api/public/applicant-documents — หน้าส่งเอกสารของผู้สมัคร (ไม่ต้องมีบัญชี Jarvis · เจ้าของ 22 พ.ย. 2569)\n\nGET  ?action=config                         → เปิดใช้อยู่ไหม + LIFF ID (ยังไม่ต้องมีสิทธิ์)\nPOST { action:'session', invitation, idToken } → ตรวจลิงก์ + ให้ LINE ยืนยันบัญชี → ผูกบัญชีกับลิงก์ จดการเปิด ออกคุกกี้ของรอบนี้\nต่อจากนี้ทุกคำขอใช้คุกกี้ (HttpOnly) + k = คีย์ของลิงก์ที่เปิดอยู่:\nGET  ?action=state&k=                       → สถานะปัจจุบัน (ฉบับร่างที่แนบไว้ · ส่งแล้วหรือยัง)\nPOST { action:'upload', k, kind, dataBase64 } → แนบภาพ (ฉบับร่าง) kind = id | license | house\nGET  ?action=file&k=&id=                    → ภาพของลิงก์ตัวเอง\nGET  ?action=template&k=&doc=&page=         → ต้นฉบับเอกสารของบริษัท (อ่านก่อนตอบ)\nPOST { action:'submit', k, …ชุดเอกสาร }      → ส่งชุด (ธุรกรรมเดียว · กดซ้ำได้ชุดเดิม)\nGET  ?action=receipt&k=                     → ใบรับของชุดที่ส่งแล้ว\nGET  ?action=pdf&k=&doc=                    → PDF ของเอกสารในชุดตัวเอง\n\n🔴 ไม่ส่งข้อความ LINE ไม่ใช้ Messaging API · ไม่พิมพ์รหัสลิงก์/ID token/คุกกี้ ลง log · ทุกคำตอบ no-store",
+  "doc": "/api/public/applicant-documents — หน้าส่งเอกสารของผู้สมัคร (ไม่ต้องมีบัญชี Jarvis · เจ้าของ 22 พ.ย. 2569)\n\nGET  ?action=config                         → เปิดใช้อยู่ไหม + LIFF ID (ยังไม่ต้องมีสิทธิ์)\nPOST { action:'session', invitation, idToken } → ตรวจลิงก์ + ให้ LINE ยืนยันบัญชี → ผูกบัญชีกับลิงก์ จดการเปิด ออกคุกกี้ของรอบนี้\nต่อจากนี้ทุกคำขอใช้คุกกี้ (HttpOnly) + k = คีย์ของลิงก์ที่เปิดอยู่:\nGET  ?action=state&k=                       → สถานะปัจจุบัน (ฉบับร่างที่แนบไว้ · ส่งแล้วหรือยัง)\nPOST { action:'upload', k, kind, dataBase64 } → แนบภาพ (ฉบับร่าง) kind = id | license | house\nGET  ?action=file&k=&id=                    → ภาพของลิงก์ตัวเอง\nPOST { action:'ocr', k, id }                → อ่านบัตร/ใบขับขี่ที่แนบไว้ด้วยโมเดลบนเซิร์ฟเวอร์ Ollama ของบริษัท (23 พ.ย. 2569)\n                                              ยังไม่ตั้งโมเดล/อ่านไม่ได้ = 503 ocr_unavailable → หน้าผู้สมัครใช้ตัวอ่านในมือถือแทน\nGET  ?action=template&k=&doc=&page=         → ต้นฉบับเอกสารของบริษัท (อ่านก่อนตอบ)\nPOST { action:'submit', k, …ชุดเอกสาร }      → ส่งชุด (ธุรกรรมเดียว · กดซ้ำได้ชุดเดิม)\nGET  ?action=receipt&k=                     → ใบรับของชุดที่ส่งแล้ว\nGET  ?action=pdf&k=&doc=                    → PDF ของเอกสารในชุดตัวเอง\n\n🔴 ไม่ส่งข้อความ LINE ไม่ใช้ Messaging API · ไม่พิมพ์รหัสลิงก์/ID token/คุกกี้ ลง log · ทุกคำตอบ no-store",
   "query": [
    "action",
    "k",
@@ -1908,7 +1909,8 @@ export const API_CATALOG: ApiCatalogEntry[] = [
    "idToken",
    "k",
    "dataBase64",
-   "kind"
+   "kind",
+   "id"
   ],
   "reachesPeople": false
  },
@@ -2273,6 +2275,28 @@ export const API_CATALOG: ApiCatalogEntry[] = [
    "sortOrder",
    "id",
    "isActive"
+  ],
+  "reachesPeople": false
+ },
+ {
+  "path": "/api/request-cancel-reasons",
+  "file": "api/_handlers/request-cancel-reasons.ts",
+  "methods": [
+   "GET",
+   "POST",
+   "PUT",
+   "PATCH"
+  ],
+  "doc": "GET /api/request-cancel-reasons — เหตุผลยกเลิกใบขอ: รายการกลาง (`reasons`) + เหตุผลที่ทีมใส่บนใบ (`tags`) · เจ้าของ 24 พ.ย. 2569\n  หน้า Dashboard กดเลขยกเลิกแล้วแยก ได้คนแล้ว / ยกเลิกจริง / ไม่ได้กรอกเหตุผล · ตัวตัดสิน `src/lib/requestCancelReason.ts`\nPUT  {requestNo, reasonId|null} — ใส่/เปลี่ยน/ล้างเหตุผลบนใบ (ทุกคน) · ใส่ได้เฉพาะใบที่ ERP ไม่มีเหตุผล หรือเป็น \"ยกเลิกโดย-สยามราช\"\nPOST {label, gotPerson} — เพิ่มเหตุผลในรายการกลาง (admin)\nPATCH {id, label?, gotPerson?, active?} — แก้ชื่อ (เฉพาะข้อที่ทีมเพิ่ม) · ติ๊กได้คนแล้ว · เปิด/เลิกใช้ (admin) · ไม่มีลบ\nไม่เขียนกลับ ERP · ทุกการเปลี่ยนจด audit_logs (ใคร · ใบไหน · จากอะไรเป็นอะไร)",
+  "query": [],
+  "body": [
+   "js",
+   "requestNo",
+   "reasonId",
+   "label",
+   "gotPerson",
+   "id",
+   "active"
   ],
   "reachesPeople": false
  },
