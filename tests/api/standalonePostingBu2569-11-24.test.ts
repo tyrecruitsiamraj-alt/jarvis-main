@@ -53,8 +53,27 @@ describe('ย้าย BU ของประกาศลอย', () => {
     expect(m).toContain('data-testid="posting-bu-confirm"');
     expect(m).toContain('if (posting.jobId) return null;');
     const a = read('src/components/jobs/JobPostActionsDialog.tsx');
-    expect(a).toContain('<PostingBuMover posting={p}');
+    expect(a).toMatch(/<PostingBuMover\s+posting={p}/);
     expect(a).toContain("list.filter((p) => p.standaloneKind === standaloneKind)");
     expect(read('src/components/jobs/EditPostingDialog.tsx')).toContain('<PostingBuMover posting={posting}');
+  });
+});
+
+describe('ค้าง 3 ข้อหลังขึ้นเว็บ (24 พ.ย. 2569)', () => {
+  it('รายการประกาศขึ้นชื่อเล่นคนสร้าง ไม่ใช่อีเมล (ทั้งชุดคอลัมน์ใหม่และชุดเก่า)', () => {
+    const lib = read('api/_lib/recruitPostings.ts');
+    expect(lib).toContain("from ${usersTable} cu where cu.id::text = p.created_by_user_id::text");
+    expect(lib.match(/\$\{POSTING_CREATOR_SQL\} AS created_by_name/g)).toHaveLength(2);
+    expect(lib).not.toMatch(/^\s*p\.created_by_name, p\.created_at/m);
+  });
+  it('ช่อง BU กว้างคงที่ ปุ่มจองที่ไว้ — เปลี่ยนค่า/กดย้ายแล้วไม่ขยับ', () => {
+    const m = read('src/components/jobs/PostingBuMover.tsx');
+    expect(m).toContain('<span className="inline-flex w-28 shrink-0">');
+    expect(m).toContain('<div className="flex w-40 shrink-0 items-center gap-1">');
+    expect(m).toContain('flex flex-nowrap items-center gap-2');
+  });
+  it('ย้าย BU แล้วการ์ดกล่องลอยเปลี่ยน BU ทันที (หน้ากล่องงานโหลดประกาศใหม่)', () => {
+    expect(read('src/components/jobs/JobPostActionsDialog.tsx')).toContain('onPostingsChanged?.();');
+    expect(read('src/components/jobs/JobBoardView.tsx')).toContain('onPostingsChanged={() => setPostingsRev((n) => n + 1)}');
   });
 });

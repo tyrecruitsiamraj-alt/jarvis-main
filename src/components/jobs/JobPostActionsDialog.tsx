@@ -28,11 +28,14 @@ export default function JobPostActionsDialog({
   tab,
   onTabChange,
   onClose,
+  onPostingsChanged,
 }: {
   job: { id: string; title: string } | null;
   tab: BoardActionTab;
   onTabChange: (t: BoardActionTab) => void;
   onClose: () => void;
+  /** ย้าย BU แล้ว — หน้ากล่องงานโหลดประกาศใหม่ ป้าย BU บนการ์ดเปลี่ยนทันที ไม่ต้องรีเฟรช (24 พ.ย. 2569) */
+  onPostingsChanged?: () => void;
 }) {
   return (
     <Dialog open={job !== null} onOpenChange={(v) => !v && onClose()}>
@@ -40,7 +43,7 @@ export default function JobPostActionsDialog({
         <DialogHeader>
           <DialogTitle>{job ? `${job.title} · ทำอะไรไปแล้ว` : 'ทำอะไรไปแล้ว'}</DialogTitle>
         </DialogHeader>
-        {job ? <JobPostActionsPanel jobId={job.id} tab={tab} onTabChange={onTabChange} /> : null}
+        {job ? <JobPostActionsPanel jobId={job.id} tab={tab} onTabChange={onTabChange} onPostingsChanged={onPostingsChanged} /> : null}
       </DialogContent>
     </Dialog>
   );
@@ -56,11 +59,13 @@ export function JobPostActionsPanel({
   tab,
   onTabChange,
   reloadKey,
+  onPostingsChanged,
 }: {
   jobId: string;
   tab: BoardActionTab;
   onTabChange: (t: BoardActionTab) => void;
   reloadKey?: unknown;
+  onPostingsChanged?: () => void;
 }) {
   const [d, setD] = useState<JobPostActionsDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -172,7 +177,13 @@ export function JobPostActionsPanel({
                         {formatDateTimeTh(p.createdAt)} · ผู้สมัคร {th(p.applicationCount ?? 0)} คน
                       </p>
                     </div>
-                    <PostingBuMover posting={p} onMoved={() => setBoxRev((n) => n + 1)} />
+                    <PostingBuMover
+                      posting={p}
+                      onMoved={() => {
+                        setBoxRev((n) => n + 1);
+                        onPostingsChanged?.();
+                      }}
+                    />
                   </li>
                 ))}
               </ul>

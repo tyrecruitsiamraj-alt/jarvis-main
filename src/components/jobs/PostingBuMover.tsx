@@ -42,43 +42,49 @@ export default function PostingBuMover({ posting, onMoved }: { posting: RecruitP
   };
 
   return (
-    <div className="space-y-1" data-testid="posting-bu">
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-xs text-muted-foreground">BU</span>
-        <Select
-          value={bu}
-          onValueChange={(v) => {
-            setBu(v);
-            setConfirm(false);
-            setMsg(null);
-          }}
-        >
-          <SelectTrigger className="h-8 w-24" aria-label="BU ของประกาศ">
-            <SelectValue placeholder="เลือก BU" />
-          </SelectTrigger>
-          <SelectContent>
-            {APP_DEPARTMENT_CODES.map((c) => (
-              <SelectItem key={c} value={c}>
-                {c}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        {confirm ? (
-          <>
-            <Button type="button" size="xs" disabled={busy} onClick={() => void move()} data-testid="posting-bu-confirm">
-              {busy ? <Loader2 className="animate-spin" /> : null}
-              ย้ายเลย
+    <div className="w-80 max-w-full space-y-1" data-testid="posting-bu">
+      {/* ความกว้างคงที่ทุกชิ้น (24 พ.ย. 2569) — คลาสเดิม jarvis-soft-field บังคับช่องเลือกกว้าง 100% ปุ่มเลยตกบรรทัด
+          ห่อช่องด้วย span กว้างคงที่ · ที่ปุ่มจองไว้ให้ "ย้ายเลย + ยกเลิก" ⇒ เปลี่ยน BU / กดย้ายแล้วของบนจอไม่ขยับ */}
+      <div className="flex flex-nowrap items-center gap-2">
+        <span className="shrink-0 text-xs text-muted-foreground">BU</span>
+        <span className="inline-flex w-28 shrink-0">
+          <Select
+            value={bu}
+            onValueChange={(v) => {
+              setBu(v);
+              setConfirm(false);
+              setMsg(null);
+            }}
+          >
+            <SelectTrigger className="h-8 w-full" aria-label="BU ของประกาศ">
+              <SelectValue placeholder="เลือก BU" />
+            </SelectTrigger>
+            <SelectContent>
+              {APP_DEPARTMENT_CODES.map((c) => (
+                <SelectItem key={c} value={c}>
+                  {c}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </span>
+        <div className="flex w-40 shrink-0 items-center gap-1">
+          {confirm ? (
+            <>
+              <Button type="button" size="xs" disabled={busy} onClick={() => void move()} data-testid="posting-bu-confirm">
+                {busy ? <Loader2 className="animate-spin" /> : null}
+                ย้ายเลย
+              </Button>
+              <Button type="button" size="xs" variant="outline" disabled={busy} onClick={() => setConfirm(false)}>
+                ยกเลิก
+              </Button>
+            </>
+          ) : (
+            <Button type="button" size="xs" variant="outline" disabled={!changed} onClick={() => setConfirm(true)} data-testid="posting-bu-move">
+              ย้าย BU
             </Button>
-            <Button type="button" size="xs" variant="outline" disabled={busy} onClick={() => setConfirm(false)}>
-              ยกเลิก
-            </Button>
-          </>
-        ) : (
-          <Button type="button" size="xs" variant="outline" disabled={!changed} onClick={() => setConfirm(true)} data-testid="posting-bu-move">
-            ย้าย BU
-          </Button>
-        )}
+          )}
+        </div>
       </div>
       <p className={cn('min-h-4 text-[11px]', msg ? (msg.ok ? TONE.success.value : TONE.danger.value) : 'text-muted-foreground')} role="status">
         {msg

@@ -2387,6 +2387,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
           tab={actionsOf?.tab ?? 'autopost'}
           onTabChange={(tab) => setActionsOf((a) => (a ? { ...a, tab } : a))}
           onClose={() => setActionsOf(null)}
+          onPostingsChanged={() => setPostingsRev((n) => n + 1)}
         />
       ) : null}
 

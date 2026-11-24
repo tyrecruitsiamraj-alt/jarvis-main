@@ -490,10 +490,19 @@ function mapPosting(r: PostingRow, links: RecruitPostingLink[]): RecruitPosting 
   };
 }
 
+/**
+ * คนสร้างประกาศที่โชว์บนจอ = ชื่อเล่น (เจ้าของ 24 พ.ย. 2569 "ชื่อเล่นแทนอีเมล") — กติกาเดียวกับ `STAFF_NAME_SQL`
+ * บัญชีถูกลบ = ส่วนหน้า @ ของค่าที่จดไว้ · ค่าดิบยังอยู่ในฐาน (ไม่แตะ)
+ */
+const POSTING_CREATOR_SQL = `coalesce(
+    (select coalesce(nullif(btrim(cu.nickname), ''), nullif(btrim(cu.full_name), ''))
+       from ${usersTable} cu where cu.id::text = p.created_by_user_id::text),
+    nullif(split_part(btrim(p.created_by_name), '@', 1), ''))`;
+
 const POSTING_COLUMNS = `p.id, p.job_id, p.standalone_kind, p.department_code, p.title, p.detail,
   p.location_text, p.salary_text, p.contact_name, p.contact_phone,
   p.position_name, p.province, p.responsible_name, p.specific_type, p.form_type, p.status,
-  p.created_by_name, p.created_at, p.updated_at,
+  ${POSTING_CREATOR_SQL} AS created_by_name, p.created_at, p.updated_at,
   (SELECT count(*) FROM ${applicationsTable} a WHERE a.posting_id = p.id) AS application_count`;
 
 /**
@@ -505,7 +514,7 @@ const POSTING_COLUMNS_LEGACY = `p.id, p.job_id, p.standalone_kind, p.department_
   p.location_text, p.salary_text, p.contact_name, p.contact_phone,
   null::text AS position_name, null::text AS province, null::text AS responsible_name,
   null::text AS specific_type, null::text AS form_type, p.status,
-  p.created_by_name, p.created_at, p.updated_at,
+  ${POSTING_CREATOR_SQL} AS created_by_name, p.created_at, p.updated_at,
   (SELECT count(*) FROM ${applicationsTable} a WHERE a.posting_id = p.id) AS application_count`;
 
 /** 42703 undefined_column — โค้ดใหม่ขึ้นก่อน migration 074 */
