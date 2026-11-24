@@ -189,7 +189,7 @@ describe('runLumosPushRetryOnce', () => {
     expect(sql).toContain("q.person_ref like 'ir-%'");
     expect(sql).toContain("q.channel = 'reminder' and q.person_ref like 'card-%'");
     expect(sql).toContain("q.status = 'pending'");
-    expect(sql).toContain("q.push_state = 'push_failed'");
+    expect(sql).toContain("q.push_state in ('push_failed', 'quiet_wait')");
     expect(sql).toContain("q.push_state = 'push_pending'");
     expect(sql).not.toMatch(/push_state is null/);
   });

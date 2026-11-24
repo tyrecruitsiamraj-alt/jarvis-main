@@ -16,6 +16,7 @@ import { toE164Thai } from './thaiPhone.js';
 import { notifyRoles, notifyUsers } from './appNotifications.js';
 import {
   isCallOutcome,
+  policyForQueueRef,
   resolveCallFollowup,
   type CallFollowupDecision,
   type CallOutcome,
@@ -244,7 +245,8 @@ export async function applyCallFollowupToQueueRow(input: {
         // สายทักทายทั่วไป (15 ต.ค. 2569): คำถามเดียวที่ตัดสินคือ "ยังหางานอยู่ไหม" ⇒ ไม่สนใจ = ไม่หางานแล้ว = พักเบอร์ทุกใบขอ
         declinedScope: input.declinedScope ?? (row.job_ref === GREETING_JOB_REF ? 'all' : null),
         // นโยบายที่เจ้าของตั้งจากหน้า Follow (migration 073) — ตารางยังไม่ migrate = ค่าเดิมในโค้ด
-        policy: await getCallFollowupPolicy(),
+        // สายติดตามเริ่มงานไม่ใช้ช่วงห้ามโทร (`policyForQueueRef` · เจ้าของ 24 พ.ย. 2569)
+        policy: policyForQueueRef(await getCallFollowupPolicy(), row.person_ref),
         // ไม่รับสาย ⇒ เวลาโทรซ้ำถัดไปจากหน้า ตั้งค่า › โทรซ้ำคนไม่รับสาย (ทุกงาน · 26 ต.ค. 2569)
       });
   // rejected เก็บเป็น no_answer (นับเป็นไม่รับสายทุกหน้า + ตัวส่งซ้ำจัดนัดค้างได้)

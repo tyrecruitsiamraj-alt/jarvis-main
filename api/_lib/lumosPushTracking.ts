@@ -18,6 +18,9 @@ import { tableInAppSchema } from './schema.js';
 import { errorSummaryText, logError, logInfo, logWarn } from './logger.js';
 import { enrichPayloadsWithIncome } from './lumosPayloadIncome.js';
 import { firstEventIdOf } from './lumosEventId.js';
+import { getCallFollowupPolicy } from './callFollowupPolicyStore.js';
+import { DEFAULT_CALL_FOLLOWUP_POLICY, policyForQueueRef } from '../../src/lib/callFollowupPolicy.js';
+import { isQuietAt } from '../../src/lib/lumosPushRetryPolicy.js';
 import {
   getLumosPushConfig,
   pushInterviews,
@@ -30,6 +33,8 @@ import {
 const queueTable = tableInAppSchema('lumos_dispatch_queue');
 
 export type LumosPushChannel = 'interview' | 'reminder';
+/** แถวที่เข้าคิวตอนช่วงห้ามโทร — ยังไม่ยิง รอตัวส่งซ้ำยิงตอนพ้นช่วง (`lumosPushRetryWorker` หยิบด้วยค่านี้) */
+export const QUIET_WAIT_PUSH_STATE = 'quiet_wait';
 export type LumosPushRow = { id: string; payload: unknown };
 
 /** 42703 = คอลัมน์ยังไม่มี (ยังไม่ migrate 123) */
@@ -155,6 +160,23 @@ export async function pushQueuedRows(
         order by id`,
       [channel, jobRef, [...personRefs]],
     );
+    // ช่วงห้ามโทร (เจ้าของ 24 พ.ย. 2569 ตั้ง 20:00–08:00 · เฉพาะสายผู้สมัคร) — เดิมรอบแรกยิงทันทีไม่ดูเวลา
+    // ⇒ คนกรอกตอนตี 4 ถูกโทรตอนตี 4 · ตอนนี้จด `quiet_wait` ให้ตัวส่งซ้ำยิงตอนพ้นช่วง (เวลานัด = next_attempt_at ที่เข้าคิวตั้งไว้)
+    // อ่านนโยบายไม่ได้ = ค่าเริ่มต้นในโค้ด (ห้าม 20:00–08:00) — เข้มไว้ก่อน
+    // แถวพวกนี้คือแถวที่เพิ่งเข้าคิว/ฟื้นจากยกเลิก (`added`) ⇒ จดทับ push_state เดิมได้ (แถวฟื้นอาจค้าง 'pushed' ของรอบก่อน)
+    const policy = policyForQueueRef(await getCallFollowupPolicy().catch(() => DEFAULT_CALL_FOLLOWUP_POLICY), jobRef);
+    if (isQuietAt(new Date(), policy)) {
+      for (const row of rows) {
+        await mark(
+          `update ${queueTable} set push_state = '${QUIET_WAIT_PUSH_STATE}', push_error = null
+            where id = $1::bigint`,
+          [row.id],
+          'quiet wait',
+        );
+      }
+      logInfo('lumos.push.quietWait', { channel, jobRef, rows: rows.length });
+      return;
+    }
     const r = await pushQueueRowsTracked(channel, rows);
     logInfo('lumos.push', { channel, jobRef, rows: rows.length, ...r });
   } catch (e) {

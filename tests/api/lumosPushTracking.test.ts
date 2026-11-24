@@ -15,6 +15,12 @@ const pushReminders = vi.fn();
 const getLumosPushConfig = vi.fn(() => ({ baseUrl: 'x', connectionId: 'y', apiKey: 'z' }) as unknown);
 vi.mock('../../api/_lib/postgres.js', () => ({ dbQuery: (...a: unknown[]) => dbQuery(...a) }));
 vi.mock('../../api/_lib/schema.js', () => ({ tableInAppSchema: (n: string) => n }));
+// ช่วงห้ามโทร (24 พ.ย. 2569) — ค่าเริ่มของเทสต์ = ไม่มีช่วงห้าม (ไม่ขึ้นกับเวลาที่รันเทสต์) · เทสต์ช่วงห้ามตั้งเอง
+const quietPolicy = vi.fn(() => ({ quietFromHour: 0, quietToHour: 0 }) as Record<string, number>);
+vi.mock('../../api/_lib/callFollowupPolicyStore.js', async () => {
+  const { DEFAULT_CALL_FOLLOWUP_POLICY } = await import('../../src/lib/callFollowupPolicy');
+  return { getCallFollowupPolicy: async () => ({ ...DEFAULT_CALL_FOLLOWUP_POLICY, ...quietPolicy() }) };
+});
 vi.mock('../../api/_lib/lumosPushClient.js', () => ({
   pushInterviews: (...a: unknown[]) => pushInterviews(...a),
   pushReminders: (...a: unknown[]) => pushReminders(...a),
@@ -38,6 +44,29 @@ beforeEach(() => {
 });
 
 describe('ยิงรอบแรกแบบจดผล', () => {
+  it('ช่วงห้ามโทร (สายผู้สมัคร) ⇒ ไม่ยิง จด quiet_wait ให้ตัวส่งซ้ำยิงตอนพ้นช่วง · สายติดตามไม่ติดช่วงนี้ (24 พ.ย. 2569)', async () => {
+    quietPolicy.mockReturnValue({ quietFromHour: 20, quietToHour: 8 });
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-11-23T04:14:00+07:00'));
+    try {
+      dbQuery.mockImplementation((sql: string) =>
+        Promise.resolve({ rows: /^\s*select/i.test(sql) ? [{ id: '902', payload: { phone: '+66800000000' } }] : [] }),
+      );
+      await pushQueuedRows('interview', 'greet', ['app-2f44b07b']);
+      expect(pushInterviews).not.toHaveBeenCalled();
+      const states = dbQuery.mock.calls.map((c) => String(c[0])).filter((x) => /update/.test(x));
+      expect(states).toHaveLength(1);
+      expect(states[0]).toMatch(/push_state = 'quiet_wait'/);
+      // คิว follow ไม่ใช้ช่วงห้าม ⇒ ยิงตามปกติ
+      dbQuery.mockClear();
+      await pushQueuedRows('reminder', 'follow', ['follow-8f2c1a']);
+      expect(pushReminders).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+      quietPolicy.mockReturnValue({ quietFromHour: 0, quietToHour: 0 });
+    }
+  });
+
   it('หาแถวคิวของใบที่เพิ่งเข้า แล้วยิงทีละแถวด้วยคีย์ประจำแถว · จด กำลังส่ง → ถึงแล้ว', async () => {
     dbQuery.mockImplementation((sql: string) =>
       Promise.resolve({ rows: /^\s*select/i.test(sql) ? [{ id: '901', payload: { phone: '+66800000000' } }] : [] }),
@@ -174,7 +203,7 @@ describe('สายไฟ — ทุกทางที่ส่งใบสม�
     const c = code('api/_lib/callFollowup.ts');
     expect(c).not.toContain('retrySlots');
     expect(c).not.toContain('RETRY_TIME_SLOTS_BKK');
-    expect((c.match(/policy: await getCallFollowupPolicy\(\)/g) ?? []).length).toBeGreaterThanOrEqual(2);
+    expect((c.match(/policy: (policyForQueueRef\()?await getCallFollowupPolicy\(\)/g) ?? []).length).toBeGreaterThanOrEqual(2);
     const w = code('api/_lib/lumosPushRetryWorker.ts');
     expect(w).not.toContain('isListedRetryTime');
     expect(w).toContain('lateMinutes > RETRY_REPLAN_AFTER_MINUTES');

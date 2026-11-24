@@ -191,6 +191,19 @@ export function shiftOutOfQuietHours(at: Date, policy: CallFollowupPolicy): Date
   return out;
 }
 
+/**
+ * ช่วงห้ามโทรใช้กับ **สายผู้สมัครเท่านั้น** (เจ้าของ 24 พ.ย. 2569 Choice "เฉพาะสายผู้สมัคร")
+ * สายติดตามเริ่มงาน (`follow-` · คิว `follow`) โทรตามเวลานัดเสมอ — ครึ่งหนึ่งนัด 04:00–07:59 / 20:00 ให้ปลุกหรือเตือนก่อนเข้างาน
+ * ⇒ ทุกจุดที่อ่านนโยบายเพื่อเลื่อน/รอเวลาของสายหนึ่ง ต้องผ่านตัวนี้ก่อน
+ */
+export function isFollowQueueRef(ref: string | null | undefined): boolean {
+  const r = (ref ?? '').trim();
+  return r === 'follow' || r.startsWith('follow-');
+}
+export function policyForQueueRef(policy: CallFollowupPolicy, ref: string | null | undefined): CallFollowupPolicy {
+  return isFollowQueueRef(ref) ? { ...policy, quietFromHour: 0, quietToHour: 0 } : policy;
+}
+
 export const RETRY_LEAD_MINUTES = 10;
 /** โทรกลับตามเวลาที่ผู้สมัครขอ ได้ถึงกี่ครั้ง (รวมสายแรก) — ค่าเดิมก่อนแยกจากเพดานโทรซ้ำ 18 พ.ย. 2569 */
 export const RESCHEDULE_MAX_ATTEMPTS = 18;

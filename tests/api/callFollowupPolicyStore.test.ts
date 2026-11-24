@@ -86,7 +86,8 @@ describe('การ wiring — จุดที่ใช้นโยบายต�
   it('callFollowup.ts เดินนโยบายด้วย getCallFollowupPolicy ทั้ง 2 ทาง (AI + คน)', async () => {
     const fs = await import('node:fs');
     const src = fs.readFileSync('api/_lib/callFollowup.ts', 'utf-8');
-    const hits = src.match(/policy: await getCallFollowupPolicy\(\)/g) ?? [];
+    // สายติดตามผ่าน `policyForQueueRef` (ไม่ใช้ช่วงห้ามโทร · 24 พ.ย. 2569) — ยังอ่านจากที่เก็บเหมือนเดิม
+    const hits = src.match(/policy: (policyForQueueRef\()?await getCallFollowupPolicy\(\)/g) ?? [];
     expect(hits.length).toBe(2);
     expect(src).not.toMatch(/policy: DEFAULT_CALL_FOLLOWUP_POLICY/);
   });

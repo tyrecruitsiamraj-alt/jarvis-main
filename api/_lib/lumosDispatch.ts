@@ -72,6 +72,7 @@ import {
   CONFIRMED_FOCUS_DAYS,
   DEFAULT_CALL_FOLLOWUP_POLICY,
   shiftOutOfQuietHours,
+  policyForQueueRef,
 } from '../../src/lib/callFollowupPolicy.js';
 import { cancelPushedReminder, getLumosPushConfig, pushReminders } from './lumosPushClient.js';
 import { firstEventIdOf } from './lumosEventId.js';
@@ -763,7 +764,8 @@ async function insertQueueItems(
   // อ่านนโยบายไม่ได้ = ใช้ค่าเริ่มต้น (ห้ามโทร 20:00–08:00) — เข้มไว้ก่อน ปลอดภัยกว่า
   let nextAttemptAt: string | null = null;
   try {
-    const policy = await getCallFollowupPolicy().catch(() => DEFAULT_CALL_FOLLOWUP_POLICY);
+    // งานติดตามเริ่มงานไม่ใช้ช่วงห้ามโทร — โทรตามเวลานัด (`policyForQueueRef` · เจ้าของ 24 พ.ย. 2569)
+    const policy = policyForQueueRef(await getCallFollowupPolicy().catch(() => DEFAULT_CALL_FOLLOWUP_POLICY), jobRef);
     const now = new Date();
     const shifted = shiftOutOfQuietHours(now, policy);
     if (shifted.getTime() > now.getTime()) nextAttemptAt = shifted.toISOString();

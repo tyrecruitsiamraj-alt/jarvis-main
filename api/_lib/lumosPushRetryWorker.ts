@@ -34,11 +34,12 @@ import { getCallFollowupPolicy } from './callFollowupPolicyStore.js';
 import { listSuppressedPhones, stopOpenInterviewCalls } from './callFollowup.js';
 import { listHeldPhones } from './candidateCallHolds.js';
 import { releaseDueCallBatches } from './callBatchStore.js';
-import { pushQueueRowsTracked, type LumosPushChannel } from './lumosPushTracking.js';
+import { pushQueueRowsTracked, QUIET_WAIT_PUSH_STATE, type LumosPushChannel } from './lumosPushTracking.js';
 import { checkQueueImports } from './lumosQueueImportWatch.js';
 import { listSiamrajUnitRequests } from './siamrajUnitRequests.js';
 import {
   DEFAULT_CALL_FOLLOWUP_POLICY,
+  policyForQueueRef,
   RETRY_LEAD_MINUTES,
   type CallFollowupPolicy,
 } from '../../src/lib/callFollowupPolicy.js';
@@ -133,7 +134,7 @@ type RetryCandidate = Candidate & {
 
 /**
  * 1) แถวที่ push ไม่ถึง — ใบสมัคร/iRecruit/คนของเรา (interview) · คนของเรา (reminder) · ยังไม่มีผล (นิยามกลาง
- * `queuePending`) · จดว่าส่งไม่ถึง หรือกำลังส่งค้างนานเกิน · แถวเก่าก่อน migration 123 (`push_state` null) และงานติดตามไม่แตะ
+ * `queuePending`) · จดว่าส่งไม่ถึง / รอพ้นช่วงห้ามโทร (`quiet_wait` · 24 พ.ย. 2569) / กำลังส่งค้างนานเกิน · แถวเก่าก่อน migration 123 (`push_state` null) และงานติดตามไม่แตะ
  */
 export function buildCandidateSql(): string {
   return `select q.id::text as id, q.channel, q.person_ref, q.payload, q.created_at, q.next_attempt_at,
@@ -149,7 +150,7 @@ export function buildCandidateSql(): string {
                   or (q.channel = 'reminder' and q.person_ref like 'card-%'))
              and ${queuePending('q')}
              and q.result is null
-             and (q.push_state = 'push_failed'
+             and (q.push_state in ('push_failed', '${QUIET_WAIT_PUSH_STATE}')
                   or (q.push_state = 'push_pending'
                       and q.push_started_at < now() - make_interval(mins => $2::int)))
            order by coalesce(q.next_attempt_at, q.created_at) asc
@@ -578,13 +579,15 @@ export async function runLumosPushRetryOnce(
       continue;
     }
     // d) ช่วงห้ามโทร (ถ้ามี) / ยังไกลเวลานัด ⇒ รอ
-    if (isQuietAt(now, policy) || due.getTime() - now.getTime() > cfg.leadMinutes * 60_000) {
+    //    สายติดตามเริ่มงานไม่ใช้ช่วงห้ามโทร — โทรซ้ำตามเวลานัด (`policyForQueueRef` · เจ้าของ 24 พ.ย. 2569)
+    const callPolicy = isFollow ? policyForQueueRef(policy, 'follow') : policy;
+    if (isQuietAt(now, callPolicy) || due.getTime() - now.getTime() > cfg.leadMinutes * 60_000) {
       run.waiting += 1;
       continue;
     }
     // e) ส่งรอบใหม่เป็นงานใหม่ที่ Lumos
     const attempt = Math.max(2, Number(r.attempt_count) || 2);
-    const iso = bangkokIso(retryScheduledAt(due, now, policy));
+    const iso = bangkokIso(retryScheduledAt(due, now, callPolicy));
     try {
       const res = await pushQueueRowsTracked(
         r.channel,
