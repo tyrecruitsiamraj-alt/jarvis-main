@@ -1,3 +1,4 @@
+import type { ApplicantAppointmentHistoryItem } from './appointmentHistory';
 import type { GreetingHeard } from '@/lib/greetingCall';
 import { apiFetch } from '@/lib/apiFetch';
 import type { PrepChecklist, SelectionStatus } from '@/lib/selectionProgress';
@@ -602,6 +603,8 @@ export type ApplicantDetailExtras = {
   aiCalls: ApplicantAiCall[];
   staffCalls: ApplicantStaffCall[];
   dialCalls: ApplicantDialCall[];
+  /** ประวัตินัดหมายข้ามทุกใบของคนนี้ (24 พ.ย. 2569 · `src/lib/appointmentHistory.ts`) */
+  appointmentHistory: ApplicantAppointmentHistoryItem[];
 };
 
 /**
@@ -617,6 +620,7 @@ export async function fetchApplicantDetailExtras(id: string): Promise<ApplicantD
     aiCalls: body.aiCalls ?? [],
     staffCalls: body.staffCalls ?? [],
     dialCalls: body.dialCalls ?? [],
+    appointmentHistory: body.appointmentHistory ?? [],
   };
 }
 

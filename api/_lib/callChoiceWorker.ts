@@ -22,12 +22,13 @@ import { dbQuery } from './postgres.js';
 import { OVER_AGE_MIN } from '../../src/lib/applicantAge.js';
 import { tableInAppSchema } from './schema.js';
 import { logError, logInfo } from './logger.js';
-import { notifyRoles } from './appNotifications.js';
+import { notifyRoles, notifyUsers } from './appNotifications.js';
 import { CLAIM_KEEP_SQL, OVERVIEW_BUCKETS } from './applicantOverviewSql.js';
 import { enqueueLumosInterviewForApplications } from './lumosDispatch.js';
 import { autoMoveIntEnv } from '../../src/lib/applicationAutoMoveReport.js';
 import {
   CALL_CHOICE_HOURS,
+  buildClaimerUnclaimNotice,
   buildUnclaimNotice,
   idleDays,
   unclaimDedupeKey,
@@ -96,9 +97,11 @@ async function unclaimIdle(limit: number, now: Date): Promise<UnclaimedItem[]> {
     full_name: string;
     unclaimed_from_name: string | null;
     claimed_at: string | null;
+    old_by: string | null;
+    departed: boolean;
   }>(
     `with due as (
-       select a.id, a.claimed_at, ${departedSql('a.claimed_by')} as departed from ${APPS} a
+       select a.id, a.claimed_at, a.claimed_by as old_by, ${departedSql('a.claimed_by')} as departed from ${APPS} a
         where (${OVERVIEW_BUCKETS.claimed_idle}
                -- คนเก็บปิด/ลบบัญชีแล้ว = ปล่อยทันที ไม่รอ 1 วัน
                or (a.claimed_by is not null and ${departedSql('a.claimed_by')}))
@@ -119,13 +122,15 @@ async function unclaimIdle(limit: number, now: Date): Promise<UnclaimedItem[]> {
             updated_at = now()
        from due
       where a.id = due.id
-      returning a.full_name, a.unclaimed_from_name, due.claimed_at`,
+      returning a.full_name, a.unclaimed_from_name, due.claimed_at, due.old_by::text as old_by, due.departed`,
     [limit],
   );
   return rows.map((r) => ({
     applicantName: r.full_name,
     heldByName: r.unclaimed_from_name,
     days: idleDays(r.claimed_at, now),
+    // แจ้งคนเก็บได้เฉพาะบัญชีที่ยังใช้งาน
+    heldByUserId: r.departed ? null : r.old_by,
   }));
 }
 
@@ -249,6 +254,24 @@ export async function runClaimGuardOnce(opts?: { limit?: number; now?: Date }): 
         body: notice.body,
         link: '/jobs/board?view=list&bucket=awaiting_call_choice',
         dedupeKey: unclaimDedupeKey(now),
+      });
+    }
+
+    // แจ้งคนที่เก็บไว้เอง (24 พ.ย. 2569) — หนึ่งแจ้งเตือนต่อคนต่อรอบ
+    const byUser = new Map<string, string[]>();
+    for (const it of unclaimedItems) {
+      if (!it.heldByUserId) continue;
+      byUser.set(it.heldByUserId, [...(byUser.get(it.heldByUserId) ?? []), it.applicantName]);
+    }
+    for (const [userId, names] of byUser) {
+      const mine = buildClaimerUnclaimNotice(names);
+      if (!mine) continue;
+      await notifyUsers([userId], {
+        type: 'claim_idle_released_mine',
+        title: mine.title,
+        body: mine.body,
+        link: '/jobs/board?view=list&bucket=awaiting_call_choice',
+        dedupeKey: `claim-idle-mine:${now.toISOString().slice(0, 16)}`,
       });
     }
 

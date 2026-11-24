@@ -23,6 +23,7 @@ import { auditFromAuthed } from '../_lib/audit.js';
 import { isPgUndefinedTable } from '../_lib/postgres.js';
 import { logError } from '../_lib/logger.js';
 import { applyHumanCallFollowup } from '../_lib/callFollowup.js';
+import { createContactLog } from '../_lib/applicationContacts.js';
 import { isSiamrajRequestInScope } from '../_lib/siamrajUnitRequests.js';
 import { isApplicationInWriteScope, loadApplicationScopeRow } from '../_lib/applicationScope.js';
 import { bangkokBusinessDateYmd } from '../_lib/businessDate.js';
@@ -310,6 +311,30 @@ async function handler(req: AuthedReq, res: ApiRes) {
         });
       }
 
+      /**
+       * นัดได้จากถังโทร ⇒ ใบสมัครเป็น "นัดแล้ว" ขึ้นแท็บติดตามนัดหมาย (เจ้าของเคาะ 24 พ.ย. 2569 · Journey จุดบอด)
+       * เดิมจดวันนัดไว้กับงานโทรอย่างเดียว ใบไม่ขยับ ⇒ ไม่ขึ้นแท็บนัดหมาย เว้นแต่มีคนลงผลซ้ำในแท็บการติดต่อ
+       * ใช้ตัวเดียวกับแท็บการติดต่อ (`createContactLog`) ⇒ ประวัตินัดหมายมีแถวนี้ด้วย · ล้มไม่ทำให้ผลโทรล้ม
+       */
+      let appointedApplication = false;
+      if (saved.source === 'application' && saved.appointmentAt && saved.resultOutcome === 'confirmed') {
+        try {
+          await createContactLog({
+            applicationId: saved.candidateRef,
+            ok: true,
+            appointmentAt: saved.appointmentAt,
+            jobId: saved.jobId,
+            jobLabel: saved.requestNo,
+            note: typeof body.note === 'string' ? body.note : null,
+            createdBy: viewerId,
+            createdByName: req.user?.email ?? null,
+          });
+          appointedApplication = true;
+        } catch (e) {
+          logError('call-hold.appointment-to-application.failed', { holdId, message: e instanceof Error ? e.message : String(e) });
+        }
+      }
+
       void auditFromAuthed(req, {
         action: 'call-hold.result',
         entityType: 'candidate_call_hold',
@@ -320,6 +345,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
           appointmentAt: saved.appointmentAt,
           jobId: saved.jobId,
           followup: followup?.action ?? null,
+          appointedApplication,
         },
       });
 

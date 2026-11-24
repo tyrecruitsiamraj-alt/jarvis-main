@@ -14691,3 +14691,18 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 - `applicantFilters.ts`: หัวข้อ `bu` (บนสุด) + `area` (ต่อจากจังหวัด · มีเมื่อหน้าส่ง `areaOf`) · `RmWorkspace` เรียงรายชื่อคนสนใจด้วย `sortByApplicantArea` · `RmTable` บรรทัดใต้ที่อยู่ (`applicant-area`)
 - เทสต์ `tests/api/applicantArea2569-11-24.test.ts`
 - (แก้ต่อ 24 พ.ย.) ป๊อปแก้ไขประกาศของกล่องลอยไม่มีทางเข้าบนจอ (`PostingLinksList`/`ApplyLinksPanel` ไม่ได้ถูกใช้) ⇒ ส่วนย้าย BU แยกเป็น `src/components/jobs/PostingBuMover.tsx` · วางในป๊อป "ทำอะไรไปแล้ว" ของการ์ดกล่องลอย (`JobPostActionsDialog` หัวข้อ "ประกาศของกล่องนี้") + `EditPostingDialog`
+
+### 24 พ.ย. 2569 (4) — ช่วงห้ามโทร 20:00–08:00 เฉพาะสายผู้สมัคร
+- migration 198 ตั้งนโยบายกลาง quiet 20→8 · สายติดตามเริ่มงาน (`follow-`/คิว `follow`) ยกเว้นด้วย `policyForQueueRef` (`src/lib/callFollowupPolicy.ts`) ที่เดียว — ใช้ที่ `insertQueueItems` · `callFollowup` · ตัวโทรซ้ำ · ยิงรอบแรก
+- ยิงรอบแรก (`pushQueuedRows`) ช่วงห้ามโทร = ไม่ยิง จด `push_state = 'quiet_wait'` ⇒ `lumosPushRetryWorker` หยิบยิงตอนพ้นช่วง
+- เทสต์ `tests/api/callQuietHoursApplicants2569-11-24.test.ts`
+
+### 24 พ.ย. 2569 (5) — Journey ผู้สมัคร: Excel · ไม่มาตามนัด · ถังโทร · ประวัตินัด · ไม่สนใจ 30 วัน · คืนรายชื่อแจ้งคนเก็บ · ภาพบัตร
+- นำเข้า Excel: ช่องติ๊ก "ส่งให้ AI โทร" (เริ่มไม่ติ๊ก) · ไม่ติ๊ก = `call_choice='manual'` ในธุรกรรมเดียวกับการบันทึก (`job-applications-import.ts`) ⇒ ตัวส่งรอบ 5 นาทีข้าม
+- ไม่มา/ไม่ผ่าน ⇒ `api/_lib/appointmentReturn.ts` (`status` converted → contacted · ปลดคนเก็บ/Lead/ล็อกเบอร์ · AI ไม่โทรเอง) · ลง มา/เลื่อนนัด/ผ่าน ทีหลัง = กลับแท็บนัด · เรียกจาก `application-attendance.ts`
+- นัดได้จากถังโทร (`matching-call-holds` PATCH · ผล confirmed + วันนัด + ใบสมัคร) ⇒ `createContactLog` ⇒ ใบเป็น converted
+- ประวัตินัดหมายข้ามทุกใบของเบอร์: `api/_lib/appointmentHistory.ts` (ผลนัด/คัดเลือกจับด้วยเวลานัดระดับนาที) → `detail_of` ส่ง `appointmentHistory` → `src/lib/appointmentHistory.ts` → `AppointmentHistoryTable` แท็บ "การนัดหมาย" (แทน `AppointmentsTable`)
+- ไม่สนใจ = AI ไม่โทร 30 วัน (`declinedSuppressUntil` · `suppressDays`) แทนถาวร · ปุ่มของคนไม่ติดบัญชีห้ามโทร
+- ตัวคืนรายชื่อ (`callChoiceWorker`) แจ้งคนเก็บด้วย `claim_idle_released_mine` (`buildClaimerUnclaimNotice`)
+- ภาพบัตรเบลอ/มืด/แสงสะท้อน = `stepError` ขั้นแนบภาพไม่ผ่าน · อ่าน So Scraping ผ่าน `scrapRead` (อ่านอย่างเดียว · lock 2 วิ · คำสั่ง 8 วิ)
+- เทสต์ `tests/api/journeyFixes2569-11-24.test.ts` · `tests/api/scrapReadTimeout2569-11-24.test.ts`

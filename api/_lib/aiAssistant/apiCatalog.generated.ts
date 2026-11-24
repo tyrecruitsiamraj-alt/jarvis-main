@@ -125,7 +125,7 @@ export const API_CATALOG: ApiCatalogEntry[] = [
    "GET",
    "POST"
   ],
-  "doc": "GET/POST /api/application-attendance — ผลติดตามนัด \"มาตามนัด/ไม่มา/เลื่อนนัด\"\n(เจ้าของสั่ง 15 ส.ค. 2569 · migration 089)\n\nPOST { applicationId, appointmentAt, result: 'showed'|'no_show'|'rescheduled', note? }\nPOST { …, result: 'passed'|'not_passed' } — ผ่าน/ไม่ผ่าน หลังมาตามนัด (migration 151 · 18 ต.ค. 2569) · ต้องมีผลนัดล่าสุดเป็น \"มาตามนัด\"\nGET  ?applicationId= → { items }\n\nกติกา (ตรวจฝั่ง server ห้ามเชื่อฟอร์ม):\n- บันทึกได้ตั้งแต่ **วันนัด (เวลาไทย) เป็นต้นไป** — ก่อนวันนัด 400 (กันกดล่วงหน้า)\n- append-only กดซ้ำเพื่อแก้ได้ ล่าสุดชนะ · **ไม่แตะ status ใบ**\n- ใครกดก็ได้ (คนอยู่หน้างานวันนัดมักไม่ใช่คนโทร) — ระบบ stamp ชื่อคนกดเสมอ\n- rbac + ด่าน BU เดียวกับใบสมัคร",
+  "doc": "GET/POST /api/application-attendance — ผลติดตามนัด \"มาตามนัด/ไม่มา/เลื่อนนัด\"\n(เจ้าของสั่ง 15 ส.ค. 2569 · migration 089)\n\nPOST { applicationId, appointmentAt, result: 'showed'|'no_show'|'rescheduled', note? }\nPOST { …, result: 'passed'|'not_passed' } — ผ่าน/ไม่ผ่าน หลังมาตามนัด (migration 151 · 18 ต.ค. 2569) · ต้องมีผลนัดล่าสุดเป็น \"มาตามนัด\"\nGET  ?applicationId= → { items }\n\nกติกา (ตรวจฝั่ง server ห้ามเชื่อฟอร์ม):\n- บันทึกได้ตั้งแต่ **วันนัด (เวลาไทย) เป็นต้นไป** — ก่อนวันนัด 400 (กันกดล่วงหน้า)\n- append-only กดซ้ำเพื่อแก้ได้ ล่าสุดชนะ\n- ไม่มา / ไม่ผ่าน ⇒ ใบกลับแท็บผู้สมัคร ปลดคนเก็บ (`returnApplicantAfterAppointment` · เจ้าของ 24 พ.ย. 2569)\n  มา / เลื่อนนัด / ผ่าน หลังจากนั้น ⇒ กลับแท็บนัดหมาย (`restoreAppointmentStatus`)\n- ใครกดก็ได้ (คนอยู่หน้างานวันนัดมักไม่ใช่คนโทร) — ระบบ stamp ชื่อคนกดเสมอ\n- rbac + ด่าน BU เดียวกับใบสมัคร",
   "query": [
    "applicationId"
   ],

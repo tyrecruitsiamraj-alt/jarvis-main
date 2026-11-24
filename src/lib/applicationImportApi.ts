@@ -95,6 +95,8 @@ export async function runApplicationImport(input: {
   job?: { id: string; title?: string | null; unitName?: string | null } | null;
   /** PDPA (15 ต.ค. 2569) — บันทึกจริงต้องเป็น true (ยืนยันว่าผู้สมัครในไฟล์ยินยอมแล้ว) */
   pdpaConsent?: boolean;
+  /** ติ๊ก "ส่งให้ AI โทร" (24 พ.ย. 2569) — ไม่ติ๊ก = AI ไม่โทร รอคนกดส่งเองจากแท็บผู้สมัคร */
+  sendAi?: boolean;
 }): Promise<ApplicationImportResult> {
   const r = await apiFetch('/api/job-applications-import', {
     method: 'POST',
@@ -105,9 +107,8 @@ export async function runApplicationImport(input: {
       channel_id: input.channelId ?? null,
       channel_label: input.channelLabel ?? null,
       pdpa_consent: input.pdpaConsent === true,
-      ...(input.job
-        ? { job_id: input.job.id, job_title: input.job.title ?? null, unit_name: input.job.unitName ?? null, send_ai: true }
-        : {}),
+      send_ai: input.sendAi === true,
+      ...(input.job ? { job_id: input.job.id, job_title: input.job.title ?? null, unit_name: input.job.unitName ?? null } : {}),
     }),
   });
   if (!r.ok) throw new Error(await readError(r, input.dryRun ? 'อ่านไฟล์ไม่สำเร็จ' : 'นำเข้าไม่สำเร็จ'));

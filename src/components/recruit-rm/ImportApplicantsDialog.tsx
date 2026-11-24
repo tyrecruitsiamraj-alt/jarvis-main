@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, Bot, FileDown, LoaderCircle, Paperclip, Upload, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -69,6 +70,11 @@ const ImportApplicantsDialog: React.FC<{
   const [showDupes, setShowDupes] = useState(false);
   /** PDPA (15 ต.ค. 2569) — ยืนยันว่าผู้สมัครในไฟล์ยินยอมแล้วก่อนนำเข้า */
   const [consent, setConsent] = useState(false);
+  /**
+   * ส่งให้ AI โทรไหม (เจ้าของเคาะ 24 พ.ย. 2569 "ไม่ติ๊กส่ง AI = AI ไม่โทร รอคนกด") — เริ่มที่ไม่ติ๊ก
+   * เดิมนำเข้าจากการ์ดส่ง AI เสมอ และนำเข้าจากแท็บผู้สมัครถูกตัวส่งอัตโนมัติรอบ 5 นาทีโทรทักทายเอง
+   */
+  const [sendAi, setSendAi] = useState(false);
   /** ไฟล์แนบข้างชื่อหลังนำเข้า (เจ้าของ 12 พ.ย. 2569) — คีย์ = id ใบสมัคร */
   /**
    * ไฟล์แนบรายคน — คีย์ = เลขแถวใน Excel (เจ้าของ 12 พ.ย. 2569 "พอนำเข้าปุ้บ ขึ้นตรวจสอบแล้วแนบทีละคน")
@@ -166,6 +172,7 @@ const ImportApplicantsDialog: React.FC<{
         dryRun: false,
         ...shared(),
         pdpaConsent: consent,
+        sendAi,
       });
       setPreview(result);
       onSaved(result.inserted ?? 0);
@@ -191,14 +198,14 @@ const ImportApplicantsDialog: React.FC<{
   const dupes = preview?.duplicates ?? [];
   /** ต้องเลือกทั้งผู้รับผิดชอบและช่องทางก่อนนำเข้า (เจ้าของ 4 ต.ค. 2569) */
   const sharedPicked = responsible !== NO_STAFF && channel !== null;
-  const aiBlock = job && preview?.dryRun ? (preview.ai_block ?? null) : null;
+  const aiBlock = job && sendAi && preview?.dryRun ? (preview.ai_block ?? null) : null;
   const ai = saved ? preview?.ai : undefined;
 
   return (
     <Dialog open={open} onOpenChange={(o) => (!o && busy !== 'saving' ? onClose() : undefined)}>
       <DialogContent className="max-h-[88vh] max-w-6xl overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{job ? 'นำเข้า Excel แล้วส่ง AI โทร' : 'นำเข้าผู้สมัครจาก Excel'}</DialogTitle>
+          <DialogTitle>{job ? 'นำเข้า Excel' : 'นำเข้าผู้สมัครจาก Excel'}</DialogTitle>
           {job ? (
             <DialogDescription data-testid="import-job">
               {job.label || [job.unitName, job.title].filter(Boolean).join(' · ')}
@@ -333,6 +340,20 @@ const ImportApplicantsDialog: React.FC<{
                   <Label className="text-xs text-muted-foreground">รายชื่อชุดนี้มาจากช่องทาง</Label>
                   <ChannelPicker value={channel} onChange={setChannel} reloadKey={open} />
                 </div>
+              </div>
+            ) : null}
+
+            {fileBase64 ? (
+              <div className="flex items-center gap-2" data-testid="import-send-ai">
+                <Checkbox
+                  id="import-send-ai"
+                  checked={sendAi}
+                  disabled={saved || busy === 'saving'}
+                  onCheckedChange={(v) => setSendAi(v === true)}
+                />
+                <Label htmlFor="import-send-ai" className="text-sm font-normal">
+                  {job ? 'ส่งให้ AI โทรเลย' : 'ส่งให้ AI โทรทักทาย'}
+                </Label>
               </div>
             ) : null}
 
@@ -473,14 +494,14 @@ const ImportApplicantsDialog: React.FC<{
                 >
                   {busy === 'saving' ? (
                     <LoaderCircle className="animate-spin" aria-hidden />
-                  ) : job && !aiBlock ? (
+                  ) : job && sendAi && !aiBlock ? (
                     <Bot aria-hidden />
                   ) : (
                     <Upload aria-hidden />
                   )}
                   {busy === 'saving'
                     ? 'กำลังนำเข้า…'
-                    : job && !aiBlock
+                    : job && sendAi && !aiBlock
                       ? `นำเข้าแล้วส่ง AI โทร ${ready} คน`
                       : `นำเข้า ${ready} คน`}
                 </Button>

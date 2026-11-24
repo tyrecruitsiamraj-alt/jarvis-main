@@ -17,11 +17,11 @@ import ApplicantInfoPanel from '@/components/recruit-rm/ApplicantInfoPanel';
 import SendDocumentsSection from '@/components/documents/SendDocumentsSection';
 import ApplicantPhoneFix from '@/components/recruit-rm/ApplicantPhoneFix';
 import {
-  AppointmentsTable,
   AttendanceTable,
   CallsTable,
   ContactsTable,
   HistoryTable,
+  AppointmentHistoryTable,
   RecordLoadProvider,
   type RecordLoadState,
 } from '@/components/recruit-rm/ApplicantRecordTables';
@@ -52,6 +52,7 @@ import { jobPickLabel } from '@/lib/jobPickLabel';
 /** ป้ายหน่วยงานของนัด — ตัวเดียวกับฟอร์มเพิ่มผู้สมัคร (`jobPickLabel` · 21 ต.ค. 2569) */
 const appointmentUnitLabel = jobPickLabel;
 import { canRecordAttendance } from '@/lib/appointmentAttendance';
+import { buildAppointmentHistory } from '@/lib/appointmentHistory';
 import { profileDraftOf, profilePatchFromDraft, type ProfileDraft } from '@/lib/applicantProfileEdit';
 import {
   APPOINTMENT_PLACES,
@@ -89,7 +90,7 @@ import type { JobRequest } from '@/types';
  * 🔴 `embedded` = คืนเนื้อเปล่า ๆ ไม่ห่อ Dialog (ฝังใน "ป๊อปดูรายชื่อ" ของกล่องงาน) — ห้ามซ้อน Dialog ใน Dialog
  */
 const ADVANCE = '__advance__';
-const EMPTY_EXTRAS: ApplicantDetailExtras = { history: [], aiCalls: [], staffCalls: [], dialCalls: [] };
+const EMPTY_EXTRAS: ApplicantDetailExtras = { history: [], aiCalls: [], staffCalls: [], dialCalls: [], appointmentHistory: [] };
 
 const StepNo: React.FC<{ n: number; done: boolean }> = ({ n, done }) => (
   <span
@@ -849,8 +850,12 @@ export default function ApplicantContactDialog({
           </RecordLoadProvider>
         </TabsContent>
         <TabsContent value="appointments" className="pt-2">
-          <RecordLoadProvider state={recState.logs} onRetry={() => loadRecords(a.id)}>
-            <AppointmentsTable logs={logs} />
+          {/* ประวัตินัดหมายทุกใบของคนนี้ + ผล (24 พ.ย. 2569) — โหลดไม่ได้ฝั่งไหนก็ขึ้น "โหลดไม่ได้" */}
+          <RecordLoadProvider
+            state={recState.logs === 'ready' ? recState.extras : recState.logs}
+            onRetry={() => loadRecords(a.id)}
+          >
+            <AppointmentHistoryTable rows={buildAppointmentHistory(extras.appointmentHistory ?? [], logs)} />
           </RecordLoadProvider>
         </TabsContent>
         <TabsContent value="attendance" className="pt-2">

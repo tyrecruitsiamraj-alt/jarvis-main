@@ -171,7 +171,13 @@ async function handler(req: AuthedReq, res: ApiRes) {
 
     // นำเข้าตามกล่อง — ใบต้องอยู่ใน BU ตัวเอง (กติกาเดียวกับเพิ่มข้อมูลผู้สมัคร) และยังเปิดอยู่
     const jobId = text(raw?.job_id, 120);
-    const sendAi = Boolean(jobId) && raw?.send_ai === true;
+    /**
+     * ติ๊ก "ส่งให้ AI โทร" ไหม (เจ้าของเคาะ 24 พ.ย. 2569 "ไม่ติ๊กส่ง AI = AI ไม่โทร รอคนกด")
+     * ไม่ติ๊ก ⇒ จด call_choice = 'manual' ในธุรกรรมเดียวกับการบันทึก — ตัวส่งอัตโนมัติรอบ 5 นาที (`applicationDispatchRetry`) ข้ามใบนี้
+     * ติ๊ก + ผูกใบขอ ⇒ ส่งทันที (ข้างล่าง) · ติ๊ก + ไม่ผูกใบขอ ⇒ ปล่อยให้ตัวส่งอัตโนมัติส่งบททักทายตามเดิม
+     */
+    const wantAi = raw?.send_ai === true;
+    const sendAi = Boolean(jobId) && wantAi;
     let job: { unit_name?: string | null } | null = null;
     if (jobId) {
       const scopedJobIds = await loadScopedJobIdSet(req.user);
@@ -277,6 +283,12 @@ async function handler(req: AuthedReq, res: ApiRes) {
           `insert into ${tbl} (${STAFF_INSERT_COLUMNS}) values (${STAFF_INSERT_VALUES}) returning id`,
           staffInsertParams(p.value, staffName, await deptOf(p.value.job_id)),
         );
+        if (ins[0]?.id && !wantAi) {
+          await client.query(
+            `update ${tbl} set call_choice = 'manual', call_choice_at = now(), call_choice_by_name = $2 where id = $1`,
+            [ins[0].id, staffName],
+          );
+        }
         if (ins[0]?.id) {
           insertedIds.push(ins[0].id);
           insertedPhones.set(ins[0].id, p.value.phone);

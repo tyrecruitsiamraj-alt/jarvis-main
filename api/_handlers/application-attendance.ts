@@ -8,7 +8,9 @@
  *
  * กติกา (ตรวจฝั่ง server ห้ามเชื่อฟอร์ม):
  * - บันทึกได้ตั้งแต่ **วันนัด (เวลาไทย) เป็นต้นไป** — ก่อนวันนัด 400 (กันกดล่วงหน้า)
- * - append-only กดซ้ำเพื่อแก้ได้ ล่าสุดชนะ · **ไม่แตะ status ใบ**
+ * - append-only กดซ้ำเพื่อแก้ได้ ล่าสุดชนะ
+ * - ไม่มา / ไม่ผ่าน ⇒ ใบกลับแท็บผู้สมัคร ปลดคนเก็บ (`returnApplicantAfterAppointment` · เจ้าของ 24 พ.ย. 2569)
+ *   มา / เลื่อนนัด / ผ่าน หลังจากนั้น ⇒ กลับแท็บนัดหมาย (`restoreAppointmentStatus`)
  * - ใครกดก็ได้ (คนอยู่หน้างานวันนัดมักไม่ใช่คนโทร) — ระบบ stamp ชื่อคนกดเสมอ
  * - rbac + ด่าน BU เดียวกับใบสมัคร
  */
@@ -26,6 +28,24 @@ import {
   loadLatestAttendanceByApplication,
 } from '../_lib/applicationAttendance.js';
 import { createScreeningResult } from '../_lib/applicationScreening.js';
+import { restoreAppointmentStatus, returnApplicantAfterAppointment } from '../_lib/appointmentReturn.js';
+import { logError } from '../_lib/logger.js';
+
+/**
+ * ย้ายแท็บตามผลนัด — ผลบันทึกแล้วเสมอ ย้ายไม่สำเร็จ = แค่ log (ใบยังอยู่แท็บเดิม กดลงผลซ้ำได้)
+ * คืน 'candidates' = กลับแท็บผู้สมัคร · 'appointments' = กลับแท็บนัดหมาย · null = ไม่ย้าย
+ */
+async function applyAppointmentOutcome(applicationId: string, result: string, byName: string | null): Promise<'candidates' | 'appointments' | null> {
+  try {
+    if (result === 'no_show' || result === 'not_passed') {
+      return (await returnApplicantAfterAppointment(applicationId, byName)) ? 'candidates' : null;
+    }
+    return (await restoreAppointmentStatus(applicationId)) ? 'appointments' : null;
+  } catch (e) {
+    logError('application-attendance: ย้ายแท็บตามผลนัดไม่สำเร็จ', e, { applicationId, result });
+    return null;
+  }
+}
 import { canRecordScreening, isScreeningResult } from '../../src/lib/appointmentScreening.js';
 import { isApplicationInWriteScope, loadApplicationScopeRowOrNull } from '../_lib/applicationScope.js';
 import { canRecordAttendance, isAttendanceResult } from '../../src/lib/appointmentAttendance.js';
@@ -105,13 +125,14 @@ async function handler(req: AuthedReq, res: ApiRes) {
           }
           throw e;
         }
+        const moved = await applyAppointmentOutcome(applicationId, item.result, req.user?.email ?? null);
         void auditFromAuthed(req, {
           action: 'application-screening.log',
           entityType: 'application_screening_result',
           entityId: item.id,
-          after: { applicationId, appointmentAt: item.appointmentAt, result: item.result },
+          after: { applicationId, appointmentAt: item.appointmentAt, result: item.result, tab: moved },
         });
-        return res.status(201).json({ item });
+        return res.status(201).json({ item, tab: moved });
       }
 
       let log;
@@ -137,14 +158,15 @@ async function handler(req: AuthedReq, res: ApiRes) {
         throw e;
       }
 
+      const moved = await applyAppointmentOutcome(applicationId, log.result, req.user?.email ?? null);
       void auditFromAuthed(req, {
         action: 'application-attendance.log',
         entityType: 'application_appointment_result',
         entityId: log.id,
-        after: { applicationId, appointmentAt: log.appointmentAt, result: log.result },
+        after: { applicationId, appointmentAt: log.appointmentAt, result: log.result, tab: moved },
       });
 
-      return res.status(201).json({ item: log });
+      return res.status(201).json({ item: log, tab: moved });
     }
 
     res.setHeader?.('Allow', 'GET, POST');

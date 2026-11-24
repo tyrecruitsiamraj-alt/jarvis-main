@@ -400,12 +400,12 @@ describe('บอก AI ว่าไม่สนใจ = พักเบอร์
       /where id = \$1 limit 1/.test(String(sql)) ? ({ rows: [row] } as never) : ({ rows: [] } as never),
     );
 
-  it('สายเสนองาน ไม่สนใจงานนี้ → ลงบัญชีห้ามโทร declined ถึง 2099 + ยกเลิกสายเสนองานอื่นของเบอร์นี้ที่ยังรอ', async () => {
+  it('สายเสนองาน ไม่สนใจงานนี้ → ลงบัญชีห้ามโทร declined 30 วัน (เจ้าของ 24 พ.ย. 2569 · เดิมถึง 2099) + ยกเลิกสายเสนองานอื่นของเบอร์นี้ที่ยังรอ', async () => {
     route(queueRow('interview', 'siamraj-sql:OPL6910072', 'app-17d93ba4'));
-    await applyCallFollowupToQueueRow({ queueId: 36353, outcome: 'declined', declinedScope: 'job' });
+    await applyCallFollowupToQueueRow({ queueId: 36353, outcome: 'declined', declinedScope: 'job', now: new Date('2026-11-24T03:00:00.000Z') });
     const sqls = allSql();
     const ins = vi.mocked(dbQuery).mock.calls.find((c) => /insert into candidate_call_suppression/.test(String(c[0])));
-    expect(ins?.[1]).toEqual(['+66812345678', '2099-12-31T00:00:00+07:00', 'declined', 'บอก AI ว่าไม่สนใจ', null]);
+    expect(ins?.[1]).toEqual(['+66812345678', '2026-12-24T03:00:00.000Z', 'declined', 'บอก AI ว่าไม่สนใจ', null]);
     const cancel = vi.mocked(dbQuery).mock.calls.find((c) => /set status = 'cancelled'/.test(String(c[0])));
     expect(String(cancel?.[0])).toContain("channel = 'interview' and result is null and status in ('pending', 'delivered')");
     expect(cancel?.[1]).toEqual(['812345678']);

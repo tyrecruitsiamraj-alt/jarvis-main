@@ -29,7 +29,7 @@ describe('แถวกดโทรในแท็บการโทร', () => {
   it('API อ่านจาก audit application.dial ของใบนั้น', () => {
     const src = fs.readFileSync(path.join(process.cwd(), 'api/_handlers/job-applications.ts'), 'utf8');
     expect(src).toContain("a.action = 'application.dial'");
-    expect(src).toContain('return res.status(200).json({ history, aiCalls, staffCalls, dialCalls });');
+    expect(src).toContain('return res.status(200).json({ history, aiCalls, staffCalls, dialCalls, appointmentHistory });');
   });
 });
 

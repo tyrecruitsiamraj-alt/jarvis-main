@@ -12,7 +12,8 @@ import {
   type PublicApplication,
 } from '@/lib/publicApplicationsApi';
 import type { ContactLog } from '@/lib/applicationContactsApi';
-import { appointmentLogs, attendanceLabel, isAppointmentFailedContact, type DetailCallRow } from '@/lib/applicantDetail';
+import { attendanceLabel, isAppointmentFailedContact, type DetailCallRow } from '@/lib/applicantDetail';
+import type { AppointmentHistoryRow } from '@/lib/appointmentHistory';
 import { ATTENDANCE_TONE } from '@/lib/appointmentAttendance';
 
 /**
@@ -142,32 +143,29 @@ export const ContactsTable: React.FC<{ logs: ContactLog[]; words?: ContactWords 
   </Table>
 );
 
-export const AppointmentsTable: React.FC<{ logs: ContactLog[] }> = ({ logs }) => {
-  const appts = appointmentLogs(logs);
-  return (
-    <Table
-      head={['ผลการนัดหมาย', 'นัดหมายวันที่', 'สถานที่นัดหมาย', 'ลงหน่วยงาน', 'บันทึกโดย']}
-      empty="ยังไม่มีนัดหมาย"
-      isEmpty={appts.length === 0}
-    >
-      {appts.map((l) => {
-        const failed = isAppointmentFailedContact(l);
-        return (
-        <tr key={l.id} className="border-b border-border/50 last:border-0">
-          <Td className={cn('font-medium', failed ? TONE.danger.value : TONE.success.value)}>
-            {failed ? 'นัดหมายไม่สำเร็จ' : 'นัดหมายสำเร็จ'}
-            {failed ? <span className="block text-xs font-normal text-muted-foreground">{l.reasonLabel}</span> : null}
-          </Td>
-          <Td className="whitespace-nowrap tabular-nums">{failed ? EM_DASH : appointmentWhenText(l.appointmentAt)}</Td>
-          <Td>{failed ? EM_DASH : l.appointmentPlace || EM_DASH}</Td>
-          <Td>{failed ? EM_DASH : l.jobLabel || 'หาล่วงหน้า'}</Td>
-          <Td className="whitespace-nowrap text-muted-foreground">{by(l.createdByName, l.createdAt)}</Td>
-        </tr>
-        );
-      })}
-    </Table>
-  );
-};
+/**
+ * ประวัตินัดหมายทุกใบของคนนี้ + ผล (เจ้าของ 24 พ.ย. 2569 "เคยนัดไปหน่วยงานไหนแล้วไม่ไป") — แถวจาก `buildAppointmentHistory`
+ * แทนตารางนัดของใบเดียว (นัดหมายไม่สำเร็จของใบนี้ยังอยู่ครบ)
+ */
+export const AppointmentHistoryTable: React.FC<{ rows: AppointmentHistoryRow[] }> = ({ rows }) => (
+  <Table head={['นัดหมายวันที่', 'ลงหน่วยงาน', 'ผล', 'สถานที่นัดหมาย', 'บันทึกโดย']} empty="ยังไม่มีนัดหมาย" isEmpty={rows.length === 0}>
+    {rows.map((r) => (
+      <tr key={r.key} className="border-b border-border/50 last:border-0" data-testid="appointment-history-row">
+        <Td className="whitespace-nowrap tabular-nums">
+          {r.at ? appointmentWhenText(r.at) : EM_DASH}
+          {r.isCurrent ? <span className="block text-xs text-muted-foreground">ใบนี้</span> : null}
+        </Td>
+        <Td>{r.unit || 'หาล่วงหน้า'}</Td>
+        <Td className={cn('font-medium', r.tone === 'neutral' ? 'text-muted-foreground' : TONE[r.tone].value)}>
+          {r.outcome}
+          {r.reason ? <span className="block text-xs font-normal text-muted-foreground">{r.reason}</span> : null}
+        </Td>
+        <Td>{r.place || EM_DASH}</Td>
+        <Td className="whitespace-nowrap text-muted-foreground">{by(r.byName, r.createdAt)}</Td>
+      </tr>
+    ))}
+  </Table>
+);
 
 export const AttendanceTable: React.FC<{ logs: AttendanceLogItem[] }> = ({ logs }) => (
   <Table head={['นัดหมายวันที่', 'ผลการติดตามนัด', 'หมายเหตุ', 'บันทึกโดย']} empty="ยังไม่มีผลติดตามนัด" isEmpty={logs.length === 0}>

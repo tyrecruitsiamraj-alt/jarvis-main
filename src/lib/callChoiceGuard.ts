@@ -96,6 +96,8 @@ export type UnclaimedItem = {
   heldByName: string | null;
   /** ดองไว้กี่วัน (null = คำนวณไม่ได้) */
   days: number | null;
+  /** บัญชีคนเก็บ (ยังใช้งานอยู่) — ไว้แจ้งคนเก็บเอง · null = ไม่แจ้ง */
+  heldByUserId?: string | null;
 };
 
 export type UnclaimNotice = { title: string; body: string };
@@ -129,6 +131,21 @@ export function buildUnclaimNotice(items: UnclaimedItem[], now: Date = new Date(
     title: `ถอดชื่อที่เก็บไว้แล้วไม่โทร ${items.length} ใบ`,
     // 17 พ.ย. 2569 ปล่อยแล้วไม่ส่ง AI เอง (เจ้าของ Choice "กลับกองกลาง ไม่ส่ง AI เอง")
     body: `${who}${more}${agePart} — ใบเหล่านี้ไปอยู่กอง "เลือกวิธีโทร"`,
+  };
+}
+
+/**
+ * แจ้งคนที่เก็บไว้เอง (เจ้าของ 24 พ.ย. 2569 Choice "คืนกลับแท็บผู้สมัครเอง + แจ้งคนเก็บ") — เดิมแจ้งแค่หัวหน้า
+ * คนเก็บไม่รู้ว่าชื่อหายไปไหน · บอกชื่อผู้สมัครที่ถูกคืน (สูงสุด 3 ชื่อ) + ไปอยู่ที่ไหน
+ */
+export function buildClaimerUnclaimNotice(applicantNames: readonly string[]): UnclaimNotice | null {
+  const names = applicantNames.map((n) => n.trim()).filter(Boolean);
+  if (applicantNames.length === 0) return null;
+  const shown = names.slice(0, 3).join(' · ');
+  const more = applicantNames.length > 3 ? ` และอีก ${applicantNames.length - 3} คน` : '';
+  return {
+    title: `คืนรายชื่อที่คุณเก็บไว้ ${applicantNames.length} คน`,
+    body: `${shown || 'ผู้สมัคร'}${more} — เก็บไว้เกิน 1 วันยังไม่ได้โทร ตอนนี้อยู่แท็บผู้สมัคร`,
   };
 }
 

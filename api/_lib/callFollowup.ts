@@ -15,6 +15,7 @@ import { tableInAppSchema } from './schema.js';
 import { toE164Thai } from './thaiPhone.js';
 import { notifyRoles, notifyUsers } from './appNotifications.js';
 import {
+  DEFAULT_CALL_FOLLOWUP_POLICY,
   isCallOutcome,
   policyForQueueRef,
   resolveCallFollowup,
@@ -30,8 +31,14 @@ import { logError, logInfo } from './logger.js';
 const queueTable = tableInAppSchema('lumos_dispatch_queue');
 const suppressionTable = tableInAppSchema('candidate_call_suppression');
 
-/** บอก AI ว่าไม่สนใจ = พักเบอร์จนกว่าคนปลดที่ ตั้งค่า › บัญชีห้ามโทร (เจ้าของ 18 พ.ย. 2569 "ไม่โทรเลยถ้าเขาบอกไม่สนใจ") */
-export const DECLINED_SUPPRESS_UNTIL = '2099-12-31T00:00:00+07:00';
+/**
+ * บอก AI ว่าไม่สนใจ = AI ไม่โทรเบอร์นี้ 30 วัน (`suppressDays` ของนโยบายกลาง) · เจ้าหน้าที่โทรเองได้ตลอด
+ * เจ้าของเคาะ 24 พ.ย. 2569 *"พัก 30 วันระหว่างนั้นถ้าคนจะโทรเองก็ทำได้"* — แทนข้อ 18 พ.ย. ที่พักถาวร (ถึงปี 2099)
+ * บัญชีห้ามโทรกันเฉพาะเส้นที่ส่ง AI (`insertQueueItems` · ตัวส่งซ้ำ) ปุ่มของคนไม่เช็กอยู่แล้ว
+ */
+export function declinedSuppressUntil(now: Date, suppressDays: number): string {
+  return new Date(now.getTime() + Math.max(1, suppressDays) * 24 * 60 * 60 * 1000).toISOString();
+}
 
 /**
  * ดึงเวลาที่ผู้สมัครขอให้โทรกลับออกจากผลที่ Lumos ส่งมา
@@ -291,13 +298,15 @@ export async function applyCallFollowupToQueueRow(input: {
       note: decision.reason,
     });
   }
-  // 🔴 บอก AI ว่าไม่สนใจ = ไม่โทรอีกทุกใบขอ จนกว่าคนปลดที่บัญชีห้ามโทร (เจ้าของ 18 พ.ย. 2569 "ไม่โทรเลยถ้าเขาบอกไม่สนใจ")
+  // 🔴 บอก AI ว่าไม่สนใจ = AI ไม่โทรทุกใบขอ 30 วัน (เจ้าของ 24 พ.ย. 2569 · เดิม 18 พ.ย. พักถาวร)
   //    เคสจริง: ปฏิเสธ 3 พ.ย. (ไม่เอางานผ่านซับ) ระบบนับแค่ "ไม่สนใจงานนี้" · 17 พ.ย. ถูกคีย์ใบงานอื่น AI โทรตีหนึ่งถึงแปดโมง
   //    เฉพาะสายเสนองาน (interview) · สายติดตามเริ่มงาน (reminder) declined = "ไม่ไปวันนี้" ไม่เกี่ยว
   //    สายเสนองานอื่นของเบอร์นี้ที่ยังรอ = ยกเลิกด้วย (ที่ Lumos ด้วย ถ้าส่งไปแล้ว)
   if (input.outcome === 'declined' && row.channel === 'interview') {
     const phone = phoneFromPayload(row.payload);
-    if (await suppressPhone({ phone, until: DECLINED_SUPPRESS_UNTIL, reason: 'declined', note: 'บอก AI ว่าไม่สนใจ' })) {
+    const days = (await getCallFollowupPolicy().catch(() => DEFAULT_CALL_FOLLOWUP_POLICY)).suppressDays;
+    const until = declinedSuppressUntil(input.now ?? new Date(), days);
+    if (await suppressPhone({ phone, until, reason: 'declined', note: 'บอก AI ว่าไม่สนใจ' })) {
       try {
         await stopOpenInterviewCalls(phone ?? '', 'declined.stopCalls');
       } catch (e) {

@@ -180,6 +180,8 @@ export function stepError(form: ApplicantForm, step: number, ctx: { today: strin
     for (const kind of UPLOAD_KINDS) {
       const slot = form.slots[kind];
       if (!slot) return `แนบภาพ${UPLOAD_LABEL[kind]}`;
+      // ภาพเบลอ · มืด · แสงสะท้อน = ไม่ให้ผ่าน ต้องถ่ายใหม่ (เจ้าของเคาะ 23 พ.ย. 2569 · เดิมเป็นแค่คำเตือน)
+      if (slot.quality.length > 0) return `${UPLOAD_LABEL[kind]}: ${slot.quality[0]}`;
       if (slot.status === 'reading') return `รออ่านภาพ${UPLOAD_LABEL[kind]}ให้เสร็จ`;
       if (!slot.imageConfirmed) return `ตรวจภาพ${UPLOAD_LABEL[kind]}แล้วติ๊กยืนยัน`;
     }

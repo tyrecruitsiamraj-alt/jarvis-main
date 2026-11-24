@@ -73,6 +73,7 @@ import {
 } from '../_lib/applicantCallOutcomes.js';
 import { loadContactAppointments, loadLatestContactResults } from '../_lib/applicationContacts.js';
 import { loadLatestAttendanceByApplication } from '../_lib/applicationAttendance.js';
+import { loadAppointmentHistory } from '../_lib/appointmentHistory.js';
 import { isEarlierAppointment } from '../../src/lib/appointmentAttendance.js';
 import { staffEntryDepartmentFor } from '../_lib/applicationDepartment.js';
 import { loadLatestScreeningByApplication } from '../_lib/applicationScreening.js';
@@ -1326,7 +1327,12 @@ async function getApplicationDetailExtras(req: AuthedReq, res: ApiRes, id: strin
     return rows.map((r) => ({ id: r.id, at: toIso(r.created_at), by_name: r.by_name }));
   });
 
-  return res.status(200).json({ history, aiCalls, staffCalls, dialCalls });
+  // ประวัตินัดหมายข้ามทุกใบของเบอร์นี้ (24 พ.ย. 2569) — ใบที่ผู้ดูมีสิทธิ์เท่านั้น (ชุดเดียวกับประวัติการสมัคร)
+  const appointmentHistory = await soft(async () =>
+    (await loadAppointmentHistory([id, ...history.map((h) => String(h.id))])).map((r) => ({ ...r, is_current: r.application_id === id })),
+  );
+
+  return res.status(200).json({ history, aiCalls, staffCalls, dialCalls, appointmentHistory });
 }
 
 /**
