@@ -1,4 +1,5 @@
 import { dbQuery } from '../_lib/postgres.js';
+import { decryptAttachment, encryptAttachment } from '../_lib/piiCipher.js';
 import {
   withRbac,
   sendError,
@@ -42,7 +43,7 @@ async function upload(req: AuthedReq, res: ApiRes) {
   }
   await dbQuery(
     `update ${tbl} set document_filename = $2, document_mime = $3, document_size = $4, document_bytes = $5 where id = $1`,
-    [id, doc.value.filename, doc.value.mime, doc.value.size, Buffer.from(doc.value.base64, 'base64')],
+    [id, doc.value.filename, doc.value.mime, doc.value.size, encryptAttachment(Buffer.from(doc.value.base64, 'base64'))],
   );
   await auditFromAuthed(req, {
     action: 'job_application.document_attach',
@@ -77,6 +78,9 @@ async function handler(req: AuthedReq, res: ApiRes) {
     );
     const row = rows[0];
     if (!row || !row.document_bytes) return sendError(res, 404, 'Not found', 'ไม่มีไฟล์แนบ');
+    // ไฟล์เข้ารหัส (24 พ.ย. 2569) ถอดก่อนส่ง · ไฟล์เก่าไม่เข้ารหัสได้ตามเดิม · ถอดไม่ออก = บอกตรง ๆ
+    const plain = decryptAttachment(Buffer.from(row.document_bytes));
+    if (!plain) return sendError(res, 500, 'Server error', 'เปิดไฟล์แนบไม่ได้ (กุญแจถอดรหัสไม่ตรง)');
 
     // จำกัดตาม BU — กันดาวน์โหลดไฟล์แนบ (CV) ของผู้สมัครงานแผนกอื่นด้วยการเดา id
     // (ยอมใบที่จำแผนกตัวเองไว้ด้วย — ใบขอปิดแล้วต้องยังโหลด CV ได้ถ้าเป็นแผนกตัวเอง)
@@ -87,7 +91,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
     return res.status(200).json({
       filename: row.document_filename || 'document',
       mime: row.document_mime || 'application/octet-stream',
-      dataBase64: Buffer.from(row.document_bytes).toString('base64'),
+      dataBase64: plain.toString('base64'),
     });
   } catch (e) {
     return handleApiError(res, e, 'job-application-document GET', { userId: req.user.sub });

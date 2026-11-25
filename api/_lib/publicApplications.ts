@@ -143,6 +143,21 @@ export type DocumentValidation =
   | { ok: true; value: PublicApplicationDocument | null }
   | { ok: false; message: string };
 
+/** หัวไฟล์ตรงกับชนิดที่บอกไหม — PDF `%PDF-` · JPG `FF D8 FF` · PNG `89 50 4E 47 0D 0A 1A 0A` */
+export function documentBytesMatchMime(base64: string, mime: string): boolean {
+  let head: Buffer;
+  try {
+    head = Buffer.from(base64.slice(0, 24), 'base64');
+  } catch {
+    return false;
+  }
+  const starts = (sig: number[]) => head.length >= sig.length && sig.every((b, i) => head[i] === b);
+  if (mime === 'application/pdf') return starts([0x25, 0x50, 0x44, 0x46, 0x2d]);
+  if (mime === 'image/jpeg' || mime === 'image/jpg') return starts([0xff, 0xd8, 0xff]);
+  if (mime === 'image/png') return starts([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  return false;
+}
+
 /** ตรวจไฟล์แนบ (base64) — ชนิดไฟล์ pdf/jpg/png และขนาด ≤ MAX_DOC_BYTES */
 export function normalizeDocument(raw: unknown): DocumentValidation {
   if (raw == null) return { ok: true, value: null };
@@ -162,6 +177,10 @@ export function normalizeDocument(raw: unknown): DocumentValidation {
   if (size <= 0) return { ok: true, value: null };
   if (size > MAX_DOC_BYTES) {
     return { ok: false, message: `ไฟล์ใหญ่เกินไป (สูงสุด ${Math.round(MAX_DOC_BYTES / (1024 * 1024))}MB)` };
+  }
+  // ตรวจเนื้อไฟล์จริง ไม่เชื่อชนิดที่เครื่องผู้ส่งบอก (24 พ.ย. 2569 ตรวจความปลอดภัยลิงก์)
+  if (!documentBytesMatchMime(clean, mime)) {
+    return { ok: false, message: 'รองรับเฉพาะไฟล์ PDF, JPG หรือ PNG' };
   }
   return {
     ok: true,

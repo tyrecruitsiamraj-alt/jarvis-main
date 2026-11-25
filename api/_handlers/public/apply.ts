@@ -1,4 +1,5 @@
 import { dbQuery, dbTransaction } from '../../_lib/postgres.js';
+import { encryptAttachment } from '../../_lib/piiCipher.js';
 import { LINE_BOT_CHANNEL, LINE_BOT_CHANNEL_LABEL, referralSourceOfChannel } from '../../../src/lib/referralChannel.js';
 import { sendError, handleApiError, type ApiReq, type ApiRes } from '../../_lib/http.js';
 import { isRequestClosedForApply, REQUEST_CLOSED_APPLY_MESSAGE } from '../../_lib/requestClosedForApply.js';
@@ -146,7 +147,8 @@ export default async function handler(req: ApiReq, res: ApiRes) {
       }
     }
 
-    const docBytes = v.document ? Buffer.from(v.document.base64, 'base64') : null;
+    // เก็บไฟล์แนบแบบเข้ารหัส (24 พ.ย. 2569) — ถอดที่ `job-application-document` ตอนเจ้าหน้าที่เปิดดู
+    const docBytes = v.document ? encryptAttachment(Buffer.from(v.document.base64, 'base64')) : null;
     // จำแผนกเจ้าของงานไว้กับใบ — ใบขอปิดแล้วรายชื่อต้องยังอยู่ในคลังกลาง (migration 082)
     const departmentCode = await resolveApplicationDepartment({
       postingId: v.postingId,
