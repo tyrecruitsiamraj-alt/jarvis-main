@@ -77,6 +77,11 @@ function UnitContactMovedRedirect() {
   return <Navigate to={`/jobs/siamraj/${encodeURIComponent(id)}/applicants`} replace />;
 }
 
+function UnitMatchMovedRedirect() {
+  const { id = '' } = useParams();
+  return <Navigate to={`/jobs/siamraj/${encodeURIComponent(id)}/match`} replace />;
+}
+
 function LegacyPostingRedirect() {
   const { id = '' } = useParams();
   return <Navigate to={`/jobs/board/${encodeURIComponent(id)}/posting`} replace />;
@@ -191,9 +196,10 @@ const ProtectedRoutes = () => {
             <Route path="/jobs/siamraj/:id" element={<SiamrajUnitRequestDetailPage />} />
             <Route path="/jobs/siamraj/:id/applicants" element={<UnitRequestTabPage tab="applicants" />} />
             <Route path="/jobs/siamraj/:id/scrap" element={<UnitRequestTabPage tab="scrap" />} />
+            <Route path="/jobs/siamraj/:id/match" element={<UnitRequestTabPage tab="match" />} />
             <Route path="/jobs/siamraj/:id/actions" element={<UnitRequestTabPage tab="actions" />} />
-            {/* แท็บ AI Match ถอดแล้ว (13 พ.ย. 2569) — ลิงก์เก่าพาไปจับคู่งานของหน้างานสรรหา */}
-            <Route path="/jobs/siamraj/:id/ai-match" element={<Navigate to="/jobs/board?view=match" replace />} />
+            {/* แท็บ AI Match ถอดแล้ว (13 พ.ย. 2569) — 25 พ.ย. 2569 ใบขอมีแท็บจับคู่งานแล้ว ลิงก์เก่าพาไปแท็บนั้นของใบเดิม */}
+            <Route path="/jobs/siamraj/:id/ai-match" element={<UnitMatchMovedRedirect />} />
             <Route path="/jobs/siamraj/:id/contact" element={<UnitContactMovedRedirect />} />
             <Route path="/jobs/:id" element={<JobDetailPage />} />
             <Route path="/dashboard" element={<SupervisorDashboard />} />

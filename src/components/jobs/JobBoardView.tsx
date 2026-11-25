@@ -256,7 +256,7 @@ export const POSTING_PICKS: ReadonlyArray<{ id: BoardViewId; label: string }> = 
 
 /**
  * แท็บ "ผู้สมัคร ▾" เลือกได้สองรายชื่อ (เจ้าของ 17 พ.ย. 2569 "แท็บผู้สมัครทำเป็นลูกศรกดลงจะเจอ Scrap") —
- * Scrap = รายชื่อที่ So Scraping ดึงจาก JobBKK/JobThai ทุกใบขอ (`ScrapCandidatesPanel` · ยังไม่ใช่ใบสมัคร)
+ * Scrap = รายชื่อที่ So Scraping ดึงจาก JobBKK/JobThai ทุกใบขอ (25 พ.ย. 2569 ตารางเดียวกับแท็บผู้สมัคร `RmWorkspace scrap` · ใบสร้างตอนกดส่ง AI/เก็บไปโทรเอง)
  */
 export const APPLICANT_PICKS: ReadonlyArray<{ id: BoardViewId; label: string }> = [
   { id: 'list', label: 'ผู้สมัคร' },

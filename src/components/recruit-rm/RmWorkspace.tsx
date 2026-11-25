@@ -119,7 +119,7 @@ import {
   type ScrapListView,
   type ScrapWorkRow,
 } from '@/lib/scrapApplicants';
-import { fetchScrapCandidatesAll, resolveScrapApplicationIds } from '@/lib/scrapCandidatesApi';
+import { fetchScrapCandidatesAll, fetchScrapCandidatesOfJob, resolveScrapApplicationIds } from '@/lib/scrapCandidatesApi';
 
 /** ผลประเมินที่เลือกบนแท็บ Scrap (`?sres=`) */
 const SCRAP_RESULT_PARAM = 'sres';
@@ -209,7 +209,12 @@ const RmWorkspace: React.FC<{
    * ใช้กับแท็บผู้สมัครเท่านั้น — แถว = รายชื่อจาก So Scraping (ใบเสมือน) + ใบที่สร้างจาก Scrap แล้ว · ชิปของ Scrap + ผลประเมิน
    */
   scrap?: boolean;
-}> = ({ tab: controlledTab, jobs, refreshKey = 0, dateRange: controlledDateRange, onDateRangeChange, headerActionsSlot = null, scrap = false }) => {
+  /**
+   * ล็อกใบขอเดียว — แท็บผู้สมัคร/Scrap ในหน้าใบขอ (เจ้าของ 25 พ.ย. 2569 "แท็บผู้สมัครแบบหน้าผู้สมัคร" · "แท็บ Scrap แบบใหม่")
+   * โหลดเฉพาะใบนั้น (เส้นเดียวกับ "ดูรายชื่อ" ทุกคนของใบ) · ใบจาก Scrap อยู่แท็บ Scrap ไม่ขึ้นแท็บผู้สมัคร
+   */
+  lockedJobId?: string;
+}> = ({ tab: controlledTab, jobs, refreshKey = 0, dateRange: controlledDateRange, onDateRangeChange, headerActionsSlot = null, scrap = false, lockedJobId }) => {
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get('tab');
   const tab: RmTab = controlledTab ?? (isRmTab(tabParam) ? tabParam : 'candidates');
@@ -378,9 +383,11 @@ const RmWorkspace: React.FC<{
    */
   const jobAllParam = searchParams.get(RM_JOB_ALL_PARAM);
   const jobAll =
-    tab === 'candidates' && !scrapMode && !bucket && !leadView && !cancelledView && jobAllParam && searchParams.getAll(`${APPLICANT_FILTER_PARAM_PREFIX}job`).includes(jobAllParam)
-      ? jobAllParam
-      : null;
+    tab === 'candidates' && lockedJobId
+      ? lockedJobId
+      : tab === 'candidates' && !scrapMode && !bucket && !leadView && !cancelledView && jobAllParam && searchParams.getAll(`${APPLICANT_FILTER_PARAM_PREFIX}job`).includes(jobAllParam)
+        ? jobAllParam
+        : null;
   /** ชุดที่โหลด: ของฉัน · นัดทุกคน · การติดต่อทุกคน · ทุกคนของใบเดียว */
   const rowsScope = jobAll ? `job:${jobAll}` : everyoneAppointments ? 'appointments' : everyoneContact ? 'contact' : 'mine';
   const everyoneView = rowsScope !== 'mine';
@@ -397,7 +404,7 @@ const RmWorkspace: React.FC<{
     const appsReq = (jobAll ? fetchJobApplications(jobAll) : fetchAllJobApplications(leadView, bucket, cancelledView, everyoneAppointments, everyoneContact, bucket ? searchParams.get('bu') : null));
     // แท็บ Scrap: รายชื่อสดจาก So Scraping คู่กับใบที่โหลด (จับคู่ใน `buildScrapWorkRows`) — อันใดล้ม = ทั้งชุดล้ม ไม่โชว์ครึ่งเดียว
     (scrapMode
-      ? Promise.all([appsReq, fetchScrapCandidatesAll()]).then(([apps, sc]) => {
+      ? Promise.all([appsReq, lockedJobId ? fetchScrapCandidatesOfJob(lockedJobId) : fetchScrapCandidatesAll()]).then(([apps, sc]) => {
           if (seq === loadSeq.current) setScrapRows(sc.rows);
           return apps;
         })
@@ -657,8 +664,8 @@ const RmWorkspace: React.FC<{
   const workRows = useMemo(() => (scrapMode ? scrapWork.map((w) => w.app) : rows), [scrapMode, scrapWork, rows]);
   /** ใบที่สร้างจาก Scrap ไม่ขึ้นแท็บผู้สมัคร (เจ้าของ "แยกยอดเป็น Scrap") · ดูทุกคนของใบเดียวยังเห็นครบ (ตรงเลขบนการ์ด) */
   const candidateRows = useMemo(
-    () => (tab === 'candidates' && !jobAll ? rows.filter((r) => !isScrapApplication(r)) : rows),
-    [rows, tab, jobAll],
+    () => (tab === 'candidates' && (!jobAll || lockedJobId) ? rows.filter((r) => !isScrapApplication(r)) : rows),
+    [rows, tab, jobAll, lockedJobId],
   );
   /** ฐานของแท็บ Scrap ก่อนกดชิป — คำค้น/วันที่ชุดเดียวกับแท็บผู้สมัคร */
   const scrapBase = useMemo(

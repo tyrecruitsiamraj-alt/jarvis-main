@@ -586,7 +586,7 @@
     {
      "label": "Scrap (ในเมนู ▾)",
      "action": "tab",
-     "target": "?view=scrap (ScrapCandidatesPanel ทุกใบขอ)",
+     "target": "?view=scrap (ตารางแท็บผู้สมัคร โหมด Scrap ทุกใบขอ)",
      "api": "GET /api/scrap-candidates?all=1",
      "effects": [],
      "when": null,
@@ -1365,7 +1365,7 @@
     {
      "label": "Scrap (ในเมนู ▾)",
      "action": "tab",
-     "target": "?view=scrap (ScrapCandidatesPanel ทุกใบขอ)",
+     "target": "?view=scrap (ตารางแท็บผู้สมัคร โหมด Scrap ทุกใบขอ)",
      "api": "GET /api/scrap-candidates?all=1",
      "effects": [],
      "when": null,
@@ -4117,7 +4117,7 @@
    "title": "ผู้สมัคร",
    "route": "/jobs/siamraj/:id/applicants",
    "parent": "unit-request-detail",
-   "src": "src/pages/jobs/UnitRequestTabPage.tsx:52",
+   "src": "src/pages/jobs/UnitRequestTabPage.tsx:108",
    "controls": [
     {
      "label": "ย้อนกลับ / กลับไปงานสรรหา",
@@ -4181,46 +4181,59 @@
    "title": "Scrap",
    "route": "/jobs/siamraj/:id/scrap",
    "parent": "unit-request-detail",
-   "src": "src/pages/jobs/UnitRequestTabPage.tsx:272",
+   "src": "src/pages/jobs/UnitRequestTabPage.tsx:113",
    "controls": [
     {
-     "label": "ชิป ทั้งหมด / ผ่านเกณฑ์ / ต้องดูเพิ่ม / ไม่ผ่าน / ยังไม่ประเมิน",
+     "label": "กล่องมุมมอง (ไม่ได้ส่ง AI · อายุเกิน · รอโทร … · อยู่ในการติดต่อ · อยู่ในผู้สมัคร · ไม่มีเบอร์) + ผลประเมิน",
      "action": "filter",
      "target": "หน้านี้",
      "api": null,
      "effects": [],
      "when": null,
-     "src": "src/components/jobs/ScrapCandidatesPanel.tsx:155"
+     "src": "src/components/recruit-rm/RmWorkspace.tsx:1216"
     },
     {
-     "label": "ติ๊กชื่อ (ไม่มีเบอร์/อยู่ในการติดต่อแล้ว ติ๊กไม่ได้)",
-     "action": "inline",
+     "label": "ส่ง AI โทร (ติ๊ก/รายแถว)",
+     "action": "api",
+     "target": "ป๊อปยืนยันรายชื่อ",
+     "api": "POST /api/scrap-candidates (apply) → POST /api/application-call-choice (ai)",
+     "effects": [
+      "สร้างใบสมัคร Scrap · JobBKK/JobThai",
+      "เข้าคิว AI บท เห็นประวัติบนเว็บ"
+     ],
+     "when": null,
+     "src": "src/components/recruit-rm/RmWorkspace.tsx:933"
+    },
+    {
+     "label": "เก็บไปโทรเอง",
+     "action": "api",
+     "target": "แท็บการติดต่อ",
+     "api": "POST /api/scrap-candidates (apply) → POST /api/application-call-choice (manual)",
+     "effects": [
+      "สร้างใบสมัคร",
+      "จองใบ + ล็อกเบอร์"
+     ],
+     "when": null,
+     "src": "src/components/recruit-rm/RmWorkspace.tsx:897"
+    }
+   ]
+  },
+  {
+   "id": "unit-request-match",
+   "kind": "page",
+   "title": "จับคู่งาน",
+   "route": "/jobs/siamraj/:id/match",
+   "parent": "unit-request-detail",
+   "src": "src/pages/jobs/UnitRequestTabPage.tsx:120",
+   "controls": [
+    {
+     "label": "แผงจับคู่คนกับใบขอ (ตัวเดียวกับหน้าจับคู่งาน)",
+     "action": "tab",
      "target": "หน้านี้",
      "api": null,
      "effects": [],
      "when": null,
-     "src": "src/components/jobs/ScrapCandidatesPanel.tsx:237"
-    },
-    {
-     "label": "เก็บเข้าการติดต่อ",
-     "action": "api",
-     "target": "หน้านี้ (ข้อความผล + ปุ่มไปหน้าการติดต่อ)",
-     "api": "POST /api/scrap-candidates",
-     "effects": [
-      "สร้างใบสมัครป้าย Scrap · JobBKK/JobThai (เบอร์ซ้ำ 14 วัน = ใช้ใบเดิม)",
-      "เก็บเป็น Lead ของคนกด · AI ไม่โทรเอง"
-     ],
-     "when": "ติ๊กอย่างน้อย 1 คน",
-     "src": "src/components/jobs/ScrapCandidatesPanel.tsx:172"
-    },
-    {
-     "label": "ไปหน้าการติดต่อ",
-     "action": "navigate",
-     "target": "/jobs/board?view=contact",
-     "api": null,
-     "effects": [],
-     "when": "หลังเก็บสำเร็จ",
-     "src": "src/components/jobs/ScrapCandidatesPanel.tsx:177"
+     "src": "src/pages/matching/MatchingPage.tsx:3610"
     }
    ]
   },
@@ -4859,7 +4872,7 @@
   {
    "id": "unit-ai-match-redirect",
    "kind": "page",
-   "title": "/jobs/siamraj/:id/ai-match (แท็บ AI Match ถอดแล้ว)",
+   "title": "/jobs/siamraj/:id/ai-match (พาไปแท็บจับคู่งานของใบเดิม)",
    "route": "/jobs/siamraj/:id/ai-match",
    "parent": "legacy-redirects",
    "src": "src/App.tsx:187",
@@ -4867,7 +4880,7 @@
     {
      "label": "(เด้งเองอัตโนมัติ — ไม่พกเลขใบขอไปด้วย)",
      "action": "navigate",
-     "target": "/jobs/board?view=match",
+     "target": "/jobs/siamraj/:id/match",
      "api": null,
      "effects": [],
      "when": null,

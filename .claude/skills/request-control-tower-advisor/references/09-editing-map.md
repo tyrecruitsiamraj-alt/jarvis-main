@@ -14743,3 +14743,10 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 - ถอดก้อนย่อย ยังต้องหาคน · เริ่มงานแล้ว (หัวเหลือ 5 ช่อง · `ReleaseLaneKey` ไม่มี sourcing/started · ledger ไม่มี releasable/startedAlready) + หัวข้อกรอง "สถานะทำงาน"
 - หน้าทีม Online: เลน + ใบเปิดต่อ BU นับเฉพาะ `isPostingBoardJob` (`RawBoardJob.posting`) · ทะเบียนอนุมัติยังใช้ใบเปิดทุกใบ · ลิงก์ "ยังไม่ประกาศ" → `?lane=unreleased`
 - ⚠️ หน้าภาพรวมก้อนการประกาศ (`PostingProgress`) ยังนับใบเปิดทุกสถานะ และยังแยก ยังต้องหาคน/เริ่มงานแล้ว (คำอยู่ในไฟล์) — เลขไม่เท่าหัวหน้าโพสต์ประกาศแล้ว รอเจ้าของเคาะ
+
+### 25 พ.ย. 2569 (7) — หน้าใบขอ: แท็บจับคู่งาน · ผู้สมัคร/Scrap ใช้ตารางหน้าผู้สมัคร + ชื่อตำแหน่งมีตำแหน่ง ERP นำหน้า
+- `UNIT_TAB_IDS` = detail · applicants · scrap · match · actions · route `/jobs/siamraj/:id/match` · ลิงก์เก่า `/ai-match` → แท็บ match ของใบเดิม (`UnitMatchMovedRedirect`)
+- `UnitRequestTabPage`: ผู้สมัคร = `RmWorkspace lockedJobId` (โหลดทุกคนของใบ · ตัดใบจาก Scrap) · Scrap = `RmWorkspace scrap lockedJobId` (`fetchScrapCandidatesOfJob`) · จับคู่งาน = `MatchingPage lockedJob` (lazy)
+- `MatchingPage` prop `lockedJob`: ไม่มีลิสต์/หัวหน้า · ไม่แตะ `?jobId=` · เนื้อแผงอยู่ `jobPanelBody` ใช้ทั้งแผงข้าง (Sheet) และแท็บในใบขอ · ไม่มีปุ่ม "ดูใบขอ"
+- ถอด `ScrapCandidatesPanel.tsx` (ไม่มีที่ใช้แล้ว) · ผัง Flow ระบบอัปเดต
+- ชื่อตำแหน่ง: `primaryJobRoleLabel` (`api/_lib/siamrajJobMapping.ts` ที่เดียว ทุกเส้นดึงใบขอ ERP) = ตำแหน่ง ERP ที่ไม่ใช่ "พนักงาน" + ประเภทงาน ("หัวหน้าไซด์ คนสวน") · เทสต์ `tests/api/positionTitlePrefix2569-11-25.test.ts`

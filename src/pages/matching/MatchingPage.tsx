@@ -498,14 +498,20 @@ function jobTitleText(j: JobRequest): string {
  * `embedded` = ฝังเป็นมุมมอง "จับคู่งาน" ใต้แท็บ "โพสต์ประกาศ ▾" ของหน้างานสรรหา (เจ้าของ 11 พ.ย. 2569
  * "จับคู่งานย้ายไปไว้กับ โพสต์ประกาศ แบบกดแล้วมีลูกศรให้เลือก" · ทำตามแบบร่าง) — หัวหน้า/แท็บของหน้านี้ไม่ขึ้น (หน้าแม่มีแล้ว)
  */
-const MatchingPage: React.FC<{ embedded?: boolean }> = ({ embedded = false }) => {
+/**
+ * `lockedJob` = แท็บ "จับคู่งาน" ในหน้าใบขอ (เจ้าของ 25 พ.ย. 2569 "กดใบขอไหน … จับคู่งานก็ทำจากใบขอนั้นๆได้เลย" ·
+ * Choice "แท็บจับคู่งานในใบขอ") — แผงจับคู่ของใบนั้นกางในหน้าเลย (ตัวเดียวกับแผงข้างของหน้านี้) ไม่มีลิสต์ใบขอ ไม่แตะ `?jobId=`
+ * เก็บคนแล้วไปหน้าการติดต่อหลักตามเดิม (ไม่มีแท็บการติดต่อในใบขอ)
+ */
+const MatchingPage: React.FC<{ embedded?: boolean; lockedJob?: JobRequest | null }> = ({ embedded = false, lockedJob = null }) => {
+  const locked = Boolean(lockedJob);
   const navigate = useNavigate();
   const { user, hasPermission } = useAuth();
   /** หน้า "งานโทร" ยังซ่อนไว้ให้แอดมิน — ลิงก์ที่ชี้ไปหน้านั้นต้องซ่อนตามกัน */
   // ในโหมด server-side list ไม่ต้องดึง feed 500 ใบมาที่ client — ใช้ serverItems แทน
   // skip=true → hook ไม่ยิง /api/siamraj/unit-requests?limit=500 เลย
   const { jobs: feedJobs, loading: feedLoading } = useUnitRequestsFeed({
-    skip: MATCHING_SERVER_LIST_ENABLED,
+    skip: MATCHING_SERVER_LIST_ENABLED || locked,
   });
   const [searchParams, setSearchParams] = useSearchParams();
   const [search, setSearch] = useState('');
@@ -535,7 +541,7 @@ const MatchingPage: React.FC<{ embedded?: boolean }> = ({ embedded = false }) =>
    */
   const jobUrlHistory = useUrlDialogHistory({
     param: 'jobId',
-    isOpen: !!jobDetail,
+    isOpen: !!jobDetail && !locked,
     onClose: () => setJobDetail(null),
   });
   const [localJobEditsById, setLocalJobEditsById] = useState<Record<string, Partial<JobRequest>>>({});
@@ -665,7 +671,7 @@ const MatchingPage: React.FC<{ embedded?: boolean }> = ({ embedded = false }) =>
   };
 
   useEffect(() => {
-    if (!MATCHING_SERVER_LIST_ENABLED) return;
+    if (!MATCHING_SERVER_LIST_ENABLED || locked) return;
     // debounce เฉพาะตอนพิมพ์ค้นหา — เปลี่ยน filter อื่นยิงทันที
     const t = window.setTimeout(() => void fetchServerPage(1, false), search.trim() ? 350 : 0);
     return () => window.clearTimeout(t);
@@ -1517,8 +1523,9 @@ const MatchingPage: React.FC<{ embedded?: boolean }> = ({ embedded = false }) =>
      * 🔴 เปิดรายละเอียด = **push `?jobId=` ลง URL** (Wave 3.3 · 5 ก.ย. 2569)
      * เดิมเปิดโดยไม่แตะ URL เลย ⇒ กดย้อนกลับแล้ว **หลุดออกจากหน้าทั้งหน้า**
      * ทั้งที่คนใช้แค่อยากปิดแผงกลับไปดูลิสต์เดิม · กติกาเต็มอยู่ที่ `useUrlDialogHistory`
+     * แท็บในหน้าใบขอ (`lockedJob`) ไม่แตะ URL — แผงคือทั้งแท็บ ไม่มีอะไรให้ปิด
      */
-    jobUrlHistory.openWithUrl(j.id);
+    if (!locked) jobUrlHistory.openWithUrl(j.id);
     setJobDetail({ ...j, ...(localJobEditsById[j.id] || {}) });
     setShowDistantCandidates(true);
     setProposeError(null);
@@ -1552,7 +1559,15 @@ const MatchingPage: React.FC<{ embedded?: boolean }> = ({ embedded = false }) =>
   // fired-guard แบบเดียวกับ ?ir=1 · ไม่งั้นตอน ?ir=1 ถูกลบจาก URL (setSearchParams) effect
   // นี้ยิงซ้ำ → openJob เดิมอีกรอบ → ป้ายผลโทร Lumos ทั้งใบหาย + ติ๊กที่เลือกไว้ถูกล้าง
   const openedJobIdRef = React.useRef<string | null>(null);
+  // แท็บจับคู่งานของใบขอ — เปิดแผงของใบนั้นครั้งเดียวต่อใบ
   useEffect(() => {
+    if (!lockedJob || openedJobIdRef.current === lockedJob.id) return;
+    openedJobIdRef.current = lockedJob.id;
+    openJob(lockedJob);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- เปิดครั้งเดียวต่อใบ (openJob ล้างที่ติ๊กไว้ ห้ามยิงซ้ำ)
+  }, [lockedJob?.id]);
+  useEffect(() => {
+    if (locked) return;
     const jobId = searchParams.get('jobId');
     if (!jobId) return;
     if (openedJobIdRef.current === jobId || jobDetail?.id === jobId) return;
@@ -2302,359 +2317,14 @@ const MatchingPage: React.FC<{ embedded?: boolean }> = ({ embedded = false }) =>
    * พฤติกรรมนี้ใช้ร่วมกับ `PreCheckPage` ที่ `useUrlDialogHistory` **ห้ามแยกกัน**
    */
   const closeJob = () => {
+    if (locked) return;
     setJobDetail(null);
     jobUrlHistory.closeAndSyncUrl();
   };
 
-  return (
-    <div>
-      {/* ช่องค้นหาอยู่แถวเดียวกับหัวเรื่องแบบหน้า Dashboard (เจ้าของสั่ง 10 ส.ค. 2569)
-          เดิมอยู่ในกล่องตัวกรองใต้แผง funnel ซึ่งต้องเลื่อนลงไปหา */}
-      {embedded ? null : (
-      <PageHeader
-        /* 🔴 ชื่อหัวหน้าต้อง = ชื่อเมนู เสมอ — เดิมเป็น "Matching — คนของเรา" */
-        title={conveyorLabel('matching')}
-        /* คำโปรยใต้หัวเรื่องเอาออก (เจ้าของสั่ง 13 ส.ค. 2569) — หน้านี้คนใช้ทุกวันอยู่แล้ว */
-        subtitle=""
-        backPath="/matching"
-        actions={
-          searchInHeader ? undefined : (
-            <SearchField
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="ค้นหา site / หน่วยงาน / ตำแหน่ง / สถานที่"
-              wrapperClassName="w-full sm:w-[26rem]"
-            />
-          )
-        }
-      />
-      )}
-      <div className={cn('space-y-4', !embedded && 'px-4 md:px-6')}>
-        {/* การไหลของการโทร — เจ้าของสั่งให้มี "เฉพาะหน้านี้" (10 ส.ค. 2569)
-            ใช้คอมโพเนนต์ตัวเดียวกับหน้า Follow ตัวเลข/นิยาม/โทนสีจึงมาจากที่เดียวกัน
-            เริ่มที่ "ทั้งระบบ" เพราะงานโทรเกือบทั้งหมดออกจากหน้านี้อยู่แล้ว
-            (ข้อมูลจริง: คนของเรา 5,280 + iRecruit 26 + Follow 1) แล้วกดสลับดูรายต้นทางได้
-            หัวแผงบอกเสมอว่ากำลังดูต้นทางไหน จึงไม่ซ้ำรอย "เลขถูกแต่ตอบผิดคำถาม" */}
-        {/* เจ้าของสั่ง 11 ส.ค. 2569: เอาการ์ดสรุปฝั่งงานเข้ามารวมกับการไหลของงาน
-            "จะได้ติดตามได้ง่าย ๆ ในแบบ visual ที่ชัดเจน" — เดิมเป็นสองก้อนคนละที่
-            คนอ่านต้องกวาดตาสองรอบแล้วต่อเรื่องเอาเองว่าอัตราที่ยังไม่มีคนกับสายที่โทรไป
-            เกี่ยวกันยังไง · ตอนนี้อ่านรวดเดียว: มีอัตราเท่าไหร่ → AI หาคนได้แค่ไหน →
-            โทรไปถึงไหนแล้ว
-            ⚠️ การ์ดแถวฝั่งงาน **ยังเป็นตัวกรองรายการด้านล่างเหมือนเดิม** (กล่องตัวกรอง
-            ถูกเอาออกไปแล้ว 10 ส.ค. นี่คือทางกรองทางเดียวที่เหลืออยู่ ห้ามทำหาย) */}
-        {/* แผง "AI โทร" — 2 แถวสถานะเดียวกัน (AI · คนเก็บไปโทร) ในกรอบเดียว
-            (เจ้าของสั่ง 14 ส.ค. 2569 · แทน CallFunnelPanel เดิมที่เป็น funnel 4 ช่อง)
-            ⚠️ หน้า Follow ยังใช้ CallFunnelPanel อยู่ — แผงนี้เฉพาะหน้า Matching */}
-
-        {/* แถบชิปกรองรายการ — แทน "ขั้น 1 ฝั่งงาน" เดิม (ทางกรองทางเดียวที่เหลือ ห้ามทำหาย)
-            โฉมเดียวกับชิปเลนหน้าโพสต์ประกาศ (15 ต.ค. 2569): ปุ่ม xs · ทึบเมื่อเลือก · เลขต่อท้าย */}
-        <div className="flex flex-wrap items-center gap-1.5" data-testid="matching-filter-chips">
-          {filterChips.map((c) => (
-            <Button
-              key={c.key}
-              type="button"
-              size="xs"
-              variant={c.active ? 'default' : 'outline'}
-              onClick={c.on}
-              disabled={serverListLoading}
-              aria-pressed={c.active}
-              className="shrink-0"
-            >
-              {c.label}
-              {/* ระหว่างโหลดยังไม่รู้เลข — ห้ามขึ้น 0 (QA 17 ต.ค. 2569) · 1 พ.ย. 2569 ชิปหน้าตาเดียวกับหน้าโพสต์ประกาศ (เลขไม่ระบายสี + หน่วยใบ) */}
-              <span className="tabular-nums">
-                {(loadingJobs || serverListLoading) && c.count === 0 ? '…' : `${c.count.toLocaleString('th-TH')} ใบ`}
-              </span>
-            </Button>
-          ))}
-          {/* แผง AI โทร พับเป็นปุ่มเดียว (15 ต.ค. 2569 ตัดหนัก) — กดแล้วกางแถวตัวเลข 2 แถวใต้แถบนี้ */}
-          <Button
-            type="button"
-            size="xs"
-            variant={aiFlowOpen ? 'secondary' : 'ghost'}
-            onClick={() => setAiFlowOpen((v) => !v)}
-            aria-expanded={aiFlowOpen}
-            className="ml-auto shrink-0"
-          >
-            AI โทร
-            <span className="tabular-nums">{aiFlowTotal === null ? '…' : aiFlowTotal.toLocaleString('th-TH')}</span>
-            <ChevronDown className={cn('transition-transform', aiFlowOpen && 'rotate-180')} aria-hidden />
-          </Button>
-        </div>
-        <AiCallFlowPanel defaultSource="all" open={aiFlowOpen} onTotal={setAiFlowTotal} />
-
-        {/* ⚠️ MyCallsSection ("โทรของฉัน") เคยอยู่ตรงนี้ (14 ส.ค. เช้า) — เจ้าของสั่งย้าย
-            (14 ส.ค.): "เก็บไปโทรเองแล้วไปอยู่ไหนหาไม่เจอ · ให้ไปอยู่หน้าการติดต่อ"
-            → Matching = ที่ "เก็บ" (action) · แท็บการติดต่อบนบอร์ด = ที่ "ดู+โทร" (ปลายทาง)
-            เหมือนบอร์ด: เก็บไปติดต่อที่ dialog แล้วไปดูที่แท็บการติดต่อ · ตอนนี้ MyCallsSection
-            อยู่ในแท็บการติดต่อ (RmWorkspace) แยกส่วนจาก list "เก็บไปติดต่อ" (claim) */}
-
-        {/* ⚠️ แผง "ชุดส่งงานโทร" (CallBatchPanel) เคยอยู่ตรงนี้ — เจ้าของสั่งเอาออก 10 ส.ค. 2569
-            เอาออกจากทุกหน้าแล้ว (หน้าหลัก → หน้านี้ → ไม่เอาเลย) และลบคอมโพเนนต์ทิ้ง
-
-            **ทางตันที่ตามมาถูกปิดแล้ว 11 ส.ค. 2569** — เจ้าของเคาะว่าให้ข้ามขั้นอนุมัติ
-            ปุ่มในแถบติ๊กเลือกจึงเป็น "ตั้งคิวโทร (n)" ที่สร้างชุด `approved` เลย
-            แล้วคงช่วงถอนคำ 10 นาทีไว้เป็นตัวกันพลาด (ดู CallBatchUndoStrip ใต้แถบติ๊กเลือก)
-
-            โหมด assist (ระบบจัดชุด คนอนุมัติ) ถูกถอดทิ้งในวันเดียวกัน — มันเป็นทางเดียว
-            ที่เหลือที่ยังผลิตชุด `pending_approval` ได้ ซึ่งไม่มีใครอนุมัติได้แล้ว */}
-
-        {/* ⚠️ กล่องตัวกรอง (ด่วนเท่านั้น · BU · หน่วยงาน · ชิปสถานะ 6 ตัว) เคยอยู่ตรงนี้
-            — เจ้าของสั่งเอาออก 10 ส.ค. 2569
-
-            **state ของตัวกรองยังอยู่ครบและยังทำงาน** (`urgentOnly` · `buFilter` · `unitFilter`
-            · `workflowFilter`) เพราะยังมีทางตั้งค่าจากที่อื่น:
-            - ลิงก์จากหน้าหลัก (`?workflow=none` / `?workflow=green`) และการ์ดสรุปด้านล่าง
-              ซึ่งกดแล้วตั้ง workflowFilter ให้
-            - URL param ที่แชร์กันไว้เดิมยังใช้ได้ ไม่พัง
-            ถ้าวันไหนอยากได้ตัวกรองกลับมา เปิดบล็อกนี้คืนได้เลยโดยไม่ต้องแก้ตรรกะ */}
-
-        {/* ⚠️ กล่องสรุป 5 ใบเคยอยู่ตรงนี้ — ย้ายขึ้นไปรวมในแถบ "การไหลของงาน" ด้านบน
-            (เจ้าของสั่ง 11 ส.ค. 2569) · ตัวสร้างอยู่ที่ `demandFlowRow` ใกล้ ๆ state ของตัวกรอง
-            ตรรกะการกดกรองไม่เปลี่ยนเลย เปลี่ยนแค่ที่วางกับหน้าตาให้เป็นชุดเดียวกับเส้นการโทร */}
-        {/* ⚠️ บรรทัด "AI วิเคราะห์แล้ว N ใบ · ที่เหลือประมาณจากสกิล…" เคยอยู่ตรงนี้ —
-            เจ้าของสั่งเอาออก 13 ส.ค. 2569 · ความหมายเดิมยังบอกอยู่ที่ชิปบนการ์ดแต่ละใบ
-            ("AI แนะนำ N" ทึบ = ผ่าน AI แล้ว · "~N (ยังไม่ผ่าน AI)" เส้นประ = ประมาณ) */}
-
-        {/* ⚠️ ชิป "ของฉันถืออยู่ n คน" เคยอยู่ตรงนี้ — เอาออกพร้อมปุ่มรับไปโทรเอง
-            (เจ้าของสั่ง 11 ส.ค. 2569) หน้านี้ไม่มีทางรับงานโทรและไม่มีที่บันทึกผลแล้ว
-            ชิปที่นับงานที่รับไว้จึงชี้ไปที่ที่ไม่มีอยู่ · งานที่ยังถืออยู่ดูได้ที่ถัง
-            "ต้องคนตาม" ในแถบการไหลของงาน ซึ่งเป็นที่ที่กดรับมาแต่แรก */}
-
-        {/* หัวลิสต์ — เจ้าของสั่ง 13 ส.ค. 2569 ให้เหลือแค่ของที่ใช้จริง:
-            ตัดบรรทัด "ใบขอ N รายการ · แสดงลำดับ…" ออก (ยอดรวมอยู่บนแถบการไหลของงานแล้ว
-            เลขหน้าอยู่ที่แถบเลขหน้าท้ายลิสต์) · "หน้าละ" กับ "เรียงตาม" เป็น dropdown
-            แทนแถบปุ่ม 5 อัน (กินที่ทั้งบรรทัดโดยที่คนเลือกครั้งเดียวแล้วไม่แตะอีก) ·
-            คู่มือ "สีบอกอายุใบขอ" ตัดออก (แถบสีซ้ายการ์ดมี title บอกเกณฑ์อยู่แล้ว) */}
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 px-1">
-          {loadingJobs || serverListLoading ? (
-            <p className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
-              <LoaderCircle className="h-3.5 w-3.5 animate-spin text-primary" />
-              <span>กำลังโหลดรายการ…</span>
-            </p>
-          ) : null}
-          <div className="ml-auto flex shrink-0 flex-wrap items-center gap-2">
-            <label className="flex items-center gap-1 text-xs text-muted-foreground">
-              <span>หน้าละ</span>
-              <select
-                value={pageSize}
-                disabled={serverListLoading}
-                onChange={(e) => changePageSize(Number(e.target.value))}
-                className="rounded-lg border border-border bg-background px-2 py-1 text-xs font-medium tabular-nums text-foreground disabled:cursor-wait"
-              >
-                {MATCHING_PAGE_SIZE_OPTIONS.map((size) => (
-                  <option key={size} value={size}>
-                    {size}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="flex items-center gap-1 text-xs text-muted-foreground">
-              <span>เรียงตาม</span>
-              <select
-                value={sortBy}
-                disabled={serverListLoading}
-                onChange={(e) => setSortBy(e.target.value as MatchingListSort)}
-                className="rounded-lg border border-border bg-background px-2 py-1 text-xs font-medium text-foreground disabled:cursor-wait"
-              >
-                {(
-                  [
-                    ['default', 'เลยกำหนดและฉุกเฉินก่อน'],
-                    ['age_desc', 'ค้างนานสุด → ใหม่สุด'],
-                    ['age_asc', 'ใหม่สุด → ค้างนานสุด'],
-                    ['recommend', 'มีคนแนะนำก่อน'],
-                    ['green_desc', 'ใบที่มีคนตรงสเปกมากสุดก่อน'],
-                    ['no_recommend', 'ยังไม่มีคนแนะนำก่อน'],
-                  ] as Array<[MatchingListSort, string]>
-                ).map(([value, label]) => (
-                  <option key={value} value={value}>
-                    {label}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-
-          <div className="flex w-full flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-            {/* ⚠️ ชิป "AI พร้อมแล้ว" (สถานะ idle) เคยอยู่ระหว่างสองชิปนี้ — เจ้าของสั่งเอาออก
-                12 ส.ค. 2569 ("AI พร้อมแล้ว ไม่ต้องเอามาโชว์") · idle = ไม่มีข้อมูลให้ทำอะไรต่อ
-                คงไว้เฉพาะสถานะที่คนต้องรู้: กำลังประมวลผล (มีของกำลังวิ่ง) กับ ปิดอยู่ */}
-            {workerStatus?.started && workerStatus.queueSize > 0 ? (
-              <span className={cn('inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium', TONE.warn.soft, TONE.warn.value)}>
-                <LoaderCircle className="h-2.5 w-2.5 animate-spin" /> AI กำลังประมวลผล {workerStatus.queueSize} ใบ
-              </span>
-            ) : workerStatus && !workerStatus.enabled ? (
-              <span className={cn('inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium', TONE.neutral.soft, DASH.muted)}>
-                AI ปิดอยู่
-              </span>
-            ) : null}
-          </div>
-        </div>
-
-        {/* การ์ดรวมใบขอ */}
-        <div className="space-y-2.5" ref={listTopRef}>
-          {serverListError ? (
-            <p className={cn('rounded-xl border px-3.5 py-2.5 text-xs font-medium', TONE.danger.soft, TONE.danger.value)}>
-              {serverListError} — ลองรีเฟรชหน้า
-            </p>
-          ) : null}
-          {/* โหลดครั้งแรก (ยังไม่มีข้อมูลใน cache) — spinner ตัวเดียวพร้อมข้อความ
-              ชัดกว่าการ์ดหลอก 8 ใบ ที่คนเข้าใจผิดว่าหน้าค้างแล้วกด refresh ซ้ำ */}
-          {rows.length === 0 && (loadingJobs || serverListLoading) ? (
-            <div className="glass-card flex flex-col items-center justify-center gap-3 rounded-2xl border border-white/70 px-6 py-16 text-center">
-              <LoaderCircle className="h-8 w-8 animate-spin text-primary" aria-hidden />
-              <div>
-                <p className="text-sm font-medium text-foreground">กำลังโหลดใบขอ…</p>
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  ดึงใบขอจากระบบ <Term k="erp" /> พร้อมผลที่ AI คิดไว้ · ไม่ต้องกดซ้ำ
-                </p>
-              </div>
-            </div>
-          ) : null}
-          {rows.length === 0 && !loadingJobs && !serverListLoading ? (
-            <div className="glass-card rounded-2xl p-8 border border-white/70 text-center text-muted-foreground">
-              <Search className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
-              <p className="text-sm font-medium text-foreground">ไม่พบใบขอตามเงื่อนไข</p>
-            </div>
-          ) : null}
-          {/* ═══ การ์ดใบขอ — กริด 3 คอลัมน์แบบการ์ดหน้าโพสต์ประกาศ (เจ้าของ Choice 15 ต.ค. 2569 "แบบโพสต์ประกาศ") ═══
-              เดิมการ์ดยาวเต็มแถว + แถบสีซ้าย + แถบผลโทร 6 ช่อง (ส่วนใหญ่ 0) · ตอนนี้: ชื่อ/ตำแหน่ง · ป้ายอายุมุมขวา ·
-              ชิปทำต่อ · ที่อยู่/เงิน/วันที่ · ผลโทรบรรทัดเดียว · ก้นการ์ด = เหลือหา + ปุ่ม
-              🔴 ป้ายอายุใช้ getJobAgeChipInfo ตัวเดียวกับโพสต์ประกาศ (ห้ามสเกลสีอายุชุดที่สอง) */}
-          <div
-            className={cn(
-              'grid gap-3 transition-opacity duration-200 sm:grid-cols-2 lg:grid-cols-3',
-              rows.length > 0 && serverListLoading && 'pointer-events-none opacity-50',
-            )}
-            data-testid="matching-job-grid"
-          >
-          {visibleRows.map((j) => {
-            const matchCount = boardMatchById[j.id]
-              ? recommendedCandidateCount(boardMatchById[j.id].matches)
-              : serverStoredMatches[j.id]
-                ? serverStoredMatches[j.id].recommended
-                : undefined;
-            const requested = requestPositionCount(j);
-            const remaining = officialRemainingCount(j);
-            const age = getJobAgeChipInfo(j);
-            return (
-              <Card
-                key={j.id}
-                role="button"
-                tabIndex={0}
-                onClick={() => openJob(j)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    openJob(j);
-                  }
-                }}
-                className="group flex h-full cursor-pointer flex-col gap-2 rounded-2xl p-3 shadow-sm transition-colors hover:border-primary/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
-              >
-                {/* ── ชื่อ + ตำแหน่ง · มุมขวา = ด่วน / ผ่านมากี่วัน ── */}
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0 space-y-0.5">
-                    {/* ชื่อ/ตำแหน่ง/บรรทัดรอง — ตัวเดียวกับการ์ดโพสต์ประกาศ (BoardJobCard) */}
-                    <h2 className="line-clamp-2 text-lg font-medium text-foreground group-hover:text-primary">
-                      {jobBoardCardTitle(j)}
-                    </h2>
-                    <p className="line-clamp-1 text-base font-medium text-primary">{publicJobTitle(j)}</p>
-                  </div>
-                  <div className="flex shrink-0 flex-col items-end gap-1">
-                    {j.urgency === 'urgent' ? (
-                      <span className="rounded-md bg-destructive/10 px-2 py-0.5 text-sm font-medium text-destructive">ฉุกเฉิน</span>
-                    ) : null}
-                    <span className={cn('rounded-md border px-1.5 py-0.5 text-sm font-medium', JOB_AGE_CHIP_META[age.level].chipCls)} title={age.title}>
-                      {age.cardText}
-                    </span>
-                  </div>
-                </div>
-
-                {/* ── ที่ไหน — ของอื่น (ชิปทำต่อ · AI แนะนำ · เงิน/วันที่ · ผลโทร · หาคนจากกองไม่สนใจ) อยู่ในป๊อปรายละเอียด
-                    (เจ้าของ 15 ต.ค. 2569 "หน้าจับคู่ก็รก ดูไม่เป็นมืออาชีพ" · Choice "ตัดหนัก เหลือเท่าที่ต้องใช้") ── */}
-                <p className={cn('flex min-w-0 items-start gap-1.5 text-sm', DASH.muted)}>
-                  <MapPin className="mt-0.5 size-4 shrink-0" aria-hidden />
-                  <span className="line-clamp-2 min-w-0">{j.location_address || EM_DASH}</span>
-                </p>
-
-                {/* ── ก้นการ์ด: เหลือหา + ปุ่มทำต่อ ── */}
-                <div className="mt-auto flex flex-wrap items-center justify-between gap-2 border-t border-border/70 pt-2">
-                  <p className="text-sm text-foreground">
-                    เหลือหา <b className={cn('tabular-nums', TONE.warn.value)}>{remaining}</b>
-                    <span className={DASH.muted}> / {requested} อัตรา</span>
-                  </p>
-                  <Button
-                    type="button"
-                    size="xs"
-                    variant="outline"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      openJob(j);
-                    }}
-                    className="shrink-0 rounded-lg"
-                  >
-                    <Users aria-hidden />
-                    {boardLoadingId === j.id ? 'กำลังโหลด…' : matchCount != null ? `ดูคน ${matchCount}` : 'ดูคน'}
-                  </Button>
-                </div>
-              </Card>
-            );
-          })}
-          </div>
-          {totalPages > 1 ? (
-            <nav aria-label="เปลี่ยนหน้ารายการใบขอ" className="space-y-1.5 pt-1">
-              <div className="flex flex-wrap items-center justify-center gap-1.5">
-                <Button type="button" variant="outline" size="sm" disabled={serverListLoading || currentPage <= 1} onClick={() => goToPage(currentPage - 1)}>
-                  ← ก่อนหน้า
-                </Button>
-                {pageItems.map((item, idx) =>
-                  item === '…' ? (
-                    <span key={`gap-${idx}`} className="px-1 text-sm text-muted-foreground">
-                      …
-                    </span>
-                  ) : (
-                    <Button
-                      key={item}
-                      type="button"
-                      size="sm"
-                      variant={item === currentPage ? 'default' : 'outline'}
-                      disabled={serverListLoading}
-                      onClick={() => goToPage(item)}
-                      aria-current={item === currentPage ? 'page' : undefined}
-                      className="min-w-9 tabular-nums"
-                    >
-                      {item}
-                    </Button>
-                  ),
-                )}
-                <Button type="button" variant="outline" size="sm" disabled={serverListLoading || currentPage >= totalPages} onClick={() => goToPage(currentPage + 1)}>
-                  ถัดไป →
-                </Button>
-              </div>
-              <p className="text-center text-xs text-muted-foreground">
-                {serverListLoading
-                  ? 'กำลังโหลด…'
-                  : `แสดงลำดับ ${pageRangeStart.toLocaleString()}–${pageRangeEnd.toLocaleString()} จาก ${listTotal.toLocaleString()} ใบ`}
-              </p>
-            </nav>
-          ) : null}
-        </div>
-      </div>
-
-      {/* Drawer: คนของเรา ต่อใบขอ */}
-      {/* 🔴 `backClose={false}` — แผงนี้ผูกกับ `?jobId=` อยู่แล้ว ปล่อยให้ตัวห่อกลาง
-          ของ shadcn ปักประวัติซ้ำ = สองระบบแย่งกันจัดการ (ดู `useUrlDialogHistory`) */}
-      <Sheet backClose={false} open={!!jobDetail} onOpenChange={(o) => !o && closeJob()}>
-        <SheetContent
-          side="right"
-          className="matching-sheet-scroll w-full overflow-y-auto [scrollbar-gutter:stable] sm:max-w-xl"
-        >
-          {/* 20 ต.ค. 2569 เจ้าของ: "แก้หน้านี้ให้ดูสวย ดูง่าย ลดความเป็น AI · ใช้ shadcn · ระยะห่างเท่ากัน"
-              ⇒ หัวใบขอเป็น Card เดียว · ป้ายเงื่อนไขเป็น Badge · ปุ่มเป็น Button · ตัดเลขใบขอที่ขึ้นซ้ำ */}
-          <SheetHeader className="space-y-1">
-            <SheetTitle className="text-foreground">จับคู่คนกับใบขอ</SheetTitle>
-            <SheetDescription>จากกล่อง ไม่มีงาน · Re Use · Drop</SheetDescription>
-          </SheetHeader>
+  /** แผงจับคู่ของใบที่เปิด — แผงข้าง (Sheet) ของหน้านี้ หรือทั้งแท็บจับคู่งานในหน้าใบขอ (`lockedJob`) */
+  const jobPanelBody = (
+    <>
           {jobDetail ? (
             <div className="mt-4 space-y-4">
               <Card className="space-y-3 rounded-2xl p-4">
@@ -2674,11 +2344,14 @@ const MatchingPage: React.FC<{ embedded?: boolean }> = ({ embedded = false }) =>
                     <Button type="button" variant="outline" size="sm" onClick={() => openBranchEditor(jobDetail)}>
                       <MapPin aria-hidden /> แก้เงื่อนไข/สาขา
                     </Button>
+                    {/* อยู่ในหน้าใบขอแล้ว (แท็บจับคู่งาน) ไม่ต้องมีปุ่มพาไปใบขอ */}
+                    {locked ? null : (
                     <Button asChild variant="outline" size="sm">
                       <Link to={unitRequestPath(jobDetail)} state={{ returnTo: '/jobs/board?view=match' }} onClick={() => setJobDetail(null)}>
                         ดูใบขอ <ExternalLink aria-hidden />
                       </Link>
                     </Button>
+                    )}
                   </div>
                 </div>
                 {jobDetail.location_address ? (
@@ -3590,8 +3263,367 @@ const MatchingPage: React.FC<{ embedded?: boolean }> = ({ embedded = false }) =>
 
             </div>
           ) : null}
+    </>
+  );
+
+  return (
+    <div>
+      {/* ช่องค้นหาอยู่แถวเดียวกับหัวเรื่องแบบหน้า Dashboard (เจ้าของสั่ง 10 ส.ค. 2569)
+          เดิมอยู่ในกล่องตัวกรองใต้แผง funnel ซึ่งต้องเลื่อนลงไปหา */}
+      {embedded || locked ? null : (
+      <PageHeader
+        /* 🔴 ชื่อหัวหน้าต้อง = ชื่อเมนู เสมอ — เดิมเป็น "Matching — คนของเรา" */
+        title={conveyorLabel('matching')}
+        /* คำโปรยใต้หัวเรื่องเอาออก (เจ้าของสั่ง 13 ส.ค. 2569) — หน้านี้คนใช้ทุกวันอยู่แล้ว */
+        subtitle=""
+        backPath="/matching"
+        actions={
+          searchInHeader ? undefined : (
+            <SearchField
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="ค้นหา site / หน่วยงาน / ตำแหน่ง / สถานที่"
+              wrapperClassName="w-full sm:w-[26rem]"
+            />
+          )
+        }
+      />
+      )}
+      {locked ? null : (
+      <div className={cn('space-y-4', !embedded && 'px-4 md:px-6')}>
+        {/* การไหลของการโทร — เจ้าของสั่งให้มี "เฉพาะหน้านี้" (10 ส.ค. 2569)
+            ใช้คอมโพเนนต์ตัวเดียวกับหน้า Follow ตัวเลข/นิยาม/โทนสีจึงมาจากที่เดียวกัน
+            เริ่มที่ "ทั้งระบบ" เพราะงานโทรเกือบทั้งหมดออกจากหน้านี้อยู่แล้ว
+            (ข้อมูลจริง: คนของเรา 5,280 + iRecruit 26 + Follow 1) แล้วกดสลับดูรายต้นทางได้
+            หัวแผงบอกเสมอว่ากำลังดูต้นทางไหน จึงไม่ซ้ำรอย "เลขถูกแต่ตอบผิดคำถาม" */}
+        {/* เจ้าของสั่ง 11 ส.ค. 2569: เอาการ์ดสรุปฝั่งงานเข้ามารวมกับการไหลของงาน
+            "จะได้ติดตามได้ง่าย ๆ ในแบบ visual ที่ชัดเจน" — เดิมเป็นสองก้อนคนละที่
+            คนอ่านต้องกวาดตาสองรอบแล้วต่อเรื่องเอาเองว่าอัตราที่ยังไม่มีคนกับสายที่โทรไป
+            เกี่ยวกันยังไง · ตอนนี้อ่านรวดเดียว: มีอัตราเท่าไหร่ → AI หาคนได้แค่ไหน →
+            โทรไปถึงไหนแล้ว
+            ⚠️ การ์ดแถวฝั่งงาน **ยังเป็นตัวกรองรายการด้านล่างเหมือนเดิม** (กล่องตัวกรอง
+            ถูกเอาออกไปแล้ว 10 ส.ค. นี่คือทางกรองทางเดียวที่เหลืออยู่ ห้ามทำหาย) */}
+        {/* แผง "AI โทร" — 2 แถวสถานะเดียวกัน (AI · คนเก็บไปโทร) ในกรอบเดียว
+            (เจ้าของสั่ง 14 ส.ค. 2569 · แทน CallFunnelPanel เดิมที่เป็น funnel 4 ช่อง)
+            ⚠️ หน้า Follow ยังใช้ CallFunnelPanel อยู่ — แผงนี้เฉพาะหน้า Matching */}
+
+        {/* แถบชิปกรองรายการ — แทน "ขั้น 1 ฝั่งงาน" เดิม (ทางกรองทางเดียวที่เหลือ ห้ามทำหาย)
+            โฉมเดียวกับชิปเลนหน้าโพสต์ประกาศ (15 ต.ค. 2569): ปุ่ม xs · ทึบเมื่อเลือก · เลขต่อท้าย */}
+        <div className="flex flex-wrap items-center gap-1.5" data-testid="matching-filter-chips">
+          {filterChips.map((c) => (
+            <Button
+              key={c.key}
+              type="button"
+              size="xs"
+              variant={c.active ? 'default' : 'outline'}
+              onClick={c.on}
+              disabled={serverListLoading}
+              aria-pressed={c.active}
+              className="shrink-0"
+            >
+              {c.label}
+              {/* ระหว่างโหลดยังไม่รู้เลข — ห้ามขึ้น 0 (QA 17 ต.ค. 2569) · 1 พ.ย. 2569 ชิปหน้าตาเดียวกับหน้าโพสต์ประกาศ (เลขไม่ระบายสี + หน่วยใบ) */}
+              <span className="tabular-nums">
+                {(loadingJobs || serverListLoading) && c.count === 0 ? '…' : `${c.count.toLocaleString('th-TH')} ใบ`}
+              </span>
+            </Button>
+          ))}
+          {/* แผง AI โทร พับเป็นปุ่มเดียว (15 ต.ค. 2569 ตัดหนัก) — กดแล้วกางแถวตัวเลข 2 แถวใต้แถบนี้ */}
+          <Button
+            type="button"
+            size="xs"
+            variant={aiFlowOpen ? 'secondary' : 'ghost'}
+            onClick={() => setAiFlowOpen((v) => !v)}
+            aria-expanded={aiFlowOpen}
+            className="ml-auto shrink-0"
+          >
+            AI โทร
+            <span className="tabular-nums">{aiFlowTotal === null ? '…' : aiFlowTotal.toLocaleString('th-TH')}</span>
+            <ChevronDown className={cn('transition-transform', aiFlowOpen && 'rotate-180')} aria-hidden />
+          </Button>
+        </div>
+        <AiCallFlowPanel defaultSource="all" open={aiFlowOpen} onTotal={setAiFlowTotal} />
+
+        {/* ⚠️ MyCallsSection ("โทรของฉัน") เคยอยู่ตรงนี้ (14 ส.ค. เช้า) — เจ้าของสั่งย้าย
+            (14 ส.ค.): "เก็บไปโทรเองแล้วไปอยู่ไหนหาไม่เจอ · ให้ไปอยู่หน้าการติดต่อ"
+            → Matching = ที่ "เก็บ" (action) · แท็บการติดต่อบนบอร์ด = ที่ "ดู+โทร" (ปลายทาง)
+            เหมือนบอร์ด: เก็บไปติดต่อที่ dialog แล้วไปดูที่แท็บการติดต่อ · ตอนนี้ MyCallsSection
+            อยู่ในแท็บการติดต่อ (RmWorkspace) แยกส่วนจาก list "เก็บไปติดต่อ" (claim) */}
+
+        {/* ⚠️ แผง "ชุดส่งงานโทร" (CallBatchPanel) เคยอยู่ตรงนี้ — เจ้าของสั่งเอาออก 10 ส.ค. 2569
+            เอาออกจากทุกหน้าแล้ว (หน้าหลัก → หน้านี้ → ไม่เอาเลย) และลบคอมโพเนนต์ทิ้ง
+
+            **ทางตันที่ตามมาถูกปิดแล้ว 11 ส.ค. 2569** — เจ้าของเคาะว่าให้ข้ามขั้นอนุมัติ
+            ปุ่มในแถบติ๊กเลือกจึงเป็น "ตั้งคิวโทร (n)" ที่สร้างชุด `approved` เลย
+            แล้วคงช่วงถอนคำ 10 นาทีไว้เป็นตัวกันพลาด (ดู CallBatchUndoStrip ใต้แถบติ๊กเลือก)
+
+            โหมด assist (ระบบจัดชุด คนอนุมัติ) ถูกถอดทิ้งในวันเดียวกัน — มันเป็นทางเดียว
+            ที่เหลือที่ยังผลิตชุด `pending_approval` ได้ ซึ่งไม่มีใครอนุมัติได้แล้ว */}
+
+        {/* ⚠️ กล่องตัวกรอง (ด่วนเท่านั้น · BU · หน่วยงาน · ชิปสถานะ 6 ตัว) เคยอยู่ตรงนี้
+            — เจ้าของสั่งเอาออก 10 ส.ค. 2569
+
+            **state ของตัวกรองยังอยู่ครบและยังทำงาน** (`urgentOnly` · `buFilter` · `unitFilter`
+            · `workflowFilter`) เพราะยังมีทางตั้งค่าจากที่อื่น:
+            - ลิงก์จากหน้าหลัก (`?workflow=none` / `?workflow=green`) และการ์ดสรุปด้านล่าง
+              ซึ่งกดแล้วตั้ง workflowFilter ให้
+            - URL param ที่แชร์กันไว้เดิมยังใช้ได้ ไม่พัง
+            ถ้าวันไหนอยากได้ตัวกรองกลับมา เปิดบล็อกนี้คืนได้เลยโดยไม่ต้องแก้ตรรกะ */}
+
+        {/* ⚠️ กล่องสรุป 5 ใบเคยอยู่ตรงนี้ — ย้ายขึ้นไปรวมในแถบ "การไหลของงาน" ด้านบน
+            (เจ้าของสั่ง 11 ส.ค. 2569) · ตัวสร้างอยู่ที่ `demandFlowRow` ใกล้ ๆ state ของตัวกรอง
+            ตรรกะการกดกรองไม่เปลี่ยนเลย เปลี่ยนแค่ที่วางกับหน้าตาให้เป็นชุดเดียวกับเส้นการโทร */}
+        {/* ⚠️ บรรทัด "AI วิเคราะห์แล้ว N ใบ · ที่เหลือประมาณจากสกิล…" เคยอยู่ตรงนี้ —
+            เจ้าของสั่งเอาออก 13 ส.ค. 2569 · ความหมายเดิมยังบอกอยู่ที่ชิปบนการ์ดแต่ละใบ
+            ("AI แนะนำ N" ทึบ = ผ่าน AI แล้ว · "~N (ยังไม่ผ่าน AI)" เส้นประ = ประมาณ) */}
+
+        {/* ⚠️ ชิป "ของฉันถืออยู่ n คน" เคยอยู่ตรงนี้ — เอาออกพร้อมปุ่มรับไปโทรเอง
+            (เจ้าของสั่ง 11 ส.ค. 2569) หน้านี้ไม่มีทางรับงานโทรและไม่มีที่บันทึกผลแล้ว
+            ชิปที่นับงานที่รับไว้จึงชี้ไปที่ที่ไม่มีอยู่ · งานที่ยังถืออยู่ดูได้ที่ถัง
+            "ต้องคนตาม" ในแถบการไหลของงาน ซึ่งเป็นที่ที่กดรับมาแต่แรก */}
+
+        {/* หัวลิสต์ — เจ้าของสั่ง 13 ส.ค. 2569 ให้เหลือแค่ของที่ใช้จริง:
+            ตัดบรรทัด "ใบขอ N รายการ · แสดงลำดับ…" ออก (ยอดรวมอยู่บนแถบการไหลของงานแล้ว
+            เลขหน้าอยู่ที่แถบเลขหน้าท้ายลิสต์) · "หน้าละ" กับ "เรียงตาม" เป็น dropdown
+            แทนแถบปุ่ม 5 อัน (กินที่ทั้งบรรทัดโดยที่คนเลือกครั้งเดียวแล้วไม่แตะอีก) ·
+            คู่มือ "สีบอกอายุใบขอ" ตัดออก (แถบสีซ้ายการ์ดมี title บอกเกณฑ์อยู่แล้ว) */}
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 px-1">
+          {loadingJobs || serverListLoading ? (
+            <p className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
+              <LoaderCircle className="h-3.5 w-3.5 animate-spin text-primary" />
+              <span>กำลังโหลดรายการ…</span>
+            </p>
+          ) : null}
+          <div className="ml-auto flex shrink-0 flex-wrap items-center gap-2">
+            <label className="flex items-center gap-1 text-xs text-muted-foreground">
+              <span>หน้าละ</span>
+              <select
+                value={pageSize}
+                disabled={serverListLoading}
+                onChange={(e) => changePageSize(Number(e.target.value))}
+                className="rounded-lg border border-border bg-background px-2 py-1 text-xs font-medium tabular-nums text-foreground disabled:cursor-wait"
+              >
+                {MATCHING_PAGE_SIZE_OPTIONS.map((size) => (
+                  <option key={size} value={size}>
+                    {size}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="flex items-center gap-1 text-xs text-muted-foreground">
+              <span>เรียงตาม</span>
+              <select
+                value={sortBy}
+                disabled={serverListLoading}
+                onChange={(e) => setSortBy(e.target.value as MatchingListSort)}
+                className="rounded-lg border border-border bg-background px-2 py-1 text-xs font-medium text-foreground disabled:cursor-wait"
+              >
+                {(
+                  [
+                    ['default', 'เลยกำหนดและฉุกเฉินก่อน'],
+                    ['age_desc', 'ค้างนานสุด → ใหม่สุด'],
+                    ['age_asc', 'ใหม่สุด → ค้างนานสุด'],
+                    ['recommend', 'มีคนแนะนำก่อน'],
+                    ['green_desc', 'ใบที่มีคนตรงสเปกมากสุดก่อน'],
+                    ['no_recommend', 'ยังไม่มีคนแนะนำก่อน'],
+                  ] as Array<[MatchingListSort, string]>
+                ).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          <div className="flex w-full flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+            {/* ⚠️ ชิป "AI พร้อมแล้ว" (สถานะ idle) เคยอยู่ระหว่างสองชิปนี้ — เจ้าของสั่งเอาออก
+                12 ส.ค. 2569 ("AI พร้อมแล้ว ไม่ต้องเอามาโชว์") · idle = ไม่มีข้อมูลให้ทำอะไรต่อ
+                คงไว้เฉพาะสถานะที่คนต้องรู้: กำลังประมวลผล (มีของกำลังวิ่ง) กับ ปิดอยู่ */}
+            {workerStatus?.started && workerStatus.queueSize > 0 ? (
+              <span className={cn('inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium', TONE.warn.soft, TONE.warn.value)}>
+                <LoaderCircle className="h-2.5 w-2.5 animate-spin" /> AI กำลังประมวลผล {workerStatus.queueSize} ใบ
+              </span>
+            ) : workerStatus && !workerStatus.enabled ? (
+              <span className={cn('inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium', TONE.neutral.soft, DASH.muted)}>
+                AI ปิดอยู่
+              </span>
+            ) : null}
+          </div>
+        </div>
+
+        {/* การ์ดรวมใบขอ */}
+        <div className="space-y-2.5" ref={listTopRef}>
+          {serverListError ? (
+            <p className={cn('rounded-xl border px-3.5 py-2.5 text-xs font-medium', TONE.danger.soft, TONE.danger.value)}>
+              {serverListError} — ลองรีเฟรชหน้า
+            </p>
+          ) : null}
+          {/* โหลดครั้งแรก (ยังไม่มีข้อมูลใน cache) — spinner ตัวเดียวพร้อมข้อความ
+              ชัดกว่าการ์ดหลอก 8 ใบ ที่คนเข้าใจผิดว่าหน้าค้างแล้วกด refresh ซ้ำ */}
+          {rows.length === 0 && (loadingJobs || serverListLoading) ? (
+            <div className="glass-card flex flex-col items-center justify-center gap-3 rounded-2xl border border-white/70 px-6 py-16 text-center">
+              <LoaderCircle className="h-8 w-8 animate-spin text-primary" aria-hidden />
+              <div>
+                <p className="text-sm font-medium text-foreground">กำลังโหลดใบขอ…</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  ดึงใบขอจากระบบ <Term k="erp" /> พร้อมผลที่ AI คิดไว้ · ไม่ต้องกดซ้ำ
+                </p>
+              </div>
+            </div>
+          ) : null}
+          {rows.length === 0 && !loadingJobs && !serverListLoading ? (
+            <div className="glass-card rounded-2xl p-8 border border-white/70 text-center text-muted-foreground">
+              <Search className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+              <p className="text-sm font-medium text-foreground">ไม่พบใบขอตามเงื่อนไข</p>
+            </div>
+          ) : null}
+          {/* ═══ การ์ดใบขอ — กริด 3 คอลัมน์แบบการ์ดหน้าโพสต์ประกาศ (เจ้าของ Choice 15 ต.ค. 2569 "แบบโพสต์ประกาศ") ═══
+              เดิมการ์ดยาวเต็มแถว + แถบสีซ้าย + แถบผลโทร 6 ช่อง (ส่วนใหญ่ 0) · ตอนนี้: ชื่อ/ตำแหน่ง · ป้ายอายุมุมขวา ·
+              ชิปทำต่อ · ที่อยู่/เงิน/วันที่ · ผลโทรบรรทัดเดียว · ก้นการ์ด = เหลือหา + ปุ่ม
+              🔴 ป้ายอายุใช้ getJobAgeChipInfo ตัวเดียวกับโพสต์ประกาศ (ห้ามสเกลสีอายุชุดที่สอง) */}
+          <div
+            className={cn(
+              'grid gap-3 transition-opacity duration-200 sm:grid-cols-2 lg:grid-cols-3',
+              rows.length > 0 && serverListLoading && 'pointer-events-none opacity-50',
+            )}
+            data-testid="matching-job-grid"
+          >
+          {visibleRows.map((j) => {
+            const matchCount = boardMatchById[j.id]
+              ? recommendedCandidateCount(boardMatchById[j.id].matches)
+              : serverStoredMatches[j.id]
+                ? serverStoredMatches[j.id].recommended
+                : undefined;
+            const requested = requestPositionCount(j);
+            const remaining = officialRemainingCount(j);
+            const age = getJobAgeChipInfo(j);
+            return (
+              <Card
+                key={j.id}
+                role="button"
+                tabIndex={0}
+                onClick={() => openJob(j)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    openJob(j);
+                  }
+                }}
+                className="group flex h-full cursor-pointer flex-col gap-2 rounded-2xl p-3 shadow-sm transition-colors hover:border-primary/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+              >
+                {/* ── ชื่อ + ตำแหน่ง · มุมขวา = ด่วน / ผ่านมากี่วัน ── */}
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 space-y-0.5">
+                    {/* ชื่อ/ตำแหน่ง/บรรทัดรอง — ตัวเดียวกับการ์ดโพสต์ประกาศ (BoardJobCard) */}
+                    <h2 className="line-clamp-2 text-lg font-medium text-foreground group-hover:text-primary">
+                      {jobBoardCardTitle(j)}
+                    </h2>
+                    <p className="line-clamp-1 text-base font-medium text-primary">{publicJobTitle(j)}</p>
+                  </div>
+                  <div className="flex shrink-0 flex-col items-end gap-1">
+                    {j.urgency === 'urgent' ? (
+                      <span className="rounded-md bg-destructive/10 px-2 py-0.5 text-sm font-medium text-destructive">ฉุกเฉิน</span>
+                    ) : null}
+                    <span className={cn('rounded-md border px-1.5 py-0.5 text-sm font-medium', JOB_AGE_CHIP_META[age.level].chipCls)} title={age.title}>
+                      {age.cardText}
+                    </span>
+                  </div>
+                </div>
+
+                {/* ── ที่ไหน — ของอื่น (ชิปทำต่อ · AI แนะนำ · เงิน/วันที่ · ผลโทร · หาคนจากกองไม่สนใจ) อยู่ในป๊อปรายละเอียด
+                    (เจ้าของ 15 ต.ค. 2569 "หน้าจับคู่ก็รก ดูไม่เป็นมืออาชีพ" · Choice "ตัดหนัก เหลือเท่าที่ต้องใช้") ── */}
+                <p className={cn('flex min-w-0 items-start gap-1.5 text-sm', DASH.muted)}>
+                  <MapPin className="mt-0.5 size-4 shrink-0" aria-hidden />
+                  <span className="line-clamp-2 min-w-0">{j.location_address || EM_DASH}</span>
+                </p>
+
+                {/* ── ก้นการ์ด: เหลือหา + ปุ่มทำต่อ ── */}
+                <div className="mt-auto flex flex-wrap items-center justify-between gap-2 border-t border-border/70 pt-2">
+                  <p className="text-sm text-foreground">
+                    เหลือหา <b className={cn('tabular-nums', TONE.warn.value)}>{remaining}</b>
+                    <span className={DASH.muted}> / {requested} อัตรา</span>
+                  </p>
+                  <Button
+                    type="button"
+                    size="xs"
+                    variant="outline"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openJob(j);
+                    }}
+                    className="shrink-0 rounded-lg"
+                  >
+                    <Users aria-hidden />
+                    {boardLoadingId === j.id ? 'กำลังโหลด…' : matchCount != null ? `ดูคน ${matchCount}` : 'ดูคน'}
+                  </Button>
+                </div>
+              </Card>
+            );
+          })}
+          </div>
+          {totalPages > 1 ? (
+            <nav aria-label="เปลี่ยนหน้ารายการใบขอ" className="space-y-1.5 pt-1">
+              <div className="flex flex-wrap items-center justify-center gap-1.5">
+                <Button type="button" variant="outline" size="sm" disabled={serverListLoading || currentPage <= 1} onClick={() => goToPage(currentPage - 1)}>
+                  ← ก่อนหน้า
+                </Button>
+                {pageItems.map((item, idx) =>
+                  item === '…' ? (
+                    <span key={`gap-${idx}`} className="px-1 text-sm text-muted-foreground">
+                      …
+                    </span>
+                  ) : (
+                    <Button
+                      key={item}
+                      type="button"
+                      size="sm"
+                      variant={item === currentPage ? 'default' : 'outline'}
+                      disabled={serverListLoading}
+                      onClick={() => goToPage(item)}
+                      aria-current={item === currentPage ? 'page' : undefined}
+                      className="min-w-9 tabular-nums"
+                    >
+                      {item}
+                    </Button>
+                  ),
+                )}
+                <Button type="button" variant="outline" size="sm" disabled={serverListLoading || currentPage >= totalPages} onClick={() => goToPage(currentPage + 1)}>
+                  ถัดไป →
+                </Button>
+              </div>
+              <p className="text-center text-xs text-muted-foreground">
+                {serverListLoading
+                  ? 'กำลังโหลด…'
+                  : `แสดงลำดับ ${pageRangeStart.toLocaleString()}–${pageRangeEnd.toLocaleString()} จาก ${listTotal.toLocaleString()} ใบ`}
+              </p>
+            </nav>
+          ) : null}
+        </div>
+      </div>
+      )}
+
+      {/* Drawer: คนของเรา ต่อใบขอ */}
+      {/* 🔴 `backClose={false}` — แผงนี้ผูกกับ `?jobId=` อยู่แล้ว ปล่อยให้ตัวห่อกลาง
+          ของ shadcn ปักประวัติซ้ำ = สองระบบแย่งกันจัดการ (ดู `useUrlDialogHistory`) */}
+      {locked ? (
+        <div data-testid="unit-match-panel">{jobPanelBody}</div>
+      ) : (
+      <Sheet backClose={false} open={!!jobDetail} onOpenChange={(o) => !o && closeJob()}>
+        <SheetContent
+          side="right"
+          className="matching-sheet-scroll w-full overflow-y-auto [scrollbar-gutter:stable] sm:max-w-xl"
+        >
+          {/* 20 ต.ค. 2569 เจ้าของ: "แก้หน้านี้ให้ดูสวย ดูง่าย ลดความเป็น AI · ใช้ shadcn · ระยะห่างเท่ากัน"
+              ⇒ หัวใบขอเป็น Card เดียว · ป้ายเงื่อนไขเป็น Badge · ปุ่มเป็น Button · ตัดเลขใบขอที่ขึ้นซ้ำ */}
+          <SheetHeader className="space-y-1">
+            <SheetTitle className="text-foreground">จับคู่คนกับใบขอ</SheetTitle>
+            <SheetDescription>จากกล่อง ไม่มีงาน · Re Use · Drop</SheetDescription>
+          </SheetHeader>
+          {jobPanelBody}
         </SheetContent>
       </Sheet>
+      )}
 
       <Dialog open={branchEditorOpen} onOpenChange={(open) => !branchSaveBusy && setBranchEditorOpen(open)}>
         <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">

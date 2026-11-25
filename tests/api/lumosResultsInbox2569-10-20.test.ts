@@ -78,7 +78,8 @@ describe('ปุ่มเลือกใครโทร: ตัวที่เ�
 describe('หน้าต่างจับคู่งาน: shadcn + ขนาดตัวอักษรเท่ากัน (เจ้าของ 20 ต.ค. 2569)', () => {
   it('ช่องติ๊กเป็น Checkbox ของ shadcn · ไม่มีขนาดตัวอักษรสุ่ม 9–11px ในหน้าต่าง · ไม่มีประโยคอธิบายเดิม', () => {
     const src = read('src/pages/matching/MatchingPage.tsx');
-    const a = src.indexOf('<SheetContent');
+    // 25 พ.ย. 2569 เนื้อแผงย้ายไปเป็น `jobPanelBody` (ใช้ทั้งแผงข้างและแท็บจับคู่งานในใบขอ)
+    const a = src.indexOf('const jobPanelBody = (');
     const sheet = src.slice(a, src.indexOf('</SheetContent>', a));
     expect(sheet).not.toContain('type="checkbox"');
     expect(sheet).toContain('<Checkbox');

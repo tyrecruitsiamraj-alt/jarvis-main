@@ -97,14 +97,13 @@ describe('เส้น API + หน้าจอ', () => {
   });
 
   it('ใบขอมีแท็บ Scrap · หน้างานสรรหามี ผู้สมัคร ▾ Scrap · ทั้งสองที่มีปุ่มเก็บเข้าการติดต่อ', () => {
-    expect(readFileSync('src/components/jobs/UnitRequestTabs.tsx', 'utf8')).toMatch(/UNIT_TAB_IDS = \['detail', 'applicants', 'scrap', 'actions'\]/);
+    expect(readFileSync('src/components/jobs/UnitRequestTabs.tsx', 'utf8')).toMatch(/UNIT_TAB_IDS = \['detail', 'applicants', 'scrap', 'match', 'actions'\]/);
     expect(readFileSync('src/App.tsx', 'utf8')).toContain('<UnitRequestTabPage tab="scrap" />');
     expect(readFileSync('src/components/jobs/JobBoardView.tsx', 'utf8')).toContain("{ id: 'scrap', label: 'Scrap' }");
     expect(readFileSync('src/pages/jobs/StaffJobBoardPage.tsx', 'utf8')).toContain("view === 'scrap'");
-    const panel = readFileSync('src/components/jobs/ScrapCandidatesPanel.tsx', 'utf8');
-    expect(panel).toContain('เก็บเข้าการติดต่อ');
-    expect(panel).toContain("navigate('/jobs/board?view=contact')");
-    expect(readFileSync('src/pages/jobs/UnitRequestTabPage.tsx', 'utf8')).toContain('data-testid="applicants-to-contact"');
+    // 25 พ.ย. 2569 แผงเดิมถอด — ทั้งสองที่ใช้ตารางแท็บผู้สมัคร (เก็บ Lead / เก็บไปโทรเอง / ส่ง AI · ปุ่มพาไปการติดต่อ)
+    expect(readFileSync('src/pages/jobs/UnitRequestTabPage.tsx', 'utf8')).toContain('<RmWorkspace key="scrap" tab="candidates" scrap');
+    expect(readFileSync('src/components/recruit-rm/RmWorkspace.tsx', 'utf8')).toContain("resolveScrapApplicationIds([row.id], 'to_contact')");
   });
 });
 

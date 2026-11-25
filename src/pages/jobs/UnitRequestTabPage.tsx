@@ -1,10 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import React, { Suspense, useCallback, useEffect, useState } from 'react';
+import { useLocation, useParams } from 'react-router-dom';
 import PageHeader from '@/components/shared/PageHeader';
-import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
-import ScrapCandidatesPanel from '@/components/jobs/ScrapCandidatesPanel';
+import { lazyPage } from '@/lib/staleChunkReload';
+import RmWorkspace from '@/components/recruit-rm/RmWorkspace';
 import { fetchScrapCandidatesOfJob } from '@/lib/scrapCandidatesApi';
+import { isScrapApplication } from '@/lib/scrapCandidates';
 import { resolveUnitDetailBackPath } from '@/lib/jobUnitSessionState';
 import { backLabelFor } from '@/lib/stageOrigin';
 import UnitRequestTabs, { type UnitRequestTabId } from '@/components/jobs/UnitRequestTabs';
@@ -12,28 +12,12 @@ import OrderPostButton from '@/components/jobs/OrderPostButton';
 import { JobPostActionsPanel } from '@/components/jobs/JobPostActionsDialog';
 import type { BoardActionTab } from '@/components/jobs/BoardCardActions';
 import { applicationsJobKey, fetchSiamrajUnitRequest } from '@/lib/siamrajUnitRequestsApi';
-import { fetchJobApplications, setJobApplicationLead, type PublicApplication } from '@/lib/publicApplicationsApi';
-import {
-  groupApplicationsByOrigin,
-  summarizeUnitMatches,
-  UNIT_MATCH_CALLER_LABEL,
-  unitMatchFactLine,
-  unitMatchLastCaller,
-  unitMatchOriginLabel,
-  unitMatchStatus,
-  unitMatchStatusCounts,
-} from '@/lib/unitMatchingView';
+import { fetchJobApplications } from '@/lib/publicApplicationsApi';
 import { jobBoardCardTitle } from '@/lib/unitRequestDisplay';
-import { EM_DASH } from '@/lib/displayFallback';
 import type { JobRequest } from '@/types';
-import { LoaderCircle, PhoneCall, Users } from 'lucide-react';
 
-const STATUS_CLASS: Record<string, string> = {
-  success: 'jarvis-chip jarvis-chip-success',
-  warn: 'jarvis-chip jarvis-chip-warn',
-  danger: 'jarvis-chip jarvis-chip-danger',
-  neutral: 'jarvis-chip jarvis-chip-neutral',
-};
+/** แผงจับคู่ของหน้าจับคู่งาน (ไฟล์ใหญ่ — โหลดเมื่อเปิดแท็บนี้เท่านั้น) */
+const MatchingPage = lazyPage(() => import('@/pages/matching/MatchingPage'));
 
 /** 🔴 แท็บ `posting` มีหน้าของตัวเอง (`UnitRequestPostingTabPage`) — ไฟล์นี้ไม่รับ */
 export type UnitRequestSubTab = Exclude<UnitRequestTabId, 'detail' | 'posting'>;
@@ -41,15 +25,22 @@ export type UnitRequestSubTab = Exclude<UnitRequestTabId, 'detail' | 'posting'>;
 const TAB_TITLE: Record<UnitRequestSubTab, string> = {
   applicants: 'ผู้สมัคร',
   scrap: 'Scrap',
+  match: 'จับคู่งาน',
   actions: 'Autopost / Scrap / โพสต์เอง',
 };
 
 /**
- * แท็บย่อยของใบขอ — ผู้สมัคร / AI Match / การติดต่อ
- * (เจ้าของสั่ง 16 ส.ค. 2569 เย็น · แท็บ "รายละเอียดงาน" ยังเป็นหน้าเดิมคนละไฟล์)
+ * แท็บย่อยของใบขอ (แท็บ "รายละเอียดงาน" เป็นหน้าเดิมคนละไฟล์)
  *
- * ⚠️ **ผู้สมัคร ≠ AI Match** — ผู้สมัครคือคนที่มีใบสมัครจริงกับใบขอนี้ ส่วน AI Match
- * คือคนที่ AI แนะนำ ซึ่งยังไม่ใช่ใบสมัคร · เอาปนกันแล้วยอด "ผู้สมัคร" จะเฟ้อทันที
+ * 🔴 25 พ.ย. 2569 เจ้าของ: "หน้าใบขอ ถ้ากดใบขอไหน ก็ทำเรื่องอะไรต่างๆในใบขอนั้นได้ เช่น จับคู่งาน … แต่เก็บแล้วไปหน้าการติดต่อเหมือนเดิม"
+ *   Choice "แท็บจับคู่งานในใบขอ" + "แท็บ Scrap แบบใหม่" + "แท็บผู้สมัครแบบหน้าผู้สมัคร"
+ * - ผู้สมัคร = ตาราง/กล่อง/ปุ่มชุดเดียวกับแท็บผู้สมัครของหน้างานสรรหา ล็อกใบขอนี้ (`RmWorkspace lockedJobId`)
+ *   ใบจาก Scrap ไม่ขึ้นที่นี่ (อยู่แท็บ Scrap)
+ * - Scrap = ตัวเดียวกับแท็บ Scrap ของหน้างานสรรหา ล็อกใบขอนี้ (`RmWorkspace scrap lockedJobId`)
+ * - จับคู่งาน = แผงจับคู่ของใบนี้ (`MatchingPage lockedJob`)
+ * - เก็บไปโทรเอง/เก็บ Lead แล้ว = ไปแท็บการติดต่อของหน้างานสรรหา (ไม่มีแท็บการติดต่อในใบขอ — ถอด 11 พ.ย. 2569)
+ *
+ * ⚠️ **ผู้สมัคร ≠ จับคู่งาน** — ผู้สมัครคือคนที่มีใบสมัครจริงกับใบขอนี้ ส่วนจับคู่งานคือคนที่ระบบแนะนำ ยังไม่ใช่ใบสมัคร
  */
 const UnitRequestTabPage: React.FC<{ tab: UnitRequestSubTab }> = ({ tab }) => {
   const { id = '' } = useParams();
@@ -63,32 +54,29 @@ const UnitRequestTabPage: React.FC<{ tab: UnitRequestSubTab }> = ({ tab }) => {
     search: location.search,
   });
   const [job, setJob] = useState<JobRequest | null>(null);
-  const [items, setItems] = useState<PublicApplication[] | null>(null);
+  const [loaded, setLoaded] = useState(false);
+  /** เลขบนแท็บผู้สมัคร (ไม่นับใบจาก Scrap) — undefined = ยังโหลดไม่เสร็จ */
+  const [applicantTotal, setApplicantTotal] = useState<number | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
   /** แท็บ Autopost / Scrap / โพสต์เอง — กล่องที่เลือก + โหลดใหม่หลังสั่งงาน */
   const [actionsTab, setActionsTab] = useState<BoardActionTab>('autopost');
   const [actionsRev, setActionsRev] = useState(0);
   /** ยอดรายชื่อจาก Scrap ของใบนี้ (เลขบนแท็บ · 17 พ.ย. 2569) — undefined = ยังโหลดไม่เสร็จ */
   const [scrapTotal, setScrapTotal] = useState<number | undefined>(undefined);
-  const navigate = useNavigate();
-  /** แท็บผู้สมัคร: ติ๊กแล้ว "เก็บเข้าการติดต่อ" (เจ้าของ 17 พ.ย. 2569 — ใบงานทั้งผู้สมัครและ Scrap กดเลือกเก็บได้) */
-  const [picked, setPicked] = useState<Set<string>>(new Set());
-  const [leadBusy, setLeadBusy] = useState(false);
-  const [leadNotice, setLeadNotice] = useState<{ text: string; ok: boolean } | null>(null);
 
   const reload = useCallback(async () => {
     setError(null);
     try {
-      // 🔴 QA 17 ต.ค. 2569: เดิมค้นใบสมัครด้วย `id` จาก URL (เลขใบขอเปล่า `OPL6909071`) แต่ใบสมัครเก็บด้วย
-      // คีย์เต็ม `siamraj-sql:OPL6909071` ⇒ แท็บผู้สมัคร/การติดต่อขึ้น 0 ทุกใบ (ของจริง 44 คน) · ใช้ `job.id` แบบ loadBoardMatch
       const j = await fetchSiamrajUnitRequest(id).catch(() => null);
-      const apps = await fetchJobApplications(applicationsJobKey(id, j?.id));
       setJob((j as JobRequest | null) ?? null);
-      setItems(apps);
+      setLoaded(true);
+      const apps = await fetchJobApplications(applicationsJobKey(id, j?.id));
+      setApplicantTotal(apps.filter((a) => !isScrapApplication(a)).length);
       void fetchScrapCandidatesOfJob(j?.id ?? id)
         .then((d) => setScrapTotal(d.counts.total))
         .catch(() => setScrapTotal(undefined));
     } catch (e) {
+      setLoaded(true);
       setError(e instanceof Error ? e.message : 'โหลดรายชื่อไม่สำเร็จ');
     }
   }, [id]);
@@ -97,46 +85,9 @@ const UnitRequestTabPage: React.FC<{ tab: UnitRequestSubTab }> = ({ tab }) => {
     if (id) void reload();
   }, [id, reload]);
 
-  const summary = useMemo(() => summarizeUnitMatches(items ?? []), [items]);
-  /** ชิปที่กดอยู่ (ข้อความสถานะเดียวกับป้ายท้ายการ์ด) · null = ทุกคน */
-  const [statusPick, setStatusPick] = useState<string | null>(null);
-  const statusCounts = useMemo(() => unitMatchStatusCounts(items ?? []), [items]);
-  const groups = useMemo(
-    () => groupApplicationsByOrigin((items ?? []).filter((a) => !statusPick || unitMatchStatus(a).text === statusPick)),
-    [items, statusPick],
-  );
-
-  const togglePick = (appId: string, on: boolean) =>
-    setPicked((cur) => {
-      const next = new Set(cur);
-      if (on) next.add(appId);
-      else next.delete(appId);
-      return next;
-    });
-
-  /** เก็บคนที่ติ๊กเข้าการติดต่อ (Lead ของฉัน) — คำสั่งเดียวกับปุ่ม "เก็บเข้า Lead" ของแท็บผู้สมัครหน้างานสรรหา */
-  const keepPicked = async () => {
-    const ids = [...picked];
-    if (ids.length === 0) return;
-    setLeadBusy(true);
-    setLeadNotice(null);
-    const failed: string[] = [];
-    for (const appId of ids) {
-      try {
-        await setJobApplicationLead(appId, true);
-      } catch (e) {
-        failed.push(e instanceof Error ? e.message : 'เก็บไม่สำเร็จ');
-      }
-    }
-    const done = ids.length - failed.length;
-    setLeadNotice({
-      text: `เก็บเข้าการติดต่อแล้ว ${done} คน${failed.length ? ` · ไม่สำเร็จ ${failed.length} คน (${[...new Set(failed)].join(' · ')})` : ''}`,
-      ok: done > 0,
-    });
-    setPicked(new Set());
-    setLeadBusy(false);
-    await reload();
-  };
+  /** id เต็มของใบ (`siamraj-sql:` / `siamraj-pre:`) — โหลดใบไม่ขึ้นใช้คีย์จาก URL */
+  const jobKey = job?.id ?? applicationsJobKey(id, undefined);
+  const loadingText = <p className="text-sm text-muted-foreground">กำลังโหลด…</p>;
 
   return (
     <div className="relative">
@@ -147,129 +98,33 @@ const UnitRequestTabPage: React.FC<{ tab: UnitRequestSubTab }> = ({ tab }) => {
         backLabel={backLabelFor(backPath)}
       />
 
-      {/* ไม่มีขอบบน — แถบแท็บต้องอยู่ระดับเดียวกับหน้ารายละเอียดใบขอ (เจ้าของ 19 ต.ค. 2569 "กดสลับแล้วหน้ากระโดด") */}
       <div className="space-y-4 px-4 pb-4 md:px-6">
-        <UnitRequestTabs
-          jobId={id}
-          active={tab}
-          counts={{ applicants: items?.length, scrap: scrapTotal }}
-        />
+        <UnitRequestTabs jobId={id} active={tab} counts={{ applicants: applicantTotal, scrap: scrapTotal }} />
 
         {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
-        {/* ── ผู้สมัคร ───────────────────────────────────── */}
+        {/* ── ผู้สมัคร: ตารางเดียวกับหน้าผู้สมัคร ล็อกใบนี้ ── */}
         {tab === 'applicants' ? (
-          <>
-            {/* ชิปนับตามป้ายท้ายการ์ด กดแล้วเหลือเฉพาะคนกลุ่มนั้น กดซ้ำ = ทุกคน (เจ้าของ 11 พ.ย. 2569) · ชิปรวมกัน = ผู้สมัครทั้งหมด */}
-            <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border/70 bg-secondary/40 px-3.5 py-2.5 text-sm">
-              <Button
-                type="button"
-                size="xs"
-                variant={statusPick === null ? 'default' : 'outline'}
-                className="rounded-full"
-                aria-pressed={statusPick === null}
-                onClick={() => setStatusPick(null)}
-              >
-                <Users aria-hidden />
-                ผู้สมัคร <span className="tabular-nums">{summary.total}</span> คน
-              </Button>
-              {statusCounts.map((s) => (
-                <Button
-                  key={s.text}
-                  type="button"
-                  size="xs"
-                  variant={statusPick === s.text ? 'default' : 'outline'}
-                  className="rounded-full"
-                  aria-pressed={statusPick === s.text}
-                  onClick={() => setStatusPick((cur) => (cur === s.text ? null : s.text))}
-                >
-                  {s.text} <span className="tabular-nums">{s.count}</span>
-                </Button>
-              ))}
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2 text-sm">
-              <span className="tabular-nums text-muted-foreground">เลือก {picked.size} คน</span>
-              <Button type="button" size="sm" disabled={picked.size === 0 || leadBusy} onClick={() => void keepPicked()} data-testid="applicants-to-contact">
-                {leadBusy ? <LoaderCircle className="animate-spin" aria-hidden /> : <PhoneCall aria-hidden />}
-                เก็บเข้าการติดต่อ
-              </Button>
-              {leadNotice?.ok ? (
-                <Button type="button" size="sm" variant="outline" onClick={() => navigate('/jobs/board?view=contact')}>
-                  ไปหน้าการติดต่อ
-                </Button>
-              ) : null}
-              {leadNotice ? <span className={leadNotice.ok ? 'text-foreground' : 'text-destructive'}>{leadNotice.text}</span> : null}
-            </div>
-
-            {!items && !error ? (
-              <p className="flex items-center gap-2 py-10 text-sm text-muted-foreground">
-                <LoaderCircle className="h-4 w-4 animate-spin text-blue-500" /> กำลังโหลด…
-              </p>
-            ) : null}
-
-            {items && items.length === 0 ? (
-              <div className="rounded-xl border border-border/70 bg-card px-4 py-10 text-center">
-                <p className="text-sm font-medium text-foreground">ยังไม่มีใครสมัครใบขอนี้</p>
-                <p className="mx-auto mt-1 max-w-sm text-xs text-muted-foreground">
-                  ใบสมัครจากหน้าสาธารณะจะมาโผล่ที่นี่ · กดแท็บ “AI Match” เพื่อดูว่า AI แนะนำใครบ้าง
-                </p>
-              </div>
-            ) : null}
-
-            {groups.map((g) => (
-              <section key={g.origin} className="space-y-1.5">
-                <div className="flex flex-wrap items-baseline gap-x-2">
-                  <h2 className="text-sm font-medium text-foreground">{g.label}</h2>
-                  <span className="font-mono text-xs tabular-nums text-muted-foreground">
-                    {g.items.length} คน
-                  </span>
-                  {g.hint ? <span className="text-xs text-muted-foreground">· {g.hint}</span> : null}
-                </div>
-                <ul className="space-y-1.5">
-                  {g.items.map((a) => {
-                    const st = unitMatchStatus(a);
-                    const originLabel = unitMatchOriginLabel(a);
-                    const caller = unitMatchLastCaller(a);
-                    return (
-                      <li
-                        key={a.id}
-                        className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 rounded-xl border border-border/70 bg-card px-3 py-2 text-sm sm:grid-cols-[auto_1.4fr_1.2fr_auto] sm:items-center"
-                      >
-                        <Checkbox
-                          aria-label={`เลือก ${a.full_name}`}
-                          checked={picked.has(a.id)}
-                          disabled={Boolean(a.is_lead)}
-                          onCheckedChange={(v) => togglePick(a.id, v === true)}
-                          className="row-span-3 mt-0.5 sm:row-span-1 sm:mt-0"
-                        />
-                        <span className="flex flex-wrap items-center gap-1.5">
-                          <b className="font-medium text-foreground">{a.full_name}</b>
-                          {a.is_lead ? <span className="text-xs text-muted-foreground">อยู่ในการติดต่อ{a.lead_by_name ? `ของ ${a.lead_by_name}` : 'แล้ว'}</span> : null}
-                          {originLabel ? (
-                            <span className="jarvis-chip jarvis-chip-violet">{originLabel}</span>
-                          ) : null}
-                        </span>
-                        <span className="text-xs text-muted-foreground">
-                          {unitMatchFactLine(a) || EM_DASH}
-                        </span>
-                        {/* ทุกการ์ดหน้าตาเดียวกัน: สถานะ + ใครโทรล่าสุดอยู่ท้ายแถว (เจ้าของ 11 พ.ย. 2569
-                            "ไม่เอาหน้าตาแบบนี้ เอาหน้าตาแบบ ณัฎฐกานต์ แต่บอกสถานะด้านหลัง") — แผงขั้นตอน/เตรียมเข้างานถอดจากการ์ดนี้ */}
-                        <span className="flex flex-col items-start gap-0.5 sm:items-end">
-                          <span className={STATUS_CLASS[st.tone]}>{st.text}</span>
-                          {caller ? <span className="whitespace-nowrap text-xs text-muted-foreground">{UNIT_MATCH_CALLER_LABEL[caller]}</span> : null}
-                        </span>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </section>
-            ))}
-          </>
+          loaded ? <RmWorkspace tab="candidates" jobs={job ? [job] : []} lockedJobId={jobKey} /> : loadingText
         ) : null}
 
-        {/* ── Scrap (เจ้าของ 17 พ.ย. 2569 "เปิดใบขอไหนที่มีการสั่ง Scrap ต้องเห็นรายชื่อ") ── */}
-        {tab === 'scrap' ? <ScrapCandidatesPanel jobId={job?.id ?? applicationsJobKey(id, undefined)} onTotal={setScrapTotal} /> : null}
+        {/* ── Scrap: ตัวเดียวกับแท็บ Scrap หน้างานสรรหา ล็อกใบนี้ (เจ้าของ 17 พ.ย. 2569 "เปิดใบขอไหนที่มีการสั่ง Scrap ต้องเห็นรายชื่อ") ── */}
+        {tab === 'scrap' ? (
+          loaded ? <RmWorkspace key="scrap" tab="candidates" scrap jobs={job ? [job] : []} lockedJobId={jobKey} /> : loadingText
+        ) : null}
+
+        {/* ── จับคู่งาน: แผงจับคู่ของใบนี้ ── */}
+        {tab === 'match' ? (
+          job ? (
+            <Suspense fallback={loadingText}>
+              <MatchingPage embedded lockedJob={job} />
+            </Suspense>
+          ) : loaded ? (
+            <p className="text-sm text-muted-foreground">ไม่พบใบขอนี้</p>
+          ) : (
+            loadingText
+          )
+        ) : null}
 
         {/* ── Autopost / Scrap / โพสต์เอง (เจ้าของ 13 พ.ย. 2569 "ย้ายไปเป็นอีกแท็บ … เอาทำอะไรไปแล้วโชว์ด้วย") ──
             บน = ทำอะไรไปแล้ว (ตัวเดียวกับป๊อปบนการ์ด) · ล่าง = ฟอร์มสั่งตัวเดียวกับป๊อปประกาศ (`OrderPostButton`) กางไว้เลย */}
@@ -286,13 +141,12 @@ const UnitRequestTabPage: React.FC<{ tab: UnitRequestSubTab }> = ({ tab }) => {
               </section>
             </>
           ) : (
-            <p className="text-sm text-muted-foreground">กำลังโหลด…</p>
+            loadingText
           )
         ) : null}
 
         {/* แท็บ "การติดต่อ" ถอดแล้ว (เจ้าของ 11 พ.ย. 2569 "เอาออกจากหน้านี้") — การติดต่ออยู่แท็บของหน้างานสรรหา */}
       </div>
-
     </div>
   );
 };

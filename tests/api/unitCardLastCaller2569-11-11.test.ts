@@ -34,7 +34,8 @@ describe('การ์ดไม่มีแผงขั้นตอนแล้�
   it('หมวดตามที่มาไม่วางแผงขั้นตอนในการ์ด · server ส่ง last_call_by', () => {
     const page = readFileSync('src/pages/jobs/UnitRequestTabPage.tsx', 'utf8');
     expect(page).not.toContain('isInterestedOutcome(a.last_call_outcome) || a.selection_status');
-    expect(page).toContain('UNIT_MATCH_CALLER_LABEL[caller]');
+    // 25 พ.ย. 2569 แท็บผู้สมัครของใบขอใช้ตารางหน้าผู้สมัคร (คำตอบกับ AI/สถานะ อยู่ในตาราง) — การ์ดเดิมถอด
+    expect(page).toContain('<RmWorkspace tab="candidates" jobs={job ? [job] : []} lockedJobId={jobKey} />');
     expect(readFileSync('api/_handlers/job-applications.ts', 'utf8')).toContain('.last_call_by = hit.by;');
   });
 });
@@ -62,8 +63,9 @@ describe('ชิปนับบนแท็บผู้สมัคร', () => {
 describe('ถอดแท็บการติดต่อของใบขอ + ไอคอนหัวข้อขั้นตอนของสาย (เจ้าของ 11 พ.ย. 2569)', () => {
   it('ใบขอ 4 แท็บ (17 พ.ย. 2569 เพิ่ม Scrap) · ลิงก์เก่า /contact พาไปแท็บผู้สมัคร', () => {
     // 13 พ.ย. 2569: AI Match ถอด (ย้ายไปหน้างานสรรหา) · เพิ่มแท็บ Autopost / Scrap / โพสต์เอง
-    expect(readFileSync('src/components/jobs/UnitRequestTabs.tsx', 'utf8')).toContain("export const UNIT_TAB_IDS = ['detail', 'applicants', 'scrap', 'actions'] as const;");
-    expect(readFileSync('src/App.tsx', 'utf8')).toContain('<Route path="/jobs/siamraj/:id/ai-match" element={<Navigate to="/jobs/board?view=match" replace />} />');
+    // 25 พ.ย. 2569 เพิ่มแท็บจับคู่งาน · ลิงก์เก่า /ai-match พาไปแท็บนั้นของใบเดิม
+    expect(readFileSync('src/components/jobs/UnitRequestTabs.tsx', 'utf8')).toContain("export const UNIT_TAB_IDS = ['detail', 'applicants', 'scrap', 'match', 'actions'] as const;");
+    expect(readFileSync('src/App.tsx', 'utf8')).toContain('<Route path="/jobs/siamraj/:id/ai-match" element={<UnitMatchMovedRedirect />} />');
     expect(readFileSync('src/App.tsx', 'utf8')).toContain('<Route path="/jobs/siamraj/:id/contact" element={<UnitContactMovedRedirect />} />');
     expect(readFileSync('src/pages/jobs/UnitRequestTabPage.tsx', 'utf8')).not.toContain('<MyCallsSection');
   });
