@@ -14765,3 +14765,7 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 - ที่อยู่คน: ต้นเหตุจริง = `hr_recruitment_address` มีรหัส 2 ชุด (`ms_province` กับชุดเก่า `hr_ms_province`/`hr_ms_amphur` · กรุงเทพ '10' กับ '2') เดิม join ชุดเดียว → 504 แถวไม่มีจังหวัด · **614 แถวจังหวัดผิด** ⇒ `api/_lib/recruitAddressSql.ts` ตัดสินชุดด้วยคู่ (จังหวัด, อำเภอ) ใช้ทั้ง `boardCandidatesSql.ts` และ `selectionContacts.ts` · กันพลาดอีกชั้น `candidateAreaOf` ช่องว่าง = อ่าน `full_address` · `thaiProvinces` alias อยุธยา
 - วันเริ่มงาน: เจ้าของ "ถามเลยว่าเริ่มงานได้วันไหนทุกอัน" ⇒ `SPOKEN_START_DATE = ''` (`api/_lib/lumosJobBrief.ts`) ทั้ง 4 เส้นใน `lumosDispatch.ts` · บทในไฟล์ถาม "ถ้าได้งานนี้ สะดวกเริ่มงานได้วันไหนคะ" · บทแจ้งงานถอดบรรทัดวันที่ · บทที่แก้ในหน้าตั้งค่า (interview) บรรทัด `{วันเริ่มงาน}` หายเอง เหลือบรรทัด `{ไม่มีวันเริ่มงาน}`
 - เทสต์ `tests/api/matchErpArea2569-11-25.test.ts`
+
+### 25 พ.ย. 2569 (10) — ปุ่มยกเลิกสาย (DELETE /api/lumos/dispatch) ยกเลิกที่ Lumos ด้วย
+- เดิม `cancelLumosQueueItem` เปลี่ยนแค่ status ฝั่งเรา — สายที่ push ไปแล้ว Lumos ยังโทร (จอขึ้นยกเลิกแล้ว)
+- ตอนนี้แถวที่ push แล้วและยังไม่มีผล → `cancelPushedInterview` / `cancelPushedReminderIgnoringMissing` · ล้มที่ Lumos = log · เทสต์อยู่ท้าย `tests/api/matchErpArea2569-11-25.test.ts`

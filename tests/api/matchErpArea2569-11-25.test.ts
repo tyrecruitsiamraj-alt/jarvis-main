@@ -138,3 +138,14 @@ describe('ที่อยู่ผู้สมัคร ERP มีรหัส 2
     }
   });
 });
+
+describe('ปุ่มยกเลิกสาย ต้องยกเลิกที่ Lumos ด้วย (25 พ.ย. 2569)', () => {
+  it('แถวที่ส่งถึง Lumos แล้ว → DELETE ที่ Lumos · เฉพาะแถวที่ยังไม่มีผล', () => {
+    const src = readFileSync('api/_lib/lumosDispatch.ts', 'utf8');
+    const fn = src.slice(src.indexOf('export async function cancelLumosQueueItem'), src.indexOf('// ─── Follow (คนกรอกรายชื่อเอง'));
+    expect(fn).toContain('result is null');
+    expect(fn).toContain("push_state = 'pushed'");
+    expect(fn).toContain('cancelPushedInterview(');
+    expect(fn).toContain('cancelPushedReminderIgnoringMissing(');
+  });
+});

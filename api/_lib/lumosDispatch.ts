@@ -78,7 +78,7 @@ import {
   shiftOutOfQuietHours,
   policyForQueueRef,
 } from '../../src/lib/callFollowupPolicy.js';
-import { cancelPushedReminder, getLumosPushConfig, pushReminders } from './lumosPushClient.js';
+import { cancelPushedInterview, cancelPushedReminder, getLumosPushConfig, pushReminders } from './lumosPushClient.js';
 import { firstEventIdOf } from './lumosEventId.js';
 import type { LumosPushReminderRecord } from './lumosPushClient.js';
 import { resolveInterviewAdminPhone } from './interviewAdminPhone.js';
@@ -1699,20 +1699,36 @@ export async function loadLumosJobCallSummaryMap(): Promise<Map<string, LumosJob
   return map;
 }
 
-/** ยกเลิกรายการที่ส่งผิด — ได้ผลเฉพาะที่ยังไม่มีผลกลับ */
+/**
+ * ยกเลิกรายการที่ส่งผิด — ได้ผลเฉพาะที่ยังไม่มีผลกลับ
+ * 🔴 25 พ.ย. 2569: ส่งถึง Lumos แล้ว (push) ต้องยกเลิกที่ Lumos ด้วย — เดิมเปลี่ยนแค่สถานะฝั่งเรา
+ *    จอขึ้น "ยกเลิกแล้ว" แต่ Lumos ยังถือสายไว้โทร (เจอตอนจะยกเลิก 2 สาย OPL6911035 ที่จับคู่คนไกล)
+ *    ยกเลิกเฉพาะแถวที่ยังไม่มีผล (แผนที่จบแล้วห้ามยกเลิกซ้ำ — ไปโดนแผนอื่นของเบอร์เดียวกัน) · ล้มที่ Lumos = log ไม่ throw
+ */
 export async function cancelLumosQueueItem(
   jobId: string,
   channel: 'reminder' | 'interview',
   personRef: string,
 ): Promise<boolean> {
-  const { rows } = await dbQuery<{ id: number }>(
+  const { rows } = await dbQuery<{ id: number; pushed: boolean; client_id: string | null }>(
     `update ${queueTable}
         set status = 'cancelled', updated_at = now()
       where job_ref = $1 and channel = $2 and person_ref = $3
         and result is null and status in ('pending', 'delivered')
-      returning id`,
+      returning id, (push_state = 'pushed' or pushed_at is not null) as pushed,
+                coalesce(payload->>'client_interview_id', payload->>'client_contact_id') as client_id`,
     [jobId, channel, personRef],
   );
+  if (getLumosPushConfig()) {
+    for (const r of rows.filter((x) => x.pushed)) {
+      try {
+        if (channel === 'interview') await cancelPushedInterview(r.client_id || `${jobId}::${personRef}::interview`);
+        else if (r.client_id) await cancelPushedReminderIgnoringMissing(r.client_id);
+      } catch (e) {
+        logError('lumos.dispatch.cancel.lumos failed (คิวฝั่งเรายกเลิกแล้ว)', e, { queueId: r.id });
+      }
+    }
+  }
   return rows.length > 0;
 }
 
