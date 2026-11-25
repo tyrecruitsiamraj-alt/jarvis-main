@@ -14736,3 +14736,10 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 - บท `scrap` (`lumosCallScript.templates.ts` เรซูเม่เว็บหางาน · ตัวแปร `{เว็บหางาน}` · แก้ได้ในหน้าตั้งค่าบทโทร) · ใหม่ `api/_lib/scrapApplicationWeb.ts` อ่านช่องทางทุกใบในชุดที่ส่ง AI · คนจาก Scrap ไม่มีชื่อ = ไม่ส่ง (`SCRAP_NO_NAME_REASON`)
 - แท็บ Scrap ในหน้าใบขอ (`UnitRequestTabPage`) ยังเป็น `ScrapCandidatesPanel` เดิม
 - เทสต์ `tests/api/scrapApplicants2569-11-25.test.ts`
+
+### 25 พ.ย. 2569 (6) — กล่อง "อายุเกิน" แยกออกมา + หน้าโพสต์ประกาศขึ้นเฉพาะใบกำลังดำเนินการสรรหา
+- อายุเกิน: `RM_LIST_VIEWS_SHOWN` มี `over_age` ต่อจาก `not_sent` · `rmShownViewOf` ตัดสินหลังสนใจ/ไม่สนใจ ก่อนสถานะคิว · แท็บ Scrap มีชิปเดียวกัน (`SCRAP_LIST_VIEWS`)
+- หน้าโพสต์ประกาศ: `isPostingBoardJob` (`jobBoardSearch.ts`) = ใบเปิด + สถานะทำงานดำเนินการ (ไม่ตั้ง = ดำเนินการ) · `useJobBoardFilters` option `postingOnly` (เฉพาะฝั่งเจ้าหน้าที่ · หน้าสมัครสาธารณะยังเห็นทุกใบเปิด)
+- ถอดก้อนย่อย ยังต้องหาคน · เริ่มงานแล้ว (หัวเหลือ 5 ช่อง · `ReleaseLaneKey` ไม่มี sourcing/started · ledger ไม่มี releasable/startedAlready) + หัวข้อกรอง "สถานะทำงาน"
+- หน้าทีม Online: เลน + ใบเปิดต่อ BU นับเฉพาะ `isPostingBoardJob` (`RawBoardJob.posting`) · ทะเบียนอนุมัติยังใช้ใบเปิดทุกใบ · ลิงก์ "ยังไม่ประกาศ" → `?lane=unreleased`
+- ⚠️ หน้าภาพรวมก้อนการประกาศ (`PostingProgress`) ยังนับใบเปิดทุกสถานะ และยังแยก ยังต้องหาคน/เริ่มงานแล้ว (คำอยู่ในไฟล์) — เลขไม่เท่าหัวหน้าโพสต์ประกาศแล้ว รอเจ้าของเคาะ

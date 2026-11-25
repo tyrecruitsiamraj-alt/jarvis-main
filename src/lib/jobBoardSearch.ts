@@ -1,9 +1,20 @@
 import type { JobRequest } from '@/types';
 import { jobBoardCardTitle, publicJobPositionLabel, unitRequestSearchBlob } from '@/lib/unitRequestDisplay';
 import { inferProvinceFromAddress } from '@/lib/parseThaiJobAddress';
+import { resolveUnitRequestWorkStatus } from '@/lib/unitRequestWorkStatus';
 
 export function isBoardVisibleJob(j: JobRequest): boolean {
   return j.status === 'open' || j.status === 'in_progress';
+}
+
+/**
+ * ใบที่ขึ้นหน้าโพสต์ประกาศ (ฝั่งเจ้าหน้าที่) — เจ้าของ 25 พ.ย. 2569 "หน้าโพสต์ประกาศ เอาขึ้นเฉพาะ กำลังดำเนินการสรรหา" · Choice "ไม่ขึ้นเลย"
+ * = ใบเปิด + สถานะทำงาน "ดำเนินการ" (ยังไม่ตั้งสถานะ = ดำเนินการ · นิยามเดียวกับกล่อง "กำลังดำเนินการสรรหา" ของ Dashboard)
+ * ชะลอ · เริ่มประเมิน · รอสัมภาษณ์ · รอแจ้งเข้า · รอเริ่มงาน · งาน/จ่ายรายวัน = ไม่ขึ้น · หน้าสมัครสาธารณะยังใช้ `isBoardVisibleJob`
+ * หน้าทีม Online นับเลนจากตัวนี้ตัวเดียวกัน (เลขกดแล้วเท่ากัน)
+ */
+export function isPostingBoardJob(j: JobRequest): boolean {
+  return isBoardVisibleJob(j) && resolveUnitRequestWorkStatus(j.work_status) === 'in_progress';
 }
 
 export function normBoardSearch(s: string): string {

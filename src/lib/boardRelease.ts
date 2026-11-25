@@ -43,27 +43,11 @@ export type ReleaseLaneKey =
   | 'all'
   | 'released'
   | 'unreleased'
-  | 'sourcing'
-  | 'started'
   | 'applied'
   | 'silent';
 
-/**
- * 🔴 **สองก้อนย่อยของ "ยังไม่ปล่อย"** (เจ้าของเคาะ 21 ก.ย. 2569)
- *
- * ปัญหาที่ทำให้ต้องมี: หัวจอเขียน *"ยังไม่ปล่อย 195 ใบ"* แต่ปุ่มส่งทีเดียว (ถอดแล้ว 26 ก.ย.)
- * เขียน *"175 ใบ"* แล้วต่อท้ายด้วยคำแก้ตัวตัวเล็ก ๆ ว่า "ไม่รวม 20 ใบที่มีคนเริ่มงานแล้ว"
- * ⇒ เลขสองที่บนจอเดียวกันพูดคนละชุด คนอ่านเลยไม่เชื่อทั้งคู่
- *
- * เจ้าของสั่ง: *"แยกยอดเป็นสองก้อน … เลขทุกที่บวกกันได้ ไม่ต้องมีคำแก้ตัว"*
- *   `sourcing` ยังต้องหาคน  = กองที่ต้องไล่ผ่านป๊อปทีละใบ
- *   `started`  มีคนเริ่มงานแล้ว = ERP พาไปเริ่มงานแล้ว ประกาศหาคนไม่มีประโยชน์
- *   `sourcing + started = unreleased` เป๊ะ (มีเทสต์คุม)
- *
- * ⚠️ **ไม่ใช่ก้อนที่สี่ที่เคยถูกสั่งยุบ** — ของเดิมชื่อ "ไม่ต้องปล่อย" และอยู่ระดับ
- * เดียวกับสามก้อนหลัก · ของใหม่เป็น**ก้อนย่อยใต้ "ยังไม่ปล่อย"** สามก้อนหลักยังเหมือนเดิม
- */
-export const UNRELEASED_SPLIT_KEYS = ['sourcing', 'started'] as const;
+// 🔴 สองก้อนย่อยของ "ยังไม่ปล่อย" (ยังต้องหาคน · เริ่มงานแล้ว — 21 ก.ย. 2569) ถอดแล้ว 25 พ.ย. 2569:
+//    หน้าโพสต์ประกาศขึ้นเฉพาะใบกำลังดำเนินการสรรหา (`isPostingBoardJob`) ⇒ "เริ่มงานแล้ว" เป็น 0 เสมอ (เจ้าของ Choice "ถอดออก")
 
 /**
  * 🔴 **สองก้อนย่อยของ "ปล่อยแล้ว"** (เจ้าของเคาะ 22 ก.ย. 2569 — นิยามกล่องงานข้อ 7:
@@ -196,14 +180,6 @@ export const RELEASE_LANE_TEXT: Record<ReleaseLaneKey, { label: string; hint: st
     label: 'ยังไม่ประกาศ',
     hint: 'คนนอกยังไม่เห็นใบนี้ — นี่คือกองงานประกาศ',
   },
-  sourcing: {
-    label: 'ยังต้องหาคน',
-    hint: 'ยังไม่ประกาศ และยังต้องหาคน',
-  },
-  started: {
-    label: 'เริ่มงานแล้ว',
-    hint: 'ยังไม่ประกาศ แต่มีคนเริ่มงานแล้ว',
-  },
   applied: {
     label: 'มีคนกรอก',
     hint: 'ประกาศแล้วและมีคนสมัคร',
@@ -309,16 +285,6 @@ export type ReleaseLedger = {
   releasedSilent: number;
   /** หัวคนรวมของใบที่ปล่อยแล้วและมีคนสมัคร — เจ้าของขอเห็น "จำนวนเท่าไหร่" */
   applicantHeads: number;
-  /**
-   * ใบที่ปล่อยได้จริง = ยังไม่ปล่อย **และยังเป็นงานหาคนของเรา** (ก้อนย่อย "ยังต้องหาคน")
-   * 🔴 ห้ามใช้ `unreleased` แทน (ดูเหตุผลที่ `stillSourcing`)
-   */
-  releasable: number;
-  /**
-   * ยังไม่ปล่อย **แต่มีคนเริ่มงานแล้ว** — `releasable + startedAlready = unreleased` เป๊ะ
-   * แยกออกมาเพื่อให้จอพิมพ์สองก้อนได้โดยไม่ต้องคำนวณเองที่หน้าจอ (หนึ่งเมตริกหนึ่งนิยาม)
-   */
-  startedAlready: number;
 };
 
 /**
@@ -352,7 +318,6 @@ export function buildReleaseLedger(
   let unreleased = 0;
   let releasedWithApplicants = 0;
   let applicantHeads = 0;
-  let releasable = 0;
 
   const stepCount: Record<ReleaseStepKey, number> = {
     info: 0,
@@ -373,7 +338,6 @@ export function buildReleaseLedger(
     }
     unreleased += 1;
     stepCount[releaseStepOf(job, facts)] += 1;
-    if (stillSourcing(job)) releasable += 1;
   }
 
   const all = openJobs.length;
@@ -391,8 +355,6 @@ export function buildReleaseLedger(
     releasedWithApplicants,
     releasedSilent: released - releasedWithApplicants,
     applicantHeads,
-    releasable,
-    startedAlready: unreleased - releasable,
   };
 }
 
@@ -403,11 +365,6 @@ export function filterByReleaseLane(
   lane: ReleaseLaneKey | null,
 ): JobRequest[] {
   if (!lane || lane === 'all') return [...openJobs];
-  // สองก้อนย่อยของ "ยังไม่ปล่อย" — แบ่งด้วย `stillSourcing` (ที่เดียว)
-  if (lane === 'sourcing') return releasableJobsOf(openJobs, facts);
-  if (lane === 'started') {
-    return openJobs.filter((j) => !facts.isReleased(j) && !stillSourcing(j));
-  }
   // สองก้อนย่อยของ "ปล่อยแล้ว" — แบ่งด้วยตัวนับเดียวกับ ledger (`facts.applicants`)
   if (lane === 'applied') {
     return openJobs.filter((j) => facts.isReleased(j) && facts.applicants(j) > 0);
@@ -429,10 +386,3 @@ export function filterByReleaseStep(
   );
 }
 
-/** ใบที่ยังไม่ปล่อย และยังเป็นงานหาคนของเรา — ก้อนย่อย "ยังต้องหาคน" */
-export function releasableJobsOf(
-  openJobs: readonly JobRequest[],
-  facts: ReleaseFacts,
-): JobRequest[] {
-  return openJobs.filter((j) => !facts.isReleased(j) && stillSourcing(j));
-}

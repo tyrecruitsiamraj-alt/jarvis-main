@@ -32,7 +32,6 @@ import { formatYmdTh } from './dateTh';
 import { rangeText } from './periodPick';
 import { genderLabel } from './genderRequirement';
 import { isDrivingPositionLabel } from './jobBoardPositionPreset';
-import { UNIT_REQUEST_WORK_STATUS_LABELS, UNIT_REQUEST_WORK_STATUS_OPTIONS, resolveUnitRequestWorkStatus } from './unitRequestWorkStatus';
 import {
   READINESS_FACET_LABEL,
   READINESS_FACET_ORDER,
@@ -62,7 +61,6 @@ export { UNSPECIFIED, visibleFacetOptions } from './facetEngine';
 
 export type BoardFacetKey =
   | 'ready'
-  | 'workStatus'
   | 'so'
   | 'applicants'
   | 'release'
@@ -258,18 +256,7 @@ const FACETS: readonly FacetDef[] = [
       return r ? readinessFacetValues(r) : [];
     },
   },
-  {
-    /**
-     * สถานะทำงานของใบขอ (เจ้าของ 20 พ.ย. 2569 "ให้เลือกสถานะใบขอได้หน่อย เช่น ดำเนินการสรรหา ฯลฯ")
-     * ค่าเดียวกับเมนูใบขอ (`work_status`) และก้อนใบขอหน้าภาพรวม (`workStatusOfRemaining` · ดำเนินการ = กำลังดำเนินการสรรหา)
-     */
-    key: 'workStatus',
-    label: 'สถานะทำงาน',
-    ui: 'check',
-    order: [...UNIT_REQUEST_WORK_STATUS_OPTIONS],
-    labelOf: (v) => (v === 'in_progress' ? 'กำลังดำเนินการสรรหา' : (UNIT_REQUEST_WORK_STATUS_LABELS as Record<string, string>)[v] ?? v),
-    values: (job) => [resolveUnitRequestWorkStatus(job.work_status)],
-  },
+  // หัวข้อ "สถานะทำงาน" (20 พ.ย. 2569) ถอดแล้ว 25 พ.ย. 2569 — หน้าโพสต์ประกาศขึ้นเฉพาะใบกำลังดำเนินการสรรหา (`isPostingBoardJob`) เหลือค่าเดียว
   {
     /** สั่งโพสต์ / Scrap ไป So Scraping (เจ้าของ 20 ต.ค. 2569 "สั่งแล้วดูไม่ได้จะตามงานยังไง") */
     key: 'so',
@@ -454,7 +441,7 @@ export const BOARD_FACET_KEYS: readonly BoardFacetKey[] = FACETS.map((f) => f.ke
  * ที่เหลือรวมอยู่ใน "ตัวกรองอื่น" · หัวข้อลูกอยู่ในกล่องเดียวกับหัวข้อแม่ (อำเภอในจังหวัด · งานย่อยในตำแหน่ง)
  */
 /** "พร้อมประกาศไหม" ขึ้นก่อน (2 ต.ค. 2569 แทน "ติดขั้น" ซึ่ง 30 ก.ย. แทนแถวบนหัวที่ถอดไป) */
-export const BOARD_PRIMARY_FACETS: readonly BoardFacetKey[] = ['ready', 'workStatus', 'position', 'unit', 'province', 'income'];
+export const BOARD_PRIMARY_FACETS: readonly BoardFacetKey[] = ['ready', 'position', 'unit', 'province', 'income'];
 export const BOARD_FACET_ATTACH: Partial<Record<BoardFacetKey, BoardFacetKey>> = {
   subtype: 'position',
   district: 'province',

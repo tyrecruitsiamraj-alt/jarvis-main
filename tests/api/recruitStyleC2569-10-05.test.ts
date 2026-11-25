@@ -95,7 +95,8 @@ describe('ชิปกรองหัวแท็บ (แทนกล่อง�
   it('🔴 โพสต์ประกาศ: การ์ดตัวเลข 3 ใบ → ชิป · เลนครบ 7 อันยังกดได้', () => {
     expect(HEADER).not.toContain('KpiCard');
     expect(HEADER).not.toContain('<Card');
-    for (const lane of ['all', 'released', 'unreleased', 'applied', 'silent', 'sourcing', 'started']) {
+    // 25 พ.ย. 2569 เหลือ 5 ช่อง (ถอด ยังต้องหาคน · เริ่มงานแล้ว)
+    for (const lane of ['all', 'released', 'unreleased', 'applied', 'silent']) {
       expect(HEADER, lane).toContain(`laneKey="${lane}"`);
     }
   });

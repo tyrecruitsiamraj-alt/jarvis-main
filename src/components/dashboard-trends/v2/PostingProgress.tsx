@@ -47,6 +47,11 @@ function groupsOf(rows: readonly StuckRequest[]): { ids: Record<PersonGroupKey, 
 }
 
 const L = (k: keyof typeof RELEASE_LANE_TEXT) => RELEASE_LANE_TEXT[k].label;
+/**
+ * ส่วนย่อยของ "ยังไม่ประกาศ" บนหน้าภาพรวม — หัวหน้าโพสต์ประกาศถอดสองช่องนี้แล้ว 25 พ.ย. 2569 (หน้านั้นขึ้นเฉพาะใบกำลังดำเนินการสรรหา)
+ * หน้าภาพรวมยังนับใบเปิดทุกสถานะ จึงยังแยกให้เห็น · คำเดิม
+ */
+const UNRELEASED_PART_LABEL = { sourcing: 'ยังต้องหาคน', started: 'เริ่มงานแล้ว' } as const;
 const buOf = (r: StuckRequest) => r.bu?.trim() || BU_UNKNOWN;
 
 export default function PostingProgress({ view, open, onView, onOpenRequest, onNames, resetKey }: Props) {
@@ -81,8 +86,8 @@ export default function PostingProgress({ view, open, onView, onOpenRequest, onN
           { key: 'silent', label: L('silent'), hex: TONE.neutral.hex, has: (r: StuckRequest) => (r.applications ?? 0) === 0 },
         ]
       : [
-          { key: 'sourcing', label: L('sourcing'), hex: TONE.warn.hex, has: (r: StuckRequest) => r.sourcing !== false },
-          { key: 'started', label: L('started'), hex: TONE.info.hex, has: (r: StuckRequest) => r.sourcing === false },
+          { key: 'sourcing', label: UNRELEASED_PART_LABEL.sourcing, hex: TONE.warn.hex, has: (r: StuckRequest) => r.sourcing !== false },
+          { key: 'started', label: UNRELEASED_PART_LABEL.started, hex: TONE.info.hex, has: (r: StuckRequest) => r.sourcing === false },
         ];
   const BU_ORDER = ['LBD', 'LBA', 'LM', 'SN', 'DS', 'CR'];
   const rank = (b: string) => (b === BU_UNKNOWN ? 99 : BU_ORDER.indexOf(b) < 0 ? 50 : BU_ORDER.indexOf(b));

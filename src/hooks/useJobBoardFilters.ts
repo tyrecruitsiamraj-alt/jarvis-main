@@ -7,7 +7,7 @@ import { inferProvinceFromAddress } from '@/lib/parseThaiJobAddress';
 import { districtMatchesFilter } from '@/lib/districtMatch';
 import { getDistrictOptionsForProvince } from '@/lib/thaiDistricts';
 import { THAI_PROVINCE_NAMES_SORTED } from '@/lib/thaiProvinces';
-import { isBoardVisibleJob } from '@/lib/jobBoardSearch';
+import { isBoardVisibleJob, isPostingBoardJob } from '@/lib/jobBoardSearch';
 import { DRIVING_POSITION_LABEL, jobMatchesPositionFilter } from '@/lib/jobBoardPositionPreset';
 import { filterJobBoardRows, type JobBoardRowFilterState } from '@/lib/jobBoardRowFilter';
 
@@ -20,6 +20,8 @@ export type JobBoardFilterOptions = {
   drivingPositionGroup?: boolean;
   /** ค้นไม่เจอเลย = คืนทั้งหมด (หน้าสมัครสาธารณะ) · ไม่ส่ง = คืน 0 ใบ (เจ้าหน้าที่) */
   searchFallbackAll?: boolean;
+  /** หน้าโพสต์ประกาศของเจ้าหน้าที่ — เฉพาะใบกำลังดำเนินการสรรหา (`isPostingBoardJob` · 25 พ.ย. 2569) */
+  postingOnly?: boolean;
 };
 
 export function useJobBoardFilters(jobs: JobRequest[], options?: JobBoardFilterOptions) {
@@ -46,7 +48,8 @@ export function useJobBoardFilters(jobs: JobRequest[], options?: JobBoardFilterO
     setPositionFilter(initialPosition);
   }, [initialPosition]);
 
-  const visible = useMemo(() => jobs.filter(isBoardVisibleJob), [jobs]);
+  const postingOnly = Boolean(options?.postingOnly);
+  const visible = useMemo(() => jobs.filter(postingOnly ? isPostingBoardJob : isBoardVisibleJob), [jobs, postingOnly]);
 
   const provinceOptions = THAI_PROVINCE_NAMES_SORTED;
 

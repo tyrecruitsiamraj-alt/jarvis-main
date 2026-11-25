@@ -1873,24 +1873,6 @@
      "src": "src/components/jobs/BoardReleaseHeader.tsx:176"
     },
     {
-     "label": "ยังต้องหาคน",
-     "action": "filter",
-     "target": "?lane=sourcing",
-     "api": null,
-     "effects": [],
-     "when": null,
-     "src": "src/components/jobs/BoardReleaseHeader.tsx:177"
-    },
-    {
-     "label": "เริ่มงานแล้ว",
-     "action": "filter",
-     "target": "?lane=started",
-     "api": null,
-     "effects": [],
-     "when": null,
-     "src": "src/components/jobs/BoardReleaseHeader.tsx:178"
-    },
-    {
      "label": "กดลองใหม่",
      "action": "api",
      "target": "โหลดทะเบียนประกาศ+ลิงก์+ใบขอใหม่ (สด)",
@@ -15919,9 +15901,9 @@
      "src": "src/components/team-online/TeamOnlineSections.tsx:133"
     },
     {
-     "label": "ยังไม่ประกาศ · ยังต้องหาคน / ประกาศแล้ว ยังไม่มีใครสมัคร",
+     "label": "ยังไม่ประกาศ / ประกาศแล้ว ยังไม่มีใครสมัคร",
      "action": "navigate",
-     "target": "/jobs/board?lane=sourcing · /jobs/board?lane=silent",
+     "target": "/jobs/board?lane=unreleased · /jobs/board?lane=silent",
      "api": null,
      "effects": [],
      "when": "ส่วนใบยังไม่มีผู้สมัคร",

@@ -341,6 +341,7 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
     lockPosition: positionPreset?.locked,
     drivingPositionGroup: positionPreset?.isDrivingGroup,
     searchFallbackAll: variant === 'public',
+    postingOnly: variant === 'staff',
   });
   const isStaff = variant === 'staff';
 
@@ -502,8 +503,6 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
     () =>
       laneParam === 'released' ||
       laneParam === 'unreleased' ||
-      laneParam === 'sourcing' ||
-      laneParam === 'started' ||
       laneParam === 'applied' ||
       laneParam === 'silent'
         ? laneParam

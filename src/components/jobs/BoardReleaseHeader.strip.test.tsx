@@ -5,14 +5,15 @@ import { RELEASE_LANE_TEXT, type ReleaseLaneKey, type ReleaseLedger } from '@/li
 import type { LedgerState } from '@/lib/boardDataState';
 afterEach(cleanup);
 const ready: LedgerState = { status: 'ready', reason: null };
-const ledger: ReleaseLedger = { all:329,released:157,unreleased:172,percent:48,steps:[],releasedWithApplicants:139,releasedSilent:18,applicantHeads:1992,releasable:74,startedAlready:98 };
-const keys: ReleaseLaneKey[] = ['all','released','applied','silent','unreleased','sourcing','started'];
-const counts = [329,157,139,18,172,74,98];
+const ledger: ReleaseLedger = { all:329,released:157,unreleased:172,percent:48,steps:[],releasedWithApplicants:139,releasedSilent:18,applicantHeads:1992 };
+// 25 พ.ย. 2569 ถอด ยังต้องหาคน · เริ่มงานแล้ว (หน้าโพสต์ประกาศขึ้นเฉพาะใบกำลังดำเนินการสรรหา)
+const keys: ReleaseLaneKey[] = ['all','released','applied','silent','unreleased'];
+const counts = [329,157,139,18,172];
 describe('approved compact strip preserves live bindings',()=>{
-  it('renders all seven ordered filters, source counts, and applicant heads',()=>{
+  it('renders all five ordered filters, source counts, and applicant heads',()=>{
     render(<BoardReleaseHeader state={ready} ledger={ledger} lane={null} onLaneChange={()=>{}}/>);
     const tree=screen.getByTestId('board-release-tree');
-    expect(within(tree).getAllByRole('button')).toHaveLength(7);
+    expect(within(tree).getAllByRole('button')).toHaveLength(5);
     expect([...tree.children].map(e=>e.getAttribute('data-testid'))).toEqual(keys.map(k=>`board-lane-${k}`));
     keys.forEach((key,i)=>expect(screen.getByTestId(`board-lane-${key}`)).toHaveTextContent(`${RELEASE_LANE_TEXT[key].label}${counts[i]}ใบ`));
     expect(screen.getByTestId('board-lane-applied')).toHaveTextContent('1,992 คน');
@@ -59,6 +60,6 @@ describe('approved compact strip preserves live bindings',()=>{
   it('preserves stale-data label and source hint',()=>{
     render(<BoardReleaseHeader state={ready} ledger={ledger} lane={null} onLaneChange={()=>{}} ageLabel="ข้อมูลสำเนา · 10 นาที"/>);
     expect(screen.getByText('ข้อมูลสำเนา · 10 นาที')).toBeTruthy();
-    expect(screen.getByTestId('board-lane-sourcing')).toHaveAttribute('title',RELEASE_LANE_TEXT.sourcing.hint);
+    expect(screen.getByTestId('board-lane-unreleased')).toHaveAttribute('title',RELEASE_LANE_TEXT.unreleased.hint);
   });
 });

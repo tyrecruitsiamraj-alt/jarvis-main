@@ -44,7 +44,7 @@ describe('งานของทีม Online', () => {
       '/jobs/board?view=list&bucket=success_unscheduled',
       '/jobs/board?lane=unreleased&step=publish',
       '/jobs/board?lane=silent',
-      '/jobs/board?lane=sourcing',
+      '/jobs/board?lane=unreleased',
     ]);
   });
 

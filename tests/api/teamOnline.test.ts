@@ -239,15 +239,16 @@ describe('ตัวเลขประกอบจากแถวจริง', (
     const body = await run({});
     const lbd = body.byBu.find((r: { bu: string }) => r.bu === 'LBD');
     expect(lbd).toMatchObject({ openNow: 1, remaining: 2 });
-    expect(body.lanes.scope.open).toBe(4);
+    // 25 พ.ย. 2569 เลนนับเฉพาะใบที่ขึ้นหน้าโพสต์ประกาศ (กำลังดำเนินการสรรหา) — R5 (งานรายวัน) ไม่นับ
+    expect(body.lanes.scope.open).toBe(3);
   });
 
   it('เลนกล่องงาน + ใบยังไม่มีผู้สมัครแยกอายุ · ยอดทั้งสิทธิ์ (scope) ไม่ตามตัวกรอง BU · ลิงก์ใบพกรหัส ERP', async () => {
     const body = await run({ bu: 'LBD' });
     // ทั้งสิทธิ์: R1 ปล่อยแล้วมีผู้สมัคร · R9 ยังไม่ปล่อย ไม่มีผู้สมัคร (ค้าง 151 วัน) ·
     // R2 ใบล่วงหน้า = มีผู้สมัคร 1 จากประกาศที่เก็บคีย์ siamraj-sql:R2 (ทางถอยเลขที่ใบ — ตัวเดียวกับเลขบนการ์ดกล่องงาน)
-    // R5 เริ่มงานแล้ว (work_status daily_work) = started ไม่ใช่ sourcing · ไม่นับว่ายังไม่มีผู้สมัคร
-    expect(body.lanes.scope).toMatchObject({ open: 4, sourcing: 2, started: 1, applied: 1, silent: 0, noApplicants: 1, oldestDays: 151 });
+    // R5 งานรายวัน (work_status daily_work) ไม่ขึ้นหน้าโพสต์ประกาศแล้ว (25 พ.ย. 2569) ⇒ ไม่อยู่ในเลนเลย
+    expect(body.lanes.scope).toMatchObject({ open: 3, sourcing: 2, started: 0, applied: 1, silent: 0, noApplicants: 1, oldestDays: 151 });
     expect(body.lanes.scope.aging).toMatchObject({ d0_3: 0, d91: 1 });
     // ตามตัวกรอง BU ของหน้า = LBD อย่างเดียว
     expect(body.lanes.total).toMatchObject({ open: 1, applied: 1, noApplicants: 0 });

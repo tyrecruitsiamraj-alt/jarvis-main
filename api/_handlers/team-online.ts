@@ -39,7 +39,7 @@ import { jobPositionUnits } from '../../src/lib/jobPositionUnits.js';
 import { buildCountIndex, buildJobKeyIndex, countFor, requestNoOf } from '../../src/lib/jobKeyIndex.js';
 import { buildReleaseIndex } from '../../src/lib/jobReleaseIndex.js';
 import { jobRequestDateYmd } from '../../src/lib/jobRequestDate.js';
-import { isBoardVisibleJob } from '../../src/lib/jobBoardSearch.js';
+import { isBoardVisibleJob, isPostingBoardJob } from '../../src/lib/jobBoardSearch.js';
 import { releaseStepOf, stillSourcing, type ReleaseFacts } from '../../src/lib/boardRelease.js';
 import { queueLane } from '../../src/lib/officeTeam.js';
 import {
@@ -294,6 +294,7 @@ function boardJobsOf(
       ageDays: ymd ? Math.max(0, Math.round((Date.parse(`${today}T00:00:00Z`) - Date.parse(`${ymd}T00:00:00Z`)) / 86_400_000)) : null,
       released: isReleased,
       sourcing: stillSourcing(j),
+      posting: isPostingBoardJob(j),
       applicants: facts.applicants(j),
       step: isReleased ? null : releaseStepOf(j, facts),
     };
@@ -410,7 +411,8 @@ const jobBu = (j: { site_code?: unknown }) => trendBuFromSiteCode(String(j.site_
  * 🔴 feed ส่งใบที่ RM รับทราบแล้วมาด้วย (`status: 'closed'`) — ไม่กรองแล้ว "ใบเปิด/เหลือหา" เกินหัวกล่องงาน (แก้ 29 ก.ย. 2569 รอบ 4)
  */
 function openJobsOf(feed: readonly JobRequest[]): RawOpenJob[] {
-  return feed.filter(isBoardVisibleJob).map((j) => ({ id: String(j.id), bu: jobBu(j), positions: jobPositionUnits(j) }));
+  // ชุดเดียวกับหัวหน้าโพสต์ประกาศ — ขึ้นเฉพาะใบกำลังดำเนินการสรรหา (25 พ.ย. 2569)
+  return feed.filter(isPostingBoardJob).map((j) => ({ id: String(j.id), bu: jobBu(j), positions: jobPositionUnits(j) }));
 }
 
 /**
@@ -681,7 +683,8 @@ export async function buildTeamOnline(
         )
       : null;
   if (boardJobs) {
-    const jobs = boardJobs.filter((j) => inScope(j.bu));
+    // เลน = ใบที่ขึ้นหน้าโพสต์ประกาศเท่านั้น (25 พ.ย. 2569) · ทะเบียนอนุมัติข้างล่างยังใช้ใบเปิดทุกใบ (รออะไร = เริ่มงานแล้ว ฯลฯ)
+    const jobs = boardJobs.filter((j) => inScope(j.bu) && j.posting !== false);
     const pageJobs = jobs.filter((j) => inPage(j.bu));
     const allOf = (list: typeof jobs) => laneRows(list.map((j) => ({ ...j, bu: 'ALL' })), () => 'ทั้งหมด', ['ALL'])[0];
     body.lanes = {

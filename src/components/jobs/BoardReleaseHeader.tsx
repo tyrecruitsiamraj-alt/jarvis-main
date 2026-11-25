@@ -56,12 +56,13 @@ const th = (n: number) => n.toLocaleString('th-TH');
  * · ประกอบจาก Tailwind ล้วน (กติกา repo ห้ามไฟล์ CSS ใหม่) · ใช้ทั้งตอนโหลดและตอนมีเลข ⇒ หน้าไม่กระโดด
  */
 const LANE_GRID =
-  'grid snap-x grid-cols-[repeat(7,minmax(9rem,1fr))] overflow-x-auto rounded-xl border border-border bg-card p-1.5 lg:grid-cols-7';
+  'grid snap-x grid-cols-[repeat(5,minmax(9rem,1fr))] overflow-x-auto rounded-xl border border-border bg-card p-1.5 lg:grid-cols-5';
 /** เส้นคั่นบาง ๆ ซ้ายของแต่ละช่อง (ช่องแรกไม่มี) · ช่อง 2 กับ 5 (ต้นก้อนประกาศแล้ว / ยังไม่ประกาศ) เส้นเข้มกว่า */
 const CELL_DIVIDER =
   "before:absolute before:inset-y-3 before:-left-px before:w-px before:bg-border/60 before:content-[''] first:before:hidden [&:nth-child(2)]:before:bg-border [&:nth-child(5)]:before:bg-border";
-/** ลำดับช่องซ้ายไปขวา: ทั้งหมด · ประกาศแล้ว (มีคนกรอก · ยังไม่มีคนกรอก) · ยังไม่ประกาศ (ยังต้องหาคน · เริ่มงานแล้ว) */
-const CELL_ORDER = ['all', 'released', 'applied', 'silent', 'unreleased', 'sourcing', 'started'] as const;
+/** ลำดับช่องซ้ายไปขวา: ทั้งหมด · ประกาศแล้ว (มีคนกรอก · ยังไม่มีคนกรอก) · ยังไม่ประกาศ */
+// 25 พ.ย. 2569 ถอด "ยังต้องหาคน · เริ่มงานแล้ว" (หน้านี้ขึ้นเฉพาะใบกำลังดำเนินการสรรหา — เริ่มงานแล้วเป็น 0 เสมอ · เจ้าของ Choice "ถอดออก")
+const CELL_ORDER = ['all', 'released', 'applied', 'silent', 'unreleased'] as const;
 
 
 /**
@@ -161,7 +162,7 @@ const BoardReleaseHeader: React.FC<BoardReleaseHeaderProps> = ({
       {ageLabel ? <p className={cn('text-xs', DASH.muted)}>{ageLabel}</p> : null}
 
       {/* 🔴 เลขชุดนี้ **ตรงกับหน้าหลัก** · ประกาศแล้ว + ยังไม่ประกาศ = ใบขอทั้งหมด · มีคนกรอก + ยังไม่มีคนกรอก = ประกาศแล้ว
-          · ยังต้องหาคน + เริ่มงานแล้ว = ยังไม่ประกาศ (ก้อนย่อยเจ้าของเคาะ 21 ก.ย. 2569) · ทุกช่องกดกรองการ์ดข้างล่าง */}
+          · ทุกช่องกดกรองการ์ดข้างล่าง · ก้อนย่อยใต้ยังไม่ประกาศถอดแล้ว 25 พ.ย. 2569 */}
       <div className={LANE_GRID} data-testid="board-release-tree">
         <LaneCell laneKey="all" count={ledger.all} active={lane === null || lane === 'all'} onClick={() => onLaneChange(null)} />
         <LaneCell laneKey="released" count={ledger.released} active={lane === 'released'} onClick={() => toggle('released')} />
@@ -174,8 +175,6 @@ const BoardReleaseHeader: React.FC<BoardReleaseHeaderProps> = ({
         />
         <LaneCell laneKey="silent" count={ledger.releasedSilent} tone="warn" active={lane === 'silent'} onClick={() => toggle('silent')} />
         <LaneCell laneKey="unreleased" count={ledger.unreleased} active={lane === 'unreleased'} onClick={() => toggle('unreleased')} />
-        <LaneCell laneKey="sourcing" count={ledger.releasable} tone="danger" active={lane === 'sourcing'} onClick={() => toggle('sourcing')} />
-        <LaneCell laneKey="started" count={ledger.startedAlready} active={lane === 'started'} onClick={() => toggle('started')} />
       </div>
     </div>
   );

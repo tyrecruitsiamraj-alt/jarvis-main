@@ -3,6 +3,7 @@ import type { PublishReadiness } from '@/lib/publishReadiness';
 import type { JobRequest } from '@/types';
 import {
   applyBoardFilters,
+  BOARD_PRIMARY_FACETS,
   boardFacetValueLabel,
   buildBoardFacets,
   drivingSubtypeOf,
@@ -24,6 +25,7 @@ import {
   type BoardFacetFacts,
   type BoardFilterState,
 } from '@/lib/boardFilters';
+import { isPostingBoardJob } from '@/lib/jobBoardSearch';
 
 /**
  * แถบกรองแบบ iRecruit บนกล่องงาน (เจ้าของสั่ง 26 ก.ย. 2569 — แผน
@@ -86,15 +88,14 @@ function facts(over: Partial<{
 const state = (selection: BoardFilterState['selection'], dates: BoardFilterState['dates'] = null) =>
   ({ selection, dates }) as BoardFilterState;
 
-describe('สถานะทำงาน (เจ้าของ 20 พ.ย. 2569 "ให้เลือกสถานะใบขอได้หน่อย เช่น ดำเนินการสรรหา")', () => {
-  it('กรองด้วยสถานะทำงานของใบ · ไม่ตั้ง = กำลังดำเนินการสรรหา (ตัวตัดสินเดียวกับเมนูใบขอ) · ป้ายดำเนินการ = กำลังดำเนินการสรรหา', () => {
-    const doing = job({ work_status: 'in_progress' } as Partial<JobRequest>);
-    const none = job({ work_status: undefined } as Partial<JobRequest>);
-    const waiting = job({ work_status: 'waiting_inform' } as Partial<JobRequest>);
-    expect(applyBoardFilters([doing, none, waiting], state({ workStatus: ['in_progress'] }), facts())).toEqual([doing, none]);
-    expect(applyBoardFilters([doing, none, waiting], state({ workStatus: ['waiting_inform'] }), facts())).toEqual([waiting]);
-    expect(boardFacetValueLabel('workStatus', 'in_progress')).toBe('กำลังดำเนินการสรรหา');
-    expect(boardFacetValueLabel('workStatus', 'waiting_inform')).toBe('รอแจ้งเข้า');
+describe('หน้าโพสต์ประกาศขึ้นเฉพาะใบกำลังดำเนินการสรรหา (เจ้าของ 25 พ.ย. 2569 · ถอดหัวข้อ "สถานะทำงาน")', () => {
+  it('ดำเนินการ / ไม่ตั้งสถานะ = ขึ้น · สถานะอื่นไม่ขึ้น · หัวข้อสถานะทำงานไม่อยู่ในแถบกรองแล้ว', () => {
+    const doing = job({ work_status: 'in_progress' , status: 'open' } as Partial<JobRequest>);
+    const none = job({ work_status: undefined , status: 'open' } as Partial<JobRequest>);
+    const waiting = job({ work_status: 'waiting_inform' , status: 'open' } as Partial<JobRequest>);
+    const hold = job({ work_status: 'on_hold' , status: 'open' } as Partial<JobRequest>);
+    expect([doing, none, waiting, hold].filter(isPostingBoardJob)).toEqual([doing, none]);
+    expect(BOARD_PRIMARY_FACETS).not.toContain('workStatus');
   });
 });
 

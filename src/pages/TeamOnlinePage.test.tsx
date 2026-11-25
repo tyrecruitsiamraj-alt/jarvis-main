@@ -294,7 +294,7 @@ describe('หน้าทีม Online', () => {
     expect(hrefs).toContain('/jobs/board?view=list&bucket=success_unscheduled');
     expect(hrefs).toContain('/jobs/board?lane=unreleased&step=publish');
     expect(hrefs).toContain('/jobs/board?lane=silent');
-    expect(hrefs).toContain('/jobs/board?lane=sourcing');
+    expect(hrefs).toContain('/jobs/board?lane=unreleased');
     // งานเดิมที่นับเองจากตารางประกาศ (กดไปเจอเลขไม่เท่า) ต้องไม่กลับมา
     expect(text()).not.toContain('ยังไม่ Gen link');
   });

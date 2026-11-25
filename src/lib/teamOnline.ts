@@ -960,6 +960,11 @@ export type RawBoardJob = {
   released: boolean;
   /** ยังเป็นงานหาคนของเรา (`stillSourcing`) */
   sourcing: boolean;
+  /**
+   * ขึ้นหน้าโพสต์ประกาศ (`isPostingBoardJob` · กำลังดำเนินการสรรหา — 25 พ.ย. 2569) · เลนนับเฉพาะใบนี้ (กดไปแล้วเลขเท่ากัน)
+   * ไม่ส่งมา = ถือว่าขึ้น (ข้อมูลเก่า)
+   */
+  posting?: boolean;
   applicants: number;
   /** ขั้นที่ติดของใบที่ยังไม่ปล่อย (`releaseStepOf`) · ใบที่ปล่อยแล้ว = null */
   step: 'info' | 'place' | 'benefits' | 'publish' | null;
