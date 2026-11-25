@@ -40,12 +40,13 @@ describe('แถวเครื่องมือรายแท็บ', () => {
   });
 
   it('ผู้สมัคร = 5 ปุ่ม: เพิ่ม · นำเข้า · เก็บไปโทรเอง · ส่ง AI · รายงาน', () => {
-    expect(WS).toContain("onAddApplicant={tab === 'candidates' ?");
+    // แท็บ Scrap (25 พ.ย. 2569) ไม่มีปุ่มเพิ่ม/นำเข้า/รายงาน
+    expect(WS).toContain("onAddApplicant={tab === 'candidates' && !scrapMode ?");
     // นำเข้า Excel + รายงาน ย้ายขึ้นแถวหัวข้างปุ่มวันที่เมื่อมีช่อง (เจ้าของสั่ง 14 ต.ค. 2569) · ไม่มีช่อง = แถวปุ่มทำงานเดิม
-    expect(WS).toContain("onImportApplicants={tab === 'candidates' && !headerActionsSlot ?");
+    expect(WS).toContain("onImportApplicants={tab === 'candidates' && !scrapMode && !headerActionsSlot ?");
     expect(WS).toContain("onHoldSelected={tab === 'candidates' ?");
-    expect(WS).toContain("onExport={tab === 'candidates' && !headerActionsSlot ?");
-    expect(WS).toMatch(/tab === 'candidates' && headerActionsSlot\s*\?\s*createPortal\(/);
+    expect(WS).toContain("onExport={tab === 'candidates' && !scrapMode && !headerActionsSlot ?");
+    expect(WS).toMatch(/tab === 'candidates' && !scrapMode && headerActionsSlot\s*\?\s*createPortal\(/);
     expect(WS).toContain('onSendAiSelected={() => askSendAi(selectedIds)}');
   });
 
@@ -65,7 +66,8 @@ describe('แถวเครื่องมือรายแท็บ', () => {
 describe('ชิปกรองหัวแท็บ (แทนกล่องตัวเลข)', () => {
   it('ทุกแท็บของ RmWorkspace ใช้ FilterChips ตัวเดียวกัน · ถัง drill-down ไม่มีชิป', () => {
     // 23 พ.ย. 2569 แบบร่างรอบ 4: การติดต่อ/นัดหมาย ใช้กล่องเลข RmKpiStrip (ข้อมูลชุดเดียวกับชิป) · นัดหมายเหลือชิปรอง 1 แถว
-    expect(WS.match(/<FilterChips/g)?.length).toBe(2);
+    // + แท็บ Scrap 2 อัน (มุมมอง · ผลประเมิน — 25 พ.ย. 2569) = ตัวเดียวกับแท็บผู้สมัคร
+    expect(WS.match(/<FilterChips/g)?.length).toBe(4);
     expect(WS.match(/<RmKpiStrip/g)?.length).toBe(2);
     expect(WS).toContain("!bucket && tab === 'candidates'");
     expect(WS).toContain("!bucket && tab === 'contact'");

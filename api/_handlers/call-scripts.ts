@@ -53,6 +53,11 @@ const SCRIPT_META: Record<EditableScriptKey, { topic: string; label: string; hin
     label: 'ผู้สมัครที่เจ้าหน้าที่คีย์/นำเข้า',
     hint: 'ใบสมัครที่ไม่ได้กรอกเองผ่านลิงก์ — ลำดับเดียวกับผู้สมัครผ่านลิงก์ ต่างแค่ประโยคแรก',
   },
+  scrap: {
+    topic: 'งานสรรหา',
+    label: 'คนจาก Scrap (JobBKK / JobThai)',
+    hint: 'โทรหาคนที่ So Scraping เจอเรซูเม่บนเว็บหางาน — เขาไม่ได้สมัครกับเรา · ลำดับเดียวกับผู้สมัครคีย์เอง ต่างแค่ประโยคแรก · {เว็บหางาน} = JobBKK หรือ JobThai',
+  },
   apply: {
     topic: 'งานสรรหา',
     label: 'ผู้สมัครผ่านลิงก์',

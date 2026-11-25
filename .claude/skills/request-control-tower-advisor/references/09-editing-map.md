@@ -14726,3 +14726,13 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 - `phonesWithWork` (`api/_lib/lumosDispatch.ts`): สายติดตามงานไม่ยกเลิกใน `EMPLOYED_FOLLOW_DAYS` (60) วัน ผลล่าสุดไม่ใช่ `no_show_start` · ด่านใน `insertQueueItems` (ไม่ใช่คิว follow) → `employed` + `EMPLOYED_REASON` ทุกเส้นเสนองาน · อ่านไม่ได้ = `guarded`
 - ชิป `appt_failed` (`recruitRm.ts` · `isAppointmentFailedReturn`) ตัดสินก่อนผลโทร · คอลัมน์คำตอบกับ AI (`applicantAiAnswerText.ts`)
 - เทสต์ `tests/api/employedNoOffer2569-11-25.test.ts`
+
+### 25 พ.ย. 2569 (5) — แท็บ Scrap ทำงานแบบแท็บผู้สมัคร + บท AI คนจาก Scrap
+- เจ้าของ: "เลือกเพื่อส่ง Ai โทรได้แบบผู้สมัครเลย" · Choice "คงหน้าเดิม ทำให้เหมือนผู้สมัคร แยกยอดเป็น Scrap" · บทใหม่ตามแบบร่าง
+- ใหม่ `src/lib/scrapApplicants.ts` (ตรรกะล้วน): ใบเสมือน `scrap:<ใบขอ>:<คน>` · `buildScrapWorkRows` รวมรายชื่อ So Scraping (อ่านสด) กับใบที่โหลด · ชิป `SCRAP_LIST_VIEWS` (8 ชิปของผู้สมัคร + อยู่ในการติดต่อ · อยู่ในผู้สมัคร · ไม่มีเบอร์) ไม่ทับกัน
+- `RmWorkspace` prop `scrap` (แท็บ Scrap บนกล่องงาน `?view=scrap`) · ชิป `?list=` + ผลประเมิน `?sres=` · กดส่ง AI/เก็บไปโทรเอง/เก็บ Lead บนใบเสมือน = `resolveScrapApplicationIds` (`scrapCandidatesApi.ts`) สร้างใบก่อน แล้วยิง `/api/application-call-choice` เส้นเดิม · เปิดดูไม่สร้างใบ
+- แท็บผู้สมัครตัดใบจาก Scrap (`isScrapApplication` = ช่องทาง `Scrap · …`) ยกเว้นโหมดทุกคนของใบเดียว · `RmTable` prop `scrapOf` = คอลัมน์ "ผลประเมิน"
+- `/api/scrap-candidates` POST `action: 'apply'` (`addScrapToContact` mode `apply`): สร้างใบอย่างเดียว ไม่เก็บ Lead · ใบเดิม 14 วันของใบขออื่น = ข้าม · `in_jarvis.claimed` ใหม่
+- บท `scrap` (`lumosCallScript.templates.ts` เรซูเม่เว็บหางาน · ตัวแปร `{เว็บหางาน}` · แก้ได้ในหน้าตั้งค่าบทโทร) · ใหม่ `api/_lib/scrapApplicationWeb.ts` อ่านช่องทางทุกใบในชุดที่ส่ง AI · คนจาก Scrap ไม่มีชื่อ = ไม่ส่ง (`SCRAP_NO_NAME_REASON`)
+- แท็บ Scrap ในหน้าใบขอ (`UnitRequestTabPage`) ยังเป็น `ScrapCandidatesPanel` เดิม
+- เทสต์ `tests/api/scrapApplicants2569-11-25.test.ts`

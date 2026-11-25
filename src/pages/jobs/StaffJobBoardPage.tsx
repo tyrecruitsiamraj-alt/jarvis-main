@@ -2,8 +2,8 @@ import React, { Suspense, useEffect, useMemo, useState } from 'react';
 import { lazyPage } from '@/lib/staleChunkReload';
 import { Navigate, useSearchParams } from 'react-router-dom';
 import JobBoardView, { APPLICANT_PICKS, BOARD_VIEW_TABS, POSTING_PICKS, type BoardViewId } from '@/components/jobs/JobBoardView';
-import ScrapCandidatesPanel from '@/components/jobs/ScrapCandidatesPanel';
 import { SCRAP_REQUEST_PARAM } from '@/lib/scrapCandidatesApi';
+import { APPLICANT_FILTER_PARAM_PREFIX } from '@/lib/applicantFilters';
 import { usePageTitle } from '@/hooks/usePageTitle';
 import RmWorkspace from '@/components/recruit-rm/RmWorkspace';
 import ImportApplicantsDialog from '@/components/recruit-rm/ImportApplicantsDialog';
@@ -104,15 +104,17 @@ const StaffJobBoardPage: React.FC = () => {
   const retiredView = (RETIRED_VIEWS as readonly string[]).includes(raw ?? '');
   // ชื่อแท็บเบราว์เซอร์ตามแท็บที่เปิด (QA 5 ต.ค. 2569)
   usePageTitle([...POSTING_PICKS, ...APPLICANT_PICKS, ...BOARD_VIEW_TABS].find((t) => t.id === view)?.label ?? 'งานสรรหา');
-  /** ชื่อใบขอตามเลขใบขอ — แท็บ Scrap ใช้แสดงในตัวเลือกใบขอ (ชุดใบที่หน้านี้โหลดไว้แล้ว ไม่ยิงเส้นใหม่) */
-  const requestTitleByNo = useMemo(() => {
-    const m = new Map<string, string>();
-    for (const j of allJobs) {
-      const no = /^siamraj-sql:(.+)$/.exec(j.id)?.[1];
-      if (no) m.set(no.toUpperCase(), jobBoardCardTitle(j));
-    }
-    return m;
-  }, [allJobs]);
+  /**
+   * ลิงก์ "Scrap ของใบขอนี้" (`?scrap_req=`) — แท็บ Scrap ใช้ตัวกรองใบขอชุดเดียวกับแท็บผู้สมัคร (`a.job=`) ⇒ แปลงแล้วล้างทิ้ง
+   */
+  const scrapReq = view === 'scrap' ? searchParams.get(SCRAP_REQUEST_PARAM) : null;
+  useEffect(() => {
+    if (!scrapReq) return;
+    const params = new URLSearchParams(searchParams);
+    params.delete(SCRAP_REQUEST_PARAM);
+    params.set(`${APPLICANT_FILTER_PARAM_PREFIX}job`, `siamraj-sql:${scrapReq.toUpperCase()}`);
+    setSearchParams(params, { replace: true });
+  }, [scrapReq, searchParams, setSearchParams]);
   /** ทางถอยของแท็บภาพรวม — แผง Dashboard เดิม (28 ก.ย.) ยังเปิดได้ที่ `?view=dashboard&dash=classic` */
   const classicDashboard = searchParams.get('dash') === 'classic';
   /**
@@ -205,11 +207,8 @@ const StaffJobBoardPage: React.FC = () => {
         }
         listContent={
           view === 'board' ? null : view === 'scrap' ? (
-            <ScrapCandidatesPanel
-              key={listRev}
-              requestTitle={(no) => requestTitleByNo.get(no) ?? null}
-              initialRequest={searchParams.get(SCRAP_REQUEST_PARAM)}
-            />
+            // แท็บ Scrap = ตารางเดียวกับแท็บผู้สมัคร (เจ้าของ 25 พ.ย. 2569 "เลือกเพื่อส่ง Ai โทรได้แบบผู้สมัครเลย")
+            <RmWorkspace key="scrap" tab="candidates" scrap jobs={allJobs} refreshKey={listRev} />
           ) : view === 'match' ? (
             <Suspense fallback={<p className="py-6 text-sm text-muted-foreground">กำลังเปิดจับคู่งาน…</p>}>
               <MatchingPage embedded />

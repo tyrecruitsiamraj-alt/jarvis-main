@@ -1,5 +1,5 @@
 import { applicantAreaOf, sortByApplicantArea, type ApplicantArea } from '@/lib/applicantArea';
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { GlassTabIndicator, glassTabClass, glassTabsListClass } from '@/components/ui/tabs';
 import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
@@ -102,6 +102,28 @@ import { bindJobOptions } from '@/lib/bindJobPicker';
 const GREET_OPTION = '__greet__';
 import { publicJobPositionLabel } from '@/lib/unitRequestDisplay';
 import {
+  SCRAP_RESULT_LABEL,
+  SCRAP_RESULT_ORDER,
+  isScrapApplication,
+  type ScrapCandidateRow,
+  type ScrapResult,
+} from '@/lib/scrapCandidates';
+import {
+  SCRAP_LIST_VIEWS,
+  SCRAP_LIST_VIEW_LABEL,
+  buildScrapWorkRows,
+  countScrapViews,
+  isScrapListView,
+  isScrapVirtualId,
+  scrapResultOfRow,
+  type ScrapListView,
+  type ScrapWorkRow,
+} from '@/lib/scrapApplicants';
+import { fetchScrapCandidatesAll, resolveScrapApplicationIds } from '@/lib/scrapCandidatesApi';
+
+/** ผลประเมินที่เลือกบนแท็บ Scrap (`?sres=`) */
+const SCRAP_RESULT_PARAM = 'sres';
+import {
   APPLICANT_FACET_ATTACH,
   applicantPrimaryFacets,
   APPLICANT_FILTER_PARAM_PREFIX,
@@ -182,7 +204,12 @@ const RmWorkspace: React.FC<{
    * มี = แท็บผู้สมัครวาง 2 ปุ่มนี้ที่ช่องนี้แทนแถวปุ่มทำงาน · ไม่มี (หน้าเดี่ยว) = อยู่แถวปุ่มทำงานตามเดิม
    */
   headerActionsSlot?: HTMLElement | null;
-}> = ({ tab: controlledTab, jobs, refreshKey = 0, dateRange: controlledDateRange, onDateRangeChange, headerActionsSlot = null }) => {
+  /**
+   * แท็บ Scrap แบบแท็บผู้สมัคร (เจ้าของ 25 พ.ย. 2569 "เลือกเพื่อส่ง Ai โทรได้แบบผู้สมัครเลย" · `scrapApplicants.ts`)
+   * ใช้กับแท็บผู้สมัครเท่านั้น — แถว = รายชื่อจาก So Scraping (ใบเสมือน) + ใบที่สร้างจาก Scrap แล้ว · ชิปของ Scrap + ผลประเมิน
+   */
+  scrap?: boolean;
+}> = ({ tab: controlledTab, jobs, refreshKey = 0, dateRange: controlledDateRange, onDateRangeChange, headerActionsSlot = null, scrap = false }) => {
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get('tab');
   const tab: RmTab = controlledTab ?? (isRmTab(tabParam) ? tabParam : 'candidates');
@@ -195,6 +222,12 @@ const RmWorkspace: React.FC<{
   // "รายชื่อทั้งหมด" จึงต้องมี ?list=all ชัด ๆ · ลิงก์จากตัวเลขที่ต้องการทุกคน (ยังไม่ถูกโทร ฯลฯ) ส่ง list=all มาเอง
   // ลิงก์เก่า ?list=<ชิปที่ถูกยุบ 3 พ.ย. 2569> แปลงเป็นชิปที่รวมมัน (rmListViewFromParam)
   const listView: RmListView = rmListViewFromParam(listParam) ?? RM_LIST_VIEW_DEFAULT;
+  /** แท็บ Scrap — ชิปของตัวเอง (`?list=` ร่วมกัน ค่าเริ่ม = รายชื่อทั้งหมด) + ผลประเมิน (`?sres=`) */
+  const scrapMode = scrap && tab === 'candidates';
+  const scrapView: ScrapListView = isScrapListView(listParam) ? listParam : 'all';
+  const sresParam = searchParams.get(SCRAP_RESULT_PARAM);
+  const scrapResult: ScrapResult | null = SCRAP_RESULT_ORDER.find((x) => x === sresParam) ?? null;
+  const [scrapRows, setScrapRows] = useState<ScrapCandidateRow[]>([]);
 
   const [rows, setRows] = useState<PublicApplication[]>([]);
   const [loading, setLoading] = useState(true);
@@ -265,9 +298,9 @@ const RmWorkspace: React.FC<{
    * เก็บใน `?lead=1` เพื่อให้ refresh/แชร์ลิงก์แล้วยังอยู่มุมมองเดิม (แพตเทิร์นเดียวกับ ?tab=)
    * ⚠️ การกรองอยู่ฝั่ง server — ลิสต์ปกติไม่เคยมีแถว Lead ติดมาให้ต้องกรองซ้ำ
    */
-  const leadView = searchParams.get('lead') === '1';
+  const leadView = !scrapMode && searchParams.get('lead') === '1';
   /** มุมมองใบที่ "ยกเลิกข้อมูลผู้สมัคร" (135 · 4 ต.ค. 2569) — เฉพาะแท็บผู้สมัคร · กู้คืนได้จากแถว */
-  const cancelledView = searchParams.get('cancelled') === '1';
+  const cancelledView = !scrapMode && searchParams.get('cancelled') === '1';
   /** กำลังยิง "ถอย Lead" ของแท็บการติดต่อ — ปิดปุ่มกันกดซ้อน */
   const [releasing, setReleasing] = useState(false);
   /**
@@ -314,7 +347,7 @@ const RmWorkspace: React.FC<{
    * โหมดนี้ **ข้ามตัวแบ่งแท็บ** — ถังหนึ่งมีได้ทั้ง Lead/claim/แถวปกติ ถ้าปล่อยให้
    * isInRmTab หั่นต่อ เลขจะไม่ตรงกล่องแล้วเหมือนของหาย
    */
-  const bucket = isRmBucket(searchParams.get('bucket')) ? searchParams.get('bucket') : null;
+  const bucket = !scrapMode && isRmBucket(searchParams.get('bucket')) ? searchParams.get('bucket') : null;
   const clearBucket = () => {
     const params = new URLSearchParams(searchParams);
     params.delete('bucket');
@@ -345,7 +378,7 @@ const RmWorkspace: React.FC<{
    */
   const jobAllParam = searchParams.get(RM_JOB_ALL_PARAM);
   const jobAll =
-    tab === 'candidates' && !bucket && !leadView && !cancelledView && jobAllParam && searchParams.getAll(`${APPLICANT_FILTER_PARAM_PREFIX}job`).includes(jobAllParam)
+    tab === 'candidates' && !scrapMode && !bucket && !leadView && !cancelledView && jobAllParam && searchParams.getAll(`${APPLICANT_FILTER_PARAM_PREFIX}job`).includes(jobAllParam)
       ? jobAllParam
       : null;
   /** ชุดที่โหลด: ของฉัน · นัดทุกคน · การติดต่อทุกคน · ทุกคนของใบเดียว */
@@ -361,7 +394,15 @@ const RmWorkspace: React.FC<{
     setLoading(true);
     setLoadError(null);
     if (rowsScopeRef.current !== null && rowsScopeRef.current !== rowsScope) setRows([]);
-    (jobAll ? fetchJobApplications(jobAll) : fetchAllJobApplications(leadView, bucket, cancelledView, everyoneAppointments, everyoneContact, bucket ? searchParams.get('bu') : null))
+    const appsReq = (jobAll ? fetchJobApplications(jobAll) : fetchAllJobApplications(leadView, bucket, cancelledView, everyoneAppointments, everyoneContact, bucket ? searchParams.get('bu') : null));
+    // แท็บ Scrap: รายชื่อสดจาก So Scraping คู่กับใบที่โหลด (จับคู่ใน `buildScrapWorkRows`) — อันใดล้ม = ทั้งชุดล้ม ไม่โชว์ครึ่งเดียว
+    (scrapMode
+      ? Promise.all([appsReq, fetchScrapCandidatesAll()]).then(([apps, sc]) => {
+          if (seq === loadSeq.current) setScrapRows(sc.rows);
+          return apps;
+        })
+      : appsReq
+    )
       .then((next) => {
         if (seq === loadSeq.current) {
           setRows(next);
@@ -375,7 +416,7 @@ const RmWorkspace: React.FC<{
         if (seq === loadSeq.current) setLoading(false);
       });
   };
-  useEffect(load, [leadView, bucket, cancelledView, refreshKey, rowsScope]);
+  useEffect(load, [leadView, bucket, cancelledView, refreshKey, scrapMode, rowsScope]);
 
   /**
    * `?open=<id>` — ลิงก์จากรายชื่อบนหน้าหลัก/ภาพรวม (เจ้าของ 9 พ.ย. 2569 "กดไปทำงานต่อได้") ·
@@ -599,16 +640,74 @@ const RmWorkspace: React.FC<{
     },
   ];
 
+  /**
+   * แท็บ Scrap (25 พ.ย. 2569) — แถวคนละหนึ่ง: ใบจริง (มีคนแตะแล้ว) หรือใบเสมือนจากรายชื่อ So Scraping
+   * ข้อมูลใบขอ (ตำแหน่ง/หน่วยงาน/เจ้าหน้าที่สรรหา) ของใบเสมือนมาจากใบขอที่หน้ากล่องงานโหลดไว้
+   */
+  const scrapWork = useMemo<ScrapWorkRow[]>(() => {
+    if (!scrapMode) return [];
+    const byJob = new Map((jobs ?? []).map((j) => [j.id, j] as const));
+    return buildScrapWorkRows(rows, scrapRows, (jobId) => {
+      const j = byJob.get(jobId);
+      return j ? { title: publicJobPositionLabel(j), unitName: j.unit_name ?? null, recruiterName: j.recruiter_name ?? null } : null;
+    });
+  }, [scrapMode, rows, scrapRows, jobs]);
+  const scrapById = useMemo(() => new Map(scrapWork.map((w) => [w.app.id, w] as const)), [scrapWork]);
+  /** แถวที่ตาราง/ป๊อปยืนยันใช้ — แท็บ Scrap = แถวของ Scrap · แท็บอื่น = ใบที่โหลด */
+  const workRows = useMemo(() => (scrapMode ? scrapWork.map((w) => w.app) : rows), [scrapMode, scrapWork, rows]);
+  /** ใบที่สร้างจาก Scrap ไม่ขึ้นแท็บผู้สมัคร (เจ้าของ "แยกยอดเป็น Scrap") · ดูทุกคนของใบเดียวยังเห็นครบ (ตรงเลขบนการ์ด) */
+  const candidateRows = useMemo(
+    () => (tab === 'candidates' && !jobAll ? rows.filter((r) => !isScrapApplication(r)) : rows),
+    [rows, tab, jobAll],
+  );
+  /** ฐานของแท็บ Scrap ก่อนกดชิป — คำค้น/วันที่ชุดเดียวกับแท็บผู้สมัคร */
+  const scrapBase = useMemo(
+    () => (scrapMode ? filterApplications(workRows, 'candidates', rmFilters, keyword, false, true) : []),
+    [scrapMode, workRows, rmFilters, keyword],
+  );
+  const scrapPick = useCallback(
+    (r: PublicApplication, view: ScrapListView, result: ScrapResult | null) => {
+      const w = scrapById.get(r.id);
+      return Boolean(w) && (view === 'all' || w!.view === view) && (result === null || scrapResultOfRow(w!) === result);
+    },
+    [scrapById],
+  );
+  /** เลขบนชิป Scrap — ชิปมุมมองนับหลังเลือกผลประเมิน · ชิปผลประเมินนับหลังเลือกมุมมอง (เลขตรงกับที่เห็นเมื่อกด) */
+  const scrapCountBase = useMemo(
+    () => (scrapMode ? applyApplicantFilters(scrapBase, applicantFilterState, applicantFacts) : []),
+    [scrapMode, scrapBase, applicantFilterState, applicantFacts],
+  );
+  const scrapViewCounts = useMemo(
+    () => countScrapViews(scrapCountBase.filter((r) => scrapPick(r, 'all', scrapResult)).map((r) => scrapById.get(r.id)!)),
+    [scrapCountBase, scrapPick, scrapResult, scrapById],
+  );
+  const scrapResultCounts = useMemo(() => {
+    const inView = scrapCountBase.filter((r) => scrapPick(r, scrapView, null));
+    const out = { all: inView.length } as Record<ScrapResult | 'all', number>;
+    for (const k of SCRAP_RESULT_ORDER) out[k] = inView.filter((r) => scrapResultOfRow(scrapById.get(r.id)!) === k).length;
+    return out;
+  }, [scrapCountBase, scrapPick, scrapView, scrapById]);
+  const setScrapParam = (key: string, value: string | null) => {
+    const params = new URLSearchParams(searchParams);
+    if (value === null) params.delete(key);
+    else params.set(key, value);
+    setSearchParams(params);
+    setSelectedIds([]);
+    setPage(1);
+  };
+
   /** ชุดก่อนแถบซ้าย (แท็บ + มุมมองย่อย + วันที่ + คำค้น) — ฐานของเลขต่อท้ายตัวเลือก */
   const baseFiltered = useMemo(() => {
     // โหมด drill-down: server กรองด้วยนิยามเดียวกับกล่องแล้ว — แสดงตามนั้นตรง ๆ
     // (หั่นต่อด้วยแท็บ/ตัวกรอง = เลขไม่ตรงกล่อง)
     if (bucket) return rows;
-    const base = filterApplications(rows, tab, rmFilters, keyword, everyoneContact, Boolean(jobAll));
+    // แท็บ Scrap: ชิปของ Scrap แบ่งเอง (รวมคนที่มีคนเก็บไปแล้ว) จึงไม่หั่นด้วยแท็บ
+    if (scrapMode) return scrapBase.filter((r) => scrapPick(r, scrapView, scrapResult));
+    const base = filterApplications(candidateRows, tab, rmFilters, keyword, everyoneContact, Boolean(jobAll));
     // มุมมองย่อยใช้เฉพาะแท็บรายชื่อผู้สมัคร — แท็บอื่นมีความหมายของตัวเองอยู่แล้ว
     if (tab !== 'candidates') return base;
     return base.filter((r) => isInRmListView(r, listView));
-  }, [rows, tab, keyword, listView, bucket, rmFilters, everyoneContact, jobAll]);
+  }, [rows, candidateRows, tab, keyword, listView, bucket, rmFilters, everyoneContact, jobAll, scrapMode, scrapBase, scrapPick, scrapView, scrapResult]);
 
   const filtered = useMemo(() => {
     if (bucket) return baseFiltered;
@@ -628,7 +727,7 @@ const RmWorkspace: React.FC<{
    */
   const elsewhere = useMemo(() => {
     // มุมมองทุกคน (นัด/การติดต่อ) มีแต่แถวของมุมนั้น — นับให้แท็บอื่นไม่ได้
-    if (bucket || everyoneView || applicantFacetCount === 0 || filtered.length > 0) return [];
+    if (bucket || everyoneView || scrapMode || applicantFacetCount === 0 || filtered.length > 0) return [];
     return RM_TABS.filter((t) => t !== tab)
       .map((t) => {
         const base = filterApplications(rows, t, rmFilters, keyword);
@@ -636,7 +735,7 @@ const RmWorkspace: React.FC<{
         return { tab: t, n };
       })
       .filter((x) => x.n > 0);
-  }, [bucket, everyoneView, applicantFacetCount, filtered.length, tab, rows, rmFilters, keyword, applicantFilterState, applicantFacts]);
+  }, [scrapMode, bucket, everyoneView, applicantFacetCount, filtered.length, tab, rows, rmFilters, keyword, applicantFilterState, applicantFacts]);
   const goToTab = (t: RmTab) =>
     setSearchParams((prev) => {
       const p = new URLSearchParams(prev);
@@ -679,14 +778,14 @@ const RmWorkspace: React.FC<{
   const listViewCounts = useMemo(() => {
     // แถบซ้ายกรองก่อนนับด้วย — เลขบนปุ่มมุมมองย่อยต้องตรงกับที่เห็นเมื่อกดเข้าไป
     const base = applyApplicantFilters(
-      filterApplications(rows, 'candidates', rmFilters, keyword, false, Boolean(jobAll)),
+      filterApplications(candidateRows, 'candidates', rmFilters, keyword, false, Boolean(jobAll)),
       applicantFilterState,
       applicantFacts,
     );
     const out = {} as Record<RmListView, number>;
     for (const v of RM_LIST_VIEWS) out[v] = base.filter((r) => isInRmListView(r, v)).length;
     return out;
-  }, [rows, keyword, rmFilters, applicantFilterState, applicantFacts, jobAll]);
+  }, [candidateRows, keyword, rmFilters, applicantFilterState, applicantFacts, jobAll]);
 
   const setListView = (next: RmListView) => {
     const params = new URLSearchParams(searchParams);
@@ -746,7 +845,7 @@ const RmWorkspace: React.FC<{
   useEffect(() => {
     if (pageRows.length === 0) return;
     let cancelled = false;
-    void fetchCallHoldsByPhones(pageRows.map((r) => r.phone)).then((map) => {
+    void fetchCallHoldsByPhones(pageRows.map((r) => r.phone).filter(Boolean)).then((map) => {
       if (cancelled) return;
       setHoldByRef((prev) => {
         // เขียนสถานะของ "แถวในหน้านี้" ใหม่ทั้งก้อน — มีล็อก = ตั้ง · ไม่มี = ลบคีย์ออก
@@ -792,8 +891,15 @@ const RmWorkspace: React.FC<{
     if (ids.length === 0) return;
     say(null);
     try {
-      const outcome = await chooseApplicationCall(ids, 'manual');
-      say(summarizeCallChoice(outcome), tab !== 'contact');
+      // แท็บ Scrap: คนที่ยังไม่มีใบ สร้างใบก่อน แล้วเก็บด้วยเส้นเดียวกับผู้สมัคร (25 พ.ย. 2569)
+      const resolved = scrapMode ? await resolveScrapApplicationIds(ids) : { ids, notes: [] as string[] };
+      if (resolved.ids.length === 0) {
+        say(resolved.notes.join(' · ') || 'ไม่มีรายชื่อที่เก็บได้');
+        load();
+        return;
+      }
+      const outcome = await chooseApplicationCall(resolved.ids, 'manual');
+      say([summarizeCallChoice(outcome), ...resolved.notes].join(' · '), tab !== 'contact');
       load(); // ใบย้ายแท็บ (claimed_by_me) + ป้ายล็อกเปลี่ยน ต้องเห็นทันที
     } catch (e) {
       say(friendlyErrorText(e, 'เก็บไปโทรเองไม่สำเร็จ'));
@@ -822,8 +928,17 @@ const RmWorkspace: React.FC<{
     setAiSending(true);
     try {
       const bindJob = aiUnbound.length > 0 ? (jobs ?? []).find((j) => j.id === bindJobId) : undefined;
+      // แท็บ Scrap: คนที่ยังไม่มีใบ สร้างใบก่อน (บท AI "เห็นประวัติบนเว็บ …") แล้วส่งด้วยเส้นเดียวกับผู้สมัคร
+      const resolved = scrapMode ? await resolveScrapApplicationIds(aiConfirmIds) : { ids: aiConfirmIds, notes: [] as string[] };
+      if (resolved.ids.length === 0) {
+        say(resolved.notes.join(' · ') || 'ไม่มีรายชื่อที่ส่งได้');
+        setAiConfirmIds(null);
+        setSelectedIds([]);
+        load();
+        return;
+      }
       const outcome: CallChoiceOutcome = await chooseApplicationCall(
-        aiConfirmIds,
+        resolved.ids,
         'ai',
         aiUnbound.length > 0 && bindJobId === GREET_OPTION
           ? 'greet'
@@ -831,7 +946,7 @@ const RmWorkspace: React.FC<{
             ? { id: bindJob.id, title: publicJobPositionLabel(bindJob), unitName: bindJob.unit_name }
             : null,
       );
-      say(summarizeCallChoice(outcome));
+      say([summarizeCallChoice(outcome), ...resolved.notes].join(' · '));
       setAiConfirmIds(null);
       setSelectedIds([]);
       load();
@@ -846,9 +961,9 @@ const RmWorkspace: React.FC<{
   const aiConfirmNames = useMemo(
     () =>
       (aiConfirmIds ?? [])
-        .map((id) => rows.find((r) => r.id === id)?.full_name)
+        .map((id) => workRows.find((r) => r.id === id)?.full_name)
         .filter((n): n is string => Boolean(n)),
-    [aiConfirmIds, rows],
+    [aiConfirmIds, workRows],
   );
   /**
    * ใบที่ต้องเลือกใบขอก่อนส่ง AI = ยังไม่ผูก หรือ **ใบขอปิดแล้ว** (19 ต.ค. 2569 · คนกรอกลิงก์ของใบที่ปิดไปเป็นเดือน)
@@ -860,11 +975,11 @@ const RmWorkspace: React.FC<{
   );
   const aiUnbound = useMemo(
     () =>
-      rows.filter(
+      workRows.filter(
         (r) =>
           (aiConfirmIds ?? []).includes(r.id) && (!r.job_id?.trim() || (openJobIds !== null && !openJobIds.has(r.job_id.trim()))),
       ),
-    [aiConfirmIds, rows, openJobIds],
+    [aiConfirmIds, workRows, openJobIds],
   );
   const bindGroups = useMemo(() => {
     if (aiUnbound.length === 0) return [];
@@ -885,7 +1000,37 @@ const RmWorkspace: React.FC<{
     ].filter((g) => g.options.length > 0);
   }, [aiUnbound, jobs]);
 
+  const onScrapVirtualAction = (action: RmRowAction, row: PublicApplication) => {
+    switch (action) {
+      case 'ai':
+        askSendAi([row.id]);
+        return;
+      case 'call':
+        void keepForSelf([row.id]);
+        return;
+      case 'bookmark':
+        say(null);
+        void resolveScrapApplicationIds([row.id], 'to_contact')
+          .then((r) => {
+            say(r.ids.length > 0 ? `เก็บ ${row.full_name} เข้า Lead แล้ว` : r.notes.join(' · ') || 'เก็บเข้า Lead ไม่สำเร็จ', r.ids.length > 0);
+            load();
+          })
+          .catch((e: unknown) => say(friendlyErrorText(e, 'เก็บเข้า Lead ไม่สำเร็จ')));
+        return;
+      default:
+        say(`${row.full_name} ยังไม่มีประวัติ กดส่ง AI โทรหรือเก็บไปโทรเองก่อน`);
+    }
+  };
+
   const onRowAction = (action: RmRowAction, row: PublicApplication) => {
+    /**
+     * แท็บ Scrap: คนที่ยังไม่มีใบ (ใบเสมือน) — ปุ่มเดียวกับผู้สมัคร แต่สร้างใบก่อนตอนกด (ไม่สร้างตอนเปิดดู)
+     * ประวัติ/ผลโทรยังไม่มีจนกว่าจะส่ง AI หรือเก็บไปโทรเอง
+     */
+    if (scrapMode && isScrapVirtualId(row.id)) {
+      onScrapVirtualAction(action, row);
+      return;
+    }
     if (action === 'docs') {
       setDocsApp(row);
       return;
@@ -1060,7 +1205,33 @@ const RmWorkspace: React.FC<{
           · ผู้สมัคร = มุมมองย่อย 3 อัน (URL ?list=) · การติดต่อ = ยังไม่โทร/โทรแล้ว · ติดตามนัดหมาย = มา/ไม่มา/รอผล
           · โหมด drill-down (?bucket=) ไม่มีชิป — เลขต้องเท่ากล่องที่กดมา */}
       {/* ตัวเลขรายวัน พับได้ (เจ้าของสั่ง 15 ต.ค. 2569 · Choice "พับได้บนแท็บผู้สมัคร") — เหนือแถวชิปมุมมอง */}
-      {!bucket && tab === 'candidates' ? (
+      {scrapMode ? (
+        <div className="mt-4 flex flex-wrap items-center gap-2" data-testid="scrap-chips">
+          <FilterChipsDropdown
+            ariaLabel="มุมมอง Scrap"
+            value={scrapView}
+            onChange={(v) => setScrapParam('list', v === 'all' ? null : v)}
+            chips={SCRAP_LIST_VIEWS.map((v) => ({
+              id: v,
+              label: SCRAP_LIST_VIEW_LABEL[v],
+              count: loading ? null : loadError ? 'unknown' : scrapViewCounts[v],
+            }))}
+          />
+          <FilterChipsDropdown<ScrapResult | 'all'>
+            ariaLabel="ผลประเมินของ So Scraping"
+            value={scrapResult ?? 'all'}
+            onChange={(v) => setScrapParam(SCRAP_RESULT_PARAM, v === 'all' ? null : v)}
+            chips={[
+              { id: 'all' as const, label: 'ทุกผลประเมิน', count: loading ? null : loadError ? 'unknown' : scrapResultCounts.all },
+              ...SCRAP_RESULT_ORDER.map((k) => ({
+                id: k,
+                label: SCRAP_RESULT_LABEL[k],
+                count: loading ? null : loadError ? ('unknown' as const) : scrapResultCounts[k],
+              })),
+            ]}
+          />
+        </div>
+      ) : !bucket && tab === 'candidates' ? (
         <div className="mt-4">
           {/* 19 ต.ค. 2569 เจ้าของ "ทำเป็น Dropdown" — 11 ชิปล้น 2 แถว ⇒ ปุ่มเดียวกางดูครบพร้อมเลข */}
           <FilterChipsDropdown
@@ -1269,8 +1440,8 @@ const RmWorkspace: React.FC<{
             onSearch={() => setPage(1)}
             selectedCount={selectedIds.length}
             /* เพิ่มข้อมูลผู้สมัคร + นำเข้า Excel + รายงาน มีแค่แท็บผู้สมัคร (เจ้าของสั่ง 4–5 ต.ค. 2569) */
-            onAddApplicant={tab === 'candidates' ? () => setAddOpen(true) : undefined}
-            onImportApplicants={tab === 'candidates' && !headerActionsSlot ? () => setImportOpen(true) : undefined}
+            onAddApplicant={tab === 'candidates' && !scrapMode ? () => setAddOpen(true) : undefined}
+            onImportApplicants={tab === 'candidates' && !scrapMode && !headerActionsSlot ? () => setImportOpen(true) : undefined}
             /* "เก็บไปโทรเอง" เหลือแท็บผู้สมัครแท็บเดียว — การติดต่อ: *"ไม่ต้องมีคำว่าเก็บไปโทรเองแล้ว"* (5 ต.ค. 2569) */
             onHoldSelected={tab === 'candidates' ? () => void keepSelectedForSelf() : undefined}
             holdingSelected={holdingSelected}
@@ -1278,14 +1449,14 @@ const RmWorkspace: React.FC<{
             /* "ถอย Lead" — การติดต่อ ติ๊กแล้วโผล่ (5 ต.ค. 2569) · ย้ายกลับแท็บผู้สมัคร */
             onReleaseSelected={tab === 'contact' ? () => void releaseSelected() : undefined}
             releasing={releasing}
-            onExport={tab === 'candidates' && !headerActionsSlot ? () => downloadApplicantExport(shown, { recruiterOf }) : undefined}
+            onExport={tab === 'candidates' && !scrapMode && !headerActionsSlot ? () => downloadApplicantExport(shown, { recruiterOf }) : undefined}
             exportCount={shown.length}
             /* แท็บติดตามนัดหมาย: "โหลดเป็น PDF" (4 ต.ค. 2569) · window.print + print CSS เฉพาะก้อน rm-print-area */
             onPrintPdf={tab === 'appointments' ? () => window.print() : undefined}
             printDisabled={Boolean(loadError) || loading || rows.length === 0}
           />
           {/* นำเข้า Excel + รายงาน ขึ้นแถวหัวข้างปุ่มวันที่ (14 ต.ค. 2569) — หน้าตาเดียวกับปุ่มเดิมใน `RmSearchBar` */}
-          {tab === 'candidates' && headerActionsSlot
+          {tab === 'candidates' && !scrapMode && headerActionsSlot
             ? createPortal(
                 <>
                   <Button variant="secondary" size="xs" type="button" onClick={() => setImportOpen(true)} className="shrink-0">
@@ -1530,6 +1701,7 @@ const RmWorkspace: React.FC<{
                 recruiterOf={recruiterOf}
                 areaOf={areaOf}
                 actionsOverride={cancelledView ? ['view', 'restore'] : undefined}
+                scrapOf={scrapMode ? (r) => scrapById.get(r.id) ?? null : undefined}
                 extraRows={
                   currentPage === 1 && matchShown.length > 0 ? (
                     <SelectionContactRows rows={matchShown} onResult={setMatchResultFor} onSendAi={setMatchAiFor} />

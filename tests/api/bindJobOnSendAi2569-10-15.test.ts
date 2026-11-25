@@ -164,6 +164,8 @@ describe('หน้าจอ — ป๊อปยืนยันส่ง AI', ()
   it('มีช่องเลือกใบขอเมื่อมีใบไม่ผูก + ปุ่มส่งกดไม่ได้จนกว่าจะเลือก', () => {
     expect(ws).toMatch(/data-testid="ai-bind-job"/);
     expect(ws).toMatch(/confirmDisabled=\{aiUnbound\.length > 0 && !bindJobId\}/);
-    expect(ws).toMatch(/chooseApplicationCall\(\s*aiConfirmIds,\s*'ai',[\s\S]{0,160}bindJob\s*\?\s*\{ id: bindJob\.id/);
+    // 25 พ.ย. 2569 แท็บ Scrap สร้างใบก่อน (`resolveScrapApplicationIds`) แล้วส่ง id ที่ได้ — แท็บอื่น resolved.ids = aiConfirmIds
+    expect(ws).toContain('const resolved = scrapMode ? await resolveScrapApplicationIds(aiConfirmIds) : { ids: aiConfirmIds');
+    expect(ws).toMatch(/chooseApplicationCall\(\s*resolved\.ids,\s*'ai',[\s\S]{0,160}bindJob\s*\?\s*\{ id: bindJob\.id/);
   });
 });

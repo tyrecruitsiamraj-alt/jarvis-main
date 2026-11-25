@@ -45,6 +45,36 @@ import { aiQueueStatusOf } from '@/lib/applicantAiQueueStatus';
 import { rmRowStatusOf } from '@/lib/applicantAiAnswerText';
 import { PROCESS_STATE_LABEL, PROCESS_STATE_TONE, PROCESS_STEP_LABEL, applicantProcessOf } from '@/lib/applicantProcess';
 import { irecruitLateHours, lateText } from '@/lib/irecruitPullStatus';
+import {
+  SCRAP_RESULT_LABEL,
+  SCRAP_RESULT_TONE,
+  scrapInJarvisLabel,
+  scrapPlatformLabel,
+  scrapReasonLabel,
+} from '@/lib/scrapCandidates';
+import type { ScrapWorkRow } from '@/lib/scrapApplicants';
+
+/**
+ * ผลประเมินของ So Scraping บนแท็บ Scrap (25 พ.ย. 2569) — ป้ายผล (คำ ไม่ใช่สีอย่างเดียว) · เหตุผล · เว็บ ·
+ * คนที่อยู่ในการติดต่อของคนอื่น/ในผู้สมัครแล้ว บอกไว้บรรทัดล่าง
+ */
+function ScrapResultCell({ w }: { w: ScrapWorkRow | null }) {
+  const result = w?.scrap?.result ?? 'unscored';
+  const reasons = (w?.scrap?.reasons ?? []).map(scrapReasonLabel).join(' · ');
+  const inj = w?.virtual ? w.scrap?.in_jarvis : null;
+  const where = inj ? scrapInJarvisLabel(inj) : null;
+  const web = w?.scrap ? scrapPlatformLabel(w.scrap.platform) : (w?.app.channel_label ?? '').replace(/^Scrap · /, '');
+  return (
+    <td className="px-1.5 py-2">
+      <span className="flex flex-col items-start gap-0.5">
+        <span className={cn('whitespace-nowrap', TONE[SCRAP_RESULT_TONE[result]].chip)}>{SCRAP_RESULT_LABEL[result]}</span>
+        <span className={cn('line-clamp-2 min-w-32 break-words text-xs', DASH.cellMuted)} title={reasons || undefined}>
+          {[web, reasons, where].filter(Boolean).join(' · ') || EM_DASH}
+        </span>
+      </span>
+    </td>
+  );
+}
 
 /** สถานะแบบ iRecruit (เจ้าของ 4 ต.ค. 2569 "เอาสถานะมาเพิ่มพอ") — ชิปสถานะ + ขั้นที่อยู่ */
 /** บรรทัดล่าง: ไม่สำเร็จ = เหตุผล · นัดได้/เลื่อนนัด = วันนัด · อื่น ๆ = ขั้นที่อยู่ (เจ้าของ 18 พ.ย. 2569 "นัดไม่ได้ก็บอกเลยว่าเพราะอะไร") */
@@ -189,7 +219,9 @@ const RmTable: React.FC<{
    */
   extraRows?: React.ReactNode;
   extraRowCount?: number;
-}> = ({ tab, rows, selectedIds, onToggleRow, onToggleAll, onAction, docsEnabled = false, holdByRef = {}, onAttendance, recruiterOf, areaOf, actionsOverride, unitOf, extraRows, extraRowCount = 0 }) => {
+  /** แท็บ Scrap (25 พ.ย. 2569) — มี = คอลัมน์ "ผลประเมิน" ของ So Scraping (ผล · เหตุผล · เว็บ) ต่อจากอายุ */
+  scrapOf?: (r: PublicApplication) => ScrapWorkRow | null;
+}> = ({ tab, rows, selectedIds, onToggleRow, onToggleAll, onAction, docsEnabled = false, holdByRef = {}, onAttendance, recruiterOf, areaOf, actionsOverride, unitOf, extraRows, extraRowCount = 0, scrapOf }) => {
   const actions = actionsOverride ?? RM_ROW_ACTIONS[tab];
   /**
    * 🔴 แท็บผู้สมัครใช้ชุดคอลัมน์ที่เจ้าของสั่งเอง (30 ก.ย. 2569 · Choice "เอาตามที่ฉันสั่ง"):
@@ -282,7 +314,8 @@ const RmTable: React.FC<{
    */
   /** แท็บติดตามนัดหมาย (แบบร่างรอบ 4 · เจ้าของ "ทำเลย" 23 พ.ย. 2569): ผู้สมัคร · หน่วยงาน·ใบขอ · นัด · สถานะ · ผลนัด · ทำงาน (ไม่มีที่อยู่/สมัคร) */
   const apptColumns = tab === 'appointments';
-  const colCount = 1 + (ownerColumns ? 11 : apptColumns ? 3 : 5) + (apptColumns ? 2 : 0) + (tab === 'contact' ? 1 : 0) + 1;
+  const scrapColumn = ownerColumns && Boolean(scrapOf);
+  const colCount = 1 + (ownerColumns ? 11 : apptColumns ? 3 : 5) + (apptColumns ? 2 : 0) + (tab === 'contact' ? 1 : 0) + (scrapColumn ? 1 : 0) + 1;
 
   return (
     <div className={cn('overflow-hidden rounded-xl border', DASH.card)}>
@@ -318,6 +351,7 @@ const RmTable: React.FC<{
                   <th className="px-1.5 py-2 font-medium">เจ้าของงาน</th>
                   <th className="px-1.5 py-2 font-medium">เพศ</th>
                   <th className="px-1.5 py-2 text-right font-medium">อายุ</th>
+                  {scrapColumn ? <th className="min-w-36 px-1.5 py-2 font-medium">ผลประเมิน</th> : null}
                   <th className="px-1.5 py-2 font-medium">วันที่สมัคร</th>
                   {/* กว้างขั้นต่ำ — เดิมถูกบีบจนคำตกบรรทัดทีละคำ (เจ้าของ 25 พ.ย. 2569 "เรียงไม่สวยเลย") */}
                   <th className="min-w-40 px-1.5 py-2 font-medium">คำตอบกับ AI</th>
@@ -478,6 +512,7 @@ const RmTable: React.FC<{
                       <td className={cn('px-1.5 py-2 text-right tabular-nums', DASH.cell)}>
                         {typeof r.age === 'number' ? r.age : EM_DASH}
                       </td>
+                      {scrapColumn ? <ScrapResultCell w={scrapOf?.(r) ?? null} /> : null}
                       {/* วันที่สมัคร + ผ่านมาแล้วกี่วัน (เจ้าของ 16 ต.ค. 2569 "เอาวันที่สมัครมาด้วย") · วันที่ตามปฏิทินกรุงเทพ ห้าม .slice ตรง ๆ */}
                       <td className="px-1.5 py-2 whitespace-nowrap">
                         <span className="flex flex-col gap-0.5">

@@ -4,6 +4,8 @@
  * GET ?all=1                    → ทุกใบที่เห็นได้ (แท็บผู้สมัคร ▾ Scrap ของหน้างานสรรหา)
  * GET ?counts=1                 → ยอดต่อเลขใบขอ + โทรแล้ว (คอลัมน์ โทร/Scrap ของตารางใบขอ · 17 · 19 พ.ย. 2569)
  * POST { action: 'to_contact', job_id, candidate_ids } → สร้าง/ใช้ใบสมัครเดิม แล้วเก็บเข้าการติดต่อ (Lead) ของคนกด
+ * POST { action: 'apply', job_id, candidate_ids }      → สร้าง/ใช้ใบสมัครเดิมอย่างเดียว คืน application_id
+ *   (ขั้นแรกของ "ส่ง AI โทร" / "เก็บไปโทรเอง" บนแท็บ Scrap · 25 พ.ย. 2569) — ขั้นต่อไปคือ `/api/application-call-choice`
  * สิทธิ์ resource เดียวกับผู้สมัคร (`job-applications`) · ผู้ใช้ที่ล็อก BU เห็นเฉพาะใบขอใน BU ตัวเอง (`loadScopedJobIdSet`)
  * AI ไม่โทรเอง: ใบสร้างในชื่อ So Scraping + เป็น Lead — ตัวส่งอัตโนมัติข้ามทั้งสองแบบ
  */
@@ -61,7 +63,8 @@ async function handler(req: AuthedReq, res: ApiRes) {
       return sendError(res, 405, 'Method not allowed');
     }
     const body = ((await readJsonBody(req)) ?? {}) as Record<string, unknown>;
-    if (body.action !== 'to_contact') return sendError(res, 400, 'bad_request', 'action ไม่ถูกต้อง');
+    if (body.action !== 'to_contact' && body.action !== 'apply') return sendError(res, 400, 'bad_request', 'action ไม่ถูกต้อง');
+    const mode = body.action === 'apply' ? 'apply' : 'lead';
     const requestNo = requestNoFrom(String(body.job_id ?? ''));
     if (!requestNo) return sendError(res, 400, 'bad_request', 'ไม่พบใบขอ');
     const ids = [...new Set((Array.isArray(body.candidate_ids) ? body.candidate_ids : []).filter((x): x is string => typeof x === 'string' && UUID.test(x)))];
@@ -84,9 +87,10 @@ async function handler(req: AuthedReq, res: ApiRes) {
       requestNo,
       ids,
       { userId: req.user.sub, name: operator, departmentCode: await staffEntryDepartmentFor(job.id, dept.code) },
+      mode,
     );
     void auditFromAuthed(req, {
-      action: 'scrap_candidates.to_contact',
+      action: mode === 'apply' ? 'scrap_candidates.apply' : 'scrap_candidates.to_contact',
       entityType: 'job',
       entityId: job.id,
       after: {

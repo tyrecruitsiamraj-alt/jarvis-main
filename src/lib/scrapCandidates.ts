@@ -43,6 +43,22 @@ export function scrapChannelLabel(p: string | null | undefined): string {
   return `Scrap · ${scrapPlatformLabel(p)}`;
 }
 
+const SCRAP_CHANNEL_PREFIX = 'Scrap · ';
+
+/**
+ * ใบสมัครที่สร้างจากรายชื่อ Scrap → ชื่อเว็บ ("JobBKK"/"JobThai") · ใบอื่น = null
+ * ดูจากช่องทางบนใบ (`scrapChannelLabel`) — คอมเมนต์จาก So Scraping ก็สร้างในชื่อ So Scraping แต่ช่องทางคนละแบบ
+ */
+export function scrapWebOfChannel(channelLabel: string | null | undefined): string | null {
+  const s = (channelLabel ?? '').trim();
+  return s.startsWith(SCRAP_CHANNEL_PREFIX) ? s.slice(SCRAP_CHANNEL_PREFIX.length).trim() || 'เว็บหางาน' : null;
+}
+
+/** ใบที่สร้างจากรายชื่อ Scrap (ไม่ใช่ผู้สมัครที่มาเอง) — แท็บผู้สมัครไม่นับ อยู่แท็บ Scrap (เจ้าของ 25 พ.ย. 2569 "แยกยอดเป็น Scrap") */
+export function isScrapApplication(a: { channel_label?: string | null }): boolean {
+  return scrapWebOfChannel(a.channel_label) !== null;
+}
+
 export function scrapResultOf(raw: unknown): ScrapResult {
   return raw === 'qualified' || raw === 'needs_review' || raw === 'rejected' ? raw : 'unscored';
 }
@@ -133,7 +149,13 @@ export function scrapDisplayName(full: string | null | undefined, first: string 
 }
 
 /** สถานะคนนี้ในฝั่ง Jarvis (จับคู่ด้วยเบอร์ในใบขอเดียวกัน) */
-export type ScrapInJarvis = { application_id: string; is_lead: boolean; lead_by_name: string | null } | null;
+export type ScrapInJarvis = {
+  application_id: string;
+  is_lead: boolean;
+  lead_by_name: string | null;
+  /** มีเจ้าหน้าที่เก็บไปโทรเองอยู่ (25 พ.ย. 2569) — ไม่มากับคำตอบเก่า = ไม่รู้ */
+  claimed?: boolean;
+} | null;
 
 export type ScrapCandidateRow = {
   candidate_id: string;

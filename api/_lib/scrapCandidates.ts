@@ -98,14 +98,15 @@ async function loadRaw(requestNos: string[], candidateIds: string[] | null = nul
 async function inJarvisByPhone(jobIds: string[], phones: string[]): Promise<Map<string, ScrapInJarvis>> {
   const out = new Map<string, ScrapInJarvis>();
   if (jobIds.length === 0 || phones.length === 0) return out;
-  const { rows } = await dbQuery<{ job_id: string; phone_e164: string; id: string; is_lead: boolean | null; lead_by_name: string | null }>(
-    `select distinct on (job_id, phone_e164) job_id, phone_e164, id::text as id, is_lead, lead_by_name
+  const { rows } = await dbQuery<{ job_id: string; phone_e164: string; id: string; is_lead: boolean | null; lead_by_name: string | null; claimed: boolean }>(
+    `select distinct on (job_id, phone_e164) job_id, phone_e164, id::text as id, is_lead, lead_by_name, (claimed_by is not null) as claimed
        from ${APPS}
       where job_id = any($1::text[]) and phone_e164 = any($2::text[])
       order by job_id, phone_e164, coalesce(is_lead, false) desc, created_at desc`,
     [jobIds, phones.map((p) => `+66${p.slice(1)}`)],
   );
-  for (const r of rows) out.set(`${r.job_id}|${r.phone_e164}`, { application_id: r.id, is_lead: Boolean(r.is_lead), lead_by_name: r.lead_by_name });
+  for (const r of rows)
+    out.set(`${r.job_id}|${r.phone_e164}`, { application_id: r.id, is_lead: Boolean(r.is_lead), lead_by_name: r.lead_by_name, claimed: Boolean(r.claimed) });
   return out;
 }
 
@@ -202,8 +203,12 @@ export async function listScrapCalledCounts(requestNos: readonly string[]): Prom
 export type ScrapJobInfo = { id: string; title: string | null; unitName: string | null; recruiterName: string | null };
 
 /**
- * เก็บเข้าการติดต่อ: มีใบสมัครเบอร์นี้ภายใน 14 วันแล้ว = ใช้ใบเดิม (Journey เดียวกับคอมเมนต์ So Scraping) · ไม่มี = สร้างใบ
+ * เก็บเข้าการติดต่อ (`mode: 'lead'`): มีใบสมัครเบอร์นี้ภายใน 14 วันแล้ว = ใช้ใบเดิม (Journey เดียวกับคอมเมนต์ So Scraping) · ไม่มี = สร้างใบ
  * แล้วเก็บเป็น Lead ของคนกด ในธุรกรรมเดียวกัน (ล็อกเบอร์ — กดซ้อนกันสองคนไม่ได้ใบซ้ำ)
+ *
+ * สร้างใบอย่างเดียว (`mode: 'apply'` · เจ้าของ 25 พ.ย. 2569 "เลือกเพื่อส่ง AI โทรได้แบบผู้สมัคร") — ขั้นแรกของปุ่ม
+ * "ส่ง AI โทร" / "เก็บไปโทรเอง" บนแท็บ Scrap (ขั้นที่สองคือ `/api/application-call-choice` ตัวเดียวกับแท็บผู้สมัคร)
+ * ใบเดิมภายใน 14 วันของ **ใบขออื่น** = ข้าม (ส่ง AI ต่อจะได้บทของงานอื่น) · ใบสร้างใน call_choice ว่าง = ตัวส่งอัตโนมัติข้าม
  * ไม่มีเบอร์มือถือ = ข้าม (โทรไม่ได้)
  */
 export async function addScrapToContact(
@@ -211,6 +216,7 @@ export async function addScrapToContact(
   requestNo: string,
   candidateIds: string[],
   by: { userId: string; name: string | null; departmentCode: string | null },
+  mode: 'lead' | 'apply' = 'lead',
 ): Promise<ScrapToContactResult[]> {
   const raw = await loadRaw([requestNo], candidateIds);
   const byId = new Map(raw.map((r) => [r.candidate_id, r]));
@@ -251,14 +257,17 @@ export async function addScrapToContact(
       const hit = await lockAndFindRepeat(client, { phone: app.value.phone });
       let appId: string | null = null;
       let existing = false;
+      let otherJob: string | null = null;
       if (hit) {
-        const { rows } = await client.query<{ id: string }>(
-          `select id::text as id from ${APPS} where phone_e164 = $1 order by (job_id = $2) desc, created_at desc limit 1`,
+        const { rows } = await client.query<{ id: string; job_id: string | null; job_title: string | null }>(
+          `select id::text as id, job_id, job_title from ${APPS} where phone_e164 = $1 order by (job_id = $2) desc, created_at desc limit 1`,
           [`+66${row.phone!.slice(1)}`, job.id],
         );
         appId = rows[0]?.id ?? null;
         existing = Boolean(appId);
+        if (mode === 'apply' && rows[0] && rows[0].job_id !== job.id) otherJob = rows[0].job_title || 'งานอื่น';
       }
+      if (otherJob) return { appId: null, existing: false, otherLead: null, otherJob };
       if (!appId) {
         const { rows } = await client.query<{ id: string }>(
           `insert into ${APPS} as a (${STAFF_INSERT_COLUMNS}) values (${STAFF_INSERT_VALUES}) returning a.id::text as id`,
@@ -268,7 +277,7 @@ export async function addScrapToContact(
       }
       // Lead ของคนอื่นอยู่แล้ว = ไม่แย่ง (การติดต่อของใครของมัน)
       let otherLead: string | null = null;
-      if (appId) {
+      if (appId && mode === 'lead') {
         await client.query(
           `update ${APPS} set is_lead = true, lead_by = $2, lead_by_name = $3, lead_at = now(), updated_at = now()
             where id = $1 and coalesce(is_lead, false) = false`,
@@ -280,14 +289,20 @@ export async function addScrapToContact(
         );
         if (rows[0]?.lead_by && rows[0].lead_by !== by.userId) otherLead = rows[0].lead_by_name ?? 'คนอื่น';
       }
-      return { appId, existing, otherLead };
+      return { appId, existing, otherLead, otherJob: null as string | null };
     });
     out.push({
       candidate_id: id,
       name: row.full_name,
-      outcome: res.otherLead ? 'skipped' : res.existing ? 'existing' : 'added',
+      outcome: res.otherLead || res.otherJob ? 'skipped' : res.existing ? 'existing' : 'added',
       application_id: res.appId,
-      note: res.otherLead ? `อยู่ในการติดต่อของ ${res.otherLead} แล้ว` : res.existing ? 'มีใบสมัครเบอร์นี้แล้ว ใช้ใบเดิม' : null,
+      note: res.otherJob
+        ? `สมัครงาน ${res.otherJob} มาแล้วภายใน 14 วัน — ดูที่แท็บผู้สมัคร`
+        : res.otherLead
+          ? `อยู่ในการติดต่อของ ${res.otherLead} แล้ว`
+          : res.existing
+            ? 'มีใบสมัครเบอร์นี้แล้ว ใช้ใบเดิม'
+            : null,
     });
   }
   return out;

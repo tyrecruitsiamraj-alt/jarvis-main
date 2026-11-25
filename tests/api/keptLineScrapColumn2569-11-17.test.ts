@@ -49,7 +49,8 @@ describe('คอลัมน์ Scrap ในตารางใบขอ', () => 
   });
   it('กดเลขไปแท็บผู้สมัคร ▾ Scrap เลือกใบนั้นไว้', () => {
     expect(boardScrapPathOfRequest('LBM6903002')).toBe('/jobs/board?view=scrap&scrap_req=LBM6903002');
-    expect(readFileSync('src/pages/jobs/StaffJobBoardPage.tsx', 'utf8')).toContain('initialRequest={searchParams.get(SCRAP_REQUEST_PARAM)}');
+    // 25 พ.ย. 2569 แท็บ Scrap ใช้ตารางผู้สมัคร — เลขใบขอแปลงเป็นตัวกรองใบขอ (`a.job=`) ชุดเดียวกับแท็บผู้สมัคร
+    expect(readFileSync('src/pages/jobs/StaffJobBoardPage.tsx', 'utf8')).toContain('params.set(`${APPLICANT_FILTER_PARAM_PREFIX}job`, `siamraj-sql:${scrapReq.toUpperCase()}`)');
     expect(readFileSync('api/_handlers/scrap-candidates.ts', 'utf8')).toContain("one(req.query?.counts) === '1'");
   });
 });

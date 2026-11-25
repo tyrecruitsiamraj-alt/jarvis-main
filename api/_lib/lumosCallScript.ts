@@ -70,6 +70,7 @@ export type EditableScriptKey =
   | 'offer'
   | 'apply'
   | 'applied'
+  | 'scrap'
   | 'greet'
   | 'intro'
   | 'follow'
@@ -83,6 +84,7 @@ export const EDITABLE_SCRIPT_DEFAULTS: Record<EditableScriptKey, readonly string
   offer: T.เสนองาน,
   apply: T.สมัครผ่านลิงก์,
   applied: T.ผู้สมัครคีย์เอง,
+  scrap: T.เรซูเม่เว็บหางาน,
   greet: T.ทักทายทั่วไป,
   intro: T.โทรเบื้องต้น,
   follow: T.ติดตาม,
@@ -188,6 +190,8 @@ export const KNOWN_PLACEHOLDERS: readonly string[] = [
   'ไม่มีตำแหน่งที่สนใจ',
   'จังหวัด',
   'ไม่มีจังหวัด',
+  /** บทคนจาก Scrap (25 พ.ย. 2569) — "JobBKK" / "JobThai" */
+  'เว็บหางาน',
 ];
 
 const PLACEHOLDER = /\{([^{}]+)\}/g;
@@ -393,6 +397,14 @@ export function buildApplyQuestions(f: ApplyScriptFacts): string[] {
  */
 export function buildAppliedQuestions(f: ApplyScriptFacts): string[] {
   return renderLines(activeScriptLines('applied'), applyValues(f));
+}
+
+/**
+ * บทของ **คนจาก Scrap** (เจ้าของ 25 พ.ย. 2569) — เขาไม่ได้สมัครกับเรา (So Scraping เจอเรซูเม่บน JobBKK/JobThai)
+ * ลำดับและค่าชุดเดียวกับบทผู้สมัครคีย์เอง ต่างแค่ประโยคแรก "เห็นประวัติ…บนเว็บ …"
+ */
+export function buildScrapQuestions(f: ApplyScriptFacts & { web: string }): string[] {
+  return renderLines(activeScriptLines('scrap'), { ...applyValues(f), เว็บหางาน: f.web.trim() || 'เว็บหางาน' });
 }
 
 // ─── บทที่ 2.3 · ทักทายทั่วไป (ไม่มีใบขอ) ────────────────────────────────────

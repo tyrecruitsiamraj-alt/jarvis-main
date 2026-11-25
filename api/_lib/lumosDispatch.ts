@@ -62,11 +62,15 @@ import {
   buildOfferQuestions,
   buildApplyQuestions,
   buildAppliedQuestions,
+  buildScrapQuestions,
   buildGreetingQuestions,
   buildIntroQuestions,
   buildScreeningQuestions,
+  type ApplyScriptFacts,
   type EditableScriptKey,
 } from './lumosCallScript.js';
+import { scrapWebByApplicationId } from './scrapApplicationWeb.js';
+import { SCRAP_NAME_HIDDEN, SCRAP_NAME_MISSING } from '../../src/lib/scrapCandidates.js';
 import { getCallFollowupPolicy } from './callFollowupPolicyStore.js';
 import {
   CONFIRMED_FOCUS_DAYS,
@@ -268,6 +272,8 @@ export function buildApplicationInterviewPayload(
   applyFacts?: ApplyJobFacts | null,
   /** ข้อมูลใบขอ (ชื่อจุดทำงาน) — ใช้ได้ทั้งบทเสนองานและบทผู้สมัครผ่านลิงก์ */
   jobFacts?: ApplyJobFacts | null,
+  /** ใบที่สร้างจากรายชื่อ Scrap = ชื่อเว็บหางาน ("JobBKK"/"JobThai") ⇒ บทคนจาก Scrap (25 พ.ย. 2569) */
+  scrapWeb?: string | null,
 ): LumosInterviewPayload | null {
   const phone = toE164Thai(app.phone);
   if (!phone || !app.full_name?.trim() || !app.job_id) return null;
@@ -291,23 +297,31 @@ export function buildApplicationInterviewPayload(
     // บนใบ (ไม่มีเวลาทำงาน/เงื่อนไขรถ) บทจึงสั้นกว่าเส้นอื่นโดยตั้งใจ
     questions: applyFacts
       ? buildApplyQuestions({ candidateName: app.full_name, position, unit, placeForTravel: unit, ...applyFacts })
-      : // ใบที่เจ้าหน้าที่คีย์/นำเข้า = บทของตัวเอง ลำดับ Journey เดียวกับบทสมัครผ่านลิงก์ (6 ต.ค. 2569)
-        buildAppliedQuestions({
-          candidateName: app.full_name,
-          position,
-          unit,
-          workArea: jobFacts?.workArea,
-          ageRange: jobFacts?.ageRange,
-          monthlyIncome: jobFacts?.monthlyIncome,
-          baseSalary: jobFacts?.baseSalary,
-          dailyWage: jobFacts?.dailyWage,
-          baseOnly: jobFacts?.baseOnly,
-          benefitLine: jobFacts?.benefitLine,
-          workSchedule: jobFacts?.workSchedule,
-        }),
+      : scrapWeb
+        ? // คนจาก Scrap ไม่ได้สมัครกับเรา — ห้ามพูด "เคยฝากใบสมัคร" (เจ้าของ 25 พ.ย. 2569)
+          buildScrapQuestions({ ...keyedFacts(app.full_name, position, unit, jobFacts), web: scrapWeb })
+        : // ใบที่เจ้าหน้าที่คีย์/นำเข้า = บทของตัวเอง ลำดับ Journey เดียวกับบทสมัครผ่านลิงก์ (6 ต.ค. 2569)
+          buildAppliedQuestions(keyedFacts(app.full_name, position, unit, jobFacts)),
     type: 'phone',
     language: 'th',
     tone: 'professional',
+  };
+}
+
+/** ค่าของบทใบที่ไม่ได้กรอกเองผ่านลิงก์ (คีย์/นำเข้า/Scrap) — ชุดเดียวกันทั้งสองบท */
+function keyedFacts(candidateName: string, position: string, unit: string, jobFacts?: ApplyJobFacts | null): ApplyScriptFacts {
+  return {
+    candidateName,
+    position,
+    unit,
+    workArea: jobFacts?.workArea,
+    ageRange: jobFacts?.ageRange,
+    monthlyIncome: jobFacts?.monthlyIncome,
+    baseSalary: jobFacts?.baseSalary,
+    dailyWage: jobFacts?.dailyWage,
+    baseOnly: jobFacts?.baseOnly,
+    benefitLine: jobFacts?.benefitLine,
+    workSchedule: jobFacts?.workSchedule,
   };
 }
 
@@ -388,7 +402,26 @@ export async function enqueueLumosInterviewForApplications(
   // ข้อมูลใบขอ (ชื่อจุดทำงาน · พื้นที่ · อายุ · รายได้) — อ่านครั้งเดียวต่อใบขอ มีเพดานเวลา (ล้ม = บทสั้นลง ไม่ทำให้ส่งไม่ได้)
   const applyFacts = applications.some((a) => !isOverAge(a.age)) ? await loadApplyScriptFacts(jobId) : null;
   const requestClosed = applyFacts?.found === false ? await isRequestClosedForApply(jobId) : false;
+  // ใบจากรายชื่อ Scrap → บท "เห็นประวัติบนเว็บ …" (25 พ.ย. 2569) · ถามช่องทางจากฐานทุกใบ (บางเส้นไม่ได้ส่งคนคีย์มา)
+  // อ่านไม่ได้ = ใบของ So Scraping ไม่ส่ง (ห้ามตกไปบท "เคยฝากใบสมัคร") · ใบอื่นส่งตามเดิม
+  let scrapWeb = new Map<string, string>();
+  let scrapWebUnread = false;
+  try {
+    scrapWeb = await scrapWebByApplicationId(applications.map((a) => a.id));
+  } catch (e) {
+    scrapWebUnread = true;
+    logWarn('lumos.dispatch.scrapWeb: อ่านช่องทางไม่ได้', { error: errorSummaryText(e) });
+  }
   for (const app of applications) {
+    if (scrapWebUnread && app.created_by_name !== null) {
+      skipped.push({ ref: `app-${app.id}`, name: app.full_name, reason: FACTS_UNREAD_REASON });
+      continue;
+    }
+    // คนจาก Scrap ที่ไม่มีชื่อ (ซ่อนชื่อบน JobThai) — AI ต้องเรียกชื่อตอนทัก ⇒ ไม่ส่ง ให้เจ้าหน้าที่โทรเอง
+    if (scrapWeb.has(app.id) && isScrapNoName(app.full_name)) {
+      skipped.push({ ref: `app-${app.id}`, name: app.full_name, reason: SCRAP_NO_NAME_REASON });
+      continue;
+    }
     // 🔴 อายุเกิน = ไม่เข้าคิวเลย ทุกเส้น (กรอกเสร็จ · ปุ่มส่ง AI · ตัวส่งเองหลังรอเลือกวิธีโทร) — ชื่อไปกล่อง "อายุเกิน" บนแท็บผู้สมัคร
     if (isOverAge(app.age)) {
       skipped.push({ ref: `app-${app.id}`, name: app.full_name, reason: OVER_AGE_REASON });
@@ -414,6 +447,7 @@ export async function enqueueLumosInterviewForApplications(
       undefined,
       app.created_by_name === null ? (applyFacts ?? {}) : null,
       applyFacts,
+      scrapWeb.get(app.id) ?? null,
     );
     if (!payload) {
       skipped.push({ ref: `app-${app.id}`, name: app.full_name, reason: NO_PHONE_REASON });
@@ -906,6 +940,11 @@ export const NO_INCOME_REASON = 'ใบขอยังไม่ตั้งร�
 export const FACTS_UNREAD_REASON = 'อ่านรายได้ของใบขอไม่ทัน — ลองกดส่ง AI ใหม่อีกครั้ง';
 export const REQUEST_CLOSED_REASON = 'ใบขอปิดแล้ว — เลือกใบขอที่ยังเปิด หรือให้ AI ทักทายถามก่อน';
 const HELD_REASON = 'เจ้าหน้าที่รับไปโทรเองอยู่ — AI ไม่โทรทับ';
+export const SCRAP_NO_NAME_REASON = 'ไม่มีชื่อ (ซ่อนชื่อบนเว็บหางาน) AI เรียกชื่อไม่ได้ — เก็บไปโทรเองแทน';
+const isScrapNoName = (name: string | null | undefined) => {
+  const n = (name ?? '').trim();
+  return !n || n === SCRAP_NAME_HIDDEN || n === SCRAP_NAME_MISSING;
+};
 const SUPPRESSED_REASON = 'เบอร์นี้ถูกพักอยู่ (แจ้งว่าไม่หางานแล้ว / เบอร์เสีย)';
 const DECLINED_REASON = 'เคยปฏิเสธงานนี้ไปแล้ว — ไม่เสนอซ้ำ';
 const EMPLOYED_REASON = 'ได้งานแล้ว (มีสายติดตามงานใน 60 วัน) — ไม่เสนองานใหม่';
