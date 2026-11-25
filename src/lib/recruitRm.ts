@@ -195,6 +195,7 @@ export const RM_LIST_VIEWS = [
   'ai_cancelled',
   'collect',
   'no_job',
+  'appt_failed',
 ] as const;
 export type RmListView = (typeof RM_LIST_VIEWS)[number];
 
@@ -224,7 +225,8 @@ export type RmListView = (typeof RM_LIST_VIEWS)[number];
  * ลิงก์เก่า ?list=<ชิปเดิม> ยังเปิดได้ (`rmListViewFromParam` แปลงเป็นชิปที่รวมมัน)
  */
 // 3 พ.ย. 2569 (ต่อ) เจ้าของ "ไม่ได้ส่ง AI 744 แยก iRecruit ไม่ผูกใบขอ ออกมา" → 9 ชิป: + iRecruit (ดึงจาก iRecruit) · ไม่ผูกใบขอ
-export const RM_LIST_VIEWS_SHOWN = ['all', 'ai_waiting', 'no_pickup', 'interested', 'declined', 'ai_talked', 'not_sent', 'irecruit_pull', 'no_job'] as const satisfies readonly RmListView[];
+// 25 พ.ย. 2569 เจ้าของ "ไอที่ดึงนัดหมายไม่สำเร็จออกมา แยกไปไว้อีกกล่องว่า นัดหมายไม่สำเร็จ" (Choice กล่องในแท็บผู้สมัคร) — ต่อจากไม่สนใจ
+export const RM_LIST_VIEWS_SHOWN = ['all', 'ai_waiting', 'no_pickup', 'interested', 'declined', 'appt_failed', 'ai_talked', 'not_sent', 'irecruit_pull', 'no_job'] as const satisfies readonly RmListView[];
 export type RmShownView = (typeof RM_LIST_VIEWS_SHOWN)[number];
 
 /** ชิปเดิมที่ถูกยุบ → ชิปที่รวมมัน (ลิงก์เก่า/ตัวนับเก่าไม่ตาย) */
@@ -282,6 +284,7 @@ export const RM_LIST_VIEW_LABEL: Record<RmListView, string> = {
   bad_data: 'เบอร์โทรผิด',
   ai_cancelled: 'ยกเลิก',
   no_job: 'ไม่ผูกใบขอ',
+  appt_failed: 'นัดหมายไม่สำเร็จ',
   // คิวงานสรรหา (16 ส.ค.): สนใจจริง แต่ยังไม่ขึ้นบอร์ด (= ยังไม่ได้มาสมัคร)
   // "ขึ้นบอร์ดแล้ว" = on_board (server จับคู่เบอร์กับคนบนบอร์ด ERP) → ออกจากคิวเอง
   collect: 'รอเก็บใบสมัคร',
@@ -308,6 +311,14 @@ export function isInRmListView(r: PublicApplication, view: RmListView): boolean 
   return target !== undefined && rmShownViewOf(r) === target;
 }
 
+/**
+ * นัดหมายไม่สำเร็จ = ผลนัดล่าสุด "ไม่มา" หรือ "ไม่ผ่าน" และใบไม่ได้อยู่สถานะนัดแล้ว (ถูกคืนแท็บผู้สมัครแล้ว · 24–25 พ.ย. 2569)
+ * นัดใหม่ (converted อีกครั้ง) = ออกจากกล่องนี้เอง
+ */
+export function isAppointmentFailedReturn(r: Pick<PublicApplication, 'status' | 'attendance_result' | 'screening_result'>): boolean {
+  return r.status !== 'converted' && (r.attendance_result === 'no_show' || r.screening_result === 'not_passed');
+}
+
 /** รับสาย/คุยแล้วแต่ไม่ได้คำตอบที่ตัดสินได้ (ถังกลาง `classifyCallMicro`) — ไม่ใช่ "ไม่รับสาย" */
 const TALKED_NO_ANSWER = new Set(['talked_unclear', 'not_yet', 'picked_silent']);
 
@@ -321,6 +332,8 @@ export const IRECRUIT_PULL_CREATED_BY = 'iRecruit';
  * ⚠️ อายุเกิน/ซ้ำ iRecruit ที่ถูกส่ง AI ไปแล้ว = อยู่ตามผลโทรจริง ไม่ใช่ "ไม่ได้ส่ง" (ตรงกับความจริง)
  */
 export function rmShownViewOf(r: PublicApplication): Exclude<RmShownView, 'all'> {
+  // ไม่มาตามนัด / ไม่ผ่าน แล้วถูกคืนแท็บผู้สมัคร (`appointmentReturn.ts`) = กล่องของตัวเอง ก่อนผลโทร (เดิมตกไปอยู่ "สนใจ")
+  if (isAppointmentFailedReturn(r)) return 'appt_failed';
   if (isInterestedApplicant(r)) return 'interested';
   if (isNotInterestedApplicant(r)) return 'declined';
   const talkedOrNot = (): 'ai_talked' | 'no_pickup' => (r.ai_answer && TALKED_NO_ANSWER.has(r.ai_answer.micro) ? 'ai_talked' : 'no_pickup');

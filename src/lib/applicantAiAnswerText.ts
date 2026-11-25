@@ -115,6 +115,13 @@ export function rmRowStatusOf(r: PublicApplication, now: number = Date.now()): R
     }
     case 'no_job':
       return { view, title: 'ไม่ผูกใบขอ', detail: 'AI ไม่โทร · เลือกใบขอแล้วกดส่ง AI ได้', tone: 'warn' };
+    case 'appt_failed':
+      return {
+        view,
+        title: 'นัดหมายไม่สำเร็จ',
+        detail: join(r.screening_result === 'not_passed' ? 'ไม่ผ่าน' : 'ไม่มาตามนัด', rowWhen(r.appointment_at)),
+        tone: 'danger',
+      };
     default: {
       // ไม่ได้ส่ง AI — เหตุจริงตามลำดับ: ยกเลิก · เบอร์ผิด · ซ้ำ iRecruit · เหตุจากตัวส่ง (อายุเกิน · ไม่มีรายได้ · เก็บไปโทรเอง …)
       const why =

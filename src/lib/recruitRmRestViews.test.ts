@@ -73,7 +73,7 @@ describe('ทำไมยังไม่ส่ง AI (27 ต.ค. 2569)', () => 
     expect(aiAnswerTextOf(row({ job_id: undefined }))).toMatchObject({ kind: 'not_sent', reason: 'ไม่ผูกใบขอ' });
   });
   it('ลำดับบนจอตามที่เจ้าของสั่ง', () => {
-    expect(RM_LIST_VIEWS_SHOWN).toEqual(['all', 'ai_waiting', 'no_pickup', 'interested', 'declined', 'ai_talked', 'not_sent', 'irecruit_pull', 'no_job']);
+    expect(RM_LIST_VIEWS_SHOWN).toEqual(['all', 'ai_waiting', 'no_pickup', 'interested', 'declined', 'appt_failed', 'ai_talked', 'not_sent', 'irecruit_pull', 'no_job']);
   });
 });
 
