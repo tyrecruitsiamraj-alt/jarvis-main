@@ -6,6 +6,9 @@ import { FOLLOW_STATUS_LABEL, isFollowCallStatus } from '@/lib/followApi';
 import { IRECRUIT_PULL_STATE_LABEL, irecruitPullState } from '@/lib/irecruitPullStatus';
 import { IRECRUIT_PULL_CREATED_BY, rmShownViewOf } from '@/lib/recruitRm';
 import { isOverAge, OVER_AGE_REASON } from '@/lib/applicantAge';
+import { isScrapApplication } from '@/lib/scrapCandidates';
+
+export const SCRAP_NOT_SENT_REASON = 'Scrap ยังไม่กดส่ง AI';
 
 /**
  * ═══ คำบรรทัดบนของคอลัมน์ "คำตอบกับ AI" — ตัวเดียวทั้งตารางและตัวกรอง (เจ้าของ 22 ต.ค. 2569) ═══
@@ -31,6 +34,8 @@ export function notSentReasonOf(r: PublicApplication): string {
   if (isOverAge(r.age)) return OVER_AGE_REASON;
   if (!r.job_id) return 'ไม่ผูกใบขอ';
   if (r.call_choice === 'ai' || r.call_choice === 'auto_ai') return 'เลือกให้ AI โทรแล้ว รอระบบส่ง';
+  // ใบจากรายชื่อ Scrap (25 พ.ย. 2569) — ไม่ใช่ "เพิ่มเอง/นำเข้า"
+  if (isScrapApplication(r)) return SCRAP_NOT_SENT_REASON;
   if (r.created_by_name?.trim()) return 'เพิ่มเอง/นำเข้า ยังไม่กดส่ง AI';
   // กรอกผ่านลิงก์ ระบบควรส่งเองแต่ส่งไม่ออก (ก่อนมีตัวส่งซ้ำ 15 ต.ค. หรือตัวส่งซ้ำเลิกลองหลัง 7 วัน) — กดส่งจากแถวได้
   return 'ส่ง AI ไม่สำเร็จตอนกรอก · กดส่ง AI ได้';

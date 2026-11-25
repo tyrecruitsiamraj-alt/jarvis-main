@@ -52,7 +52,7 @@ import {
   scrapPlatformLabel,
   scrapReasonLabel,
 } from '@/lib/scrapCandidates';
-import type { ScrapWorkRow } from '@/lib/scrapApplicants';
+import { scrapVirtualStatus, type ScrapWorkRow } from '@/lib/scrapApplicants';
 
 /**
  * ผลประเมินของ So Scraping บนแท็บ Scrap (25 พ.ย. 2569) — ป้ายผล (คำ ไม่ใช่สีอย่างเดียว) · เหตุผล · เว็บ ·
@@ -143,7 +143,17 @@ function daysAppliedText(createdAt: string | null | undefined, now: Date): strin
  * คอลัมน์ "คำตอบกับ AI" = ชิปที่แถวนั้นอยู่ (เจ้าของ 3 พ.ย. 2569 "อ่านแล้วต้องเคลียร์ว่าโทรแล้วเป็นไง ไม่โทรเพราะไร … แก้ให้ตรง Slot มัน")
  * บรรทัดบน = ชื่อชิปเป๊ะ · บรรทัดล่าง = ข้อเท็จจริง (โทรกี่ครั้ง ผลล่าสุด เวลา / เหตุที่ไม่ได้โทร) — ตัวตัดสินเดียว `rmRowStatusOf`
  */
-function AiAnswerCell({ r }: { r: PublicApplication }) {
+function AiAnswerCell({ r, scrap }: { r: PublicApplication; scrap?: ScrapWorkRow | null }) {
+  // แท็บ Scrap: คนที่ยังไม่มีใบ ยังไม่มีผลโทร — บอกว่าอยู่ชิปไหน (ไม่มีเบอร์ / อยู่ในการติดต่อ / อยู่ในผู้สมัคร / ยังไม่ส่ง)
+  if (scrap?.virtual) {
+    const v = scrapVirtualStatus(scrap);
+    return (
+      <span className="flex flex-col gap-0.5" data-testid="ai-row-status" data-view={scrap.view}>
+        <span className={cn('whitespace-nowrap text-xs font-medium', TONE[v.tone].value)}>{v.title}</span>
+        {v.detail ? <span className={cn('text-xs', DASH.cellMuted)}>{v.detail}</span> : null}
+      </span>
+    );
+  }
   const st = rmRowStatusOf(r);
   // iRecruit ค้างเกินเวลา = บอกชั่วโมงที่ค้าง (21 ต.ค. 2569)
   const late = st.view === 'irecruit_pull' ? irecruitLateHours(r.irecruit_status, r.created_at) : null;
@@ -523,7 +533,7 @@ const RmTable: React.FC<{
                         </span>
                       </td>
                       <td className="px-1.5 py-2">
-                        <AiAnswerCell r={r} />
+                        <AiAnswerCell r={r} scrap={scrapOf?.(r)} />
                       </td>
                       <td className="px-1.5 py-2">
                         <ProcessCell r={r} />
@@ -661,8 +671,14 @@ const RmTable: React.FC<{
                             label = 'เก็บไปโทรเอง';
                           }
                         }
+                        // แท็บ Scrap: ไม่มีเบอร์ / อยู่ในการติดต่อ / อยู่ในผู้สมัครแล้ว = กดเก็บ/ส่งไม่ได้ บอกเหตุ (ดูรายละเอียดยังกดได้)
+                        const sw = scrapOf?.(r);
+                        if (sw?.virtual && sw.view !== 'not_sent' && a !== 'view') {
+                          disabled = true;
+                          label = scrapVirtualStatus(sw).title;
+                        }
                         // ส่ง AI โทร — เบอร์ใช้ไม่ได้/มีคนถืออยู่ = กดไม่ได้ พร้อมบอกเหตุผล (ยิงจริงต้องผ่านป๊อปยืนยัน)
-                        if (a === 'ai') {
+                        if (a === 'ai' && !disabled) {
                           const held = holdByRef[r.id];
                           if (r.phone_callable === false) {
                             disabled = true;

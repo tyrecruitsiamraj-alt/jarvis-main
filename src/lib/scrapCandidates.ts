@@ -127,12 +127,16 @@ export function scrapPhone10(raw: unknown): string | null {
   return /^0[689]\d{8}$/.test(d) ? d : null;
 }
 
+const NAME_TITLE_WORDS = new Set(['นาย', 'นาง', 'นางสาว', 'น.ส.', 'mr.', 'mrs.', 'ms.', 'miss', 'mr', 'mrs', 'ms']);
+
 /** แยกชื่อ-นามสกุล (ชื่อเต็มที่ So Scraping ไม่แยกมา) — คำแรกเป็นชื่อ ที่เหลือเป็นนามสกุล */
 export function scrapSplitName(full: string | null | undefined, first?: string | null, last?: string | null): { first: string; last: string } {
   const f = (first ?? '').trim();
   const l = (last ?? '').trim();
   if (f) return { first: f, last: l };
   const parts = String(full ?? '').trim().split(/\s+/).filter(Boolean);
+  // คำนำหน้าที่แยกเป็นคำ ("นาย ณัฐพล เกตุอินทร์") ไม่ใช่ชื่อ (เจอบนแท็บ Scrap 25 พ.ย. 2569) · ติดกับชื่อ = ไม่เดาตัด
+  if (parts.length > 1 && NAME_TITLE_WORDS.has(parts[0].toLowerCase())) parts.shift();
   return { first: parts[0] ?? '', last: parts.slice(1).join(' ') };
 }
 

@@ -20,6 +20,7 @@ import {
   type ScrapResult,
 } from './scrapCandidates';
 import { SO_SCRAPING_CREATED_BY } from './soScrapingLeads';
+import { SCRAP_NOT_SENT_REASON } from './applicantAiAnswerText';
 
 export const SCRAP_VIRTUAL_PREFIX = 'scrap:';
 
@@ -161,6 +162,20 @@ export function buildScrapWorkRows(
     out.push({ app: a, scrap: null, view: scrapViewOfApplication(a), virtual: false });
   }
   return out;
+}
+
+/** คำในคอลัมน์ "คำตอบกับ AI" ของคนที่ยังไม่มีใบ — ชื่อชิป + ข้อเท็จจริง (แบบเดียวกับ `rmRowStatusOf`) */
+export function scrapVirtualStatus(w: Pick<ScrapWorkRow, 'view' | 'scrap'>): {
+  title: string;
+  detail: string | null;
+  tone: 'neutral' | 'warn' | 'info';
+} {
+  const inj = w.scrap?.in_jarvis;
+  if (w.view === 'scrap_no_phone') return { title: SCRAP_LIST_VIEW_LABEL.scrap_no_phone, detail: 'So Scraping ไม่ได้เบอร์มา', tone: 'warn' };
+  if (w.view === 'scrap_contact')
+    return { title: SCRAP_LIST_VIEW_LABEL.scrap_contact, detail: inj?.lead_by_name ? `ของ ${inj.lead_by_name}` : null, tone: 'info' };
+  if (w.view === 'scrap_applicant') return { title: SCRAP_LIST_VIEW_LABEL.scrap_applicant, detail: 'สมัครใบขอนี้มาเองแล้ว', tone: 'info' };
+  return { title: SCRAP_LIST_VIEW_LABEL.not_sent, detail: SCRAP_NOT_SENT_REASON, tone: 'neutral' };
 }
 
 /** ผลประเมินของแถว — ใบที่ So Scraping ไม่มีคนนั้นแล้ว = ยังไม่ประเมิน */

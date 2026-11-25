@@ -15,7 +15,9 @@ import {
   scrapVirtualId,
   SCRAP_LIST_VIEWS,
 } from '../../src/lib/scrapApplicants';
-import { isScrapApplication, scrapWebOfChannel, type ScrapCandidateRow } from '../../src/lib/scrapCandidates';
+import { isScrapApplication, scrapSplitName, scrapWebOfChannel, type ScrapCandidateRow } from '../../src/lib/scrapCandidates';
+import { notSentReasonOf } from '../../src/lib/applicantAiAnswerText';
+import { scrapVirtualStatus } from '../../src/lib/scrapApplicants';
 import type { PublicApplication } from '../../src/lib/publicApplicationsApi';
 import { EDITABLE_SCRIPT_DEFAULTS, KNOWN_PLACEHOLDERS, buildScrapQuestions } from '../../api/_lib/lumosCallScript';
 import { EDITABLE_SCRIPT_KEYS } from '../../api/_lib/callScriptStore';
@@ -110,6 +112,23 @@ describe('ชิปของแท็บ Scrap — ไม่ทับกัน �
     const sum = SCRAP_LIST_VIEWS.filter((v) => v !== 'all').reduce((n, v) => n + c[v], 0);
     expect(c.all).toBe(rows.length);
     expect(sum).toBe(c.all);
+  });
+});
+
+describe('คำบนแถวของคนจาก Scrap (ตรวจบนเว็บจริง 25 พ.ย. 2569)', () => {
+  it('ใบจาก Scrap ที่ยังไม่ส่ง = "Scrap ยังไม่กดส่ง AI" ไม่ใช่ "เพิ่มเอง/นำเข้า"', () => {
+    expect(notSentReasonOf(app())).toBe('Scrap ยังไม่กดส่ง AI');
+  });
+  it('คนที่ยังไม่มีใบ บอกชิปของตัวเอง · ปุ่มเก็บ/ส่งกดไม่ได้เมื่อไม่ใช่ "ไม่ได้ส่ง AI"', () => {
+    expect(scrapVirtualStatus({ view: 'scrap_no_phone', scrap: null }).title).toBe('ไม่มีเบอร์');
+    expect(scrapVirtualStatus({ view: 'scrap_contact', scrap: scrap({ in_jarvis: { application_id: 'x', is_lead: true, lead_by_name: 'แบงค์' } }) }).detail).toBe('ของ แบงค์');
+    expect(scrapVirtualStatus({ view: 'not_sent', scrap: null }).title).toBe('ไม่ได้ส่ง AI');
+    const t = read('src/components/recruit-rm/RmTable.tsx');
+    expect(t).toContain("if (sw?.virtual && sw.view !== 'not_sent' && a !== 'view') {");
+  });
+  it('คำนำหน้าที่แยกเป็นคำไม่ใช่ชื่อ · ติดกับชื่อไม่เดาตัด', () => {
+    expect(scrapSplitName('นาย ณัฐพล เกตุอินทร์')).toEqual({ first: 'ณัฐพล', last: 'เกตุอินทร์' });
+    expect(scrapSplitName('นายณัฐพล เกตุอินทร์')).toEqual({ first: 'นายณัฐพล', last: 'เกตุอินทร์' });
   });
 });
 
