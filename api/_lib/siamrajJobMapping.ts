@@ -41,10 +41,29 @@ export function inferJobTypeFromDescription(...names: (string | null | undefined
   return 'central';
 }
 
+/** ตำแหน่งใน ERP ที่ไม่ต้องบอก (เกือบทุกใบเป็น "พนักงาน") · เลขรหัสล้วนไม่ใช่ชื่อ */
+const PLAIN_STAFF_TITLES = new Set(['พนักงาน', 'ไม่ระบุ']);
+
+/**
+ * ชื่อตำแหน่งของใบขอ = ประเภทงาน (`job_name1` / รหัสงาน) — ตำแหน่งใน ERP ที่ไม่ใช่ "พนักงาน" นำหน้า
+ * 🔴 25 พ.ย. 2569 เจ้าของ "LMO6911017 เปิดมาเป็น หัวหน้าไซต์ แต่ในระบบเราเป็น คนสวน" · Choice "หัวหน้าไซด์ คนสวน"
+ *   เดิมเอาช่องแรกที่มีค่า ⇒ ประเภทงานชนะเสมอ ตำแหน่งหาย (การ์ด · ประกาศ · บท AI พูด "คนสวน")
+ *   วัดวันนั้น: ใบเปิด 313 ใบ ตำแหน่ง "พนักงาน" 302 · หัวหน้าไซด์ 4 · แรงงานสำรอง 3 · เจ้าหน้าที่ 3 · ผู้ช่วย 1
+ * คำตามที่ ERP เขียน (ไม่แก้ "ไซด์") · ชื่องานมีคำตำแหน่งอยู่แล้ว = ไม่ซ้ำ
+ */
 export function primaryJobRoleLabel(
   jobName1: string | null | undefined,
   staffTitleName: string | null | undefined,
   code1: string | null | undefined,
 ): string | undefined {
-  return jobName1?.trim() || staffTitleName?.trim() || code1?.trim() || undefined;
+  const named = (v: string | null | undefined) => {
+    const s = v?.trim() || '';
+    return s && !/^\d+$/.test(s) ? s : '';
+  };
+  const job = named(jobName1) || named(code1);
+  const raw = named(staffTitleName);
+  const title = raw && !PLAIN_STAFF_TITLES.has(raw) ? raw : '';
+  if (job && title && !job.includes(title)) return `${title} ${job}`;
+  // ไม่รู้ประเภทงาน = ใช้ตำแหน่ง (รวม "พนักงาน") แบบเดิม · ไม่มีชื่อเลย = รหัสเดิม
+  return job || raw || code1?.trim() || undefined;
 }
