@@ -189,13 +189,63 @@ export async function startQuizAttemptFromSet(
   }
 }
 
-/** เข้าซ้ำด้วยเลขบัตร + วันเกิด — ต้องตรงทั้งคู่ (ไม่บอกว่าผิดช่องไหน) */
-export async function findQuizAttemptForResume(setId: string, citizenHash: string, birthDate: string): Promise<string | null> {
-  const { rows } = await dbQuery<{ token: string }>(
-    `select token from ${ATTEMPTS} where set_id = $1::uuid and citizen_id_hash = $2 and birth_date = $3::date and archived_at is null limit 1`,
-    [setId, citizenHash, birthDate],
+/**
+ * ═══ ความปลอดภัยของลิงก์แบบทดสอบ (เจ้าของ 25 พ.ย. 2569 · Choice "แบบทดสอบ + ไฟล์แนบหน้าสมัคร") ═══
+ * - เข้าซ้ำ (เลขบัตร + วันเกิด) ผิดครบ `QUIZ_RESUME_MAX_FAILS` ครั้ง = ล็อกใบนั้น `QUIZ_RESUME_LOCK_HOURS` ชม. (นับในฐาน 199 ไม่ใช่ต่อ IP)
+ * - ลิงก์ใบที่ยังไม่ส่ง ใช้ได้ `QUIZ_ATTEMPT_TTL_DAYS` วันนับจากเริ่มทำ — เลยแล้วเปิด/ส่ง/เข้าซ้ำไม่ได้ (ใบที่ส่งแล้วเปิดดูได้ตามเดิม ไม่มีคะแนน)
+ */
+export const QUIZ_RESUME_MAX_FAILS = 5;
+export const QUIZ_RESUME_LOCK_HOURS = 24;
+export const QUIZ_ATTEMPT_TTL_DAYS = 7;
+
+export function isQuizAttemptExpired(a: { submitted_at: string | Date | null; created_at: string | Date }, now: Date = new Date()): boolean {
+  if (a.submitted_at) return false;
+  const started = new Date(a.created_at).getTime();
+  return Number.isFinite(started) && now.getTime() - started > QUIZ_ATTEMPT_TTL_DAYS * 24 * 60 * 60 * 1000;
+}
+
+export type QuizResumeResult = { kind: 'ok'; token: string } | { kind: 'miss' } | { kind: 'locked' } | { kind: 'expired' };
+
+/** เข้าซ้ำด้วยเลขบัตร + วันเกิด — ต้องตรงทั้งคู่ (ไม่บอกว่าผิดช่องไหน) · ผิดนับต่อใบ ครบเพดานล็อก */
+export async function resumeQuizAttempt(setId: string, citizenHash: string, birthDate: string, now: Date = new Date()): Promise<QuizResumeResult> {
+  type ResumeRow = { id: string; token: string; bd: string; fails: number; locked_until: string | Date | null; created_at: string | Date; submitted_at: string | Date | null };
+  let rows: ResumeRow[];
+  try {
+    ({ rows } = await dbQuery<ResumeRow>(
+      `select id::text, token, to_char(birth_date, 'YYYY-MM-DD') as bd, resume_fail_count as fails, resume_locked_until as locked_until,
+              created_at, submitted_at
+         from ${ATTEMPTS} where set_id = $1::uuid and citizen_id_hash = $2 and archived_at is null limit 1`,
+      [setId, citizenHash],
+    ));
+  } catch (e) {
+    // ยังไม่รัน 199 — ใช้กติกาเดิม (ตรงทั้งคู่ · ไม่นับผิด)
+    if ((e as { code?: string })?.code !== '42703') throw e;
+    const { rows: old } = await dbQuery<{ token: string }>(
+      `select token from ${ATTEMPTS} where set_id = $1::uuid and citizen_id_hash = $2 and birth_date = $3::date and archived_at is null limit 1`,
+      [setId, citizenHash, birthDate],
+    );
+    return old[0] ? { kind: 'ok', token: old[0].token } : { kind: 'miss' };
+  }
+  const a = rows[0];
+  if (!a) return { kind: 'miss' };
+  if (a.locked_until && new Date(a.locked_until).getTime() > now.getTime()) return { kind: 'locked' };
+  if (a.bd === birthDate) {
+    if (a.fails > 0 || a.locked_until) {
+      await dbQuery(`update ${ATTEMPTS} set resume_fail_count = 0, resume_locked_until = null where id = $1::uuid`, [a.id]);
+    }
+    return isQuizAttemptExpired(a, now) ? { kind: 'expired' } : { kind: 'ok', token: a.token };
+  }
+  const { rows: upd } = await dbQuery<{ locked: boolean }>(
+    `update ${ATTEMPTS}
+        set resume_fail_count = case when resume_locked_until is not null and resume_locked_until <= now() then 1 else resume_fail_count + 1 end,
+            resume_locked_until = case
+              when (case when resume_locked_until is not null and resume_locked_until <= now() then 1 else resume_fail_count + 1 end) >= $2
+              then now() + make_interval(hours => $3) else null end
+      where id = $1::uuid
+      returning resume_locked_until is not null as locked`,
+    [a.id, QUIZ_RESUME_MAX_FAILS, QUIZ_RESUME_LOCK_HOURS],
   );
-  return rows[0]?.token ?? null;
+  return upd[0]?.locked ? { kind: 'locked' } : { kind: 'miss' };
 }
 
 export async function listQuizAttempts(): Promise<QuizAttemptRow[]> {

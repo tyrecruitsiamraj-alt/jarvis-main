@@ -14717,3 +14717,7 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 ### 25 พ.ย. 2569 (2) — ไฟล์แนบหน้าสมัคร: ตรวจหัวไฟล์จริง + เก็บแบบเข้ารหัส
 - `normalizeDocument` เรียก `documentBytesMatchMime` · เขียน `encryptAttachment` (หน้าสมัคร + เจ้าหน้าที่แนบ) · อ่าน `decryptAttachment` (ไฟล์เก่าไม่มีหัว `JENC1` คืนตามเดิม) — `api/_lib/piiCipher.ts`
 - เทสต์ `tests/api/applyAttachmentSecure2569-11-25.test.ts`
+
+### 25 พ.ย. 2569 (3) — แบบทดสอบ: กันเดาวันเกิด + ลิงก์หมดอายุ
+- migration 199 `resume_fail_count` / `resume_locked_until` · `resumeQuizAttempt` (`api/_lib/skillQuiz.ts`) ผิด 5 ครั้งล็อก 24 ชม. (นับในฐาน) · `isQuizAttemptExpired` ใบยังไม่ส่งเกิน 7 วัน = 410
+- เทสต์ `tests/api/skillQuizResumeGuard2569-11-25.test.ts`

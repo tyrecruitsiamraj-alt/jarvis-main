@@ -7,7 +7,8 @@
  * ลิงก์ของชุด (16 พ.ย. 2569 · แบบ Knowa):
  * GET ?set=                       → ชื่อชุด · ตำแหน่ง · จำนวนข้อ (ไม่ส่งข้อสอบ)
  * POST { action: 'start', set, firstName, lastName, phone, age, citizenId, birthDate, consent } → token ใบของคนนี้
- * POST { action: 'resume', set, citizenId, birthDate } → token ใบเดิม (ตรงทั้งคู่เท่านั้น)
+ * POST { action: 'resume', set, citizenId, birthDate } → token ใบเดิม (ตรงทั้งคู่เท่านั้น · ผิด 5 ครั้งล็อก 24 ชม. · 25 พ.ย. 2569)
+ * ใบที่ยังไม่ส่ง ลิงก์ใช้ได้ 7 วันนับจากเริ่ม (410) — `isQuizAttemptExpired`
  * เลขบัตรเก็บแบบเข้ารหัส + แฮชไว้ค้น · ทำชุดเดิมได้ครั้งเดียว (ฐานตัดสิน)
  *
  * GET ?image=<uuid> → ตัวรูปของคำถาม/ตัวเลือก (17 พ.ย. 2569) · รหัสสุ่มเดาไม่ได้ · รูปไม่เปลี่ยนจึงเก็บแคชได้ยาว
@@ -17,8 +18,11 @@ import { readJsonBody } from '../../_lib/body.js';
 import { rateLimitOrReject } from '../../_lib/rateLimit.js';
 import {
   draftQuizWithAi,
-  findQuizAttemptForResume,
   getQuizAttemptByToken,
+  isQuizAttemptExpired,
+  QUIZ_ATTEMPT_TTL_DAYS,
+  QUIZ_RESUME_LOCK_HOURS,
+  resumeQuizAttempt,
   getQuizImage,
   getQuizSetByToken,
   markQuizOpened,
@@ -36,6 +40,8 @@ const BKK_DAY = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok' });
 const today = () => BKK_DAY.format(new Date());
 const NOT_FOUND = 'ไม่พบแบบทดสอบนี้';
 const RESUME_MISS = 'ไม่พบข้อมูล ตรวจเลขบัตรและวันเกิดอีกครั้ง';
+const RESUME_LOCKED = `กรอกผิดหลายครั้ง ลองใหม่ได้อีกครั้งใน ${QUIZ_RESUME_LOCK_HOURS} ชั่วโมง หรือติดต่อเจ้าหน้าที่`;
+const EXPIRED = `ลิงก์แบบทดสอบนี้เกิน ${QUIZ_ATTEMPT_TTL_DAYS} วันแล้ว ติดต่อเจ้าหน้าที่เพื่อขอลิงก์ใหม่`;
 
 export default async function handler(req: ApiReq, res: ApiRes) {
   const method = (req.method || 'GET').toUpperCase();
@@ -65,6 +71,7 @@ export default async function handler(req: ApiReq, res: ApiRes) {
       if (!TOKEN.test(token)) return sendError(res, 404, 'not_found', 'ไม่พบแบบทดสอบนี้');
       const a = await getQuizAttemptByToken(token);
       if (!a) return sendError(res, 404, 'not_found', 'ไม่พบแบบทดสอบนี้');
+      if (isQuizAttemptExpired(a)) return sendError(res, 410, 'expired', EXPIRED);
       res.setHeader?.('Cache-Control', 'no-store');
       const head = { title: a.content.title, personName: a.person_name, personRole: a.person_role };
       if (a.submitted_at) return res.status(200).json({ ...head, submitted: true, questions: [] });
@@ -83,9 +90,11 @@ export default async function handler(req: ApiReq, res: ApiRes) {
         if (!rateLimitOrReject(req, res, 'public-skill-quiz-resume', 20, 10 * 60 * 1000)) return;
         const r = parseQuizResumeInput(body, today());
         if (!r.ok) return sendError(res, 400, 'bad_request', r.message);
-        const token = await findQuizAttemptForResume(set.id, hashPii('skill_quiz', r.value.citizenId), r.value.birthDate);
-        if (!token) return sendError(res, 404, 'not_found', RESUME_MISS);
-        return res.status(200).json({ token });
+        const found = await resumeQuizAttempt(set.id, hashPii('skill_quiz', r.value.citizenId), r.value.birthDate);
+        if (found.kind === 'locked') return sendError(res, 429, 'locked', RESUME_LOCKED);
+        if (found.kind === 'expired') return sendError(res, 410, 'expired', EXPIRED);
+        if (found.kind !== 'ok') return sendError(res, 404, 'not_found', RESUME_MISS);
+        return res.status(200).json({ token: found.token });
       }
       const t = parseQuizTakerInput(body, today());
       if (!t.ok) return sendError(res, 400, 'bad_request', t.message);
@@ -106,6 +115,7 @@ export default async function handler(req: ApiReq, res: ApiRes) {
     if (!TOKEN.test(token)) return sendError(res, 404, 'not_found', 'ไม่พบแบบทดสอบนี้');
     const a = await getQuizAttemptByToken(token);
     if (!a) return sendError(res, 404, 'not_found', 'ไม่พบแบบทดสอบนี้');
+    if (isQuizAttemptExpired(a)) return sendError(res, 410, 'expired', EXPIRED);
     const parsed = parseQuizAnswers(a.content, body.answers);
     if (!parsed.ok) return sendError(res, 400, 'bad_request', parsed.message);
     if (!(await submitQuizAnswers(a.id, parsed.value))) return sendError(res, 409, 'already_submitted', 'ส่งคำตอบไปแล้ว');
