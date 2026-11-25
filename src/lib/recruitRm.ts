@@ -226,14 +226,14 @@ export type RmListView = (typeof RM_LIST_VIEWS)[number];
  */
 // 3 พ.ย. 2569 (ต่อ) เจ้าของ "ไม่ได้ส่ง AI 744 แยก iRecruit ไม่ผูกใบขอ ออกมา" → 9 ชิป: + iRecruit (ดึงจาก iRecruit) · ไม่ผูกใบขอ
 // 25 พ.ย. 2569 เจ้าของ "ไอที่ดึงนัดหมายไม่สำเร็จออกมา แยกไปไว้อีกกล่องว่า นัดหมายไม่สำเร็จ" (Choice กล่องในแท็บผู้สมัคร) — ต่อจากไม่สนใจ
-export const RM_LIST_VIEWS_SHOWN = ['all', 'ai_waiting', 'no_pickup', 'interested', 'declined', 'appt_failed', 'ai_talked', 'not_sent', 'irecruit_pull', 'no_job'] as const satisfies readonly RmListView[];
+// 25 พ.ย. 2569 เจ้าของ "หน้าผู้สมัคร แยกกล่องอายุเกินออกมาเลย" — ต่อจากไม่ได้ส่ง AI (เดิมยุบรวมไว้ 3 พ.ย.)
+export const RM_LIST_VIEWS_SHOWN = ['all', 'ai_waiting', 'no_pickup', 'interested', 'declined', 'appt_failed', 'ai_talked', 'not_sent', 'over_age', 'irecruit_pull', 'no_job'] as const satisfies readonly RmListView[];
 export type RmShownView = (typeof RM_LIST_VIEWS_SHOWN)[number];
 
 /** ชิปเดิมที่ถูกยุบ → ชิปที่รวมมัน (ลิงก์เก่า/ตัวนับเก่าไม่ตาย) */
 const RM_VIEW_ALIAS: Partial<Record<RmListView, RmShownView>> = {
   ai_at_risk: 'ai_waiting',
   retry_wait: 'ai_waiting',
-  over_age: 'not_sent',
   irecruit_dup: 'not_sent',
   bad_data: 'not_sent',
   ai_cancelled: 'not_sent',
@@ -336,6 +336,8 @@ export function rmShownViewOf(r: PublicApplication): Exclude<RmShownView, 'all'>
   if (isAppointmentFailedReturn(r)) return 'appt_failed';
   if (isInterestedApplicant(r)) return 'interested';
   if (isNotInterestedApplicant(r)) return 'declined';
+  // อายุ 58 ปีขึ้นไป AI ไม่โทร — กล่องของตัวเอง (25 พ.ย. 2569) · คนโทรเองแล้วได้คำตอบสนใจ/ไม่สนใจ ยังอยู่กล่องคำตอบ
+  if (isOverAge(r.age)) return 'over_age';
   const talkedOrNot = (): 'ai_talked' | 'no_pickup' => (r.ai_answer && TALKED_NO_ANSWER.has(r.ai_answer.micro) ? 'ai_talked' : 'no_pickup');
   const q = aiQueueStatusOf(r);
   if (q) {

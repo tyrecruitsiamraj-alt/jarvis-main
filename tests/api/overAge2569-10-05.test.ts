@@ -28,11 +28,11 @@ describe('ตัวตัดสินอายุเกิน', () => {
 
 describe('กล่อง "อายุเกิน" บนแท็บผู้สมัคร', () => {
   it('ปุ่มอยู่คู่กับสนใจ/ไม่สนใจ · เลือกแล้วเหลือเฉพาะคน 58 ขึ้นไป · ทั้งหมดยังเห็นทุกคน', () => {
-    expect([...RM_LIST_VIEWS_SHOWN]).toEqual(['all', 'ai_waiting', 'no_pickup', 'interested', 'declined', 'appt_failed', 'ai_talked', 'not_sent', 'irecruit_pull', 'no_job'] /* 9 ชิป เจ้าของ 3 พ.ย. 2569 */);
-    // 3 พ.ย. 2569 ชิป "อายุเกิน" ยุบเข้า "ไม่ได้ส่ง AI" (เหตุผลอยู่บนแถว) — ลิงก์เก่า ?list=over_age = ชิปนั้น
-    expect(RM_LIST_VIEW_LABEL.not_sent).toBe('ไม่ได้ส่ง AI');
-    expect(isInRmListView(app(59), 'not_sent')).toBe(true);
+    // 25 พ.ย. 2569 เจ้าของ "แยกกล่องอายุเกินออกมาเลย" — ต่อจากไม่ได้ส่ง AI (3 พ.ย. เคยยุบรวม)
+    expect([...RM_LIST_VIEWS_SHOWN]).toEqual(['all', 'ai_waiting', 'no_pickup', 'interested', 'declined', 'appt_failed', 'ai_talked', 'not_sent', 'over_age', 'irecruit_pull', 'no_job']);
+    expect(RM_LIST_VIEW_LABEL.over_age).toBe('อายุเกิน');
     expect(isInRmListView(app(59), 'over_age')).toBe(true);
+    expect(isInRmListView(app(59), 'not_sent')).toBe(false);
     expect(isInRmListView(app(59), 'ai_waiting')).toBe(false);
     expect(isInRmListView(app(59), 'all')).toBe(true);
   });

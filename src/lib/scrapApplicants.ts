@@ -20,6 +20,7 @@ import {
   type ScrapResult,
 } from './scrapCandidates';
 import { SO_SCRAPING_CREATED_BY } from './soScrapingLeads';
+import { isOverAge, OVER_AGE_REASON } from './applicantAge';
 import { SCRAP_NOT_SENT_REASON } from './applicantAiAnswerText';
 
 export const SCRAP_VIRTUAL_PREFIX = 'scrap:';
@@ -45,6 +46,7 @@ export const scrapRequestJobId = (requestNo: string) => `siamraj-sql:${requestNo
 export const SCRAP_LIST_VIEWS = [
   'all',
   'not_sent',
+  'over_age',
   'ai_waiting',
   'no_pickup',
   'interested',
@@ -61,6 +63,7 @@ export type ScrapRowView = Exclude<ScrapListView, 'all'>;
 export const SCRAP_LIST_VIEW_LABEL: Record<ScrapListView, string> = {
   all: RM_LIST_VIEW_LABEL.all,
   not_sent: RM_LIST_VIEW_LABEL.not_sent,
+  over_age: RM_LIST_VIEW_LABEL.over_age,
   ai_waiting: RM_LIST_VIEW_LABEL.ai_waiting,
   no_pickup: RM_LIST_VIEW_LABEL.no_pickup,
   interested: RM_LIST_VIEW_LABEL.interested,
@@ -153,7 +156,9 @@ export function buildScrapWorkRows(
         ? inj.is_lead || inj.claimed
           ? 'scrap_contact'
           : 'scrap_applicant'
-        : 'not_sent';
+        : isOverAge(s.age)
+          ? 'over_age'
+          : 'not_sent';
     out.push({ app: scrapRowAsApplication(s, jobOf(scrapRequestJobId(s.request_no))), scrap: s, view, virtual: true });
   }
   for (const a of apps) {
@@ -174,6 +179,7 @@ export function scrapVirtualStatus(w: Pick<ScrapWorkRow, 'view' | 'scrap'>): {
   if (w.view === 'scrap_no_phone') return { title: SCRAP_LIST_VIEW_LABEL.scrap_no_phone, detail: 'So Scraping ไม่ได้เบอร์มา', tone: 'warn' };
   if (w.view === 'scrap_contact')
     return { title: SCRAP_LIST_VIEW_LABEL.scrap_contact, detail: inj?.lead_by_name ? `ของ ${inj.lead_by_name}` : null, tone: 'info' };
+  if (w.view === 'over_age') return { title: SCRAP_LIST_VIEW_LABEL.over_age, detail: OVER_AGE_REASON, tone: 'warn' };
   if (w.view === 'scrap_applicant') return { title: SCRAP_LIST_VIEW_LABEL.scrap_applicant, detail: 'สมัครใบขอนี้มาเองแล้ว', tone: 'info' };
   return { title: SCRAP_LIST_VIEW_LABEL.not_sent, detail: SCRAP_NOT_SENT_REASON, tone: 'neutral' };
 }

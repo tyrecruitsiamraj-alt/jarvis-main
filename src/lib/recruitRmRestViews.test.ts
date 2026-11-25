@@ -12,7 +12,7 @@ const FUTURE = new Date(Date.now() + 86_400_000).toISOString();
 const CASES: Array<[Partial<PublicApplication>, string]> = [
   [{ last_call_outcome: 'confirmed', last_call_at: '2026-10-13T01:00:00Z' }, 'interested'],
   [{ last_call_outcome: 'declined', last_call_at: '2026-10-13T01:00:00Z' }, 'declined'],
-  [{ age: 60 }, 'not_sent'],
+  [{ age: 60 }, 'over_age'],
   [{ irecruit_dup_at: '2026-10-10T00:00:00Z' }, 'not_sent'],
   [{ last_call_status: 'pending', last_call_followup: 'needs_human', last_call_attempts: 3, last_call_prev_outcome: 'no_answer' }, 'no_pickup'],
   [{ last_call_status: 'failed', last_call_followup: 'needs_human', last_call_outcome: 'no_answer', ai_answer: { micro: 'no_pickup', at: null } }, 'no_pickup'],
@@ -25,7 +25,7 @@ const CASES: Array<[Partial<PublicApplication>, string]> = [
   [{ created_by_name: 'สมชาย', job_id: undefined }, 'no_job'],
   // ซ้ำ iRecruit แล้วกดส่ง AI จนตอบสนใจ = อยู่ "สนใจ" กล่องเดียว (เดิมอยู่สองกล่อง)
   [{ irecruit_dup_at: '2026-10-10T00:00:00Z', last_call_outcome: 'confirmed', last_call_at: '2026-10-13T01:00:00Z' }, 'interested'],
-  [{ age: 60, irecruit_dup_at: '2026-10-10T00:00:00Z' }, 'not_sent'],
+  [{ age: 60, irecruit_dup_at: '2026-10-10T00:00:00Z' }, 'over_age'],
   [{ last_call_status: 'cancelled' }, 'not_sent'],
   // 27 ต.ค. 2569 เจ้าของ (คำสั่งล่าสุด): ไม่รับสายอยู่รอติดต่อซ้ำ · ครบ 3 ครั้ง = ไม่รับสาย (ไม่ใช่ไม่สนใจ)
   [{ last_call_status: 'failed', last_call_followup: 'needs_human', last_call_outcome: 'unresponsive', last_call_attempts: 3, last_call_at: '2026-10-27T05:00:00Z' }, 'no_pickup'],
@@ -52,7 +52,7 @@ describe('ชิปแท็บผู้สมัคร แบ่งครบไ
   it('ลิงก์เก่า ?list=<ชิปที่ถูกยุบ> แปลงเป็นชิปที่รวมมัน · collect/ไม่รู้จัก = null', () => {
     expect(rmListViewFromParam('ai_at_risk')).toBe('ai_waiting');
     expect(rmListViewFromParam('retry_wait')).toBe('ai_waiting');
-    expect(rmListViewFromParam('over_age')).toBe('not_sent');
+    expect(rmListViewFromParam('over_age')).toBe('over_age');
     expect(rmListViewFromParam('irecruit_pull')).toBe('irecruit_pull');
     expect(rmListViewFromParam('no_pickup')).toBe('no_pickup');
     expect(rmListViewFromParam('collect')).toBeNull();
@@ -73,7 +73,8 @@ describe('ทำไมยังไม่ส่ง AI (27 ต.ค. 2569)', () => 
     expect(aiAnswerTextOf(row({ job_id: undefined }))).toMatchObject({ kind: 'not_sent', reason: 'ไม่ผูกใบขอ' });
   });
   it('ลำดับบนจอตามที่เจ้าของสั่ง', () => {
-    expect(RM_LIST_VIEWS_SHOWN).toEqual(['all', 'ai_waiting', 'no_pickup', 'interested', 'declined', 'appt_failed', 'ai_talked', 'not_sent', 'irecruit_pull', 'no_job']);
+    // 25 พ.ย. 2569 กล่องอายุเกินแยกออกมาต่อจากไม่ได้ส่ง AI
+    expect(RM_LIST_VIEWS_SHOWN).toEqual(['all', 'ai_waiting', 'no_pickup', 'interested', 'declined', 'appt_failed', 'ai_talked', 'not_sent', 'over_age', 'irecruit_pull', 'no_job']);
   });
 });
 
@@ -91,7 +92,7 @@ describe('บรรทัดบนแถว = ชื่อชิป + ข้อ�
     const { rmRowStatusOf } = await import('@/lib/applicantAiAnswerText');
     const TITLE: Record<string, string> = {
       ai_waiting: 'รอ AI โทร', no_pickup: 'ไม่รับสาย', interested: 'สนใจ', declined: 'ไม่สนใจ',
-      ai_talked: 'คุยแล้วไม่ได้คำตอบ', not_sent: 'ไม่ได้ส่ง AI', irecruit_pull: 'iRecruit', no_job: 'ไม่ผูกใบขอ',
+      ai_talked: 'คุยแล้วไม่ได้คำตอบ', not_sent: 'ไม่ได้ส่ง AI', over_age: 'อายุเกิน', irecruit_pull: 'iRecruit', no_job: 'ไม่ผูกใบขอ',
     };
     for (const [x, expected] of CASES) {
       const st = rmRowStatusOf(row(x));
@@ -101,7 +102,8 @@ describe('บรรทัดบนแถว = ชื่อชิป + ข้อ�
   });
   it('บรรทัดล่างบอกข้อเท็จจริง', async () => {
     const { rmRowStatusOf } = await import('@/lib/applicantAiAnswerText');
-    expect(rmRowStatusOf(row({ age: 60 })).detail).toBe('อายุ 58 ปีขึ้นไป AI ไม่โทร');
+    expect(rmRowStatusOf(row({ age: 60 })).title).toBe('อายุเกิน');
+    expect(rmRowStatusOf(row({ age: 60 })).detail).toBe('60 ปี · อายุ 58 ปีขึ้นไป AI ไม่โทร');
     expect(rmRowStatusOf(row({ last_call_status: 'failed', last_call_followup: 'needs_human', last_call_outcome: 'busy', last_call_attempts: 3, ai_answer: { micro: 'no_pickup', at: null } })).detail).toMatch(/^AI โทร 3 ครั้ง · ล่าสุด สายไม่ว่าง/);
     expect(rmRowStatusOf(row({ last_call_status: 'pending', last_call_followup: 'retry_scheduled', last_call_attempts: 2, last_call_prev_outcome: 'no_answer', last_call_next_at: FUTURE })).detail).toMatch(/^โทรแล้ว 1 ครั้ง ไม่รับสาย · โทรซ้ำ /);
     expect(rmRowStatusOf(row({ last_call_status: 'completed', ai_answer: { micro: 'picked_silent', at: null } })).detail).toBe('รับสายแต่ไม่พูด');

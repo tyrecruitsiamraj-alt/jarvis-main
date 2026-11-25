@@ -118,6 +118,8 @@ export function rmRowStatusOf(r: PublicApplication, now: number = Date.now()): R
       const st = irecruitPullState(r.irecruit_status);
       return { view, title: 'iRecruit', detail: join('ดึงจาก iRecruit ยังไม่ส่ง AI', st ? IRECRUIT_PULL_STATE_LABEL[st] : null), tone: 'warn' };
     }
+    case 'over_age':
+      return { view, title: 'อายุเกิน', detail: join(typeof r.age === 'number' ? `${r.age} ปี` : null, OVER_AGE_REASON), tone: 'warn' };
     case 'no_job':
       return { view, title: 'ไม่ผูกใบขอ', detail: 'AI ไม่โทร · เลือกใบขอแล้วกดส่ง AI ได้', tone: 'warn' };
     case 'appt_failed':
