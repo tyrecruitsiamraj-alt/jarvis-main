@@ -10,6 +10,7 @@ import { loadMatchingBuScope } from '../_lib/departmentScope.js';
 import { irecruitUnavailableReason } from '../_lib/irecruitSqlServer.js';
 import { AI_NOT_CONFIGURED_MESSAGE, isAiConfigured } from '../_lib/aiClient.js';
 import { matchIrecruitCandidatesForJob } from '../_lib/irecruitCandidateMatcher.js';
+import { matchBlockedText, matchBlockersOf } from '../../src/lib/matchProximity.js';
 import { enqueueLumosInterviewForIrecruit } from '../_lib/lumosDispatch.js';
 import { isAutoDispatchEnabled } from '../_lib/lumosDispatchMode.js';
 import { logError } from '../_lib/logger.js';
@@ -52,6 +53,12 @@ async function handler(req: AuthedReq, res: ApiRes) {
     const job = await getSiamrajUnitRequestById(jobId, await loadMatchingBuScope(req.user));
     if (!job) {
       return sendError(res, 404, 'Not found', 'ไม่พบใบขอ ERP');
+    }
+
+    // 🔴 ใบขอ ERP ไม่ครบ = ไม่จับคู่ ไม่ส่งโทร (เจ้าของ 25 พ.ย. 2569 "ผิดบอกเลยว่าผิดที่ไหน ขาดอะไร")
+    const blockedText = matchBlockedText(matchBlockersOf(job as Record<string, unknown>));
+    if (blockedText) {
+      return sendError(res, 422, 'Unprocessable', blockedText);
     }
 
     const refresh = getQuery(req, 'refresh') === '1';

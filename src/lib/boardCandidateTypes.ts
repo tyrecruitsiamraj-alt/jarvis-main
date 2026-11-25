@@ -40,6 +40,8 @@ export type BoardMatchResult = {
   recommended_target?: number;
   fallback_used?: boolean;
   fallback_pool_size?: number;
+  /** ใบขอ ERP ขาดช่องเหล่านี้ → ไม่จับคู่ (25 พ.ย. 2569) */
+  blocked?: import('@/lib/matchProximity').MatchBlocker[];
 };
 
 /**

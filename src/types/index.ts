@@ -245,6 +245,14 @@ export interface JobRequest {
   /** อายุ/วันเวลาทำงานที่ใบขอ ERP เขียนไว้ก่อนทีม Online แก้ทับ (6 ต.ค. 2569 · ปุ่ม "ใบขอ" ป๊อปประกาศหน้าเดียว) — ไม่มีคีย์ = ไม่ได้ทับ */
   erp_age_range_min?: number | null;
   erp_age_range_max?: number | null;
+  /** รายได้ที่ใบขอ ERP เขียนไว้ก่อนทีมแก้ทับ (25 พ.ย. 2569 · ตัวจับคู่ตัดสิน "ขาดรายได้") — ไม่มีคีย์ = ไม่ได้ทับ */
+  erp_total_income?: number | null;
+  /**
+   * จังหวัด/อำเภอของไซต์ใน ERP (`ms_site.province_code` → `ms_province` · `ms_site.location_ss`) — 25 พ.ย. 2569
+   * ที่ตั้งงานที่ตัวจับคู่ใช้ **ตัวเดียว** (`jobAreaForMatch`) · ไม่มี = ไม่จับคู่
+   */
+  erp_site_province?: string | null;
+  erp_site_district?: string | null;
   erp_work_schedule?: string | null;
   /** รายละเอียดงาน/คุณสมบัติที่ใบขอ ERP เขียนไว้ก่อนทีมแก้ทับ (3 พ.ย. 2569) — ไม่มีคีย์ = ไม่ได้ทับ */
   erp_job_details?: string[] | null;

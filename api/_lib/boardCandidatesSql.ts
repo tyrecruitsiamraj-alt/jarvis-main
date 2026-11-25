@@ -1,4 +1,10 @@
 import { siamrajSqlQuery } from './siamrajSqlServer.js';
+import {
+  RECRUIT_ADDRESS_JOINS_SQL,
+  RECRUIT_AMPHUR_NAME_SQL,
+  RECRUIT_PROVINCE_NAME_SQL,
+  RECRUIT_TAMBON_NAME_SQL,
+} from './recruitAddressSql.js';
 
 /**
  * "คนของเรา" — ผู้สมัครที่ผ่านสัมภาษณ์แล้ว รอลงงาน (board card บน SQL Server Siamraj)
@@ -84,13 +90,13 @@ SELECT TOP (@limit)
     j2.job_description_name AS job2_name,
     r.site_name,
     r.work_place,
-    pv.province_name,
-    am.amphur_name,
+    ${RECRUIT_PROVINCE_NAME_SQL} AS province_name,
+    ${RECRUIT_AMPHUR_NAME_SQL} AS amphur_name,
     LTRIM(RTRIM(CONCAT(
         ra.home_no, N' ', ra.address1, N' ', ra.address2, N' ', ra.address3, N' ',
-        CASE WHEN tb.tambon_name IS NOT NULL THEN N'ต.' + tb.tambon_name + N' ' ELSE N'' END,
-        CASE WHEN am.amphur_name IS NOT NULL THEN N'อ.' + am.amphur_name + N' ' ELSE N'' END,
-        pv.province_name, N' ', ra.zip_code
+        CASE WHEN (${RECRUIT_TAMBON_NAME_SQL}) IS NOT NULL THEN N'ต.' + (${RECRUIT_TAMBON_NAME_SQL}) + N' ' ELSE N'' END,
+        CASE WHEN (${RECRUIT_AMPHUR_NAME_SQL}) IS NOT NULL THEN N'อ.' + (${RECRUIT_AMPHUR_NAME_SQL}) + N' ' ELSE N'' END,
+        ${RECRUIT_PROVINCE_NAME_SQL}, N' ', ra.zip_code
     )))                    AS full_address,
     c.priority_code,
     c.last_activity_at,
@@ -102,10 +108,7 @@ INNER JOIN dbo.ir_board_column AS bc ON bc.column_id = c.column_id
 LEFT JOIN dbo.hr_recruitment   AS r  ON r.citizen_id = c.citizen_id
 LEFT JOIN dbo.hr_ms_job_description_1 AS j1 ON j1.job_description_code_1 = r.job_description_code_1
 LEFT JOIN dbo.hr_ms_job_description_2 AS j2 ON j2.job_description_code_2 = r.job_description_code_2
-LEFT JOIN dbo.hr_recruitment_address  AS ra ON ra.citizen_id = r.citizen_id
-LEFT JOIN dbo.ms_province             AS pv ON pv.province_code = ra.province_code
-LEFT JOIN dbo.ms_province_amphur      AS am ON am.province_code = ra.province_code AND am.amphur_code = ra.amphur_code
-LEFT JOIN dbo.ms_province_tambon      AS tb ON tb.province_code = ra.province_code AND tb.amphur_code = ra.amphur_code AND tb.tambon_code = ra.tambon_code
+LEFT JOIN dbo.hr_recruitment_address  AS ra ON ra.citizen_id = r.citizen_id${RECRUIT_ADDRESS_JOINS_SQL}
 WHERE c.board_id    = @boardId
   AND c.is_archived = 'N'
   AND (c.column_id IN (/*COLUMN_IDS*/) /*INFORMED_ALSO*/)

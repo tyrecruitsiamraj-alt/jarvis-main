@@ -101,6 +101,13 @@ export function speakableDate(v: unknown): string {
   return Number.isNaN(d.getTime()) ? s : thaiDateFormat.format(d);
 }
 
+/**
+ * วันเริ่มงานที่ AI พูด = **ไม่พูดเลย** (เจ้าของ 25 พ.ย. 2569 *"เปลี่ยนไปถามเลยว่าเริ่มงานได้วันไหนทุกอัน"*)
+ * เหตุ: ใบขอค้างนาน AI บอกผู้สมัครว่า "เริ่มงาน 10 ส.ค. 2569" · "25 พ.ค. 2569" ผู้สมัครทักว่าผ่านมานานแล้ว
+ * ⇒ ทุกเส้นที่ส่ง Lumos ส่งค่าว่าง → บรรทัด `{วันเริ่มงาน}` หายทั้งบรรทัด · บทถาม "เริ่มงานได้วันไหน" แทน
+ */
+export const SPOKEN_START_DATE = '';
+
 export type JobBriefInput = Record<string, unknown>;
 
 export type JobBrief = {

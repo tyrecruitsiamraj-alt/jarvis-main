@@ -17,8 +17,10 @@ import { enqueueLumosReminderForBoardMatch } from './lumosDispatch.js';
 import { isAutoDispatchEnabled } from './lumosDispatchMode.js';
 import {
   AREA_RANK_LABEL,
-  jobAreaOf,
+  jobAreaForMatch,
+  matchBlockersOf,
   orderPoolForShortlist,
+  type MatchBlocker,
   requiredGenderLabel,
   type AreaRank,
 } from '../../src/lib/matchProximity.js';
@@ -50,6 +52,8 @@ export type BoardMatchResult = {
   /** true = ถังแรก (ไม่มีงาน) หาได้ต่ำกว่าเป้า จึงค้นถังถัดไป (Re Use → Drop) เพิ่มแล้ว */
   fallback_used?: boolean;
   fallback_pool_size?: number;
+  /** ใบขอ ERP ขาดช่องเหล่านี้ → ไม่จับคู่ ไม่ส่งโทร (`matchBlockersOf` · 25 พ.ย. 2569) — ไม่มี/ว่าง = จับคู่ปกติ */
+  blocked?: MatchBlocker[];
 };
 
 const SHORTLIST_SIZE = 20;
@@ -240,7 +244,8 @@ async function rankPool(
 ): Promise<{ matches: BoardCandidateMatch[]; shortlisted: number }> {
   const terms = seedTerms(spec, jobTitle);
   // 17 พ.ย. 2569: ตัดเพศ/อายุผิดเงื่อนไข แล้วเรียงตามความใกล้ก่อนตัด shortlist (เดิมคะแนนสกิลเท่ากันหมด ได้ 20 คนล่าสุดทั้งประเทศ)
-  const area = jobAreaOf(job as Parameters<typeof jobAreaOf>[0]);
+  // ที่ตั้งงาน = จังหวัดไซต์ใน ERP เท่านั้น (เจ้าของ 25 พ.ย. 2569 "ใบขอเราจะไม่เดา") — ใบที่ไม่มีถูกกันไว้ก่อนถึงตรงนี้แล้ว
+  const area = jobAreaForMatch(job as Parameters<typeof jobAreaForMatch>[0]);
   const ordered = orderPoolForShortlist(job, area, pool, (c) => prescore(c, terms, jobTitle));
   const scored = ordered.scored;
   const areaById = new Map(scored.map((x) => [x.c.card_id, x.a]));
@@ -323,6 +328,24 @@ export async function matchBoardCandidatesForJob(
   job: Record<string, unknown>,
   options?: { refresh?: boolean },
 ): Promise<BoardMatchResult> {
+  // 🔴 ใบขอ ERP ไม่ครบ = ไม่จับคู่ ไม่ถาม AI ไม่ส่งโทร — บันทึกผลว่าง + เหตุ ให้หน้าจับคู่บอกว่าขาดอะไร
+  //    (เจ้าของ 25 พ.ย. 2569 *"ผิดบอกเลยว่าผิดที่ไหน ขาดอะไร … เลยทำให้ไม่ match รอ"*)
+  const blocked = matchBlockersOf(job);
+  if (blocked.length > 0) {
+    const result: BoardMatchResult = {
+      jobId,
+      request_no: (job.request_no as string | undefined) ?? null,
+      job_family_code: '',
+      job_family_label: '',
+      pool_size: 0,
+      shortlisted: 0,
+      matches: [],
+      blocked,
+    };
+    await saveBoardMatchResult(jobId, result);
+    logInfo('board-match.blocked', { jobId, blocked });
+    return result;
+  }
   const spec =
     (!options?.refresh && getCachedCandidateSpec(jobId)) ||
     (await analyzeCandidateSpecForJob(jobId, job, { refresh: options?.refresh }));

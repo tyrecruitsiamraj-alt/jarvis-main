@@ -139,7 +139,8 @@ describe('ต่อเข้า payload จริง', () => {
   const JOB = {
     unit_name: 'ลูกค้า ก',
     job_description_code_1: 'ขับรถ',
-    required_date: '2026-08-10',
+    // 25 พ.ย. 2569: วันเริ่มงานที่เลยมาแล้วไม่พูด (`speakableStartDate`) — fixture ต้องเป็นวันในอนาคต
+    required_date: '2027-08-10',
     total_income: 13000,
     work_place: 'สนง.จังหวัดตาก',
     work_schedule: 'วันจันทร์ - วันศุกร์ • 08:00 - 17:00 น.',
@@ -152,7 +153,8 @@ describe('ต่อเข้า payload จริง', () => {
     expect(msg).toContain('สนง.จังหวัดตาก');
     expect(msg).toContain('08:00 - 17:00');
     expect(msg).toContain('ต้องใช้รถของตัวเอง');
-    expect(msg).toContain('2569');
+    // 25 พ.ย. 2569: ไม่พูดวันเริ่มงานของใบขอแล้ว (เจ้าของ "ถามเลยว่าเริ่มงานได้วันไหนทุกอัน")
+    expect(msg).not.toContain('2570');
     // ท้ายประโยคเดิมต้องยังอยู่ — ไม่งั้นผู้สมัครไม่รู้ว่าต้องทำอะไรต่อ
     expect(msg).toContain('ทีมสรรหาจะติดต่อ');
   });

@@ -8,6 +8,7 @@
  * อ่านอย่างเดียว · การ์ดอ่านไม่ได้ = แถวยังอยู่ ช่องที่ขาดเป็นค่าว่าง
  */
 import { dbQuery, isPgUndefinedTable } from './postgres.js';
+import { RECRUIT_ADDRESS_JOINS_SQL, RECRUIT_AMPHUR_NAME_SQL, RECRUIT_PROVINCE_NAME_SQL } from './recruitAddressSql.js';
 import { tableInAppSchema } from './schema.js';
 import { siamrajSqlQuery } from './siamrajSqlServer.js';
 import { logWarn, errorSummaryText } from './logger.js';
@@ -92,12 +93,10 @@ async function loadCards(ids: number[]): Promise<Map<number, CardRow>> {
     const rows = await siamrajSqlQuery<CardRow>(
       `SELECT c.card_id,
               CASE WHEN r.birth_date IS NOT NULL THEN DATEDIFF(YEAR, r.birth_date, GETDATE()) ELSE NULL END AS age,
-              r.sex_code, am.amphur_name, pv.province_name
+              r.sex_code, ${RECRUIT_AMPHUR_NAME_SQL} AS amphur_name, ${RECRUIT_PROVINCE_NAME_SQL} AS province_name
          FROM dbo.ir_board_card AS c
          LEFT JOIN dbo.hr_recruitment AS r ON r.citizen_id = c.citizen_id
-         LEFT JOIN dbo.hr_recruitment_address AS ra ON ra.citizen_id = r.citizen_id
-         LEFT JOIN dbo.ms_province AS pv ON pv.province_code = ra.province_code
-         LEFT JOIN dbo.ms_province_amphur AS am ON am.province_code = ra.province_code AND am.amphur_code = ra.amphur_code
+         LEFT JOIN dbo.hr_recruitment_address AS ra ON ra.citizen_id = r.citizen_id${RECRUIT_ADDRESS_JOINS_SQL}
         WHERE c.card_id IN (${ph.join(', ')})`,
       inputs,
     );

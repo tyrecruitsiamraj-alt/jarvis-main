@@ -203,7 +203,8 @@ describe('Part 2 · เสนองานให้คนที่สมัคร
     expect(msg).toContain(CALLER_ORG);
     expect(msg).toContain('พนักงานขับรถ');
     expect(msg).toContain('OPL6908026');
-    expect(msg).toContain('1 ก.ย. 2569');
+    // 25 พ.ย. 2569: บทแจ้งงานไม่พูดวันเริ่มงานของใบขอแล้ว (เจ้าของ "ถามเลยว่าเริ่มงานได้วันไหนทุกอัน")
+    expect(msg).not.toContain('1 ก.ย. 2569');
     expect(msg).not.toMatch(/\d[\d,]*\s*บาท/);
   });
 });

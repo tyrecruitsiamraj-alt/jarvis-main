@@ -38,6 +38,9 @@ type SqlServerRequestRow = {
   want_date_from: Date | string | null;
   site_code: string | null;
   site_name: string | null;
+  /** จังหวัด/อำเภอของไซต์ (ms_site) — ที่ตั้งงานของตัวจับคู่ (25 พ.ย. 2569) */
+  site_province_name: string | null;
+  site_district_name: string | null;
   department_code: string | null;
   department_name: string | null;
   customer_name: string | null;
@@ -250,6 +253,8 @@ function mapSqlServerRow(r: SqlServerRequestRow) {
     // จุดทำงานจริง — โชว์คู่กับชื่อคู่สัญญา (ดู siamrajUnitName.ts)
     work_site_name: workSiteNameOf(r.site_name, r.customer_name?.trim() || r.site_name),
     site_code: r.site_code || undefined,
+    erp_site_province: r.site_province_name?.trim() || null,
+    erp_site_district: r.site_district_name?.trim() || null,
     position_units: breakdown.remainingPositions > 0 ? breakdown.remainingPositions : undefined,
     request_positions: breakdown.requestPositions,
     filled_positions: breakdown.filledPositions,
@@ -345,6 +350,8 @@ const BASE_SQL = `
     S.resign_date,
     A.site_code,
     SS.site_name,
+    (SELECT TOP 1 PV.province_name FROM ms_province PV WHERE PV.province_code = SS.province_code) AS site_province_name,
+    NULLIF(LTRIM(RTRIM(SS.location_ss)), N'') AS site_district_name,
     RTRIM(SS.department_code) AS department_code,
     (SELECT TOP 1 D.department_name FROM ms_department D WHERE D.department_code = SS.department_code ORDER BY D.seq) AS department_name,
     RTRIM(SS.contract_type_code) AS contract_type_code,
@@ -496,7 +503,7 @@ const BASE_SQL_BY_ID_ANY = `${BASE_SQL}
 
 const SELECT_COLUMNS = `
   external_id, request_no, act_saleco_datetime, want_date_from, resign_date,
-  site_code, site_name, department_code, department_name, contract_type_code, contract_type_name,
+  site_code, site_name, site_province_name, site_district_name, department_code, department_name, contract_type_code, contract_type_name,
   customer_name, status, is_stop, stop_no, staff_fullname, mobile_phone,
   job_description_code_1, job_description_code_2, staff_title_code, staff_title_name,
   job_name1, job_name2, requester_name, request_action_name, request_action_code,

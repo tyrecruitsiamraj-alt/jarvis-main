@@ -12,7 +12,7 @@ import {
   type CandidateSpecAnalysis,
 } from './candidateSpecAnalyzer.js';
 import { isJobFamilyCode, classifyJobFamily, selectShortlist } from './jobFamilyLexicon.js';
-import { AREA_RANK_LABEL, jobAreaOf, orderPoolForShortlist, requiredGenderLabel, type AreaRank } from '../../src/lib/matchProximity.js';
+import { AREA_RANK_LABEL, jobAreaForMatch, orderPoolForShortlist, requiredGenderLabel, type AreaRank } from '../../src/lib/matchProximity.js';
 
 export type IrecruitCandidateMatch = {
   id: number;
@@ -232,7 +232,8 @@ export async function matchIrecruitCandidatesForJob(
   }
 
   // 3) pre-rank + คัด shortlist — 17 พ.ย. 2569: ตัดเพศ/อายุผิดเงื่อนไข · เรียงตามความใกล้ก่อนตัด (เดิมได้คนล่าสุดทั้งประเทศ)
-  const area = jobAreaOf(job as Parameters<typeof jobAreaOf>[0]);
+  // ที่ตั้งงาน = จังหวัดไซต์ใน ERP เท่านั้น (25 พ.ย. 2569) — ใบที่ไม่มีถูกกันที่ handler แล้ว (`matchBlockersOf`)
+  const area = jobAreaForMatch(job as Parameters<typeof jobAreaForMatch>[0]);
   const ordered = orderPoolForShortlist(
     job,
     area,

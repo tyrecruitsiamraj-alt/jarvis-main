@@ -67,6 +67,7 @@ import {
   type CandidateProposal,
 } from '@/lib/candidateProposalsApi';
 import { DASH, TONE, type ToneKey } from '@/lib/designTokens';
+import { matchBlockedText, type MatchBlocker } from '@/lib/matchProximity';
 import {
   compareCandidatePriority,
   describePriorityScore,
@@ -195,6 +196,8 @@ type BoardMatchResult = {
   recommended_target?: number;
   fallback_used?: boolean;
   fallback_pool_size?: number;
+  /** ใบขอ ERP ขาดช่องเหล่านี้ → ไม่จับคู่ (25 พ.ย. 2569 · `matchBlockersOf`) */
+  blocked?: MatchBlocker[];
 };
 /** ผลจาก API — AI คิดที่ worker หลังบ้านเท่านั้น หน้าเว็บได้แค่ผลสำเร็จหรือสถานะรอ */
 type BoardMatchResponse = BoardMatchResult & {
@@ -2501,6 +2504,11 @@ const MatchingPage: React.FC<{ embedded?: boolean; lockedJob?: JobRequest | null
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="space-y-1">
                   <h3 className="text-sm font-medium text-foreground">คนของเรา</h3>
+                  {matchBlockedText(boardMatchById[jobDetail.id]?.blocked) ? (
+                    <p className={cn('text-xs', TONE.warn.value)} data-testid="match-blocked">
+                      {matchBlockedText(boardMatchById[jobDetail.id]?.blocked)}
+                    </p>
+                  ) : null}
                   <p className="text-xs text-muted-foreground tabular-nums">
                     {boardMatchById[jobDetail.id]
                       ? `แนะนำ ${recommendedCandidateCount(boardMatchById[jobDetail.id].matches)} จาก ${boardMatchById[jobDetail.id].pool_size} คน` +

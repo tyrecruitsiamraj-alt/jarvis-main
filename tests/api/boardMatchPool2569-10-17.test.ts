@@ -28,6 +28,8 @@ vi.mock('../../api/_lib/boardCandidatesSql.js', async (orig) => {
         column_label: String(col),
         first_name: `คน${id}`,
         job1_name: 'แม่บ้าน',
+        // อยู่จังหวัดเดียวกับไซต์ (ERP_COMPLETE) — ไม่มีที่อยู่ห้ามเขียว (25 พ.ย. 2569 ใบขอมีจังหวัดจาก ERP เสมอ)
+        province_name: 'กรุงเทพมหานคร',
       }));
     }),
   };
@@ -69,6 +71,9 @@ beforeEach(() => {
   failColumns.clear();
 });
 
+/** ใบขอ ERP ครบ (จังหวัดไซต์ · เพศ · อายุ · รายได้) — ไม่ครบไม่จับคู่ตั้งแต่ 25 พ.ย. 2569 (`matchBlockersOf`) */
+const ERP_COMPLETE = { erp_site_province: 'กรุงเทพมหานคร', gender_requirement: 'หญิง', age_range_min: 20, age_range_max: 50, total_income: 12000 };
+
 describe('กองจับคู่งาน = ไม่มีงาน · Re Use · Drop', () => {
   it('รหัสถังตามบอร์ดจริง เรียงตามลำดับค้น · ไม่มี To do / In process / Done / งานรายวัน / Checklist', () => {
     expect(boardMatchColumnIds()).toEqual([7, 6, 5]);
@@ -98,7 +103,7 @@ describe('กองจับคู่งาน = ไม่มีงาน · Re 
 describe('AI แมทค้นทีละถัง ไม่มีงาน → Re Use → Drop', () => {
   it('ถังแรกพอเป้าแล้ว = ไม่ค้นถังถัดไป', async () => {
     pools.set(7, [1, 2, 3]);
-    const r = await matchBoardCandidatesForJob('J1', { position_units: 1, position_name: 'แม่บ้าน' });
+    const r = await matchBoardCandidatesForJob('J1', { ...ERP_COMPLETE, position_units: 1, position_name: 'แม่บ้าน' });
     expect(fetched.map((f) => f.columnId)).toEqual([7]);
     expect(fetched.every((f) => f.excludeInformed === true)).toBe(true);
     expect(r.fallback_used).toBe(false);
@@ -110,7 +115,7 @@ describe('AI แมทค้นทีละถัง ไม่มีงาน �
     pools.set(6, [3]);
     pools.set(5, [4, 5, 6, 7]);
     pools.set(2, [99]);
-    const r = await matchBoardCandidatesForJob('J2', { position_units: 2, position_name: 'แม่บ้าน' });
+    const r = await matchBoardCandidatesForJob('J2', { ...ERP_COMPLETE, position_units: 2, position_name: 'แม่บ้าน' });
     expect(fetched.map((f) => f.columnId)).toEqual([7, 6, 5]);
     expect(r.fallback_used).toBe(true);
     expect(r.pool_size).toBe(7);
@@ -122,7 +127,7 @@ describe('AI แมทค้นทีละถัง ไม่มีงาน �
     pools.set(7, [1]);
     failColumns.add(6);
     pools.set(5, [2]);
-    const r = await matchBoardCandidatesForJob('J3', { position_units: 1, position_name: 'แม่บ้าน' });
+    const r = await matchBoardCandidatesForJob('J3', { ...ERP_COMPLETE, position_units: 1, position_name: 'แม่บ้าน' });
     expect(r.matches.map((m) => m.card_id)).toEqual([1, 2]);
   });
 });

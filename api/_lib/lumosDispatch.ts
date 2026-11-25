@@ -49,7 +49,7 @@ import { pushQueuedRows } from './lumosPushTracking.js';
 import { ensureCallScriptsFresh } from './callScriptStore.js';
 import { MATCH_RANK_UNKNOWN, matchRankFromTier } from '../../src/lib/matchRank.js';
 import { replaceScriptOf } from '../../src/lib/irecruitReplaceSync.js';
-import { buildJobBrief, speakableDate } from './lumosJobBrief.js';
+import { buildJobBrief, SPOKEN_START_DATE } from './lumosJobBrief.js';
 import {
   activeScriptFingerprint,
   activeScriptSource,
@@ -146,7 +146,7 @@ export function buildReminderPayload(
   const position = jobPositionLabel(job, result.job_family_label);
   const unit = str(job.unit_name) || 'หน่วยงานของเรา';
   // วันที่ต้อง "พูดออกเสียงแล้วเข้าใจ" — เดิมส่ง 2026-08-01 ดิบ AI เลยอ่านเป็นตัวเลขเรียง
-  const requiredDate = speakableDate(job.required_date);
+  const requiredDate = SPOKEN_START_DATE;
   // รายละเอียดงานที่ผู้สมัครถามเป็นอย่างแรกเสมอ (ที่ไหน · เวลาไหน · ต้องมีรถไหม)
   // เดิมไม่ได้บอกเลย เขาเลยต้องรอเจ้าหน้าที่โทรกลับมาตอบเรื่องพื้นฐานที่สุด
   const brief = buildJobBrief(job);
@@ -231,7 +231,7 @@ export function buildInterviewPayload(
       placeForTravel,
       workSchedule: brief.workSchedule,
       needsOwnVehicle: brief.needsOwnVehicle,
-      startDate: speakableDate(job.required_date),
+      startDate: SPOKEN_START_DATE,
     }),
     type: 'phone',
     language: 'th',
@@ -361,7 +361,7 @@ export function buildRecruitLaneInterviewPayload(
       placeForTravel,
       workSchedule: brief.workSchedule,
       needsOwnVehicle: brief.needsOwnVehicle,
-      startDate: speakableDate(job.required_date),
+      startDate: SPOKEN_START_DATE,
     }),
     type: 'phone',
     language: 'th',
@@ -1200,7 +1200,7 @@ export function buildRecallInterviewPayload(
         placeForTravel,
         workSchedule: brief.workSchedule,
         needsOwnVehicle: brief.needsOwnVehicle,
-        startDate: speakableDate(job.required_date),
+        startDate: SPOKEN_START_DATE,
       },
       { askStillLooking: true },
     ),

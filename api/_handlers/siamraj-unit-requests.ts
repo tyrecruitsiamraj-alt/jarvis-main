@@ -172,7 +172,11 @@ export async function attachNotes(items: unknown[]): Promise<void> {
         if (fo.province) it.override_province = fo.province;
         if (fo.district) it.override_district = fo.district;
         if (fo.subdistrict) it.override_subdistrict = fo.subdistrict;
-        if (fo.total_income != null) it.total_income = fo.total_income;
+        if (fo.total_income != null) {
+          // ค่า ERP ไว้ให้ตัวจับคู่ตัดสิน "ขาดรายได้" (`matchBlockersOf` · 25 พ.ย. 2569 ERP เท่านั้น)
+          it.erp_total_income = it.total_income ?? null;
+          it.total_income = fo.total_income;
+        }
         if (fo.benefits && fo.benefits.length > 0) it.extra_benefits = fo.benefits;
         // วันเวลาทำงาน + คุณสมบัติที่ตั้งเอง (6 ต.ค. 2569 · วางข้อความโพสต์) — null = ใช้ค่า ERP / ไม่มี
         if (fo.work_schedule) {

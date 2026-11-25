@@ -76,13 +76,71 @@ export function jobAreaOf(job: {
   };
 }
 
+/**
+ * ที่ตั้งงานสำหรับ **จับคู่** — จังหวัดของไซต์ใน ERP เท่านั้น (`ms_site.province_code` · อำเภอ `ms_site.location_ss`)
+ * 🔴 เจ้าของ 25 พ.ย. 2569: *"ใบขอเราจะไม่เดาไรนะ เราจะเอาตาม erp เท่านั้น ผิดบอกเลยว่าผิดที่ไหน ขาดอะไร"*
+ *    ไม่แยกจากข้อความสถานที่ ไม่ใช้ค่าที่ทีมแก้ในกล่องงาน — ไม่มี = ไม่จับคู่ (`matchBlockersOf`)
+ */
+export function jobAreaForMatch(job: { erp_site_province?: string | null; erp_site_district?: string | null }): JobArea {
+  return { province: canonProvince(job.erp_site_province), district: canonDistrict(job.erp_site_district) };
+}
+
+export type MatchBlocker = 'place' | 'gender' | 'age' | 'income';
+
+export const MATCH_BLOCKER_LABEL: Record<MatchBlocker, string> = {
+  place: 'จังหวัดของไซต์',
+  gender: 'เพศ',
+  age: 'อายุ',
+  income: 'รายได้',
+};
+
+const filled = (v: unknown) => v != null && String(v).trim() !== '';
+/** ค่า ERP ของช่องที่ทีมแก้ทับได้ — ใบที่ถูกแก้เก็บค่าเดิมไว้ที่ `erp_*` */
+const erpValue = (job: Record<string, unknown>, key: string) => (`erp_${key}` in job ? job[`erp_${key}`] : job[key]);
+
+/**
+ * ใบขอที่ ERP ขาดช่องเหล่านี้ = **ไม่จับคู่ ไม่ส่ง AI โทร** จนกว่าแก้ที่ ERP (เจ้าของ 25 พ.ย. 2569
+ * *"ขาดเพศ ขาดอายุ ขาดรายได้ ขาดอะไรก็ว่าไป เลยทำให้ไม่ match"*) · ว่าง = จับคู่ได้
+ * เพศ "ไม่จำกัด" = มีค่า (ใบขอเลือกไว้แล้ว) · อายุมีขั้นใดขั้นหนึ่งก็พอ
+ */
+export function matchBlockersOf(job: Record<string, unknown>): MatchBlocker[] {
+  const out: MatchBlocker[] = [];
+  if (!jobAreaForMatch(job as { erp_site_province?: string | null }).province) out.push('place');
+  const g = String(erpValue(job, 'gender_requirement') ?? '').trim();
+  if (!g || /^ไม่ระบุ$/u.test(g)) out.push('gender');
+  if (!(Number(erpValue(job, 'age_range_min')) > 0) && !(Number(erpValue(job, 'age_range_max')) > 0)) out.push('age');
+  if (!(Number(job.erp_total_income ?? job.total_income) > 0)) out.push('income');
+  return out;
+}
+
+/** "ไม่จับคู่ · ขาด: จังหวัดของไซต์ · อายุ" — ว่าง = null */
+export function matchBlockedText(blockers: readonly MatchBlocker[] | null | undefined): string | null {
+  return blockers && blockers.length ? `ไม่จับคู่ · ขาดในใบขอ ERP: ${blockers.map((b) => MATCH_BLOCKER_LABEL[b]).join(' · ')}` : null;
+}
+
+/**
+ * จังหวัด/อำเภอของคน — ช่องรหัสจังหวัดของ iRecruit ก่อน ว่างหรืออ่านไม่ออก = อ่านจากที่อยู่ที่พิมพ์ไว้
+ * (25 พ.ย. 2569: 802 รายการช่องจังหวัดว่าง แต่ที่อยู่พิมพ์ครบ เช่น "…เขตราชเทวี กรุงเทพมหานคร 10400" ถูกนับว่าไม่มีที่อยู่)
+ */
+export function candidateAreaOf(c: { province_name?: string | null; amphur_name?: string | null; full_address?: string | null }): JobArea {
+  const fromCol = canonProvince(c.province_name);
+  if (fromCol) return { province: fromCol, district: canonDistrict(c.amphur_name) };
+  const text = String(c.full_address ?? '').trim();
+  if (!text) return { province: null, district: null };
+  const parts = parseThaiAddressParts(text);
+  const province = canonProvince(parts.province);
+  return { province, district: province ? canonDistrict(parts.district ?? c.amphur_name ?? null) : null };
+}
+
 /** คนนี้อยู่ใกล้งานแค่ไหน — งานไม่รู้จังหวัด = ทุกคน 3 (เรียงไม่ได้ ไม่ลงโทษใคร) */
-export function areaRankOf(job: JobArea, candidate: { province_name?: string | null; amphur_name?: string | null }): AreaRank {
-  const cp = canonProvince(candidate.province_name);
+export function areaRankOf(
+  job: JobArea,
+  candidate: { province_name?: string | null; amphur_name?: string | null; full_address?: string | null },
+): AreaRank {
+  const { province: cp, district: cd } = candidateAreaOf(candidate);
   if (!cp) return 3;
   if (!job.province) return 3;
   if (cp === job.province) {
-    const cd = canonDistrict(candidate.amphur_name);
     return cd && job.district && cd === job.district ? 0 : 1;
   }
   const jr = REGION_OF.get(job.province);
@@ -135,7 +193,7 @@ export function requiredGenderLabel(raw: unknown): string | null {
  * เรียงก่อนตัด shortlist: คนที่สกิลมีคำตรง → ใกล้งานก่อน → คะแนนสกิล → ลำดับเดิม (ความเคลื่อนไหวล่าสุด)
  * ตัดคนที่เพศ/อายุรู้ค่าและผิดเงื่อนไขทิ้งก่อน (`matchGate`)
  */
-export function orderPoolForShortlist<T extends { sex_code?: unknown; age?: unknown; province_name?: string | null; amphur_name?: string | null }>(
+export function orderPoolForShortlist<T extends { sex_code?: unknown; age?: unknown; province_name?: string | null; amphur_name?: string | null; full_address?: string | null }>(
   job: MatchGateJob,
   area: JobArea,
   pool: T[],
