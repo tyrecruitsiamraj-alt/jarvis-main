@@ -23,10 +23,15 @@ describe('ขั้นตอน + สถานะแบบ iRecruit', () => {
     expect(applicantProcessOf(app({ appointment_at: '2026-10-06T05:00:00Z', attendance_result: 'showed' }))).toEqual({ step: 'follow', state: 'ok' });
     expect(applicantProcessOf(app({ appointment_at: '2026-10-06T05:00:00Z', attendance_result: 'no_show' }))).toEqual({ step: 'follow', state: 'fail', reason: 'ไม่มาตามนัด' });
   });
-  it('สถานะการติดต่อ: ยังไม่โทร / โทรแล้ว / นัดสัมภาษณ์แล้ว', () => {
+  it('สถานะการติดต่อ 5 ค่า: ยังไม่โทร / ติดต่อไม่ได้ / ติดต่อได้ / นัดได้ / นัดไม่สำเร็จ (เจ้าของ 25 พ.ย. 2569)', () => {
     expect(applicantContactStateOf(app({}))).toBe('not_called');
-    expect(applicantContactStateOf(app({ dial_count: 1 }))).toBe('called');
-    expect(applicantContactStateOf(app({ last_call_status: 'failed' }))).toBe('called');
+    expect(applicantContactStateOf(app({ dial_count: 1 }))).toBe('unreached');
+    expect(applicantContactStateOf(app({ last_call_status: 'failed' }))).toBe('unreached');
+    expect(applicantContactStateOf(app({ last_call_outcome: 'no_answer' }))).toBe('unreached');
+    expect(applicantContactStateOf(app({ last_call_outcome: 'declined' }))).toBe('reached');
+    expect(applicantContactStateOf(app({ last_contact_ok: false, last_call_outcome: 'confirmed' }))).toBe('unreached');
+    expect(applicantContactStateOf(app({ last_contact_ok: true }))).toBe('reached');
+    expect(applicantContactStateOf(app({ last_contact_ok: true, last_appointment_failed: true }))).toBe('appt_failed');
     expect(applicantContactStateOf(app({ appointment_at: '2026-10-06T05:00:00Z' }))).toBe('appointed');
   });
 });

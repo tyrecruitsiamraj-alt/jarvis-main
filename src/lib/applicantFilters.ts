@@ -13,7 +13,7 @@
  * 🔴 ไม่แตะฐานข้อมูล — กรองจากรายชื่อที่หน้าโหลดมาแล้ว
  */
 import type { PublicApplication } from '@/lib/publicApplicationsApi';
-import { subChannelOf } from '@/lib/channelSub';
+import { channelPathOf } from '@/lib/channelSub';
 import type { RmTab } from '@/lib/recruitRm';
 import { isInterestedApplicant, isNotInterestedApplicant } from '@/lib/applicantCallOutcome';
 import { ATTENDANCE_LABEL } from '@/lib/appointmentAttendance';
@@ -22,6 +22,7 @@ import { fullDaysSince } from '@/lib/fullDays';
 import { aiAnswerTextOf } from '@/lib/applicantAiAnswerText';
 import {
   CONTACT_STATE_LABEL,
+  CONTACT_STATE_ORDER,
   PROCESS_STATE_LABEL,
   PROCESS_STEP_LABEL,
   applicantContactStateOf,
@@ -31,8 +32,11 @@ import { RM_LICENSE_TYPES } from '@/lib/recruitRmMasters';
 import { APP_DEPARTMENT_CODES } from '@/lib/departmentCodes';
 import { APPLICANT_AREA_LABEL, APPLICANT_AREA_ORDER, type ApplicantArea } from '@/lib/applicantArea';
 import {
+  TREE_SEP,
   UNSPECIFIED,
   applyFacetDefs,
+  parseRangeValue,
+  rangeValue,
   buildFacetViews,
   countSelectedValues,
   describeSelection,
@@ -123,20 +127,6 @@ export function applicantCallValue(r: PublicApplication): string {
   return 'none';
 }
 
-const AGE_BANDS: ReadonlyArray<{ id: string; label: string; min: number; max: number }> = [
-  { id: '18-25', label: '18–25', min: 0, max: 25 },
-  { id: '26-35', label: '26–35', min: 26, max: 35 },
-  { id: '36-45', label: '36–45', min: 36, max: 45 },
-  { id: '46+', label: '46 ขึ้นไป', min: 46, max: 200 },
-];
-
-const DAY_BANDS: ReadonlyArray<{ id: string; label: string; max: number }> = [
-  { id: '0-3', label: '0–3 วัน', max: 3 },
-  { id: '4-7', label: '4–7 วัน', max: 7 },
-  { id: '8-30', label: '8–30 วัน', max: 30 },
-  { id: '30+', label: 'เกิน 30 วัน', max: Number.MAX_SAFE_INTEGER },
-];
-
 const APPT_LABEL: Record<string, string> = {
   past: 'เลยวันนัดแล้ว',
   today: 'วันนี้',
@@ -219,7 +209,7 @@ const FACETS: readonly Def[] = [
   {
     key: 'call',
     label: 'ผลโทรล่าสุด',
-    ui: 'chip',
+    ui: 'check',
     order: ['interested', 'pending', 'not_interested', 'none'],
     labelOf: (v) => CALL_LABEL[v] ?? v,
     values: (r) => [applicantCallValue(r)],
@@ -243,7 +233,7 @@ const FACETS: readonly Def[] = [
   {
     key: 'step',
     label: 'ขั้นตอน',
-    ui: 'chip',
+    ui: 'check',
     order: ['contact', 'appointment', 'follow'],
     labelOf: (v) => PROCESS_STEP_LABEL[v as keyof typeof PROCESS_STEP_LABEL] ?? v,
     values: (r) => [applicantProcessOf(r).step],
@@ -251,7 +241,7 @@ const FACETS: readonly Def[] = [
   {
     key: 'status',
     label: 'สถานะ',
-    ui: 'chip',
+    ui: 'check',
     order: Object.keys(PROCESS_STATE_LABEL),
     labelOf: (v) => PROCESS_STATE_LABEL[v as keyof typeof PROCESS_STATE_LABEL] ?? v,
     values: (r) => [applicantProcessOf(r).state],
@@ -259,8 +249,8 @@ const FACETS: readonly Def[] = [
   {
     key: 'contactState',
     label: 'สถานะการติดต่อ',
-    ui: 'chip',
-    order: ['not_called', 'called', 'appointed'],
+    ui: 'check',
+    order: [...CONTACT_STATE_ORDER],
     labelOf: (v) => CONTACT_STATE_LABEL[v as keyof typeof CONTACT_STATE_LABEL] ?? v,
     values: (r) => [applicantContactStateOf(r)],
   },
@@ -307,15 +297,12 @@ const FACETS: readonly Def[] = [
     },
   },
   {
+    /** แถบลาก 0 ถึงอายุมากสุดในรายชื่อ (เจ้าของ 25 พ.ย. 2569 "ขอเป็นแบบลาก เริ่มจาก 0 ถึง n") · ไม่กรอกอายุ = ไม่ผ่านเมื่อเลือกช่วง */
     key: 'age',
     label: 'ช่วงอายุ',
-    ui: 'chip',
-    order: AGE_BANDS.map((b) => b.id),
-    labelOf: (v) => AGE_BANDS.find((b) => b.id === v)?.label ?? v,
-    values: (r) => {
-      if (typeof r.age !== 'number' || !Number.isFinite(r.age)) return [UNSPECIFIED];
-      return [AGE_BANDS.find((b) => r.age! >= b.min && r.age! <= b.max)?.id ?? UNSPECIFIED];
-    },
+    ui: 'range',
+    unit: 'ปี',
+    values: (r) => (typeof r.age === 'number' && Number.isFinite(r.age) ? [String(Math.round(r.age))] : [UNSPECIFIED]),
   },
   {
     /** ใบขับขี่ (เติมจาก iRecruit 4 ต.ค. 2569) — คนหนึ่งมีได้หลายใบ = อยู่หลายค่า · ไม่ได้กรอก = ไม่ระบุ */
@@ -338,14 +325,15 @@ const FACETS: readonly Def[] = [
   {
     key: 'days',
     label: 'สมัครมาแล้ว',
-    ui: 'chip',
-    order: DAY_BANDS.map((b) => b.id),
-    labelOf: (v) => DAY_BANDS.find((b) => b.id === v)?.label ?? v,
-    /** 🔴 ครบ 24 ชม. = 1 วัน — ตัวนับเดียวกับคอลัมน์ "สมัครมาแล้ว" (`fullDaysSince` · เจ้าของเคาะ 30 ก.ย. 2569) */
+    ui: 'range',
+    unit: 'วัน',
+    /**
+     * 🔴 ครบ 24 ชม. = 1 วัน — ตัวนับเดียวกับคอลัมน์ "สมัครมาแล้ว" (`fullDaysSince` · เจ้าของเคาะ 30 ก.ย. 2569)
+     * แถบลาก 0 ถึงจำนวนวันมากสุดในรายชื่อ (เจ้าของ 25 พ.ย. 2569)
+     */
     values: (r, facts) => {
       const n = fullDaysSince(r.created_at, facts.now);
-      if (n === null) return [UNSPECIFIED];
-      return [DAY_BANDS.find((b) => n <= b.max)?.id ?? UNSPECIFIED];
+      return n === null ? [UNSPECIFIED] : [String(n)];
     },
   },
   {
@@ -355,8 +343,16 @@ const FACETS: readonly Def[] = [
      */
     key: 'channel',
     label: 'ช่องทาง',
-    ui: 'check',
-    values: (r) => [trimOr(subChannelOf(r.channel_label, r.referral_source))],
+    ui: 'tree',
+    /**
+     * เป็นชั้น หลัก › รอง › กลุ่ม (เจ้าของ 25 พ.ย. 2569 · แทน "ขึ้นแค่ช่องทางรอง" 28 ต.ค.) — `channelPathOf`
+     * แถวมีค่าทุกชั้นของตัวเอง ⇒ ติ๊กหลัก = ได้ทุกรองใต้หลักนั้น · แถบโชว์ชั้นถัดไปเมื่อเลือกชั้นบน
+     */
+    values: (r) => {
+      const path = channelPathOf(r.channel_label, r.referral_source);
+      if (path.length === 0) return [UNSPECIFIED];
+      return path.map((_, i) => path.slice(0, i + 1).join(TREE_SEP));
+    },
   },
   {
     /** BU ของใบสมัคร (เจ้าของ 24 พ.ย. 2569 "หน้าผู้สมัครให้แยกดูแบบ Bu ได้") — ใบขอ = BU ของใบขอ · กล่องลอย = BU ของประกาศ */
@@ -396,6 +392,15 @@ export function applicantFacetLabel(key: ApplicantFacetKey): string {
 export function applicantFacetValueLabel(key: ApplicantFacetKey, value: string): string {
   if (value === UNSPECIFIED) return unspecifiedLabel(key);
   const def = FACET_BY_KEY.get(key);
+  if (def?.ui === 'range') {
+    const r = parseRangeValue(value);
+    return r ? `${r[0]}–${r[1]} ${def.unit ?? ''}`.trim() : value;
+  }
+  // ช่องทางเป็นชั้น — คำบนจอ = ชื่อชั้นสุดท้าย (ชั้นบนอยู่บรรทัดแม่ในแถบอยู่แล้ว)
+  if (def?.ui === 'tree') {
+    const at = value.lastIndexOf(TREE_SEP);
+    return at === -1 ? value : value.slice(at + TREE_SEP.length);
+  }
   return def?.labelOf ? def.labelOf(value) : value;
 }
 
@@ -474,7 +479,9 @@ export function buildApplicantFacets(
  * ⚠️ "หน่วยงาน" ยังคีย์ด้วย `job_id` (ปุ่ม "ดูรายชื่อ" จากการ์ดกล่องงานติ๊กใบขอให้) — แค่คำบนจอเป็นชื่อหน่วยงาน
  */
 export const RECRUIT_TAB_FACETS: readonly ApplicantFacetKey[] = [
+  // ลำดับตามเจ้าของ 25 พ.ย. 2569 (ตำแหน่งขึ้นมาใต้ BU) · ทุกหัวข้อเรียงลงมา ไม่มีปุ่มวางต่อกัน
   'bu',
+  'position',
   'recruiter',
   'step',
   'status',
@@ -485,7 +492,6 @@ export const RECRUIT_TAB_FACETS: readonly ApplicantFacetKey[] = [
   'province',
   'area',
   'days',
-  'position',
   'age',
   'education',
   'channel',
@@ -498,6 +504,9 @@ const RECRUIT_TAB_FACET_LABEL: Partial<Record<ApplicantFacetKey, string>> = {
   days: 'จำนวนวันที่ผ่านมา',
   position: 'ตำแหน่ง',
   age: 'อายุ',
+  // เจ้าของ 25 พ.ย. 2569 "เปลี่ยนเป็น"
+  aiStatus: 'คำตอบ AI',
+  area: 'ระยะห่าง',
 };
 
 /** ลำดับหัวข้อของแถบกรองตามแท็บ */
@@ -539,6 +548,21 @@ export function toggleApplicantFacetValue(
   key: ApplicantFacetKey,
   value: string,
 ): ApplicantFilterState {
+  const def = FACET_BY_KEY.get(key);
+  // แถบลาก — ค่าเดียวแทนของเดิม · ลากเต็มแถบ (0 ถึงสูงสุด) ส่งค่าว่างมา = ไม่กรอง
+  if (def?.ui === 'range') {
+    const r = value ? parseRangeValue(value) : null;
+    return { ...state, selection: { ...state.selection, [key]: r ? [rangeValue(r[0], r[1])] : [] } };
+  }
+  // ชั้นช่องทาง — ติ๊กลูก = เอาแม่/บรรพบุรุษออก (เจาะลง) · เอาแม่ออก = ลูกหลานหลุดตาม
+  if (def?.ui === 'tree') {
+    const cur = state.selection[key] ?? [];
+    const isAncestor = (a: string, b: string) => b.startsWith(`${a}${TREE_SEP}`);
+    const next = cur.includes(value)
+      ? cur.filter((v) => v !== value && !isAncestor(value, v))
+      : [...cur.filter((v) => !isAncestor(v, value)), value];
+    return { ...state, selection: { ...state.selection, [key]: next } };
+  }
   const selection = toggleSelection(state.selection, key, value);
   if (key === 'province' && (selection.province ?? []).filter((p) => p !== UNSPECIFIED).length === 0) {
     selection.district = [];

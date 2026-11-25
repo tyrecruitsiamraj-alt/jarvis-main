@@ -26,8 +26,8 @@ const code = (rel: string) =>
 describe('ตัวกรองแท็บผู้สมัคร = แถบซ้ายแบบ iRecruit', () => {
   const ws = code('src/components/recruit-rm/RmWorkspace.tsx');
 
-  it('วาดแถบซ้าย (จอใหญ่) และปุ่มเปิดแผง (จอเล็ก) ครบทั้งคู่', () => {
-    expect(ws).toMatch(/<FilterSidebar\b/);
+  it('วาดแผงลอยทับตาราง (จอใหญ่ · 25 พ.ย. 2569) และปุ่มเปิดแผง (จอเล็ก) ครบทั้งคู่', () => {
+    expect(ws).toMatch(/<FilterPopoverPanel\b/);
     expect(ws).toMatch(/<FilterSheetButton\b/);
   });
 

@@ -14706,3 +14706,14 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 - ตัวคืนรายชื่อ (`callChoiceWorker`) แจ้งคนเก็บด้วย `claim_idle_released_mine` (`buildClaimerUnclaimNotice`)
 - ภาพบัตรเบลอ/มืด/แสงสะท้อน = `stepError` ขั้นแนบภาพไม่ผ่าน · อ่าน So Scraping ผ่าน `scrapRead` (อ่านอย่างเดียว · lock 2 วิ · คำสั่ง 8 วิ)
 - เทสต์ `tests/api/journeyFixes2569-11-24.test.ts` · `tests/api/scrapReadTimeout2569-11-24.test.ts`
+
+### 25 พ.ย. 2569 — ตัวกรองหน้าผู้สมัคร/การติดต่อ: เรียงลงมา · แถบลาก · ช่องทางเป็นชั้น · ลอยทับตาราง
+- `facetEngine.ts`: ui ใหม่ `range` (ค่า `ต่ำ-สูง` · `parseRangeValue`/`rangeValue` · view มี `range`) + `tree` (ค่า = เส้นทาง `TREE_SEP` · แถวมีค่าทุกชั้น · option มี `depth`)
+- `applicantFilters.ts`: ลำดับ `RECRUIT_TAB_FACETS` ใหม่ (ตำแหน่งใต้ BU) · คำ "คำตอบ AI" "ระยะห่าง" · ขั้นตอน/สถานะ/สถานะการติดต่อ/ผลโทร = check · อายุ/จำนวนวัน = range · ช่องทาง = tree (`channelPathOf` ใน `channelSub.ts`) · `toggleApplicantFacetValue` จัด range/tree
+- สถานะการติดต่อ 5 ค่า (`applicantProcess.ts` `CONTACT_STATE_ORDER`) — ไฟล์รายงาน (`applicantExport.ts`) ใช้คำเดียวกัน
+- `BoardFilterPanel.tsx`: `RangeBody` (Slider สองตัวลาก · `ui/slider.tsx` วาดตัวลากตามจำนวนค่า) · `TreeBody` · `FilterPopoverPanel` แทน `FilterSidebar`/`FilterRail` (ถอดแล้ว)
+- `RmTable` คอลัมน์คำตอบกับ AI `min-w-40` · ป้าย "ปล่อยจาก" เป็นชื่อเล่น (`UNCLAIMED_FROM_NAME_SQL` ใน `job-applications.ts`)
+
+### 25 พ.ย. 2569 (2) — ไฟล์แนบหน้าสมัคร: ตรวจหัวไฟล์จริง + เก็บแบบเข้ารหัส
+- `normalizeDocument` เรียก `documentBytesMatchMime` · เขียน `encryptAttachment` (หน้าสมัคร + เจ้าหน้าที่แนบ) · อ่าน `decryptAttachment` (ไฟล์เก่าไม่มีหัว `JENC1` คืนตามเดิม) — `api/_lib/piiCipher.ts`
+- เทสต์ `tests/api/applyAttachmentSecure2569-11-25.test.ts`

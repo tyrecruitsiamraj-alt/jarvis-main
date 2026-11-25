@@ -90,8 +90,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useRolePermissions } from '@/contexts/RolePermissionsContext';
 import {
   FilterSheetButton,
-  FilterSidebar,
-  FilterRail,
+  FilterPopoverPanel,
   type FilterExtraSection,
 } from '@/components/jobs/BoardFilterPanel';
 import { buildJobKeyIndex } from '@/lib/jobKeyIndex';
@@ -130,25 +129,6 @@ import LoadErrorNotice from '@/components/shared/LoadErrorNotice';
 /** แท็บของพื้นที่นี้ → `?view=` ของบอร์ดรับสมัคร · ชื่อแท็บใช้ `RM_TAB_LABEL` ชุดเดียวกับแถบแท็บของบอร์ด */
 const RM_TAB_BOARD_VIEW: Record<RmTab, string> = { candidates: 'list', contact: 'contact', appointments: 'appointments' };
 
-/**
- * แถบกรองซ้ายพับ/กาง — จำต่อเครื่อง (เจ้าของสั่ง 30 ก.ย. 2569: *"Filter ทำแบบย่อ กางได้"* → Choice "แถบซ้ายพับได้")
- * ค่าตั้งต้น = พับ (ตารางได้เต็มความกว้าง) · เครื่องไม่ให้เก็บ = พับทุกครั้งที่เปิด ใช้ต่อได้ปกติ
- */
-const FILTER_OPEN_KEY = 'jarvis:applicant-filter-open';
-function readFilterOpen(): boolean {
-  try {
-    return window.localStorage.getItem(FILTER_OPEN_KEY) === '1';
-  } catch {
-    return false;
-  }
-}
-function writeFilterOpen(open: boolean): void {
-  try {
-    window.localStorage.setItem(FILTER_OPEN_KEY, open ? '1' : '0');
-  } catch {
-    /* เครื่องไม่ให้เก็บ — ใช้ต่อได้ แค่ไม่จำ */
-  }
-}
 
 /**
  * พื้นที่ทำงาน "รายชื่อผู้สมัคร" — เนื้อของหน้างานสรรหา (RM) เดิมทั้งก้อน
@@ -249,11 +229,8 @@ const RmWorkspace: React.FC<{
     setNoticeGoContact(goContact);
   };
   /** แถบกรองซ้าย (จอ xl) กางอยู่ไหม — ค่าตั้งต้นพับ */
-  const [filterOpen, setFilterOpen] = useState<boolean>(readFilterOpen);
-  const changeFilterOpen = (open: boolean) => {
-    setFilterOpen(open);
-    writeFilterOpen(open);
-  };
+  /** แผงตัวกรองลอยทับตาราง (25 พ.ย. 2569) — เปิดหน้ามาหุบเสมอ ไม่จำค่าเดิม (ลอยทับตั้งแต่เปิดหน้า = บังรายชื่อ) */
+  const [filterOpen, setFilterOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   /** นำเข้าผู้สมัครจาก Excel (1 ต.ค. 2569) */
   const [importOpen, setImportOpen] = useState(false);
@@ -1231,7 +1208,7 @@ const RmWorkspace: React.FC<{
           ถ้าให้กรองซ้ำที่นี่ เลขจะไม่ตรงกับกล่องที่กดมา */}
       {/* 🔴 **แถบกรองด้านซ้ายแบบ iRecruit** (เจ้าของสั่ง 28 ก.ย. 2569: *"หน้าอื่นๆพวก รายชื่อผู้สมัคร
           การโทรของฉัน ฯลฯ ทำแบบ Irecruit เลย"* → Choice "แถบกรองซ้ายตามแบบร่างที่เคาะไว้")
-          · จอ sm (640px) ขึ้นไป = แถบซ้าย (`FilterSidebar`) · จอมือถือ = ปุ่มไอคอนเปิดแผง (แถวนี้)
+          · จอ sm (640px) ขึ้นไป = ปุ่มไอคอน + แผงลอยทับตาราง (`FilterPopoverPanel` · 25 พ.ย. 2569) · จอมือถือ = ปุ่มไอคอนเปิดแผง (แถวนี้)
           · 30 ก.ย. 2569 ย้ายจาก xl ลงมา sm — เจ้าของดูในจอกว้าง ~750px เลยไม่เคยเห็นแถบข้างรายชื่อ ·
             ค่าตั้งต้นพับ (ตารางได้เต็มกว้าง) · กางแล้วตารางเลื่อนข้างในได้ ชื่ออยู่คอลัมน์ซ้ายสุดจึงยังเห็น
           · แท็บกล่องงานยังเป็นปุ่มเดียว (แบบ A) — เจ้าของ: "หน้ากล่องงาน … เป็นช่องๆแบบเดิม"
@@ -1262,11 +1239,12 @@ const RmWorkspace: React.FC<{
         </div>
       ) : null}
       {/* แถบ "กำลังดู: … — N คนข้างล่าง" ถูกถอด 27 ก.ย. 2569 (Clean — ไม่มีประโยคอธิบาย) */}
-      {/* จอ sm ขึ้นไป: แถบกรองอยู่ข้างรายชื่อเสมอ — พับ = ปุ่มไอคอน (`FilterRail`) · กาง = แถบเต็ม ตารางยังเห็นข้าง ๆ */}
+      {/* จอ sm ขึ้นไป: ปุ่มไอคอนข้างรายชื่อ · กด = แผงลอยทับตาราง (`FilterPopoverPanel` · 25 พ.ย. 2569) ตารางเต็มกว้างเสมอ */}
       <div className={cn('mt-5', !bucket && 'sm:flex sm:items-start sm:gap-3')}>
-        {!bucket && !filterOpen ? <FilterRail selected={panelSelected} onExpand={() => changeFilterOpen(true)} /> : null}
-        {!bucket && filterOpen ? (
-          <FilterSidebar
+        {!bucket ? (
+          <FilterPopoverPanel
+            open={filterOpen}
+            onOpenChange={setFilterOpen}
             facets={applicantFacets}
             primary={applicantPrimaryFacets(tab)}
             attach={APPLICANT_FACET_ATTACH}
@@ -1274,7 +1252,6 @@ const RmWorkspace: React.FC<{
             sections={applicantPanelSections}
             onClear={clearApplicantPanel}
             resultText={`เหลือ ${filtered.length.toLocaleString('th-TH')} รายชื่อ`}
-            onCollapse={() => changeFilterOpen(false)}
           />
         ) : null}
         <div className="min-w-0 flex-1 space-y-4">

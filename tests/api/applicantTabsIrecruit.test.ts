@@ -75,23 +75,21 @@ describe('ศูนย์คุมงานสรรหา ย้ายไปแ
 });
 
 describe('แท็บผู้สมัคร: ตัวกรองพับได้ · ดูเป็นคน · เก็บแล้วมีปุ่มพาไป · ชื่อไม่ขาด', () => {
-  it('🔴 แถบกรองอยู่ข้างรายชื่อ: พับเป็นค่าตั้งต้น = แถบแคบ · กดกาง = แถบเต็ม ตารางยังอยู่ข้าง ๆ · กดพับกลับได้', () => {
-    // เจ้าของ 30 ก.ย. 2569: "ไว้ข้าง ๆ รายชื่อ กดแล้วกางออก แต่ชื่อก็ยังดูได้ พอกดก็หุบกลับไป"
-    expect(WS).toContain("const FILTER_OPEN_KEY = 'jarvis:applicant-filter-open'");
-    expect(WS).toMatch(/getItem\(FILTER_OPEN_KEY\) === '1'/);
-    expect(WS).toMatch(/useState<boolean>\(readFilterOpen\)/);
-    expect(WS).toMatch(/!bucket && !filterOpen \? <FilterRail/);
-    expect(WS).toMatch(/!bucket && filterOpen \? \(\s*<FilterSidebar/);
-    expect(WS).toContain('onCollapse={() => changeFilterOpen(false)}');
-    // แถบกับตารางอยู่แถวเดียวกัน (ไม่ใช่แผงทับหน้า) · ตั้งแต่จอ sm — เจ้าของดูในจอกว้าง ~750px
-    expect(WS).toContain("!bucket && 'sm:flex sm:items-start sm:gap-3'");
+  it('🔴 ตัวกรองลอยทับตาราง ไม่บีบ (เจ้าของ 25 พ.ย. 2569 Choice · แทนแถบข้างรายชื่อ 30 ก.ย.) · เปิดหน้ามาหุบ · กดพับกลับได้', () => {
+    // เจ้าของ 25 พ.ย. 2569: "ดูมันจะใช้ยากๆนะถ้าเป็นแบบนี้" (แถบกาง 224px ตารางถูกบีบจนคำตกบรรทัด)
+    expect(WS).toContain('const [filterOpen, setFilterOpen] = useState(false);');
+    expect(WS).not.toContain('FILTER_OPEN_KEY');
+    expect(WS).toMatch(/<FilterPopoverPanel\s+open=\{filterOpen\}\s+onOpenChange=\{setFilterOpen\}/);
+    expect(PANEL_UI).toContain('<PopoverContent');
+    expect(PANEL_UI).toContain("onCollapse={() => onOpenChange(false)}");
     expect(WS).toContain('mt-3 flex flex-wrap items-center gap-2 sm:hidden');
-    expect(PANEL_UI).toContain('p-3 sm:block');
+    expect(PANEL_UI).not.toContain('export function FilterSidebar');
+    expect(PANEL_UI).not.toContain('export function FilterRail');
   });
 
   it('🔴 ปุ่มตัวกรองเป็นไอคอนอย่างเดียว ไม่มีคำว่า "ตัวกรอง" (เจ้าของ: "มันดูใหญ่ไป")', () => {
     // กล่องงานด้วย (Choice "เป็นไอคอนเหมือนกัน" 30 ก.ย. 2569) — ปุ่มตัวกรองทุกแท็บหน้าตาเดียวกัน
-    for (const name of ['FilterRail', 'FilterSheetButton', 'FilterButton']) {
+    for (const name of ['FilterPopoverPanel', 'FilterSheetButton', 'FilterButton']) {
       const body = PANEL_UI.slice(PANEL_UI.indexOf(`export function ${name}`));
       const button = body.slice(body.indexOf('<Button'), body.indexOf('</Button>'));
       expect(button, name).toContain('size="iconXs"');

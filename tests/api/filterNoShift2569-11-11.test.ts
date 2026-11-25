@@ -44,8 +44,8 @@ describe('ทั้งระบบ: กดแล้วปุ่มอยู่�
     expect(read('src/components/jobs/JobBoardView.tsx')).toContain("className={cn('col-start-1 row-start-1', p.id !== (picked ?? picks[0]).id && 'invisible')}");
     expect(read('src/components/layout/StageBanner.tsx')).toContain("if (!step || pathname === '/jobs/board') return null;");
   });
-  it('ตัวกรอง: ปุ่มพับอยู่จุดเดียวกับปุ่มกาง', () => {
-    expect(panel).toContain("'relative m-3 hidden shrink-0 self-start sm:inline-flex'");
+  it('ตัวกรอง: แผงลอยทับตาราง (25 พ.ย. 2569) · ปุ่มพับอยู่ก่อนชื่อแผง', () => {
+    expect(panel).toContain("'relative hidden shrink-0 sm:inline-flex'");
     expect(panel.indexOf('aria-label="พับตัวกรอง"')).toBeLessThan(panel.indexOf('>ตัวกรองเพิ่มเติม</p>'));
   });
   it('รายการใบขอ: ลูกศรเรียงสองตัวเสมอ · ล็อกความกว้างคอลัมน์', () => {

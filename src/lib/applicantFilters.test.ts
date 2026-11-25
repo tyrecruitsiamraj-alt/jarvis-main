@@ -133,11 +133,15 @@ describe('จังหวัด → อำเภอ', () => {
 });
 
 describe('หัวข้ออื่นตามแบบร่าง', () => {
-  it('สมัครมาแล้วกี่วัน — ช่วงวันตามวันเต็ม', () => {
+  it('สมัครมาแล้วกี่วัน — แถบลาก 0 ถึงวันมากสุด (เจ้าของ 25 พ.ย. 2569) · ค่าเก่าแบบ "30+" อ่านไม่ออก = ไม่กรอง', () => {
     const fresh = app({ created_at: '2026-09-26T02:00:00Z' });
     const old = app({ created_at: '2026-08-01T02:00:00Z' });
     expect(applyApplicantFilters([fresh, old], state({ days: ['0-3'] }), facts())).toEqual([fresh]);
-    expect(applyApplicantFilters([fresh, old], state({ days: ['30+'] }), facts())).toEqual([old]);
+    expect(applyApplicantFilters([fresh, old], state({ days: ['30-60'] }), facts())).toEqual([old]);
+    expect(applyApplicantFilters([fresh, old], state({ days: ['30+'] }), facts())).toEqual([fresh, old]);
+    const d = buildApplicantFacets([fresh, old], state({ days: ['0-3'] }), facts()).find((x) => x.key === 'days')!;
+    expect(d.ui).toBe('range');
+    expect(d.range).toEqual({ min: 0, max: 57, from: 0, to: 3, unit: 'วัน' });
   });
 
   it('🔴 สมัครมาแล้ว นับครบ 24 ชม. = 1 วัน ตัวเดียวกับคอลัมน์บนตาราง (เจ้าของเคาะ 30 ก.ย. 2569)', () => {
@@ -148,9 +152,32 @@ describe('หัวข้ออื่นตามแบบร่าง', () => {
     expect(applyApplicantFilters([h95, h96], state({ days: ['4-7'] }), facts())).toEqual([h96]);
   });
 
-  it('ช่องทาง: ตารางช่องทางก่อน ไม่มีค่อยใช้ที่ผู้สมัครเลือก · เพศเป็นภาษาไทย', () => {
+  it('ช่องทาง: ตารางช่องทางก่อน ไม่มีค่อยใช้ที่ผู้สมัครเลือก · เป็นชั้น หลัก › รอง › กลุ่ม · เพศเป็นภาษาไทย', () => {
     const v = buildApplicantFacets([app({ channel_label: 'LINE OA' }), app()], EMPTY_APPLICANT_FILTER_STATE, facts());
     expect(v.find((x) => x.key === 'channel')!.options.map((o) => o.label).sort()).toEqual(['Facebook', 'LINE OA']);
+    const rows = [
+      app({ channel_label: 'Facebook · Facebook Group · หางานขับรถ ชลบุรี' }),
+      app({ channel_label: 'Facebook Group · กลุ่มหางานจังหวัด' }),
+      app({ channel_label: 'Webjob · Jobthai' }),
+    ];
+    const tree = buildApplicantFacets(rows, EMPTY_APPLICANT_FILTER_STATE, facts()).find((x) => x.key === 'channel')!;
+    expect(tree.ui).toBe('tree');
+    expect(tree.options.map((o) => [o.label, o.depth, o.count])).toEqual([
+      ['Facebook', 0, 2],
+      ['Facebook Group', 1, 2],
+      ['กลุ่มหางานจังหวัด', 2, 1],
+      ['หางานขับรถ ชลบุรี', 2, 1],
+      ['Webjob', 0, 1],
+      ['Jobthai', 1, 1],
+    ]);
+    // ติ๊กหลัก = ได้ทุกรองใต้หลัก · ติ๊กรอง = หลักหลุด (เจาะลง) · เอาหลักออก = ลูกหลุดตาม
+    expect(applyApplicantFilters(rows, state({ channel: ['Facebook'] }), facts())).toHaveLength(2);
+    let st = toggleApplicantFacetValue(state({ channel: ['Facebook'] }), 'channel', 'Facebook › Facebook Group › หางานขับรถ ชลบุรี');
+    expect(st.selection.channel).toEqual(['Facebook › Facebook Group › หางานขับรถ ชลบุรี']);
+    expect(applyApplicantFilters(rows, st, facts())).toEqual([rows[0]]);
+    st = toggleApplicantFacetValue(st, 'channel', 'Facebook › Facebook Group');
+    st = toggleApplicantFacetValue(st, 'channel', 'Facebook › Facebook Group');
+    expect(st.selection.channel).toEqual([]);
     expect(v.find((x) => x.key === 'gender')!.options.map((o) => o.label)).toEqual(['ชาย', 'หญิง', 'อื่น ๆ']);
   });
 
@@ -285,7 +312,8 @@ describe('ตัวกรองแท็บผู้สมัคร + การ�
     expect(applicantPrimaryFacets('appointments')).toEqual(APPLICANT_PRIMARY_FACETS);
     expect(RECRUIT_TAB_FACETS).toEqual([
       // BU บนสุด + ใกล้งานแค่ไหนต่อจากจังหวัด (เจ้าของ 24 พ.ย. 2569 · applicantArea2569-11-24)
-      'bu', 'recruiter', 'step', 'status', 'contactState', 'call', 'aiStatus', 'job', 'province', 'area', 'days', 'position', 'age', 'education', 'channel', 'gender',
+      // เจ้าของ 25 พ.ย. 2569: ตำแหน่งขึ้นมาใต้ BU
+      'bu', 'position', 'recruiter', 'step', 'status', 'contactState', 'call', 'aiStatus', 'job', 'province', 'area', 'days', 'age', 'education', 'channel', 'gender',
     ]);
     for (const tab of ['candidates', 'contact'] as const) {
       const f = buildApplicantFacets(rows, state({ province: ['ลพบุรี'] }), facts({ tab }));
@@ -315,7 +343,7 @@ describe('สถานะการตอบของ AI (เจ้าของ 2
   ];
   it('ค่า = คำบนคอลัมน์ "คำตอบกับ AI" ตรงตัว · ติ๊กแล้วเหลือเฉพาะแถวนั้น · มีแค่แท็บผู้สมัคร/การติดต่อ', () => {
     const f = buildApplicantFacets(rowsAi, EMPTY_APPLICANT_FILTER_STATE, facts()).find((x) => x.key === 'aiStatus')!;
-    expect(f.label).toBe('สถานะการตอบของ AI');
+    expect(f.label).toBe('คำตอบ AI'); // เจ้าของ 25 พ.ย. 2569 "เปลี่ยนเป็น คำตอบ Ai"
     const labels = f.options.map((o) => o.label);
     expect(labels).toContain('ส่ง AI แล้ว ยังไม่มีผล');
     expect(labels).toContain('ยังไม่ได้ส่งให้ AI');

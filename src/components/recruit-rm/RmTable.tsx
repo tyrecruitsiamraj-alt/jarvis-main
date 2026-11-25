@@ -319,7 +319,8 @@ const RmTable: React.FC<{
                   <th className="px-1.5 py-2 font-medium">เพศ</th>
                   <th className="px-1.5 py-2 text-right font-medium">อายุ</th>
                   <th className="px-1.5 py-2 font-medium">วันที่สมัคร</th>
-                  <th className="px-1.5 py-2 font-medium">คำตอบกับ AI</th>
+                  {/* กว้างขั้นต่ำ — เดิมถูกบีบจนคำตกบรรทัดทีละคำ (เจ้าของ 25 พ.ย. 2569 "เรียงไม่สวยเลย") */}
+                  <th className="min-w-40 px-1.5 py-2 font-medium">คำตอบกับ AI</th>
                   <th className="px-1.5 py-2 font-medium">สถานะ</th>
                 </>
               ) : (

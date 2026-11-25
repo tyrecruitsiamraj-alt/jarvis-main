@@ -321,6 +321,15 @@ const STANDALONE_KIND_SQL = `(select p.standalone_kind from ${tableInAppSchema('
   (select p.location_text from ${tableInAppSchema('recruit_postings')} p where p.id = a.posting_id and p.job_id is null) as posting_location`;
 // ↑ BU ของใบ (ตัวกรอง BU หน้าผู้สมัคร) + ที่ตั้งงานของกล่องลอย (ป้ายความใกล้ `applicantArea.ts`) — เจ้าของ 24 พ.ย. 2569
 
+/**
+ * ป้าย "ปล่อยจาก …" = ชื่อเล่น ไม่ใช่อีเมล (เจ้าของ 25 พ.ย. 2569 · กติกา `STAFF_NAME_SQL`) — ค่าที่จดไว้เป็นอีเมลของคนเก็บ
+ * จับบัญชีด้วยอีเมล → ชื่อเล่น › ชื่อในบัญชี › ส่วนหน้า @ · ค่าที่ไม่ใช่อีเมล (เช่น "… (ปิดบัญชีแล้ว)") คงเดิม
+ */
+const UNCLAIMED_FROM_NAME_SQL = `case when a.unclaimed_from_name like '%@%' then coalesce(
+    (select coalesce(nullif(btrim(uu.nickname), ''), nullif(btrim(uu.full_name), ''))
+       from ${tableInAppSchema('users')} uu where lower(uu.email) = lower(btrim(a.unclaimed_from_name)) limit 1),
+    nullif(split_part(btrim(a.unclaimed_from_name), '@', 1), '')) else a.unclaimed_from_name end as unclaimed_from_name`;
+
 const LIST_COLUMNS = `
   id, full_name, title_prefix, first_name, last_name, phone, age, gender,
   province, district, subdistrict, postal_code,
@@ -333,7 +342,7 @@ const LIST_COLUMNS = `
   is_lead, lead_by, lead_by_name, lead_at,
   selection_status, prep_checklist,
   dialed_first_at, dialed_last_at, dial_count,
-  unclaimed_at, unclaimed_from_name, call_choice, call_choice_at, call_choice_by_name,
+  unclaimed_at, ${UNCLAIMED_FROM_NAME_SQL}, call_choice, call_choice_at, call_choice_by_name,
   ${POSTING_OWNER_SQL},
   ${STANDALONE_KIND_SQL},
   ${applicationOriginColumn('a')}

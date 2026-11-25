@@ -19,7 +19,25 @@
 /** คำกลางของ "ไม่มีข้อมูลช่องนี้" — ให้กดกรองได้ (กติกาในแผน: ฟิลด์ไม่มีค่า = มีค่า "ไม่ระบุ") */
 export const UNSPECIFIED = '__none__';
 
-export type FacetUi = 'chip' | 'check';
+/**
+ * วิธีเลือก — chip ปุ่มวางต่อกัน · check รายการเรียงลงมา · range แถบลากช่วงตัวเลข (ค่า `ต่ำ-สูง`) ·
+ * tree รายการเป็นชั้น (ค่า = เส้นทาง `หลัก › รอง › …` · แถวมีค่าทุกชั้นของตัวเอง ⇒ ติ๊กแม่ = ได้ลูกทั้งหมด)
+ * (เจ้าของ 25 พ.ย. 2569 "เรียงลงมา … แบบลาก 0 ถึง n … ช่องทางหลัก เลือกแล้วค่อยโชว์ช่องทางรอง")
+ */
+export type FacetUi = 'chip' | 'check' | 'range' | 'tree';
+
+/** ตัวคั่นชั้นของหัวข้อแบบ tree */
+export const TREE_SEP = ' › ';
+
+/** ค่าของหัวข้อแบบ range = `ต่ำ-สูง` (จำนวนเต็ม) · อ่านไม่ออก = null (ไม่กรอง — URL เก่าแบบช่วงตายตัว เช่น `46+`) */
+export function parseRangeValue(v: string): [number, number] | null {
+  const m = /^(\d+)-(\d+)$/.exec(String(v).trim());
+  if (!m) return null;
+  const a = Number(m[1]);
+  const b = Number(m[2]);
+  return a <= b ? [a, b] : [b, a];
+}
+export const rangeValue = (from: number, to: number): string => `${Math.min(from, to)}-${Math.max(from, to)}`;
 
 /** สถานะขั้นต่ำที่เครื่องกรองต้องรู้ — หน้าไหนมีของเพิ่ม (ช่วงวันที่ ฯลฯ) ขยายเอาเอง */
 export type FacetState<K extends string> = {
@@ -40,11 +58,20 @@ export type FacetDef<T, K extends string, F, S extends FacetState<K> = FacetStat
   available?: (facts: F) => boolean;
   /** เส้นข้อมูลของหัวข้อนี้ยังโหลดไม่เสร็จ — หัวข้อยังอยู่ (ขึ้นกำลังโหลด) แต่ยังไม่กรอง (ห้ามตัดแถวทิ้งเพราะยังไม่รู้) */
   pending?: (facts: F) => boolean;
+  /** หน่วยของหัวข้อแบบ range (เช่น "ปี" "วัน") */
+  unit?: string;
   /** แถวนี้มีค่าอะไรบ้าง — คืนได้หลายค่า · คืน [] = แถวนี้ไม่อยู่ในหัวข้อนี้ (หัวข้อลูกก่อนเลือกแม่) */
   values: (row: T, facts: F, state: S) => string[];
 };
 
-export type FacetOption = { value: string; label: string; count: number; selected: boolean };
+export type FacetOption = {
+  value: string;
+  label: string;
+  count: number;
+  selected: boolean;
+  /** ชั้นของหัวข้อแบบ tree (0 = ชั้นบนสุด) */
+  depth?: number;
+};
 export type FacetView<K extends string = string> = {
   key: K;
   label: string;
@@ -54,6 +81,8 @@ export type FacetView<K extends string = string> = {
   selectedCount: number;
   /** เส้นข้อมูลยังโหลดไม่เสร็จ */
   pending?: boolean;
+  /** หัวข้อแบบ range — ขอบของแถบลาก (0 ถึงค่าสูงสุดในชุด) + ช่วงที่เลือกอยู่ + หน่วย */
+  range?: { min: number; max: number; from: number; to: number; unit: string };
 };
 
 /** ค่าที่ติ๊กจริงของหัวข้อนั้น (กรองของว่างออก) */
@@ -128,6 +157,17 @@ function rowPasses<T, K extends string, F, S extends FacetState<K>>(
     const want = selectedOf(state, d.key);
     if (want.length === 0) continue;
     const have = table.get(d.key)?.[i] ?? [];
+    if (d.ui === 'range') {
+      const ranges = want.map(parseRangeValue).filter((x): x is [number, number] => x !== null);
+      if (ranges.length === 0) continue;
+      const inRange = have.some((v) => {
+        if (v === UNSPECIFIED) return false;
+        const n = Number(v);
+        return Number.isFinite(n) && ranges.some(([a, b]) => n >= a && n <= b);
+      });
+      if (!inRange) return false;
+      continue;
+    }
     if (!have.some((v) => want.includes(v))) return false;
   }
   return true;
@@ -168,6 +208,29 @@ export function buildFacetViews<T, K extends string, F, S extends FacetState<K>>
       out.push({ key: d.key, label: d.label, ui: d.ui, searchable: Boolean(d.searchable), options: [], selectedCount: selected.length, pending: true });
       continue;
     }
+    if (d.ui === 'range') {
+      // แถบลาก 0 ถึงค่าสูงสุดในทั้งชุด (ไม่ขึ้นกับสิ่งที่ติ๊ก — ขอบแถบไม่ขยับตอนกรอง)
+      let max = 0;
+      for (const vals of table.get(d.key) ?? []) {
+        for (const v of vals) {
+          const n = Number(v);
+          if (v !== UNSPECIFIED && Number.isFinite(n)) max = Math.max(max, Math.ceil(n));
+        }
+      }
+      const picked = selected.map(parseRangeValue).find((x): x is [number, number] => x !== null) ?? null;
+      const from = picked ? Math.max(0, Math.min(picked[0], max)) : 0;
+      const to = picked ? Math.max(from, Math.min(picked[1], max)) : max;
+      out.push({
+        key: d.key,
+        label: d.label,
+        ui: d.ui,
+        searchable: false,
+        options: [],
+        selectedCount: picked ? 1 : 0,
+        range: { min: 0, max, from, to, unit: d.unit ?? '' },
+      });
+      continue;
+    }
     const universe = new Set<string>();
     // ลำดับของค่าเยอะ = จำนวนในทั้งชุด (ไม่ขึ้นกับสิ่งที่ติ๊ก) — ติ๊กแล้วตัวเลือกไม่สลับที่
     const baseCounts = new Map<string, number>();
@@ -192,6 +255,32 @@ export function buildFacetViews<T, K extends string, F, S extends FacetState<K>>
       count: counts.get(value) ?? 0,
       selected: selected.includes(value),
     }));
+
+    if (d.ui === 'tree') {
+      // เรียงแบบต้นไม้: แม่ตามด้วยลูกของตัวเอง · พี่น้องเรียงตามจำนวนในทั้งชุด · "ไม่ระบุ" ท้ายสุด
+      const parentOf = (v: string) => (v.includes(TREE_SEP) ? v.slice(0, v.lastIndexOf(TREE_SEP)) : '');
+      const kids = new Map<string, FacetOption[]>();
+      for (const o of options) {
+        o.depth = o.value === UNSPECIFIED ? 0 : o.value.split(TREE_SEP).length - 1;
+        const p = o.value === UNSPECIFIED ? '' : parentOf(o.value);
+        kids.set(p, [...(kids.get(p) ?? []), o]);
+      }
+      const bySize = (a: FacetOption, b: FacetOption) => {
+        if (a.value === UNSPECIFIED) return 1;
+        if (b.value === UNSPECIFIED) return -1;
+        return (baseCounts.get(b.value) ?? 0) - (baseCounts.get(a.value) ?? 0) || a.label.localeCompare(b.label, 'th');
+      };
+      const ordered: FacetOption[] = [];
+      const walk = (p: string) => {
+        for (const o of [...(kids.get(p) ?? [])].sort(bySize)) {
+          ordered.push(o);
+          if (o.value !== UNSPECIFIED) walk(o.value);
+        }
+      };
+      walk('');
+      out.push({ key: d.key, label: d.label, ui: d.ui, searchable: false, options: ordered, selectedCount: selected.length });
+      continue;
+    }
 
     if (d.order) {
       const order = d.order;

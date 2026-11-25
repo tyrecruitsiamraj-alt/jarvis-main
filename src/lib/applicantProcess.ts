@@ -3,7 +3,7 @@
  * เจ้าของเทียบหน้าผู้สมัครกับ iRecruit: *"เอาสถานะมาเพิ่มพอ · เอาตัวกรองที่ขาดมาเสริม"*
  *
  * iRecruit มี 3 ขั้น (การติดต่อ → การนัดหมาย → ติดตามการนัดหมาย) × 3 สถานะ (รอดำเนินการ · สำเร็จ · ไม่สำเร็จ)
- * และ "สถานะการติดต่อ" (ยังไม่โทร · โทรแล้ว · นัดสัมภาษณ์แล้ว) · คิดจากของที่ป๊อปรายละเอียดบันทึกอยู่แล้ว
+ * และ "สถานะการติดต่อ" (25 พ.ย. 2569 เป็น 5 ค่า: ยังไม่โทร · ติดต่อไม่ได้ · ติดต่อได้ · นัดได้ · นัดไม่สำเร็จ) · คิดจากของที่ป๊อปรายละเอียดบันทึกอยู่แล้ว
  * (ตัวเดียวกับขั้น 1-2-3 ในป๊อป — `applicantDetail.ts`) ไม่มีช่องใหม่ในฐาน:
  *   ผลติดตามนัด (089) → ขั้นติดตามนัด สำเร็จ (มา) / ไม่สำเร็จ (ไม่มา)
  *   มีวันนัด → นัดได้ · นัดที่เลื่อนมา → เลื่อนนัด (18 พ.ย. 2569 · เดิม เลื่อน = ไม่สำเร็จ)
@@ -11,6 +11,7 @@
  *   ยังไม่มีอะไร → ขั้นติดต่อ รอดำเนินการ
  */
 import type { PublicApplication } from '@/lib/publicApplicationsApi';
+import { CONNECTED_CALL_OUTCOMES } from '@/lib/callOutcomeBuckets';
 
 export type ProcessStep = 'contact' | 'appointment' | 'follow';
 /**
@@ -19,7 +20,11 @@ export type ProcessStep = 'contact' | 'appointment' | 'follow';
  * > ส่วนถ้านัดได้แล้วรอมาสมัครก็เปลี่ยนเป็น นัดได้"* · เลื่อนแล้วมีวันใหม่ = เลื่อนนัด · ยังไม่มีใครทำอะไร = รอดำเนินการ
  */
 export type ProcessState = 'pending' | 'booked' | 'rescheduled' | 'ok' | 'fail';
-export type ContactState = 'not_called' | 'called' | 'appointed';
+/**
+ * สถานะการติดต่อ 5 ค่าตามผลที่ลงจริง (เจ้าของ 25 พ.ย. 2569 Choice — เดิม 3 ค่า ยังไม่โทร · โทรแล้ว · นัดสัมภาษณ์แล้ว)
+ * คำเดียวกับปุ่มลงผลในป๊อป (ติดต่อได้ / ติดต่อไม่ได้ · นัดหมายสำเร็จ / ไม่สำเร็จ)
+ */
+export type ContactState = 'not_called' | 'unreached' | 'reached' | 'appointed' | 'appt_failed';
 
 export const PROCESS_STEP_LABEL: Record<ProcessStep, string> = {
   contact: 'การติดต่อ',
@@ -43,9 +48,12 @@ export const PROCESS_STATE_TONE: Record<ProcessState, 'warn' | 'info' | 'success
 };
 export const CONTACT_STATE_LABEL: Record<ContactState, string> = {
   not_called: 'ยังไม่โทร',
-  called: 'โทรแล้ว',
-  appointed: 'นัดสัมภาษณ์แล้ว',
+  unreached: 'ติดต่อไม่ได้',
+  reached: 'ติดต่อได้',
+  appointed: 'นัดได้',
+  appt_failed: 'นัดไม่สำเร็จ',
 };
+export const CONTACT_STATE_ORDER: readonly ContactState[] = ['not_called', 'unreached', 'reached', 'appointed', 'appt_failed'];
 
 type ProcessSource = Pick<
   PublicApplication,
@@ -79,15 +87,13 @@ export function applicantProcessOf(r: ProcessSource): { step: ProcessStep; state
 
 export function applicantContactStateOf(r: ProcessSource): ContactState {
   if (r.appointment_at) return 'appointed';
-  if (
-    r.last_call_outcome ||
-    typeof r.last_contact_ok === 'boolean' ||
-    (r.dial_count ?? 0) > 0 ||
-    r.ai_answer ||
-    r.last_call_status === 'completed' ||
-    r.last_call_status === 'failed'
-  ) {
-    return 'called';
+  // ผลที่คนลงในป๊อปชนะ (ติดต่อได้ / ไม่ได้ · นัดหมายไม่สำเร็จ)
+  if (r.last_contact_ok === true) return r.last_appointment_failed === true ? 'appt_failed' : 'reached';
+  if (r.last_contact_ok === false) return 'unreached';
+  // ไม่มีผลที่คนลง — ดูสายล่าสุด: คุยกันแล้ว (ยืนยัน · รับทราบ · ปฏิเสธ · ขอเลื่อน) หรือมีคำตอบ AI = ติดต่อได้
+  if ((CONNECTED_CALL_OUTCOMES as readonly string[]).includes(String(r.last_call_outcome ?? '')) || r.ai_answer) return 'reached';
+  if (r.last_call_outcome || (r.dial_count ?? 0) > 0 || r.last_call_status === 'completed' || r.last_call_status === 'failed') {
+    return 'unreached';
   }
   return 'not_called';
 }

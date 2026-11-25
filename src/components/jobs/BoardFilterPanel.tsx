@@ -27,7 +27,8 @@ import {
   type BoardFacetKey,
   type BoardSort,
 } from '@/lib/boardFilters';
-import { visibleFacetOptions, type FacetView } from '@/lib/facetEngine';
+import { Slider } from '@/components/ui/slider';
+import { TREE_SEP, rangeValue, visibleFacetOptions, type FacetOption, type FacetView } from '@/lib/facetEngine';
 
 /**
  * ═══ ตัวกรองของกล่องงาน + แท็บผู้สมัคร — เนื้อในชุดเดียว วางได้สองแบบ ═══
@@ -67,6 +68,94 @@ function IconCount({ n }: { n: number }) {
   );
 }
 
+/** แถวตัวเลือกแบบเรียงลงมา (ช่องติ๊ก · คำ · เลข) — ใช้ทั้งหัวข้อธรรมดาและหัวข้อเป็นชั้น */
+function OptionRow<K extends string>({
+  facetKey,
+  option: o,
+  onToggle,
+  indent = 0,
+}: {
+  facetKey: K;
+  option: FacetOption;
+  onToggle: (key: K, value: string) => void;
+  indent?: number;
+}) {
+  const id = `bf-${facetKey}-${o.value}`;
+  return (
+    <li className={cn(indent === 1 && 'pl-5', indent >= 2 && 'pl-10')}>
+      <label
+        htmlFor={id}
+        className={cn(
+          'flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1 hover:bg-secondary',
+          o.count === 0 && !o.selected && 'opacity-50',
+        )}
+      >
+        <Checkbox id={id} checked={o.selected} onCheckedChange={() => onToggle(facetKey, o.value)} />
+        <span className="min-w-0 flex-1 truncate text-xs text-foreground" title={o.label}>
+          {o.label}
+        </span>
+        <span className="shrink-0 text-xs tabular-nums text-muted-foreground">{o.count.toLocaleString('th-TH')}</span>
+      </label>
+    </li>
+  );
+}
+
+/**
+ * แถบลากช่วงตัวเลข 0 ถึงค่าสูงสุดในรายชื่อ (อายุ · จำนวนวันที่ผ่านมา — เจ้าของ 25 พ.ย. 2569)
+ * ลากระหว่างทางขยับแค่ตัวเลขบนหัว · ปล่อยมือแล้วค่อยกรอง · ลากกลับเต็มแถบ = ไม่กรอง
+ */
+function RangeBody<K extends string>({ facet, onToggle }: { facet: FacetView<K>; onToggle: (key: K, value: string) => void }) {
+  const r = facet.range;
+  const [draft, setDraft] = useState<[number, number] | null>(null);
+  if (!r || r.max <= 0) return <p className="px-2 text-xs text-muted-foreground">ไม่มีข้อมูล</p>;
+  const [from, to] = draft ?? [r.from, r.to];
+  return (
+    <div className="space-y-3 px-2 pb-1">
+      <p className="text-xs tabular-nums text-foreground" aria-live="polite">
+        {from.toLocaleString('th-TH')} – {to.toLocaleString('th-TH')} {r.unit}
+      </p>
+      <Slider
+        min={r.min}
+        max={r.max}
+        step={1}
+        value={[from, to]}
+        minStepsBetweenThumbs={0}
+        onValueChange={(v) => setDraft([v[0] ?? r.min, v[1] ?? r.max])}
+        onValueCommit={(v) => {
+          setDraft(null);
+          const a = v[0] ?? r.min;
+          const b = v[1] ?? r.max;
+          onToggle(facet.key, a <= r.min && b >= r.max ? '' : rangeValue(a, b));
+        }}
+        aria-label={facet.label}
+      />
+      <div className="flex justify-between text-xs tabular-nums text-muted-foreground">
+        <span>{r.min.toLocaleString('th-TH')}</span>
+        <span>{r.max.toLocaleString('th-TH')}</span>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * รายการเป็นชั้น หลัก › รอง › กลุ่ม (ช่องทาง — เจ้าของ 25 พ.ย. 2569) — ชั้นบนโชว์เสมอ ·
+ * ชั้นถัดไปโผล่ใต้แม่เมื่อเลือกแม่ (หรือเลือกลูกตัวใดตัวหนึ่งไว้) · เรียงลงมาแถวเดียวเหมือนหัวข้ออื่น
+ */
+function TreeBody<K extends string>({ facet, onToggle }: { facet: FacetView<K>; onToggle: (key: K, value: string) => void }) {
+  if (facet.options.length === 0) return <p className="px-2 text-xs text-muted-foreground">ไม่มีข้อมูล</p>;
+  const picked = facet.options.filter((o) => o.selected).map((o) => o.value);
+  const parentOf = (v: string) => (v.includes(TREE_SEP) ? v.slice(0, v.lastIndexOf(TREE_SEP)) : '');
+  const open = (parent: string) => picked.some((p) => p === parent || p.startsWith(`${parent}${TREE_SEP}`));
+  const shown = facet.options.filter((o) => (o.depth ?? 0) === 0 || open(parentOf(o.value)));
+  return (
+    <ul className="space-y-1">
+      {shown.map((o) => (
+        <OptionRow key={o.value} facetKey={facet.key} option={o} onToggle={onToggle} indent={o.depth ?? 0} />
+      ))}
+    </ul>
+  );
+}
+
 function FacetBody<K extends string>({
   facet,
   onToggle,
@@ -77,6 +166,8 @@ function FacetBody<K extends string>({
   const [query, setQuery] = useState('');
   // หัวข้อมีไว้รอเสมอ (เจ้าของ 11 พ.ย. 2569) — ยังโหลด/ไม่มีค่า = บอกในหัวข้อ ไม่ซ่อนหัวข้อ
   if (facet.pending) return <p className="px-2 text-xs text-muted-foreground">กำลังโหลด…</p>;
+  if (facet.ui === 'range') return <RangeBody facet={facet} onToggle={onToggle} />;
+  if (facet.ui === 'tree') return <TreeBody facet={facet} onToggle={onToggle} />;
   if (facet.options.length === 0) return <p className="px-2 text-xs text-muted-foreground">ไม่มีข้อมูล</p>;
   const { shown, hiddenCount } = facet.searchable
     ? visibleFacetOptions(facet.options, query)
@@ -115,28 +206,9 @@ function FacetBody<K extends string>({
         />
       ) : null}
       <ul className="space-y-1">
-        {shown.map((o) => {
-          const id = `bf-${facet.key}-${o.value}`;
-          return (
-            <li key={o.value}>
-              <label
-                htmlFor={id}
-                className={cn(
-                  'flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1 hover:bg-secondary',
-                  o.count === 0 && !o.selected && 'opacity-50',
-                )}
-              >
-                <Checkbox id={id} checked={o.selected} onCheckedChange={() => onToggle(facet.key, o.value)} />
-                <span className="min-w-0 flex-1 truncate text-xs text-foreground" title={o.label}>
-                  {o.label}
-                </span>
-                <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
-                  {o.count.toLocaleString('th-TH')}
-                </span>
-              </label>
-            </li>
-          );
-        })}
+        {shown.map((o) => (
+          <OptionRow key={o.value} facetKey={facet.key} option={o} onToggle={onToggle} />
+        ))}
       </ul>
       {shown.length === 0 ? <p className="px-2 text-xs text-muted-foreground">ไม่เจอค่าที่ตรงกับคำค้น</p> : null}
       {hiddenCount > 0 ? (
@@ -348,57 +420,48 @@ function FilterPanelHeader({
 }
 
 /**
- * แถบกรองด้านซ้ายแบบ iRecruit — แท็บรายชื่อผู้สมัคร / การโทรของฉัน / ติดตามนัดหมาย (เจ้าของสั่ง 28 ก.ย. 2569)
- * โชว์ตั้งแต่จอ sm (640px) ขึ้นไป · จอมือถือใช้ `FilterSheetButton` (เนื้อในชุดเดียวกัน)
- * ⚠️ เดิมเริ่มที่ xl — แต่เจ้าของดูในจอกว้าง ~750px เลยไม่เคยเห็นแถบข้างรายชื่อ (30 ก.ย. 2569)
- *    แถบกางแล้วตารางแคบลงได้ (เลื่อนข้างในตาราง) คอลัมน์ชื่ออยู่ซ้ายสุด ชื่อจึงยังเห็นเสมอ
+ * ═══ ตัวกรองลอยทับตาราง — แท็บผู้สมัคร / การติดต่อ / ติดตามนัดหมาย (เจ้าของ 25 พ.ย. 2569) ═══
+ * > *"ดูมันจะใช้ยากๆนะถ้าเป็นแบบนี้"* → Choice "ตัวกรองลอยทับตาราง ไม่บีบ"
+ * เดิม (30 ก.ย.) แถบกางอยู่ข้างรายชื่อ 224px ⇒ จอแคบตารางถูกบีบ คอลัมน์คำตอบ AI/สถานะตกบรรทัดทีละคำ
+ * ตอนนี้: ปุ่มไอคอนข้างรายชื่อ (ไม่มีคำ · เลขที่ติ๊กมุมปุ่ม) → กดแล้วแผงลอยลงมาทับตาราง ตารางเต็มกว้างเสมอ ·
+ * ติ๊กแล้วรายชื่อข้างหลังเปลี่ยนทันที · กดนอกแผง / กดพับ = หุบ · ตั้งแต่จอ sm — จอมือถือใช้ `FilterSheetButton`
  */
-export function FilterSidebar<K extends string>({
+export function FilterPopoverPanel<K extends string>({
+  open,
+  onOpenChange,
   onClear,
   resultText,
-  onCollapse,
   ...content
-}: FilterPanelProps<K> & {
-  /** พับแถบเก็บ (แท็บฝั่งผู้สมัคร · 30 ก.ย. 2569) — ไม่ส่ง = แถบกางถาวรแบบเดิม */
-  onCollapse?: () => void;
-}) {
+}: FilterPanelProps<K> & { open: boolean; onOpenChange: (open: boolean) => void }) {
   const n = selectedTotal(content.facets, content.sections);
   return (
-    <aside
-      aria-label="ตัวกรองเพิ่มเติม"
-      className="hidden w-56 shrink-0 self-start rounded-xl border border-border bg-card p-3 sm:block"
-    >
-      <FilterPanelHeader selected={n} onClear={onClear} resultText={resultText} onCollapse={onCollapse} />
-      <div className="mt-2">
-        <FilterAccordion {...content} />
-      </div>
-    </aside>
-  );
-}
-
-/**
- * ═══ แถบกรองพับ — ปุ่มไอคอนข้างรายชื่อ (แท็บฝั่งผู้สมัคร · เจ้าของสั่ง 30 ก.ย. 2569) ═══
- * > *"ตัวกรอง ฉันอยากได้แบบไว้ข้าง ๆ รายชื่อ แต่แบบกดแล้วกางออก แต่ชื่อก็ยังดูได้ พอกดก็หุบกลับไป"*
- * > *"ตัวกรองทำเป็นไอค่อน ไม่เอาคำว่าตัวกรอง มันดูใหญ่ไป"*
- * พับอยู่ = ปุ่มไอคอนเล็กชิดซ้ายของรายชื่อ (ไม่มีคำ · ติ๊กอยู่กี่ข้อแปะเลขที่มุม) · กด = กางเป็นแถบเต็ม (`FilterSidebar`)
- * ตารางยังอยู่ข้าง ๆ เห็นชื่อตลอด (ไม่ใช่แผงทับหน้า) · ตั้งแต่จอ sm ขึ้นไป — จอมือถือใช้ `FilterSheetButton`
- * `selected` = จำนวนที่ติ๊กอยู่ทั้งแถบ (รวมหัวข้อเพิ่ม เช่น วันที่สมัคร)
- */
-export function FilterRail({ selected, onExpand }: { selected: number; onExpand: () => void }) {
-  return (
-    <Button
-      type="button"
-      variant="outline"
-      size="iconXs"
-      onClick={onExpand}
-      aria-expanded={false}
-      aria-label={selected > 0 ? `กางตัวกรอง (ติ๊กอยู่ ${selected})` : 'กางตัวกรอง'}
-      title="กางตัวกรอง"
-      className={cn(triggerClass(selected > 0), 'relative m-3 hidden shrink-0 self-start sm:inline-flex')}
-    >
-      <SlidersHorizontal aria-hidden />
-      <IconCount n={selected} />
-    </Button>
+    <Popover open={open} onOpenChange={onOpenChange}>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          size="iconXs"
+          aria-expanded={open}
+          aria-label={n > 0 ? `ตัวกรอง (ติ๊กอยู่ ${n})` : 'ตัวกรอง'}
+          title="ตัวกรอง"
+          className={cn(triggerClass(n > 0), 'relative hidden shrink-0 sm:inline-flex')}
+        >
+          <SlidersHorizontal aria-hidden />
+          <IconCount n={n} />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent
+        align="start"
+        sideOffset={8}
+        aria-label="ตัวกรองเพิ่มเติม"
+        className="max-h-[75vh] w-72 overflow-y-auto p-3"
+      >
+        <FilterPanelHeader selected={n} onClear={onClear} resultText={resultText} onCollapse={() => onOpenChange(false)} />
+        <div className="mt-2">
+          <FilterAccordion {...content} />
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }
 

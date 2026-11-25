@@ -47,3 +47,35 @@ export function subChannelOf(label: string | null | undefined, referral: string 
   const pick = parts.length > 1 && isMain(parts[0]) ? parts[1] : parts[0];
   return CANONICAL.get(pick.toLowerCase()) ?? pick;
 }
+
+/**
+ * ═══ เส้นทางช่องทาง หลัก › รอง › กลุ่ม — ตัวกรอง "ช่องทาง" แบบเป็นชั้น (เจ้าของ 25 พ.ย. 2569) ═══
+ * > *"เอาเป็นช่องทางหลัก เลือกอันไหนค่อยโชว์ช่องทางรอง แล้วถ้าเลือกช่องทางรองแล้วในนั้นมีไรเพิ่มก็ค่อยลงมาอีก"*
+ * (แทนข้อ 28 ต.ค. "ขึ้นแค่ช่องทางรอง")
+ * - "หลัก · รอง · กลุ่ม" ตามตัวเลือกช่องทาง · ป้ายเก่าไม่มีหลักแต่ขึ้นต้นด้วยชื่อหลัก ("Facebook Group · กลุ่ม…") → หลักตามชื่อนั้น
+ * - iRecruit · Scrap และป้ายอื่นที่ไม่ใช่ 4 หลัก = เป็นหลักของตัวเอง · ไม่มีป้าย = ที่ผู้สมัครเลือกเอง (เป็นหลัก)
+ * - คืน [] = ไม่รู้ช่องทาง (ตัวกรองนับเป็น "ไม่ระบุ")
+ */
+export function channelPathOf(label: string | null | undefined, referral: string | null | undefined): string[] {
+  const canon = (s: string) => CANONICAL.get(s.toLowerCase()) ?? s;
+  const parts = String(label ?? '')
+    .split(' · ')
+    .map((p) => canon(p.trim()))
+    .filter(Boolean);
+  if (parts.length === 0) {
+    const r = referral as ApplicationReferralSource | null | undefined;
+    return r && r in REFERRAL_AS_CHANNEL ? [REFERRAL_AS_CHANNEL[r]] : [];
+  }
+  const head = parts[0];
+  const main = MAIN_CHANNEL_NAMES.find((m) => m.toLowerCase() === head.toLowerCase());
+  if (main) return [main, ...collapse(parts.slice(1))];
+  const prefixed = MAIN_CHANNEL_NAMES.find((m) => head.toLowerCase().startsWith(`${m.toLowerCase()} `));
+  if (prefixed) return [prefixed, ...collapse(parts)];
+  return [head, ...collapse(parts.slice(1))];
+}
+
+/** เหลือไม่เกิน 2 ชั้นใต้หลัก (รอง · กลุ่ม) — ชั้นที่ลึกกว่านั้นต่อท้ายชั้นกลุ่ม */
+function collapse(rest: string[]): string[] {
+  if (rest.length <= 2) return rest;
+  return [rest[0], rest.slice(1).join(' · ')];
+}
