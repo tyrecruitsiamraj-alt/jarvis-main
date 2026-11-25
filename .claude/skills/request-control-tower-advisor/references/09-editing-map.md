@@ -14721,3 +14721,8 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 ### 25 พ.ย. 2569 (3) — แบบทดสอบ: กันเดาวันเกิด + ลิงก์หมดอายุ
 - migration 199 `resume_fail_count` / `resume_locked_until` · `resumeQuizAttempt` (`api/_lib/skillQuiz.ts`) ผิด 5 ครั้งล็อก 24 ชม. (นับในฐาน) · `isQuizAttemptExpired` ใบยังไม่ส่งเกิน 7 วัน = 410
 - เทสต์ `tests/api/skillQuizResumeGuard2569-11-25.test.ts`
+
+### 25 พ.ย. 2569 (4) — ได้งานแล้วห้ามส่ง AI เสนองาน + กล่อง "นัดหมายไม่สำเร็จ" แท็บผู้สมัคร
+- `phonesWithWork` (`api/_lib/lumosDispatch.ts`): สายติดตามงานไม่ยกเลิกใน `EMPLOYED_FOLLOW_DAYS` (60) วัน ผลล่าสุดไม่ใช่ `no_show_start` · ด่านใน `insertQueueItems` (ไม่ใช่คิว follow) → `employed` + `EMPLOYED_REASON` ทุกเส้นเสนองาน · อ่านไม่ได้ = `guarded`
+- ชิป `appt_failed` (`recruitRm.ts` · `isAppointmentFailedReturn`) ตัดสินก่อนผลโทร · คอลัมน์คำตอบกับ AI (`applicantAiAnswerText.ts`)
+- เทสต์ `tests/api/employedNoOffer2569-11-25.test.ts`

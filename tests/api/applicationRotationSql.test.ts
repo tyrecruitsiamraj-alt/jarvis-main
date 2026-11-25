@@ -132,7 +132,7 @@ describe('ด่านถาวรอยู่ที่คอขวดเข้�
   it('คนที่ถูกคัดทุกเหตุผล ต้องไม่ถูกนับซ้ำเป็น "เคยส่งแล้ว"', () => {
     expect(src).toMatch(/!skippedSet\.has\(ref\)/);
     // ถังที่ไม่ได้ส่งต้องรวมครบทั้งสี่ ไม่ใช่แค่ held/declined เหมือนเดิม
-    expect(src).toMatch(/skippedSet = new Set\(\[\.\.\.held, \.\.\.suppressed, \.\.\.declined, \.\.\.guarded\]\)/);
+    expect(src).toMatch(/skippedSet = new Set\(\[\.\.\.held, \.\.\.suppressed, \.\.\.declined, \.\.\.guarded, \.\.\.employed\]\)/);
   });
 
   /** "กันไว้ก่อนเพราะตรวจไม่ได้" ต้องไม่ถูกรายงานว่า "เจ้าหน้าที่รับไปโทรเอง" */
