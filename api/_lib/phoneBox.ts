@@ -8,6 +8,7 @@
  *   ทีละกลุ่มแทน So Scraping · กติกาเจ้าของ 17 พ.ย.: ได้ 202 = นับว่าโพสต์แล้ว · ห้ามส่งซ้ำ (request_id เดิมเท่านั้น)
  */
 import { dbQuery, isPgUndefinedTable } from './postgres.js';
+import { phoneBoxGroupNamesOf } from '../../src/lib/phoneBoxPosts.js';
 import { tableInAppSchema } from './schema.js';
 import { decryptApiKey, encryptApiKey } from './aiSettingsStore.js';
 
@@ -145,6 +146,15 @@ export async function readPhoneBoxStatus(baseUrl: string, key: string, fetchImpl
   } catch (e) {
     if (e instanceof PhoneBoxError) return { ok: false, message: e.message };
     throw e;
+  }
+}
+
+/** ชื่อกลุ่มของบัญชีที่ phone-box (GET อย่างเดียว) · อ่านไม่ได้ = null — ใช้จำกัดกลุ่มในป๊อป Autopost (25 พ.ย. 2569) */
+export async function readPhoneBoxAccountGroupNames(baseUrl: string, key: string, accountId: string, fetchImpl: typeof fetch = fetch): Promise<string[] | null> {
+  try {
+    return phoneBoxGroupNamesOf(await getJson(baseUrl, `/v1/accounts/${encodeURIComponent(accountId)}/groups`, key, fetchImpl));
+  } catch {
+    return null;
   }
 }
 

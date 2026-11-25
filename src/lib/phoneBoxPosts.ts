@@ -54,3 +54,56 @@ export function phoneBoxStatusText(v: { status: string; published: boolean | nul
       return { text: v.status, tone: 'neutral' };
   }
 }
+
+/* ═══ กลุ่มของบัญชีมือถือ (เจ้าของ 25 พ.ย. 2569 · Choice "เลือกได้เฉพาะกลุ่มของบัญชี") ═══
+ * > "ดู jarvis ขาส่งงานมา phone box … มันส่งกลุ่มมาไม่ตรงเยอะเลย เหมือนมันไม่ใช่กลุ่มของ account นั้น"
+ * ต้นเหตุ: ป๊อป Autopost ให้ทุกบัญชีเลือกได้ทุกกลุ่มของ So Scraping (2 พ.ย. 2569 — So Scraping กดเข้าร่วมให้เอง)
+ * แต่มือถือโพสต์ได้เฉพาะกลุ่มที่บัญชีอยู่จริง ⇒ phone-box ตีกลับ "ถาวร: ไม่พบกลุ่มในรายชื่อของบัญชี" (OPL6910028 ตีกลับ 25/27)
+ * ⇒ บัญชีที่ส่งผ่าน phone-box เหลือเฉพาะกลุ่มที่ชื่อตรงกับรายชื่อกลุ่มของบัญชีนั้นที่ phone-box (GET /v1/accounts/{id}/groups)
+ * อ่านไม่ได้ = ไม่มีกลุ่มให้เลือก (ไม่ส่งมั่ว) · ป๊อปกับ server ใช้ `soGroupsOfAccount` ตัวเดียวกัน
+ */
+
+/** ชื่อกลุ่มเทียบกันได้ — ตัดช่องว่างล่องหน/ช่องว่างซ้ำ ตัวพิมพ์เล็ก */
+export function phoneBoxGroupKey(name: string | null | undefined): string {
+  return (name ?? '')
+    .normalize('NFC')
+    .replace(/[\u200b-\u200d\ufeff]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
+
+/** ชื่อกลุ่มจากคำตอบของ phone-box · ไม่มีรายการ / มีรายการแต่อ่านชื่อไม่ได้เลย = null (ถือว่าอ่านไม่ได้) */
+export function phoneBoxGroupNamesOf(body: unknown): string[] | null {
+  const list = (body as { groups?: unknown } | null)?.groups;
+  if (!Array.isArray(list)) return null;
+  const pick = (g: Record<string, unknown>) =>
+    [g.name, g.group_name, g.title, g.display_name].find((v): v is string => typeof v === 'string' && v.trim() !== '') ?? null;
+  const names = list.map((g) => (g && typeof g === 'object' ? pick(g as Record<string, unknown>) : null)).filter((v): v is string => Boolean(v));
+  return list.length > 0 && names.length === 0 ? null : names;
+}
+
+type AccountGroups = { id: string; groupIds: string[]; warning: string | null };
+type GroupOwners = { id: string; name: string | null; accountIds: string[] };
+
+/**
+ * จำกัดกลุ่มของบัญชีมือถือ — `groupIds` = กลุ่มของ So Scraping ที่ชื่อตรงกับรายชื่อของบัญชีที่ phone-box · ถอดบัญชีออกจาก `accountIds` ของกลุ่มอื่น
+ * `names` null = อ่านไม่ได้ ⇒ ไม่มีกลุ่ม + คำเตือน
+ */
+export function limitToPhoneBoxGroups<A extends AccountGroups, G extends GroupOwners>(
+  acc: A,
+  groups: readonly G[],
+  names: readonly string[] | null,
+): { account: A; groups: G[]; matched: number } {
+  const keys = new Set((names ?? []).map(phoneBoxGroupKey));
+  const mine = new Set(groups.filter((g) => keys.has(phoneBoxGroupKey(g.name))).map((g) => g.id));
+  return {
+    account: {
+      ...acc,
+      groupIds: [...mine],
+      warning: names === null ? 'อ่านรายชื่อกลุ่มของบัญชีมือถือไม่ได้ — ลองเปิดป๊อปใหม่' : acc.warning,
+    },
+    groups: groups.map((g) => (mine.has(g.id) || !g.accountIds.includes(acc.id) ? g : { ...g, accountIds: g.accountIds.filter((x) => x !== acc.id) })),
+    matched: mine.size,
+  };
+}

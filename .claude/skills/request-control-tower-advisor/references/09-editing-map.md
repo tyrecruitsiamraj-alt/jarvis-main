@@ -14750,3 +14750,9 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 - `MatchingPage` prop `lockedJob`: ไม่มีลิสต์/หัวหน้า · ไม่แตะ `?jobId=` · เนื้อแผงอยู่ `jobPanelBody` ใช้ทั้งแผงข้าง (Sheet) และแท็บในใบขอ · ไม่มีปุ่ม "ดูใบขอ"
 - ถอด `ScrapCandidatesPanel.tsx` (ไม่มีที่ใช้แล้ว) · ผัง Flow ระบบอัปเดต
 - ชื่อตำแหน่ง: `primaryJobRoleLabel` (`api/_lib/siamrajJobMapping.ts` ที่เดียว ทุกเส้นดึงใบขอ ERP) = ตำแหน่ง ERP ที่ไม่ใช่ "พนักงาน" + ประเภทงาน ("หัวหน้าไซด์ คนสวน") · เทสต์ `tests/api/positionTitlePrefix2569-11-25.test.ts`
+
+### 25 พ.ย. 2569 (8) — Autopost บัญชีมือถือ (phone-box) เลือกได้เฉพาะกลุ่มที่บัญชีอยู่จริง
+- ต้นเหตุ: ทุกบัญชีเห็นทุกกลุ่มของ So Scraping (2 พ.ย.) แต่มือถือโพสต์ได้แค่กลุ่มที่บัญชีอยู่ ⇒ phone-box ตีกลับ "ถาวร: ไม่พบกลุ่มในรายชื่อของบัญชี"
+- `withPhoneBoxAccounts` (`api/_lib/soScrapingOptions.ts`) อ่าน GET /v1/accounts/{id}/groups (`readPhoneBoxAccountGroupNames`) → `limitToPhoneBoxGroups` (`src/lib/phoneBoxPosts.ts`) แก้ `groupIds`/`accountIds` ⇒ ป๊อป + `soPickError` ใช้ `soGroupsOfAccount` ชุดเดียวกัน · เทียบชื่อด้วย `phoneBoxGroupKey` · อ่านไม่ได้ = ไม่มีกลุ่ม
+- กลุ่มที่อยู่ในมือถือแต่ไม่อยู่ในรายชื่อ So Scraping เลือกไม่ได้ (ยังไม่มี id) · เทสต์ `tests/api/phoneBoxAccountGroups2569-11-25.test.ts`
+- แถวคนจาก Scrap ที่อยู่ในการติดต่อของคนอื่น บอกชื่อคนเก็บ (`scrapRowAsApplication` เติม is_lead/lead_by_name/claimed) · แผงจับคู่บรรทัดตำแหน่งไม่ซ้ำคำ (`jobRoleParts`)

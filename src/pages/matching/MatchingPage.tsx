@@ -27,7 +27,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import type { JobRequest } from '@/types';
 import { useUnitRequestsFeed } from '@/hooks/useUnitRequestsFeed';
-import { jobBoardCardTitle, unitRequestCardTitle, unitRequestSearchBlob } from '@/lib/unitRequestDisplay';
+import { jobBoardCardTitle, jobRoleParts, unitRequestCardTitle, unitRequestSearchBlob } from '@/lib/unitRequestDisplay';
 import { publicJobTitle } from '@/lib/publicJobTitle';
 import { unitRequestPath } from '@/lib/jobNavigation';
 import { formatYmdDmyBe } from '@/lib/dateTh';
@@ -2331,13 +2331,8 @@ const MatchingPage: React.FC<{ embedded?: boolean; lockedJob?: JobRequest | null
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0 space-y-1">
                     <p className="text-base font-medium text-foreground">{unitRequestCardTitle(jobDetail)}</p>
-                    {[jobDetail.staff_title_name, jobDetail.job_description_code_1, jobDetail.job_description_code_2]
-                      .filter((v) => v && v !== 'ไม่ระบุ').length ? (
-                      <p className="text-sm text-foreground">
-                        {[jobDetail.staff_title_name, jobDetail.job_description_code_1, jobDetail.job_description_code_2]
-                          .filter((v) => v && v !== 'ไม่ระบุ')
-                          .join(' · ')}
-                      </p>
+                    {jobRoleParts(jobDetail).length ? (
+                      <p className="text-sm text-foreground">{jobRoleParts(jobDetail).join(' · ')}</p>
                     ) : null}
                   </div>
                   <div className="flex flex-wrap gap-2">

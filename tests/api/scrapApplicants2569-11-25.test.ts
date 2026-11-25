@@ -17,6 +17,7 @@ import {
 } from '../../src/lib/scrapApplicants';
 import { isScrapApplication, scrapSplitName, scrapWebOfChannel, type ScrapCandidateRow } from '../../src/lib/scrapCandidates';
 import { notSentReasonOf } from '../../src/lib/applicantAiAnswerText';
+import { jobRoleParts } from '../../src/lib/unitRequestDisplay';
 import { scrapVirtualStatus } from '../../src/lib/scrapApplicants';
 import type { PublicApplication } from '../../src/lib/publicApplicationsApi';
 import { EDITABLE_SCRIPT_DEFAULTS, KNOWN_PLACEHOLDERS, buildScrapQuestions } from '../../api/_lib/lumosCallScript';
@@ -125,6 +126,15 @@ describe('คำบนแถวของคนจาก Scrap (ตรวจบ�
     expect(scrapVirtualStatus({ view: 'not_sent', scrap: null }).title).toBe('ไม่ได้ส่ง AI');
     const t = read('src/components/recruit-rm/RmTable.tsx');
     expect(t).toContain("if (sw?.virtual && sw.view !== 'not_sent' && a !== 'view') {");
+  });
+  it('คนที่อยู่ในการติดต่อของคนอื่นแล้ว บรรทัดใต้ชื่อบอกว่าใครเก็บ', () => {
+    const a = scrapRowAsApplication(scrap({ in_jarvis: { application_id: 'x', is_lead: true, lead_by_name: 'แบงค์' } }));
+    expect(a.is_lead).toBe(true);
+    expect(a.lead_by_name).toBe('แบงค์');
+  });
+  it('บรรทัดตำแหน่งในแผงจับคู่ไม่ขึ้นคำซ้ำ', () => {
+    expect(jobRoleParts({ staff_title_name: 'หัวหน้าไซด์', job_description_code_1: 'หัวหน้าไซด์ คนสวน', job_description_code_2: 'ไม่ระบุ' })).toEqual(['หัวหน้าไซด์ คนสวน']);
+    expect(jobRoleParts({ staff_title_name: 'พนักงาน', job_description_code_1: 'ขับรถ', job_description_code_2: 'ผู้บริหาร' })).toEqual(['พนักงาน', 'ขับรถ', 'ผู้บริหาร']);
   });
   it('คำนำหน้าที่แยกเป็นคำไม่ใช่ชื่อ · ติดกับชื่อไม่เดาตัด', () => {
     expect(scrapSplitName('นาย ณัฐพล เกตุอินทร์')).toEqual({ first: 'ณัฐพล', last: 'เกตุอินทร์' });

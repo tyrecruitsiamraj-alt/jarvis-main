@@ -6,7 +6,8 @@
  * - ยังไม่ได้ใส่ key = อ่านจากฐานของ So Scraping แบบเดิม (`source: 'db'`) — ทางถอยจนกว่าจะได้ key
  * - ใส่ key แล้วเรียกไม่ได้ (401 / ล่ม) = บอกตรง ๆ ไม่ถอยไปฐานเงียบ ๆ
  */
-import { listPhoneBoxRoutes, phoneBoxRouteFor } from './phoneBox.js';
+import { getPhoneBoxKeyView, listPhoneBoxRoutes, phoneBoxRouteFor, readPhoneBoxAccountGroupNames, savedPhoneBoxKey } from './phoneBox.js';
+import { limitToPhoneBoxGroups } from '../../src/lib/phoneBoxPosts.js';
 import { dbQuery, isPgUndefinedTable } from './postgres.js';
 import { tableInAppSchema } from './schema.js';
 import { decryptApiKey, encryptApiKey } from './aiSettingsStore.js';
@@ -180,14 +181,31 @@ export async function fetchSoOptions(requestNo: string | null = null): Promise<S
 async function withPhoneBoxAccounts(o: SoOptions): Promise<SoOptions> {
   const routes = await listPhoneBoxRoutes().catch(() => []);
   if (routes.length === 0) return o;
-  return {
-    ...o,
-    accounts: o.accounts.map((a) =>
-      phoneBoxRouteFor(routes, a.name)
-        ? { ...a, phoneBox: true, status: 'ready', warning: null, pausedUntil: null, pauseReason: null, dailyCap: null, remainingToday: null, pendingGroups: 0, workerOnline: true }
-        : a,
-    ),
-  };
+  const marked = o.accounts.map((a) =>
+    phoneBoxRouteFor(routes, a.name)
+      ? { ...a, phoneBox: true, status: 'ready' as const, warning: null, pausedUntil: null, pauseReason: null, dailyCap: null, remainingToday: null, pendingGroups: 0, workerOnline: true }
+      : a,
+  );
+  /**
+   * กลุ่มของบัญชีมือถือ = เฉพาะกลุ่มที่บัญชีอยู่จริงที่ phone-box (เจ้าของ 25 พ.ย. 2569 "ส่งกลุ่มมาไม่ตรง … ไม่ใช่กลุ่มของ account นั้น")
+   * ใช้ทั้งป๊อป (รายชื่อให้ติ๊ก) และ server (`soPickError` → `soGroupsOfAccount`) · ไม่มีกุญแจ/อ่านไม่ได้ = ไม่มีกลุ่ม (ไม่ส่งมั่ว)
+   */
+  const key = await savedPhoneBoxKey().catch(() => null);
+  const baseUrl = key ? (await getPhoneBoxKeyView()).base_url : '';
+  let groups = o.groups;
+  const accounts: SoOptions['accounts'] = [];
+  for (const a of marked) {
+    if (!a.phoneBox) {
+      accounts.push(a);
+      continue;
+    }
+    const route = phoneBoxRouteFor(routes, a.name)!;
+    const names = key ? await readPhoneBoxAccountGroupNames(baseUrl, key, route.accountId) : null;
+    const r = limitToPhoneBoxGroups(a, groups, names);
+    groups = r.groups;
+    accounts.push(r.account);
+  }
+  return { ...o, accounts, groups };
 }
 
 /**

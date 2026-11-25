@@ -102,6 +102,17 @@ export function unitRequestSelectLabel(job: JobRequest): string {
 }
 
 /** ป้ายตำแหน่งบนบอร์ดประกาศสาธารณะ */
+/**
+ * บรรทัดตำแหน่งใต้ชื่อใบ (ตำแหน่ง · ประเภทงาน · รายละเอียด) — คำที่อยู่ในคำอื่นแล้วไม่ขึ้นซ้ำ
+ * (25 พ.ย. 2569 ชื่องานมีตำแหน่งนำหน้าแล้ว "หัวหน้าไซด์ คนสวน" ⇒ เดิมขึ้น "หัวหน้าไซด์ · หัวหน้าไซด์ คนสวน")
+ */
+export function jobRoleParts(job: Pick<JobRequest, 'staff_title_name' | 'job_description_code_1' | 'job_description_code_2'>): string[] {
+  const parts = [job.staff_title_name, job.job_description_code_1, job.job_description_code_2]
+    .map((v) => (v ?? '').trim())
+    .filter((v) => v && v !== 'ไม่ระบุ');
+  return parts.filter((p, i) => parts.indexOf(p) === i && !parts.some((q) => q !== p && q.includes(p)));
+}
+
 export function publicJobPositionLabel(job: JobRequest): string {
   return job.job_description_code_1?.trim() || JOB_TYPE_LABELS[job.job_type] || 'อื่นๆ';
 }

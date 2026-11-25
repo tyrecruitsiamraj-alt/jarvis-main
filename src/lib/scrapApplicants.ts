@@ -111,6 +111,10 @@ export function scrapRowAsApplication(s: ScrapCandidateRow, job?: JobInfo | null
     created_by_name: SO_SCRAPING_CREATED_BY,
     status: 'new',
     created_at: s.found_at ?? '',
+    // มีใบในการติดต่อของคนอื่นแล้ว — บรรทัด "ใครเก็บ" ใต้ชื่อบอกตามจริง (ไม่ใช่ "ยังไม่มีคนเก็บ")
+    is_lead: s.in_jarvis?.is_lead ?? undefined,
+    lead_by_name: s.in_jarvis?.lead_by_name ?? undefined,
+    claimed: s.in_jarvis?.claimed ?? undefined,
   };
 }
 
