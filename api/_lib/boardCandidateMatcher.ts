@@ -244,7 +244,7 @@ async function rankPool(
 ): Promise<{ matches: BoardCandidateMatch[]; shortlisted: number }> {
   const terms = seedTerms(spec, jobTitle);
   // 17 พ.ย. 2569: ตัดเพศ/อายุผิดเงื่อนไข แล้วเรียงตามความใกล้ก่อนตัด shortlist (เดิมคะแนนสกิลเท่ากันหมด ได้ 20 คนล่าสุดทั้งประเทศ)
-  // ที่ตั้งงาน = จังหวัดไซต์ใน ERP เท่านั้น (เจ้าของ 25 พ.ย. 2569 "ใบขอเราจะไม่เดา") — ใบที่ไม่มีถูกกันไว้ก่อนถึงตรงนี้แล้ว
+  // ที่ตั้งงาน = "สถานที่ทำงาน (ที่อยู่เต็ม)" ของ ERP เท่านั้น (เจ้าของ 25 พ.ย. 2569) — ใบที่ไม่มีจังหวัดถูกกันไว้ก่อนถึงตรงนี้แล้ว
   const area = jobAreaForMatch(job as Parameters<typeof jobAreaForMatch>[0]);
   const ordered = orderPoolForShortlist(job, area, pool, (c) => prescore(c, terms, jobTitle));
   const scored = ordered.scored;

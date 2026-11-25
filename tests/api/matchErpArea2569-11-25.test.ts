@@ -24,9 +24,8 @@ import { CALL_SCRIPT_TEMPLATES } from '../../api/_lib/lumosCallScript.templates'
 const MG = {
   id: 'siamraj-sql:OPL6911035',
   request_no: 'OPL6911035',
-  location_address: 'บริษัท เอ็มจี เซลส์ (ประเทศไทย) จำกัด',
-  erp_site_province: 'กรุงเทพมหานคร',
-  erp_site_district: null,
+  // "สถานที่ทำงาน (ที่อยู่เต็ม)" ของ ERP — ตัวอย่างใบที่เขียนจังหวัดครบ
+  location_address: '209 อาคารเคเคพี ทาวเวอร์ ถ.สุขุมวิท 21 (อโศก) แขวงคลองเตยเหนือ เขตวัฒนา กทม',
   gender_requirement: 'ชาย',
   age_range_min: 25,
   age_range_max: 50,
@@ -55,13 +54,15 @@ describe('ที่อยู่คน — ช่องจังหวัดว�
   });
 });
 
-describe('ที่ตั้งงาน = จังหวัดไซต์ใน ERP เท่านั้น', () => {
-  it('ใช้ erp_site_province ไม่แยกจากข้อความสถานที่ ไม่ใช้ค่าที่ทีมแก้', () => {
-    expect(jobAreaForMatch(MG).province).toBe('กรุงเทพมหานคร');
-    expect(jobAreaForMatch({ ...MG, erp_site_province: null }).province).toBeNull();
-    // ข้อความสถานที่มีจังหวัด หรือทีมใส่จังหวัดเอง ก็ไม่นับ — ERP ไม่มี = ไม่มี
+describe('ที่ตั้งงาน = "สถานที่ทำงาน (ที่อยู่เต็ม)" ของ ERP เท่านั้น (เจ้าของ 25 พ.ย. 2569)', () => {
+  it('อ่านจังหวัด/เขตจากที่อยู่เต็ม', () => {
+    expect(jobAreaForMatch(MG)).toEqual({ province: 'กรุงเทพมหานคร', district: 'วัฒนา' });
+  });
+  it('ไม่มีจังหวัดในที่อยู่ = ไม่รู้ (ไม่เดาจากชื่อบริษัท ไม่ใช้ค่าที่ทีมแก้ ไม่ใช้จังหวัดของไซต์)', () => {
+    expect(jobAreaForMatch({ location_address: 'บริษัท เอ็มจี เซลส์ (ประเทศไทย) จำกัด' }).province).toBeNull();
+    expect(jobAreaForMatch({ location_address: 'ตามที่ได้รับมอบหมาย' }).province).toBeNull();
     expect(
-      jobAreaForMatch({ ...MG, erp_site_province: null, location_address: 'ถ.สุขุมวิท เขตวัฒนา กรุงเทพมหานคร', override_province: 'กรุงเทพมหานคร' } as never).province,
+      jobAreaForMatch({ location_address: 'TMA บางบ่อ', override_province: 'สมุทรปราการ', erp_site_province: 'สมุทรปราการ' } as never).province,
     ).toBeNull();
   });
 });
@@ -71,9 +72,9 @@ describe('ใบขอ ERP ไม่ครบ = ไม่จับคู่ + �
     expect(matchBlockersOf(MG)).toEqual([]);
     expect(matchBlockedText([])).toBeNull();
   });
-  it('ไซต์ไม่มีจังหวัด → ขาดจังหวัดของไซต์', () => {
-    expect(matchBlockersOf({ ...MG, erp_site_province: null })).toEqual(['place']);
-    expect(matchBlockedText(['place'])).toBe('ไม่จับคู่ · ขาดในใบขอ ERP: จังหวัดของไซต์');
+  it('สถานที่ทำงานไม่มีจังหวัด → ขาดจังหวัดในสถานที่ทำงาน', () => {
+    expect(matchBlockersOf({ ...MG, location_address: 'ตามที่ได้รับมอบหมาย' })).toEqual(['place']);
+    expect(matchBlockedText(['place'])).toBe('ไม่จับคู่ · ขาดในใบขอ ERP: จังหวัดในสถานที่ทำงาน');
   });
   it('เพศว่าง/ไม่ระบุ · อายุไม่มีทั้งสองขั้น · รายได้ 0 → ขาด', () => {
     expect(matchBlockersOf({ ...MG, gender_requirement: 'ไม่ระบุ', age_range_min: null, age_range_max: null, total_income: 0 })).toEqual([
@@ -96,13 +97,6 @@ describe('ใบขอ ERP ไม่ครบ = ไม่จับคู่ + �
     expect(board.indexOf('matchBlockersOf(job)')).toBeLessThan(board.indexOf('analyzeCandidateSpecForJob(jobId, job'));
     const ir = readFileSync('api/_handlers/matching-irecruit-candidates.ts', 'utf8');
     expect(ir.indexOf('matchBlockersOf(')).toBeLessThan(ir.indexOf('matchIrecruitCandidatesForJob(jobId'));
-  });
-  it('ERP query ดึงจังหวัดไซต์ครบ 3 จุด (row · BASE_SQL · SELECT_COLUMNS)', () => {
-    const src = readFileSync('api/_lib/siamrajSqlServerRequests.ts', 'utf8');
-    expect(src).toContain('site_province_name: string | null;');
-    expect(src).toContain('AS site_province_name');
-    expect(src).toMatch(/SELECT_COLUMNS = `[\s\S]*site_province_name, site_district_name/);
-    expect(src).toContain('erp_site_province: r.site_province_name');
   });
 });
 

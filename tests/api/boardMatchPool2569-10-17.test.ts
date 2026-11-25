@@ -71,8 +71,8 @@ beforeEach(() => {
   failColumns.clear();
 });
 
-/** ใบขอ ERP ครบ (จังหวัดไซต์ · เพศ · อายุ · รายได้) — ไม่ครบไม่จับคู่ตั้งแต่ 25 พ.ย. 2569 (`matchBlockersOf`) */
-const ERP_COMPLETE = { erp_site_province: 'กรุงเทพมหานคร', gender_requirement: 'หญิง', age_range_min: 20, age_range_max: 50, total_income: 12000 };
+/** ใบขอ ERP ครบ (จังหวัดในสถานที่ทำงาน · เพศ · อายุ · รายได้) — ไม่ครบไม่จับคู่ตั้งแต่ 25 พ.ย. 2569 (`matchBlockersOf`) */
+const ERP_COMPLETE = { location_address: 'อาคารเคเคพี ทาวเวอร์ เขตวัฒนา กรุงเทพมหานคร', gender_requirement: 'หญิง', age_range_min: 20, age_range_max: 50, total_income: 12000 };
 
 describe('กองจับคู่งาน = ไม่มีงาน · Re Use · Drop', () => {
   it('รหัสถังตามบอร์ดจริง เรียงตามลำดับค้น · ไม่มี To do / In process / Done / งานรายวัน / Checklist', () => {
