@@ -3851,7 +3851,11 @@ const MatchingPage: React.FC<{ embedded?: boolean; lockedJob?: JobRequest | null
       <Sheet backClose={false} open={!!jobDetail} onOpenChange={(o) => !o && closeJob()}>
         <SheetContent
           side="right"
-          className="matching-sheet-scroll w-full overflow-y-auto [scrollbar-gutter:stable] sm:max-w-xl"
+          // โฉมใหม่เป็นตารางคน 7–8 คอลัมน์ — ป๊อปกว้างขึ้นให้เห็นครบไม่ต้องเลื่อนข้าง (ตรวจบนเว็บ 26 พ.ย. 2569)
+          className={cn(
+            'matching-sheet-scroll w-full overflow-y-auto [scrollbar-gutter:stable]',
+            classic ? 'sm:max-w-xl' : 'sm:max-w-4xl',
+          )}
         >
           {/* 20 ต.ค. 2569 เจ้าของ: "แก้หน้านี้ให้ดูสวย ดูง่าย ลดความเป็น AI · ใช้ shadcn · ระยะห่างเท่ากัน"
               ⇒ หัวใบขอเป็น Card เดียว · ป้ายเงื่อนไขเป็น Badge · ปุ่มเป็น Button · ตัดเลขใบขอที่ขึ้นซ้ำ */}
