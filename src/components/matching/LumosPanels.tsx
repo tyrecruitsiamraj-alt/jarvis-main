@@ -271,8 +271,9 @@ export function LumosSendBar({
               ล้างที่เลือก
             </Button>
           ) : null}
+          {/* ทึบสีกรมท่า คู่กับ "ส่ง AI โทร" สีเบอร์กันดี — เจ้าของ 26 พ.ย. 2569 "ปุ่มเก็บไปโทรเอง … จางมาก ไม่เด่นเลย" */}
           <Button
-            variant="outline"
+            variant="heroSolid"
             size="sm"
             type="button"
             disabled={act.holdSelf.disabled}
