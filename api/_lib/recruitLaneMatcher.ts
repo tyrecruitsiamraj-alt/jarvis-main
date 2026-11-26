@@ -13,11 +13,12 @@
  *   (iRecruit id 1234 กับ card_id 1234 คนละคน) แล้ว join กลับผิดตัวแบบเงียบ ๆ
  */
 import { aiChat } from './aiClient.js';
+import { jobAreaForMatch, orderPoolForShortlist } from '../../src/lib/matchProximity.js';
 import { logError, logInfo } from './logger.js';
 import { parseLenientJson } from './jsonRepair.js';
 import { listRecruitCandidatesByKeywords, listRecruitCandidatesForMatch } from './recruitRegisterSql.js';
 import { listSoRecruitLeadsForMatch } from './soRecruitLeadsSql.js';
-import { listBoardReadyCandidates, boardChecklistColumnId } from './boardCandidatesSql.js';
+
 import { loadBoardPhoneSet } from './applicationBoardLink.js';
 import { toE164Thai } from './thaiPhone.js';
 import {
@@ -163,19 +164,6 @@ async function loadSoRecruit(): Promise<SourceLoad> {
   }
 }
 
-async function loadChecklist(): Promise<SourceLoad> {
-  try {
-    const rows = await listBoardReadyCandidates({
-      columnIds: [boardChecklistColumnId()],
-      limit: MAX_CHECKLIST_POOL,
-      excludeInformed: true,
-    });
-    return { candidates: rows.map(fromChecklistCard), error: null };
-  } catch (e) {
-    return { candidates: [], error: e instanceof Error ? e.message : String(e) };
-  }
-}
-
 /**
  * ตัดคนที่ขึ้นบอร์ดถังอื่นแล้ว (= ได้ใบสมัครแล้ว → งานของคัดสรร) ออกจากกองสรรหา
  * คนจากถัง Checklist **ไม่ถูกตัด** ทั้งที่อยู่บนบอร์ด — ถังนั้นคือกองของเลนนี้เอง
@@ -309,10 +297,11 @@ export async function matchRecruitLaneCandidatesForJob(
   const dbKeywords = terms.filter((t) => t.length >= 3 && !t.includes(' '));
 
   // 3 แหล่งพร้อมกัน + เซ็ตเบอร์บนบอร์ด (ใช้ตัดคนที่ได้ใบสมัครแล้ว)
-  const [irecruit, soRecruit, checklist, boardPhones] = await Promise.all([
+  // 🔴 26 พ.ย. 2569 เจ้าของ Choice "ใช้กติกาเดียวกับจับคู่หลัก + ตัด Checklist" (กติกา 17 ต.ค. "เอาแค่ ไม่มีงาน reuse Drop ก็พอสำหรับการ match")
+  //    เจอจริง: OPL6911035 เลนนี้ส่ง AI โทรคนถัง Checklist ที่อยู่เพชรบูรณ์/สระแก้ว ให้งานบางนา
+  const [irecruit, soRecruit, boardPhones] = await Promise.all([
     loadIrecruit(dbKeywords, options?.owner),
     loadSoRecruit(),
-    loadChecklist(),
     loadBoardPhoneSet().catch(() => null),
   ]);
 
@@ -329,15 +318,9 @@ export async function matchRecruitLaneCandidatesForJob(
       loaded: soRecruit.candidates.length,
       error: soRecruit.error,
     },
-    {
-      source: 'checklist',
-      label: RECRUIT_SOURCE_LABEL.checklist,
-      loaded: checklist.candidates.length,
-      error: checklist.error,
-    },
   ];
 
-  const merged = [...checklist.candidates, ...soRecruit.candidates, ...irecruit.candidates];
+  const merged = [...soRecruit.candidates, ...irecruit.candidates];
   const { pool: deduped, droppedDuplicates } = dedupePoolByPhone(merged, toE164Thai);
   const { kept: pool, dropped: onBoardDropped } = dropCandidatesAlreadyOnBoard(
     deduped,
@@ -366,9 +349,16 @@ export async function matchRecruitLaneCandidatesForJob(
     board_check_unavailable: boardPhones === null,
   };
 
-  const scored = pool
-    .map((c) => ({ c, s: prescorePoolCandidate(c, terms, jobTitle) }))
-    .sort((a, b) => b.s - a.s);
+  // กติกาเดียวกับจับคู่หลัก (26 พ.ย. 2569): ตัดเพศ/อายุที่รู้ค่าและผิดเงื่อนไข · เรียงคนที่สกิลตรง → ใกล้งาน (ที่อยู่งานจาก ERP เท่านั้น)
+  const area = jobAreaForMatch(job as Parameters<typeof jobAreaForMatch>[0]);
+  const ordered = orderPoolForShortlist(
+    job,
+    area,
+    pool.map((c) => ({ ...c, sex_code: c.sex, province_name: null, amphur_name: null, full_address: c.location_label })),
+    (c) => prescorePoolCandidate(c, terms, jobTitle),
+  );
+  const areaByRef = new Map(ordered.scored.map((x) => [x.c.ref, x.a]));
+  const scored = ordered.scored.map(({ c, s }) => ({ c: c as RecruitPoolCandidate, s }));
 
   const family = isJobFamilyCode(spec.job_family_code)
     ? spec.job_family_code
@@ -416,7 +406,10 @@ export async function matchRecruitLaneCandidatesForJob(
 
   const matches: RecruitLaneMatch[] = ranked.map((r) => {
     const c = shortlist[r.index];
-    const tier = r.tier === 'green' || r.tier === 'red' ? r.tier : 'yellow';
+    const aiTier = r.tier === 'green' || r.tier === 'red' ? r.tier : 'yellow';
+    // ไม่มีที่อยู่ / คนละภาค ห้ามเขียว (ระบบตัดสิน ไม่ใช่ AI · เหมือนจับคู่หลัก)
+    const a = areaByRef.get(c.ref) ?? 3;
+    const tier = aiTier === 'green' && a >= 3 ? 'yellow' : aiTier;
     return {
       ...c,
       tier,

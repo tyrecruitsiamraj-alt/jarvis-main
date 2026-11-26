@@ -14782,3 +14782,8 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 ### 26 พ.ย. 2569 (1) — คำ "โพสต์แล้ว" → "โพสต์" ทั้งระบบ · กราฟรายสัปดาห์ Autopost/Scrap/Gen link/โพสต์ ในแท็บ Scale ลง
 - เจ้าของ "เปลี่ยนคำว่าโพสต์แล้วเป็น โพสต์ พอและทั้งหมดเลยนะ" — กติกาใน `src/lib/uiWords.ts` (banned 'โพสต์แล้ว') · เปลี่ยน 28 จุดใน src (คอมเมนต์ไม่แตะ)
 - เจ้าของขอกราฟเส้นรายเดือน แต่ข้อมูลมีแค่ ต.ค.–พ.ย. ⇒ รายสัปดาห์ (เริ่มจันทร์) `scaleWeekTable` (`src/lib/overviewScale.ts`) · การ์ด `scale-weeks` ใน `ScalePanel.tsx` (กราฟ 4 เส้น + ตารางเพิ่ม/ลดจากสัปดาห์ก่อน) · โพสต์ สัปดาห์ที่เริ่มก่อน `MANUAL_POSTED_SINCE` = "ยังไม่ได้นับ" · รวมทุกสัปดาห์ = กล่องของช่วง (เทสต์ใน `overviewScale.test.ts`)
+
+### 26 พ.ย. 2569 (2) — เลนสรรหาใช้กติกาเดียวกับจับคู่หลัก · ไม่ดึงถัง Checklist
+- เจ้าของ Choice "ใช้กติกาเดียวกับจับคู่หลัก + ตัด Checklist" — เจอจริง OPL6911035 เลนนี้ส่ง AI โทรคนถัง Checklist ที่อยู่เพชรบูรณ์/สระแก้ว
+- `recruitLaneMatcher.ts`: ถอด `loadChecklist` (กอง = iRecruit + So Recruit) · `orderPoolForShortlist` + `jobAreaForMatch` (ตัดเพศ/อายุ · เรียงใกล้งาน · ที่อยู่คนจาก `location_label`) · ไม่มีที่อยู่/คนละภาคห้ามเขียว
+- `matching-recruit-lane.ts`: `matchBlockersOf` → 422 ก่อนค้น · กติกา 30 วัน (`phonesBusyForMatchOffer`) ใช้กับเส้นนี้อยู่แล้ว (match_rank)

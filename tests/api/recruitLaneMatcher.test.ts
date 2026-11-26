@@ -180,8 +180,14 @@ describe('โครงเส้นทาง — handler ต่อของจร
     expect(src).toMatch(/loadMatchingBuScope\(req\.user\)/);
   });
 
-  it('matcher ตัดคน "แจ้งเข้าแล้ว" ออกจากถัง Checklist', () => {
-    expect(read('api/_lib/recruitLaneMatcher.ts')).toMatch(/excludeInformed: true/);
-    expect(read('api/_lib/boardCandidatesSql.ts')).toMatch(/ISNULL\(r\.is_inform, 'N'\) <> 'Y'/);
+  it('26 พ.ย. 2569: ไม่ดึงถัง Checklist แล้ว · ใช้กติกาเดียวกับจับคู่หลัก (ที่อยู่งาน ERP · ตัดเพศ/อายุ · ใบ ERP ไม่ครบไม่ค้น)', () => {
+    const m = read('api/_lib/recruitLaneMatcher.ts');
+    expect(m).not.toContain('loadChecklist');
+    expect(m).not.toContain('boardChecklistColumnId');
+    expect(m).toContain('jobAreaForMatch(job');
+    expect(m).toContain('orderPoolForShortlist(');
+    const h = read('api/_handlers/matching-recruit-lane.ts');
+    expect(h.indexOf('matchBlockersOf(')).toBeGreaterThan(-1);
+    expect(h.indexOf('matchBlockersOf(')).toBeLessThan(h.indexOf('matchRecruitLaneCandidatesForJob(jobId'));
   });
 });

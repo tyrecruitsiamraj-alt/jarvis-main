@@ -20,6 +20,7 @@ import { getSiamrajUnitRequestById } from '../_lib/siamrajUnitRequests.js';
 import { loadMatchingBuScope } from '../_lib/departmentScope.js';
 import { AI_NOT_CONFIGURED_MESSAGE, isAiConfigured } from '../_lib/aiClient.js';
 import { matchRecruitLaneCandidatesForJob } from '../_lib/recruitLaneMatcher.js';
+import { matchBlockedText, matchBlockersOf } from '../../src/lib/matchProximity.js';
 import { enqueueLumosInterviewForRecruitLane } from '../_lib/lumosDispatch.js';
 
 function getQuery(req: AuthedReq, key: string): string {
@@ -57,6 +58,12 @@ async function handler(req: AuthedReq, res: ApiRes) {
     const job = await getSiamrajUnitRequestById(jobId, await loadMatchingBuScope(req.user));
     if (!job) {
       return sendError(res, 404, 'Not found', 'ไม่พบใบขอ ERP');
+    }
+
+    // 🔴 ใบขอ ERP ไม่ครบ = ไม่ค้น ไม่ส่งโทร — กติกาเดียวกับจับคู่หลัก (26 พ.ย. 2569)
+    const blockedText = matchBlockedText(matchBlockersOf(job as Record<string, unknown>));
+    if (blockedText) {
+      return sendError(res, 422, 'Unprocessable', blockedText);
     }
 
     const result = await matchRecruitLaneCandidatesForJob(jobId, job as Record<string, unknown>, {
