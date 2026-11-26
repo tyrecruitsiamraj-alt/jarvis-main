@@ -37,6 +37,8 @@ import {
   RM_LIST_VIEWS_SHOWN,
   RM_LIST_VIEW_DEFAULT,
   RM_LIST_VIEW_LABEL,
+  RM_AI_SEND_BLOCKED,
+  aiSendBlockedReasonOf,
   type RmListView,
   telHref,
   type RmRowAction,
@@ -229,7 +231,8 @@ const RmWorkspace: React.FC<{
   const listView: RmListView = rmListViewFromParam(listParam) ?? RM_LIST_VIEW_DEFAULT;
   /** แท็บ Scrap — ชิปของตัวเอง (`?list=` ร่วมกัน ค่าเริ่ม = รายชื่อทั้งหมด) + ผลประเมิน (`?sres=`) */
   const scrapMode = scrap && tab === 'candidates';
-  const scrapView: ScrapListView = isScrapListView(listParam) ? listParam : 'all';
+  // ลิงก์เก่า ?list=not_sent (กล่องถอด 26 พ.ย. 2569) → พร้อมส่ง AI
+  const scrapView: ScrapListView = isScrapListView(listParam) ? listParam : listParam === 'not_sent' ? 'ready' : 'all';
   const sresParam = searchParams.get(SCRAP_RESULT_PARAM);
   const scrapResult: ScrapResult | null = SCRAP_RESULT_ORDER.find((x) => x === sresParam) ?? null;
   const [scrapRows, setScrapRows] = useState<ScrapCandidateRow[]>([]);
@@ -924,11 +927,29 @@ const RmWorkspace: React.FC<{
    * AI โทรได้เฉพาะใบที่มีใบขอ ⇒ ต้องเลือกก่อนถึงกดส่งได้ · ใบที่ผูกอยู่แล้วไม่ถูกย้าย (server เช็คอีกชั้น)
    */
   const [bindJobId, setBindJobId] = useState('');
+  /**
+   * คนที่ติ๊กมาจากกล่องที่ส่ง AI ไม่ได้ (26 พ.ย. 2569 · `aiSendBlockedReasonOf`) — ไม่เข้าป๊อปยืนยัน ส่งเฉพาะคนที่ส่งได้
+   * แล้วบอกในผลว่าข้ามใครเพราะอะไร (ทำไม่ได้ต้องเห็น)
+   */
+  const [aiPreSkipped, setAiPreSkipped] = useState<Array<{ name: string; reason: string }>>([]);
   const askSendAi = (ids: string[]) => {
     if (ids.length === 0) return;
     say(null);
+    const pre: Array<{ name: string; reason: string }> = [];
+    const ok: string[] = [];
+    for (const id of ids) {
+      const row = workRows.find((r) => r.id === id);
+      const why = row ? aiSendBlockedReasonOf(row) : null;
+      if (row && why) pre.push({ name: row.full_name, reason: why });
+      else ok.push(id);
+    }
+    if (ok.length === 0) {
+      say(summarizeCallChoice({ choice: 'ai', done: 0, skipped: pre }));
+      return;
+    }
+    setAiPreSkipped(pre);
     setBindJobId('');
-    setAiConfirmIds(ids);
+    setAiConfirmIds(ok);
   };
   const confirmSendAi = async () => {
     if (!aiConfirmIds || aiSending) return;
@@ -938,7 +959,7 @@ const RmWorkspace: React.FC<{
       // แท็บ Scrap: คนที่ยังไม่มีใบ สร้างใบก่อน (บท AI "เห็นประวัติบนเว็บ …") แล้วส่งด้วยเส้นเดียวกับผู้สมัคร
       const resolved = scrapMode ? await resolveScrapApplicationIds(aiConfirmIds) : { ids: aiConfirmIds, notes: [] as string[] };
       if (resolved.ids.length === 0) {
-        say(resolved.notes.join(' · ') || 'ไม่มีรายชื่อที่ส่งได้');
+        say([...resolved.notes, ...(aiPreSkipped.length > 0 ? [summarizeCallChoice({ choice: 'ai', done: 0, skipped: aiPreSkipped })] : [])].join('\n') || 'ไม่มีรายชื่อที่ส่งได้');
         setAiConfirmIds(null);
         setSelectedIds([]);
         load();
@@ -953,7 +974,7 @@ const RmWorkspace: React.FC<{
             ? { id: bindJob.id, title: publicJobPositionLabel(bindJob), unitName: bindJob.unit_name }
             : null,
       );
-      say([summarizeCallChoice(outcome), ...resolved.notes].join('\n'));
+      say([summarizeCallChoice({ ...outcome, skipped: [...aiPreSkipped, ...outcome.skipped] }), ...resolved.notes].join('\n'));
       setAiConfirmIds(null);
       setSelectedIds([]);
       load();
@@ -1453,6 +1474,8 @@ const RmWorkspace: React.FC<{
             onHoldSelected={tab === 'candidates' ? () => void keepSelectedForSelf() : undefined}
             holdingSelected={holdingSelected}
             onSendAiSelected={() => askSendAi(selectedIds)}
+            /* กล่องที่ส่ง AI ไม่ได้ = ปุ่มรวมกดไม่ได้ พร้อมเหตุ (26 พ.ย. 2569) */
+            sendAiBlockedReason={tab === 'candidates' && !bucket ? ((RM_AI_SEND_BLOCKED as Partial<Record<string, string>>)[scrapMode ? scrapView : listView] ?? null) : null}
             /* "ถอย Lead" — การติดต่อ ติ๊กแล้วโผล่ (5 ต.ค. 2569) · ย้ายกลับแท็บผู้สมัคร */
             onReleaseSelected={tab === 'contact' ? () => void releaseSelected() : undefined}
             releasing={releasing}

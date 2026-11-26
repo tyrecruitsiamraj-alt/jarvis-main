@@ -26,6 +26,7 @@ import {
   RM_ROW_ACTION_LABEL,
   DOCS_DISABLED_REASON,
   IRECRUIT_ADD_PENDING_REASON,
+  aiSendBlockedReasonOf,
   applicationAddressLabel,
   applicationJobLabel,
   applicationUnitLabel,
@@ -673,7 +674,7 @@ const RmTable: React.FC<{
                         }
                         // แท็บ Scrap: ไม่มีเบอร์ / อยู่ในการติดต่อ / อยู่ในผู้สมัครแล้ว = กดเก็บ/ส่งไม่ได้ บอกเหตุ (ดูรายละเอียดยังกดได้)
                         const sw = scrapOf?.(r);
-                        if (sw?.virtual && sw.view !== 'not_sent' && a !== 'view') {
+                        if (sw?.virtual && sw.view !== 'ready' && a !== 'view') {
                           disabled = true;
                           label = scrapVirtualStatus(sw).title;
                         }
@@ -686,6 +687,10 @@ const RmTable: React.FC<{
                           } else if (held || r.claimed) {
                             disabled = true;
                             label = 'มีคนเก็บไปโทรอยู่ · AI จะไม่โทรทับ';
+                          } else if (aiSendBlockedReasonOf(r)) {
+                            // กล่องที่ส่งไม่ได้ (26 พ.ย. 2569 · ใบขอยังไม่ตั้งรายได้ · เบอร์ถูกพัก · เคยปฏิเสธงานนี้ …)
+                            disabled = true;
+                            label = aiSendBlockedReasonOf(r) ?? label;
                           } else if (silentAi) {
                             label = 'ส่ง AI ใหม่';
                           }

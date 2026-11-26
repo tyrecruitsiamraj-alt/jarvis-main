@@ -98,8 +98,8 @@ describe('ชิปของแท็บ Scrap — ไม่ทับกัน �
     expect(view('a1b2c3d4-0000-4000-8000-000000000001')).toBe('interested');
     expect(view('a1b2c3d4-0000-4000-8000-000000000002')).toBe('scrap_contact');
     expect(view('a1b2c3d4-0000-4000-8000-000000000003')).toBe('scrap_applicant');
-    expect(view('a1b2c3d4-0000-4000-8000-000000000004')).toBe('not_sent');
-    expect(view(scrapVirtualId({ request_no: 'LBA6911012', candidate_id: '00000000-0000-4000-8000-00000000000d' }))).toBe('not_sent');
+    expect(view('a1b2c3d4-0000-4000-8000-000000000004')).toBe('ready');
+    expect(view(scrapVirtualId({ request_no: 'LBA6911012', candidate_id: '00000000-0000-4000-8000-00000000000d' }))).toBe('ready');
     expect(view(scrapVirtualId({ request_no: 'LBA6911012', candidate_id: '00000000-0000-4000-8000-00000000000f' }))).toBe('scrap_contact');
     expect(view(scrapVirtualId({ request_no: 'LBA6911012', candidate_id: '00000000-0000-4000-8000-000000000010' }))).toBe('scrap_no_phone');
     expect(rows.filter((r) => r.app.phone === '0899999999')).toHaveLength(1);
@@ -120,12 +120,12 @@ describe('คำบนแถวของคนจาก Scrap (ตรวจบ�
   it('ใบจาก Scrap ที่ยังไม่ส่ง = "Scrap ยังไม่กดส่ง AI" ไม่ใช่ "เพิ่มเอง/นำเข้า"', () => {
     expect(notSentReasonOf(app())).toBe('Scrap ยังไม่กดส่ง AI');
   });
-  it('คนที่ยังไม่มีใบ บอกชิปของตัวเอง · ปุ่มเก็บ/ส่งกดไม่ได้เมื่อไม่ใช่ "ไม่ได้ส่ง AI"', () => {
+  it('คนที่ยังไม่มีใบ บอกชิปของตัวเอง · ปุ่มเก็บ/ส่งกดไม่ได้เมื่อไม่ใช่ "พร้อมส่ง AI" (26 พ.ย. 2569)', () => {
     expect(scrapVirtualStatus({ view: 'scrap_no_phone', scrap: null }).title).toBe('ไม่มีเบอร์');
     expect(scrapVirtualStatus({ view: 'scrap_contact', scrap: scrap({ in_jarvis: { application_id: 'x', is_lead: true, lead_by_name: 'แบงค์' } }) }).detail).toBe('ของ แบงค์');
-    expect(scrapVirtualStatus({ view: 'not_sent', scrap: null }).title).toBe('ไม่ได้ส่ง AI');
+    expect(scrapVirtualStatus({ view: 'ready', scrap: null }).title).toBe('พร้อมส่ง AI');
     const t = read('src/components/recruit-rm/RmTable.tsx');
-    expect(t).toContain("if (sw?.virtual && sw.view !== 'not_sent' && a !== 'view') {");
+    expect(t).toContain("if (sw?.virtual && sw.view !== 'ready' && a !== 'view') {");
   });
   it('คนที่อยู่ในการติดต่อของคนอื่นแล้ว บรรทัดใต้ชื่อบอกว่าใครเก็บ', () => {
     const a = scrapRowAsApplication(scrap({ in_jarvis: { application_id: 'x', is_lead: true, lead_by_name: 'แบงค์' } }));

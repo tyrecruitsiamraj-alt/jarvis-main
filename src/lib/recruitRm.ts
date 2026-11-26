@@ -1,6 +1,7 @@
 import { fullDaysSince } from '@/lib/fullDays';
 import { toYmdBangkok } from '@/lib/dateTh';
-import { isOverAge } from '@/lib/applicantAge';
+import { isOverAge, OVER_AGE_REASON } from '@/lib/applicantAge';
+import { aiBlockBoxOf } from '@/lib/aiBlockReasons';
 import { aiQueueStatusOf } from '@/lib/applicantAiQueueStatus';
 import { isInterestedApplicant, isNotInterestedApplicant } from '@/lib/applicantCallOutcome';
 import type { UserRole } from '@/types';
@@ -196,6 +197,16 @@ export const RM_LIST_VIEWS = [
   'collect',
   'no_job',
   'appt_failed',
+  // 26 พ.ย. 2569 แยก "ไม่ได้ส่ง AI" เป็นกล่องตามเรื่อง (`aiBlockReasons.ts`)
+  'ready',
+  'request_closed',
+  'no_income',
+  'phone_paused',
+  'declined_job',
+  'employed',
+  'offered_recently',
+  'kept',
+  'no_name',
 ] as const;
 export type RmListView = (typeof RM_LIST_VIEWS)[number];
 
@@ -227,17 +238,68 @@ export type RmListView = (typeof RM_LIST_VIEWS)[number];
 // 3 พ.ย. 2569 (ต่อ) เจ้าของ "ไม่ได้ส่ง AI 744 แยก iRecruit ไม่ผูกใบขอ ออกมา" → 9 ชิป: + iRecruit (ดึงจาก iRecruit) · ไม่ผูกใบขอ
 // 25 พ.ย. 2569 เจ้าของ "ไอที่ดึงนัดหมายไม่สำเร็จออกมา แยกไปไว้อีกกล่องว่า นัดหมายไม่สำเร็จ" (Choice กล่องในแท็บผู้สมัคร) — ต่อจากไม่สนใจ
 // 25 พ.ย. 2569 เจ้าของ "หน้าผู้สมัคร แยกกล่องอายุเกินออกมาเลย" — ต่อจากไม่ได้ส่ง AI (เดิมยุบรวมไว้ 3 พ.ย.)
-export const RM_LIST_VIEWS_SHOWN = ['all', 'ai_waiting', 'no_pickup', 'interested', 'declined', 'appt_failed', 'ai_talked', 'not_sent', 'over_age', 'irecruit_pull', 'no_job'] as const satisfies readonly RmListView[];
+/**
+ * 🔴 26 พ.ย. 2569 เจ้าของ *"ไม่เอาแยกกล่องใครกล่องมันไปเลยจบ ก็ไม่ต้องมีคำว่าไม่ส่ง Ai แล้วแต่แยกมาเลยว่าเรื่องไหนที่ไม่ส่ง Ai"*
+ * กล่อง "ไม่ได้ส่ง AI" หายไป เหลือกล่องตามเรื่อง (`RM_NOT_SENT_VIEWS`) · ส่ง AI ได้เฉพาะกล่องที่ไม่อยู่ใน `RM_AI_SEND_BLOCKED`
+ */
+export const RM_NOT_SENT_VIEWS = [
+  'ready',
+  'request_closed',
+  'no_income',
+  'phone_paused',
+  'declined_job',
+  'bad_data',
+  'employed',
+  'offered_recently',
+  'kept',
+  'no_name',
+  'irecruit_dup',
+  'ai_cancelled',
+] as const satisfies readonly RmListView[];
+export type RmNotSentView = (typeof RM_NOT_SENT_VIEWS)[number];
+
+export const RM_LIST_VIEWS_SHOWN = [
+  'all',
+  'ai_waiting',
+  'no_pickup',
+  'interested',
+  'declined',
+  'appt_failed',
+  'ai_talked',
+  ...RM_NOT_SENT_VIEWS,
+  'over_age',
+  'irecruit_pull',
+  'no_job',
+] as const satisfies readonly RmListView[];
 export type RmShownView = (typeof RM_LIST_VIEWS_SHOWN)[number];
 
-/** ชิปเดิมที่ถูกยุบ → ชิปที่รวมมัน (ลิงก์เก่า/ตัวนับเก่าไม่ตาย) */
+/** ชิปเดิมที่ถูกยุบ → ชิปที่รวมมัน (ลิงก์เก่า/ตัวนับเก่าไม่ตาย) · ลิงก์เก่า "ไม่ได้ส่ง AI" → พร้อมส่ง AI */
 const RM_VIEW_ALIAS: Partial<Record<RmListView, RmShownView>> = {
   ai_at_risk: 'ai_waiting',
   retry_wait: 'ai_waiting',
-  irecruit_dup: 'not_sent',
-  bad_data: 'not_sent',
-  ai_cancelled: 'not_sent',
+  not_sent: 'ready',
 };
+
+/**
+ * กล่องที่ส่ง AI ไม่ได้ → เหตุที่ขึ้นบนปุ่ม (ปุ่มกดไม่ได้ · ติ๊กรวมกับกล่องอื่น = ส่งเฉพาะคนที่ส่งได้)
+ * ใบขอปิดแล้ว · ไม่ผูกใบขอ = ส่งได้ (ป๊อปยืนยันให้เลือกใบขอที่ยังเปิดก่อน — เจ้าของ 26 พ.ย. 2569 "เลือกใบขอที่ยังเปิด แล้วย้ายใบสมัครไป")
+ */
+export const RM_AI_SEND_BLOCKED: Partial<Record<RmShownView, string>> = {
+  no_income: 'ใบขอยังไม่ตั้งรายได้ — ตั้งรายได้ในป๊อปโพสต์ประกาศ แล้วระบบส่งให้เอง',
+  phone_paused: 'เบอร์ถูกพักอยู่ — ดูวันที่ AI โทรได้อีกในแถว',
+  declined_job: 'เคยปฏิเสธงานนี้แล้ว AI ไม่เสนอซ้ำ',
+  bad_data: 'เบอร์โทรผิด — แก้เบอร์ที่ดูรายละเอียดก่อน',
+  employed: 'ได้งานแล้ว AI ไม่เสนองานใหม่',
+  offered_recently: 'AI เพิ่งเสนองานคนนี้ — เก็บไปโทรเองได้',
+  kept: 'มีคนเก็บไปโทรเองอยู่',
+  no_name: 'ไม่มีชื่อ AI เรียกชื่อไม่ได้ — เก็บไปโทรเองแทน',
+  over_age: OVER_AGE_REASON,
+};
+
+/** ใบนี้ส่ง AI ไม่ได้เพราะอะไร (null = ส่งได้) — ตัวตัดสินเดียวของปุ่มรายแถวและปุ่มส่งรวม */
+export function aiSendBlockedReasonOf(r: PublicApplication): string | null {
+  return RM_AI_SEND_BLOCKED[rmShownViewOf(r)] ?? null;
+}
 
 /** ค่า ?list= → ชิปที่โชว์ (ชิปเดิมแปลงให้ · ไม่รู้จัก/collect = null ให้ผู้เรียกใช้ค่าเริ่ม) */
 export function rmListViewFromParam(v: string | null | undefined): RmShownView | null {
@@ -279,12 +341,23 @@ export const RM_LIST_VIEW_LABEL: Record<RmListView, string> = {
   retry_wait: 'รอติดต่อซ้ำ',
   // 20 ต.ค. 2569 เจ้าของ: "แก้คำ ยังไม่ได้ เป็น iRecruit" + Choice แยกกล่อง — ดึงจาก iRecruit (คนกดส่ง AI เอง) แยกจากที่ยังไม่ส่ง AI
   irecruit_pull: 'iRecruit',
+  // ลิงก์เก่าเท่านั้น (ถอดกล่อง 26 พ.ย. 2569 → `ready`)
   not_sent: 'ไม่ได้ส่ง AI',
-  // 27 ต.ค. 2569 เจ้าของ "ข้อมูลผิด เปลี่ยนเป็น เบอร์โทรผิด" (ชิปนี้ = เบอร์ใช้กับระบบโทรไม่ได้)
+  // 27 ต.ค. 2569 เจ้าของ "ข้อมูลผิด เปลี่ยนเป็น เบอร์โทรผิด" (ชิปนี้ = เบอร์ใช้กับระบบโทรไม่ได้ · คนรับไม่ใช่เจ้าของเบอร์)
   bad_data: 'เบอร์โทรผิด',
-  ai_cancelled: 'ยกเลิก',
+  ai_cancelled: 'ยกเลิกสาย AI',
   no_job: 'ไม่ผูกใบขอ',
   appt_failed: 'นัดหมายไม่สำเร็จ',
+  // 26 พ.ย. 2569 Choice "พร้อมส่ง AI" — ไม่มีอะไรติด กดส่งได้ทันที
+  ready: 'พร้อมส่ง AI',
+  request_closed: 'ใบขอปิดแล้ว',
+  no_income: 'ใบขอยังไม่ตั้งรายได้',
+  phone_paused: 'เบอร์ถูกพัก',
+  declined_job: 'เคยปฏิเสธงานนี้',
+  employed: 'ได้งานแล้ว',
+  offered_recently: 'AI เพิ่งเสนองาน',
+  kept: 'เก็บไปโทรเอง',
+  no_name: 'ไม่มีชื่อ',
   // คิวงานสรรหา (16 ส.ค.): สนใจจริง แต่ยังไม่ขึ้นบอร์ด (= ยังไม่ได้มาสมัคร)
   // "ขึ้นบอร์ดแล้ว" = on_board (server จับคู่เบอร์กับคนบนบอร์ด ERP) → ออกจากคิวเอง
   collect: 'รอเก็บใบสมัคร',
@@ -344,13 +417,24 @@ export function rmShownViewOf(r: PublicApplication): Exclude<RmShownView, 'all'>
     // AI โทรครบทุกรอบแล้วยังไม่ได้คำตอบ (needs_human) = จบฝั่ง AI แล้ว ไปตามผลที่ได้ · ที่เหลือ (รอสายแรก · นัดโทรซ้ำ · เงียบ · Lumos ไม่รับ) = รอโทร
     return q.kind === 'needs_human' ? talkedOrNot() : 'ai_waiting';
   }
-  if (r.last_call_status === 'cancelled') return 'not_sent';
+  if (r.last_call_status === 'cancelled') return 'ai_cancelled';
   const aiCalled =
     Boolean(r.ai_answer) || r.last_call_status === 'completed' || r.last_call_status === 'failed' || Boolean(r.last_call_prev_outcome);
   if (aiCalled) return talkedOrNot();
   if (r.created_by_name === IRECRUIT_PULL_CREATED_BY) return 'irecruit_pull';
   if (!r.job_id?.trim()) return 'no_job';
-  return 'not_sent';
+  return notSentViewOf(r);
+}
+
+/**
+ * ยังไม่ได้ส่ง AI → กล่องตามเรื่อง (26 พ.ย. 2569) · ลำดับ: คนเก็บไปโทรเอง → เบอร์ใช้กับระบบโทรไม่ได้ → ซ้ำ iRecruit →
+ * เหตุที่ตัวส่งจดไว้ (`ai_block_reason` · ตัวส่งซ้ำทุก 5 นาทีและปุ่มส่ง AI) → ไม่มีอะไรติด = พร้อมส่ง AI
+ */
+function notSentViewOf(r: PublicApplication): RmNotSentView {
+  if (r.claimed_by_name?.trim() || r.call_choice === 'manual') return 'kept';
+  if (r.phone_callable === false) return 'bad_data';
+  if (r.irecruit_dup_at) return 'irecruit_dup';
+  return aiBlockBoxOf(r.ai_block_reason) ?? 'ready';
 }
 
 export function isRmListView(v: string | null | undefined): v is RmListView {

@@ -121,7 +121,9 @@ describe('ด่านถาวรอยู่ที่คอขวดเข้�
   });
 
   it('มีเหตุผลรายงานให้ผู้ใช้เห็นว่าทำไมไม่ส่ง', () => {
-    expect(src).toContain("'เคยปฏิเสธงานนี้ไปแล้ว — ไม่เสนอซ้ำ'");
+    // ข้อความเหตุย้ายไป src/lib/aiBlockReasons.ts ที่เดียว (26 พ.ย. 2569) — ตัวส่งอ้างจากที่นั่น
+    expect(fs.readFileSync('src/lib/aiBlockReasons.ts', 'utf8')).toContain("'เคยปฏิเสธงานนี้ไปแล้ว — ไม่เสนอซ้ำ'");
+    expect(src).toContain('AI_BLOCK_REASON.declined');
   });
 
   /**
@@ -139,6 +141,7 @@ describe('ด่านถาวรอยู่ที่คอขวดเข้�
   /** "กันไว้ก่อนเพราะตรวจไม่ได้" ต้องไม่ถูกรายงานว่า "เจ้าหน้าที่รับไปโทรเอง" */
   it('แยก guarded ออกจาก held — คนละเหตุผล คนละวิธีแก้', () => {
     expect(src).toMatch(/guarded\.push\(item\.personRef\)/);
-    expect(src).toContain('ระบบตรวจบัญชีห้ามโทรไม่ได้ตอนนั้น');
+    expect(fs.readFileSync('src/lib/aiBlockReasons.ts', 'utf8')).toContain('ระบบตรวจบัญชีห้ามโทรไม่ได้ตอนนั้น');
+    expect(src).toContain('AI_BLOCK_REASON.guarded');
   });
 });

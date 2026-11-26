@@ -13,20 +13,20 @@ const CASES: Array<[Partial<PublicApplication>, string]> = [
   [{ last_call_outcome: 'confirmed', last_call_at: '2026-10-13T01:00:00Z' }, 'interested'],
   [{ last_call_outcome: 'declined', last_call_at: '2026-10-13T01:00:00Z' }, 'declined'],
   [{ age: 60 }, 'over_age'],
-  [{ irecruit_dup_at: '2026-10-10T00:00:00Z' }, 'not_sent'],
+  [{ irecruit_dup_at: '2026-10-10T00:00:00Z' }, 'irecruit_dup'],
   [{ last_call_status: 'pending', last_call_followup: 'needs_human', last_call_attempts: 3, last_call_prev_outcome: 'no_answer' }, 'no_pickup'],
   [{ last_call_status: 'failed', last_call_followup: 'needs_human', last_call_outcome: 'no_answer', ai_answer: { micro: 'no_pickup', at: null } }, 'no_pickup'],
   [{ last_call_status: 'pending', last_call_followup: 'retry_scheduled', last_call_attempts: 2, last_call_prev_outcome: 'busy', last_call_next_at: FUTURE }, 'ai_waiting'],
-  [{}, 'not_sent'],
+  [{}, 'ready'],
   [{ job_id: undefined }, 'no_job'],
-  [{ phone_callable: false }, 'not_sent'],
+  [{ phone_callable: false }, 'bad_data'],
   // 20 ต.ค. 2569: ดึงจาก iRecruit ยังไม่มีใครส่ง AI = กล่อง iRecruit แยกจาก "ยังไม่ส่ง AI"
   [{ created_by_name: 'iRecruit', job_id: undefined }, 'irecruit_pull'],
   [{ created_by_name: 'สมชาย', job_id: undefined }, 'no_job'],
   // ซ้ำ iRecruit แล้วกดส่ง AI จนตอบสนใจ = อยู่ "สนใจ" กล่องเดียว (เดิมอยู่สองกล่อง)
   [{ irecruit_dup_at: '2026-10-10T00:00:00Z', last_call_outcome: 'confirmed', last_call_at: '2026-10-13T01:00:00Z' }, 'interested'],
   [{ age: 60, irecruit_dup_at: '2026-10-10T00:00:00Z' }, 'over_age'],
-  [{ last_call_status: 'cancelled' }, 'not_sent'],
+  [{ last_call_status: 'cancelled' }, 'ai_cancelled'],
   // 27 ต.ค. 2569 เจ้าของ (คำสั่งล่าสุด): ไม่รับสายอยู่รอติดต่อซ้ำ · ครบ 3 ครั้ง = ไม่รับสาย (ไม่ใช่ไม่สนใจ)
   [{ last_call_status: 'failed', last_call_followup: 'needs_human', last_call_outcome: 'unresponsive', last_call_attempts: 3, last_call_at: '2026-10-27T05:00:00Z' }, 'no_pickup'],
   // เลยนัดโทรซ้ำแล้วยังไม่มีผล = ยังอยู่รอติดต่อซ้ำ (เดิมไป AI ไม่ได้ผล)
@@ -55,6 +55,8 @@ describe('ชิปแท็บผู้สมัคร แบ่งครบไ
     expect(rmListViewFromParam('over_age')).toBe('over_age');
     expect(rmListViewFromParam('irecruit_pull')).toBe('irecruit_pull');
     expect(rmListViewFromParam('no_pickup')).toBe('no_pickup');
+    // ลิงก์เก่า "ไม่ได้ส่ง AI" (ถอด 26 พ.ย. 2569) → พร้อมส่ง AI
+    expect(rmListViewFromParam('not_sent')).toBe('ready');
     expect(rmListViewFromParam('collect')).toBeNull();
     expect(rmListViewFromParam('xx')).toBeNull();
     // ชิปเดิมยังถามได้ (ตัวนับเก่า) = คำตอบเดียวกับชิปที่รวมมัน
@@ -74,7 +76,12 @@ describe('ทำไมยังไม่ส่ง AI (27 ต.ค. 2569)', () => 
   });
   it('ลำดับบนจอตามที่เจ้าของสั่ง', () => {
     // 25 พ.ย. 2569 กล่องอายุเกินแยกออกมาต่อจากไม่ได้ส่ง AI
-    expect(RM_LIST_VIEWS_SHOWN).toEqual(['all', 'ai_waiting', 'no_pickup', 'interested', 'declined', 'appt_failed', 'ai_talked', 'not_sent', 'over_age', 'irecruit_pull', 'no_job']);
+    // 26 พ.ย. 2569 "ไม่ได้ส่ง AI" แยกเป็นกล่องตามเรื่อง ต่อจากคุยแล้วไม่ได้คำตอบ
+    expect(RM_LIST_VIEWS_SHOWN).toEqual([
+      'all', 'ai_waiting', 'no_pickup', 'interested', 'declined', 'appt_failed', 'ai_talked',
+      'ready', 'request_closed', 'no_income', 'phone_paused', 'declined_job', 'bad_data', 'employed', 'offered_recently', 'kept', 'no_name', 'irecruit_dup', 'ai_cancelled',
+      'over_age', 'irecruit_pull', 'no_job',
+    ]);
   });
 });
 
@@ -92,7 +99,8 @@ describe('บรรทัดบนแถว = ชื่อชิป + ข้อ�
     const { rmRowStatusOf } = await import('@/lib/applicantAiAnswerText');
     const TITLE: Record<string, string> = {
       ai_waiting: 'รอ AI โทร', no_pickup: 'ไม่รับสาย', interested: 'สนใจ', declined: 'ไม่สนใจ',
-      ai_talked: 'คุยแล้วไม่ได้คำตอบ', not_sent: 'ไม่ได้ส่ง AI', over_age: 'อายุเกิน', irecruit_pull: 'iRecruit', no_job: 'ไม่ผูกใบขอ',
+      ai_talked: 'คุยแล้วไม่ได้คำตอบ', ready: 'พร้อมส่ง AI', irecruit_dup: 'ซ้ำ iRecruit', bad_data: 'เบอร์โทรผิด', ai_cancelled: 'ยกเลิกสาย AI',
+      over_age: 'อายุเกิน', irecruit_pull: 'iRecruit', no_job: 'ไม่ผูกใบขอ',
     };
     for (const [x, expected] of CASES) {
       const st = rmRowStatusOf(row(x));

@@ -65,6 +65,7 @@ import { addDays } from '../../src/lib/trends/timeBuckets.js';
 import { monthWindow, rangeWindow } from '../../src/lib/recruitOverviewWindow.js';
 import { fullDaysSince } from '../../src/lib/fullDays.js';
 import { isOverAge } from '../../src/lib/applicantAge.js';
+import { aiBlockBoxOf } from '../../src/lib/aiBlockReasons.js';
 import { isOutOfAreaAnswer } from '../../src/lib/outOfAreaAnswer.js';
 import { loadOnlineRequestRows } from '../_lib/homeOnlineSql.js';
 import { getUnitNotesMap } from '../_lib/siamrajUnitNotes.js';
@@ -442,9 +443,11 @@ export function methodOf(
 const IRECRUIT_LABEL = /^irecruit/i;
 
 /** เหตุที่ไม่ส่ง AI → กอง · ไม่มีเหตุ = ไม่ใส่ช่อง */
+/** ตัวแยกเหตุเดียวกับกล่องแท็บผู้สมัคร (`aiBlockBoxOf` · 26 พ.ย. 2569 — เหตุเบอร์พักแบบใหม่ "เคยบอก AI ว่าไม่สนใจ" ไม่มีคำว่า "พัก") */
 export function aiBlockOf(reason: string | null): { aiBlock?: 'income' | 'paused' | 'other' } {
-  if (!reason) return {};
-  return { aiBlock: /รายได้/.test(reason) ? 'income' : /พัก/.test(reason) ? 'paused' : 'other' };
+  const box = aiBlockBoxOf(reason);
+  if (!box) return {};
+  return { aiBlock: box === 'no_income' ? 'income' : box === 'phone_paused' ? 'paused' : 'other' };
 }
 
 /** อายุที่กรอก — ตัวเลข 1–99 เท่านั้น · อย่างอื่น = ไม่ระบุ (ห้ามนับเป็น 0 ปี) */

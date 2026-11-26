@@ -59,8 +59,10 @@ describe('ภาพรวม 8 เรื่อง — ตัวคำนวณ',
   });
 
   it('server: เหตุไม่ส่ง AI → กอง · ไม่มีเหตุ = ไม่ใส่ช่อง', () => {
-    expect(aiBlockOf('ใบขอนี้ยังไม่ได้ตั้งรายได้')).toEqual({ aiBlock: 'income' });
-    expect(aiBlockOf('เบอร์นี้ถูกพักโทร')).toEqual({ aiBlock: 'paused' });
+    // ข้อความจริงที่ตัวส่งจด (src/lib/aiBlockReasons.ts · 26 พ.ย. 2569 เลิกจับด้วยคำว่า "รายได้"/"พัก")
+    expect(aiBlockOf('ใบขอยังไม่ตั้งรายได้ — ตั้งรายได้ในป๊อปโพสต์ประกาศ (กล่องรายได้) ก่อน แล้วค่อยส่ง AI')).toEqual({ aiBlock: 'income' });
+    expect(aiBlockOf('เบอร์นี้ถูกพักอยู่')).toEqual({ aiBlock: 'paused' });
+    expect(aiBlockOf('เคยบอก AI ว่าไม่สนใจ · AI โทรได้อีก 3 ธ.ค.')).toEqual({ aiBlock: 'paused' });
     expect(aiBlockOf('อื่น ๆ')).toEqual({ aiBlock: 'other' });
     expect(aiBlockOf(null)).toEqual({});
   });

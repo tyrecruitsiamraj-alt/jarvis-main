@@ -411,21 +411,37 @@ const SUPPRESS_DAY_FMT = new Intl.DateTimeFormat('th-TH', { day: 'numeric', mont
  * เหตุที่ AI ไม่โทรเบอร์ที่ถูกพัก — คำที่ขึ้นบนจอเมื่อกดส่ง AI แล้วไม่เข้าคิว (เจ้าของ 26 พ.ย. 2569 Choice "บอกเหตุจริง + พักถึงวันไหน")
  * `until` = เวลาที่พักถึง (ISO/timestamp) · อ่านไม่ได้ = ไม่บอกวัน
  */
+const SUPPRESS_TEXT = {
+  declined: 'เคยบอก AI ว่าไม่สนใจ',
+  not_looking: 'แจ้งว่าไม่หางานแล้ว',
+  wrong_number: 'เบอร์ผิด / ไม่ใช่เจ้าตัว',
+  pdpa: 'ขอให้หยุดติดต่อ',
+  manual: 'เจ้าหน้าที่สั่งพักเบอร์',
+  other: 'เบอร์นี้ถูกพักอยู่',
+} as const;
+/** ต้นข้อความของเบอร์ที่ถูกพัก (ยกเว้นเบอร์ผิด) — ตัวแยกกล่อง "เบอร์ถูกพัก" ในแท็บผู้สมัครใช้ (`aiBlockReasons.ts`) */
+export const SUPPRESSION_LEAD: readonly string[] = [
+  SUPPRESS_TEXT.declined,
+  SUPPRESS_TEXT.not_looking,
+  SUPPRESS_TEXT.pdpa,
+  SUPPRESS_TEXT.manual,
+  SUPPRESS_TEXT.other,
+];
+/** พักเพราะคนรับไม่ใช่เจ้าของเบอร์ — ไปกล่อง "เบอร์โทรผิด" */
+export const SUPPRESSION_WRONG_NUMBER_LEAD = SUPPRESS_TEXT.wrong_number;
+
 export function suppressionReasonText(reason: string | null | undefined, until: string | null | undefined): string {
   const d = until ? new Date(until) : null;
   const when = d && !Number.isNaN(d.getTime()) ? ` · AI โทรได้อีก ${SUPPRESS_DAY_FMT.format(d)}` : '';
   switch (reason) {
     case 'declined':
-      return `เคยบอก AI ว่าไม่สนใจ${when}`;
     case 'not_looking':
-      return `แจ้งว่าไม่หางานแล้ว${when}`;
     case 'wrong_number':
-      return `เบอร์ผิด / ไม่ใช่เจ้าตัว${when}`;
-    case 'pdpa':
-      return 'ขอให้หยุดติดต่อ — AI ไม่โทร';
     case 'manual':
-      return `เจ้าหน้าที่สั่งพักเบอร์${when}`;
+      return `${SUPPRESS_TEXT[reason]}${when}`;
+    case 'pdpa':
+      return `${SUPPRESS_TEXT.pdpa} — AI ไม่โทร`;
     default:
-      return `เบอร์นี้ถูกพักอยู่${when}`;
+      return `${SUPPRESS_TEXT.other}${when}`;
   }
 }

@@ -21,6 +21,7 @@ import { isStaffKeyedApplication } from '../../src/lib/greetingCall.js';
 import { KEEP_PUSH_FAILED_SQL } from '../../src/lib/followDispatchState.js';
 import { dbQuery, isPgUndefinedTable } from './postgres.js';
 import { isOverAge, OVER_AGE_REASON } from '../../src/lib/applicantAge.js';
+import { AI_BLOCK_REASON } from '../../src/lib/aiBlockReasons.js';
 import { GREETING_JOB_REF } from '../../src/lib/greetingCall.js';
 import { isRequestClosedForApply } from './requestClosedForApply.js';
 import { loadApplyScriptFacts, type ApplyJobFacts } from './applyScriptFacts.js';
@@ -1011,32 +1012,28 @@ export type LumosDispatchOutcome = {
   skipped: Array<{ ref: string; name: string; reason: string }>;
 };
 
-const NO_PHONE_REASON = 'ไม่มีเบอร์มือถือที่ใช้โทรได้ (ต้องเป็นมือถือ 10 หลัก)';
 /**
- * 🔴 ใบขอไม่มีรายได้ = AI ไม่โทร (เจ้าของ 6 ต.ค. 2569 · Choice "ใบที่ข้อมูลไม่ครบ ไม่ให้ตัดบรรทัดทิ้ง —
- *    ไม่มีรายได้ก็ไม่ส่งให้ AI โทรจนกว่าจะตั้งรายได้") · เดิมบรรทัดรายได้หายเงียบ ผู้สมัครไม่รู้ว่าได้เงินเท่าไหร่
- * อ่านใบขอไม่ทัน (ERP ช้า/ล่ม) = ไม่ส่งเหมือนกัน แต่บอกคนละเหตุ (กดส่งใหม่ได้เลย ไม่ต้องไปตั้งรายได้)
+ * ข้อความเหตุที่ไม่ส่งทั้งหมดอยู่ `src/lib/aiBlockReasons.ts` ที่เดียว (26 พ.ย. 2569) — แท็บผู้สมัครอ่านข้อความเดียวกันกลับไปแยกกล่อง
+ * 🔴 ใบขอไม่มีรายได้ = AI ไม่โทร (6 ต.ค. 2569) · อ่านใบขอไม่ทัน = ไม่ส่งเหมือนกันแต่บอกคนละเหตุ (กดส่งใหม่ได้เลย)
+ * 🔴 GUARDED คนละเรื่องกับ HELD — "ระบบตรวจไม่ได้" ไม่ใช่ "มีคนจองไปแล้ว" ต้องบอกว่าลองใหม่ได้ (เจอจริง 24 ส.ค. 2569)
  */
-export const NO_INCOME_REASON = 'ใบขอยังไม่ตั้งรายได้ — ตั้งรายได้ในป๊อปโพสต์ประกาศ (กล่องรายได้) ก่อน แล้วค่อยส่ง AI';
-export const FACTS_UNREAD_REASON = 'อ่านรายได้ของใบขอไม่ทัน — ลองกดส่ง AI ใหม่อีกครั้ง';
-export const REQUEST_CLOSED_REASON = 'ใบขอปิดแล้ว — เลือกใบขอที่ยังเปิด หรือให้ AI ทักทายถามก่อน';
-const HELD_REASON = 'เจ้าหน้าที่รับไปโทรเองอยู่ — AI ไม่โทรทับ';
-export const SCRAP_NO_NAME_REASON = 'ไม่มีชื่อ (ซ่อนชื่อบนเว็บหางาน) AI เรียกชื่อไม่ได้ — เก็บไปโทรเองแทน';
+const NO_PHONE_REASON = AI_BLOCK_REASON.noPhone;
+export const NO_INCOME_REASON = AI_BLOCK_REASON.noIncome;
+export const FACTS_UNREAD_REASON = AI_BLOCK_REASON.factsUnread;
+export const REQUEST_CLOSED_REASON = AI_BLOCK_REASON.requestClosed;
+const HELD_REASON = AI_BLOCK_REASON.held;
+export const SCRAP_NO_NAME_REASON = AI_BLOCK_REASON.scrapNoName;
 const isScrapNoName = (name: string | null | undefined) => {
   const n = (name ?? '').trim();
   return !n || n === SCRAP_NAME_HIDDEN || n === SCRAP_NAME_MISSING;
 };
 /** สำรองเมื่อไม่รู้เหตุ — ปกติใช้ `suppressionReasonText` บอกเหตุจริง + วันที่ (26 พ.ย. 2569) */
-const SUPPRESSED_REASON = 'เบอร์นี้ถูกพักอยู่';
-const DECLINED_REASON = 'เคยปฏิเสธงานนี้ไปแล้ว — ไม่เสนอซ้ำ';
-const EMPLOYED_REASON = 'ได้งานแล้ว (มีสายติดตามงานใน 60 วัน) — ไม่เสนองานใหม่';
+const SUPPRESSED_REASON = AI_BLOCK_REASON.suppressed;
+const DECLINED_REASON = AI_BLOCK_REASON.declined;
+const EMPLOYED_REASON = AI_BLOCK_REASON.employed;
 /** จับคู่งาน 1 คน 1 ใบ (`phonesBusyForMatchOffer` · 25 พ.ย. 2569) */
-const MATCH_BUSY_REASON = 'AI เสนองานคนนี้ไปแล้วไม่นานนี้ หรือมีงานอื่นเสนออยู่ — โทรเองได้ที่ "เก็บไปโทรเอง"';
-/**
- * 🔴 คนละเรื่องกับ HELD — อันนี้คือ "ระบบตรวจไม่ได้" ไม่ใช่ "มีคนจองไปแล้ว"
- * ต้องบอกให้ชัดว่า **ลองใหม่ได้** ไม่งั้นคนนั่งรอสายที่ไม่มีวันออก (เจอจริง 24 ส.ค. 2569)
- */
-const GUARDED_REASON = 'ระบบตรวจบัญชีห้ามโทรไม่ได้ตอนนั้น จึงกันไว้ก่อน — กดส่งใหม่ได้';
+const MATCH_BUSY_REASON = AI_BLOCK_REASON.matchBusy;
+const GUARDED_REASON = AI_BLOCK_REASON.guarded;
 
 /** ผู้สมัคร "คนของเรา" ที่คนติ๊กเลือก → คิว reminder */
 export async function enqueueLumosReminderForSelected(

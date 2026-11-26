@@ -11,7 +11,7 @@
  * ตรรกะล้วน (เทสต์ `tests/api/scrapApplicants2569-11-25.test.ts`)
  */
 import type { PublicApplication } from './publicApplicationsApi';
-import { isInRmTab, rmShownViewOf, RM_LIST_VIEW_LABEL } from './recruitRm';
+import { isInRmTab, rmShownViewOf, RM_LIST_VIEW_LABEL, RM_NOT_SENT_VIEWS, type RmNotSentView } from './recruitRm';
 import {
   isScrapApplication,
   scrapChannelLabel,
@@ -42,10 +42,11 @@ export function parseScrapVirtualId(id: string): { requestNo: string; candidateI
 /** ใบขอจริงใน ERP ของเลขใบขอ (So Scraping ผูกด้วยเลขใบขอ) */
 export const scrapRequestJobId = (requestNo: string) => `siamraj-sql:${requestNo.toUpperCase()}`;
 
-/** ชิปของแท็บ Scrap — 8 อันแรกชุดเดียวกับแท็บผู้สมัคร (คำเดียวกัน) + 3 อันของ Scrap */
+/** ชิปของแท็บ Scrap — ชุดเดียวกับแท็บผู้สมัคร (คำเดียวกัน · ไม่มี iRecruit/ไม่ผูกใบขอ) + 3 อันของ Scrap */
 export const SCRAP_LIST_VIEWS = [
   'all',
-  'not_sent',
+  // 26 พ.ย. 2569 แยก "ไม่ได้ส่ง AI" เป็นกล่องตามเรื่อง ชุดเดียวกับแท็บผู้สมัคร
+  ...RM_NOT_SENT_VIEWS,
   'over_age',
   'ai_waiting',
   'no_pickup',
@@ -62,7 +63,7 @@ export type ScrapRowView = Exclude<ScrapListView, 'all'>;
 
 export const SCRAP_LIST_VIEW_LABEL: Record<ScrapListView, string> = {
   all: RM_LIST_VIEW_LABEL.all,
-  not_sent: RM_LIST_VIEW_LABEL.not_sent,
+  ...(Object.fromEntries(RM_NOT_SENT_VIEWS.map((v) => [v, RM_LIST_VIEW_LABEL[v]])) as Record<RmNotSentView, string>),
   over_age: RM_LIST_VIEW_LABEL.over_age,
   ai_waiting: RM_LIST_VIEW_LABEL.ai_waiting,
   no_pickup: RM_LIST_VIEW_LABEL.no_pickup,
@@ -124,7 +125,7 @@ export function scrapViewOfApplication(app: PublicApplication): ScrapRowView {
   if (!isInRmTab(app, 'candidates')) return 'scrap_contact';
   const v = rmShownViewOf(app);
   // ใบจาก Scrap ผูกใบขอเสมอ และไม่ใช่รายชื่อ iRecruit — สองชิปนี้ของแท็บผู้สมัครไม่มีทางเกิด ถ้าเกิดให้ถือว่ายังไม่ส่ง
-  return v === 'irecruit_pull' || v === 'no_job' ? 'not_sent' : v;
+  return v === 'irecruit_pull' || v === 'no_job' ? 'ready' : v;
 }
 
 /**
@@ -162,7 +163,7 @@ export function buildScrapWorkRows(
           : 'scrap_applicant'
         : isOverAge(s.age)
           ? 'over_age'
-          : 'not_sent';
+          : 'ready';
     out.push({ app: scrapRowAsApplication(s, jobOf(scrapRequestJobId(s.request_no))), scrap: s, view, virtual: true });
   }
   for (const a of apps) {
@@ -185,7 +186,7 @@ export function scrapVirtualStatus(w: Pick<ScrapWorkRow, 'view' | 'scrap'>): {
     return { title: SCRAP_LIST_VIEW_LABEL.scrap_contact, detail: inj?.lead_by_name ? `ของ ${inj.lead_by_name}` : null, tone: 'info' };
   if (w.view === 'over_age') return { title: SCRAP_LIST_VIEW_LABEL.over_age, detail: OVER_AGE_REASON, tone: 'warn' };
   if (w.view === 'scrap_applicant') return { title: SCRAP_LIST_VIEW_LABEL.scrap_applicant, detail: 'สมัครใบขอนี้มาเองแล้ว', tone: 'info' };
-  return { title: SCRAP_LIST_VIEW_LABEL.not_sent, detail: SCRAP_NOT_SENT_REASON, tone: 'neutral' };
+  return { title: SCRAP_LIST_VIEW_LABEL.ready, detail: SCRAP_NOT_SENT_REASON, tone: 'neutral' };
 }
 
 /** ผลประเมินของแถว — ใบที่ So Scraping ไม่มีคนนั้นแล้ว = ยังไม่ประเมิน */

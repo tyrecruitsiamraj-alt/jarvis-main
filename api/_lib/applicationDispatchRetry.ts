@@ -29,6 +29,7 @@ import { getLumosPushConfig } from './lumosPushClient.js';
 import { isAutoDispatchEnabled } from './incomeReadyDispatch.js';
 import { OVER_AGE_MIN } from '../../src/lib/applicantAge.js';
 import { logError, logInfo } from './logger.js';
+import { recordAiBlockReasons } from './aiBlockRecord.js';
 
 const APPS = tableInAppSchema('public_job_applications');
 const QUEUE = tableInAppSchema('lumos_dispatch_queue');
@@ -111,31 +112,8 @@ function unsentSql(linked: boolean): string {
     limit ${LIMIT}`;
 }
 
-/**
- * จดเหตุที่ยังไม่ส่งไว้กับใบ (169 · เจ้าของ 28 ต.ค. 2569 "ทำไมไม่โทร") — จอแท็บผู้สมัครโชว์เหตุจริงแทน "ยังไม่กดส่ง AI"
- * เขียนเฉพาะตอนเหตุเปลี่ยน · จดไม่ได้ (ยังไม่รัน 169) = ข้าม ไม่ทำให้รอบส่งล้ม
- */
-export async function recordAiBlockReasons(skipped: ReadonlyArray<{ ref: string; reason: string }>): Promise<void> {
-  const ids: string[] = [];
-  const reasons: string[] = [];
-  for (const s of skipped) {
-    const m = /^app-([0-9a-f-]{36})$/i.exec(s.ref);
-    if (!m) continue;
-    ids.push(m[1]);
-    reasons.push(s.reason);
-  }
-  if (ids.length === 0) return;
-  try {
-    await dbQuery(
-      `update ${APPS} a set ai_block_reason = v.reason, ai_block_at = now()
-         from unnest($1::uuid[], $2::text[]) as v(id, reason)
-        where a.id = v.id and a.ai_block_reason is distinct from v.reason`,
-      [ids, reasons],
-    );
-  } catch (e) {
-    logError('applicationDispatchRetry.block_reason_failed', e);
-  }
-}
+/** จดเหตุที่ยังไม่ส่งไว้กับใบ — ย้ายไป `aiBlockRecord.ts` (ปุ่ม "ส่ง AI โทร" ใช้ด้วย · 26 พ.ย. 2569) */
+export { recordAiBlockReasons };
 
 export function isApplicationDispatchRetryEnabled(): boolean {
   if ((process.env.APPLICATION_DISPATCH_RETRY_ENABLED || '').trim().toLowerCase() === 'false') return false;

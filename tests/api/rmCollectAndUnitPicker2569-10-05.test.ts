@@ -11,7 +11,9 @@ import { RM_LIST_VIEWS, RM_LIST_VIEWS_SHOWN, RM_LIST_VIEW_DEFAULT, isShownRmList
 describe('ปุ่มมุมมองแท็บผู้สมัคร', () => {
   it('โชว์ 3 ปุ่ม ไม่มีรอเก็บใบสมัคร · นิยาม collect ยังอยู่', () => {
     // + "อายุเกิน" (5 ต.ค. 2569 · 58 ปีขึ้นไป AI ไม่โทร)
-    expect([...RM_LIST_VIEWS_SHOWN]).toEqual(['all', 'ai_waiting', 'no_pickup', 'interested', 'declined', 'appt_failed', 'ai_talked', 'not_sent', 'over_age', 'irecruit_pull', 'no_job'] /* + อายุเกิน 25 พ.ย. 2569 */);
+    // ลำดับเต็มคุมที่ src/lib/recruitRmRestViews.test.ts (26 พ.ย. 2569 "ไม่ได้ส่ง AI" แยกเป็นกล่องตามเรื่อง)
+    expect(RM_LIST_VIEWS_SHOWN).toContain('over_age');
+    expect(RM_LIST_VIEWS_SHOWN).not.toContain('not_sent');
     expect(RM_LIST_VIEWS).toContain('collect');
     expect(isShownRmListView('collect')).toBe(false);
     expect(isShownRmListView('interested')).toBe(true);

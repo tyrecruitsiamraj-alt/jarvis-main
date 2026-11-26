@@ -29,7 +29,9 @@ describe('ตัวตัดสินอายุเกิน', () => {
 describe('กล่อง "อายุเกิน" บนแท็บผู้สมัคร', () => {
   it('ปุ่มอยู่คู่กับสนใจ/ไม่สนใจ · เลือกแล้วเหลือเฉพาะคน 58 ขึ้นไป · ทั้งหมดยังเห็นทุกคน', () => {
     // 25 พ.ย. 2569 เจ้าของ "แยกกล่องอายุเกินออกมาเลย" — ต่อจากไม่ได้ส่ง AI (3 พ.ย. เคยยุบรวม)
-    expect([...RM_LIST_VIEWS_SHOWN]).toEqual(['all', 'ai_waiting', 'no_pickup', 'interested', 'declined', 'appt_failed', 'ai_talked', 'not_sent', 'over_age', 'irecruit_pull', 'no_job']);
+    // ลำดับเต็มคุมที่ src/lib/recruitRmRestViews.test.ts (26 พ.ย. 2569 "ไม่ได้ส่ง AI" แยกเป็นกล่องตามเรื่อง)
+    expect(RM_LIST_VIEWS_SHOWN).toContain('over_age');
+    expect(RM_LIST_VIEWS_SHOWN).not.toContain('not_sent');
     expect(RM_LIST_VIEW_LABEL.over_age).toBe('อายุเกิน');
     expect(isInRmListView(app(59), 'over_age')).toBe(true);
     expect(isInRmListView(app(59), 'not_sent')).toBe(false);

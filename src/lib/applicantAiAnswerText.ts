@@ -4,7 +4,7 @@ import { aiQueueStatusOf, type AiQueueStatus } from '@/lib/applicantAiQueueStatu
 import { callResultLabel } from '@/lib/homeCallResults';
 import { FOLLOW_STATUS_LABEL, isFollowCallStatus } from '@/lib/followApi';
 import { IRECRUIT_PULL_STATE_LABEL, irecruitPullState } from '@/lib/irecruitPullStatus';
-import { IRECRUIT_PULL_CREATED_BY, rmShownViewOf } from '@/lib/recruitRm';
+import { IRECRUIT_PULL_CREATED_BY, RM_LIST_VIEW_LABEL, rmShownViewOf } from '@/lib/recruitRm';
 import { isOverAge, OVER_AGE_REASON } from '@/lib/applicantAge';
 import { isScrapApplication } from '@/lib/scrapCandidates';
 
@@ -130,16 +130,22 @@ export function rmRowStatusOf(r: PublicApplication, now: number = Date.now()): R
         tone: 'danger',
       };
     default: {
-      // ไม่ได้ส่ง AI — เหตุจริงตามลำดับ: ยกเลิก · เบอร์ผิด · ซ้ำ iRecruit · เหตุจากตัวส่ง (อายุเกิน · ไม่มีรายได้ · เก็บไปโทรเอง …)
+      // กล่องตามเรื่องที่ยังไม่ได้ส่ง AI (26 พ.ย. 2569) — บรรทัดบน = ชื่อกล่อง · บรรทัดล่าง = เหตุจริงสั้น ๆ (วันที่ AI โทรได้อีก ฯลฯ)
+      const dupAt = rowWhen(r.irecruit_dup_at);
+      const fixed: Partial<Record<typeof view, string>> = {
+        ai_cancelled: 'สาย AI ถูกยกเลิก · กดส่ง AI ใหม่ได้',
+        irecruit_dup: `${dupAt ? `สมัครใน iRecruit ${dupAt}` : 'สมัครใน iRecruit'} · AI ไม่โทรเอง กดส่งได้`,
+        request_closed: 'กดส่ง AI แล้วเลือกใบขอที่ยังเปิด',
+        no_income: 'ตั้งรายได้ในป๊อปโพสต์ประกาศ แล้วระบบส่งให้เอง',
+        declined_job: 'AI ไม่เสนองานนี้ซ้ำ',
+        employed: 'มีสายติดตามงานใน 60 วัน · AI ไม่เสนองานใหม่',
+        offered_recently: 'AI เสนองานไปไม่นานนี้ หรือมีงานอื่นเสนออยู่',
+        no_name: 'ซ่อนชื่อบนเว็บหางาน · เก็บไปโทรเองแทน',
+        kept: r.claimed_by_name?.trim() ? `ของ ${r.claimed_by_name.trim()}` : 'เลือกโทรเอง',
+      };
       const why =
-        r.last_call_status === 'cancelled'
-          ? 'สาย AI ถูกยกเลิก'
-          : r.phone_callable === false
-            ? 'เบอร์ใช้โทรไม่ได้ (ไม่ใช่มือถือ 10 หลัก)'
-            : r.irecruit_dup_at
-              ? `ซ้ำ iRecruit (สมัคร ${rowWhen(r.irecruit_dup_at)}) · AI ไม่โทรเอง`
-              : notSentReasonOf(r);
-      return { view: 'not_sent', title: 'ไม่ได้ส่ง AI', detail: why, tone: 'warn' };
+        fixed[view] ?? (view === 'bad_data' && r.phone_callable === false ? 'เบอร์ใช้โทรไม่ได้ (ไม่ใช่มือถือ 10 หลัก)' : notSentReasonOf(r));
+      return { view, title: RM_LIST_VIEW_LABEL[view], detail: why, tone: view === 'ready' ? 'neutral' : 'warn' };
     }
   }
 }

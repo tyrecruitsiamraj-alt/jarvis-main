@@ -6111,9 +6111,9 @@
    "src": "src/components/recruit-rm/RmWorkspace.tsx:166",
    "controls": [
     {
-     "label": "มุมมองผู้สมัคร ▾ (รายชื่อทั้งหมด · รอโทร · ไม่รับสาย · รายชื่อคนที่สนใจ[ค่าเริ่ม] · รายชื่อคนที่ไม่สนใจ · คุยแล้วไม่ได้คำตอบ · ไม่ได้ส่ง AI · iRecruit · ไม่ผูกใบขอ)",
+     "label": "มุมมองผู้สมัคร ▾ (รายชื่อทั้งหมด · รอโทร · ไม่รับสาย · รายชื่อคนที่สนใจ[ค่าเริ่ม] · รายชื่อคนที่ไม่สนใจ · นัดหมายไม่สำเร็จ · คุยแล้วไม่ได้คำตอบ · พร้อมส่ง AI · ใบขอปิดแล้ว · ใบขอยังไม่ตั้งรายได้ · เบอร์ถูกพัก · เคยปฏิเสธงานนี้ · เบอร์โทรผิด · ได้งานแล้ว · AI เพิ่งเสนองาน · เก็บไปโทรเอง · ไม่มีชื่อ · ซ้ำ iRecruit · ยกเลิกสาย AI · อายุเกิน · iRecruit · ไม่ผูกใบขอ)",
      "action": "filter",
-     "target": "?list=all|ai_waiting|no_pickup|interested|declined|ai_talked|not_sent|irecruit_pull|no_job",
+     "target": "?list=all|ai_waiting|no_pickup|interested|declined|appt_failed|ai_talked|ready|request_closed|no_income|phone_paused|declined_job|bad_data|employed|offered_recently|kept|no_name|irecruit_dup|ai_cancelled|over_age|irecruit_pull|no_job",
      "api": null,
      "effects": [],
      "when": "ไม่อยู่โหมด ?bucket=",

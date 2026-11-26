@@ -48,6 +48,7 @@ import { isApplicationInWriteScope } from '../_lib/applicationScope.js';
 import { acquireCallHold, releaseApplicationCallHolds } from '../_lib/candidateCallHolds.js';
 import { enqueueLumosGreetingForApplications, enqueueLumosInterviewForApplications, REQUEST_CLOSED_REASON } from '../_lib/lumosDispatch.js';
 import { isRequestClosedForApply } from '../_lib/requestClosedForApply.js';
+import { recordAiBlockReasons } from '../_lib/aiBlockRecord.js';
 import { auditFromAuthed } from '../_lib/audit.js';
 import { logError } from '../_lib/logger.js';
 import { getSiamrajUnitRequestById, loadScopedJobIdSet } from '../_lib/siamrajUnitRequests.js';
@@ -283,6 +284,8 @@ export async function chooseAi(
     for (const s of outcome.skipped) {
       skipped.push({ name: s.name, reason: s.reason });
     }
+    // จดเหตุลงใบ — แท็บผู้สมัครย้ายคนไปกล่องของเหตุนั้นทันที (26 พ.ย. 2569 · เดิมจดแค่ตัวส่งซ้ำ)
+    await recordAiBlockReasons(outcome.skipped);
     // เข้าคิวไม่ได้เพราะซ้ำแถวเดิมที่ยัง active — บอกตรง ๆ ว่าอยู่ในคิวแล้ว
     for (const ref of outcome.duplicated) {
       const app = apps.find((a) => `app-${a.id}` === ref);
@@ -295,6 +298,7 @@ export async function chooseAi(
     const outcome = await enqueueLumosGreetingForApplications(greet, { autoPush: true });
     done += outcome.queued;
     for (const s of outcome.skipped) skipped.push({ name: s.name, reason: s.reason });
+    await recordAiBlockReasons(outcome.skipped);
     for (const ref of outcome.duplicated) {
       const app = greet.find((a) => `app-${a.id}` === ref);
       if (app) skipped.push({ name: app.full_name, reason: 'อยู่ในคิว AI อยู่แล้ว' });

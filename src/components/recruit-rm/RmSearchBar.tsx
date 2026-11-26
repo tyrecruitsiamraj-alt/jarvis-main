@@ -49,6 +49,8 @@ const RmSearchBar: React.FC<{
   holdingSelected?: boolean;
   /** "ส่ง AI โทร" ทีละหลายคน — 🔴 ยิงสายจริง ผู้เรียกต้องมี popup ยืนยันรายชื่อก่อนเสมอ */
   onSendAiSelected?: () => void;
+  /** กล่องที่ส่ง AI ไม่ได้ (26 พ.ย. 2569 · `RM_AI_SEND_BLOCKED`) — มีค่า = ปุ่มกดไม่ได้ พร้อมบอกเหตุ */
+  sendAiBlockedReason?: string | null;
   /** "ถอย Lead" ของแท็บการติดต่อ — ส่งแถวที่ติ๊กกลับแท็บผู้สมัคร · ไม่ส่ง = ไม่มีปุ่ม */
   onReleaseSelected?: () => void;
   releasing?: boolean;
@@ -68,6 +70,7 @@ const RmSearchBar: React.FC<{
   onHoldSelected,
   holdingSelected = false,
   onSendAiSelected,
+  sendAiBlockedReason = null,
   onReleaseSelected,
   releasing = false,
   onExport,
@@ -135,11 +138,13 @@ const RmSearchBar: React.FC<{
       <button
         type="button"
         onClick={onSendAiSelected}
-        disabled={selectedCount === 0 || holdingSelected}
+        disabled={selectedCount === 0 || holdingSelected || Boolean(sendAiBlockedReason)}
         title={
-          selectedCount === 0
-            ? 'ติ๊กเลือกแถวก่อน'
-            : `ส่ง ${selectedCount} คนให้ AI โทร — มีหน้ายืนยันรายชื่อก่อนโทรจริง`
+          sendAiBlockedReason
+            ? sendAiBlockedReason
+            : selectedCount === 0
+              ? 'ติ๊กเลือกแถวก่อน'
+              : `ส่ง ${selectedCount} คนให้ AI โทร — มีหน้ายืนยันรายชื่อก่อนโทรจริง`
         }
         className={cn(
           'inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium disabled:opacity-50',
