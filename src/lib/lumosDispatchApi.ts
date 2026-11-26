@@ -1,4 +1,6 @@
 import { apiFetch } from '@/lib/apiFetch';
+import { CALL_OUTCOME_LABEL } from '@/lib/callOutcomeTone';
+import type { CallOutcome } from '@/lib/callFollowupPolicy';
 
 export type LumosQueueStatus = 'pending' | 'delivered' | 'completed' | 'failed' | 'cancelled';
 export type LumosChannel = 'reminder' | 'interview';
@@ -145,7 +147,11 @@ const STATUS_BADGE: Record<LumosQueueStatus, LumosCallBadge> = {
 export function lumosCallBadge(row: LumosCallStatus): LumosCallBadge {
   const key = (row.outcome || '').trim().toLowerCase();
   if (key && OUTCOME_BADGE[key]) return OUTCOME_BADGE[key];
-  if (key) return { label: `ผลการโทร: ${row.outcome}`, cls: 'border-slate-300 bg-slate-100 text-slate-700', tone: 'sent' };
+  // ผลที่ไม่มีป้ายเฉพาะ (busy · reschedule_requested · wrong_person …) ใช้คำไทยกลาง — เดิมขึ้นอังกฤษ "ผลการโทร: busy" (ตรวจบนเว็บ 26 พ.ย. 2569)
+  if (key) {
+    const th = CALL_OUTCOME_LABEL[key as CallOutcome];
+    return { label: th ?? `ผลการโทร: ${row.outcome}`, cls: 'border-slate-300 bg-slate-100 text-slate-700', tone: 'sent' };
+  }
   return STATUS_BADGE[row.status];
 }
 

@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { MATCH_GROUPS, boardColumnShort, isSalaryOver, matchGroupOf } from '@/lib/matchingGroups';
 import { filterAndSortMatchingJobs, matchGroupOfJob } from '@/lib/matchingListFilter';
@@ -95,6 +96,17 @@ describe('หน้าจับคู่ 4 กล่อง (26 พ.ย. 2569)', 
     expect(isSalaryOver(19500, 15000)).toBe(false);
     expect(isSalaryOver(30000, 0)).toBe(false);
     expect(isSalaryOver(null, 15000)).toBe(false);
+  });
+
+  it('ปุ่มส่ง AI โทรท้ายป๊อปไม่ส่งข้อมูลการคลิกเข้าไปแทนรายชื่อ (เดิมพังเงียบ: event.filter ไม่มี)', () => {
+    const panels = readFileSync('src/components/matching/LumosPanels.tsx', 'utf8');
+    expect(panels).not.toContain('onClick={onSend}');
+    const table = readFileSync('src/components/matching/MatchPeopleTable.tsx', 'utf8');
+    // ปุ่มคู่แบบหน้าผู้สมัคร: เหนือตาราง + ทุกแถว
+    expect(table).toContain('data-testid="match-hold-selected"');
+    expect(table).toContain('data-testid="match-send-selected"');
+    expect(table).toContain('onSendOne(r.id)');
+    expect(table).toContain('onHoldOne(r.id)');
   });
 
   it('ถังบนบอร์ดเป็นคำสั้น', () => {

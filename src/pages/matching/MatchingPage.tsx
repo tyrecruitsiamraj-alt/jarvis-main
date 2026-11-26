@@ -1298,14 +1298,17 @@ const MatchingPage: React.FC<{ embedded?: boolean; lockedJob?: JobRequest | null
    * 409 ของตัวเราเอง ซึ่ง summarize นับเป็น "อยู่ในถังอยู่แล้ว" ไม่ใช่ conflict
    * ล็อกสำเร็จ = AI ไม่โทรทับ (insertQueueItems กรองเบอร์ที่ถูกถือทุกเส้นอยู่แล้ว)
    */
-  const holdSelectedForSelf = async () => {
-    if (!jobDetail || lumosSelectedCount === 0 || holdingSelf) return;
+  /** `only` = ปุ่มบนแถว (โฉมใหม่ 26 พ.ย. 2569 แบบหน้าผู้สมัคร) — เก็บคนนั้นคนเดียว ไม่ยุ่งกับที่ติ๊กไว้ */
+  const holdSelectedForSelf = async (only?: { board: number[]; irecruit: number[] }) => {
+    const boardIds = only?.board ?? lumosSelectedBoard;
+    const irIds = only?.irecruit ?? lumosSelectedIrecruit;
+    if (!jobDetail || boardIds.length + irIds.length === 0 || holdingSelf) return;
     setHoldingSelf(true);
     setLumosError(null);
     setLumosNotice(null);
     try {
       const targets: HoldTarget[] = [
-        ...lumosSelectedBoard.map((cardId): HoldTarget => {
+        ...boardIds.map((cardId): HoldTarget => {
           const m = openJobMatches?.find((x) => x.card_id === cardId);
           return {
             candidateRef: String(cardId),
@@ -1316,7 +1319,7 @@ const MatchingPage: React.FC<{ embedded?: boolean; lockedJob?: JobRequest | null
             source: 'board',
           };
         }),
-        ...lumosSelectedIrecruit.map((id): HoldTarget => {
+        ...irIds.map((id): HoldTarget => {
           const m = openJobIrMatches?.find((x) => x.id === id);
           return {
             candidateRef: String(id),
@@ -1345,7 +1348,10 @@ const MatchingPage: React.FC<{ embedded?: boolean; lockedJob?: JobRequest | null
         const hold = result.ok ? result.hold : result.heldBy;
         if (hold) setHoldByRef((prev) => ({ ...prev, [holdRefKey(t.source, t.candidateRef)]: hold }));
       }
-      clearLumosSelection();
+      if (only) {
+        setLumosSelectedBoard((prev) => prev.filter((id) => !only.board.includes(id)));
+        setLumosSelectedIrecruit((prev) => prev.filter((id) => !only.irecruit.includes(id)));
+      } else clearLumosSelection();
       const summary = summarizeAcquireResults({
         results,
         viewerName: user?.email ?? null,
@@ -2381,7 +2387,15 @@ const MatchingPage: React.FC<{ embedded?: boolean; lockedJob?: JobRequest | null
       called: Boolean(lumosStatusByRef[boardPersonRef(m.card_id)]),
       selectable: Boolean(m.mobile),
       selected: lumosSelectedBoard.includes(m.card_id),
+      heldBy: hold ? (hold.mine ? 'คุณ' : hold.heldByName || 'เจ้าหน้าที่อีกคน') : null,
     };
+  };
+
+  /** ปุ่ม "ส่ง AI โทร" บนแถว (โฉมใหม่) — ส่งคนนั้นคนเดียว ผ่านป๊อปยืนยันตัวเดิม */
+  const sendAiForBoardPerson = (cardId: number) => {
+    setLumosSelectedIrecruit([]);
+    setLumosSelectedBoard([cardId]);
+    beginSendFlow([cardId]);
   };
 
   /** ปุ่ม "ค้นหาใหม่" — โฉมเดิมอยู่หัว "คนของเรา" · โฉมใหม่อยู่แถว "หาคนเพิ่ม" ใต้ตาราง */
@@ -2784,6 +2798,12 @@ const MatchingPage: React.FC<{ embedded?: boolean; lockedJob?: JobRequest | null
                       return (
                         <MatchPeopleTable
                           rows={sortedBoard.map(({ m }) => boardPersonRowOf(jobDetail, m))}
+                          selectedCount={lumosSelectedCount}
+                          busy={lumosSending || holdingSelf}
+                          onHoldSelected={() => void holdSelectedForSelf()}
+                          onSendSelected={() => beginSendFlow()}
+                          onHoldOne={(id) => void holdSelectedForSelf({ board: [id], irecruit: [] })}
+                          onSendOne={sendAiForBoardPerson}
                           onToggle={toggleLumosBoard}
                           onToggleMany={(ids, on) =>
                             setLumosSelectedBoard((prev) =>
@@ -3086,6 +3106,9 @@ const MatchingPage: React.FC<{ embedded?: boolean; lockedJob?: JobRequest | null
                       </Button>
                       {/* เลนคัดสรร (16 ส.ค.): โทรหมดแล้วไม่มีคน → ค้นเจอส่ง AI ทันที
                           เขียว+เหลือง · ไม่ต้องอนุมัติ · กัน 30 วัน (server) */}
+                      {/* โฉมใหม่ถอด (เจ้าของ 26 พ.ย. 2569 "ปุ่ม AI โทรอะไรไม่รู้เยอะแยะ … แบบหน้าผู้สมัคร") —
+                          ค้นเจอแล้วติ๊กส่งด้วยปุ่ม "ส่ง AI โทร" ตัวเดียวกับคนของเรา */}
+                      {classic ? (
                       <Button size="sm"
                         type="button"
                         disabled={irLoadingId === jobDetail.id}
@@ -3094,6 +3117,7 @@ const MatchingPage: React.FC<{ embedded?: boolean; lockedJob?: JobRequest | null
                       >
                         <PhoneForwarded aria-hidden /> {SEARCH_LEGACY_POOL_AND_CALL.label}
                       </Button>
+                      ) : null}
                     </div>
                   </div>
                   {irSendNotice[jobDetail.id] ? (
@@ -3322,6 +3346,16 @@ const MatchingPage: React.FC<{ embedded?: boolean; lockedJob?: JobRequest | null
                      ก้อนเดียวกันแต่เลขคนละชุด → ยุบเหลือแถบเดียว
                   2) "ไม่ต้องตึง" — เคยทำ sticky ติดก้นจอแล้วเจ้าของไม่เอา
                      ตอนนี้เป็นกล่องธรรมดาไหลตามเนื้อหา อยู่เหนือกล่อง "หาคนไม่พอ" */}
+              {/* โฉมใหม่: ปุ่มคู่อยู่เหนือตารางคนแล้ว (แบบหน้าผู้สมัคร) — แถบนี้ขึ้นเฉพาะใบที่ไม่มีตาราง
+                  แต่ติ๊กคนที่ยังไม่สมัครไว้ (ไม่งั้นติ๊กแล้วไม่มีปุ่มให้กด) */}
+              {classic ||
+              (lumosSelectedIrecruit.length > 0 &&
+                !(
+                  boardMatchById[jobDetail.id] &&
+                  !(boardMatchById[jobDetail.id] as BoardMatchResponse).manual_only &&
+                  (recommendedCandidateCount(boardMatchById[jobDetail.id].matches) > 0 ||
+                    (showDistantCandidates && distantCandidateCount(boardMatchById[jobDetail.id].matches) > 0))
+                )) ? (
               <div className="space-y-2 border-t border-border pt-4">
                 <LumosSendBar
                   simple={!classic}
@@ -3339,12 +3373,14 @@ const MatchingPage: React.FC<{ embedded?: boolean; lockedJob?: JobRequest | null
                   sendableCount={lumosSelectedSendable}
                   holdableCount={lumosSelectedHoldable}
                 />
-                <CallBatchUndoStrip
-                  batches={pendingBatches}
-                  cancellingId={batchCancellingId}
-                  onCancel={(id) => void cancelPendingBatch(id)}
-                />
               </div>
+              ) : null}
+              {/* ชุดที่ตั้งคิวไว้ (ถอนคำได้ 10 นาที) — ขึ้นทั้งสองโฉม · ว่าง = ไม่มีอะไรบนจอ */}
+              <CallBatchUndoStrip
+                batches={pendingBatches}
+                cancellingId={batchCancellingId}
+                onCancel={(id) => void cancelPendingBatch(id)}
+              />
 
               {/* ── ขั้น 4 · หาคนไม่พอ — ส่งต่อทีมอื่น ────────────────────────────
                   เจ้าของสั่ง 13 ส.ค. 2569: เอากล่อง "หาได้ไม่ถึงเป้า" มารวมที่นี่
@@ -3509,18 +3545,7 @@ const MatchingPage: React.FC<{ embedded?: boolean; lockedJob?: JobRequest | null
                     : ''}
                 </p>
               ) : null}
-              <Button
-                type="button"
-                size="xs"
-                variant={aiFlowOpen ? 'secondary' : 'ghost'}
-                onClick={() => setAiFlowOpen((v) => !v)}
-                aria-expanded={aiFlowOpen}
-                className="ml-auto shrink-0"
-              >
-                AI โทร
-                <span className="tabular-nums">{aiFlowTotal === null ? '…' : aiFlowTotal.toLocaleString('th-TH')}</span>
-                <ChevronDown className={cn('transition-transform', aiFlowOpen && 'rotate-180')} aria-hidden />
-              </Button>
+              {/* ปุ่มกางสถิติ "AI โทร" ถอดจากโฉมใหม่ (เจ้าของ 26 พ.ย. 2569 "ปุ่ม AI โทรอะไรไม่รู้เยอะแยะ … แบบหน้าผู้สมัคร") */}
             </div>
           </div>
         )}

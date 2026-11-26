@@ -9,7 +9,7 @@ import {
 } from '@/lib/lumosDispatchApi';
 import { lumosExtraStatChips, lumosFixedStatCells } from '@/lib/lumosStatCells';
 import { lumosSendActionStates } from '@/lib/lumosSendActions';
-import { ClipboardCheck, PhoneCall, Undo2, UserRound, X } from 'lucide-react';
+import { Bot, ClipboardCheck, Phone, PhoneCall, Undo2, UserRound, X } from 'lucide-react';
 import { formatDateTimeTh } from '@/lib/dateTh';
 import { useEffect, useState } from 'react';
 import { CALL_BATCH_UNDO_MINUTES, activeItemCount, undoMsLeft, type CallBatch } from '@/lib/callBatch';
@@ -271,25 +271,27 @@ export function LumosSendBar({
               ล้างที่เลือก
             </Button>
           ) : null}
-          {/* ทึบสีกรมท่า คู่กับ "ส่ง AI โทร" สีเบอร์กันดี — เจ้าของ 26 พ.ย. 2569 "ปุ่มเก็บไปโทรเอง … จางมาก ไม่เด่นเลย" */}
+          {/* สี/ไอคอนชุดเดียวกับแถบหน้าผู้สมัคร (`RmSearchBar`) — เจ้าของ 26 พ.ย. 2569
+              "ปุ่มเก็บไปโทรเอง … จางมาก ไม่เด่นเลย" · "ทำให้มันดูง่าย ๆ แบบหน้าผู้สมัคร" */}
           <Button
-            variant="heroSolid"
-            size="sm"
+            size="xs"
             type="button"
             disabled={act.holdSelf.disabled}
             onClick={onHoldSelf}
             title={act.holdSelf.reason ?? 'ล็อกคนที่เลือกเข้าถังโทรของคุณ — AI จะไม่โทรทับ · ไปโทรที่แท็บ "การติดต่อ"'}
           >
-            <UserRound aria-hidden /> {holdingSelf ? 'กำลังเก็บ…' : `เก็บไปโทรเอง (${act.holdSelf.count})`}
+            <Phone aria-hidden /> {holdingSelf ? 'กำลังเก็บ…' : `เก็บไปโทรเอง (${act.holdSelf.count})`}
           </Button>
           <Button
-            size="sm"
+            size="xs"
+            variant="outline"
             type="button"
             disabled={act.sendSelected.disabled}
-            onClick={onSend}
+            onClick={() => onSend()}
             title={act.sendSelected.reason ?? 'ส่งคนที่ติ๊กไว้เข้าคิว AI โทร'}
+            className={TONE.violet.outline}
           >
-            <PhoneCall aria-hidden /> ส่ง AI โทร ({act.sendSelected.count})
+            <Bot aria-hidden /> ส่ง AI โทร ({act.sendSelected.count})
           </Button>
         </div>
         {count > 0 && act.sendSelected.reason ? (
@@ -358,7 +360,7 @@ export function LumosSendBar({
           <button
             type="button"
             disabled={act.sendSelected.disabled}
-            onClick={onSend}
+            onClick={() => onSend()}
             title={act.sendSelected.reason ?? 'ส่งเฉพาะคนที่ติ๊กไว้เข้าคิว AI โทร'}
             className={cn(
               'inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-[11px] font-medium disabled:opacity-50',
