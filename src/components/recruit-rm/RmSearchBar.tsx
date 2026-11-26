@@ -122,8 +122,9 @@ const RmSearchBar: React.FC<{
     ) : null}
 
     {onNoCallSelected ? (
+      /* สีเทาทึบแบบ "เพิ่มข้อมูลผู้สมัคร" — แบบเส้นขอบตอนยังไม่ติ๊กจางจนหาไม่เจอ (เจ้าของ 26 พ.ย. 2569 "ฉันไม่เจอปุ่ม ไม่โทร") */
       <Button
-        variant="outline"
+        variant="secondary"
         size="xs"
         type="button"
         onClick={onNoCallSelected}
