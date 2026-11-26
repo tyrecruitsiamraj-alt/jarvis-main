@@ -140,6 +140,14 @@ describe('ตัวส่งจดเหตุลงใบทุกทาง + �
     const src = readFileSync('api/_handlers/application-call-choice.ts', 'utf8');
     expect((src.match(/await recordAiBlockReasons\(outcome\.skipped\)/g) ?? []).length).toBe(2);
   });
+  it('ย้ายจากใบขอปิดแล้ว = สายเสนองาน ติดกติกา 30 วันแบบจับคู่งาน (Choice "นับด้วย") · ใบที่ไม่เคยผูกใบขอไม่นับ', () => {
+    const h = readFileSync('api/_handlers/application-call-choice.ts', 'utf8');
+    expect(h).toContain('if (r.job_id?.trim() && closedJobIds.has(r.job_id.trim())) movedFromClosed.add(r.id);');
+    expect(h).toContain('closedJobIds, movedFromClosed);');
+    expect(h).toContain('{ autoPush: true, offerIds }');
+    const d = readFileSync('api/_lib/lumosDispatch.ts', 'utf8');
+    expect(d).toContain('matchRank: opts?.offerIds?.has(app.id) ? MATCH_RANK_UNKNOWN : null');
+  });
   it('ตัวส่งไม่เขียนข้อความเหตุเอง ใช้ชุดใน aiBlockReasons.ts', () => {
     const src = readFileSync('api/_lib/lumosDispatch.ts', 'utf8');
     expect(src).toContain("from '../../src/lib/aiBlockReasons.js'");

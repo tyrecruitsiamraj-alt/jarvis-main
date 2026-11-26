@@ -395,7 +395,14 @@ export async function enqueueLumosInterviewForApplications(
      */
     created_by_name?: string | null;
   }>,
-  opts?: { autoPush?: boolean },
+  opts?: {
+    autoPush?: boolean;
+    /**
+     * ใบที่ถูกย้ายจากใบขอปิดแล้วมาใบนี้ = AI เสนองานใหม่ (เจ้าของ 26 พ.ย. 2569 Choice "นับด้วย")
+     * ⇒ เข้ากติกาเดียวกับจับคู่งาน: AI เสนอแล้วภายใน N วัน/มีงานอื่นเสนออยู่ = ไม่ส่ง · โทรรอบเดียวแล้วส่งให้คน
+     */
+    offerIds?: ReadonlySet<string>;
+  },
 ): Promise<LumosDispatchOutcome> {
   // บทฉบับแก้จากหน้าตั้งค่า — โหลดก่อนประกอบบทเสมอ (ล้มก็ใช้บทเดิม ไม่ทำให้สายล้ม)
   await ensureCallScriptsFresh();
@@ -455,8 +462,8 @@ export async function enqueueLumosInterviewForApplications(
       skipped.push({ ref: `app-${app.id}`, name: app.full_name, reason: NO_PHONE_REASON });
       continue;
     }
-    // ใบสมัครไม่มี tier จาก AI แมท — null = MATCH_RANK_UNKNOWN (เท่าเหลือง) ตอนเสิร์ฟ
-    items.push({ personRef: `app-${app.id}`, payload, matchRank: null });
+    // ใบสมัครไม่มี tier จาก AI แมท — null = MATCH_RANK_UNKNOWN (เท่าเหลือง) ตอนเสิร์ฟ · ใบที่ย้ายมา = สายเสนองาน (ติดกติกา 30 วัน)
+    items.push({ personRef: `app-${app.id}`, payload, matchRank: opts?.offerIds?.has(app.id) ? MATCH_RANK_UNKNOWN : null });
   }
   await attachInterviewAdminPhone(items, requestNoFromJobRef(jobId));
   const { added, held, suppressed, declined, guarded, employed, matchBusy, suppressedWhy } = await insertQueueItems('interview', jobId, items);

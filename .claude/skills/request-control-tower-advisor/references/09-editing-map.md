@@ -14808,3 +14808,7 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 - `matching-board-candidates.ts`: เช็ก `matchBlockersOf(job)` ก่อนอ่านผลที่เก็บ — ขาด = ตอบผลว่าง + `blocked` (จอขึ้น "ไม่จับคู่ · ขาดในใบขอ ERP: …")
 - `callBatchDispatcher.ts`: ชุดโทรที่อนุมัติแล้วของใบที่ขาด = ไม่ปล่อย (log `call-batch.release.blocked`)
 - `BOARD_MATCH_POOL_SINCE` → 25 พ.ย. 22:50 — ผลก่อนกติกาทุกใบแมทใหม่ 1 รอบ (worker) · เทสต์ `tests/api/matchStaleBlocked2569-11-26.test.ts`
+
+### 26 พ.ย. 2569 (6) — ย้ายจากใบขอปิดแล้วไปใบใหม่ = AI เสนองาน ติดกติกา 30 วัน
+- เจ้าของ Choice "นับด้วย" — `application-call-choice.ts` เก็บ `movedFromClosed` (เฉพาะใบที่ job_id เดิมอยู่ใน closedJobIds · ใบไม่เคยผูกไม่นับ) → `chooseAi(..., offerIds)` → `enqueueLumosInterviewForApplications(opts.offerIds)` ใส่ `matchRank = MATCH_RANK_UNKNOWN`
+- ผล: `insertQueueItems` ตรวจ `phonesBusyForMatchOffer` (เสนอแล้วภายใน N วัน / มีงานอื่นเสนออยู่ = กล่อง "AI เพิ่งเสนองาน") · callFollowup โทรรอบเดียวแล้วส่งให้คน · นับเป็นการเสนอครั้งถัดไปด้วย

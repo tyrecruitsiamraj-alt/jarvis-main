@@ -229,6 +229,8 @@ export async function chooseAi(
   greeting = false,
   /** ใบขอที่ปิดแล้ว (19 ต.ค. 2569) — ใบสมัครของใบพวกนี้นับเหมือนยังไม่ผูกใบขอ (ทักทาย/เลือกใบใหม่) */
   closedJobIds: ReadonlySet<string> = new Set(),
+  /** ใบที่เพิ่งย้ายจากใบขอปิดแล้ว (26 พ.ย. 2569) — สายนี้คือ AI เสนองานใหม่ ติดกติกา "เสนอแล้วภายใน N วัน ส่งซ้ำไม่ได้" */
+  offerIds: ReadonlySet<string> = new Set(),
 ): Promise<CallChoiceResult> {
   const skipped: CallChoiceResult['skipped'] = [];
   const byJob = new Map<string, Row[]>();
@@ -279,7 +281,7 @@ export async function chooseAi(
   for (const [jobId, apps] of byJob) {
     // ปั๊มก่อนส่ง — ล้มกลางทางแล้วใบยังออกจากกองรอ ดีกว่ารอบถัดไปยิงซ้ำคนเดิม
     await stampChoice(apps.map((a) => a.id), 'ai', actorName);
-    const outcome = await enqueueLumosInterviewForApplications(jobId, apps, { autoPush: true });
+    const outcome = await enqueueLumosInterviewForApplications(jobId, apps, { autoPush: true, offerIds });
     done += outcome.queued;
     for (const s of outcome.skipped) {
       skipped.push({ name: s.name, reason: s.reason });
@@ -361,6 +363,8 @@ async function handler(req: AuthedReq, res: ApiRes) {
 
     // ผูกใบขอให้ใบที่ยังไม่ผูก/ใบขอปิดแล้ว (ส่ง AI เท่านั้น) — DB ตัดสินด้วย job_id เดิม (ใบที่ผูกใบเปิดอยู่ไม่ถูกย้าย)
     const bindJobId = choice === 'ai' && typeof raw?.job_id === 'string' ? raw.job_id.trim().slice(0, 120) : '';
+    /** ใบที่ย้ายจากใบขอปิดแล้ว (ไม่นับใบที่ยังไม่เคยผูกใบขอ) */
+    const movedFromClosed = new Set<string>();
     if (bindJobId && allowed.some(needsJob)) {
       const scopedJobIds = await loadScopedJobIdSet(req.user);
       if (scopedJobIds && !scopedJobIds.has(bindJobId)) {
@@ -381,6 +385,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
       const boundIds = new Set(bound.map((b) => b.id));
       for (const r of allowed) {
         if (!boundIds.has(r.id)) continue;
+        if (r.job_id?.trim() && closedJobIds.has(r.job_id.trim())) movedFromClosed.add(r.id);
         r.job_id = bindJobId;
         r.job_title = jobTitle;
         r.unit_name = unitName;
@@ -398,7 +403,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
         ? await chooseManual(req, allowed)
         : choice === 'release'
           ? await chooseRelease(req, allowed)
-          : await chooseAi(req.user.email || null, allowed, choice === 'ai' && raw?.greeting === true && !bindJobId, closedJobIds);
+          : await chooseAi(req.user.email || null, allowed, choice === 'ai' && raw?.greeting === true && !bindJobId, closedJobIds, movedFromClosed);
     result.skipped = [...skippedScope, ...result.skipped];
 
     void auditFromAuthed(req, {
