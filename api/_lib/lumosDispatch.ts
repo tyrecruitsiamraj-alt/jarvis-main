@@ -753,35 +753,36 @@ export async function phonesWithWork(phones: readonly string[]): Promise<Set<str
 }
 
 /**
- * 🔴 จับคู่งาน: **1 คน เสนอทีละ 1 ใบ · วันละไม่เกิน 1 สาย · ปฏิเสธ/เงียบ/เบอร์ผิดแล้วหยุดเสนอ** (เจ้าของ 25 พ.ย. 2569
- * Choice "ใบที่เหมาะสุดใบเดียว + วันละ 1 สาย" · "Ai โทรให้รอบแรกแบบเดียวกันกับสัมภาษณ์ ถ้าจะโทรต่อก็ให้คนเก็บไปโทรเอง")
- * เจอจริง: คนเดียวถูกจับคู่ 113 ใบขอ · คนที่บอก "ไม่ได้สมัคร" โดนโทร 6 ครั้งจาก 2 ใบในวันเดียว
+ * 🔴 จับคู่งาน: **AI เสนองานคนนี้ไปแล้วใน N วัน (ตั้งค่า `matchOfferCooldownDays` · ค่าเริ่ม 30) = ส่ง AI อีกไม่ได้ · มีใบอื่นเสนอค้าง = ยังไม่ส่ง** (เจ้าของ 25 พ.ย. 2569
+ * "ถ้า Ai เสนอไปแล้วภายใน 30 วันส่ง Ai อีกไม่ได้ดีกว่าไหม" + Choice "ติดด้วย ทุกทาง" — รวมปุ่มส่ง AI ที่เจ้าหน้าที่กดเอง)
+ * เจอจริง: คนเดียวถูกจับคู่ 113 ใบ · คน "ไม่ได้สมัคร" โดนโทร 6 ครั้งจาก 2 ใบในวันเดียว
  * ⚠️ ด่านนี้ต้องอยู่ตอนเข้าคิว — สายจับคู่ส่งเข้า Lumos ทันที (push) ตัวกันตอนเสิร์ฟ (`buildTakePendingSql`) ไม่ได้ใช้
- * ใช้เฉพาะแถวจับคู่ (`match_rank` มีค่า) · ผู้สมัครที่กรอกเองไม่โดน
- * คืนเหตุต่อเบอร์: open = มีใบอื่นเสนออยู่ยังไม่จบ · today = AI โทรเรื่องจับคู่ไปแล้วใน 24 ชม. · stopped = ตอบไม่สนใจ/เงียบ/เบอร์ผิด ใน 30 วัน
+ * ใช้เฉพาะแถวจับคู่ (`match_rank` มีค่า) · ผู้สมัครที่กรอกเองไม่โดน · อยากคุยกับคนนั้น = เจ้าหน้าที่ "เก็บไปโทรเอง"
+ * คืนเหตุต่อเบอร์: open = มีใบอื่นเสนออยู่ยังไม่มีผล · recent = AI โทรเสนองาน (จับคู่) ได้ผลแล้วใน `cooldownDays` วัน
  */
-export const MATCH_OFFER_STOP_DAYS = 30;
-export async function phonesBusyForMatchOffer(phones: readonly string[], jobRef: string): Promise<Map<string, 'open' | 'today' | 'stopped'>> {
+export async function phonesBusyForMatchOffer(
+  phones: readonly string[],
+  jobRef: string,
+  cooldownDays: number,
+): Promise<Map<string, 'open' | 'recent'>> {
   const list = [...new Set(phones.filter(Boolean))];
-  const out = new Map<string, 'open' | 'today' | 'stopped'>();
+  const out = new Map<string, 'open' | 'recent'>();
   if (list.length === 0) return out;
   const ph = phoneExprFor('q');
-  const { rows } = await dbQuery<{ phone: string; reason: 'open' | 'today' | 'stopped' }>(
+  const { rows } = await dbQuery<{ phone: string; reason: 'open' | 'recent' }>(
     `select ${ph} as phone,
-            case when bool_or(q.status in ('pending', 'delivered') and q.result is null and q.last_outcome is null and q.job_ref <> $2) then 'open'
-                 when bool_or(coalesce(q.last_result_at, q.updated_at) >= now() - interval '24 hours' and (q.result is not null or q.last_outcome is not null)) then 'today'
-                 else 'stopped' end as reason
+            case when bool_or(q.status in ('pending', 'delivered') and q.result is null and q.last_outcome is null and q.job_ref <> $2)
+                 then 'open' else 'recent' end as reason
        from ${queueTable} q
       where q.match_rank is not null
         and ${ph} = any($1::text[])
         and (
           (q.status in ('pending', 'delivered') and q.result is null and q.last_outcome is null and q.job_ref <> $2)
-          or (coalesce(q.last_result_at, q.updated_at) >= now() - interval '24 hours' and (q.result is not null or q.last_outcome is not null))
-          or (coalesce(q.last_outcome, q.result->>'outcome') in ('declined', 'unresponsive', 'wrong_person')
-              and q.updated_at >= now() - interval '${MATCH_OFFER_STOP_DAYS} days')
+          or ((q.result is not null or q.last_outcome is not null)
+              and coalesce(q.last_result_at, q.first_result_at, q.updated_at) >= now() - make_interval(days => $3::int))
         )
       group by ${ph}`,
-    [list, jobRef],
+    [list, jobRef, Math.max(1, Math.round(cooldownDays))],
   );
   for (const r of rows) out.set(r.phone, r.reason);
   return out;
@@ -814,7 +815,7 @@ async function insertQueueItems(
   guarded: string[];
   /** ได้งานแล้ว (`phonesWithWork`) — สายเสนองานไม่ส่ง · ไม่มีผลกับสายติดตาม (เจ้าของ 25 พ.ย. 2569) */
   employed: string[];
-  /** จับคู่งาน: คนนี้มีใบอื่นเสนออยู่ / โทรไปแล้ววันนี้ / เพิ่งปฏิเสธ (`phonesBusyForMatchOffer` · 25 พ.ย. 2569) */
+  /** จับคู่งาน: AI เสนองานคนนี้ไปแล้วใน N วัน (ตั้งค่า) / มีใบอื่นเสนออยู่ (`phonesBusyForMatchOffer` · 25 พ.ย. 2569) */
   matchBusy: string[];
 }> {
   const added: string[] = [];
@@ -873,12 +874,13 @@ async function insertQueueItems(
     }
   }
 
-  // จับคู่งาน: 1 คน 1 ใบ · วันละ 1 สาย · ปฏิเสธแล้วหยุด (`phonesBusyForMatchOffer`) — อ่านไม่ได้ = กันไว้ก่อน (`guarded`)
+  // จับคู่งาน: AI เสนอแล้วใน N วัน (ตั้งค่า) / มีใบอื่นค้าง = ไม่ส่ง (`phonesBusyForMatchOffer`) — อ่านไม่ได้ = กันไว้ก่อน (`guarded`)
   const matchPhones = items.filter((i) => i.matchRank != null).map((i) => payloadPhone(i.payload)).filter((p): p is string => Boolean(p));
-  let busyMatchPhones: Map<string, 'open' | 'today' | 'stopped'> | null = new Map();
+  let busyMatchPhones: Map<string, 'open' | 'recent'> | null = new Map();
   if (matchPhones.length > 0) {
     try {
-      busyMatchPhones = await phonesBusyForMatchOffer(matchPhones, jobRef);
+      const cooldown = (await getCallFollowupPolicy().catch(() => DEFAULT_CALL_FOLLOWUP_POLICY)).matchOfferCooldownDays;
+      busyMatchPhones = await phonesBusyForMatchOffer(matchPhones, jobRef, cooldown);
     } catch {
       busyMatchPhones = null;
     }
@@ -1009,7 +1011,7 @@ const SUPPRESSED_REASON = 'เบอร์นี้ถูกพักอยู�
 const DECLINED_REASON = 'เคยปฏิเสธงานนี้ไปแล้ว — ไม่เสนอซ้ำ';
 const EMPLOYED_REASON = 'ได้งานแล้ว (มีสายติดตามงานใน 60 วัน) — ไม่เสนองานใหม่';
 /** จับคู่งาน 1 คน 1 ใบ (`phonesBusyForMatchOffer` · 25 พ.ย. 2569) */
-const MATCH_BUSY_REASON = 'มีงานอื่นเสนออยู่ หรือ AI โทรเรื่องงานไปแล้ววันนี้ หรือเพิ่งตอบไม่สนใจ';
+const MATCH_BUSY_REASON = 'AI เสนองานคนนี้ไปแล้วไม่นานนี้ หรือมีงานอื่นเสนออยู่ — โทรเองได้ที่ "เก็บไปโทรเอง"';
 /**
  * 🔴 คนละเรื่องกับ HELD — อันนี้คือ "ระบบตรวจไม่ได้" ไม่ใช่ "มีคนจองไปแล้ว"
  * ต้องบอกให้ชัดว่า **ลองใหม่ได้** ไม่งั้นคนนั่งรอสายที่ไม่มีวันออก (เจอจริง 24 ส.ค. 2569)

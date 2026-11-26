@@ -6,6 +6,7 @@
  * 4 พ.ย. 2569 เจ้าของ Choice "ไปเสาร์+อาทิตย์เลย" — วันที่โทรซ้ำ เลือก เสาร์-อาทิตย์ (ค่าเริ่ม) / วันถัดไป (`retryDayMode`)
  * ตัวคำนวณเวลา `nextRetryAt` (src/lib/callFollowupPolicy.ts) · admin แก้
  * ตารางติดตามคนเริ่มงานมีเวลาของตัวเอง ไม่ใช้ค่านี้
+ * 25 พ.ย. 2569 เจ้าของ "ขอให้ Setting อะไรต่างๆผ่านหน้า ui ได้" — เพิ่ม "AI เสนองานคนเดิมได้อีกหลังกี่วัน" (`matchOfferCooldownDays`)
  */
 import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
@@ -15,14 +16,21 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import TimeSelect24 from '@/components/shared/TimeSelect24';
 import { useAuth } from '@/contexts/AuthContext';
-import { DEFAULT_CALL_FOLLOWUP_POLICY, RETRY_DAY_MODE_LABEL, ROUND_LIMITS, totalCallsOf, type RetryDayMode } from '@/lib/callFollowupPolicy';
+import {
+  DEFAULT_CALL_FOLLOWUP_POLICY,
+  MATCH_OFFER_COOLDOWN_LIMITS,
+  RETRY_DAY_MODE_LABEL,
+  ROUND_LIMITS,
+  totalCallsOf,
+  type RetryDayMode,
+} from '@/lib/callFollowupPolicy';
 import { fetchCallFollowupPolicy, saveCallFollowupPolicy, type CallRetryRoundInput } from '@/lib/callFollowupPolicyApi';
 import { TONE } from '@/lib/designTokens';
 import { cn } from '@/lib/utils';
 
 type NumKey = keyof typeof ROUND_LIMITS;
 type TimeKey = 'dayMorning' | 'dayAfternoon';
-type Form = Record<NumKey | TimeKey, string> & { retryDayMode: RetryDayMode };
+type Form = Record<NumKey | TimeKey, string> & { retryDayMode: RetryDayMode; matchOfferCooldownDays: string };
 
 const NUM_FIELDS: Array<{ key: NumKey; label: string }> = [
   { key: 'roundCalls', label: 'สายต่อรอบ' },
@@ -45,6 +53,7 @@ const toForm = (p: CallRetryRoundInput): Form => ({
   dayMorning: p.dayMorning,
   dayAfternoon: p.dayAfternoon,
   retryDayMode: p.retryDayMode,
+  matchOfferCooldownDays: String(p.matchOfferCooldownDays),
 });
 
 const CallRetryTab: React.FC = () => {
@@ -70,7 +79,7 @@ const CallRetryTab: React.FC = () => {
     };
   }, []);
 
-  const set = (key: NumKey | TimeKey | 'retryDayMode', v: string) => {
+  const set = (key: NumKey | TimeKey | 'retryDayMode' | 'matchOfferCooldownDays', v: string) => {
     setForm((cur) => ({ ...cur, [key]: v }));
     setNotice(null);
     setError(null);
@@ -79,7 +88,11 @@ const CallRetryTab: React.FC = () => {
     const n = Number(form[k]);
     return Number.isInteger(n) && n >= ROUND_LIMITS[k][0] && n <= ROUND_LIMITS[k][1];
   };
-  const allNumOk = NUM_FIELDS.every((f) => numOk(f.key));
+  const cooldownOk = (() => {
+    const n = Number(form.matchOfferCooldownDays);
+    return Number.isInteger(n) && n >= MATCH_OFFER_COOLDOWN_LIMITS[0] && n <= MATCH_OFFER_COOLDOWN_LIMITS[1];
+  })();
+  const allNumOk = NUM_FIELDS.every((f) => numOk(f.key)) && cooldownOk;
   const total = allNumOk
     ? totalCallsOf({ roundCalls: Number(form.roundCalls), roundsPerDay: Number(form.roundsPerDay), retryDays: Number(form.retryDays) })
     : null;
@@ -99,6 +112,7 @@ const CallRetryTab: React.FC = () => {
         dayMorning: form.dayMorning,
         dayAfternoon: form.dayAfternoon,
         retryDayMode: form.retryDayMode,
+        matchOfferCooldownDays: Number(form.matchOfferCooldownDays),
       });
       setForm(toForm(saved));
       setNotice('บันทึกแล้ว');
@@ -165,6 +179,27 @@ const CallRetryTab: React.FC = () => {
             <TimeSelect24 value={form[f.key]} disabled={!canEdit || !loaded} label={f.label} onChange={(v) => set(f.key, v)} />
           </div>
         ))}
+      </div>
+
+      <div className="space-y-1.5 border-t border-border pt-4">
+        <Label htmlFor="retry-matchOfferCooldownDays">จับคู่งาน: AI เสนองานคนเดิมได้อีกหลังกี่วัน</Label>
+        <Input
+          id="retry-matchOfferCooldownDays"
+          type="number"
+          inputMode="numeric"
+          min={MATCH_OFFER_COOLDOWN_LIMITS[0]}
+          max={MATCH_OFFER_COOLDOWN_LIMITS[1]}
+          className="w-28 tabular-nums"
+          value={form.matchOfferCooldownDays}
+          disabled={!canEdit || !loaded}
+          onChange={(e) => set('matchOfferCooldownDays', e.target.value)}
+          data-testid="retry-matchOfferCooldownDays"
+        />
+        {form.matchOfferCooldownDays && !cooldownOk ? (
+          <p className={cn('text-xs', TONE.danger.value)}>
+            ใส่ {MATCH_OFFER_COOLDOWN_LIMITS[0]}–{MATCH_OFFER_COOLDOWN_LIMITS[1]}
+          </p>
+        ) : null}
       </div>
 
       {error ? <p className={cn('text-sm', TONE.danger.value)}>{error}</p> : null}

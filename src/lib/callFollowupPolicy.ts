@@ -63,6 +63,11 @@ export type CallFollowupPolicy = {
    * เช่น 3 วัน: กรอกวันพุธ → พุธ · เสาร์ · อาทิตย์ · กรอกเสาร์ → เสาร์ · อาทิตย์ · เสาร์ถัดไป
    */
   retryDayMode: RetryDayMode;
+  /**
+   * จับคู่งาน: AI เสนองานคนเดิมได้อีกหลังกี่วัน (เจ้าของ 25 พ.ย. 2569 "ถ้า Ai เสนอไปแล้วภายใน 30 วันส่ง Ai อีกไม่ได้"
+   * · "ขอให้ Setting อะไรต่างๆผ่านหน้า ui ได้") — แก้ที่ ตั้งค่า › โทรซ้ำคนไม่รับสาย · ใช้ที่ `phonesBusyForMatchOffer`
+   */
+  matchOfferCooldownDays: number;
 };
 
 export type RetryDayMode = 'weekend' | 'next';
@@ -83,6 +88,7 @@ export const DEFAULT_CALL_FOLLOWUP_POLICY: CallFollowupPolicy = {
   dayMorning: '09:00',
   dayAfternoon: '13:00',
   retryDayMode: 'weekend',
+  matchOfferCooldownDays: 30,
 };
 
 const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -94,6 +100,8 @@ export const ROUND_LIMITS = {
   roundsGapHours: [1, 6],
   retryDays: [1, 5],
 } as const;
+/** ขอบของ "AI เสนองานคนเดิมได้อีกหลังกี่วัน" (25 พ.ย. 2569) */
+export const MATCH_OFFER_COOLDOWN_LIMITS = [1, 180] as const;
 /** โทรได้สูงสุดกี่ครั้งต่อคน (รวมครั้งแรก) = เพดานของ สายต่อรอบ × รอบต่อวัน × วัน */
 export const MAX_CALL_ATTEMPTS = ROUND_LIMITS.roundCalls[1] * ROUND_LIMITS.roundsPerDay[1] * ROUND_LIMITS.retryDays[1];
 /** รวมโทรได้กี่ครั้ง — นิยามเดียวของ maxAttempts */
@@ -119,6 +127,7 @@ export function normalizeCallFollowupPolicy(raw: unknown): CallFollowupPolicy {
   num('quietFromHour', 0, 23);
   num('quietToHour', 0, 23);
   num('suppressDays', 1, 365);
+  num('matchOfferCooldownDays', MATCH_OFFER_COOLDOWN_LIMITS[0], MATCH_OFFER_COOLDOWN_LIMITS[1]);
   for (const k of Object.keys(ROUND_LIMITS) as Array<keyof typeof ROUND_LIMITS>) num(k, ROUND_LIMITS[k][0], ROUND_LIMITS[k][1]);
   out.dayMorning = hhmmOr(src.dayMorning, out.dayMorning);
   out.dayAfternoon = hhmmOr(src.dayAfternoon, out.dayAfternoon);

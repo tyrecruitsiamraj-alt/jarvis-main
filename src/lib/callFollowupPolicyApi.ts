@@ -17,6 +17,7 @@ export async function fetchCallFollowupPolicy(): Promise<CallFollowupPolicy> {
 export type CallRetryRoundInput = Pick<
   CallFollowupPolicy,
   'roundCalls' | 'roundGapMinutes' | 'roundsPerDay' | 'roundsGapHours' | 'retryDays' | 'dayMorning' | 'dayAfternoon' | 'retryDayMode'
+  | 'matchOfferCooldownDays'
 >;
 
 export async function saveCallFollowupPolicy(input: CallRetryRoundInput): Promise<CallFollowupPolicy> {

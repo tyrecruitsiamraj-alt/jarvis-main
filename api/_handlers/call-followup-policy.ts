@@ -3,14 +3,14 @@
  * > *"ไม่รับสายแล้วโทรวันถัดไป ขอเป็นโทรใหม่ตอนเที่ยง · ขอหน้าไว้ตั้งเวลาผ่าน UI"* · Choice: ทุกงานที่ AI โทร · Admin แก้
  * - GET: ค่าที่ใช้อยู่
  * - PUT (admin): ช่องโทรซ้ำเป็นรอบ (27 ต.ค. 2569) `{ roundCalls, roundGapMinutes, roundsPerDay, roundsGapHours, retryDays,
- *   dayMorning, dayAfternoon, retryDayMode }` — maxAttempts คิดให้เอง · ค่าอื่นของนโยบายคงเดิม · จดบันทึกการใช้งานทุกครั้ง
+ *   dayMorning, dayAfternoon, retryDayMode, matchOfferCooldownDays }` — maxAttempts คิดให้เอง · ค่าอื่นของนโยบายคงเดิม · จดบันทึกการใช้งานทุกครั้ง
  * ความหมาย/ตัวกรองค่าอยู่ `src/lib/callFollowupPolicy.ts` ที่เดียว · เก็บใน app_call_followup_policy (073)
  */
 import { withRbac, sendError, handleApiError, type ApiRes, type AuthedReq } from '../_lib/http.js';
 import { readJsonBody } from '../_lib/body.js';
 import { auditFromAuthed } from '../_lib/audit.js';
 import { getCallFollowupPolicy, setCallFollowupPolicy } from '../_lib/callFollowupPolicyStore.js';
-import { normalizeCallFollowupPolicy, ROUND_LIMITS } from '../../src/lib/callFollowupPolicy.js';
+import { MATCH_OFFER_COOLDOWN_LIMITS, normalizeCallFollowupPolicy, ROUND_LIMITS } from '../../src/lib/callFollowupPolicy.js';
 
 const ROUND_FIELD_LABEL: Record<keyof typeof ROUND_LIMITS, string> = {
   roundCalls: 'สายต่อรอบ',
@@ -44,6 +44,12 @@ async function handler(req: AuthedReq, res: ApiRes) {
       }
       // วันที่โทรซ้ำ (4 พ.ย. 2569) — ไม่ส่งมา = คงค่าเดิม
       if (body.retryDayMode !== undefined && body.retryDayMode !== 'weekend' && body.retryDayMode !== 'next') return sendError(res, 400, 'Bad request', 'วันที่โทรซ้ำไม่ถูกต้อง');
+      // จับคู่งาน: AI เสนองานคนเดิมได้อีกหลังกี่วัน (25 พ.ย. 2569) — ไม่ส่งมา = คงค่าเดิม
+      if (body.matchOfferCooldownDays !== undefined) {
+        const v = Number(body.matchOfferCooldownDays);
+        const [min, max] = MATCH_OFFER_COOLDOWN_LIMITS;
+        if (!Number.isInteger(v) || v < min || v > max) return sendError(res, 400, 'Bad request', `AI เสนองานคนเดิมได้อีกหลังกี่วัน ต้องเป็น ${min}–${max}`);
+      }
       const before = await getCallFollowupPolicy();
       const pick = (p: typeof before) => ({
         roundCalls: p.roundCalls,
@@ -55,6 +61,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
         dayAfternoon: p.dayAfternoon,
         retryDayMode: p.retryDayMode,
         maxAttempts: p.maxAttempts,
+        matchOfferCooldownDays: p.matchOfferCooldownDays,
       });
       // รับเฉพาะช่องของหน้านี้ — ค่าอื่นของนโยบาย (ห้ามโทร · พักเบอร์ ฯลฯ) คงเดิม
       const roundKeys = [...Object.keys(ROUND_LIMITS), 'dayMorning', 'dayAfternoon'];
@@ -62,6 +69,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
         ...before,
         ...Object.fromEntries(roundKeys.map((k) => [k, body[k]])),
         retryDayMode: body.retryDayMode ?? before.retryDayMode,
+        matchOfferCooldownDays: body.matchOfferCooldownDays ?? before.matchOfferCooldownDays,
       });
       const saved = await setCallFollowupPolicy(next, req.user?.email ?? null);
       await auditFromAuthed(req, {

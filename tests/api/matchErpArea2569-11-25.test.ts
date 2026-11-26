@@ -144,19 +144,32 @@ describe('ปุ่มยกเลิกสาย ต้องยกเลิก
   });
 });
 
-describe('จับคู่งาน 1 คน 1 ใบ · วันละ 1 สาย — ด่านอยู่ตอนเข้าคิว', () => {
+describe('จับคู่งาน: AI เสนอแล้วใน N วัน (ตั้งค่า) ส่ง AI อีกไม่ได้ · มีใบอื่นค้างไม่ส่ง — ด่านอยู่ตอนเข้าคิว', () => {
   const src = readFileSync('api/_lib/lumosDispatch.ts', 'utf8');
-  it('เฉพาะแถวจับคู่ (matchRank) · มีใบอื่นค้าง / โทรไปแล้วใน 24 ชม. / ปฏิเสธ-เงียบ-เบอร์ผิดใน 30 วัน = ไม่เข้าคิว', () => {
+  it('เฉพาะแถวจับคู่ (matchRank) · จำนวนวันมาจากหน้าตั้งค่า (matchOfferCooldownDays) ไม่ฝังเลข', () => {
     const fn = src.slice(src.indexOf('export async function phonesBusyForMatchOffer'), src.indexOf('async function insertQueueItems('));
     expect(fn).toContain('q.match_rank is not null');
-    expect(fn).toContain("interval '24 hours'");
-    expect(fn).toContain("('declined', 'unresponsive', 'wrong_person')");
+    expect(fn).toContain('make_interval(days => $3::int)');
     expect(fn).toContain('q.job_ref <> $2');
+    expect(fn).not.toMatch(/interval '\d+ days'/);
     const ins = src.slice(src.indexOf('async function insertQueueItems('), src.indexOf('async function insertQueueItems(') + 12000);
+    expect(ins).toContain('.matchOfferCooldownDays;');
     expect(ins).toMatch(/if \(item\.matchRank != null\) \{\s*if \(busyMatchPhones === null\) \{\s*guarded\.push/);
     expect(ins).toContain('matchBusy.push(item.personRef)');
   });
-  it('ทุกเส้นที่ส่งสายจับคู่รายงานเหตุ "มีงานอื่นเสนออยู่…" ให้คนเห็น', () => {
+  it('ทุกเส้นที่ส่งสายจับคู่รายงานเหตุให้คนเห็น', () => {
     expect((src.match(/for \(const ref of matchBusy\) skipped\.push/g) ?? []).length).toBe(5);
+  });
+});
+
+describe('ตั้งค่าผ่านหน้าจอ: AI เสนองานคนเดิมได้อีกหลังกี่วัน', () => {
+  it('ค่าเริ่ม 30 · บีบให้อยู่ 1–180 · หน้าตั้งค่ามีช่อง · PUT รับช่องนี้', async () => {
+    const { DEFAULT_CALL_FOLLOWUP_POLICY, normalizeCallFollowupPolicy } = await import('../../src/lib/callFollowupPolicy');
+    expect(DEFAULT_CALL_FOLLOWUP_POLICY.matchOfferCooldownDays).toBe(30);
+    expect(normalizeCallFollowupPolicy({ matchOfferCooldownDays: 14 }).matchOfferCooldownDays).toBe(14);
+    expect(normalizeCallFollowupPolicy({ matchOfferCooldownDays: 999 }).matchOfferCooldownDays).toBe(180);
+    expect(normalizeCallFollowupPolicy({}).matchOfferCooldownDays).toBe(30);
+    expect(readFileSync('src/pages/settings/CallRetryTab.tsx', 'utf8')).toContain('data-testid="retry-matchOfferCooldownDays"');
+    expect(readFileSync('api/_handlers/call-followup-policy.ts', 'utf8')).toContain('matchOfferCooldownDays: body.matchOfferCooldownDays ?? before.matchOfferCooldownDays');
   });
 });
