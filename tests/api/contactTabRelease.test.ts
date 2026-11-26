@@ -125,9 +125,10 @@ describe('POST /api/application-call-choice choice=release', () => {
     const [sql, params] = updates()[0] as [string, unknown[]];
     expect(sql).toMatch(/claimed_by = null/);
     expect(sql).toMatch(/is_lead = false/);
-    expect(sql).toMatch(/where id = \$1 and \(claimed_by is null or claimed_by = \$2\)/);
+    // 26 พ.ย. 2569 Supervisor ขึ้นไปถอยใบของใครก็ได้ ($3) — บัญชีทดสอบเป็น admin
+    expect(sql).toMatch(/where id = \$1 and \(\$3::boolean or claimed_by is null or claimed_by = \$2\)/);
     expect(sql).not.toMatch(/call_choice|unclaimed_at|status =/);
-    expect(params).toEqual([MINE, 'u-me']);
+    expect(params).toEqual([MINE, 'u-me', true]);
     expect(releaseHolds).toHaveBeenCalledWith(MINE, 'u-me');
     expect(acquire).not.toHaveBeenCalled();
   });
@@ -143,20 +144,22 @@ describe('POST /api/application-call-choice choice=release', () => {
     expect(json).toHaveBeenCalledWith({ choice: 'release', done: 1, skipped: [] });
   });
 
-  it('🔴 ใบที่คนอื่นจองไว้ ⇒ ข้ามพร้อมเหตุผล ไม่ยิง update ไม่คืนล็อก', async () => {
+  it('🔴 ใบที่คนอื่นจองไว้ · Supervisor ขึ้นไป ⇒ ถอยได้ + คืนล็อกของคนเก็บ (เจ้าของ 26 พ.ย. 2569 "คนเก็บ + Supervisor ขึ้นไป")', async () => {
     dbQuery.mockImplementation((sql: string) => {
       if (/^\s*select a\.id, a\.full_name/i.test(sql)) return Promise.resolve({ rows: [row(THEIRS, 'u-other')] });
+      if (/^\s*update /i.test(sql)) return Promise.resolve({ rows: [{ id: THEIRS }] });
       return Promise.resolve({ rows: [] });
     });
     const { res, json } = mockRes();
     await handler(req({ ids: [THEIRS], choice: 'release' }) as never, res as never);
-    expect(json).toHaveBeenCalledWith({
-      choice: 'release',
-      done: 0,
-      skipped: [{ name: 'ใบของคนอื่น', reason: 'มีเจ้าหน้าที่คนอื่นเก็บไว้ — ลบออกได้เฉพาะใบที่ตัวเองเก็บ' }],
-    });
-    expect(updates()).toHaveLength(0);
-    expect(releaseHolds).not.toHaveBeenCalled();
+    expect(json).toHaveBeenCalledWith({ choice: 'release', done: 1, skipped: [] });
+    expect(releaseHolds).toHaveBeenCalledWith(THEIRS, 'u-other');
+  });
+  it('🔴 ลูกทีม (ไม่ใช่ Supervisor) ถอยใบคนอื่นไม่ได้ · ใบที่กดโทรแล้วถอยไม่ได้ทุกคน', () => {
+    const src = readFileSync('api/_handlers/application-call-choice.ts', 'utf8');
+    expect(src).toContain("if (r.claimed_by && r.claimed_by !== req.user.sub && !canOthers) {");
+    expect(src).toContain("reason: 'มีเจ้าหน้าที่คนอื่นเก็บไว้ — ถอยได้เฉพาะคนเก็บหรือ Supervisor'");
+    expect(src).toContain("reason: 'กดโทรไปแล้ว — ย้ายออกไม่ได้ ลงผลติดต่อแทน'");
   });
 
   it('แข่งกันแล้วคนอื่นจองไปก่อน (update ไม่โดนแถว) ⇒ ข้าม ไม่คืนล็อก', async () => {

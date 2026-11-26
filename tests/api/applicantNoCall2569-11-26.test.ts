@@ -75,8 +75,32 @@ describe('ทุกทางเคารพไม่โทร', () => {
     const ws = readFileSync('src/components/recruit-rm/RmWorkspace.tsx', 'utf8');
     expect(ws).toContain("if (row.no_call_reason_id != null) void pickNoCall(null, [row.id]);");
   });
-  it('ปุ่มไม่โทรอยู่ก่อนเก็บไปโทรเอง', () => {
+  it('ไม่มีปุ่มไม่โทรบนแถบเครื่องมือ (ถอด 26 พ.ย. 2569) — เหลือปุ่มในแถว', () => {
     const bar = readFileSync('src/components/recruit-rm/RmSearchBar.tsx', 'utf8');
-    expect(bar.indexOf('data-testid="rm-no-call"')).toBeLessThan(bar.indexOf('{onHoldSelected ? ('));
+    expect(bar).not.toContain('rm-no-call');
+  });
+  it('ป๊อปรายละเอียดผู้สมัครไม่มีกล่องส่งเอกสาร (ถอด 26 พ.ย. 2569) — ปุ่มบนแถวแท็บการติดต่อยังอยู่', () => {
+    expect(readFileSync('src/components/recruit-rm/ApplicantContactDialog.tsx', 'utf8')).not.toContain('<SendDocumentsSection');
+    expect(readFileSync('src/components/recruit-rm/RmWorkspace.tsx', 'utf8')).toContain('<SendDocumentsSection applicationId={docsApp.id} autoCreate />');
   });
 });
+
+describe('26 พ.ย. 2569 (ต่อ)', () => {
+  it('ป๊อปไม่โทรไม่มีส่วนจัดการเหตุผล — กดเหตุผลแล้วย้ายกล่องเลย', () => {
+    const d = readFileSync('src/components/recruit-rm/NoCallDialog.tsx', 'utf8');
+    expect(d).not.toContain('no-call-manage');
+    expect(d).not.toMatch(/createNoCallReason|updateNoCallReason/);
+  });
+  it('ย้ายชื่อออกจากการติดต่อได้เฉพาะชื่อที่ยังไม่เคยกดโทร (จอ + server)', () => {
+    const h = readFileSync('api/_handlers/application-call-choice.ts', 'utf8');
+    expect(h).toContain("if (r.dialed_first_at) {");
+    expect(h).toContain('a.no_call_reason_id, a.dialed_first_at');
+    const t = readFileSync('src/components/recruit-rm/RmTable.tsx', 'utf8');
+    expect(t).toContain("if (a === 'release' && r.dialed_first_at) {");
+    // คนเก็บ + Supervisor ขึ้นไป ถอยได้ · ลูกทีมถอยใบคนอื่นไม่ได้ (ปุ่มบอกเหตุ)
+    expect(t).toContain("} else if (a === 'release' && r.claimed && !r.claimed_by_me && !canReleaseOthers) {");
+    expect(h).toContain("const canOthers = req.user.role === 'admin' || req.user.role === 'supervisor';");
+    expect(h).toContain('await releaseApplicationCallHolds(r.id, r.claimed_by ?? req.user.sub);');
+  });
+});
+

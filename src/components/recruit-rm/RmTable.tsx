@@ -213,6 +213,8 @@ const RmTable: React.FC<{
   onAction: (action: RmRowAction, row: PublicApplication) => void;
   /** ระบบส่งเอกสารเปิดอยู่ไหม — ปิด = ปุ่มส่งเอกสารกดไม่ได้พร้อมบอกเหตุ */
   docsEnabled?: boolean;
+  /** Supervisor ขึ้นไป — ถอย/ลบออกใบของคนอื่นได้ (เจ้าของ 26 พ.ย. 2569 "คนเก็บ + Supervisor ขึ้นไป") */
+  canReleaseOthers?: boolean;
   /** ล็อกโทรที่มีอยู่ (คีย์ = application id) — ไว้โชว์ 🔒 และกันกด "โทร" ซ้ำ */
   holdByRef?: Record<string, CallHold>;
   /** บันทึกผลติดตามนัด มา/ไม่มา (แท็บนัดหมาย · migration 089) */
@@ -233,7 +235,7 @@ const RmTable: React.FC<{
   extraRowCount?: number;
   /** แท็บ Scrap (25 พ.ย. 2569) — มี = คอลัมน์ "ผลประเมิน" ของ So Scraping (ผล · เหตุผล · เว็บ) ต่อจากอายุ */
   scrapOf?: (r: PublicApplication) => ScrapWorkRow | null;
-}> = ({ tab, rows, selectedIds, onToggleRow, onToggleAll, onAction, docsEnabled = false, holdByRef = {}, onAttendance, recruiterOf, areaOf, actionsOverride, unitOf, extraRows, extraRowCount = 0, scrapOf }) => {
+}> = ({ tab, rows, selectedIds, onToggleRow, onToggleAll, onAction, docsEnabled = false, canReleaseOthers = false, holdByRef = {}, onAttendance, recruiterOf, areaOf, actionsOverride, unitOf, extraRows, extraRowCount = 0, scrapOf }) => {
   const actions = actionsOverride ?? RM_ROW_ACTIONS[tab];
   /**
    * 🔴 แท็บผู้สมัครใช้ชุดคอลัมน์ที่เจ้าของสั่งเอง (30 ก.ย. 2569 · Choice "เอาตามที่ฉันสั่ง"):
@@ -695,6 +697,15 @@ const RmTable: React.FC<{
                           } else if (silentAi) {
                             label = 'ส่ง AI ใหม่';
                           }
+                        }
+                        // ลบออก/ถอยออกจากการติดต่อ — ได้เฉพาะชื่อที่ยังไม่เคยกดโทร (เจ้าของ 26 พ.ย. 2569)
+                        if (a === 'release' && r.dialed_first_at) {
+                          disabled = true;
+                          label = 'กดโทรไปแล้ว — ย้ายออกไม่ได้ ลงผลติดต่อแทน';
+                        } else if (a === 'release' && r.claimed && !r.claimed_by_me && !canReleaseOthers) {
+                          // เดิมกดได้แล้วเซิร์ฟเวอร์ข้ามเงียบ ๆ (เจ้าของ "เรื่องถอย ลบ ทำไมกดไม่ได้งงไปหมด")
+                          disabled = true;
+                          label = `${r.claimed_by_name?.trim() || 'คนอื่น'} เก็บไว้ — ถอยได้เฉพาะคนเก็บหรือ Supervisor`;
                         }
                         // ไม่โทร (26 พ.ย. 2569) — ใบที่กดไว้แล้ว = ยกเลิกไม่โทร · คนจาก Scrap ที่ยังไม่มีใบ = กดไม่ได้
                         if (a === 'nocall') {

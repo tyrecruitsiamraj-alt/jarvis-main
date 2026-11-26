@@ -1573,13 +1573,7 @@ const RmWorkspace: React.FC<{
             onHoldSelected={tab === 'candidates' ? () => void keepSelectedForSelf() : undefined}
             holdingSelected={holdingSelected}
             onSendAiSelected={() => askSendAi(selectedIds)}
-            /* "ไม่โทร" ก่อนเก็บไปโทรเอง (26 พ.ย. 2569) · ยกเลิกไม่โทรโผล่เมื่อติ๊กคนที่กดไว้ */
-            onNoCallSelected={tab === 'candidates' ? () => askNoCall(selectedIds) : undefined}
-            onUndoNoCallSelected={
-              tab === 'candidates' && workRows.some((r) => selectedIds.includes(r.id) && r.no_call_reason_id != null)
-                ? () => void pickNoCall(null, workRows.filter((r) => selectedIds.includes(r.id) && r.no_call_reason_id != null).map((r) => r.id))
-                : undefined
-            }
+            /* ปุ่ม "ไม่โทร" บนแถบถอดแล้ว (เจ้าของ 26 พ.ย. 2569 "ถอดปุ่ม ไม่โทร ออกด้วย") — ใช้ปุ่มในแถว */
             /* กล่องที่ส่ง AI ไม่ได้ = ปุ่มรวมกดไม่ได้ พร้อมเหตุ (26 พ.ย. 2569) */
             sendAiBlockedReason={
               tab === 'candidates' && !bucket
@@ -1836,6 +1830,7 @@ const RmWorkspace: React.FC<{
                 onToggleRow={toggleRow}
                 onToggleAll={toggleAll}
                 onAction={onRowAction}
+                canReleaseOthers={user?.role === 'admin' || user?.role === 'supervisor'}
                 docsEnabled={docsEnabled}
                 holdByRef={holdByRef}
                 onAttendance={onAttendance}
@@ -1945,11 +1940,9 @@ const RmWorkspace: React.FC<{
       <NoCallDialog
         names={noCallIds ? noCallIds.map((id) => workRows.find((r) => r.id === id)?.full_name ?? id) : null}
         reasons={noCallReasons}
-        canManage={user?.role === 'admin' || user?.role === 'supervisor'}
         busy={noCallBusy}
         onPick={(reasonId) => noCallIds && void pickNoCall(reasonId, noCallIds)}
         onClose={() => setNoCallIds(null)}
-        onReasonsChanged={loadNoCallReasons}
       />
 
       <ScrapCandidateDialog

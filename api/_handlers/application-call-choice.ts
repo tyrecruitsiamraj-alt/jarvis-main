@@ -76,6 +76,8 @@ type Row = {
   created_by_name: string | null;
   /** เจ้าหน้าที่กด "ไม่โทร" (200 · 26 พ.ย. 2569) — ส่ง AI ไม่ได้จนกว่าจะยกเลิก */
   no_call_reason_id?: number | null;
+  /** กดโทรจากจอครั้งแรกเมื่อไหร่ (095) — กดแล้วย้ายชื่อออกจากการติดต่อไม่ได้ (เจ้าของ 26 พ.ย. 2569) */
+  dialed_first_at?: Date | string | null;
 };
 
 export type CallChoiceResult = {
@@ -181,8 +183,15 @@ async function chooseRelease(req: AuthedReq, rows: Row[]): Promise<CallChoiceRes
   const skipped: CallChoiceResult['skipped'] = [];
   let done = 0;
   for (const r of rows) {
-    if (r.claimed_by && r.claimed_by !== req.user.sub) {
-      skipped.push({ name: r.full_name, reason: 'มีเจ้าหน้าที่คนอื่นเก็บไว้ — ลบออกได้เฉพาะใบที่ตัวเองเก็บ' });
+    // คนเก็บ + Supervisor ขึ้นไป ถอยได้ (เจ้าของ 26 พ.ย. 2569 Choice) — ลูกทีมถอยได้เฉพาะใบตัวเอง
+    const canOthers = req.user.role === 'admin' || req.user.role === 'supervisor';
+    if (r.claimed_by && r.claimed_by !== req.user.sub && !canOthers) {
+      skipped.push({ name: r.full_name, reason: 'มีเจ้าหน้าที่คนอื่นเก็บไว้ — ถอยได้เฉพาะคนเก็บหรือ Supervisor' });
+      continue;
+    }
+    // 🔴 เจ้าของ 26 พ.ย. 2569 "การจะย้ายชื่อออกมาต้องเป็นชื่อที่ยังไม่กดปุ่มโทรเลยถึงจะย้ายออกมา"
+    if (r.dialed_first_at) {
+      skipped.push({ name: r.full_name, reason: 'กดโทรไปแล้ว — ย้ายออกไม่ได้ ลงผลติดต่อแทน' });
       continue;
     }
     const { rows: released } = await dbQuery<{ id: string }>(
@@ -190,16 +199,16 @@ async function chooseRelease(req: AuthedReq, rows: Row[]): Promise<CallChoiceRes
           set claimed_by = null, claimed_by_name = null, claimed_at = null,
               is_lead = false, lead_by = null, lead_by_name = null, lead_at = null,
               updated_at = now()
-        where id = $1 and (claimed_by is null or claimed_by = $2)
+        where id = $1 and ($3::boolean or claimed_by is null or claimed_by = $2)
         returning id`,
-      [r.id, req.user.sub],
+      [r.id, req.user.sub, canOthers],
     );
     if (released.length === 0) {
       skipped.push({ name: r.full_name, reason: 'มีเจ้าหน้าที่คนอื่นเก็บไปก่อน' });
       continue;
     }
-    // คืนล็อกเบอร์ที่ตัวเองถือไว้ให้ใบนี้ — ไม่คืน = คนอื่นเก็บไปโทรแล้วล็อกไม่ได้
-    await releaseApplicationCallHolds(r.id, req.user.sub);
+    // คืนล็อกเบอร์ของคนเก็บ (Supervisor ถอยใบลูกทีม = คืนล็อกของลูกทีม) — ไม่คืน = คนอื่นเก็บไปโทรแล้วล็อกไม่ได้
+    await releaseApplicationCallHolds(r.id, r.claimed_by ?? req.user.sub);
     done += 1;
   }
   return { choice: 'release', done, skipped };
@@ -337,7 +346,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
     const { rows } = await dbQuery<Row>(
       `select a.id, a.full_name, a.phone, a.job_id, a.department_code,
               a.job_title, a.unit_name, a.position_interest, a.province, a.claimed_by, a.claimed_by_name, a.age,
-              a.created_by_name, a.no_call_reason_id
+              a.created_by_name, a.no_call_reason_id, a.dialed_first_at
          from ${tbl} a
         where a.id = any($1::uuid[])`,
       [ids],
