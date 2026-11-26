@@ -23,7 +23,7 @@ import {
   type CallOutcome,
 } from '../../src/lib/callFollowupPolicy.js';
 import { getCallFollowupPolicy } from './callFollowupPolicyStore.js';
-import { cancelPushedInterview, getLumosPushConfig } from './lumosPushClient.js';
+import { cancelPushedInterview, cancelPushedReminder, getLumosPushConfig } from './lumosPushClient.js';
 import { cancelFollowPlanAtLumos } from './followLumosCancel.js';
 import { followSameStopUnitSql } from './followDayScope.js';
 import { logError, logInfo } from './logger.js';
@@ -157,6 +157,8 @@ type QueueRow = {
   payload: unknown;
   person_ref: string;
   job_ref: string;
+  /** มีค่า = สายจับคู่งาน (ระบบจับคู่แล้วส่งเอง) · null = ผู้สมัครกรอกเอง / ติดตาม */
+  match_rank?: number | null;
 };
 
 /** 9 หลักท้ายของเบอร์ในคอลัมน์ — เทียบได้ทั้ง 081… / +6681… */
@@ -182,6 +184,36 @@ export async function stopOpenInterviewCalls(rawPhone: string, logTag: string): 
     for (const it of items.filter((x) => x.pushed)) {
       try {
         await cancelPushedInterview(`${it.job_ref}::${it.person_ref}::interview`);
+      } catch (e) {
+        logError(`${logTag}: ยกเลิกที่ Lumos ไม่สำเร็จ`, e, { queueId: it.id });
+      }
+    }
+  }
+  return items.length;
+}
+
+/**
+ * ยกเลิกสายจับคู่งาน (`match_rank` มีค่า · ทั้งสองช่อง) ของเบอร์นี้ที่ยังไม่มีผล ยกเว้นแถว `exceptId` — ในฐาน + ที่ Lumos ถ้าส่งไปแล้ว
+ * (25 พ.ย. 2569: 1 คน 1 ใบ — คนที่ตอบไม่สนใจ/เงียบ/ไม่ใช่เจ้าตัว ไม่ต้องโดนโทรเสนอใบอื่นที่ค้างอยู่)
+ * แถวที่มีผลแล้วไม่แตะ (ยกเลิกแผนที่จบแล้วที่ Lumos ไปโดนแผนอื่นของเบอร์เดียวกัน)
+ */
+export async function stopOpenMatchOffers(rawPhone: string, exceptId: number, logTag: string): Promise<number> {
+  const k = rawPhone.replace(/\D/g, '').slice(-9);
+  if (k.length < 9) return 0;
+  const { rows: items } = await dbQuery<{ id: string; channel: string; job_ref: string; person_ref: string; pushed: boolean; client_id: string | null }>(
+    `update ${queueTable} set status = 'cancelled', updated_at = now()
+      where match_rank is not null and id <> $2 and result is null and last_outcome is null
+        and status in ('pending', 'delivered')
+        and ${key9(QUEUE_PHONE)} = $1
+      returning id::text, channel, job_ref, person_ref, (push_state = 'pushed' or pushed_at is not null) as pushed,
+                coalesce(payload->>'client_interview_id', payload->>'client_contact_id') as client_id`,
+    [k, exceptId],
+  );
+  if (getLumosPushConfig()) {
+    for (const it of items.filter((x) => x.pushed)) {
+      try {
+        if (it.channel === 'interview') await cancelPushedInterview(it.client_id || `${it.job_ref}::${it.person_ref}::interview`);
+        else if (it.client_id) await cancelPushedReminder(it.client_id);
       } catch (e) {
         logError(`${logTag}: ยกเลิกที่ Lumos ไม่สำเร็จ`, e, { queueId: it.id });
       }
@@ -223,7 +255,7 @@ export async function applyCallFollowupToQueueRow(input: {
   let row: QueueRow | undefined;
   try {
     const { rows } = await dbQuery<QueueRow>(
-      `select id, channel, attempt_count, payload, person_ref, job_ref from ${queueTable} where id = $1 limit 1`,
+      `select id, channel, attempt_count, payload, person_ref, job_ref, match_rank from ${queueTable} where id = $1 limit 1`,
       [input.queueId],
     );
     row = rows[0];
@@ -242,7 +274,7 @@ export async function applyCallFollowupToQueueRow(input: {
   const followGroupId = followSchedule.groupId;
 
   const policyOutcome = outcomeForPolicy(input.outcome, row.channel, input.result);
-  const decision: CallFollowupDecision = input.outcome === 'automated_service'
+  const rawDecision: CallFollowupDecision = input.outcome === 'automated_service'
     ? { action: 'needs_human', nextAttemptAt: null, suppressUntil: null, reason: 'เจอระบบตอบรับอัตโนมัติ (ปิดเครื่อง/ติดต่อไม่ได้) — ให้คนตาม' }
     : resolveCallFollowup({
         outcome: policyOutcome,
@@ -256,6 +288,25 @@ export async function applyCallFollowupToQueueRow(input: {
         policy: policyForQueueRef(await getCallFollowupPolicy(), row.person_ref),
         // ไม่รับสาย ⇒ เวลาโทรซ้ำถัดไปจากหน้า ตั้งค่า › โทรซ้ำคนไม่รับสาย (ทุกงาน · 26 ต.ค. 2569)
       });
+  /**
+   * 🔴 สายจับคู่งาน: AI โทร **รอบเดียว** แล้วส่งต่อให้คน (เจ้าของ 25 พ.ย. 2569 *"Ai โทรให้รอบแรกแบบเดียวกันกับสัมภาษณ์
+   *    ถ้าจะโทรต่อก็ให้คนเก็บไปโทรเอง"*) — ไม่รับสาย/ขอให้โทรกลับ = ขึ้น "ต้องคนตาม" ไม่นัดโทรซ้ำ
+   */
+  const decision: CallFollowupDecision =
+    row.match_rank != null && rawDecision.action === 'retry'
+      ? { action: 'needs_human', nextAttemptAt: null, suppressUntil: null, reason: 'สายจับคู่งาน AI โทรรอบเดียว — ให้คนโทรต่อ' }
+      : rawDecision;
+  // จับคู่งาน: ตอบไม่สนใจ / รับแล้วเงียบ / ไม่ใช่เจ้าตัว → หยุดเสนอใบอื่นของเบอร์นี้ที่ค้างอยู่ (ฐาน + Lumos) · ล้ม = log
+  if (row.match_rank != null && ['declined', 'unresponsive', 'wrong_person'].includes(policyOutcome)) {
+    const phone = phoneFromPayload(row.payload);
+    if (phone) {
+      try {
+        await stopOpenMatchOffers(phone, row.id, 'match-offer.stop-after-outcome');
+      } catch (e) {
+        logError('match-offer.stop-after-outcome failed', e, { queueId: row.id });
+      }
+    }
+  }
   // rejected เก็บเป็น no_answer (นับเป็นไม่รับสายทุกหน้า + ตัวส่งซ้ำจัดนัดค้างได้)
   const storedOutcome = input.outcome === 'rejected' ? policyOutcome : input.outcome;
 

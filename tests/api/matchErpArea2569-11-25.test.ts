@@ -143,3 +143,20 @@ describe('ปุ่มยกเลิกสาย ต้องยกเลิก
     expect(fn).toContain('cancelPushedReminderIgnoringMissing(');
   });
 });
+
+describe('จับคู่งาน 1 คน 1 ใบ · วันละ 1 สาย — ด่านอยู่ตอนเข้าคิว', () => {
+  const src = readFileSync('api/_lib/lumosDispatch.ts', 'utf8');
+  it('เฉพาะแถวจับคู่ (matchRank) · มีใบอื่นค้าง / โทรไปแล้วใน 24 ชม. / ปฏิเสธ-เงียบ-เบอร์ผิดใน 30 วัน = ไม่เข้าคิว', () => {
+    const fn = src.slice(src.indexOf('export async function phonesBusyForMatchOffer'), src.indexOf('async function insertQueueItems('));
+    expect(fn).toContain('q.match_rank is not null');
+    expect(fn).toContain("interval '24 hours'");
+    expect(fn).toContain("('declined', 'unresponsive', 'wrong_person')");
+    expect(fn).toContain('q.job_ref <> $2');
+    const ins = src.slice(src.indexOf('async function insertQueueItems('), src.indexOf('async function insertQueueItems(') + 12000);
+    expect(ins).toMatch(/if \(item\.matchRank != null\) \{\s*if \(busyMatchPhones === null\) \{\s*guarded\.push/);
+    expect(ins).toContain('matchBusy.push(item.personRef)');
+  });
+  it('ทุกเส้นที่ส่งสายจับคู่รายงานเหตุ "มีงานอื่นเสนออยู่…" ให้คนเห็น', () => {
+    expect((src.match(/for \(const ref of matchBusy\) skipped\.push/g) ?? []).length).toBe(5);
+  });
+});

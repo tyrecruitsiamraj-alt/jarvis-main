@@ -513,3 +513,43 @@ describe('รหัสนอกชุดของ Lumos ในสายเสน
     expect(vi.mocked(dbQuery)).not.toHaveBeenCalled();
   });
 });
+
+describe('สายจับคู่งาน — AI โทรรอบเดียว · ปฏิเสธ/เงียบแล้วหยุดเสนอใบอื่น (เจ้าของ 25 พ.ย. 2569)', () => {
+  beforeEach(() => vi.mocked(dbQuery).mockReset());
+
+  it('ไม่รับสาย → ส่งต่อให้คน (needs_human) ไม่นัดโทรซ้ำ', async () => {
+    vi.mocked(dbQuery)
+      .mockResolvedValueOnce({ rows: [{ id: 39276, channel: 'interview', attempt_count: 1, payload: {}, person_ref: 'card-3368', job_ref: 'siamraj-sql:OPL6911035', match_rank: 1 }] })
+      .mockResolvedValueOnce({ rows: [] });
+    const d = await applyCallFollowupToQueueRow({ queueId: 39276, outcome: 'no_answer' });
+    expect(d?.action).toBe('needs_human');
+    expect(allSql().some((q) => q.includes("status = 'pending'"))).toBe(false);
+  });
+
+  it('ขอให้โทรกลับ → ก็ส่งต่อให้คนเหมือนกัน', async () => {
+    vi.mocked(dbQuery)
+      .mockResolvedValueOnce({ rows: [{ id: 39276, channel: 'interview', attempt_count: 1, payload: {}, person_ref: 'card-3368', job_ref: 'siamraj-sql:OPL6911035', match_rank: 2 }] })
+      .mockResolvedValueOnce({ rows: [] });
+    const d = await applyCallFollowupToQueueRow({ queueId: 39276, outcome: 'reschedule_requested' });
+    expect(d?.action).toBe('needs_human');
+  });
+
+  it('ตอบไม่สนใจ → ยกเลิกสายจับคู่ใบอื่นของเบอร์นี้ที่ค้างอยู่ (เว้นแถวนี้)', async () => {
+    vi.mocked(dbQuery)
+      .mockResolvedValueOnce({ rows: [{ id: 36052, channel: 'interview', attempt_count: 1, payload: { phone: '+66812345678' }, person_ref: 'card-3190', job_ref: 'siamraj-sql:OPL6905114', match_rank: 1 }] })
+      .mockResolvedValue({ rows: [] });
+    await applyCallFollowupToQueueRow({ queueId: 36052, outcome: 'declined' });
+    const i = allSql().findIndex((q) => q.includes('match_rank is not null and id <> $2'));
+    expect(i).toBeGreaterThan(-1);
+    expect(paramsOf(i)).toEqual(['812345678', 36052]);
+    expect(sqlOf(i)).toContain('result is null and last_outcome is null');
+  });
+
+  it('ผู้สมัครที่กรอกเอง (ไม่ใช่สายจับคู่) ยังโทรซ้ำตามนโยบายเดิม', async () => {
+    vi.mocked(dbQuery)
+      .mockResolvedValueOnce({ rows: [{ id: 7, channel: 'interview', attempt_count: 1, payload: {}, person_ref: 'app-1', job_ref: 'siamraj-sql:OPL6911035', match_rank: null }] })
+      .mockResolvedValueOnce({ rows: [] });
+    const d = await applyCallFollowupToQueueRow({ queueId: 7, outcome: 'no_answer' });
+    expect(d?.action).toBe('retry');
+  });
+});

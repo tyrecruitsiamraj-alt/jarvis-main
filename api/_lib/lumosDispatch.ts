@@ -457,7 +457,7 @@ export async function enqueueLumosInterviewForApplications(
     items.push({ personRef: `app-${app.id}`, payload, matchRank: null });
   }
   await attachInterviewAdminPhone(items, requestNoFromJobRef(jobId));
-  const { added, held, suppressed, declined, guarded, employed } = await insertQueueItems('interview', jobId, items);
+  const { added, held, suppressed, declined, guarded, employed, matchBusy } = await insertQueueItems('interview', jobId, items);
   const addedSet = new Set(added);
   const heldSet = new Set(held);
   /**
@@ -465,7 +465,7 @@ export async function enqueueLumosInterviewForApplications(
    * ⇒ คนที่ถูก **พักเบอร์** หรือ **กันไว้ก่อนเพราะตรวจไม่ได้** ถูกนับเป็น "เคยส่งแล้ว"
    * ทั้งที่ไม่เคยส่ง · รายงานบนจอเลยบอกผิดทาง
    */
-  const skippedSet = new Set([...held, ...suppressed, ...declined, ...guarded, ...employed]);
+  const skippedSet = new Set([...held, ...suppressed, ...declined, ...guarded, ...employed, ...matchBusy]);
   const nameByRef = new Map(applications.map((a) => [`app-${a.id}`, a.full_name]));
   for (const ref of held) skipped.push({ ref, name: nameByRef.get(ref) || ref, reason: HELD_REASON });
   for (const ref of suppressed) {
@@ -475,6 +475,7 @@ export async function enqueueLumosInterviewForApplications(
     skipped.push({ ref, name: nameByRef.get(ref) || ref, reason: DECLINED_REASON });
   }
   for (const ref of employed) skipped.push({ ref, name: nameByRef.get(ref) || ref, reason: EMPLOYED_REASON });
+  for (const ref of matchBusy) skipped.push({ ref, name: nameByRef.get(ref) || ref, reason: MATCH_BUSY_REASON });
   for (const ref of guarded) {
     skipped.push({ ref, name: nameByRef.get(ref) || ref, reason: GUARDED_REASON });
   }
@@ -751,6 +752,41 @@ export async function phonesWithWork(phones: readonly string[]): Promise<Set<str
   return new Set(rows.map((r) => r.phone));
 }
 
+/**
+ * 🔴 จับคู่งาน: **1 คน เสนอทีละ 1 ใบ · วันละไม่เกิน 1 สาย · ปฏิเสธ/เงียบ/เบอร์ผิดแล้วหยุดเสนอ** (เจ้าของ 25 พ.ย. 2569
+ * Choice "ใบที่เหมาะสุดใบเดียว + วันละ 1 สาย" · "Ai โทรให้รอบแรกแบบเดียวกันกับสัมภาษณ์ ถ้าจะโทรต่อก็ให้คนเก็บไปโทรเอง")
+ * เจอจริง: คนเดียวถูกจับคู่ 113 ใบขอ · คนที่บอก "ไม่ได้สมัคร" โดนโทร 6 ครั้งจาก 2 ใบในวันเดียว
+ * ⚠️ ด่านนี้ต้องอยู่ตอนเข้าคิว — สายจับคู่ส่งเข้า Lumos ทันที (push) ตัวกันตอนเสิร์ฟ (`buildTakePendingSql`) ไม่ได้ใช้
+ * ใช้เฉพาะแถวจับคู่ (`match_rank` มีค่า) · ผู้สมัครที่กรอกเองไม่โดน
+ * คืนเหตุต่อเบอร์: open = มีใบอื่นเสนออยู่ยังไม่จบ · today = AI โทรเรื่องจับคู่ไปแล้วใน 24 ชม. · stopped = ตอบไม่สนใจ/เงียบ/เบอร์ผิด ใน 30 วัน
+ */
+export const MATCH_OFFER_STOP_DAYS = 30;
+export async function phonesBusyForMatchOffer(phones: readonly string[], jobRef: string): Promise<Map<string, 'open' | 'today' | 'stopped'>> {
+  const list = [...new Set(phones.filter(Boolean))];
+  const out = new Map<string, 'open' | 'today' | 'stopped'>();
+  if (list.length === 0) return out;
+  const ph = phoneExprFor('q');
+  const { rows } = await dbQuery<{ phone: string; reason: 'open' | 'today' | 'stopped' }>(
+    `select ${ph} as phone,
+            case when bool_or(q.status in ('pending', 'delivered') and q.result is null and q.last_outcome is null and q.job_ref <> $2) then 'open'
+                 when bool_or(coalesce(q.last_result_at, q.updated_at) >= now() - interval '24 hours' and (q.result is not null or q.last_outcome is not null)) then 'today'
+                 else 'stopped' end as reason
+       from ${queueTable} q
+      where q.match_rank is not null
+        and ${ph} = any($1::text[])
+        and (
+          (q.status in ('pending', 'delivered') and q.result is null and q.last_outcome is null and q.job_ref <> $2)
+          or (coalesce(q.last_result_at, q.updated_at) >= now() - interval '24 hours' and (q.result is not null or q.last_outcome is not null))
+          or (coalesce(q.last_outcome, q.result->>'outcome') in ('declined', 'unresponsive', 'wrong_person')
+              and q.updated_at >= now() - interval '${MATCH_OFFER_STOP_DAYS} days')
+        )
+      group by ${ph}`,
+    [list, jobRef],
+  );
+  for (const r of rows) out.set(r.phone, r.reason);
+  return out;
+}
+
 async function insertQueueItems(
   channel: 'reminder' | 'interview',
   jobRef: string,
@@ -778,6 +814,8 @@ async function insertQueueItems(
   guarded: string[];
   /** ได้งานแล้ว (`phonesWithWork`) — สายเสนองานไม่ส่ง · ไม่มีผลกับสายติดตาม (เจ้าของ 25 พ.ย. 2569) */
   employed: string[];
+  /** จับคู่งาน: คนนี้มีใบอื่นเสนออยู่ / โทรไปแล้ววันนี้ / เพิ่งปฏิเสธ (`phonesBusyForMatchOffer` · 25 พ.ย. 2569) */
+  matchBusy: string[];
 }> {
   const added: string[] = [];
   /** id ของแถวที่เพิ่ง insert สำเร็จ — ใช้จดป้ายบทท้ายลูป */
@@ -787,7 +825,8 @@ async function insertQueueItems(
   const guarded: string[] = [];
   const declined: string[] = [];
   const employed: string[] = [];
-  if (items.length === 0) return { added, held, suppressed, declined, guarded, employed };
+  const matchBusy: string[] = [];
+  if (items.length === 0) return { added, held, suppressed, declined, guarded, employed, matchBusy };
 
   let heldPhones: Set<string>;
   try {
@@ -831,6 +870,17 @@ async function insertQueueItems(
       employedPhones = await phonesWithWork(items.map((i) => payloadPhone(i.payload)).filter((p): p is string => Boolean(p)));
     } catch {
       employedPhones = null;
+    }
+  }
+
+  // จับคู่งาน: 1 คน 1 ใบ · วันละ 1 สาย · ปฏิเสธแล้วหยุด (`phonesBusyForMatchOffer`) — อ่านไม่ได้ = กันไว้ก่อน (`guarded`)
+  const matchPhones = items.filter((i) => i.matchRank != null).map((i) => payloadPhone(i.payload)).filter((p): p is string => Boolean(p));
+  let busyMatchPhones: Map<string, 'open' | 'today' | 'stopped'> | null = new Map();
+  if (matchPhones.length > 0) {
+    try {
+      busyMatchPhones = await phonesBusyForMatchOffer(matchPhones, jobRef);
+    } catch {
+      busyMatchPhones = null;
     }
   }
 
@@ -878,6 +928,16 @@ async function insertQueueItems(
         employed.push(item.personRef);
         continue;
       }
+      if (item.matchRank != null) {
+        if (busyMatchPhones === null) {
+          guarded.push(item.personRef);
+          continue;
+        }
+        if (busyMatchPhones.has(phone)) {
+          matchBusy.push(item.personRef);
+          continue;
+        }
+      }
     }
     // เวลาเสิร์ฟเร็วสุด = ช้ากว่าเสมอระหว่าง quiet-hours (nextAttemptAt) กับ scheduledFor
     // ของรายการ (Follow ตั้งตาราง: วันอนาคตต้องรอถึงวันนั้นก่อนเสิร์ฟ ไม่งั้น bump มาโทรวันนี้)
@@ -918,7 +978,7 @@ async function insertQueueItems(
   }
   // จดว่าแถวพวกนี้ใช้บทชุดไหน — ล้มก็ไม่กระทบการเข้าคิว (ดู stampScriptTag)
   await stampScriptTag(insertedIds, channel, jobRef);
-  return { added, held, suppressed, declined, guarded, employed };
+  return { added, held, suppressed, declined, guarded, employed, matchBusy };
 }
 
 export type LumosDispatchOutcome = {
@@ -948,6 +1008,8 @@ const isScrapNoName = (name: string | null | undefined) => {
 const SUPPRESSED_REASON = 'เบอร์นี้ถูกพักอยู่ (แจ้งว่าไม่หางานแล้ว / เบอร์เสีย)';
 const DECLINED_REASON = 'เคยปฏิเสธงานนี้ไปแล้ว — ไม่เสนอซ้ำ';
 const EMPLOYED_REASON = 'ได้งานแล้ว (มีสายติดตามงานใน 60 วัน) — ไม่เสนองานใหม่';
+/** จับคู่งาน 1 คน 1 ใบ (`phonesBusyForMatchOffer` · 25 พ.ย. 2569) */
+const MATCH_BUSY_REASON = 'มีงานอื่นเสนออยู่ หรือ AI โทรเรื่องงานไปแล้ววันนี้ หรือเพิ่งตอบไม่สนใจ';
 /**
  * 🔴 คนละเรื่องกับ HELD — อันนี้คือ "ระบบตรวจไม่ได้" ไม่ใช่ "มีคนจองไปแล้ว"
  * ต้องบอกให้ชัดว่า **ลองใหม่ได้** ไม่งั้นคนนั่งรอสายที่ไม่มีวันออก (เจอจริง 24 ส.ค. 2569)
@@ -979,7 +1041,7 @@ export async function enqueueLumosReminderForSelected(
     }
     items.push({ personRef: `card-${m.card_id}`, payload, matchRank: matchRankFromTier(m.tier) });
   }
-  const { added, held, suppressed, declined, guarded, employed } = await insertQueueItems('reminder', result.jobId, items);
+  const { added, held, suppressed, declined, guarded, employed, matchBusy } = await insertQueueItems('reminder', result.jobId, items);
   const addedSet = new Set(added);
   const heldSet = new Set(held);
   /**
@@ -987,7 +1049,7 @@ export async function enqueueLumosReminderForSelected(
    * ⇒ คนที่ถูก **พักเบอร์** หรือ **กันไว้ก่อนเพราะตรวจไม่ได้** ถูกนับเป็น "เคยส่งแล้ว"
    * ทั้งที่ไม่เคยส่ง · รายงานบนจอเลยบอกผิดทาง
    */
-  const skippedSet = new Set([...held, ...suppressed, ...declined, ...guarded, ...employed]);
+  const skippedSet = new Set([...held, ...suppressed, ...declined, ...guarded, ...employed, ...matchBusy]);
   const nameByRef = new Map(selected.map((m) => [`card-${m.card_id}`, m.full_name]));
   for (const ref of held) skipped.push({ ref, name: nameByRef.get(ref) || ref, reason: HELD_REASON });
   for (const ref of suppressed) {
@@ -997,6 +1059,7 @@ export async function enqueueLumosReminderForSelected(
     skipped.push({ ref, name: nameByRef.get(ref) || ref, reason: DECLINED_REASON });
   }
   for (const ref of employed) skipped.push({ ref, name: nameByRef.get(ref) || ref, reason: EMPLOYED_REASON });
+  for (const ref of matchBusy) skipped.push({ ref, name: nameByRef.get(ref) || ref, reason: MATCH_BUSY_REASON });
   for (const ref of guarded) {
     skipped.push({ ref, name: nameByRef.get(ref) || ref, reason: GUARDED_REASON });
   }
@@ -1049,7 +1112,7 @@ export async function enqueueLumosInterviewForSelected(
     items.push({ personRef: `ir-${m.id}`, payload, matchRank: matchRankFromTier(m.tier) });
   }
   await attachInterviewAdminPhone(items, result.request_no || requestNoFromJobRef(result.jobId));
-  const { added, held, suppressed, declined, guarded, employed } = await insertQueueItems('interview', result.jobId, items);
+  const { added, held, suppressed, declined, guarded, employed, matchBusy } = await insertQueueItems('interview', result.jobId, items);
   const addedSet = new Set(added);
   const heldSet = new Set(held);
   /**
@@ -1057,7 +1120,7 @@ export async function enqueueLumosInterviewForSelected(
    * ⇒ คนที่ถูก **พักเบอร์** หรือ **กันไว้ก่อนเพราะตรวจไม่ได้** ถูกนับเป็น "เคยส่งแล้ว"
    * ทั้งที่ไม่เคยส่ง · รายงานบนจอเลยบอกผิดทาง
    */
-  const skippedSet = new Set([...held, ...suppressed, ...declined, ...guarded, ...employed]);
+  const skippedSet = new Set([...held, ...suppressed, ...declined, ...guarded, ...employed, ...matchBusy]);
   const nameByRef = new Map(selected.map((m) => [`ir-${m.id}`, m.full_name]));
   for (const ref of held) skipped.push({ ref, name: nameByRef.get(ref) || ref, reason: HELD_REASON });
   for (const ref of suppressed) {
@@ -1067,6 +1130,7 @@ export async function enqueueLumosInterviewForSelected(
     skipped.push({ ref, name: nameByRef.get(ref) || ref, reason: DECLINED_REASON });
   }
   for (const ref of employed) skipped.push({ ref, name: nameByRef.get(ref) || ref, reason: EMPLOYED_REASON });
+  for (const ref of matchBusy) skipped.push({ ref, name: nameByRef.get(ref) || ref, reason: MATCH_BUSY_REASON });
   for (const ref of guarded) {
     skipped.push({ ref, name: nameByRef.get(ref) || ref, reason: GUARDED_REASON });
   }
@@ -1314,7 +1378,7 @@ export async function enqueueLumosInterviewForRecruitLane(
     }
 
     await attachInterviewAdminPhone(items, requestNoFromJobRef(result.jobId));
-    const { added, held, suppressed, declined, guarded, employed } = await insertQueueItems('interview', result.jobId, items);
+    const { added, held, suppressed, declined, guarded, employed, matchBusy } = await insertQueueItems('interview', result.jobId, items);
     const addedSet = new Set(added);
     const heldSet = new Set(held);
   /**
@@ -1322,7 +1386,7 @@ export async function enqueueLumosInterviewForRecruitLane(
    * ⇒ คนที่ถูก **พักเบอร์** หรือ **กันไว้ก่อนเพราะตรวจไม่ได้** ถูกนับเป็น "เคยส่งแล้ว"
    * ทั้งที่ไม่เคยส่ง · รายงานบนจอเลยบอกผิดทาง
    */
-  const skippedSet = new Set([...held, ...suppressed, ...declined, ...guarded, ...employed]);
+  const skippedSet = new Set([...held, ...suppressed, ...declined, ...guarded, ...employed, ...matchBusy]);
     for (const ref of held) skipped.push({ ref, name: nameByRef.get(ref) || ref, reason: HELD_REASON });
     for (const ref of suppressed) {
       skipped.push({ ref, name: nameByRef.get(ref) || ref, reason: SUPPRESSED_REASON });
@@ -1331,6 +1395,7 @@ export async function enqueueLumosInterviewForRecruitLane(
       skipped.push({ ref, name: nameByRef.get(ref) || ref, reason: DECLINED_REASON });
     }
     for (const ref of employed) skipped.push({ ref, name: nameByRef.get(ref) || ref, reason: EMPLOYED_REASON });
+    for (const ref of matchBusy) skipped.push({ ref, name: nameByRef.get(ref) || ref, reason: MATCH_BUSY_REASON });
     const declinedSet = new Set(declined);
     const duplicated = items
       .map((i) => i.personRef)
@@ -1434,7 +1499,7 @@ export async function enqueueLumosInterviewForRecall(
     }
 
     await attachInterviewAdminPhone(items, requestNoFromJobRef(result.jobId));
-    const { added, held, suppressed, declined, guarded, employed } = await insertQueueItems('interview', result.jobId, items);
+    const { added, held, suppressed, declined, guarded, employed, matchBusy } = await insertQueueItems('interview', result.jobId, items);
     const addedSet = new Set(added);
     const heldSet = new Set(held);
   /**
@@ -1442,7 +1507,7 @@ export async function enqueueLumosInterviewForRecall(
    * ⇒ คนที่ถูก **พักเบอร์** หรือ **กันไว้ก่อนเพราะตรวจไม่ได้** ถูกนับเป็น "เคยส่งแล้ว"
    * ทั้งที่ไม่เคยส่ง · รายงานบนจอเลยบอกผิดทาง
    */
-  const skippedSet = new Set([...held, ...suppressed, ...declined, ...guarded, ...employed]);
+  const skippedSet = new Set([...held, ...suppressed, ...declined, ...guarded, ...employed, ...matchBusy]);
     for (const ref of held) skipped.push({ ref, name: nameByRef.get(ref) || ref, reason: HELD_REASON });
     for (const ref of suppressed) {
       skipped.push({ ref, name: nameByRef.get(ref) || ref, reason: SUPPRESSED_REASON });
@@ -1451,6 +1516,7 @@ export async function enqueueLumosInterviewForRecall(
       skipped.push({ ref, name: nameByRef.get(ref) || ref, reason: DECLINED_REASON });
     }
     for (const ref of employed) skipped.push({ ref, name: nameByRef.get(ref) || ref, reason: EMPLOYED_REASON });
+    for (const ref of matchBusy) skipped.push({ ref, name: nameByRef.get(ref) || ref, reason: MATCH_BUSY_REASON });
     const declinedSet = new Set(declined);
     const duplicated = items
       .map((i) => i.personRef)

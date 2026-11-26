@@ -30,7 +30,8 @@ describe('ได้งานแล้วห้ามส่ง AI เสนอง
     // 5 เส้นรายงานทีละเหตุ + บททักทายรายงานเป็นรายการ
     expect((src.match(/reason: EMPLOYED_REASON/g) ?? []).length).toBe(5);
     expect(src).toContain('[employed, EMPLOYED_REASON],');
-    expect((src.match(/\.\.\.guarded, \.\.\.employed\]/g) ?? []).length).toBeGreaterThanOrEqual(6);
+    // 25 พ.ย. 2569: เส้นจับคู่งานต่อท้าย ...matchBusy (1 คน 1 ใบ)
+    expect((src.match(/\.\.\.guarded, \.\.\.employed(, \.\.\.matchBusy)?\]/g) ?? []).length).toBeGreaterThanOrEqual(6);
   });
   it('คิวรีที่ส่งไปฐาน: ส่งเบอร์ชุดเดียว + 60 วัน · เบอร์ว่าง = ไม่ถามฐาน', async () => {
     const dbQuery = vi.fn().mockResolvedValue({ rows: [{ phone: '+66818795281' }] });

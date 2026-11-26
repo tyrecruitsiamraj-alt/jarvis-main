@@ -14769,3 +14769,11 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 ### 25 พ.ย. 2569 (10) — ปุ่มยกเลิกสาย (DELETE /api/lumos/dispatch) ยกเลิกที่ Lumos ด้วย
 - เดิม `cancelLumosQueueItem` เปลี่ยนแค่ status ฝั่งเรา — สายที่ push ไปแล้ว Lumos ยังโทร (จอขึ้นยกเลิกแล้ว)
 - ตอนนี้แถวที่ push แล้วและยังไม่มีผล → `cancelPushedInterview` / `cancelPushedReminderIgnoringMissing` · ล้มที่ Lumos = log · เทสต์อยู่ท้าย `tests/api/matchErpArea2569-11-25.test.ts`
+
+### 25 พ.ย. 2569 (11) — จับคู่งาน 1 คน 1 ใบ · วันละ 1 สาย · AI โทรรอบเดียวแล้วส่งคน
+- เจ้าของ Choice "ใบที่เหมาะสุดใบเดียว + วันละ 1 สาย" · "Ai โทรให้รอบแรกแบบเดียวกันกับสัมภาษณ์ ถ้าจะโทรต่อก็ให้คนเก็บไปโทรเอง"
+- เจอจริง: คนเดียวถูกจับคู่ 113 ใบ · คน "ไม่ได้สมัคร" โดนโทร 6 ครั้งจาก 2 ใบในวันเดียว · สายจับคู่ push เข้า Lumos ทันที ⇒ ตัวกันตอนเสิร์ฟ (`buildTakePendingSql`) ไม่ได้ใช้
+- ตอนเข้าคิว: `phonesBusyForMatchOffer` (`api/_lib/lumosDispatch.ts`) ใช้เฉพาะ item ที่มี `matchRank` — มีใบอื่นค้าง (open) · AI โทรเรื่องจับคู่ใน 24 ชม. (today) · declined/unresponsive/wrong_person ใน `MATCH_OFFER_STOP_DAYS` 30 วัน (stopped) → ถัง `matchBusy` เหตุ `MATCH_BUSY_REASON` · อ่านไม่ได้ = `guarded`
+- ได้ผลโทร (`applyCallFollowupToQueueRow` · `api/_lib/callFollowup.ts`): แถว `match_rank` มีค่า retry → needs_human (ไม่โทรซ้ำ) · declined/unresponsive/wrong_person → `stopOpenMatchOffers` ยกเลิกสายจับคู่ใบอื่นของเบอร์นี้ที่ยังไม่มีผล (ฐาน + Lumos)
+- ⚠️ "ใบที่เหมาะสุด" ตอนนี้ = ใบแรกที่จับคู่ถึงคนนั้น (ไม่ได้เทียบข้ามใบ) — ใบที่จับคู่ได้ต้องมีจังหวัดในสถานที่ทำงานแล้ว และเขียวต้องจังหวัดเดียวกัน
+- เทสต์ท้าย `tests/api/callFollowup.test.ts` + `tests/api/matchErpArea2569-11-25.test.ts`
