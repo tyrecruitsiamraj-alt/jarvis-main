@@ -1,4 +1,5 @@
 import { applicantAreaOf, sortByApplicantArea, type ApplicantArea } from '@/lib/applicantArea';
+import { jobBuOf } from '@/lib/soScraping';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { GlassTabIndicator, glassTabClass, glassTabsListClass } from '@/components/ui/tabs';
 import { createPortal } from 'react-dom';
@@ -625,9 +626,21 @@ const RmWorkspace: React.FC<{
     );
     return (r: PublicApplication): ApplicantArea => applicantAreaOf(r, r.job_id ? idx.get(r.job_id) : null);
   }, [jobs]);
+  /** BU ของใบสมัคร = BU ของใบขอ (ไซต์ก่อน · `jobBuOf`) — หาใบขอไม่เจอ = BU บนใบสมัคร (26 พ.ย. 2569 กรอง LBD แล้วขึ้นใบของ LBA) */
+  const buOf = useMemo(() => {
+    if (!jobs || jobs.length === 0) return undefined;
+    const idx = buildJobKeyIndex(
+      jobs.map((j) => [j.id, j] as const),
+      (existing) => existing,
+    );
+    return (r: PublicApplication): string | null => {
+      const job = r.job_id ? idx.get(r.job_id) : null;
+      return job ? (jobBuOf(job) ?? null) : null;
+    };
+  }, [jobs]);
   const applicantFacts = useMemo<ApplicantFacetFacts>(
-    () => ({ tab, now: new Date(), recruiterOf, areaOf }),
-    [tab, recruiterOf, areaOf],
+    () => ({ tab, now: new Date(), recruiterOf, areaOf, buOf }),
+    [tab, recruiterOf, areaOf, buOf],
   );
   const commitApplicantFilters = (next: ApplicantFilterState) => {
     setSearchParams((prev) => writeApplicantFilterState(prev, next), { replace: true });

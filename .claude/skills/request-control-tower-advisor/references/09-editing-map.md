@@ -14843,3 +14843,9 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 - เจ้าของ *"หน้าโพสต์ประกาศขอ Filter Bu ด้วยสำหรับ Supervisor ขึ้นไป"*
 - `boardFilters.ts`: หัวข้อ `bu` (`jobBuOf`) ลำดับที่สองของ `BOARD_PRIMARY_FACETS` (ต่อจากพร้อมประกาศไหม ตามคำสั่ง 2 ต.ค.) · `BOARD_SUPERVISOR_FACETS` + `canSeeBoardSupervisorFacets` · `applyBoardFilters`/`buildBoardFacets` รับ `hidden` (ซ่อนหัวข้อ + ไม่สนค่าใน URL)
 - `JobBoardView.tsx`: `hiddenBoardFacets` จาก role (admin/supervisor เห็น)
+
+### 26 พ.ย. 2569 (12) — ตัวกรอง BU แท็บผู้สมัคร = BU ของใบขอ (ไซต์) · แก้คนนำเข้าใบเก่าจาก Scrap
+- เจ้าของ *"ทำไม ไอซ์มาโชว์ เพราะฉันเลือก Lbd"* — ใบของ LAO6911009 (ไซต์ 67LBAL… = LBA) ตีตรา `department_code` LBD ตามแผนกคนคีย์ ⇒ กรอง LBD แล้วขึ้น เจ้าของงานเป็นไอซ์ (สรรหา LBA)
+- `applicantFilters.ts` facts `buOf` · `RmWorkspace` ให้ `jobBuOf(job)` จากใบขอที่โหลดไว้ · หาใบไม่เจอ = `department_code` เดิม · เทสต์ `tests/api/applicantBuOfJob2569-11-26.test.ts`
+- ⚠️ ยังไม่แก้: สิทธิ์ดูตาม BU ฝั่ง server ยังใช้ `department_code` ของใบสมัคร
+- แก้ข้อมูลจริง 26 พ.ย. 2569 (เจ้าของอนุมัติ): `responsible_name` ของใบจาก Scrap 615 ใบ → คนสั่ง Scrap (ใหม่ 252 · เจมส์ 299 · Administrator 64) ทีละ id ในธุรกรรมเดียว เฉพาะใบที่ค่ายังเป็นค่าเดิม · ค่าเดิมเก็บไฟล์ใน scratchpad ของ session

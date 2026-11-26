@@ -81,6 +81,11 @@ export type ApplicantFacetFacts = {
   recruiterOf?: (r: PublicApplication) => string | null;
   /** ผู้สมัครอยู่ใกล้งานแค่ไหน (`applicantArea.ts` · 24 พ.ย. 2569) — หน้ารู้จากใบขอที่โหลดไว้ · ไม่ส่ง = ไม่มีหัวข้อนี้ */
   areaOf?: (r: PublicApplication) => ApplicantArea;
+  /**
+   * BU ของใบขอที่สมัคร (ไซต์ก่อน แผนกทีหลัง · `jobBuOf`) — ไม่ส่ง/หาใบขอไม่เจอ = BU ที่ตีตราบนใบสมัคร
+   * (เจ้าของ 26 พ.ย. 2569 "ทำไม ไอซ์มาโชว์ เพราะฉันเลือก Lbd" — ใบของ LAO6911009 ไซต์ LBA แต่ใบสมัครตีตรา LBD ตามแผนกคนคีย์)
+   */
+  buOf?: (r: PublicApplication) => string | null;
 };
 
 export type ApplicantFilterState = FacetState<ApplicantFacetKey>;
@@ -360,7 +365,7 @@ const FACETS: readonly Def[] = [
     label: 'BU',
     ui: 'check',
     order: [...APP_DEPARTMENT_CODES],
-    values: (r) => [trimOr(r.department_code)],
+    values: (r, facts) => [trimOr(facts.buOf?.(r) ?? r.department_code)],
   },
   {
     /** ใกล้งานแค่ไหน (Choice 24 พ.ย. 2569 "ยังขึ้นในรายชื่อ แต่บอกว่าไกลแค่ไหน") — ตัวคิด `applicantArea.ts` */
