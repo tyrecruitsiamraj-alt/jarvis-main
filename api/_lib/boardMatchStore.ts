@@ -49,14 +49,17 @@ export type BoardMatchTierEntry = {
   /** tier ต่อคน + card_id (ใช้กรอง "คนที่ยังพร้อม" ตอนนับป้าย/workflow filter บนลิสต์) */
   tiers: Array<{ tier: 'green' | 'yellow' | 'red'; cardId: number }>;
   computedAt: string;
+  /** ผลที่บันทึกว่าใบ ERP ขาดข้อมูล (`matchBlockersOf`) — ข้อมูลครบแล้วต้องคิดใหม่ทันที ไม่รอ 24 ชม. (26 พ.ย. 2569) */
+  blocked?: boolean;
 };
 
 /** อ่านผลทั้งหมดแบบเบา (tier + card_id ต่อคน + เวลาคิด) สำหรับ workflow filter/ป้ายบนลิสต์ */
 export async function loadBoardMatchTierMap(): Promise<Map<string, BoardMatchTierEntry>> {
   const map = new Map<string, BoardMatchTierEntry>();
   try {
-    const { rows } = await dbQuery<{ job_id: string; tiers: unknown; computed_at: string | Date }>(
+    const { rows } = await dbQuery<{ job_id: string; tiers: unknown; computed_at: string | Date; blocked: boolean | null }>(
       `select job_id, computed_at,
+              (jsonb_typeof(result->'blocked') = 'array' and jsonb_array_length(result->'blocked') > 0) as blocked,
               coalesce((select jsonb_agg(jsonb_build_object('tier', m->>'tier', 'card_id', m->>'card_id'))
                         from jsonb_array_elements(result->'matches') m), '[]'::jsonb) as tiers
        from ${table}`,
@@ -65,6 +68,7 @@ export async function loadBoardMatchTierMap(): Promise<Map<string, BoardMatchTie
       if (!Array.isArray(r.tiers)) continue;
       map.set(r.job_id, {
         computedAt: toIso(r.computed_at),
+        blocked: r.blocked === true,
         tiers: (r.tiers as Array<{ tier?: string; card_id?: string }>).map((t) => ({
           tier: t?.tier === 'green' || t?.tier === 'red' ? t.tier : 'yellow',
           cardId: Number(String(t?.card_id ?? '').replace(/[^0-9]/g, '')) || 0,

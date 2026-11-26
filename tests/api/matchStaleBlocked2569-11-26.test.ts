@@ -27,3 +27,20 @@ describe('OPL6911035 — สถานที่ทำงานมีแค่ช�
     expect(batch).toContain("logInfo('call-batch.release.blocked'");
   });
 });
+
+describe('OPL6911103 — เคยขาดสถานที่ทำงาน ตอนนี้ ERP ครบแล้ว', () => {
+  const job = { request_no: 'OPL6911103', location_address: 'หมู่บ้านชลดา ลาดกระบัง 54 เขตลาดกระบัง กรุงเทพฯ' };
+  it('ที่อยู่ตอนนี้อ่านได้ ไม่ติดด่านสถานที่', () => {
+    expect(jobAreaForMatch(job)).toEqual({ province: 'กรุงเทพมหานคร', district: 'ลาดกระบัง' });
+    expect(matchBlockersOf(job)).not.toContain('place');
+  });
+  it('ผลที่บันทึกว่าขาดข้อมูล แต่ใบครบแล้ว = คิดใหม่ทันที (เปิดดู + สแกน) ไม่โชว์ไม่จับคู่ค้าง', () => {
+    const view = readFileSync('api/_handlers/matching-board-candidates.ts', 'utf8');
+    expect(view).toContain('const staleBlocked = stored != null && Array.isArray(stored.result.blocked) && stored.result.blocked.length > 0;');
+    expect(view).toContain('(isBoardMatchFromOldPool(stored.computedAt) || staleBlocked)');
+    expect(view).toContain('if (stored && !staleBlocked) {');
+    const worker = readFileSync('api/_lib/matchPrecomputeWorker.ts', 'utf8');
+    expect(worker).toContain('} else if (entry.blocked && matchBlockersOf(job).length === 0) {');
+    expect(readFileSync('api/_lib/boardMatchStore.ts', 'utf8')).toContain("jsonb_array_length(result->'blocked') > 0) as blocked");
+  });
+});

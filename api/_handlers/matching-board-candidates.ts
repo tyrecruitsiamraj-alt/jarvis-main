@@ -235,7 +235,9 @@ async function handler(req: AuthedReq, res: ApiRes) {
     const stored = await getStoredBoardMatch(jobId);
     // ผลที่คิดจากกองเดิม (ก่อน 17 ต.ค. 2569) = สั่งแมทใหม่ไว้หัวคิว · ระหว่างรอโชว์ผลเดิมที่ยังพร้อมไปก่อน
     const refresh = getQuery(req, 'refresh') === '1';
-    const rematch = !refresh && stored != null && isBoardMatchFromOldPool(stored.computedAt);
+    // ผลเดิมบอกว่าใบขาดข้อมูล แต่ตอนนี้ใบครบแล้ว (ผ่านด่านข้างบนมา) = ผลเก่า ต้องคิดใหม่ ไม่โชว์ "ไม่จับคู่" ค้างไว้ (26 พ.ย. 2569)
+    const staleBlocked = stored != null && Array.isArray(stored.result.blocked) && stored.result.blocked.length > 0;
+    const rematch = !refresh && stored != null && (isBoardMatchFromOldPool(stored.computedAt) || staleBlocked);
 
     // กรองผล (snapshot) ให้เหลือเฉพาะคนที่ "ยังพร้อม" ณ ตอนนี้ — ไม่คิด AI ใหม่, ไม่แตะ snapshot
     // คนที่ถูกจอง/ลงงานที่ใบอื่น หรือหลุดจาก pool รอลงงานแล้ว จะหายจากผลไปเอง
@@ -297,7 +299,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
       });
     }
 
-    if (stored) {
+    if (stored && !staleBlocked) {
       // สั่งค้นหาใหม่: โชว์ผลเดิมไปก่อน ผลใหม่จากหลังบ้านจะมาแทนที่เมื่อคิดเสร็จ
       return withAvailability(stored.result, stored.computedAt, {
         refresh_queued: workerActive,

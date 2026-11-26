@@ -148,7 +148,8 @@ describe('ผลแมทที่คิดจากกองเดิม (To do
     expect(worker).toMatch(/else if \(isBoardMatchFromOldPool\(entry\.computedAt\)\) \{[\s\S]*?items\.push\(\{ job, refresh: false \}\);/);
     expect(worker).toContain('const eligible = isRefresh || opts.rematch === true');
     const handler = readFileSync('api/_handlers/matching-board-candidates.ts', 'utf8');
-    expect(handler).toContain('const rematch = !refresh && stored != null && isBoardMatchFromOldPool(stored.computedAt);');
+    // 26 พ.ย. 2569 + ผลเดิมติดด่านใบขาดข้อมูลแต่ใบครบแล้ว (staleBlocked) ก็นับเป็นผลเก่า
+    expect(handler).toContain('const rematch = !refresh && stored != null && (isBoardMatchFromOldPool(stored.computedAt) || staleBlocked);');
     expect(handler).toContain('if (stored && !refresh && !rematch) {');
     expect(handler).toMatch(/enqueuePrecomputeJobs\([\s\S]*?\{\s*refresh,\s*rematch,\s*front: true,/);
   });

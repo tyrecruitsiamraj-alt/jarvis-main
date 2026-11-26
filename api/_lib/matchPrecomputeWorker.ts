@@ -21,6 +21,7 @@ import { loadBoardMatchTierMap, getStoredBoardMatch, type BoardMatchTierEntry } 
 import { matchBoardCandidatesForJob } from './boardCandidateMatcher.js';
 import { isBoardMatchFromOldPool } from './boardCandidatesSql.js';
 import { autoMatchJobIds } from './autoMatchScope.js';
+import { matchBlockersOf } from '../../src/lib/matchProximity.js';
 import { logInfo, logWarn, logError } from './logger.js';
 
 export type PrecomputeJob = Record<string, unknown> & { id: string };
@@ -317,6 +318,10 @@ async function runScan(cfg: WorkerConfig): Promise<void> {
       if (!id || !autoIds.has(id)) continue;
       const entry = tierMap.get(id);
       if (!entry) {
+        items.push({ job, refresh: false });
+      } else if (entry.blocked && matchBlockersOf(job).length === 0) {
+        // ผลเดิมบันทึกว่าใบ ERP ขาดข้อมูล แต่ตอนนี้ครบแล้ว = แมทใหม่รอบสแกนนี้ ไม่รอ 24 ชม.
+        // (26 พ.ย. 2569 OPL6911103: ผล 08:52 ขาดสถานที่ทำงาน · ERP ครบแล้วแต่จอยังขึ้นไม่จับคู่)
         items.push({ job, refresh: false });
       } else if (isBoardMatchFromOldPool(entry.computedAt)) {
         // 17 ต.ค. 2569 เปลี่ยนกองจับคู่งานเป็น ไม่มีงาน/Re Use/Drop — ผลที่คิดจากกองเดิมต้องแมทใหม่
