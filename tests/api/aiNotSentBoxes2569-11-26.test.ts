@@ -92,6 +92,12 @@ describe('แท็บผู้สมัคร: คนเดียวอยู�
     }
     expect(RM_LIST_VIEW_LABEL.ready).toBe('พร้อมส่ง AI');
   });
+  it('แท็บ Scrap มีทุกกล่องของแท็บผู้สมัคร (ยกเว้น iRecruit · ไม่ผูกใบขอ) ลำดับเดียวกัน', async () => {
+    const { SCRAP_LIST_VIEWS } = await import('../../src/lib/scrapApplicants');
+    const rm = RM_LIST_VIEWS_SHOWN.filter((v) => v !== 'irecruit_pull' && v !== 'no_job');
+    const scrapRm = SCRAP_LIST_VIEWS.filter((v) => (rm as readonly string[]).includes(v));
+    expect(scrapRm).toEqual(rm);
+  });
   it('เบอร์ถูกพัก: แถวบอกวันที่ AI โทรได้อีก', () => {
     expect(rmRowStatusOf(app({ ai_block_reason: suppressionReasonText('declined', '2026-12-25T17:30:00Z') })).detail).toBe(
       'เคยบอก AI ว่าไม่สนใจ · AI โทรได้อีก 26 ธ.ค.',

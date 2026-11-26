@@ -76,11 +76,12 @@ describe('ทำไมยังไม่ส่ง AI (27 ต.ค. 2569)', () => 
   });
   it('ลำดับบนจอตามที่เจ้าของสั่ง', () => {
     // 25 พ.ย. 2569 กล่องอายุเกินแยกออกมาต่อจากไม่ได้ส่ง AI
-    // 26 พ.ย. 2569 "ไม่ได้ส่ง AI" แยกเป็นกล่องตามเรื่อง ต่อจากคุยแล้วไม่ได้คำตอบ
+    // 26 พ.ย. 2569 "ไม่ได้ส่ง AI" แยกเป็นกล่องตามเรื่อง · เรียง กดส่ง AI ได้ → รอผล/รอคนตาม → ติดเรื่อง
     expect(RM_LIST_VIEWS_SHOWN).toEqual([
-      'all', 'ai_waiting', 'no_pickup', 'interested', 'declined', 'appt_failed', 'ai_talked',
-      'ready', 'request_closed', 'no_income', 'phone_paused', 'declined_job', 'bad_data', 'employed', 'offered_recently', 'kept', 'no_name', 'irecruit_dup', 'ai_cancelled',
-      'over_age', 'irecruit_pull', 'no_job',
+      'all',
+      'ready', 'request_closed', 'no_job', 'irecruit_pull', 'irecruit_dup', 'ai_cancelled',
+      'ai_waiting', 'interested', 'no_pickup', 'ai_talked', 'appt_failed', 'offered_recently', 'kept',
+      'no_income', 'bad_data', 'no_name', 'phone_paused', 'over_age', 'declined_job', 'employed', 'declined',
     ]);
   });
 });

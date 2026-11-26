@@ -65,7 +65,8 @@ describe('กล่อง "นัดหมายไม่สำเร็จ" ใ
     // ยังอยู่แท็บนัดหมาย (นัดใหม่) = ไม่ใช่กล่องนี้
     expect(isAppointmentFailedReturn(app({ status: 'converted', attendance_result: 'no_show' }))).toBe(false);
     expect(RM_LIST_VIEW_LABEL.appt_failed).toBe('นัดหมายไม่สำเร็จ');
-    expect(RM_LIST_VIEWS_SHOWN.indexOf('appt_failed')).toBe(RM_LIST_VIEWS_SHOWN.indexOf('declined') + 1);
+    // 26 พ.ย. 2569 เรียงกล่องใหม่ (กดส่งได้ → รอคนตาม → ติดเรื่อง) — นัดหมายไม่สำเร็จอยู่กลุ่มรอคนตาม
+    expect(RM_LIST_VIEWS_SHOWN).toContain('appt_failed');
   });
   it('คอลัมน์คำตอบกับ AI บอกเหตุ', () => {
     expect(rmRowStatusOf(app({ attendance_result: 'no_show' }))).toMatchObject({ title: 'นัดหมายไม่สำเร็จ', tone: 'danger' });

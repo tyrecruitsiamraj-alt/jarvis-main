@@ -14821,3 +14821,7 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 - `matching-board-candidates.ts`: ใบสถานะอื่น ไม่มีผล/ผลเก่า = ตอบ `manual_only` ไม่ดันคิว · กดค้นหาใหม่ = `manual: refresh` · ระหว่างคิด = pending
 - `matching-list.ts`: การ์ดไม่นับผลของใบ ERP ขาดข้อมูล และผลเก่าของใบสถานะอื่น · `MatchingPage.tsx` ข้อความ `match-manual-only`
 - เทสต์ `tests/api/autoMatchInProgress2569-11-26.test.ts`
+
+### 26 พ.ย. 2569 (8) — เรียงกล่องแท็บผู้สมัคร: กดส่ง AI ได้ → รอผล/รอคนตาม → ติดเรื่อง
+- เจ้าของ *"อันที่กดส่งต่อได้ไว้บนๆ อันที่รอคนตามแล้วก็อะไรที่ทำไรไม่ได้ไว้ล่างๆ ให้คนไปหาวิธีจัดการเอง"* · Choice ไม่มีหัวกลุ่ม
+- `RM_LIST_VIEWS_SHOWN` (`recruitRm.ts`) และ `SCRAP_LIST_VIEWS` (`scrapApplicants.ts`) ลำดับเดียวกัน — เทสต์ใน `aiNotSentBoxes2569-11-26.test.ts` คุมว่า Scrap ตามแท็บผู้สมัคร

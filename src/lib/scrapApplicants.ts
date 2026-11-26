@@ -43,18 +43,29 @@ export function parseScrapVirtualId(id: string): { requestNo: string; candidateI
 export const scrapRequestJobId = (requestNo: string) => `siamraj-sql:${requestNo.toUpperCase()}`;
 
 /** ชิปของแท็บ Scrap — ชุดเดียวกับแท็บผู้สมัคร (คำเดียวกัน · ไม่มี iRecruit/ไม่ผูกใบขอ) + 3 อันของ Scrap */
+// 26 พ.ย. 2569 ลำดับเดียวกับแท็บผู้สมัคร: กดส่ง AI ได้ → รอผล/รอคนตาม → ติดเรื่อง (ไม่มี iRecruit/ไม่ผูกใบขอ)
 export const SCRAP_LIST_VIEWS = [
   'all',
-  // 26 พ.ย. 2569 แยก "ไม่ได้ส่ง AI" เป็นกล่องตามเรื่อง ชุดเดียวกับแท็บผู้สมัคร
-  ...RM_NOT_SENT_VIEWS,
-  'over_age',
+  'ready',
+  'request_closed',
+  'irecruit_dup',
+  'ai_cancelled',
   'ai_waiting',
-  'no_pickup',
   'interested',
-  'declined',
-  'appt_failed',
+  'no_pickup',
   'ai_talked',
+  'appt_failed',
+  'offered_recently',
+  'kept',
   'scrap_contact',
+  'no_income',
+  'bad_data',
+  'no_name',
+  'phone_paused',
+  'over_age',
+  'declined_job',
+  'employed',
+  'declined',
   'scrap_applicant',
   'scrap_no_phone',
 ] as const;

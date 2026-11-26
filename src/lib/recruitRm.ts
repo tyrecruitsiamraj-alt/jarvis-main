@@ -258,18 +258,36 @@ export const RM_NOT_SENT_VIEWS = [
 ] as const satisfies readonly RmListView[];
 export type RmNotSentView = (typeof RM_NOT_SENT_VIEWS)[number];
 
+/**
+ * 🔴 ลำดับบนจอ (เจ้าของ 26 พ.ย. 2569 *"อันที่กดส่งต่อได้ไว้บนๆ อันที่รอคนตามแล้วก็อะไรที่ทำไรไม่ได้ไว้ล่างๆ"* · Choice ไม่มีหัวกลุ่ม)
+ * กดส่ง AI ได้ → รอผล/รอคนตาม → ติดเรื่อง ต้องแก้ก่อน
+ */
 export const RM_LIST_VIEWS_SHOWN = [
   'all',
-  'ai_waiting',
-  'no_pickup',
-  'interested',
-  'declined',
-  'appt_failed',
-  'ai_talked',
-  ...RM_NOT_SENT_VIEWS,
-  'over_age',
-  'irecruit_pull',
+  // กดส่ง AI ได้
+  'ready',
+  'request_closed',
   'no_job',
+  'irecruit_pull',
+  'irecruit_dup',
+  'ai_cancelled',
+  // รอผล / รอคนตาม
+  'ai_waiting',
+  'interested',
+  'no_pickup',
+  'ai_talked',
+  'appt_failed',
+  'offered_recently',
+  'kept',
+  // ติดเรื่อง ต้องแก้ก่อน
+  'no_income',
+  'bad_data',
+  'no_name',
+  'phone_paused',
+  'over_age',
+  'declined_job',
+  'employed',
+  'declined',
 ] as const satisfies readonly RmListView[];
 export type RmShownView = (typeof RM_LIST_VIEWS_SHOWN)[number];
 
