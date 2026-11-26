@@ -74,6 +74,8 @@ type Row = {
   claimed_by_name: string | null;
   age: number | null;
   created_by_name: string | null;
+  /** เจ้าหน้าที่กด "ไม่โทร" (200 · 26 พ.ย. 2569) — ส่ง AI ไม่ได้จนกว่าจะยกเลิก */
+  no_call_reason_id?: number | null;
 };
 
 export type CallChoiceResult = {
@@ -236,6 +238,10 @@ export async function chooseAi(
   const byJob = new Map<string, Row[]>();
   const greet: Row[] = [];
   for (const r of rows) {
+    if (r.no_call_reason_id != null) {
+      skipped.push({ name: r.full_name, reason: 'กดไม่โทรไว้ — ยกเลิกไม่โทรก่อนถึงส่ง AI ได้' });
+      continue;
+    }
     if (!r.job_id?.trim() || closedJobIds.has(r.job_id.trim())) {
       if (greeting && r.phone?.trim()) greet.push(r);
       else
@@ -331,7 +337,7 @@ async function handler(req: AuthedReq, res: ApiRes) {
     const { rows } = await dbQuery<Row>(
       `select a.id, a.full_name, a.phone, a.job_id, a.department_code,
               a.job_title, a.unit_name, a.position_interest, a.province, a.claimed_by, a.claimed_by_name, a.age,
-              a.created_by_name
+              a.created_by_name, a.no_call_reason_id
          from ${tbl} a
         where a.id = any($1::uuid[])`,
       [ids],

@@ -22,6 +22,7 @@ import {
 import { SO_SCRAPING_CREATED_BY } from './soScrapingLeads';
 import { isOverAge, OVER_AGE_REASON } from './applicantAge';
 import { SCRAP_NOT_SENT_REASON } from './applicantAiAnswerText';
+import type { NoCallView } from './applicantNoCall';
 
 export const SCRAP_VIRTUAL_PREFIX = 'scrap:';
 
@@ -70,7 +71,8 @@ export const SCRAP_LIST_VIEWS = [
   'scrap_no_phone',
 ] as const;
 export type ScrapListView = (typeof SCRAP_LIST_VIEWS)[number];
-export type ScrapRowView = Exclude<ScrapListView, 'all'>;
+/** + กล่องของเหตุผล "ไม่โทร" (`nocall:<id>` · 26 พ.ย. 2569) */
+export type ScrapRowView = Exclude<ScrapListView, 'all'> | NoCallView;
 
 export const SCRAP_LIST_VIEW_LABEL: Record<ScrapListView, string> = {
   all: RM_LIST_VIEW_LABEL.all,
@@ -205,10 +207,11 @@ export function scrapVirtualStatus(w: Pick<ScrapWorkRow, 'view' | 'scrap'>): {
 export const scrapResultOfRow = (r: ScrapWorkRow): ScrapResult => r.scrap?.result ?? 'unscored';
 
 /** นับต่อชิป — ทุกชิปรวมกัน = ทั้งหมด */
-export function countScrapViews(rows: readonly ScrapWorkRow[]): Record<ScrapListView, number> {
-  const out = Object.fromEntries(SCRAP_LIST_VIEWS.map((v) => [v, 0])) as Record<ScrapListView, number>;
+/** + กล่องของเหตุผลไม่โทร (`nocall:<id>`) นับด้วย — ไม่มีคน = ไม่มีคีย์ (ผู้เรียกใส่ 0 เอง) */
+export function countScrapViews(rows: readonly ScrapWorkRow[]): Record<ScrapListView, number> & Record<string, number> {
+  const out = Object.fromEntries(SCRAP_LIST_VIEWS.map((v) => [v, 0])) as Record<ScrapListView, number> & Record<string, number>;
   for (const r of rows) {
-    out[r.view] += 1;
+    out[r.view] = (out[r.view] ?? 0) + 1;
     out.all += 1;
   }
   return out;

@@ -41,6 +41,12 @@ export type PublicApplication = {
   ai_answer?: { micro: import('@/lib/callMicroOutcome').CallMicroOutcome; at: string | null } | null;
   /** เหตุที่ตัวส่งอัตโนมัติยังไม่ส่ง AI (169 · 28 ต.ค. 2569) เช่น ใบขอยังไม่ตั้งรายได้ */
   ai_block_reason?: string | null;
+  /** เจ้าหน้าที่กด "ไม่โทร" (200 · 26 พ.ย. 2569 · `applicantNoCall.ts`) — box = กล่องที่ใบไปอยู่ */
+  no_call_reason_id?: number | null;
+  no_call_label?: string | null;
+  no_call_box?: 'own' | 'bad_data' | 'over_age' | 'employed' | null;
+  no_call_at?: string | null;
+  no_call_by_name?: string | null;
   /**
    * ผลติดต่อล่าสุดที่ **เจ้าหน้าที่บันทึกเอง** (086) — false = ติดต่อไม่สำเร็จ/ไม่เอางาน
    * เจ้าของสั่ง 23 ส.ค. 2569: `ok=false` นับเป็น "ไม่สนใจ" ในมุมมองรายชื่อ

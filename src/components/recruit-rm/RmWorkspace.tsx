@@ -1,4 +1,7 @@
 import { applicantAreaOf, sortByApplicantArea, type ApplicantArea } from '@/lib/applicantArea';
+import NoCallDialog from '@/components/recruit-rm/NoCallDialog';
+import { isNoCallView, noCallViewOf, ownBoxReasons, type NoCallReason, type NoCallView } from '@/lib/applicantNoCall';
+import { fetchNoCallReasons, setApplicationNoCall } from '@/lib/applicantNoCallApi';
 import { jobBuOf } from '@/lib/soScraping';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { GlassTabIndicator, glassTabClass, glassTabsListClass } from '@/components/ui/tabs';
@@ -35,6 +38,7 @@ import {
   isInRmTab,
   isInRmListView,
   rmListViewFromParam,
+  rmShownViewOf,
   RM_LIST_VIEWS,
   RM_LIST_VIEWS_SHOWN,
   RM_LIST_VIEW_DEFAULT,
@@ -231,11 +235,18 @@ const RmWorkspace: React.FC<{
   // ค่าเริ่ม = รายชื่อคนที่สนใจ (เจ้าของสั่ง 14 ต.ค. 2569 "Default หน้า ผู้สมัครใน menu งานสรรหา ให้เป็น รายชื่อคนที่สนใจ")
   // "รายชื่อทั้งหมด" จึงต้องมี ?list=all ชัด ๆ · ลิงก์จากตัวเลขที่ต้องการทุกคน (ยังไม่ถูกโทร ฯลฯ) ส่ง list=all มาเอง
   // ลิงก์เก่า ?list=<ชิปที่ถูกยุบ 3 พ.ย. 2569> แปลงเป็นชิปที่รวมมัน (rmListViewFromParam)
-  const listView: RmListView = rmListViewFromParam(listParam) ?? RM_LIST_VIEW_DEFAULT;
+  // กล่องของเหตุผล "ไม่โทร" (`?list=nocall:<id>` · 26 พ.ย. 2569) ใช้ได้ทั้งแท็บผู้สมัครและแท็บ Scrap
+  const listView: RmListView | NoCallView = isNoCallView(listParam) ? listParam : (rmListViewFromParam(listParam) ?? RM_LIST_VIEW_DEFAULT);
   /** แท็บ Scrap — ชิปของตัวเอง (`?list=` ร่วมกัน ค่าเริ่ม = รายชื่อทั้งหมด) + ผลประเมิน (`?sres=`) */
   const scrapMode = scrap && tab === 'candidates';
   // ลิงก์เก่า ?list=not_sent (กล่องถอด 26 พ.ย. 2569) → พร้อมส่ง AI
-  const scrapView: ScrapListView = isScrapListView(listParam) ? listParam : listParam === 'not_sent' ? 'ready' : 'all';
+  const scrapView: ScrapListView | NoCallView = isNoCallView(listParam)
+    ? listParam
+    : isScrapListView(listParam)
+      ? listParam
+      : listParam === 'not_sent'
+        ? 'ready'
+        : 'all';
   const sresParam = searchParams.get(SCRAP_RESULT_PARAM);
   const scrapResult: ScrapResult | null = SCRAP_RESULT_ORDER.find((x) => x === sresParam) ?? null;
   const [scrapRows, setScrapRows] = useState<ScrapCandidateRow[]>([]);
@@ -697,7 +708,7 @@ const RmWorkspace: React.FC<{
     [scrapMode, workRows, rmFilters, keyword],
   );
   const scrapPick = useCallback(
-    (r: PublicApplication, view: ScrapListView, result: ScrapResult | null) => {
+    (r: PublicApplication, view: ScrapListView | NoCallView, result: ScrapResult | null) => {
       const w = scrapById.get(r.id);
       return Boolean(w) && (view === 'all' || w!.view === view) && (result === null || scrapResultOfRow(w!) === result);
     },
@@ -813,12 +824,70 @@ const RmWorkspace: React.FC<{
       applicantFilterState,
       applicantFacts,
     );
-    const out = {} as Record<RmListView, number>;
+    const out = {} as Record<RmListView, number> & Record<string, number>;
     for (const v of RM_LIST_VIEWS) out[v] = base.filter((r) => isInRmListView(r, v)).length;
+    // กล่องของเหตุผล "ไม่โทร" — นับจากกล่องที่แต่ละใบอยู่ (`rmShownViewOf`)
+    for (const r of base) {
+      const v = rmShownViewOf(r);
+      if (isNoCallView(v)) out[v] = (out[v] ?? 0) + 1;
+    }
     return out;
   }, [candidateRows, keyword, rmFilters, applicantFilterState, applicantFacts, jobAll]);
 
-  const setListView = (next: RmListView) => {
+  /**
+   * ═══ ปุ่ม "ไม่โทร" (เจ้าของ 26 พ.ย. 2569) — เลือกเหตุผล → ใบย้ายไปกล่องของเหตุผล · AI ไม่โทร ═══
+   * กล่องของเหตุผลที่ "ไปกล่องตัวเอง" ต่อท้ายกลุ่มติดเรื่อง (ก่อนไม่สนใจ) · เลิกใช้แล้วยังขึ้นถ้ายังมีคนในกล่อง
+   */
+  const [noCallReasons, setNoCallReasons] = useState<NoCallReason[]>([]);
+  const loadNoCallReasons = useCallback(() => {
+    void fetchNoCallReasons()
+      .then(setNoCallReasons)
+      .catch(() => setNoCallReasons([]));
+  }, []);
+  useEffect(() => {
+    if (tab === 'candidates') loadNoCallReasons();
+  }, [tab, loadNoCallReasons]);
+  const noCallChipsOf = (counts: Record<string, number>) =>
+    ownBoxReasons(noCallReasons)
+      .filter((r) => r.active || (counts[noCallViewOf(r.id)] ?? 0) > 0)
+      .map((r) => ({ id: noCallViewOf(r.id), label: r.label }));
+  const [noCallIds, setNoCallIds] = useState<string[] | null>(null);
+  const [noCallBusy, setNoCallBusy] = useState(false);
+  const askNoCall = (ids: string[]) => {
+    say(null);
+    const real = ids.filter((id) => !isScrapVirtualId(id));
+    if (real.length === 0) {
+      say('คนที่ยังไม่มีใบสมัคร กดส่ง AI โทรหรือเก็บไปโทรเองก่อน');
+      return;
+    }
+    setNoCallIds(real);
+  };
+  const pickNoCall = async (reasonId: number | null, ids: string[]) => {
+    if (noCallBusy) return;
+    setNoCallBusy(true);
+    try {
+      const out = await setApplicationNoCall(ids, reasonId);
+      const label = noCallReasons.find((r) => r.id === reasonId)?.label;
+      say(
+        [
+          reasonId === null ? `ยกเลิกไม่โทร ${out.done} คน — กลับกล่องเดิม` : `ไม่โทร ${out.done} คน · ${label ?? ''}`.trim(),
+          out.cancelledCalls > 0 ? `ยกเลิกสาย AI ที่ค้าง ${out.cancelledCalls} สาย` : null,
+          out.skipped > 0 ? `ข้าม ${out.skipped} คน (นอกแผนกของคุณ)` : null,
+        ]
+          .filter(Boolean)
+          .join(' · '),
+      );
+      setNoCallIds(null);
+      setSelectedIds([]);
+      load();
+    } catch (e) {
+      say(friendlyErrorText(e, 'บันทึกไม่โทรไม่สำเร็จ'));
+    } finally {
+      setNoCallBusy(false);
+    }
+  };
+
+  const setListView = (next: RmListView | NoCallView) => {
     const params = new URLSearchParams(searchParams);
     if (next === RM_LIST_VIEW_DEFAULT) params.delete('list');
     else params.set('list', next);
@@ -1262,11 +1331,11 @@ const RmWorkspace: React.FC<{
             ariaLabel="มุมมอง Scrap"
             value={scrapView}
             onChange={(v) => setScrapParam('list', v === 'all' ? null : v)}
-            chips={SCRAP_LIST_VIEWS.map((v) => ({
-              id: v,
-              label: SCRAP_LIST_VIEW_LABEL[v],
-              count: loading ? null : loadError ? 'unknown' : scrapViewCounts[v],
-            }))}
+            chips={SCRAP_LIST_VIEWS.flatMap((v) => {
+              const countOf = (k: string) => (loading ? null : loadError ? ('unknown' as const) : (scrapViewCounts[k] ?? 0));
+              const chip = { id: v as ScrapListView | NoCallView, label: SCRAP_LIST_VIEW_LABEL[v], count: countOf(v) };
+              return v === 'declined' ? [...noCallChipsOf(scrapViewCounts).map((c) => ({ ...c, count: countOf(c.id) })), chip] : [chip];
+            })}
           />
           <FilterChipsDropdown<ScrapResult | 'all'>
             ariaLabel="ผลประเมินของ So Scraping"
@@ -1289,12 +1358,13 @@ const RmWorkspace: React.FC<{
             ariaLabel="มุมมองผู้สมัคร"
             value={listView}
             onChange={setListView}
-            chips={RM_LIST_VIEWS_SHOWN.map((v) => ({
-              id: v,
-              label: RM_LIST_VIEW_LABEL[v],
+            chips={RM_LIST_VIEWS_SHOWN.flatMap((v) => {
               // โหลดล้ม = ยังไม่รู้เลข (null = "—") ไม่ใช่ 0 (QA 5 ต.ค. 2569)
-              count: loading ? null : loadError ? 'unknown' : listViewCounts[v],
-            }))}
+              const countOf = (k: string) => (loading ? null : loadError ? ('unknown' as const) : (listViewCounts[k] ?? 0));
+              const chip = { id: v as RmListView | NoCallView, label: RM_LIST_VIEW_LABEL[v], count: countOf(v) };
+              // กล่องของเหตุผล "ไม่โทร" ต่อท้ายกลุ่มติดเรื่อง ก่อนไม่สนใจ (26 พ.ย. 2569)
+              return v === 'declined' ? [...noCallChipsOf(listViewCounts).map((c) => ({ ...c, count: countOf(c.id) })), chip] : [chip];
+            })}
           />
         </div>
       ) : null}
@@ -1497,8 +1567,21 @@ const RmWorkspace: React.FC<{
             onHoldSelected={tab === 'candidates' ? () => void keepSelectedForSelf() : undefined}
             holdingSelected={holdingSelected}
             onSendAiSelected={() => askSendAi(selectedIds)}
+            /* "ไม่โทร" ก่อนเก็บไปโทรเอง (26 พ.ย. 2569) · ยกเลิกไม่โทรโผล่เมื่อติ๊กคนที่กดไว้ */
+            onNoCallSelected={tab === 'candidates' ? () => askNoCall(selectedIds) : undefined}
+            onUndoNoCallSelected={
+              tab === 'candidates' && workRows.some((r) => selectedIds.includes(r.id) && r.no_call_reason_id != null)
+                ? () => void pickNoCall(null, workRows.filter((r) => selectedIds.includes(r.id) && r.no_call_reason_id != null).map((r) => r.id))
+                : undefined
+            }
             /* กล่องที่ส่ง AI ไม่ได้ = ปุ่มรวมกดไม่ได้ พร้อมเหตุ (26 พ.ย. 2569) */
-            sendAiBlockedReason={tab === 'candidates' && !bucket ? ((RM_AI_SEND_BLOCKED as Partial<Record<string, string>>)[scrapMode ? scrapView : listView] ?? null) : null}
+            sendAiBlockedReason={
+              tab === 'candidates' && !bucket
+                ? isNoCallView(scrapMode ? scrapView : listView)
+                  ? 'กดไม่โทรไว้ — ยกเลิกไม่โทรก่อนถึงส่ง AI ได้'
+                  : ((RM_AI_SEND_BLOCKED as Partial<Record<string, string>>)[scrapMode ? scrapView : listView] ?? null)
+                : null
+            }
             /* "ถอย Lead" — การติดต่อ ติ๊กแล้วโผล่ (5 ต.ค. 2569) · ย้ายกลับแท็บผู้สมัคร */
             onReleaseSelected={tab === 'contact' ? () => void releaseSelected() : undefined}
             releasing={releasing}
@@ -1853,8 +1936,22 @@ const RmWorkspace: React.FC<{
 
       {/* ดูข้อมูลของแท็บผู้สมัคร = ป๊อปแบบรูป iRecruit (4 ต.ค. 2569): แท็บ 6 อัน ไม่มีขั้นตอน 3 ขั้น + ยกเลิกข้อมูลผู้สมัคร
           (แทนใบประวัติเต็มหน้า 1 ต.ค.) · คนละโหมดของป๊อปตัวเดียวกับแท็บการติดต่อ */}
+      <NoCallDialog
+        names={noCallIds ? noCallIds.map((id) => workRows.find((r) => r.id === id)?.full_name ?? id) : null}
+        reasons={noCallReasons}
+        canManage={user?.role === 'admin' || user?.role === 'supervisor'}
+        busy={noCallBusy}
+        onPick={(reasonId) => noCallIds && void pickNoCall(reasonId, noCallIds)}
+        onClose={() => setNoCallIds(null)}
+        onReasonsChanged={loadNoCallReasons}
+      />
+
       <ScrapCandidateDialog
         row={scrapDetailId ? (scrapById.get(scrapDetailId) ?? null) : null}
+        recruiterName={(() => {
+          const w = scrapDetailId ? scrapById.get(scrapDetailId) : null;
+          return w ? recruiterOf(w.app) : null;
+        })()}
         orders={(() => {
           const req = scrapDetailId ? scrapById.get(scrapDetailId)?.scrap?.request_no : null;
           return req ? (scrapOrders[req.toUpperCase()] ?? []) : [];

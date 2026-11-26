@@ -5,6 +5,7 @@ import { callResultLabel } from '@/lib/homeCallResults';
 import { FOLLOW_STATUS_LABEL, isFollowCallStatus } from '@/lib/followApi';
 import { IRECRUIT_PULL_STATE_LABEL, irecruitPullState } from '@/lib/irecruitPullStatus';
 import { IRECRUIT_PULL_CREATED_BY, RM_LIST_VIEW_LABEL, rmShownViewOf } from '@/lib/recruitRm';
+import { isNoCallView, type NoCallView } from '@/lib/applicantNoCall';
 import { isOverAge, OVER_AGE_REASON } from '@/lib/applicantAge';
 import { isScrapApplication } from '@/lib/scrapCandidates';
 
@@ -82,6 +83,14 @@ const TALKED_DETAIL: Record<string, string> = { picked_silent: 'รับสา�
 
 export function rmRowStatusOf(r: PublicApplication, now: number = Date.now()): RmRowStatus {
   const view = rmShownViewOf(r);
+  // กด "ไม่โทร" (26 พ.ย. 2569) — บรรทัดบน = เหตุผล (ชื่อกล่อง) · บรรทัดล่าง = ใครกด เมื่อไหร่
+  if (r.no_call_reason_id != null) {
+    const label = r.no_call_label?.trim() || 'ไม่โทร';
+    const title = isNoCallView(view) ? label : RM_LIST_VIEW_LABEL[view as Exclude<typeof view, NoCallView>];
+    const by = [r.no_call_by_name?.trim() ? `${r.no_call_by_name.trim()} กดไม่โทร` : 'กดไม่โทร', rowWhen(r.no_call_at)];
+    return { view, title, detail: [isNoCallView(view) ? null : label, ...by].filter(Boolean).join(' · '), tone: 'neutral' };
+  }
+  if (isNoCallView(view)) return { view, title: 'ไม่โทร', detail: null, tone: 'neutral' };
   const n = Math.trunc(Number(r.last_call_attempts) || 0);
   const times = n > 0 ? `AI โทร ${n} ครั้ง` : null;
   const join = (...xs: Array<string | null | undefined>) => xs.filter(Boolean).join(' · ') || null;

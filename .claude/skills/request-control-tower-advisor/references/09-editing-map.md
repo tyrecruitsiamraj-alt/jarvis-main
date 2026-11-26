@@ -14849,3 +14849,12 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 - `applicantFilters.ts` facts `buOf` · `RmWorkspace` ให้ `jobBuOf(job)` จากใบขอที่โหลดไว้ · หาใบไม่เจอ = `department_code` เดิม · เทสต์ `tests/api/applicantBuOfJob2569-11-26.test.ts`
 - ⚠️ ยังไม่แก้: สิทธิ์ดูตาม BU ฝั่ง server ยังใช้ `department_code` ของใบสมัคร
 - แก้ข้อมูลจริง 26 พ.ย. 2569 (เจ้าของอนุมัติ): `responsible_name` ของใบจาก Scrap 615 ใบ → คนสั่ง Scrap (ใหม่ 252 · เจมส์ 299 · Administrator 64) ทีละ id ในธุรกรรมเดียว เฉพาะใบที่ค่ายังเป็นค่าเดิม · ค่าเดิมเก็บไฟล์ใน scratchpad ของ session
+
+### 26 พ.ย. 2569 (13) — ปุ่ม "ไม่โทร" + เหตุผล → ใบย้ายไปกล่องของเหตุผล
+- เจ้าของ *"ก่อนเก็บไปหน้าติดต่อ ขอให้มีปุ่ม…เอาเป็นปุ่มคำว่าไม่โทรแล้วกัน แล้วเดี๋ยวพอเลือกเหตุผลจะได้โยนเข้ากล่องนั้นๆไป"* · Choice "ตรง ทำเลย"
+- migration 200: `applicant_no_call_reasons` (box own|bad_data|over_age|employed · 6 ข้อตั้งต้นตามเจ้าของ: ไม่มีงานในจังหวัดนั้นๆ · เพศไม่ตรง · ใบขับขี่ชั่วคราว · อายุน้อย/มาก · BL · ต่างด้าว — ทุกข้อกล่องของตัวเอง) + `public_job_applications.no_call_reason_id/no_call_at/no_call_by_name` (เพิ่มอย่างเดียว · lock_timeout 5s)
+- ใหม่ `src/lib/applicantNoCall.ts` (กล่อง `nocall:<id>` · `noCallTarget` · `ownBoxReasons`) · `src/lib/applicantNoCallApi.ts` · `api/_lib/applicantNoCall.ts` (ตั้ง/ล้าง · ตั้งแล้วยกเลิกคิว AI ค้างด้วย `cancelLumosQueueItem` · เหตุผลเพิ่ม/เลิกใช้) · `api/_handlers/applicant-no-call.ts` (ลงทะเบียนแล้ว · จัดการเหตุผล Supervisor ขึ้นไป)
+- `rmShownViewOf`: กดไม่โทร = กล่องของเหตุผลก่อนทุกอย่าง (`RmBoxView` = กล่องตายตัว | `nocall:<id>`) · `aiSendBlockedReasonOf` กันส่ง AI · `rmRowStatusOf` บรรทัดบน = เหตุผล ล่าง = ใครกด เมื่อไหร่ · Scrap `ScrapRowView` + `countScrapViews` รับกล่องไม่โทร
+- จอ: `RmSearchBar` ปุ่ม "ไม่โทร" ก่อน "เก็บไปโทรเอง" + "ยกเลิกไม่โทร" (เมื่อติ๊กคนที่กดไว้) · ใหม่ `NoCallDialog.tsx` · ดรอปดาวน์กล่องต่อกล่องของเหตุผลก่อน "ไม่สนใจ" (เลิกใช้แล้วขึ้นเมื่อยังมีคน)
+- ตัวส่งซ้ำ (`unsentSql`) และ `chooseAi` ข้ามใบที่กดไม่โทร · `job-applications` แปะ `no_call_*` (ชื่อเล่นคนกด) · เทสต์ `tests/api/applicantNoCall2569-11-26.test.ts`
+- 26 พ.ย. 2569 (ต่อ) เจ้าของ *"ทำไม 2 element หน้าตาไม่เหมือนกัน"* — `ScrapCandidateDialog` ใช้หัวป๊อป + ตารางสามคอลัมน์แบบเดียวกับป๊อป "รายละเอียดผู้สมัคร" (`ApplicantContactDialog` โหมด profile) · ไม่ฝัง `ApplicantInfoPanel` ตรง ๆ เพราะมันยิง `useApplicantTrace(id)` ด้วย id จริง (ใบเสมือนไม่มี)

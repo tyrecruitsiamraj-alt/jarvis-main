@@ -119,6 +119,27 @@ export const API_CATALOG: ApiCatalogEntry[] = [
   "reachesPeople": false
  },
  {
+  "path": "/api/applicant-no-call",
+  "file": "api/_handlers/applicant-no-call.ts",
+  "methods": [
+   "GET",
+   "POST",
+   "PATCH"
+  ],
+  "doc": "/api/applicant-no-call — ปุ่ม \"ไม่โทร\" + เหตุผล (เจ้าของ 26 พ.ย. 2569 · migration 200 · ตรรกะ `api/_lib/applicantNoCall.ts`)\nGET                         → { reasons } รายการเหตุผล (รวมที่เลิกใช้ — ใบเก่ายังอ่านชื่อออก)\nPOST  { ids, reasonId }     → ตั้งไม่โทร (reasonId = null ล้าง กลับกล่องเดิม) · ด่านสิทธิ์ต่อใบเดียวกับปุ่มส่ง AI\nPOST  { label, box }        → เพิ่มเหตุผล (Supervisor ขึ้นไป) · box = own | bad_data | over_age | employed\nPATCH { id, label?, active? } → แก้ชื่อ / เปิด-เลิกใช้ (Supervisor ขึ้นไป) · ไม่มีลบ\nทุกการเปลี่ยนจด audit_logs",
+  "query": [],
+  "body": [
+   "js",
+   "ids",
+   "reasonId",
+   "label",
+   "box",
+   "id",
+   "active"
+  ],
+  "reachesPeople": true
+ },
+ {
   "path": "/api/application-attendance",
   "file": "api/_handlers/application-attendance.ts",
   "methods": [
@@ -485,11 +506,12 @@ export const API_CATALOG: ApiCatalogEntry[] = [
    "GET",
    "PUT"
   ],
-  "doc": "═══ GET/PUT /api/call-followup-policy — โทรซ้ำคนที่ไม่รับสาย (เจ้าของ 26 ต.ค. 2569) ═══\n> *\"ไม่รับสายแล้วโทรวันถัดไป ขอเป็นโทรใหม่ตอนเที่ยง · ขอหน้าไว้ตั้งเวลาผ่าน UI\"* · Choice: ทุกงานที่ AI โทร · Admin แก้\n- GET: ค่าที่ใช้อยู่\n- PUT (admin): ช่องโทรซ้ำเป็นรอบ (27 ต.ค. 2569) `{ roundCalls, roundGapMinutes, roundsPerDay, roundsGapHours, retryDays,\n  dayMorning, dayAfternoon, retryDayMode }` — maxAttempts คิดให้เอง · ค่าอื่นของนโยบายคงเดิม · จดบันทึกการใช้งานทุกครั้ง\nความหมาย/ตัวกรองค่าอยู่ `src/lib/callFollowupPolicy.ts` ที่เดียว · เก็บใน app_call_followup_policy (073)",
+  "doc": "═══ GET/PUT /api/call-followup-policy — โทรซ้ำคนที่ไม่รับสาย (เจ้าของ 26 ต.ค. 2569) ═══\n> *\"ไม่รับสายแล้วโทรวันถัดไป ขอเป็นโทรใหม่ตอนเที่ยง · ขอหน้าไว้ตั้งเวลาผ่าน UI\"* · Choice: ทุกงานที่ AI โทร · Admin แก้\n- GET: ค่าที่ใช้อยู่\n- PUT (admin): ช่องโทรซ้ำเป็นรอบ (27 ต.ค. 2569) `{ roundCalls, roundGapMinutes, roundsPerDay, roundsGapHours, retryDays,\n  dayMorning, dayAfternoon, retryDayMode, matchOfferCooldownDays }` — maxAttempts คิดให้เอง · ค่าอื่นของนโยบายคงเดิม · จดบันทึกการใช้งานทุกครั้ง\nความหมาย/ตัวกรองค่าอยู่ `src/lib/callFollowupPolicy.ts` ที่เดียว · เก็บใน app_call_followup_policy (073)",
   "query": [],
   "body": [
    "js",
-   "retryDayMode"
+   "retryDayMode",
+   "matchOfferCooldownDays"
   ],
   "reachesPeople": false
  },
@@ -1110,7 +1132,7 @@ export const API_CATALOG: ApiCatalogEntry[] = [
   "body": [
    "js"
   ],
-  "reachesPeople": false
+  "reachesPeople": true
  },
  {
   "path": "/api/job-applications-import",
@@ -2370,7 +2392,7 @@ export const API_CATALOG: ApiCatalogEntry[] = [
    "GET",
    "POST"
   ],
-  "doc": "/api/scrap-candidates — รายชื่อจาก Scrap (So Scraping) ของใบขอ (เจ้าของ 17 พ.ย. 2569 · ตรรกะ `api/_lib/scrapCandidates.ts`)\nGET ?job=<job id หรือเลขใบขอ> → รายชื่อของใบนั้น (แท็บ Scrap ในหน้าใบขอ)\nGET ?all=1                    → ทุกใบที่เห็นได้ (แท็บผู้สมัคร ▾ Scrap ของหน้างานสรรหา)\nGET ?counts=1                 → ยอดต่อเลขใบขอ + โทรแล้ว (คอลัมน์ โทร/Scrap ของตารางใบขอ · 17 · 19 พ.ย. 2569)\nPOST { action: 'to_contact', job_id, candidate_ids } → สร้าง/ใช้ใบสมัครเดิม แล้วเก็บเข้าการติดต่อ (Lead) ของคนกด\nสิทธิ์ resource เดียวกับผู้สมัคร (`job-applications`) · ผู้ใช้ที่ล็อก BU เห็นเฉพาะใบขอใน BU ตัวเอง (`loadScopedJobIdSet`)\nAI ไม่โทรเอง: ใบสร้างในชื่อ So Scraping + เป็น Lead — ตัวส่งอัตโนมัติข้ามทั้งสองแบบ",
+  "doc": "/api/scrap-candidates — รายชื่อจาก Scrap (So Scraping) ของใบขอ (เจ้าของ 17 พ.ย. 2569 · ตรรกะ `api/_lib/scrapCandidates.ts`)\nGET ?job=<job id หรือเลขใบขอ> → รายชื่อของใบนั้น (แท็บ Scrap ในหน้าใบขอ)\nGET ?all=1                    → ทุกใบที่เห็นได้ (แท็บผู้สมัคร ▾ Scrap ของหน้างานสรรหา)\nGET ?counts=1                 → ยอดต่อเลขใบขอ + โทรแล้ว (คอลัมน์ โทร/Scrap ของตารางใบขอ · 17 · 19 พ.ย. 2569)\nPOST { action: 'to_contact', job_id, candidate_ids } → สร้าง/ใช้ใบสมัครเดิม แล้วเก็บเข้าการติดต่อ (Lead) ของคนกด\nPOST { action: 'apply', job_id, candidate_ids }      → สร้าง/ใช้ใบสมัครเดิมอย่างเดียว คืน application_id\n  (ขั้นแรกของ \"ส่ง AI โทร\" / \"เก็บไปโทรเอง\" บนแท็บ Scrap · 25 พ.ย. 2569) — ขั้นต่อไปคือ `/api/application-call-choice`\nสิทธิ์ resource เดียวกับผู้สมัคร (`job-applications`) · ผู้ใช้ที่ล็อก BU เห็นเฉพาะใบขอใน BU ตัวเอง (`loadScopedJobIdSet`)\nAI ไม่โทรเอง: ใบสร้างในชื่อ So Scraping + เป็น Lead — ตัวส่งอัตโนมัติข้ามทั้งสองแบบ",
   "query": [
    "counts",
    "all",

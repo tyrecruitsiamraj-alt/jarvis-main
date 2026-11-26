@@ -1,4 +1,5 @@
 import { checkFunctionAccess } from '../_lib/roleFunctionGrants.js';
+import { loadNoCallByApplication } from '../_lib/applicantNoCall.js';
 import { cancelApplication, isUndefinedTable, loadCancellations, restoreApplication } from '../_lib/applicationCancellations.js';
 import { loadIrecruitDups, type IrecruitDup } from '../_lib/irecruitDuplicates.js';
 import { loadIrecruitImportStatus } from '../_lib/irecruitApplicantImport.js';
@@ -1988,6 +1989,21 @@ async function handler(req: AuthedReq, res: ApiRes) {
         }
       } catch (e) {
         if (!isUndefinedColumn(e)) logError('job-applications: ai_block_reason', e);
+      }
+      // ปุ่ม "ไม่โทร" (200 · 26 พ.ย. 2569) — จอย้ายใบไปกล่องของเหตุผล · ยังไม่รัน 200 = ไม่มีช่อง
+      try {
+        const noCall = await loadNoCallByApplication(items.map((i) => String(i.id)));
+        for (const item of items) {
+          const hit = noCall.get(String(item.id));
+          if (!hit) continue;
+          (item as Record<string, unknown>).no_call_reason_id = hit.reasonId;
+          (item as Record<string, unknown>).no_call_label = hit.label;
+          (item as Record<string, unknown>).no_call_box = hit.box;
+          (item as Record<string, unknown>).no_call_at = hit.at;
+          (item as Record<string, unknown>).no_call_by_name = hit.by;
+        }
+      } catch (e) {
+        if (!isUndefinedColumn(e)) logError('job-applications: no_call', e);
       }
       // ผลติดตามนัดล่าสุด (มา/ไม่มา/เลื่อน — migration 089) — แท็บนัดหมายโชว์ชิป/ปุ่ม
       const attendance = await loadLatestAttendanceByApplication(items.map((i) => i.id));

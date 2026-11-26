@@ -99,6 +99,8 @@ function unsentSql(linked: boolean): string {
       and (a.age is null or a.age < ${OVER_AGE_MIN})
       and a.claimed_by is null
       and a.unclaimed_at is null
+      -- เจ้าหน้าที่กด "ไม่โทร" (200 · 26 พ.ย. 2569) = ตัวส่งไม่ส่งเอง
+      and a.no_call_reason_id is null
       and coalesce(a.is_lead, false) = false
       and (a.call_choice is null or a.call_choice in ('ai', 'auto_ai'))
       -- คอมเมนต์จาก So Scraping รอ ai-call ก่อน (เจ้าของ 22 ต.ค. 2569 Choice "รอ So Scraping เรียก ai-call") · เลือก AI แล้วส่งซ้ำได้ตามปกติ

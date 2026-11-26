@@ -2,6 +2,7 @@ import { fullDaysSince } from '@/lib/fullDays';
 import { toYmdBangkok } from '@/lib/dateTh';
 import { isOverAge, OVER_AGE_REASON } from '@/lib/applicantAge';
 import { aiBlockBoxOf } from '@/lib/aiBlockReasons';
+import { isNoCallView, noCallViewOf, type NoCallView } from '@/lib/applicantNoCall';
 import { aiQueueStatusOf } from '@/lib/applicantAiQueueStatus';
 import { isInterestedApplicant, isNotInterestedApplicant } from '@/lib/applicantCallOutcome';
 import type { UserRole } from '@/types';
@@ -290,6 +291,8 @@ export const RM_LIST_VIEWS_SHOWN = [
   'declined',
 ] as const satisfies readonly RmListView[];
 export type RmShownView = (typeof RM_LIST_VIEWS_SHOWN)[number];
+/** กล่องที่ใบอยู่ = กล่องตายตัว หรือกล่องของเหตุผล "ไม่โทร" (`nocall:<id>` · 26 พ.ย. 2569 — เพิ่มเหตุผลใหม่ = มีกล่องใหม่) */
+export type RmBoxView = Exclude<RmShownView, 'all'> | NoCallView;
 
 /** ชิปเดิมที่ถูกยุบ → ชิปที่รวมมัน (ลิงก์เก่า/ตัวนับเก่าไม่ตาย) · ลิงก์เก่า "ไม่ได้ส่ง AI" → พร้อมส่ง AI */
 const RM_VIEW_ALIAS: Partial<Record<RmListView, RmShownView>> = {
@@ -316,7 +319,9 @@ export const RM_AI_SEND_BLOCKED: Partial<Record<RmShownView, string>> = {
 
 /** ใบนี้ส่ง AI ไม่ได้เพราะอะไร (null = ส่งได้) — ตัวตัดสินเดียวของปุ่มรายแถวและปุ่มส่งรวม */
 export function aiSendBlockedReasonOf(r: PublicApplication): string | null {
-  return RM_AI_SEND_BLOCKED[rmShownViewOf(r)] ?? null;
+  if (r.no_call_reason_id != null) return 'กดไม่โทรไว้ — ยกเลิกไม่โทรก่อนถึงส่ง AI ได้';
+  const v = rmShownViewOf(r);
+  return isNoCallView(v) ? null : (RM_AI_SEND_BLOCKED[v] ?? null);
 }
 
 /** ค่า ?list= → ชิปที่โชว์ (ชิปเดิมแปลงให้ · ไม่รู้จัก/collect = null ให้ผู้เรียกใช้ค่าเริ่ม) */
@@ -387,7 +392,8 @@ export const RM_LIST_VIEW_LABEL: Record<RmListView, string> = {
  * ไม่ใช่คำตอบของผู้สมัคร) · คนที่ยังไม่ได้โทรจะไม่อยู่ในสองมุมมองหลัง — ตั้งใจ
  * เพราะยังไม่มีใครรู้ว่าเขาสนใจไหม การเดาแทนคือการโกหกตัวเลข
  */
-export function isInRmListView(r: PublicApplication, view: RmListView): boolean {
+export function isInRmListView(r: PublicApplication, view: RmListView | NoCallView): boolean {
+  if (isNoCallView(view)) return rmShownViewOf(r) === view;
   /**
    * 🔴 กติกา "สนใจ/ไม่สนใจ" อยู่ที่ `applicantCallOutcome.ts` **ที่เดียว**
    * (เดิมไฟล์นี้เทียบ `=== 'confirmed'` / `=== 'declined'` เองตรง ๆ → พอเจ้าของสั่งให้
@@ -422,7 +428,12 @@ export const IRECRUIT_PULL_CREATED_BY = 'iRecruit';
  * AI เคยโทรแล้ว (คุยแล้วไม่ได้คำตอบ / ไม่รับสาย) → ดึงจาก iRecruit → ไม่ผูกใบขอ → ที่เหลือ = ไม่ได้ส่ง AI (เหตุผลบนแถว: อายุเกิน · ซ้ำ · เบอร์ผิด …)
  * ⚠️ อายุเกิน/ซ้ำ iRecruit ที่ถูกส่ง AI ไปแล้ว = อยู่ตามผลโทรจริง ไม่ใช่ "ไม่ได้ส่ง" (ตรงกับความจริง)
  */
-export function rmShownViewOf(r: PublicApplication): Exclude<RmShownView, 'all'> {
+export function rmShownViewOf(r: PublicApplication): RmBoxView {
+  // เจ้าหน้าที่กด "ไม่โทร" (26 พ.ย. 2569) = กล่องของเหตุผลนั้นก่อนทุกอย่าง — การตัดสินใจของคน ชนะผลอัตโนมัติ
+  if (r.no_call_reason_id != null) {
+    const box = r.no_call_box;
+    return box && box !== 'own' ? box : noCallViewOf(r.no_call_reason_id);
+  }
   // ไม่มาตามนัด / ไม่ผ่าน แล้วถูกคืนแท็บผู้สมัคร (`appointmentReturn.ts`) = กล่องของตัวเอง ก่อนผลโทร (เดิมตกไปอยู่ "สนใจ")
   if (isAppointmentFailedReturn(r)) return 'appt_failed';
   if (isInterestedApplicant(r)) return 'interested';

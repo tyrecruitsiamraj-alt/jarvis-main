@@ -20,8 +20,9 @@ describe('ปุ่มมุมมองแท็บผู้สมัคร', (
   });
   it('RmWorkspace วาดจากชุดที่โชว์ และ ?list=collect ถอยไปค่าเริ่ม (รายชื่อคนที่สนใจ · 14 ต.ค. 2569)', () => {
     const src = readFileSync(join(process.cwd(), 'src/components/recruit-rm/RmWorkspace.tsx'), 'utf8');
-    expect(src).toContain('RM_LIST_VIEWS_SHOWN.map((v)');
-    expect(src).toContain('rmListViewFromParam(listParam) ?? RM_LIST_VIEW_DEFAULT');
+    // 26 พ.ย. 2569 + กล่องของเหตุผลไม่โทร (`nocall:<id>`) ต่อท้ายกลุ่มติดเรื่อง
+    expect(src).toContain('RM_LIST_VIEWS_SHOWN.flatMap((v)');
+    expect(src).toContain('(rmListViewFromParam(listParam) ?? RM_LIST_VIEW_DEFAULT)');
     expect(RM_LIST_VIEW_DEFAULT).toBe('interested');
   });
 });

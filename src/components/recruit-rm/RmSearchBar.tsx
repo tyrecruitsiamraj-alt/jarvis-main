@@ -1,6 +1,6 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { UserPlus, PhoneCall, Bot, FileSpreadsheet, Download, Printer, UserMinus } from 'lucide-react';
+import { UserPlus, PhoneCall, PhoneOff, Bot, FileSpreadsheet, Download, Printer, UserMinus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { DASH, TONE } from '@/lib/designTokens';
 import SearchField from '@/components/shared/SearchField';
@@ -49,6 +49,10 @@ const RmSearchBar: React.FC<{
   holdingSelected?: boolean;
   /** "ส่ง AI โทร" ทีละหลายคน — 🔴 ยิงสายจริง ผู้เรียกต้องมี popup ยืนยันรายชื่อก่อนเสมอ */
   onSendAiSelected?: () => void;
+  /** "ไม่โทร" — เลือกเหตุผลแล้วใบย้ายไปกล่องของเหตุผล (เจ้าของ 26 พ.ย. 2569 "ก่อนเก็บไปหน้าติดต่อ ขอให้มีปุ่ม") · ไม่ส่ง = ไม่มีปุ่ม */
+  onNoCallSelected?: () => void;
+  /** ยกเลิกไม่โทร — โผล่เมื่อติ๊กคนที่กดไม่โทรไว้ · กลับกล่องเดิม */
+  onUndoNoCallSelected?: () => void;
   /** กล่องที่ส่ง AI ไม่ได้ (26 พ.ย. 2569 · `RM_AI_SEND_BLOCKED`) — มีค่า = ปุ่มกดไม่ได้ พร้อมบอกเหตุ */
   sendAiBlockedReason?: string | null;
   /** "ถอย Lead" ของแท็บการติดต่อ — ส่งแถวที่ติ๊กกลับแท็บผู้สมัคร · ไม่ส่ง = ไม่มีปุ่ม */
@@ -70,6 +74,8 @@ const RmSearchBar: React.FC<{
   onHoldSelected,
   holdingSelected = false,
   onSendAiSelected,
+  onNoCallSelected,
+  onUndoNoCallSelected,
   sendAiBlockedReason = null,
   onReleaseSelected,
   releasing = false,
@@ -112,6 +118,27 @@ const RmSearchBar: React.FC<{
     {onPrintPdf ? (
       <Button variant="secondary" size="xs" type="button" onClick={onPrintPdf} disabled={printDisabled} className="shrink-0">
         <Printer aria-hidden /> โหลดเป็น PDF
+      </Button>
+    ) : null}
+
+    {onNoCallSelected ? (
+      <Button
+        variant="outline"
+        size="xs"
+        type="button"
+        onClick={onNoCallSelected}
+        disabled={selectedCount === 0}
+        title={selectedCount === 0 ? 'ติ๊กเลือกแถวก่อน' : `เลือกเหตุผลที่ไม่โทร ${selectedCount} คน`}
+        className="shrink-0"
+        data-testid="rm-no-call"
+      >
+        <PhoneOff aria-hidden />
+        ไม่โทร{selectedCount > 0 ? ` (${selectedCount})` : ''}
+      </Button>
+    ) : null}
+    {onUndoNoCallSelected ? (
+      <Button variant="ghost" size="xs" type="button" onClick={onUndoNoCallSelected} className="shrink-0" data-testid="rm-no-call-undo">
+        ยกเลิกไม่โทร
       </Button>
     ) : null}
 
