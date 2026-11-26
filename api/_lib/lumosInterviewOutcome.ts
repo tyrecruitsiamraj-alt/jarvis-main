@@ -24,6 +24,14 @@ import { isCallOutcome, type CallOutcome } from '../../src/lib/callFollowupPolic
  */
 const INTERVIEW_OUTCOME_ALIAS: Record<string, CallOutcome> = {
   completed: 'confirmed',
+  /**
+   * 26 พ.ย. 2569 — คำที่ Lumos ส่งมาตั้งแต่ 21 ต.ค. แต่เราไม่เคยรับ (ตอบ 400) ดู `VALID_OUTCOMES` ใน `lumos-interview.ts`
+   * `rejected` = ปลายทางไม่รับ ดังราว 65 วิแล้วตัด (ended_reason "SIP 487 … Request Terminated (ring 65s)") = ไม่รับสาย
+   * `automated_service` = เข้าระบบฝากข้อความ ("กรุณาฝากข้อความหลังจากได้ยินเสียงสัญญาณ") = ไม่ได้คุยกับคน = ไม่รับสาย
+   * `reschedule_requested` อยู่ในชุดกลางอยู่แล้ว ปล่อยผ่าน
+   */
+  rejected: 'no_answer',
+  automated_service: 'no_answer',
 };
 
 /**

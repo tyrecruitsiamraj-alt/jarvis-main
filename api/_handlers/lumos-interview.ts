@@ -192,9 +192,15 @@ async function fetchWaitingInterviewCandidates(limit: number): Promise<Candidate
 
 // ─── Validators ───────────────────────────────────────────────────────────────
 
+/**
+ * 🔴 26 พ.ย. 2569 เพิ่ม `reschedule_requested` · `rejected` · `automated_service` — Lumos ส่งสามคำนี้มาตั้งแต่ 21 ต.ค.
+ * แต่เราตอบ 400 (ไม่รู้จักคำ) ⇒ ผลโทร 1,351 ผล / 1,299 คนหาย สายค้าง "รอ AI โทร" ทั้งที่โทรแล้ว
+ * (Lumos ตรวจ 126 งานที่เงียบ 24–25 พ.ย.: โทรครบ ส่งผลกลับแล้วโดน 400) · ความหมายดู `normalizeInterviewOutcome`
+ */
 const VALID_OUTCOMES = [
   'completed', 'declined', 'wrong_person',
   'unresponsive', 'no_answer', 'busy', 'failed',
+  'reschedule_requested', 'rejected', 'automated_service',
 ] as const;
 
 function isValidInterviewResult(v: unknown): v is InterviewResult {

@@ -99,6 +99,23 @@ describe('แปลศัพท์ผลของช่องสัมภาษ�
   });
 });
 
+describe('🔴 คำที่ Lumos ส่งมาแต่เราตอบ 400 ตั้งแต่ 21 ต.ค. (26 พ.ย. 2569 · ผลหาย 1,351 ผล)', () => {
+  it('แปล: rejected (ดังแล้วไม่รับ) · automated_service (ฝากข้อความ) = ไม่รับสาย · reschedule_requested ผ่านตามเดิม', () => {
+    expect(normalizeInterviewOutcome('rejected')).toBe('no_answer');
+    expect(normalizeInterviewOutcome('automated_service')).toBe('no_answer');
+    expect(normalizeInterviewOutcome('reschedule_requested')).toBe('reschedule_requested');
+  });
+
+  for (const outcome of ['rejected', 'automated_service', 'reschedule_requested']) {
+    it(`รับ ${outcome} ได้ (200) และผูกกลับเข้าคิวพร้อมคำที่แปลแล้ว — ไม่ใช่ 400`, async () => {
+      const out = await post([result(`${JOB}::app-11111111-1111-4111-8111-111111111111`, outcome)]);
+      expect(out.code).toBe(200);
+      expect(h.applyLumosResult).toHaveBeenCalledTimes(1);
+      expect(h.applyLumosResult.mock.calls[0][4]).toBe(normalizeInterviewOutcome(outcome));
+    });
+  }
+});
+
 describe('รับผลกลับเข้าคิว — ต้องรับทุกแหล่ง', () => {
   const refs = [
     ['ir-', `${JOB}::ir-123`],
