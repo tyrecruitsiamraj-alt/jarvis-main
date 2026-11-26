@@ -398,7 +398,7 @@ async function postInterviewResults(req: ApiReq, res: ApiRes): Promise<void> {
         r.client_candidate_id,
         queueStatus,
         r,
-        normalizeInterviewOutcome(r.outcome),
+        normalizeInterviewOutcome(r.outcome, r),
       ).catch(() => false);
       if (ok) matched += 1;
       // จดทุกใบลงกล่องรับ (ช่องติดตามจดมาตั้งแต่ 11 ก.ย. · ช่องนี้ไม่เคยจด ⇒ ผลหายแล้วพิสูจน์ไม่ได้ว่าใครพลาด)

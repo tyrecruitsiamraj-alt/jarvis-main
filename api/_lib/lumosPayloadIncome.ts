@@ -13,6 +13,7 @@
 import { fetchJobBenefitRates, monthlyGuaranteedIncome, requestNoFromJobRef, speakableBenefitLine } from './siamrajJobBenefits.js';
 import { appendExtraInfoToPayload, buildExtraInfoSentence } from './lumosCallScript.js';
 import { logError } from './logger.js';
+import { averageBelowBase } from '../../src/lib/incomeShown.js';
 
 const TIMEOUT_MS = 4000;
 
@@ -70,17 +71,23 @@ export async function enrichPayloadsWithIncome(payloads: readonly unknown[]): Pr
       withTimeout(
         import('./applyScriptFacts.js').then((m) => m.loadAverageIncomeChoices(refs)),
         TIMEOUT_MS,
-        new Map<string, number>(),
+        new Map<string, { average: number; base: number | null }>(),
       ),
     ]);
     let added = 0;
     for (const { p, no } of todo) {
       const rates = byNo.get(no);
       if (!rates || rates.length === 0) continue;
+      const erp = monthlyGuaranteedIncome(rates);
+      const chosen = averageByRef.get(jobRefOfPayload(p) ?? '');
+      const base = chosen?.base ?? (erp.base || null);
+      // เลือกเฉลี่ยแต่ต่ำกว่าฐาน = พูดแค่ฐาน (27 พ.ย. 2569 · `averageBelowBase` ตัวเดียวกับบทผู้สมัคร)
+      const baseOnly = Boolean(chosen) && averageBelowBase(chosen?.average, base);
       const sentence = buildExtraInfoSentence({
-        monthlyIncome: averageByRef.get(jobRefOfPayload(p) ?? '') ?? monthlyGuaranteedIncome(rates).total,
-        baseSalary: monthlyGuaranteedIncome(rates).base,
+        monthlyIncome: chosen?.average ?? erp.total,
+        baseSalary: base,
         benefitLine: speakableBenefitLine(rates),
+        baseOnly,
       });
       if (!sentence) continue;
       appendExtraInfoToPayload(p, sentence);

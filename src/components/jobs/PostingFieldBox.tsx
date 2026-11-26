@@ -171,6 +171,7 @@ export function IncomeShownPicker({
   job,
   totalText,
   averageText,
+  averageBelowBase = false,
   onSaved,
 }: {
   job: JobRequest;
@@ -178,6 +179,8 @@ export function IncomeShownPicker({
   totalText: string | null;
   /** "18,500 บาท/เดือน" (เฉลี่ยคนเก่า/ที่ทีมตั้ง) · ไม่มี = "—" กดไม่ได้ */
   averageText: string | null;
+  /** เฉลี่ยต่ำกว่าฐานเงินเดือน (`averageBelowBase` · 27 พ.ย. 2569) — เลือกเฉลี่ยไว้ = ผู้สมัครเห็นแค่ฐาน AI พูดแค่ฐาน */
+  averageBelowBase?: boolean;
   onSaved: (patch: Partial<JobRequest>) => void;
 }) {
   const current = incomeShownOf(job.field_overrides);
@@ -227,6 +230,11 @@ export function IncomeShownPicker({
           );
         })}
       </ToggleGroup>
+      {current === 'average' && averageBelowBase ? (
+        <span className={cn('text-xs', TONE.warn.value)} data-testid="income-average-below-base">
+          เฉลี่ยต่ำกว่าฐานเงินเดือน ผู้สมัครเห็นแค่ฐาน AI ก็พูดแค่ฐาน
+        </span>
+      ) : null}
       {error ? (
         <span role="alert" className={cn('text-xs', TONE.danger.value)}>
           {error}

@@ -23,7 +23,13 @@ vi.mock('../../api/_lib/siamrajJobBenefits.js', async (orig) => {
 });
 
 // ใบที่ทีมเลือก "รายได้เฉลี่ย" (14 ต.ค. 2569) — X2 เลือกเฉลี่ย 13,400 · ใบอื่นพูดรายได้รวมตามเดิม
-const loadAverageIncomeChoices = vi.fn(async (refs: string[]) => new Map(refs.filter((r) => r === 'siamraj-sql:X2').map((r) => [r, 13400])));
+// X4 เลือกเฉลี่ย 9,180 ต่ำกว่าฐาน ERP 12,000 (ของจริง LAO6911017 · 27 พ.ย. 2569) · X5 ต่ำกว่าฐานที่ทีมตั้ง 14,000
+const CHOSEN: Record<string, { average: number; base: number | null }> = {
+  'siamraj-sql:X2': { average: 13400, base: null },
+  'siamraj-sql:X4': { average: 9180, base: null },
+  'siamraj-sql:X5': { average: 13400, base: 14000 },
+};
+const loadAverageIncomeChoices = vi.fn(async (refs: string[]) => new Map(refs.filter((r) => CHOSEN[r]).map((r) => [r, CHOSEN[r]])));
 vi.mock('../../api/_lib/applyScriptFacts.js', () => ({
   loadAverageIncomeChoices: (refs: string[]) => loadAverageIncomeChoices(refs),
 }));
@@ -69,6 +75,17 @@ describe('เติมรายได้ตอนยิง', () => {
     expect(await enrichPayloadsWithIncome([avg, tot])).toBe(2);
     expect(avg.questions.at(-1)).toContain('13,400');
     expect(tot.questions.at(-1)).toContain('12,000');
+  });
+
+  it('🔴 เลือกเฉลี่ยแต่ต่ำกว่าฐาน ⇒ พูดแค่ฐาน ไม่พูด "รายได้ประมาณ" (เจ้าของ Choice 27 พ.ย. 2569)', async () => {
+    const erpBase = { client_candidate_id: 'siamraj-sql:X4::app-a0423b41', questions: ['สวัสดีครับ'] };
+    const teamBase = { client_candidate_id: 'siamraj-sql:X5::app-b1', questions: ['สวัสดีครับ'] };
+    expect(await enrichPayloadsWithIncome([erpBase, teamBase])).toBe(2);
+    expect(erpBase.questions.at(-1)).not.toContain('รายได้ประมาณ');
+    expect(erpBase.questions.at(-1)).not.toContain('9,180');
+    expect(erpBase.questions.at(-1)).toContain('12,000');
+    expect(teamBase.questions.at(-1)).not.toContain('13,400');
+    expect(teamBase.questions.at(-1)).toContain('14,000');
   });
 
   it('ตัวยิงเรียกเติมก่อนยิงทุกครั้ง (รอบแรก + ส่งซ้ำผ่านตัวเดียวกัน)', async () => {

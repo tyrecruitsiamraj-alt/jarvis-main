@@ -91,6 +91,21 @@ describe('รายได้รวม หรือ เฉลี่ย ที่�
     expect((await loadApplyScriptFacts('siamraj-sql:R1', 500)).monthlyIncome).toBe(12000);
   });
 
+  it('🔴 เลือกเฉลี่ยแต่ต่ำกว่าฐาน ⇒ พูดแค่ฐาน (เจ้าของ Choice 27 พ.ย. 2569 · ของจริง LAO6911017 เฉลี่ย 9,180 ฐาน 14,000)', async () => {
+    erpHangs = false;
+    boxOverrides = {
+      resigned_income_3m: [month('2026-09-01', '2026-09-30', 9180), month('2026-10-01', '2026-10-31', 9180)],
+      income_display: { period: 'monthly', total: 19000, lines: [{ label: 'ฐานเงินเดือน', amount: 14000 }] },
+      field_overrides: { income_shown: 'average' },
+    };
+    const f = await loadApplyScriptFacts('siamraj-sql:R1', 500);
+    expect(f.baseOnly).toBe(true);
+    expect(f.baseSalary).toBe(14000);
+    expect(f.monthlyIncome).toBe(14000);
+    const choices = await loadAverageIncomeChoices(['siamraj-sql:R1']);
+    expect(choices.get('siamraj-sql:R1')).toEqual({ average: 9180, base: 14000 });
+  });
+
   it('เลือกเฉลี่ยแต่ไม่มีสลิปคนเก่า ⇒ พูดรายได้รวม (ไม่เงียบเรื่องเงิน)', async () => {
     erpHangs = false;
     boxOverrides = { field_overrides: { income_shown: 'average' } };

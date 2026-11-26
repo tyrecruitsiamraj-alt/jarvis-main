@@ -14,7 +14,7 @@ import {
   speakableBenefitLine,
 } from './siamrajJobBenefits.js';
 import { publicSafeAddressParts } from '../../src/lib/publicJobPrivacy.js';
-import { incomeShownOf, spokenMonthlyIncome, type IncomeShown } from '../../src/lib/incomeShown.js';
+import { averageBelowBase, incomeShownOf, spokenMonthlyIncome, type IncomeShown } from '../../src/lib/incomeShown.js';
 import { resignedMonthlyNetAverage } from '../../src/lib/resignedIncome.js';
 import { publicJobTitle } from '../../src/lib/publicJobTitle.js';
 import { boardProvinceOf } from '../../src/lib/boardFilters.js';
@@ -140,17 +140,26 @@ async function loadFacts(jobId: string): Promise<ApplyJobFacts> {
        *    ต่อวัน×30 ซึ่งไม่ตรงของจริง · เลือก "เฉลี่ย" ไว้ = พูดเฉลี่ยตามเดิม · ไม่มีฐาน = ถอยไปยอดรวมเดิม
        */
       const erpOnly = manual === null || manual === undefined;
-      const useBaseOnly = erpOnly && erp.base > 0 && !(shown === 'average' && average !== null && average > 0);
-      out.monthlyIncome = useBaseOnly ? erp.base : spokenMonthlyIncome(shown, manual ?? (erp.total || null), average);
-      if (useBaseOnly) out.baseOnly = true;
       // ฐานเงินเดือน (14 ต.ค. 2569 "เติมฐานเงินเดือนในบทโทร AI ด้วย") — ทีมตั้ง → ERP · ตัวเดียวกับการ์ด
-      out.baseSalary = manualMonthlyBase(job) ?? (erp.base || null);
+      const base = manualMonthlyBase(job) ?? (erp.base || null);
+      const useBaseOnly = erpOnly && erp.base > 0 && !(shown === 'average' && average !== null && average > 0);
+      out.monthlyIncome = useBaseOnly ? erp.base : spokenMonthlyIncome(shown, manual ?? (erp.total || null), average, base);
+      if (useBaseOnly) out.baseOnly = true;
+      out.baseSalary = base;
       out.benefitLine = speakableBenefitLine(rates) || null;
-      return out;
+      return withBaseOnlyWhenAverageBelow(out, shown, average);
     }
   }
-  out.monthlyIncome = spokenMonthlyIncome(shown, manual, average);
   out.baseSalary = manualMonthlyBase(job);
+  out.monthlyIncome = spokenMonthlyIncome(shown, manual, average, out.baseSalary);
+  return withBaseOnlyWhenAverageBelow(out, shown, average);
+}
+
+/** เลือกเฉลี่ยแต่ต่ำกว่าฐาน (27 พ.ย. 2569 · `averageBelowBase`) = พูดแค่ฐาน ไม่พูด "รายได้ประมาณ…" */
+function withBaseOnlyWhenAverageBelow(out: ApplyJobFacts, shown: IncomeShown, average: number | null): ApplyJobFacts {
+  if (shown !== 'average' || !averageBelowBase(average, out.baseSalary)) return out;
+  out.monthlyIncome = out.baseSalary ?? null;
+  out.baseOnly = true;
   return out;
 }
 
@@ -170,9 +179,12 @@ function spokenIncomeChoiceOf(job: Record<string, unknown>): { shown: IncomeShow
 /**
  * ใบขอที่ทีมเลือก "รายได้เฉลี่ย" → เลขเฉลี่ยที่ AI ต้องพูด (คีย์ = job ref) · ใบอื่นไม่อยู่ใน map (พูดรายได้รวมตามเดิม)
  * ใช้กับเส้นเติมรายได้ตอนยิง (`lumosPayloadIncome.ts` · เลน Match) — ล้ม = map ว่าง (พูดแบบเดิม)
+ * `base` = ฐานที่ทีมตั้งเอง (ไม่มี = null · ตัวเติมใช้ฐาน ERP) — ตัวเติมเทียบ `averageBelowBase` (27 พ.ย. 2569)
  */
-export async function loadAverageIncomeChoices(jobRefs: readonly string[]): Promise<Map<string, number>> {
-  const out = new Map<string, number>();
+export async function loadAverageIncomeChoices(
+  jobRefs: readonly string[],
+): Promise<Map<string, { average: number; base: number | null }>> {
+  const out = new Map<string, { average: number; base: number | null }>();
   const refs = [...new Set(jobRefs.filter(Boolean))];
   if (refs.length === 0) return out;
   // 1) อ่านตัวเลือกจากฐานเราก่อน — ไม่มีใบไหนเลือกเฉลี่ย = ไม่แตะ feed ใบขอ (ตัวยิงวิ่งทุกนาที ห้ามยิงระบบงานหลักทุกรอบ)
@@ -191,7 +203,7 @@ export async function loadAverageIncomeChoices(jobRefs: readonly string[]): Prom
   await attachNotes(jobs);
   for (const job of jobs) {
     const { shown, average } = spokenIncomeChoiceOf(job);
-    if (shown === 'average' && average !== null && average > 0) out.set(String(job.id), average);
+    if (shown === 'average' && average !== null && average > 0) out.set(String(job.id), { average, base: manualMonthlyBase(job) });
   }
   return out;
 }

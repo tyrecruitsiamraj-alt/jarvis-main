@@ -8,7 +8,7 @@
  *   2. คำว่า "สนใจ" ของช่องนี้คือ `completed` ซึ่งตัวตามงานไม่รู้จัก → ไม่เด้งแจ้งเตือน
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { normalizeInterviewOutcome } from '../../api/_lib/lumosInterviewOutcome.js';
+import { callbackReasonOf, isStaffCallbackRequest, normalizeInterviewOutcome } from '../../api/_lib/lumosInterviewOutcome.js';
 import { CALL_OUTCOMES } from '../../src/lib/callFollowupPolicy.js';
 
 const h = vi.hoisted(() => ({
@@ -165,5 +165,39 @@ describe('ตัวเลขที่ตอบกลับ Lumos ต้องบ
     const out = await post([result(`${JOB}::card-1`)]);
     expect(out.code).toBe(200);
     expect(out.body?.matched).toBe(0);
+  });
+});
+
+describe('ผู้สมัครขอคุยกับเจ้าหน้าที่ (เจ้าของ 27 พ.ย. 2569) — ไม่ปิดเป็นไม่สนใจ', () => {
+  // รูปจริงจาก Lumos (คุณพันธสัญญา OPL6904029 · 24 พ.ย. 2569)
+  const callback = {
+    type: 'callback_requested',
+    due_at: null,
+    reason: 'ผู้สมัครขอคุยกับเจ้าหน้าที่ ควรให้คนโทรกลับ',
+    urgency: 'normal',
+  };
+
+  it('🔴 declined + callback_requested → confirmed (กล่องสนใจ ให้คนโทร · ไม่พักเบอร์)', () => {
+    expect(normalizeInterviewOutcome('declined', { outcome: 'declined', next_action: callback })).toBe('confirmed');
+    expect(isStaffCallbackRequest({ next_action: callback })).toBe(true);
+    expect(callbackReasonOf({ next_action: callback })).toBe('ผู้สมัครขอคุยกับเจ้าหน้าที่ ควรให้คนโทรกลับ');
+  });
+
+  it('ขอเลื่อนนัด + callback = AI นัดโทรใหม่ตามเดิม (ไม่แปล)', () => {
+    expect(normalizeInterviewOutcome('reschedule_requested', { next_action: callback })).toBe('reschedule_requested');
+  });
+
+  it('declined ไม่มี next_action / next_action ชนิดอื่น = ไม่สนใจตามเดิม', () => {
+    expect(normalizeInterviewOutcome('declined', { outcome: 'declined' })).toBe('declined');
+    expect(normalizeInterviewOutcome('declined', { next_action: null })).toBe('declined');
+    expect(normalizeInterviewOutcome('declined', { next_action: { type: 'review_screening_requested' } })).toBe('declined');
+    expect(callbackReasonOf({ next_action: { type: 'review_screening_requested', reason: 'x' } })).toBe('');
+  });
+
+  it('ตัวรับผลส่ง confirmed ให้ตัวตามงาน · ผลดิบยังเป็น declined', async () => {
+    await post([{ ...result(`${JOB}::app-ebe08379-0000-4000-8000-000000000000`, 'declined'), next_action: callback }]);
+    const call = h.applyLumosResult.mock.calls[0];
+    expect(call[4]).toBe('confirmed');
+    expect((call[3] as { outcome: string }).outcome).toBe('declined');
   });
 });

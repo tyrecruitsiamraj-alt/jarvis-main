@@ -6,10 +6,10 @@ import { DASH, TONE } from '@/lib/designTokens';
 import type { JobRequest } from '@/types';
 import { boardCardAge, boardCardGender, boardCardPlace } from '@/lib/boardCardFacts';
 import { isOtBenefit, publicBenefitList, publicFieldVisible } from '@/lib/publicFieldVisibility';
-import { incomeLinesShown, incomeShownOf } from '@/lib/incomeShown';
+import { averageBelowBase, incomeLinesShown, incomeShownOf } from '@/lib/incomeShown';
 import { benefitDisplayLabels, isRetiredBenefit } from '@/lib/extraBenefits';
 import { payCycleCardText, payCyclesOf } from '@/lib/payCycle';
-import { benefitWithAmount, jobAverageIncome, jobIncomeLine, teamBenefitAmounts } from '@/lib/jobPublicFacts';
+import { benefitWithAmount, jobAverageIncome, jobIncomeLine, jobMonthlyBase, teamBenefitAmounts } from '@/lib/jobPublicFacts';
 import { publicWorkSchedule } from '@/lib/publicJobPrivacy';
 
 const NUM = new Intl.NumberFormat('th-TH');
@@ -53,6 +53,8 @@ export default function JobPublicFacts({
   const pick = incomeLinesShown(incomeShownOf(job.field_overrides), {
     total: Boolean(income?.total),
     average: averageAll !== null,
+    // เลือกเฉลี่ยแต่ต่ำกว่าฐาน = ขึ้นแค่ฐาน (27 พ.ย. 2569 · ตัวเดียวกับบท AI)
+    averageBelowBase: averageBelowBase(averageAll, jobMonthlyBase(job)),
   });
   const average = pick.average ? averageAll : null;
   const totalText = pick.total ? (income?.total ?? null) : null;

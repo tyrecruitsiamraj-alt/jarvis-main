@@ -14864,3 +14864,18 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 - 26 พ.ย. 2569 Choice "คนเก็บ + Supervisor ขึ้นไป" — ถอย/ลบออกจากการติดต่อ: ลูกทีมเฉพาะใบตัวเอง · Supervisor/Admin ใบใครก็ได้ (ยังต้องไม่เคยกดโทร) · `chooseRelease` คืนล็อกเบอร์ของคนเก็บ · ปุ่มในแถวบอกเหตุแทนกดแล้วเงียบ (`canReleaseOthers`)
 - 26 พ.ย. 2569 Supervisor (อ้น · ครีม) ลงผลในใบที่ลูกทีมเก็บ 408 ใบ/30 วัน — เจ้าของ "ไม่ต้องย้ายดีกว่าปล่อยไว้แบบนั้นแหละ" ⇒ ไม่แก้
 - 26 พ.ย. 2569 เจ้าของ *"ถอดปุ่ม ไม่โทร ออกด้วย"* (แถบเครื่องมือ — เหลือปุ่มในแถว) · *"ถอดออกด้วย"* กล่อง "ส่งเอกสาร" ในป๊อปรายละเอียดผู้สมัคร (`ApplicantContactDialog`) — ส่งเอกสารยังทำได้จากปุ่มบนแถวแท็บการติดต่อ
+
+### 27 พ.ย. 2569 (1) — ขอคุยกับเจ้าหน้าที่ → กล่องสนใจ · เฉลี่ยต่ำกว่าฐาน = บอกแค่ฐาน
+- เจ้าของถามสถานะระบบ AI โทร (แบบสอบถาม 5 ข้อ) · Choice "ขอคุยเจ้าหน้าที่ → ส่งให้คนโทร" · "รายได้เฉลี่ยต่ำกว่าฐาน = ไม่พูด" · "ขอ Lumos พูดเลขเงินเป็นคำ" (เพดานโทรต่อเดือนไม่ทำ — โทรรอบเดียวตั้งแต่ 18 พ.ย. แล้ว)
+- ขอคุยกับเจ้าหน้าที่: Lumos ส่ง `declined` + `next_action.type='callback_requested'` · เดิมอ่านแค่ outcome ⇒ ปิดเป็นไม่สนใจ + พักเบอร์ 30 วัน (47 รายตลอดมา · คุณพันธสัญญา OPL6904029 24 พ.ย.)
+  - `api/_lib/lumosInterviewOutcome.ts`: `isStaffCallbackRequest` · `callbackReasonOf` · `normalizeInterviewOutcome(outcome, result)` declined + callback = `confirmed` (last_outcome · กล่องสนใจ · ไม่พักเบอร์) · ผลดิบใน `result` ยังเป็น declined
+  - `api/_handlers/lumos-interview.ts` ส่ง `r` เข้าไป · `api/_lib/callFollowup.ts` แจ้งเตือน "<ชื่อ> ขอคุยกับเจ้าหน้าที่ — โทรกลับ" + เหตุผลของ Lumos
+  - ⚠️ ที่อ่าน `result->>'outcome'` ดิบตรง ๆ (ไม่ coalesce last_outcome) ยังนับเป็น declined: สถิติ `lumosDispatch.ts` ~1725 · `followLumosWatch` (สายติดตาม) · `pdpaRequests`
+  - 47 รายเก่ายังไม่แก้ข้อมูล รอเจ้าของอนุญาต (รายการ: queue id · ใบขอ · ใบสมัคร · วันที่)
+- เฉลี่ยต่ำกว่าฐาน: `src/lib/incomeShown.ts` `averageBelowBase` (กติกาเดียว) · `spokenMonthlyIncome(…, base)` · `incomeLinesShown` รับ `averageBelowBase` (ไม่ขึ้นทั้งรวม/เฉลี่ย เหลือฐาน)
+  - `src/lib/jobPublicFacts.ts` ใหม่ `jobMonthlyBase` (ฐานที่ทีมตั้ง → ERP) · `JobPublicFacts.tsx` (การ์ด + หน้าสมัคร)
+  - บท AI: `applyScriptFacts.ts` `withBaseOnlyWhenAverageBelow` (baseOnly) · `loadAverageIncomeChoices` คืน `{ average, base }` · `lumosPayloadIncome.ts` (เลน Match) baseOnly
+  - ป๊อปประกาศ: `IncomeShownPicker` prop `averageBelowBase` ขึ้นคำเตือน (testid `income-average-below-base`)
+  - 17 ใบที่ตั้งเฉลี่ย (27 พ.ย.): ต่ำกว่าฐาน 1 ใบ (LAO6911017 · 9,180 < 14,000) · 11 ใบสูงกว่าฐาน · 5 ใบยังไม่มีสาย
+- เอกสาร Lumos `docs/lumos/lumos-brief-2569-11-25-call-handling.md` ที่ขอ 6 พูดเลขเงินเป็นคำเต็ม (LAO6911009 · OPL6910088 ผู้สมัครได้ยินเป็นแสน)
+- เทสต์: `lumosInterviewOutcome.test.ts` · `incomeAverageBelowBase.test.ts` (ใหม่) · `lumosPayloadIncome.test.ts` · `applyScriptFactsBox.test.ts`

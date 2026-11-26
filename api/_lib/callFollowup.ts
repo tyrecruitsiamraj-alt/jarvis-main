@@ -14,6 +14,7 @@ import { GREETING_JOB_REF } from '../../src/lib/greetingCall.js';
 import { tableInAppSchema } from './schema.js';
 import { toE164Thai } from './thaiPhone.js';
 import { notifyRoles, notifyUsers } from './appNotifications.js';
+import { callbackReasonOf, isStaffCallbackRequest } from './lumosInterviewOutcome.js';
 import {
   DEFAULT_CALL_FOLLOWUP_POLICY,
   isCallOutcome,
@@ -414,11 +415,15 @@ export async function applyCallFollowupToQueueRow(input: {
     : row.job_ref === GREETING_JOB_REF
       ? 'AI ทักทาย (ยังไม่ผูกใบขอ)'
       : `ใบขอ ${row.job_ref}`;
+  // ขอคุยกับเจ้าหน้าที่ (27 พ.ย. 2569 · `isStaffCallbackRequest`) — ตัวรับผลแปลงเป็น confirmed แล้ว · คำแจ้งเตือนบอกตามจริง
+  const callback = isStaffCallbackRequest(input.result);
   if (input.outcome === 'confirmed' && !isFollow) {
     await notifyRoles(['admin'], {
       type: 'call_confirmed',
-      title: `${who} สนใจงาน — รีบติดต่อกลับ`,
-      body: `${where} · AI โทรแล้วเขาตอบรับ อย่าปล่อยให้เย็นตัว`,
+      title: callback ? `${who} ขอคุยกับเจ้าหน้าที่ — โทรกลับ` : `${who} สนใจงาน — รีบติดต่อกลับ`,
+      body: callback
+        ? `${where} · ${callbackReasonOf(input.result) || 'ไม่สะดวกคุยกับ AI'}`
+        : `${where} · AI โทรแล้วเขาตอบรับ อย่าปล่อยให้เย็นตัว`,
       link,
       dedupeKey: `call_confirmed:${row.id}`,
     });

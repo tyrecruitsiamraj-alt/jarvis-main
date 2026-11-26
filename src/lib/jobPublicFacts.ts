@@ -24,6 +24,21 @@ export function jobAverageIncome(
   return resignedMonthlyNetAverage(job.resigned_income_3m, job.lastWorkingDay)?.amount ?? null;
 }
 
+/**
+ * ฐานเงินเดือนต่อเดือนแบบตัวเลข — บรรทัด "ฐานเงินเดือน" ที่ทีมตั้ง (รายเดือน) → ฐานจาก ERP (`monthly_income_base`) · ไม่รู้ = null
+ * ลำดับเดียวกับช่องฐานของ `jobIncomeLine` และบท AI (`manualMonthlyBase ?? erp.base`) · ใช้เทียบ `averageBelowBase` (27 พ.ย. 2569)
+ */
+export function jobMonthlyBase(job: Pick<JobRequest, 'income_display' | 'monthly_income_base'>): number | null {
+  const d = job.income_display;
+  if (d && d.period === 'monthly') {
+    const line = d.lines.find((l) => l.label === 'ฐานเงินเดือน' && l.amount > 0);
+    if (line) return line.amount;
+  }
+  if (d && d.period === 'daily') return null;
+  const erp = job.monthly_income_base;
+  return typeof erp === 'number' && Number.isFinite(erp) && erp > 0 ? erp : null;
+}
+
 const norm = (s: string) => s.replace(/\s+/g, '').trim();
 
 /**

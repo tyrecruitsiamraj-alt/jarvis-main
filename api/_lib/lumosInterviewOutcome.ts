@@ -30,10 +30,34 @@ const INTERVIEW_OUTCOME_ALIAS: Record<string, CallOutcome> = {
  * คืนคำที่ระบบตามงานรู้จัก · คำที่แปลไม่ได้และไม่อยู่ในชุดกลาง = `null`
  * (ผู้เรียกต้องข้ามการตามงาน ไม่ใช่เดาแทนคน — กติกาเดิมของ `applyCallFollowupToQueueRow`)
  */
-export function normalizeInterviewOutcome(outcome: string | null | undefined): CallOutcome | null {
+export function normalizeInterviewOutcome(outcome: string | null | undefined, result?: unknown): CallOutcome | null {
   const raw = (outcome ?? '').trim();
   if (!raw) return null;
+  // ขอคุยกับเจ้าหน้าที่ (27 พ.ย. 2569) — ดู `isStaffCallbackRequest`
+  if (raw === 'declined' && isStaffCallbackRequest(result)) return 'confirmed';
   const alias = INTERVIEW_OUTCOME_ALIAS[raw];
   if (alias) return alias;
   return isCallOutcome(raw) ? raw : null;
+}
+
+/**
+ * ═══ ผู้สมัครขอคุยกับเจ้าหน้าที่ (เจ้าของ Choice 27 พ.ย. 2569 "ขอคุยเจ้าหน้าที่ → ส่งให้คนโทร") ═══
+ * Lumos ส่ง outcome `declined` (ไม่คุยกับ AI ต่อ) แต่แนบ `next_action.type = 'callback_requested'`
+ * เช่น "ผู้สมัครขอคุยกับเจ้าหน้าที่ ควรให้คนโทรกลับ" · เดิมเราอ่านแค่ outcome ⇒ ปิดเป็นไม่สนใจ + พักเบอร์ 30 วัน
+ * ไม่มีใครโทรกลับ (คุณพันธสัญญา OPL6904029 · 24 พ.ย. 2569 · ตลอดมา 47 ราย)
+ * ⇒ ตัวตามงานเห็นเป็น `confirmed` (กล่องสนใจ ให้คนโทรต่อ · ไม่พักเบอร์) · ผลดิบใน `result` ยังเป็น `declined` ตามที่ Lumos ส่ง
+ * เฉพาะ `declined` — `reschedule_requested` ที่แนบ callback มา AI นัดโทรใหม่เองตามกติกาเดิมอยู่แล้ว
+ */
+export function isStaffCallbackRequest(result: unknown): boolean {
+  if (!result || typeof result !== 'object') return false;
+  const next = (result as { next_action?: unknown }).next_action;
+  if (!next || typeof next !== 'object') return false;
+  return (next as { type?: unknown }).type === 'callback_requested';
+}
+
+/** เหตุผลที่ Lumos แนบมากับคำขอโทรกลับ ("ผู้สมัครขอคุยกับเจ้าหน้าที่ ควรให้คนโทรกลับ") · ไม่มี = '' */
+export function callbackReasonOf(result: unknown): string {
+  if (!isStaffCallbackRequest(result)) return '';
+  const reason = ((result as { next_action: { reason?: unknown } }).next_action).reason;
+  return typeof reason === 'string' ? reason.trim() : '';
 }

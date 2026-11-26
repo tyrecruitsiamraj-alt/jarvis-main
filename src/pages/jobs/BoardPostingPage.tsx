@@ -84,7 +84,8 @@ import { boardCardGender } from '@/lib/boardCardFacts';
 import { isOtBenefit, publicBenefitList } from '@/lib/publicFieldVisibility';
 import { isRetiredBenefit } from '@/lib/extraBenefits';
 import { resignedMonthlyNetAverage } from '@/lib/resignedIncome';
-import { jobAverageIncome, jobIncomeLine } from '@/lib/jobPublicFacts';
+import { jobAverageIncome, jobIncomeLine, jobMonthlyBase } from '@/lib/jobPublicFacts';
+import { averageBelowBase } from '@/lib/incomeShown';
 import PublicJobCardPreview from '@/components/jobs/PublicJobCardPreview';
 import { OrderPostFold } from '@/components/jobs/OrderPostButton';
 import { EVEN_TYPE, TONE } from '@/lib/designTokens';
@@ -813,6 +814,7 @@ export const BoardPostingSteps: React.FC<BoardPostingStepsProps> = ({
                 const avg = jobAverageIncome(src);
                 return avg !== null ? `${NUM.format(avg)} บาท/เดือน` : null;
               })()}
+              averageBelowBase={averageBelowBase(jobAverageIncome(src), jobMonthlyBase(j))}
               onSaved={onFieldsSaved}
             />
           }
