@@ -219,6 +219,7 @@ export function LumosSendBar({
   matchedCount,
   sendableCount,
   holdableCount,
+  simple = false,
 }: {
   count: number;
   /** คนทั้งใบที่ส่งได้จริง — ปุ่ม "ส่งทั้งหมดที่แมท" ใช้ยอดนี้ ไม่เกี่ยวกับการติ๊ก */
@@ -244,6 +245,11 @@ export function LumosSendBar({
   sendableCount?: number;
   /** ในจำนวนที่ติ๊ก เก็บไปโทรเองได้กี่คน (ยังไม่มีใครถือ) */
   holdableCount?: number;
+  /**
+   * โฉมใหม่ของหน้าจับคู่ (เจ้าของ Choice 26 พ.ย. 2569 "ถอดตามนี้"): เหลือ 2 ปุ่ม เก็บไปโทรเอง · ส่ง AI โทร
+   * "ตั้งคิวโทร" กับ "ส่งทั้งหมดที่แมท" ถอด — ส่งทั้งหมด = ติ๊กหัวตาราง แล้วกดส่ง AI โทร
+   */
+  simple?: boolean;
 }) {
   const act = lumosSendActionStates({
     allCount,
@@ -255,6 +261,42 @@ export function LumosSendBar({
     creatingBatch,
     holdingSelf,
   });
+  if (simple) {
+    return (
+      <div className="space-y-1" data-testid="lumos-send-bar-simple">
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="mr-auto text-sm tabular-nums text-foreground">ติ๊กแล้ว {count.toLocaleString('th-TH')} คน</p>
+          {count > 0 ? (
+            <Button variant="ghost" size="sm" type="button" onClick={onClear}>
+              ล้างที่เลือก
+            </Button>
+          ) : null}
+          <Button
+            variant="outline"
+            size="sm"
+            type="button"
+            disabled={act.holdSelf.disabled}
+            onClick={onHoldSelf}
+            title={act.holdSelf.reason ?? 'ล็อกคนที่เลือกเข้าถังโทรของคุณ — AI จะไม่โทรทับ · ไปโทรที่แท็บ "การติดต่อ"'}
+          >
+            <UserRound aria-hidden /> {holdingSelf ? 'กำลังเก็บ…' : `เก็บไปโทรเอง (${act.holdSelf.count})`}
+          </Button>
+          <Button
+            size="sm"
+            type="button"
+            disabled={act.sendSelected.disabled}
+            onClick={onSend}
+            title={act.sendSelected.reason ?? 'ส่งคนที่ติ๊กไว้เข้าคิว AI โทร'}
+          >
+            <PhoneCall aria-hidden /> ส่ง AI โทร ({act.sendSelected.count})
+          </Button>
+        </div>
+        {count > 0 && act.sendSelected.reason ? (
+          <p className="text-xs text-muted-foreground">{act.sendSelected.reason}</p>
+        ) : null}
+      </div>
+    );
+  }
   // บรรทัดเหตุผลมีเสมอ — title บนปุ่มที่ disabled ไม่ขึ้นบนมือถือ
   const hint =
     act.sendAll.reason && act.sendSelected.reason

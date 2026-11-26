@@ -47,6 +47,16 @@ import {
   type MatchingWorkflowFilter,
   type MatchingListSort,
 } from '@/lib/matchingListFilter';
+import {
+  MATCH_GROUPS,
+  boardColumnShort,
+  isMatchGroup,
+  isSalaryOver,
+  matchGroupOf,
+  type MatchGroup,
+} from '@/lib/matchingGroups';
+import { genderLabel } from '@/lib/genderRequirement';
+import MatchPeopleTable, { type MatchPersonRow } from '@/components/matching/MatchPeopleTable';
 import { APP_DEPARTMENT_CODES } from '@/lib/departmentCodes';
 import { getJobAgeChipInfo, JOB_AGE_CHIP_META } from '@/lib/jobUrgency';
 import { useAuth } from '@/contexts/AuthContext';
@@ -264,6 +274,11 @@ type ServerListSummary = {
   positionsGreen?: number;
   positionsYellow?: number;
   positionsNone?: number;
+  /** 4 กล่องของหน้าจับคู่ (26 พ.ย. 2569 · `matchingGroups.ts`) — รวมกัน = scopedTotal */
+  groups?: Record<MatchGroup, { jobs: number; positions: number }> & {
+    noMatchAnalyzed: number;
+    noMatchUnanalyzed: number;
+  };
 };
 
 /**
@@ -519,6 +534,11 @@ const MatchingPage: React.FC<{ embedded?: boolean; lockedJob?: JobRequest | null
     skip: MATCHING_SERVER_LIST_ENABLED || locked,
   });
   const [searchParams, setSearchParams] = useSearchParams();
+  /**
+   * โฉมเดิมของหน้าจับคู่ = ทางถอย `?match=classic` (26 พ.ย. 2569 · เจ้าของ Choice "ทำตามแบบร่าง ถอดตามนี้")
+   * โฉมใหม่: 4 กล่องของใบ · ป๊อปเหลือหัวใบ 2 บรรทัด → ตารางรายชื่อ → ปุ่มหลัก 2 ปุ่ม
+   */
+  const classic = searchParams.get('match') === 'classic';
   const [search, setSearch] = useState('');
   /** ช่องค้นหาอยู่บนแถบบน ซ้ายกระดิ่ง (เจ้าของสั่ง 27 ก.ย. 2569 "ทั้งระบบ") — ค้นเรื่องเดิมของหน้านี้ */
   const searchInHeader = useHeaderSearch({
@@ -528,13 +548,14 @@ const MatchingPage: React.FC<{ embedded?: boolean; lockedJob?: JobRequest | null
   });
   const [urgentOnly, setUrgentOnly] = useState(false);
   const [unitFilter, setUnitFilter] = useState('');
-  const [workflowFilter, setWorkflowFilter] = useState<WorkflowFilter>('all');
+  // โฉมใหม่เปิดมาที่กล่อง "มีคน ยังไม่ส่ง AI" (ใบที่มีคนให้โทรแต่ยังไม่ได้ส่ง)
+  const [workflowFilter, setWorkflowFilter] = useState<WorkflowFilter>(() => (classic || locked ? 'all' : 'call_ready'));
   /** แยกดูตาม BU (department_code เช่น LBD) — '' = ทุก BU */
   const [buFilter, setBuFilter] = useState('');
   /** จำนวนใบขอต่อหน้า — ผู้ใช้เลือกเอง จำค่าไว้ในเครื่อง */
   const [pageSize, setPageSize] = useState<number>(loadSavedPageSize);
   /** การเรียงลิสต์ — 'default' = SLA/ด่วนก่อนเหมือนเดิม */
-  const [sortBy, setSortBy] = useState<MatchingListSort>('default');
+  const [sortBy, setSortBy] = useState<MatchingListSort>(() => (classic || locked ? 'default' : 'group'));
   const [clientPageNo, setClientPageNo] = useState(1);
   const listTopRef = useRef<HTMLDivElement | null>(null);
   const listScrollPendingRef = useRef(false);
@@ -1623,8 +1644,12 @@ const MatchingPage: React.FC<{ embedded?: boolean; lockedJob?: JobRequest | null
   useEffect(() => {
     if (searchParams.get('urgent') === '1') setUrgentOnly(true);
     const wf = searchParams.get('workflow');
-    if (wf && (['all', 'sla', 'green', 'yellow', 'recommended', 'none', 'reserved'] as const).includes(wf as WorkflowFilter)) {
+    if (wf && (['all', 'sla', 'green', 'yellow', 'recommended', 'none', 'reserved'] as readonly string[]).includes(wf)) {
       setWorkflowFilter(wf as WorkflowFilter);
+      // ลิงก์เดิมจากหน้าหลัก = ตัวกรองเดิม เรียงแบบเดิม (ไม่ใช่กล่องของโฉมใหม่)
+      setSortBy((s) => (s === 'group' ? 'default' : s));
+    } else if (isMatchGroup(wf)) {
+      setWorkflowFilter(wf);
     }
     const bu = (searchParams.get('bu') || '').trim().toUpperCase();
     if (bu) setBuFilter(bu);
@@ -2327,6 +2352,51 @@ const MatchingPage: React.FC<{ embedded?: boolean; lockedJob?: JobRequest | null
     jobUrlHistory.closeAndSyncUrl();
   };
 
+  /**
+   * คน 1 คนของ "คนของเรา" → 1 แถวในตารางโฉมใหม่ (26 พ.ย. 2569)
+   * "ตอนนี้" รวมสถานะที่โฉมเดิมเป็นป้ายแยก: รับไปตาม · สถานะการเสนอ · ติดใบขออื่น · ถังบนบอร์ด
+   */
+  const boardPersonRowOf = (job: JobRequest, m: BoardCandidateMatch): MatchPersonRow => {
+    const key = proposalKey('board', m.card_id);
+    const proposed = proposedByKey[key];
+    const other = activeProposalByCandidate[key];
+    const elsewhere = other && other.job_id !== job.id ? other : null;
+    const hold = holdByRef[boardPersonRef(m.card_id)];
+    const branch = boardBranchProximityMeta(nearestBranchForBoardCandidate(job, m));
+    const state = [
+      hold ? `${hold.mine ? 'คุณ' : hold.heldByName || 'เจ้าหน้าที่อีกคน'} รับไปตาม` : null,
+      proposed ? proposalStatusLabel(proposed.status) : null,
+      elsewhere ? `ติดใบขอ ${elsewhere.request_no || elsewhere.job_id.slice(0, 8)}` : null,
+      boardColumnShort(m.column_label),
+    ].filter((s): s is string => Boolean(s));
+    return {
+      id: m.card_id,
+      name: m.nick_name ? `${m.full_name} (${m.nick_name})` : m.full_name,
+      age: m.age,
+      home: [m.amphur_name, m.province_name].filter(Boolean).join(' ') || null,
+      near: branch ? { label: branch.label, rank: null } : m.area_label ? { label: m.area_label, rank: m.area_rank ?? null } : null,
+      salary: m.required_salary,
+      salaryOver: isSalaryOver(m.required_salary, job.total_income),
+      state: state.join(' · ') || null,
+      called: Boolean(lumosStatusByRef[boardPersonRef(m.card_id)]),
+      selectable: Boolean(m.mobile),
+      selected: lumosSelectedBoard.includes(m.card_id),
+    };
+  };
+
+  /** ปุ่ม "ค้นหาใหม่" — โฉมเดิมอยู่หัว "คนของเรา" · โฉมใหม่อยู่แถว "หาคนเพิ่ม" ใต้ตาราง */
+  const rematchButtonFor = (jobId: string) => (
+    <Button variant="outline" size="sm"
+      type="button"
+      disabled={boardLoadingId === jobId || !!boardWaitingById[jobId]}
+      onClick={() => setRematchConfirmJobId(jobId)}
+      className="disabled:cursor-wait"
+    >
+      <RefreshCw className={cn((boardLoadingId === jobId || boardWaitingById[jobId]) && 'animate-spin')} />
+      {boardWaitingById[jobId] ? 'กำลังค้นหา…' : boardLoadingId === jobId ? 'กำลังโหลด…' : 'ค้นหาใหม่'}
+    </Button>
+  );
+
   /** แผงจับคู่ของใบที่เปิด — แผงข้าง (Sheet) ของหน้านี้ หรือทั้งแท็บจับคู่งานในหน้าใบขอ (`lockedJob`) */
   const jobPanelBody = (
     <>
@@ -2357,6 +2427,33 @@ const MatchingPage: React.FC<{ embedded?: boolean; lockedJob?: JobRequest | null
                 {jobDetail.location_address ? (
                   <p className="text-xs leading-relaxed text-muted-foreground">{jobDetail.location_address}</p>
                 ) : null}
+                {/* โฉมใหม่ (26 พ.ย. 2569): หัวใบเหลือบรรทัดเดียว — ป้าย 7 อัน + แถวผลโทร + กล่องเลข 6 กล่องถอดออก */}
+                {classic ? null : (
+                  <p className="flex flex-wrap gap-x-4 gap-y-1 text-sm tabular-nums text-muted-foreground" data-testid="match-job-facts">
+                    <span>
+                      เหลือหา <b className="font-medium text-foreground">{officialRemainingCount(jobDetail)}</b> /{' '}
+                      {requestPositionCount(jobDetail)} อัตรา
+                    </span>
+                    <span>
+                      อายุ{' '}
+                      <b className="font-medium text-foreground">
+                        {jobDetail.age_range_min != null || jobDetail.age_range_max != null
+                          ? `${jobDetail.age_range_min ?? '—'}–${jobDetail.age_range_max ?? '—'}`
+                          : 'ไม่ระบุ'}
+                      </b>
+                    </span>
+                    <span>
+                      เพศ <b className="font-medium text-foreground">{genderLabel(jobDetail.gender_requirement)}</b>
+                    </span>
+                    <span>
+                      เงิน <b className="font-medium text-foreground">{jobDetail.total_income.toLocaleString('th-TH')}</b> บาท
+                    </span>
+                    <span>
+                      ต้องการ <b className="font-medium text-foreground">{formatYmdDmyBe(jobDetail.required_date)}</b>
+                    </span>
+                  </p>
+                )}
+                {classic ? (
                 <div className="flex flex-wrap gap-2">
                   <Badge variant="outline" className="font-normal">เพศ {jobDetail.gender_requirement || 'ไม่ระบุ'}</Badge>
                   <Badge variant="outline" className="font-normal">
@@ -2376,8 +2473,9 @@ const MatchingPage: React.FC<{ embedded?: boolean; lockedJob?: JobRequest | null
                     {jobDetail.urgency === 'urgent' ? 'ฉุกเฉิน' : 'ล่วงหน้า'}
                   </Badge>
                 </div>
+                ) : null}
                 {/* ย้ายมาจากการ์ด (15 ต.ค. 2569 ตัดหนัก): ทำอะไรต่อ · AI แนะนำ · ผลโทรในใบนี้ · หาคนจากกองไม่สนใจ */}
-                {(() => {
+                {!classic ? null : (() => {
                   const mc = boardMatchById[jobDetail.id]
                     ? recommendedCandidateCount(boardMatchById[jobDetail.id].matches)
                     : serverStoredMatches[jobDetail.id]?.recommended;
@@ -2467,7 +2565,7 @@ const MatchingPage: React.FC<{ embedded?: boolean; lockedJob?: JobRequest | null
                 );
               })()}
 
-              {(() => {
+              {!classic ? null : (() => {
                 const progress = proposalCounts(proposalsByJobId[jobDetail.id]);
                 const recommended =
                   recommendedCandidateCount(boardMatchById[jobDetail.id]?.matches) +
@@ -2506,7 +2604,7 @@ const MatchingPage: React.FC<{ embedded?: boolean; lockedJob?: JobRequest | null
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="space-y-1">
                   <h3 className="text-sm font-medium text-foreground">คนของเรา</h3>
-                  {matchBlockedText(boardMatchById[jobDetail.id]?.blocked) ? (
+                  {classic && matchBlockedText(boardMatchById[jobDetail.id]?.blocked) ? (
                     <p className={cn('text-xs', TONE.warn.value)} data-testid="match-blocked">
                       {matchBlockedText(boardMatchById[jobDetail.id]?.blocked)}
                     </p>
@@ -2553,25 +2651,22 @@ const MatchingPage: React.FC<{ embedded?: boolean; lockedJob?: JobRequest | null
                       </Button>
                     ) : null;
                   })()}
-                  <Button variant="outline" size="sm"
-                    type="button"
-                    disabled={boardLoadingId === jobDetail.id || !!boardWaitingById[jobDetail.id]}
-                    onClick={() => setRematchConfirmJobId(jobDetail.id)}
-                    className="disabled:cursor-wait"
-                  >
-                    <RefreshCw
-                      className={cn(
-                        (boardLoadingId === jobDetail.id || boardWaitingById[jobDetail.id]) && 'animate-spin',
-                      )}
-                    />
-                    {boardWaitingById[jobDetail.id]
-                      ? 'กำลังค้นหา…'
-                      : boardLoadingId === jobDetail.id
-                        ? 'กำลังโหลด…'
-                        : 'ค้นหาใหม่'}
-                  </Button>
+                  {classic ? rematchButtonFor(jobDetail.id) : null}
                 </div>
               </div>
+
+              {/* โฉมใหม่: ใบที่จับคู่ไม่ได้ บอกเหตุผลเป็นกล่องเด่น พร้อมปุ่มแก้ (เดิมเป็นตัวหนังสือเล็กสีส้ม) */}
+              {!classic && matchBlockedText(boardMatchById[jobDetail.id]?.blocked) ? (
+                <div
+                  className={cn('flex flex-wrap items-center justify-between gap-2 rounded-xl border px-3 py-2.5 text-sm', TONE.warn.soft, TONE.warn.value)}
+                  data-testid="match-blocked"
+                >
+                  <span>{matchBlockedText(boardMatchById[jobDetail.id]?.blocked)}</span>
+                  <Button type="button" size="sm" onClick={() => openBranchEditor(jobDetail)}>
+                    แก้เงื่อนไข
+                  </Button>
+                </div>
+              ) : null}
 
               {showDistantCandidates &&
               distantCandidateCount(boardMatchById[jobDetail.id]?.matches) +
@@ -2603,12 +2698,15 @@ const MatchingPage: React.FC<{ embedded?: boolean; lockedJob?: JobRequest | null
                   โหมด auto ปิดอยู่ทุกจุด (manual ทุกทางตามที่เจ้าของเคาะ) ไม่มีใครถูกโทร
                   จนกว่าจะมีคนกดส่งเอง · ตัวเลขข้างล่างคือ 6 ช่องชุดเดียวกับบนการ์ด */}
               {/* ผลโทรของใบนี้อยู่หัวใบขอแล้ว (ตัดชุดซ้ำ) · คนที่เพิ่งเข้าฐานหลังแมทรอบล่าสุด หาได้จากปุ่มนี้ */}
+              {/* โฉมใหม่ถอดแถวนี้ (เจ้าของ Choice 26 พ.ย. 2569 "ถอดตามนี้") */}
+              {classic ? (
               <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border bg-card px-3 py-2">
                 <p className="text-xs text-muted-foreground">คนที่เพิ่งเข้าฐานยังไม่อยู่ในผลแมท</p>
                 <Button variant="outline" size="sm" type="button" onClick={() => void openLumosPicker()}>
                   <PhoneCall aria-hidden /> เลือกจากคนของเราทั้งหมด
                 </Button>
               </div>
+              ) : null}
 
               {/* ปุ่ม "อนุมัติทั้งใบ" เดิมย้ายไปอยู่ในแถบส่งโทรใต้ลิสต์แล้ว (ชื่อใหม่
                   "ส่งทั้งหมดที่แมท") — สี่ทางเลือกจึงอยู่ที่เดียวกัน เห็นพร้อมกันเสมอ
@@ -2653,6 +2751,7 @@ const MatchingPage: React.FC<{ embedded?: boolean; lockedJob?: JobRequest | null
                   <div className="space-y-2">
                     {/* น้ำหนักที่ใช้เรียงลิสต์นี้ — ใบไหนตั้งเองได้ (เจ้าของสั่ง 17 ส.ค. 2569)
                         ต้องบอกให้เห็นว่ากำลังเรียงด้วยน้ำหนักชุดไหน ไม่งั้นเรียงเปลี่ยนแล้วไม่รู้ว่าทำไม */}
+                    {classic ? (
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <span className="text-xs text-muted-foreground">
                         เรียงตามน้ำหนัก<span className="font-medium text-foreground">{priorityOverridden ? 'ของใบนี้' : 'ค่ากลาง'}</span>
@@ -2661,9 +2760,11 @@ const MatchingPage: React.FC<{ embedded?: boolean; lockedJob?: JobRequest | null
                         <SlidersHorizontal aria-hidden /> ตั้งน้ำหนัก
                       </Button>
                     </div>
+                    ) : null}
                     {/* เรียงตามลำดับความสำคัญของเจ้าของ: อายุ → ที่อยู่ → ประสบการณ์ → รายได้
                         (เกณฑ์แข็งพังตกท้าย · คะแนนเท่ากันคงลำดับจาก AI — sort ของ JS เป็น stable) */}
-                    {boardMatchById[jobDetail.id].matches
+                    {(() => {
+                    const sortedBoard = boardMatchById[jobDetail.id].matches
                       .filter((m) => showDistantCandidates || isRecommendedTier(m.tier))
                       .filter((m) => !(hideProposed && proposedByKey[proposalKey('board', m.card_id)]))
                       // ปฏิเสธงานนี้ไปแล้ว → ไม่เสนอใบนี้ให้เขาอีก (เจ้าของสั่ง 11 ส.ค. 2569)
@@ -2677,8 +2778,39 @@ const MatchingPage: React.FC<{ embedded?: boolean; lockedJob?: JobRequest | null
                           screeningByRef[String(m.card_id)],
                         ),
                       }))
-                      .sort((a, b) => compareCandidatePriority(a.priority, b.priority))
-                      .map(({ m, priority }) => {
+                      .sort((a, b) => compareCandidatePriority(a.priority, b.priority));
+                    // ═══ โฉมใหม่ (26 พ.ย. 2569): คนละ 1 แถวในตาราง · ลำดับคนเดิม (น้ำหนักความสำคัญ) ═══
+                    if (!classic) {
+                      return (
+                        <MatchPeopleTable
+                          rows={sortedBoard.map(({ m }) => boardPersonRowOf(jobDetail, m))}
+                          onToggle={toggleLumosBoard}
+                          onToggleMany={(ids, on) =>
+                            setLumosSelectedBoard((prev) =>
+                              on ? [...new Set([...prev, ...ids])] : prev.filter((id) => !ids.includes(id)),
+                            )
+                          }
+                          onOpen={(id) => {
+                            const m = sortedBoard.find((x) => x.m.card_id === id)?.m;
+                            if (m) setCandDetail(m);
+                          }}
+                          renderCall={(id) => {
+                            const ref = boardPersonRef(id);
+                            const row = lumosStatusByRef[ref];
+                            return row ? (
+                              <LumosCallBadgeRow
+                                row={row}
+                                expanded={lumosExpandedRef === ref}
+                                onToggle={() => setLumosExpandedRef((cur) => (cur === ref ? null : ref))}
+                                onCancel={() => void cancelLumosForRef(row)}
+                                cancelling={lumosCancellingRef === ref}
+                              />
+                            ) : null;
+                          }}
+                        />
+                      );
+                    }
+                    return sortedBoard.map(({ m, priority }) => {
                         const meta = boardTierMeta(m.tier);
                         const branchAssignment = nearestBranchForBoardCandidate(jobDetail, m);
                         const branchProximity = boardBranchProximityMeta(branchAssignment);
@@ -2894,7 +3026,8 @@ const MatchingPage: React.FC<{ embedded?: boolean; lockedJob?: JobRequest | null
                         ) : null}
                         </div>
                         );
-                      })}
+                      });
+                    })()}
                   </div>
                 )}
                 </>
@@ -2904,6 +3037,15 @@ const MatchingPage: React.FC<{ embedded?: boolean; lockedJob?: JobRequest | null
                   กำลังค้นหาคนให้ใบนี้ ผลจะขึ้นเองเมื่อเสร็จ
                 </p>
               ) : null}
+
+              {/* โฉมใหม่: ทางหาคนเพิ่มอยู่แถวเดียวใต้ตาราง (ค้นหาใหม่ · กองไม่สนใจ) — "คนที่ยังไม่สมัคร" คือกล่องถัดไป */}
+              {classic ? null : (
+                <div className="flex flex-wrap items-center gap-2" data-testid="match-find-more">
+                  <span className="text-sm text-muted-foreground">หาคนเพิ่ม</span>
+                  {rematchButtonFor(jobDetail.id)}
+                  <SelectionRecallButton jobId={jobDetail.id} />
+                </div>
+              )}
 
               {/* #2 (ยุบ) — ไม่พอ? หาผู้สมัครจากฐาน iRecruit แล้วเสนอในหน้านี้เลย */}
               {boardMatchById[jobDetail.id] && !boardErrorById[jobDetail.id] ? (
@@ -3182,6 +3324,7 @@ const MatchingPage: React.FC<{ embedded?: boolean; lockedJob?: JobRequest | null
                      ตอนนี้เป็นกล่องธรรมดาไหลตามเนื้อหา อยู่เหนือกล่อง "หาคนไม่พอ" */}
               <div className="space-y-2 border-t border-border pt-4">
                 <LumosSendBar
+                  simple={!classic}
                   count={lumosSelectedCount}
                   allCount={approveAllCount}
                   matchedCount={matchedTotalCount}
@@ -3318,6 +3461,70 @@ const MatchingPage: React.FC<{ embedded?: boolean; lockedJob?: JobRequest | null
 
         {/* แถบชิปกรองรายการ — แทน "ขั้น 1 ฝั่งงาน" เดิม (ทางกรองทางเดียวที่เหลือ ห้ามทำหาย)
             โฉมเดียวกับชิปเลนหน้าโพสต์ประกาศ (15 ต.ค. 2569): ปุ่ม xs · ทึบเมื่อเลือก · เลขต่อท้าย */}
+        {/* ═══ โฉมใหม่ (26 พ.ย. 2569): 4 กล่องของใบ แทนชิปทั้งหมด/ฉุกเฉิน/มีคนแนะนำ/ไม่มีคนแนะนำ ═══
+            กดกล่อง = ดูใบในกล่องนั้น เรียงตามกล่อง · บรรทัดสมการบอกว่า 4 กล่องรวมกันได้ทั้งหมด */}
+        {classic ? null : (
+          <div className="space-y-2" data-testid="matching-groups">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {MATCH_GROUPS.map((g) => {
+                const c = serverSummary?.groups?.[g.key];
+                const on = workflowFilter === g.key;
+                const loading = (loadingJobs || serverListLoading) && !c;
+                return (
+                  <Button
+                    key={g.key}
+                    type="button"
+                    variant="outline"
+                    data-testid={`matching-group-${g.key}`}
+                    aria-pressed={on}
+                    disabled={serverListLoading}
+                    onClick={() => {
+                      setUrgentOnly(false);
+                      setWorkflowFilter(g.key);
+                      setSortBy('group');
+                    }}
+                    className={cn(
+                      'h-auto flex-col items-start gap-0 whitespace-normal rounded-xl px-3 py-2.5 text-left font-normal disabled:cursor-wait',
+                      on && 'border-primary ring-1 ring-primary',
+                    )}
+                  >
+                    <span className="block text-2xl font-medium tabular-nums text-foreground">
+                      {loading ? '…' : (c?.jobs ?? 0).toLocaleString('th-TH')}
+                    </span>
+                    <span className="block text-sm text-foreground">{g.label}</span>
+                    <span className="block text-xs tabular-nums text-muted-foreground">
+                      {loading ? '…' : `${(c?.positions ?? 0).toLocaleString('th-TH')} อัตรา`}
+                    </span>
+                  </Button>
+                );
+              })}
+            </div>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              {serverSummary?.groups ? (
+                <p className="text-xs tabular-nums text-muted-foreground" data-testid="matching-groups-sum">
+                  {MATCH_GROUPS.map((g) => serverSummary.groups![g.key].jobs.toLocaleString('th-TH')).join(' + ')} ={' '}
+                  {MATCH_GROUPS.reduce((s, g) => s + serverSummary.groups![g.key].jobs, 0).toLocaleString('th-TH')} ใบ
+                  {workflowFilter === 'no_match'
+                    ? ` · ค้นแล้วไม่เจอ ${serverSummary.groups.noMatchAnalyzed.toLocaleString('th-TH')} ใบ · ยังไม่ได้ค้น ${serverSummary.groups.noMatchUnanalyzed.toLocaleString('th-TH')} ใบ`
+                    : ''}
+                </p>
+              ) : null}
+              <Button
+                type="button"
+                size="xs"
+                variant={aiFlowOpen ? 'secondary' : 'ghost'}
+                onClick={() => setAiFlowOpen((v) => !v)}
+                aria-expanded={aiFlowOpen}
+                className="ml-auto shrink-0"
+              >
+                AI โทร
+                <span className="tabular-nums">{aiFlowTotal === null ? '…' : aiFlowTotal.toLocaleString('th-TH')}</span>
+                <ChevronDown className={cn('transition-transform', aiFlowOpen && 'rotate-180')} aria-hidden />
+              </Button>
+            </div>
+          </div>
+        )}
+        {classic ? (
         <div className="flex flex-wrap items-center gap-1.5" data-testid="matching-filter-chips">
           {filterChips.map((c) => (
             <Button
@@ -3351,6 +3558,7 @@ const MatchingPage: React.FC<{ embedded?: boolean; lockedJob?: JobRequest | null
             <ChevronDown className={cn('transition-transform', aiFlowOpen && 'rotate-180')} aria-hidden />
           </Button>
         </div>
+        ) : null}
         <AiCallFlowPanel defaultSource="all" open={aiFlowOpen} onTotal={setAiFlowTotal} />
 
         {/* ⚠️ MyCallsSection ("โทรของฉัน") เคยอยู่ตรงนี้ (14 ส.ค. เช้า) — เจ้าของสั่งย้าย
@@ -3429,6 +3637,7 @@ const MatchingPage: React.FC<{ embedded?: boolean; lockedJob?: JobRequest | null
               >
                 {(
                   [
+                    ...(classic ? [] : ([['group', 'ตามกล่องที่เลือก']] as Array<[MatchingListSort, string]>)),
                     ['default', 'เลยกำหนดและฉุกเฉินก่อน'],
                     ['age_desc', 'ค้างนานสุด → ใหม่สุด'],
                     ['age_asc', 'ใหม่สุด → ค้างนานสุด'],
@@ -3531,7 +3740,8 @@ const MatchingPage: React.FC<{ embedded?: boolean; lockedJob?: JobRequest | null
                     <p className="line-clamp-1 text-base font-medium text-primary">{publicJobTitle(j)}</p>
                   </div>
                   <div className="flex shrink-0 flex-col items-end gap-1">
-                    {j.urgency === 'urgent' ? (
+                    {/* โฉมใหม่ถอดป้ายฉุกเฉิน (26 พ.ย. 2569) — ติด 211 จาก 320 ใบ ไม่ช่วยแยกใบไหนด่วนจริง */}
+                    {classic && j.urgency === 'urgent' ? (
                       <span className="rounded-md bg-destructive/10 px-2 py-0.5 text-sm font-medium text-destructive">ฉุกเฉิน</span>
                     ) : null}
                     <span className={cn('rounded-md border px-1.5 py-0.5 text-sm font-medium', JOB_AGE_CHIP_META[age.level].chipCls)} title={age.title}>
@@ -3546,6 +3756,26 @@ const MatchingPage: React.FC<{ embedded?: boolean; lockedJob?: JobRequest | null
                   <MapPin className="mt-0.5 size-4 shrink-0" aria-hidden />
                   <span className="line-clamp-2 min-w-0">{j.location_address || EM_DASH}</span>
                 </p>
+                {/* โฉมใหม่: บรรทัดเดียวบอกว่าใบนี้มีคนแค่ไหน ตามกล่องของใบ (ตัวตัดสินเดียวกับกล่อง) */}
+                {classic
+                  ? null
+                  : (() => {
+                      const calls = serverLumosSummary[j.id];
+                      const g = matchGroupOf(matchCount ?? 0, calls);
+                      const text =
+                        g === 'needs_human'
+                          ? `รอตาม ${(calls?.needsHuman ?? 0).toLocaleString('th-TH')} คน · ส่ง AI แล้ว ${(calls?.sent ?? 0).toLocaleString('th-TH')} คน`
+                          : g === 'ai_sent'
+                            ? `แนะนำ ${(matchCount ?? 0).toLocaleString('th-TH')} คน · ส่ง AI แล้ว ${(calls?.sent ?? 0).toLocaleString('th-TH')} คน`
+                            : g === 'call_ready'
+                              ? `แนะนำ ${(matchCount ?? 0).toLocaleString('th-TH')} คน`
+                              : 'ยังไม่มีคนแนะนำ';
+                      return (
+                        <p className="text-sm tabular-nums text-foreground" data-testid="matching-card-people">
+                          {text}
+                        </p>
+                      );
+                    })()}
 
                 {/* ── ก้นการ์ด: เหลือหา + ปุ่มทำต่อ ── */}
                 <div className="mt-auto flex flex-wrap items-center justify-between gap-2 border-t border-border/70 pt-2">
@@ -3627,7 +3857,8 @@ const MatchingPage: React.FC<{ embedded?: boolean; lockedJob?: JobRequest | null
               ⇒ หัวใบขอเป็น Card เดียว · ป้ายเงื่อนไขเป็น Badge · ปุ่มเป็น Button · ตัดเลขใบขอที่ขึ้นซ้ำ */}
           <SheetHeader className="space-y-1">
             <SheetTitle className="text-foreground">จับคู่คนกับใบขอ</SheetTitle>
-            <SheetDescription>จากกล่อง ไม่มีงาน · Re Use · Drop</SheetDescription>
+            {/* โฉมใหม่ถอดบรรทัดชื่อถังบนบอร์ด (ศัพท์ภายใน คนทั่วไปอ่านไม่ออก) — คงไว้ให้โปรแกรมอ่านจอ */}
+            <SheetDescription className={classic ? undefined : 'sr-only'}>จากกล่อง ไม่มีงาน · Re Use · Drop</SheetDescription>
           </SheetHeader>
           {jobPanelBody}
         </SheetContent>

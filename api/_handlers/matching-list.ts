@@ -24,9 +24,11 @@ import {
 import { enrichJobsWithUrgency } from '@/lib/jobUrgency';
 import {
   filterAndSortMatchingJobs,
+  matchGroupOfJob,
   normalizeMatchingListSort,
   type MatchingWorkflowFilter,
 } from '@/lib/matchingListFilter';
+import { MATCH_GROUPS, type MatchGroup } from '@/lib/matchingGroups';
 import { recommendedCandidateCount } from '@/lib/matchingProgress';
 import { jobPositionUnits } from '@/lib/jobPositionUnits';
 import type { JobRequest } from '@/types';
@@ -47,6 +49,8 @@ const WORKFLOWS: MatchingWorkflowFilter[] = [
   'recommended',
   'none',
   'reserved',
+  // 4 กล่องของหน้าจับคู่ (26 พ.ย. 2569 · `src/lib/matchingGroups.ts`)
+  ...MATCH_GROUPS.map((g) => g.key),
 ];
 
 function normalizeWorkflow(v: string): MatchingWorkflowFilter {
@@ -110,11 +114,13 @@ async function handler(req: AuthedReq, res: ApiRes) {
       sort: normalizeMatchingListSort(getQuery(req, 'sort')),
     };
 
-    const rows = filterAndSortMatchingJobs(jobs, query, {
-      hasReserved: (jobId) =>
+    const listCtx = {
+      hasReserved: (jobId: string) =>
         (proposalMap.get(jobId) ?? []).some((item) => item.status === 'reserved'),
-      matchesFor: (jobId) => tierMap.get(jobId)?.tiers,
-    });
+      matchesFor: (jobId: string) => tierMap.get(jobId)?.tiers,
+      callsFor: (jobId: string) => lumosMap.get(jobId),
+    };
+    const rows = filterAndSortMatchingJobs(jobs, query, listCtx);
 
     const page = Math.max(1, Number(getQuery(req, 'page')) || 1);
     const pageSize = Math.min(100, Math.max(1, Number(getQuery(req, 'pageSize')) || 60));
@@ -184,6 +190,24 @@ async function handler(req: AuthedReq, res: ApiRes) {
       positionsGreen: posOf(greenJobs),
       positionsYellow: posOf(yellowJobs),
       positionsNone: posOf(noneJobs),
+      /**
+       * 4 กล่องของหน้าจับคู่ (26 พ.ย. 2569) — ทุกใบของ BU ที่เลือกอยู่กล่องเดียว รวมกัน = scopedTotal
+       * ไม่มีคนตรง แยกต่อ: ค้นแล้วไม่เจอ vs ยังไม่ได้ค้น (ใบสถานะไม่ใช่ดำเนินการ ต้องกดค้นหาใหม่เอง)
+       */
+      groups: (() => {
+        const out = Object.fromEntries(MATCH_GROUPS.map((g) => [g.key, { jobs: 0, positions: 0 }])) as Record<
+          MatchGroup,
+          { jobs: number; positions: number }
+        >;
+        let noMatchAnalyzed = 0;
+        for (const j of scopedJobs) {
+          const g = matchGroupOfJob(j.id, listCtx);
+          out[g].jobs += 1;
+          out[g].positions += jobPositionUnits(j);
+          if (g === 'no_match' && tierMap.has(j.id)) noMatchAnalyzed += 1;
+        }
+        return { ...out, noMatchAnalyzed, noMatchUnanalyzed: out.no_match.jobs - noMatchAnalyzed };
+      })(),
     };
 
     // ป้าย "AI แนะนำ N" บนการ์ด: ผลที่เก็บไว้ของใบในหน้านี้

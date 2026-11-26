@@ -10,8 +10,12 @@ import { unitRequestSearchBlob } from '@/lib/unitRequestDisplay';
 import { jobToRequestControlRecord } from '@/lib/requestControl';
 import { recommendedCandidateCount, type CandidateMatchTier } from '@/lib/matchingProgress';
 import { getJobRequestAgeDays } from '@/lib/jobUrgency';
+import { isMatchGroup, matchGroupOf, type MatchCallCounts, type MatchGroup } from '@/lib/matchingGroups';
 
-/** `recommended` = มีคนแนะนำ (เขียว**หรือ**เหลือง) — คู่กับตัวเลข "AI แนะนำคนแล้ว" บนหน้าแรก */
+/**
+ * `recommended` = มีคนแนะนำ (เขียว**หรือ**เหลือง) — คู่กับตัวเลข "AI แนะนำคนแล้ว" บนหน้าแรก
+ * กล่อง 4 ใบของหน้าจับคู่ (26 พ.ย. 2569 · `matchingGroups.ts`) ใช้ชื่อกล่องเป็นตัวกรองตรง ๆ
+ */
 export type MatchingWorkflowFilter =
   | 'all'
   | 'sla'
@@ -19,7 +23,8 @@ export type MatchingWorkflowFilter =
   | 'yellow'
   | 'recommended'
   | 'none'
-  | 'reserved';
+  | 'reserved'
+  | MatchGroup;
 
 /**
  * การเรียงลิสต์ใบขอ
@@ -27,6 +32,8 @@ export type MatchingWorkflowFilter =
  * age_desc   = ค้างนานสุดก่อน · age_asc = ใบใหม่สุดก่อน
  * recommend  = ใบที่ AI แนะนำคนได้แล้วขึ้นก่อน · no_recommend = ใบที่ยังไม่มีคนแนะนำขึ้นก่อน
  * green_desc = ใบที่มี "คนเขียว" มากสุดขึ้นก่อน (เจ้าของสั่ง 14 ส.ค. 2569 — ตัวกรอง "มีคนแนะนำ")
+ * group      = ตามกล่องที่เลือก (26 พ.ย. 2569): ต้องคนตาม = คนรอตามมากก่อน · ไม่มีคนตรง = ใบใหม่ก่อน ·
+ *              สองกล่องที่เหลือ = คนแนะนำมากก่อน
  */
 export type MatchingListSort =
   | 'default'
@@ -34,7 +41,8 @@ export type MatchingListSort =
   | 'age_asc'
   | 'recommend'
   | 'no_recommend'
-  | 'green_desc';
+  | 'green_desc'
+  | 'group';
 
 export const MATCHING_LIST_SORTS: MatchingListSort[] = [
   'default',
@@ -43,6 +51,7 @@ export const MATCHING_LIST_SORTS: MatchingListSort[] = [
   'recommend',
   'no_recommend',
   'green_desc',
+  'group',
 ];
 
 /** จำนวน "คนเขียว" (tier=green) ต่อใบ — ใบที่ AI ยังไม่ประเมิน (undefined) = 0 */
@@ -79,8 +88,15 @@ export type MatchingListContext = {
   hasReserved: (jobId: string) => boolean;
   /** ผล AI แมทของใบขอ (undefined = ยังไม่เคยวิเคราะห์) */
   matchesFor: (jobId: string) => ReadonlyArray<{ tier: CandidateMatchTier }> | undefined;
+  /** ยอดสายของใบ — ใช้กับกล่อง 4 ใบ (`matchingGroups.ts`) · ไม่ส่ง = ถือว่ายังไม่เคยส่ง */
+  callsFor?: (jobId: string) => MatchCallCounts | undefined;
   today?: Date;
 };
+
+/** กล่องของใบ — ตัวเดียวที่ทั้งตัวกรองและยอดบนกล่องใช้ */
+export function matchGroupOfJob(jobId: string, ctx: Pick<MatchingListContext, 'matchesFor' | 'callsFor'>): MatchGroup {
+  return matchGroupOf(recommendedCandidateCount(ctx.matchesFor(jobId)), ctx.callsFor?.(jobId));
+}
 
 /** ตรรกะเดิมจาก rows useMemo ของ MatchingPage — ย้ายมาทั้งก้อน ห้ามแก้พฤติกรรม */
 export function filterAndSortMatchingJobs(
@@ -106,6 +122,7 @@ export function filterAndSortMatchingJobs(
       if (query.workflowFilter === 'reserved') {
         return ctx.hasReserved(j.id);
       }
+      if (isMatchGroup(query.workflowFilter)) return matchGroupOfJob(j.id, ctx) === query.workflowFilter;
       const matches = ctx.matchesFor(j.id);
       if (!matches) return false;
       if (query.workflowFilter === 'green') return matches.some((match) => match.tier === 'green');
@@ -118,6 +135,24 @@ export function filterAndSortMatchingJobs(
       return recommendedCandidateCount(matches) === 0;
     })
     .sort((a, b) => {
+      // ตามกล่องที่เลือก (26 พ.ย. 2569) — เท่ากันตกลงไปตรรกะเดิม (SLA/ด่วน)
+      if (sort === 'group') {
+        const wf = query.workflowFilter;
+        if (wf === 'no_match') {
+          const da = getJobRequestAgeDays(a, today) ?? Number.MAX_SAFE_INTEGER;
+          const db = getJobRequestAgeDays(b, today) ?? Number.MAX_SAFE_INTEGER;
+          if (da !== db) return da - db;
+        } else if (wf === 'needs_human') {
+          const ha = ctx.callsFor?.(a.id)?.needsHuman ?? 0;
+          const hb = ctx.callsFor?.(b.id)?.needsHuman ?? 0;
+          if (ha !== hb) return hb - ha;
+        } else {
+          const ra = recommendedCandidateCount(ctx.matchesFor(a.id));
+          const rb = recommendedCandidateCount(ctx.matchesFor(b.id));
+          if (ra !== rb) return rb - ra;
+        }
+      }
+
       // เรียงตามอายุใบขอ (จำนวนวันที่ค้าง) — ใบที่ไม่รู้อายุไปท้ายสุดทั้งสองทิศ ไม่ให้ปนกับของจริง
       if (sort === 'age_desc' || sort === 'age_asc') {
         const da = getJobRequestAgeDays(a, today);

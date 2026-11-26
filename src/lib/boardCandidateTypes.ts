@@ -24,6 +24,9 @@ export type BoardCandidateMatch = {
   column_label?: string | null;
   tier: 'green' | 'yellow' | 'red';
   reason: string;
+  /** ใกล้งานแค่ไหน (`matchProximity.ts` · API ส่งมาแล้ว) — 0 อำเภอเดียวกัน · 1 จังหวัดเดียวกัน · 2 ภาคเดียวกัน · 3–4 ไกล */
+  area_rank?: 0 | 1 | 2 | 3 | 4;
+  area_label?: string;
 };
 
 /** ระดับความตรงของสกิล: เขียว=ตรง · เหลือง=ใกล้เคียง · แดง=คนละสาย */
