@@ -35,8 +35,10 @@ describe('① คีย์เขียนกับคีย์อ่านต้
 
   it('🔴 ตัวอ่านกลับต้องลองทุกรูปคีย์ ไม่ใช่รูปเดียว (กู้ของเก่าที่เขียนไว้แล้ว)', () => {
     const src = read(HANDLER);
-    expect(src).toContain('function readKeysOf');
-    expect(src).toContain('function pickByKeys');
+    // ตัวอ่านคีย์ย้ายไป api/_lib/unitRequestKeys.ts (26 พ.ย. 2569 · ตัวคิดผลจับคู่ใช้ด้วย)
+    expect(src).toContain('const readKeysOf = readUnitRequestKeys;');
+    expect(src).toContain('const pickByKeys = pickByUnitRequestKeys;');
+    expect(read('api/_lib/unitRequestKeys.ts')).toContain('if (id.startsWith(PREQUEST_ID_PREFIX)) return [id];');
     // ทั้งสามตัวแปะต้องใช้ทางใหม่
     for (const fn of ['attachAssignments', 'attachNotes', 'attachWorkStatus']) {
       const at = src.indexOf(`export async function ${fn}`);

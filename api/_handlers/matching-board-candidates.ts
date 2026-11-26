@@ -12,9 +12,11 @@ import { searchErpPeople } from '../_lib/erpPeopleSearch.js';
 import { type BoardMatchResult } from '../_lib/boardCandidateMatcher.js';
 import { getStoredBoardMatch } from '../_lib/boardMatchStore.js';
 import { matchBlockersOf } from '../../src/lib/matchProximity.js';
+import { autoMatchJobIds } from '../_lib/autoMatchScope.js';
 import {
   enqueuePrecomputeJobs,
   isMatchPrecomputeWorkerActive,
+  isPrecomputeQueuedOrRunning,
 } from '../_lib/matchPrecomputeWorker.js';
 import {
   listBoardReadyCandidates,
@@ -262,11 +264,36 @@ async function handler(req: AuthedReq, res: ApiRes) {
     }
 
     const workerActive = isMatchPrecomputeWorkerActive();
+    /**
+     * 🔴 ใบสถานะไม่ใช่ "ดำเนินการ" ไม่จับคู่ให้เอง (เจ้าของ 26 พ.ย. 2569 *"ไม่ match ให้เองต้องเข้าไปกด สั่ง match เอง"*)
+     * ไม่มีผล / ผลคิดก่อนกติกาใหม่ = ไม่ดันเข้าคิว ไม่โชว์ผลเก่า บอกให้กด "ค้นหาใหม่" · กดแล้ว (refresh) ระหว่างคิด = รอผล
+     */
+    if (!refresh && !(await autoMatchJobIds([{ ...(job as Record<string, unknown>), id: jobId }])).has(jobId)) {
+      res.setHeader?.('Cache-Control', 'no-store');
+      if (workerActive && isPrecomputeQueuedOrRunning(jobId)) {
+        return res.status(200).json({ jobId, pending: true, queued: true, worker_active: workerActive });
+      }
+      return res.status(200).json({
+        jobId,
+        request_no: (job as { request_no?: string | null }).request_no ?? null,
+        job_family_code: '',
+        job_family_label: '',
+        pool_size: 0,
+        shortlisted: 0,
+        matches: [],
+        manual_only: true,
+        hidden_unavailable: 0,
+        computed_at: null,
+        from_store: false,
+        worker_active: workerActive,
+      });
+    }
     if (workerActive) {
       enqueuePrecomputeJobs([{ ...(job as Record<string, unknown>), id: jobId }], {
         refresh,
         rematch,
         front: true,
+        manual: refresh,
       });
     }
 

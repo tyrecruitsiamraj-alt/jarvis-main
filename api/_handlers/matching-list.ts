@@ -4,6 +4,9 @@ import {
   type ApiRes,
   type AuthedReq,
 } from '../_lib/http.js';
+import { matchBlockersOf } from '../../src/lib/matchProximity.js';
+import { isAutoMatchWorkStatus } from '../_lib/autoMatchScope.js';
+import { isBoardMatchFromOldPool } from '../_lib/boardCandidatesSql.js';
 import { listSiamrajUnitRequests } from '../_lib/siamrajUnitRequests.js';
 import { loadMatchingBuScope } from '../_lib/departmentScope.js';
 import { listProposalsForJobs } from '../_lib/candidateProposals.js';
@@ -88,6 +91,14 @@ async function handler(req: AuthedReq, res: ApiRes) {
     // (คนที่ถูกดึงไปใบอื่น/หลุด pool จะไม่ถูกนับ — ตรงกับที่หน้า detail แสดง)
     for (const [jobId, entry] of tierMap) {
       entry.tiers = entry.tiers.filter((t) => isBoardCandidateAvailable(t.cardId, jobId, availCtx));
+    }
+    // ตัวเลขบนการ์ดตรงกับที่เปิดใบดู (26 พ.ย. 2569): ใบ ERP ขาดข้อมูล = ไม่มีคน · ใบสถานะไม่ใช่ดำเนินการ
+    // ที่ผลคิดก่อนกติกาใหม่ = ไม่นับ (รอคนกด "ค้นหาใหม่" — `autoMatchScope.ts`)
+    for (const j of jobs) {
+      const entry = tierMap.get(j.id);
+      if (!entry) continue;
+      const blocked = matchBlockersOf(j as unknown as Record<string, unknown>).length > 0;
+      if (blocked || (!isAutoMatchWorkStatus(j.work_status) && isBoardMatchFromOldPool(entry.computedAt))) tierMap.delete(j.id);
     }
 
     const query = {

@@ -207,6 +207,8 @@ type BoardMatchResponse = BoardMatchResult & {
   /** สั่งค้นหาใหม่แล้ว — ผลที่เห็นคือของเดิม รอผลใหม่มาแทน */
   refresh_queued?: boolean;
   worker_active?: boolean;
+  /** ใบสถานะไม่ใช่ดำเนินการ — ระบบไม่จับคู่ให้เอง ต้องกด "ค้นหาใหม่" (เจ้าของ 26 พ.ย. 2569) */
+  manual_only?: boolean;
 };
 
 type IrecruitDisplayRow =
@@ -2638,7 +2640,11 @@ const MatchingPage: React.FC<{ embedded?: boolean; lockedJob?: JobRequest | null
                     กำลังค้นหาใหม่ · ที่เห็นอยู่เป็นผลรอบก่อน
                   </p>
                 ) : null}
-                {recommendedCandidateCount(boardMatchById[jobDetail.id].matches) === 0 &&
+                {(boardMatchById[jobDetail.id] as BoardMatchResponse).manual_only ? (
+                  <p className="rounded-xl border border-border bg-card px-3 py-3 text-xs text-muted-foreground" data-testid="match-manual-only">
+                    ใบนี้ไม่ได้อยู่สถานะดำเนินการ ระบบเลยไม่จับคู่ให้ · กด "ค้นหาใหม่" ถ้าจะหาคน
+                  </p>
+                ) : recommendedCandidateCount(boardMatchById[jobDetail.id].matches) === 0 &&
                 !(showDistantCandidates && distantCandidateCount(boardMatchById[jobDetail.id].matches) > 0) ? (
                   <p className="rounded-xl border border-border bg-card px-3 py-3 text-xs text-muted-foreground">
                     ยังไม่มีคนของเราที่ตรงกับใบนี้

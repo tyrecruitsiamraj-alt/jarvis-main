@@ -20,13 +20,15 @@ import { APP_DEPARTMENT_CODES, codeScope } from './departmentScope.js';
 import { loadBoardMatchTierMap, getStoredBoardMatch, type BoardMatchTierEntry } from './boardMatchStore.js';
 import { matchBoardCandidatesForJob } from './boardCandidateMatcher.js';
 import { isBoardMatchFromOldPool } from './boardCandidatesSql.js';
+import { autoMatchJobIds } from './autoMatchScope.js';
 import { logInfo, logWarn, logError } from './logger.js';
 
 export type PrecomputeJob = Record<string, unknown> & { id: string };
 
 // ─── Shared queue ─────────────────────────────────────────────────────────────
 // Map preserves insertion order → FIFO. Dedupes by job ID.
-export type QueueEntry = { job: PrecomputeJob; refresh: boolean };
+/** `manual` = คนกด "ค้นหาใหม่" เอง — ใบสถานะไม่ใช่ดำเนินการก็คิดให้ (`autoMatchScope.ts` · 26 พ.ย. 2569) */
+export type QueueEntry = { job: PrecomputeJob; refresh: boolean; manual?: boolean };
 const queue = new Map<string, QueueEntry>();
 
 // ─── Known-stored guard ────────────────────────────────────────────────────────
@@ -42,20 +44,21 @@ const knownStoredIds = new Set<string>();
  */
 export function applyEnqueue(
   target: Map<string, QueueEntry>,
-  items: Array<{ job: PrecomputeJob; refresh: boolean }>,
+  items: Array<{ job: PrecomputeJob; refresh: boolean; manual?: boolean }>,
   opts: { front?: boolean } = {},
 ): number {
   const fresh: Array<[string, QueueEntry]> = [];
-  for (const { job, refresh } of items) {
+  for (const { job, refresh, manual } of items) {
     const id = typeof job.id === 'string' ? job.id.trim() : '';
     if (!id) continue;
     const existing = target.get(id);
     if (existing) {
       if (refresh && !existing.refresh) existing.refresh = true;
+      if (manual && !existing.manual) existing.manual = true;
       continue;
     }
     if (fresh.some(([k]) => k === id)) continue;
-    fresh.push([id, { job, refresh }]);
+    fresh.push([id, manual ? { job, refresh, manual } : { job, refresh }]);
   }
   if (fresh.length === 0) return 0;
   if (opts.front && target.size > 0) {
@@ -70,7 +73,7 @@ export function applyEnqueue(
 }
 
 function enqueue(
-  items: Array<{ job: PrecomputeJob; refresh: boolean }>,
+  items: Array<{ job: PrecomputeJob; refresh: boolean; manual?: boolean }>,
   opts: { front?: boolean } = {},
 ): number {
   return applyEnqueue(queue, items, opts);
@@ -118,7 +121,8 @@ export function enqueuePrecomputeJobs(
   // รับแค่ { id } — interface อย่าง JobRequest ไม่มี index signature จึง assign เข้า
   // Record<string, unknown> ตรง ๆ ไม่ได้ · ฟิลด์อื่นถูกอ่านแบบ dynamic ผ่าน PrecomputeJob อยู่แล้ว
   jobs: Array<{ id: string }>,
-  opts: { refresh?: boolean; front?: boolean; rematch?: boolean } = {},
+  /** `manual` = คนกด "ค้นหาใหม่" เอง (คิดให้ทุกสถานะ) · ไม่ใส่ = ระบบดันเอง (คิดเฉพาะใบดำเนินการ — ตรวจตอนหยิบจากคิว) */
+  opts: { refresh?: boolean; front?: boolean; rematch?: boolean; manual?: boolean } = {},
 ): void {
   if (!workerStarted) return;
   const isRefresh = opts.refresh === true;
@@ -140,7 +144,7 @@ export function enqueuePrecomputeJobs(
   }
 
   const sorted = sortByPriority(
-    eligible.map((job) => ({ job: job as PrecomputeJob, refresh: isRefresh })),
+    eligible.map((job) => ({ job: job as PrecomputeJob, refresh: isRefresh, manual: opts.manual === true })),
   );
   const added = enqueue(sorted, { front: opts.front === true });
   if (added > 0)
@@ -151,6 +155,13 @@ export function enqueuePrecomputeJobs(
       refresh: isRefresh,
       front: opts.front === true,
     });
+}
+
+/** ใบนี้อยู่ในคิวหรือกำลังคิดอยู่ — หน้าจับคู่ใช้ตอบ "รอผล" ให้ใบที่คนกดค้นหาใหม่ (ใบสถานะอื่นไม่ถูกดันเอง) */
+let runningId: string | null = null;
+export function isPrecomputeQueuedOrRunning(jobId: string): boolean {
+  const id = jobId.trim();
+  return queue.has(id) || runningId === id;
 }
 
 /** หน้าเว็บไม่รัน AI เองแล้ว — handler ใช้เช็คว่ามี worker หลังบ้านรับงานต่อจริงไหม */
@@ -299,9 +310,11 @@ async function runScan(cfg: WorkerConfig): Promise<void> {
     // อัปเดต knownStoredIds จาก DB ทุกรอบ scan → HTTP-push จะกรองงานที่ทำแล้วออก
     for (const id of tierMap.keys()) knownStoredIds.add(id);
 
+    // จับคู่ให้เองเฉพาะใบดำเนินการ (เจ้าของ 26 พ.ย. 2569) — ใบสถานะอื่นรอคนกด "ค้นหาใหม่"
+    const autoIds = await autoMatchJobIds(jobs);
     for (const job of jobs) {
       const id = typeof job.id === 'string' ? job.id.trim() : '';
-      if (!id) continue;
+      if (!id || !autoIds.has(id)) continue;
       const entry = tierMap.get(id);
       if (!entry) {
         items.push({ job, refresh: false });
@@ -369,6 +382,12 @@ async function consumerLoop(cfg: WorkerConfig, isStopped: () => boolean): Promis
     const [id, entry] = first.value;
     queue.delete(id);
 
+    // ใบที่ระบบดันเข้าคิวเอง (หน้ารายการใบขอ · สแกน · เปิดใบดู) แต่สถานะไม่ใช่ดำเนินการ = ข้าม ไม่คิด (26 พ.ย. 2569)
+    if (!entry.manual && !(await autoMatchJobIds([{ ...entry.job, id }])).has(id)) {
+      logInfo('match-precompute.job.skip-not-in-progress', { jobId: id, queueRemaining: queue.size });
+      continue;
+    }
+    runningId = id;
     try {
       await matchBoardCandidatesForJob(id, entry.job, { refresh: entry.refresh });
       workerStats.totalProcessed++;
@@ -400,6 +419,8 @@ async function consumerLoop(cfg: WorkerConfig, isStopped: () => boolean): Promis
         jobId: id,
         message: e instanceof Error ? e.message : String(e),
       });
+    } finally {
+      runningId = null;
     }
 
     if (cfg.throttleMs > 0 && !isStopped()) {

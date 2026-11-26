@@ -14812,3 +14812,12 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 ### 26 พ.ย. 2569 (6) — ย้ายจากใบขอปิดแล้วไปใบใหม่ = AI เสนองาน ติดกติกา 30 วัน
 - เจ้าของ Choice "นับด้วย" — `application-call-choice.ts` เก็บ `movedFromClosed` (เฉพาะใบที่ job_id เดิมอยู่ใน closedJobIds · ใบไม่เคยผูกไม่นับ) → `chooseAi(..., offerIds)` → `enqueueLumosInterviewForApplications(opts.offerIds)` ใส่ `matchRank = MATCH_RANK_UNKNOWN`
 - ผล: `insertQueueItems` ตรวจ `phonesBusyForMatchOffer` (เสนอแล้วภายใน N วัน / มีงานอื่นเสนออยู่ = กล่อง "AI เพิ่งเสนองาน") · callFollowup โทรรอบเดียวแล้วส่งให้คน · นับเป็นการเสนอครั้งถัดไปด้วย
+
+### 26 พ.ย. 2569 (7) — จับคู่ให้เองเฉพาะใบ "ดำเนินการ" · ใบสถานะอื่นต้องกด "ค้นหาใหม่"
+- เจ้าของ *"ส่วนใบอื่นนอกจากดำเนินการสรรหา ไม่ match ให้เองต้องเข้าไปกด สั่ง match เอง"*
+- ใหม่ `api/_lib/autoMatchScope.ts`: `isAutoMatchWorkStatus` (ดำเนินการ / ยังไม่ตั้งสถานะ = ให้เอง) · `autoMatchJobIds` (ใช้ `work_status` ที่แนบมา ไม่มีอ่านตาราง · อ่านไม่ได้ = ไม่ให้เอง)
+- ใหม่ `api/_lib/unitRequestKeys.ts`: ย้าย `readKeysOf` / `pickByKeys` จาก `siamraj-unit-requests.ts` (กติกาใบขอชั่วคราวคีย์เดียวไปด้วย)
+- `matchPrecomputeWorker.ts`: `QueueEntry.manual` · สแกนดันเฉพาะใบดำเนินการ (รวมคิดใหม่ทุก 24 ชม.) · หยิบจากคิวแล้วใบที่ระบบดันเอง (หน้ารายการ/สแกน) แต่สถานะอื่น = ข้าม · `isPrecomputeQueuedOrRunning`
+- `matching-board-candidates.ts`: ใบสถานะอื่น ไม่มีผล/ผลเก่า = ตอบ `manual_only` ไม่ดันคิว · กดค้นหาใหม่ = `manual: refresh` · ระหว่างคิด = pending
+- `matching-list.ts`: การ์ดไม่นับผลของใบ ERP ขาดข้อมูล และผลเก่าของใบสถานะอื่น · `MatchingPage.tsx` ข้อความ `match-manual-only`
+- เทสต์ `tests/api/autoMatchInProgress2569-11-26.test.ts`
