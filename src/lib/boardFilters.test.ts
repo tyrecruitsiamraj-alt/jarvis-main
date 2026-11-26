@@ -564,3 +564,27 @@ describe('🔴 ติ๊กแล้วตัวเลือกไม่สล�
     expect(order(state({ recruiter: ['แบงค์'] }))).toEqual(order(EMPTY_BOARD_FILTER_STATE));
   });
 });
+
+/** ตัวกรอง BU หน้าโพสต์ประกาศ — เห็นเฉพาะ Supervisor ขึ้นไป (เจ้าของ 26 พ.ย. 2569) */
+describe('หัวข้อ BU', () => {
+  const lbd = { id: 'siamraj-sql:OPL6911103', site_code: '69LBDL0303', department_code: 'OPL', unit_name: 'Sony' } as JobRequest;
+  const lba = { id: 'siamraj-sql:LAO6910013', site_code: '69LBAL0101', department_code: 'LAO', unit_name: 'TMT' } as JobRequest;
+  it('กรอง BU ได้ · BU มาจากรหัสไซต์ตัวเดียวกับหน้าหลัก', async () => {
+    const { jobBuOf } = await import('@/lib/soScraping');
+    const bu = jobBuOf(lbd);
+    expect(bu).toBeTruthy();
+    expect(applyBoardFilters([lbd, lba], state({ bu: [bu!] }), facts()).map((j) => j.id)).toEqual(
+      [lbd, lba].filter((j) => jobBuOf(j) === bu).map((j) => j.id),
+    );
+    expect(BOARD_PRIMARY_FACETS.slice(0, 2)).toEqual(['ready', 'bu']);
+  });
+  it('เจ้าหน้าที่: ไม่มีหัวข้อ BU และค่า BU ใน URL ไม่มีผล', async () => {
+    const { BOARD_SUPERVISOR_FACETS, canSeeBoardSupervisorFacets } = await import('@/lib/boardFilters');
+    expect(canSeeBoardSupervisorFacets('admin')).toBe(true);
+    expect(canSeeBoardSupervisorFacets('supervisor')).toBe(true);
+    expect(canSeeBoardSupervisorFacets('staff')).toBe(false);
+    const hidden = BOARD_SUPERVISOR_FACETS;
+    expect(buildBoardFacets([lbd, lba], EMPTY_BOARD_FILTER_STATE, facts(), hidden).some((f) => f.key === 'bu')).toBe(false);
+    expect(applyBoardFilters([lbd, lba], state({ bu: ['ไม่มีจริง'] }), facts(), hidden)).toHaveLength(2);
+  });
+});

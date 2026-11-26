@@ -21,7 +21,7 @@
  * ทะเบียนปล่อย + ยอดส่ง AI) ผ่าน `BoardFacetFacts`
  */
 import type { JobRequest } from '@/types';
-import { SO_FACET_LABEL, soFacetValues, type SoFacetValue } from './soScraping';
+import { jobBuOf, SO_FACET_LABEL, soFacetValues, type SoFacetValue } from './soScraping';
 import { publicJobPositionLabel } from './unitRequestDisplay';
 import { inferProvinceFromAddress } from './parseThaiJobAddress';
 import { districtMatcherFor } from './districtMatch';
@@ -60,6 +60,7 @@ import {
 export { UNSPECIFIED, visibleFacetOptions } from './facetEngine';
 
 export type BoardFacetKey =
+  | 'bu'
   | 'ready'
   | 'so'
   | 'applicants'
@@ -238,6 +239,16 @@ const ymd = (v: string | undefined | null): string => (v ?? '').slice(0, 10);
  * ⇒ ย้ายมาอยู่ท้ายสุด (กติกา "เพิ่มได้ ห้ามลด" — ห้ามให้ของเดิมหายระหว่างย้าย)
  */
 const FACETS: readonly FacetDef[] = [
+  {
+    /**
+     * BU ของใบ (เจ้าของ 26 พ.ย. 2569 "หน้าโพสต์ประกาศขอ Filter Bu ด้วยสำหรับ Supervisor ขึ้นไป")
+     * ตัวหา BU ตัวเดียวกับหน้าหลัก (`jobBuOf` ไซต์ก่อน แผนกทีหลัง) · เจ้าหน้าที่ไม่เห็นหัวข้อนี้ (`BOARD_SUPERVISOR_FACETS`)
+     */
+    key: 'bu',
+    label: 'BU',
+    ui: 'check',
+    values: (job) => [trimOr(jobBuOf(job))],
+  },
   {
     /**
      * ═══ พร้อมประกาศไหม — แทนหัวข้อ "ติดขั้น" (เจ้าของเลือก B 2 ต.ค. 2569) ═══
@@ -441,7 +452,17 @@ export const BOARD_FACET_KEYS: readonly BoardFacetKey[] = FACETS.map((f) => f.ke
  * ที่เหลือรวมอยู่ใน "ตัวกรองอื่น" · หัวข้อลูกอยู่ในกล่องเดียวกับหัวข้อแม่ (อำเภอในจังหวัด · งานย่อยในตำแหน่ง)
  */
 /** "พร้อมประกาศไหม" ขึ้นก่อน (2 ต.ค. 2569 แทน "ติดขั้น" ซึ่ง 30 ก.ย. แทนแถวบนหัวที่ถอดไป) */
-export const BOARD_PRIMARY_FACETS: readonly BoardFacetKey[] = ['ready', 'position', 'unit', 'province', 'income'];
+// BU (26 พ.ย. 2569) ต่อจาก "พร้อมประกาศไหม" — คำสั่ง 2 ต.ค. ให้พร้อมประกาศขึ้นก่อนเสมอ
+export const BOARD_PRIMARY_FACETS: readonly BoardFacetKey[] = ['ready', 'bu', 'position', 'unit', 'province', 'income'];
+/** หัวข้อที่เห็นเฉพาะ Supervisor ขึ้นไป — เจ้าหน้าที่ไม่ได้หัวข้อนี้ และค่าใน URL ของหัวข้อนี้ไม่มีผล (26 พ.ย. 2569) */
+export const BOARD_SUPERVISOR_FACETS: readonly BoardFacetKey[] = ['bu'];
+export const canSeeBoardSupervisorFacets = (role: string | null | undefined): boolean => role === 'admin' || role === 'supervisor';
+const withoutKeys = (state: BoardFilterState, hidden: readonly BoardFacetKey[]): BoardFilterState => {
+  if (hidden.length === 0 || !hidden.some((k) => state.selection[k]?.length)) return state;
+  const selection = { ...state.selection };
+  for (const k of hidden) delete selection[k];
+  return { ...state, selection };
+};
 export const BOARD_FACET_ATTACH: Partial<Record<BoardFacetKey, BoardFacetKey>> = {
   subtype: 'position',
   district: 'province',
@@ -474,9 +495,11 @@ export function applyBoardFilters(
   rows: readonly JobRequest[],
   state: BoardFilterState,
   facts: BoardFacetFacts,
+  hidden: readonly BoardFacetKey[] = [],
 ): JobRequest[] {
   const dated = rows.filter((j) => passesDates(j, state.dates));
-  return applyFacetDefs(dated, FACETS, state, facts);
+  const defs = hidden.length ? FACETS.filter((f) => !hidden.includes(f.key)) : FACETS;
+  return applyFacetDefs(dated, defs, withoutKeys(state, hidden), facts);
 }
 
 export type BoardFacetOption = FacetOption;
@@ -492,9 +515,11 @@ export function buildBoardFacets(
   rows: readonly JobRequest[],
   state: BoardFilterState,
   facts: BoardFacetFacts,
+  hidden: readonly BoardFacetKey[] = [],
 ): BoardFacetView[] {
   const dated = rows.filter((j) => passesDates(j, state.dates));
-  return buildFacetViews(dated, FACETS, state, facts, boardFacetValueLabel);
+  const defs = hidden.length ? FACETS.filter((f) => !hidden.includes(f.key)) : FACETS;
+  return buildFacetViews(dated, defs, withoutKeys(state, hidden), facts, boardFacetValueLabel);
 }
 
 /**

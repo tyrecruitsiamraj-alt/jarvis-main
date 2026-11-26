@@ -14830,3 +14830,16 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 - เจ้าของ *"OPL6911103 ทำไมใบขอนี้ถึงยังไม่ จับคู่ให้"* — ผล 08:52 บันทึก `blocked: place` · ตอนนี้ ERP มี "…เขตลาดกระบัง กรุงเทพฯ" อ่านได้ แต่ผลเดิมค้าง (คิดใหม่ทุก 24 ชม.)
 - `boardMatchStore.loadBoardMatchTierMap` คืน `blocked` · สแกน (`matchPrecomputeWorker`) ใบที่ผลเดิม blocked แต่ตอนนี้ไม่ติดด่าน = แมทใหม่รอบสแกน (5 นาที)
 - `matching-board-candidates.ts` `staleBlocked`: เปิดดูแล้วผลเดิมติดด่านแต่ใบครบ = ดันคิวหัว + ตอบรอผล ไม่โชว์ "ไม่จับคู่" ค้าง
+
+### 26 พ.ย. 2569 (10) — คนนำเข้าของรายชื่อ Scrap = คนสั่ง Scrap · กดดูรายละเอียดคนที่ยังไม่มีใบได้
+- เจ้าของ *"ปรัชญา คำสี คนนำเข้า ทำไมเป็นเล็ก"* · Choice "คนสั่ง Scrap" · *"ทำไมกดดูประวัติไม่ได้ … กดดูรายละเอียดได้ไปเลย"*
+- `scrapBringerOf` (`src/lib/scrapCandidates.ts`): สั่งสำเร็จ/กำลังทำล่าสุดก่อนเจอคน → สั่งครั้งไหนก็ได้ล่าสุดก่อนเจอ → ล่าสุดของใบ · ไม่มี = null (ไม่ถอยไปเจ้าหน้าที่สรรหา)
+- `api/_lib/scrapCandidates.ts`: `loadScrapOrdersMap` (job_posting_requests request_type='scraping') · `listScrapCandidates` คืน `{ rows (ordered_by), orders }` · ตอนสร้างใบ `responsible_name` = คนสั่ง (ชื่อเล่นจาก `loadStaffDisplay`)
+- จอ: `scrapRowAsApplication` ใช้ `ordered_by` · ใหม่ `ScrapCandidateDialog.tsx` ป๊อปอ่านอย่างเดียว (ไม่สร้างใบ) — ข้อมูลเว็บหางาน · ผลประเมิน + เหตุผล · คำสั่ง Scrap ทุกครั้ง · ปุ่มส่ง AI / เก็บไปโทรเอง
+- ใบเก่าที่สร้างจาก Scrap ก่อนแก้ (615 ใบ) ยังเป็นเจ้าหน้าที่สรรหา — แก้ข้อมูลเก่าต้องให้เจ้าของดูรายการก่อน
+- เทสต์ `tests/api/scrapBringer2569-11-26.test.ts` (อีเมลสมมติ — รีโปเปิดสาธารณะ)
+
+### 26 พ.ย. 2569 (11) — หน้าโพสต์ประกาศ หัวข้อกรอง BU (Supervisor ขึ้นไป)
+- เจ้าของ *"หน้าโพสต์ประกาศขอ Filter Bu ด้วยสำหรับ Supervisor ขึ้นไป"*
+- `boardFilters.ts`: หัวข้อ `bu` (`jobBuOf`) ลำดับที่สองของ `BOARD_PRIMARY_FACETS` (ต่อจากพร้อมประกาศไหม ตามคำสั่ง 2 ต.ค.) · `BOARD_SUPERVISOR_FACETS` + `canSeeBoardSupervisorFacets` · `applyBoardFilters`/`buildBoardFacets` รับ `hidden` (ซ่อนหัวข้อ + ไม่สนค่าใน URL)
+- `JobBoardView.tsx`: `hiddenBoardFacets` จาก role (admin/supervisor เห็น)

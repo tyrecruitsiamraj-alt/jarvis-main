@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useOptionalAuthUser } from '@/contexts/AuthContext';
 import { RM_JOB_ALL_PARAM } from '@/lib/recruitRm';
 import { fetchSoPostSummary } from '@/lib/soPostGroupsApi';
 import type { SoPostSummary } from '@/lib/soPostGroups';
@@ -126,6 +127,8 @@ import {
   applyBoardFilters,
   BOARD_SORT_PARAM,
   buildBoardFacets,
+  BOARD_SUPERVISOR_FACETS,
+  canSeeBoardSupervisorFacets,
   EMPTY_BOARD_FILTER_STATE,
   hasAnyBoardFilter,
   readBoardFilterState,
@@ -826,23 +829,29 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
     }),
     [breakdownLoaded, applicantIdx, leadIdx, ledgerReady, releaseIdx, aiCounts, readinessFacts, soByJob],
   );
+  /** หัวข้อ BU เห็นเฉพาะ Supervisor ขึ้นไป (เจ้าของ 26 พ.ย. 2569) — เจ้าหน้าที่ซ่อนทั้งหัวข้อและค่าใน URL */
+  const authUser = useOptionalAuthUser();
+  const hiddenBoardFacets = useMemo(
+    () => (canSeeBoardSupervisorFacets(authUser?.role) ? [] : BOARD_SUPERVISOR_FACETS),
+    [authUser?.role],
+  );
   /** ใบเปิดหลังแถบซ้าย — ตัวแทน `filters.filtered` ของทุกตัวเลขข้างล่าง */
   const openRows = useMemo(
     () =>
       boardFilterOn
-        ? applyBoardFilters(filters.filtered, boardFilterState, facetFacts)
+        ? applyBoardFilters(filters.filtered, boardFilterState, facetFacts, hiddenBoardFacets)
         : publicFilterOn
           ? applyPublicFilters(filters.filtered, publicState)
           : filters.filtered,
-    [boardFilterOn, filters.filtered, boardFilterState, facetFacts, publicFilterOn, publicState],
+    [boardFilterOn, filters.filtered, boardFilterState, facetFacts, publicFilterOn, publicState, hiddenBoardFacets],
   );
   const publicFacets = useMemo(
     () => (publicFilterOn ? buildPublicFacets(filters.filtered, publicState) : []),
     [publicFilterOn, filters.filtered, publicState],
   );
   const boardFacets = useMemo(
-    () => (boardFilterOn ? buildBoardFacets(filters.filtered, boardFilterState, facetFacts) : []),
-    [boardFilterOn, filters.filtered, boardFilterState, facetFacts],
+    () => (boardFilterOn ? buildBoardFacets(filters.filtered, boardFilterState, facetFacts, hiddenBoardFacets) : []),
+    [boardFilterOn, filters.filtered, boardFilterState, facetFacts, hiddenBoardFacets],
   );
   /**
    * 🔴 **ช่องค้นหาอยู่ใน URL (`?q=`)** (เจ้าของเคาะ 26 ก.ย. 2569 — ตัวกรองทุกตัวต้องอยู่ในลิงก์)
@@ -950,9 +959,9 @@ const JobBoardView: React.FC<JobBoardViewProps> = ({
       if (!isStaff) return [];
       const rows = filters.filterRows(closedJobs ?? []);
       // แถบซ้ายกรองกล่องปิดแล้ว/ยกเลิกด้วย — "กรองในหน้าเดิมเหมือนกันทุกกล่อง" (กติกาเดิม)
-      return boardFilterOn ? applyBoardFilters(rows, boardFilterState, facetFacts) : rows;
+      return boardFilterOn ? applyBoardFilters(rows, boardFilterState, facetFacts, hiddenBoardFacets) : rows;
     },
-    [isStaff, filters, closedJobs, boardFilterOn, boardFilterState, facetFacts],
+    [isStaff, filters, closedJobs, boardFilterOn, boardFilterState, facetFacts, hiddenBoardFacets],
   );
   const closedBoxCounts = useMemo(
     () => ({
