@@ -103,10 +103,10 @@ describe('ปุ่มของแท็บการติดตาม', () => {
     expect(summarizeCallChoice({ choice: 'release', done: 6, skipped: [] })).toBe('');
     expect(
       summarizeCallChoice({ choice: 'release', done: 2, skipped: [{ name: 'ข', reason: 'มีเจ้าหน้าที่คนอื่นเก็บไว้' }] }),
-    ).toBe('ข้าม 1 คน — ข: มีเจ้าหน้าที่คนอื่นเก็บไว้');
+    ).toBe('ข้าม 1 คน\n• มีเจ้าหน้าที่คนอื่นเก็บไว้ (1 คน): ข');
     expect(
       summarizeCallChoice({ choice: 'release', done: 0, skipped: [{ name: 'ก', reason: 'มีเจ้าหน้าที่คนอื่นเก็บไว้' }] }),
-    ).toBe('ยังส่งกลับแท็บผู้สมัครไม่ได้เลย · ข้าม 1 คน — ก: มีเจ้าหน้าที่คนอื่นเก็บไว้');
+    ).toBe('ยังส่งกลับแท็บผู้สมัครไม่ได้เลย\nข้าม 1 คน\n• มีเจ้าหน้าที่คนอื่นเก็บไว้ (1 คน): ก');
   });
 });
 

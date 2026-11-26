@@ -82,6 +82,25 @@ export async function isPhoneSuppressed(rawPhone: string | null | undefined): Pr
 }
 
 /**
+ * เบอร์ที่ถูกพัก พร้อมเหตุ + พักถึงเมื่อไหร่ — ให้จอบอกเหตุจริง (26 พ.ย. 2569: คนที่บอก AI ว่าไม่สนใจ
+ * จอเคยขึ้น "แจ้งว่าไม่หางานแล้ว / เบอร์เสีย" ทุกคน) · เงื่อนไข `forFollow` เหมือน `listSuppressedPhones`
+ */
+export async function listSuppressedPhoneMap(opts: { forFollow?: boolean } = {}): Promise<Map<string, { reason: string; until: string }>> {
+  const out = new Map<string, { reason: string; until: string }>();
+  try {
+    const { rows } = await dbQuery<{ phone_e164: string; reason: string | null; until: string }>(
+      `select phone_e164, reason, suppressed_until::text as until from ${suppressionTable}
+        where suppressed_until > now()${opts.forFollow ? ` and reason is distinct from 'declined'` : ''}`,
+    );
+    for (const r of rows) out.set(r.phone_e164, { reason: r.reason ?? '', until: r.until });
+  } catch (e) {
+    if (isPgUndefinedTable(e)) return out;
+    throw e;
+  }
+  return out;
+}
+
+/**
  * เบอร์ที่ถูกพักทั้งชุด — ใช้กรองตอน enqueue หลายคนพร้อมกัน
  * `forFollow` = สายติดตามเริ่มงาน: ไม่นับ "บอก AI ว่าไม่สนใจ" (declined) — ปฏิเสธงานหนึ่งแล้วไปเริ่มงานอื่น ต้องยังได้สายติดตาม (18 พ.ย. 2569)
  */

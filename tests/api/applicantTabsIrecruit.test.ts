@@ -109,7 +109,7 @@ describe('แท็บผู้สมัคร: ตัวกรองพับ�
 
   it('🔴 กดเก็บไปโทรเองแล้วอยู่หน้าเดิม · ข้อความแจ้งมีปุ่ม "ไปการติดตาม"', () => {
     // 25 พ.ย. 2569 ต่อท้ายข้อความของแท็บ Scrap (คนที่สร้างใบไม่ได้) — ปุ่มพาไปยังเหมือนเดิม
-    expect(WS).toContain("say([summarizeCallChoice(outcome), ...resolved.notes].join(' · '), tab !== 'contact')");
+    expect(WS).toContain("say([summarizeCallChoice(outcome), ...resolved.notes].join('\\n'), tab !== 'contact')");
     expect(WS).toMatch(/noticeGoContact \? \(\s*<Button[^>]*onClick=\{\(\) => goToTab\('contact'\)\}/);
     expect(WS).toContain('ไป{RM_TAB_LABEL.contact}');
     // ทุกข้อความแจ้งผ่านตัวเดียว (ปุ่มไม่โผล่ค้างกับข้อความอื่น)

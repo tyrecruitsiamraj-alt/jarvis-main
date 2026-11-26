@@ -405,3 +405,27 @@ export const FOLLOWUP_STATE_LABEL = {
 } as const;
 
 export type FollowupState = keyof typeof FOLLOWUP_STATE_LABEL;
+
+const SUPPRESS_DAY_FMT = new Intl.DateTimeFormat('th-TH', { day: 'numeric', month: 'short', timeZone: 'Asia/Bangkok' });
+/**
+ * เหตุที่ AI ไม่โทรเบอร์ที่ถูกพัก — คำที่ขึ้นบนจอเมื่อกดส่ง AI แล้วไม่เข้าคิว (เจ้าของ 26 พ.ย. 2569 Choice "บอกเหตุจริง + พักถึงวันไหน")
+ * `until` = เวลาที่พักถึง (ISO/timestamp) · อ่านไม่ได้ = ไม่บอกวัน
+ */
+export function suppressionReasonText(reason: string | null | undefined, until: string | null | undefined): string {
+  const d = until ? new Date(until) : null;
+  const when = d && !Number.isNaN(d.getTime()) ? ` · AI โทรได้อีก ${SUPPRESS_DAY_FMT.format(d)}` : '';
+  switch (reason) {
+    case 'declined':
+      return `เคยบอก AI ว่าไม่สนใจ${when}`;
+    case 'not_looking':
+      return `แจ้งว่าไม่หางานแล้ว${when}`;
+    case 'wrong_number':
+      return `เบอร์ผิด / ไม่ใช่เจ้าตัว${when}`;
+    case 'pdpa':
+      return 'ขอให้หยุดติดต่อ — AI ไม่โทร';
+    case 'manual':
+      return `เจ้าหน้าที่สั่งพักเบอร์${when}`;
+    default:
+      return `เบอร์นี้ถูกพักอยู่${when}`;
+  }
+}

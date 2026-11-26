@@ -14787,3 +14787,8 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 - เจ้าของ Choice "ใช้กติกาเดียวกับจับคู่หลัก + ตัด Checklist" — เจอจริง OPL6911035 เลนนี้ส่ง AI โทรคนถัง Checklist ที่อยู่เพชรบูรณ์/สระแก้ว
 - `recruitLaneMatcher.ts`: ถอด `loadChecklist` (กอง = iRecruit + So Recruit) · `orderPoolForShortlist` + `jobAreaForMatch` (ตัดเพศ/อายุ · เรียงใกล้งาน · ที่อยู่คนจาก `location_label`) · ไม่มีที่อยู่/คนละภาคห้ามเขียว
 - `matching-recruit-lane.ts`: `matchBlockersOf` → 422 ก่อนค้น · กติกา 30 วัน (`phonesBusyForMatchOffer`) ใช้กับเส้นนี้อยู่แล้ว (match_rank)
+
+### 26 พ.ย. 2569 (3) — เหตุพักเบอร์บอกจริง · ผลส่ง AI เหตุละบรรทัด · "ติดต่อได้" ตัวตัดสินเดียว
+- พักเบอร์: `suppressionReasonText` (`src/lib/callFollowupPolicy.ts`) + `listSuppressedPhoneMap` (`api/_lib/callFollowup.ts`) → `insertQueueItems` คืน `suppressedWhy` · ทุกเส้นใช้ `suppressedWhy.get(ref) ?? SUPPRESSED_REASON` · เดิมทุกคนขึ้น "แจ้งว่าไม่หางานแล้ว / เบอร์เสีย" ทั้งที่ 572 เบอร์เป็น "บอก AI ว่าไม่สนใจ" (LAO6910013) · ตัวกันเข้าคิวยังใช้ `listSuppressedPhones` เดิม · เทสต์ `tests/api/suppressionReason2569-11-26.test.ts`
+- ผลกดส่ง AI / เก็บไปโทรเอง: `summarizeCallChoice` เหตุละบรรทัด "• เหตุ (N คน): ชื่อ" เรียงคนมากก่อน · แถบแจ้ง `RmWorkspace` (`rm-notice`) และ `JobApplicantsDialog` ใช้ whitespace-pre-line (เจ้าของ "แยกกล่องเรื่องให้ชัดเจนดีไหม")
+- "ติดต่อได้" ของกล่องรายชื่อเข้ามาไปถึงไหน (`staffReachOf` · `recruitIntakeFlow.ts`) ใช้ `staffResultOf` ตัวเดียวกับแท็บ Scale ลง — เดิม 300 กับ 320 · นัดได้ 55 กับ 65

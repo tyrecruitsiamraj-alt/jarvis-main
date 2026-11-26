@@ -43,9 +43,11 @@ describe('รายชื่อเข้ามาไปถึงไหน', () =
     expect(booked.rows.map((r) => r.ids.length)).toEqual([1, 0, 1]);
   });
 
-  it('ผลฝั่งทีม = ของที่ใหม่สุดระหว่างบันทึกติดต่อกับผลโทร', () => {
+  // 26 พ.ย. 2569: "ติดต่อได้" ตัดสินที่เดียว (`staffResultOf`) — แท็บภาพรวมกับ Scale ลงเคยได้ 300 กับ 320
+  it('ผลฝั่งทีม = ตัวตัดสินเดียวกับแท็บ Scale ลง (staffResultOf) · ทีมโทรแล้วยังไม่ได้ผลติดต่อได้ = โทรไม่ติด', () => {
     expect(staffReachOf(fact({ calledByStaff: true, logOk: true, logAt: '2026-11-17T08:00:00Z', staffAnswer: 'no_pickup', staffAnswerAt: '2026-11-17T06:00:00Z' }))).toBe('talk');
-    expect(staffReachOf(fact({ calledByStaff: true, logOk: true, logAt: '2026-11-17T05:00:00Z', staffAnswer: 'no_pickup', staffAnswerAt: '2026-11-17T06:00:00Z' }))).toBe('miss');
+    expect(staffReachOf(fact({ calledByStaff: true, logOk: false }))).toBe('miss');
+    expect(staffReachOf(fact({ calledByStaff: true }))).toBe('miss');
     expect(staffReachOf(fact({ calledByStaff: false }))).toBeNull();
   });
 });

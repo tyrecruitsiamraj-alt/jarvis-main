@@ -10,20 +10,22 @@ import type { CallMicroOutcome } from '@/lib/callMicroOutcome';
 import { FUNNEL_GROUP_LABEL, bringerOf, funnelPlaceOf, funnelSubOf, type FunnelGroupKey } from '@/lib/channelFunnel';
 import type { RecruitAppFact } from '@/lib/recruitOverviewTypes';
 import { isWaitingForStaff } from '@/lib/waitingForStaff';
+import { staffResultOf } from '@/lib/recruitJourney';
 
 export type IntakeRow = { key: string; label: string; ids: string[]; drop: boolean };
 export type IntakeBox = { key: string; title: string; ids: string[]; rows: IntakeRow[] };
 
-const MISS: ReadonlySet<CallMicroOutcome> = new Set(['no_pickup', 'wrong_person', 'picked_silent']);
-const ms = (v: string | null | undefined) => (v ? new Date(v).getTime() : -1);
 const idsOf = (list: readonly RecruitAppFact[]) => list.map((f) => f.id ?? '').filter(Boolean);
 
-/** ผลฝั่งทีมล่าสุด: คุยได้ / โทรไม่ติด · null = ทีมยังไม่ได้ลงมือ */
+/**
+ * ผลฝั่งทีมล่าสุด: คุยได้ / โทรไม่ติด · null = ทีมยังไม่ได้ลงมือ
+ * 🔴 26 พ.ย. 2569 ตัวตัดสิน "ติดต่อได้" มีที่เดียว = `staffResultOf` (recruitJourney.ts) — เดิมตัวนี้คิดเองจากคำตอบสายเจ้าหน้าที่
+ *    แท็บภาพรวมได้คุยได้ 300 · แท็บ Scale ลงได้ติดต่อได้ 320 · นัดได้ 55 กับ 65 (ผู้ช่วยตรวจหน้าภาพรวมเจอ · ผิดกติกาหนึ่งเมตริกหนึ่งนิยาม)
+ *    ทีมโทรแล้วแต่ยังไม่ได้ผล "ติดต่อได้" = โทรไม่ติด (แถวในกล่องบวกเท่าหัวกล่องเหมือนเดิม)
+ */
 export function staffReachOf(f: RecruitAppFact): 'talk' | 'miss' | null {
-  if (!f.calledByStaff) return null;
-  if (typeof f.logOk === 'boolean' && (!f.staffAnswer || ms(f.logAt) > ms(f.staffAnswerAt))) return f.logOk ? 'talk' : 'miss';
-  if (f.staffAnswer) return MISS.has(f.staffAnswer) ? 'miss' : 'talk';
-  return 'miss';
+  if (!f.calledByStaff && staffResultOf(f) !== 'ok') return null;
+  return staffResultOf(f) === 'ok' ? 'talk' : 'miss';
 }
 
 const AI_ROWS: ReadonlyArray<{ key: CallMicroOutcome; label: string; drop: boolean }> = [

@@ -46,13 +46,16 @@ export function summarizeCallChoice(outcome: CallChoiceLike): string {
     list.push(s.name);
     byReason.set(s.reason, list);
   }
+  // 🔴 26 พ.ย. 2569 เจ้าของ "แยกกล่องเรื่องให้ชัดเจนดีไหม" — เหตุละบรรทัด ขึ้นต้นด้วยเหตุ + จำนวนคน แล้วค่อยชื่อ
+  //    (เดิมต่อกันด้วย " · " ยาวเป็นพืด อ่านไม่ออกว่าใครติดเรื่องไหน) · ผู้แสดงต้องใช้ whitespace-pre-line
   const detail = [...byReason.entries()]
+    .sort((a, b) => b[1].length - a[1].length)
     .map(([reason, names]) => {
       const shown = names.slice(0, NAMES_SHOWN).join(', ');
       const more = names.length > NAMES_SHOWN ? ` และอีก ${names.length - NAMES_SHOWN} คน` : '';
-      return `${shown}${more}: ${reason}`;
+      return `• ${reason} (${names.length} คน): ${shown}${more}`;
     })
-    .join(' · ');
-  const skippedText = `ข้าม ${outcome.skipped.length} คน — ${detail}`;
-  return quietRelease ? skippedText : `${head} · ${skippedText}`;
+    .join('\n');
+  const skippedText = `ข้าม ${outcome.skipped.length} คน\n${detail}`;
+  return quietRelease ? skippedText : `${head}\n${skippedText}`;
 }

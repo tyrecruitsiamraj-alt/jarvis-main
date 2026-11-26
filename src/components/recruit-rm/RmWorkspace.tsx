@@ -906,7 +906,7 @@ const RmWorkspace: React.FC<{
         return;
       }
       const outcome = await chooseApplicationCall(resolved.ids, 'manual');
-      say([summarizeCallChoice(outcome), ...resolved.notes].join(' · '), tab !== 'contact');
+      say([summarizeCallChoice(outcome), ...resolved.notes].join('\n'), tab !== 'contact');
       load(); // ใบย้ายแท็บ (claimed_by_me) + ป้ายล็อกเปลี่ยน ต้องเห็นทันที
     } catch (e) {
       say(friendlyErrorText(e, 'เก็บไปโทรเองไม่สำเร็จ'));
@@ -953,7 +953,7 @@ const RmWorkspace: React.FC<{
             ? { id: bindJob.id, title: publicJobPositionLabel(bindJob), unitName: bindJob.unit_name }
             : null,
       );
-      say([summarizeCallChoice(outcome), ...resolved.notes].join(' · '));
+      say([summarizeCallChoice(outcome), ...resolved.notes].join('\n'));
       setAiConfirmIds(null);
       setSelectedIds([]);
       load();
@@ -1493,7 +1493,7 @@ const RmWorkspace: React.FC<{
                 TONE.warn.value,
               )}
             >
-              <span>{notice}</span>
+              <span className="whitespace-pre-line" data-testid="rm-notice">{notice}</span>
               {noticeGoContact ? (
                 <Button type="button" size="xs" variant="outline" onClick={() => goToTab('contact')}>
                   ไป{RM_TAB_LABEL.contact}

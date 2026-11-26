@@ -634,7 +634,7 @@ const JobApplicantsDialog: React.FC<JobApplicantsDialogProps> = ({
           ) : (
             <>
               {actionError ? (
-                <p className={cn('mb-3 rounded-xl border px-3.5 py-3 text-sm', TONE.danger.soft, TONE.danger.value)}>
+                <p className={cn('mb-3 whitespace-pre-line rounded-xl border px-3.5 py-3 text-sm', TONE.danger.soft, TONE.danger.value)}>
                   {actionError}
                 </p>
               ) : null}
