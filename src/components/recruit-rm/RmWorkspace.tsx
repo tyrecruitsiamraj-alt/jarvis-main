@@ -21,6 +21,7 @@ import { MyCallsSection } from '@/pages/matching/MyCallsPage';
 import AddApplicantDialog from '@/components/recruit-rm/AddApplicantDialog';
 import ImportApplicantsDialog from '@/components/recruit-rm/ImportApplicantsDialog';
 import ApplicantContactDialog from '@/components/recruit-rm/ApplicantContactDialog';
+import ScrapCandidateDialog from '@/components/recruit-rm/ScrapCandidateDialog';
 import SendDocumentsSection from '@/components/documents/SendDocumentsSection';
 import { fetchDocumentSettings } from '@/lib/documents/documentsStaffApi';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -108,6 +109,7 @@ import {
   SCRAP_RESULT_ORDER,
   isScrapApplication,
   type ScrapCandidateRow,
+  type ScrapOrderView,
   type ScrapResult,
 } from '@/lib/scrapCandidates';
 import {
@@ -236,6 +238,9 @@ const RmWorkspace: React.FC<{
   const sresParam = searchParams.get(SCRAP_RESULT_PARAM);
   const scrapResult: ScrapResult | null = SCRAP_RESULT_ORDER.find((x) => x === sresParam) ?? null;
   const [scrapRows, setScrapRows] = useState<ScrapCandidateRow[]>([]);
+  /** คำสั่ง Scrap ต่อเลขใบขอ — ป๊อปรายละเอียดคนที่ยังไม่มีใบ (26 พ.ย. 2569) */
+  const [scrapOrders, setScrapOrders] = useState<Record<string, ScrapOrderView[]>>({});
+  const [scrapDetailId, setScrapDetailId] = useState<string | null>(null);
 
   const [rows, setRows] = useState<PublicApplication[]>([]);
   const [loading, setLoading] = useState(true);
@@ -408,7 +413,10 @@ const RmWorkspace: React.FC<{
     // แท็บ Scrap: รายชื่อสดจาก So Scraping คู่กับใบที่โหลด (จับคู่ใน `buildScrapWorkRows`) — อันใดล้ม = ทั้งชุดล้ม ไม่โชว์ครึ่งเดียว
     (scrapMode
       ? Promise.all([appsReq, lockedJobId ? fetchScrapCandidatesOfJob(lockedJobId) : fetchScrapCandidatesAll()]).then(([apps, sc]) => {
-          if (seq === loadSeq.current) setScrapRows(sc.rows);
+          if (seq === loadSeq.current) {
+            setScrapRows(sc.rows);
+            setScrapOrders(sc.orders ?? {});
+          }
           return apps;
         })
       : appsReq
@@ -1046,7 +1054,9 @@ const RmWorkspace: React.FC<{
           .catch((e: unknown) => say(friendlyErrorText(e, 'เก็บเข้า Lead ไม่สำเร็จ')));
         return;
       default:
-        say(`${row.full_name} ยังไม่มีประวัติ กดส่ง AI โทรหรือเก็บไปโทรเองก่อน`);
+        // ดูรายละเอียด (26 พ.ย. 2569 "กดดูรายละเอียดได้ไปเลย") — ป๊อปอ่านอย่างเดียว ไม่สร้างใบ
+        say(null);
+        setScrapDetailId(row.id);
     }
   };
 
@@ -1830,6 +1840,25 @@ const RmWorkspace: React.FC<{
 
       {/* ดูข้อมูลของแท็บผู้สมัคร = ป๊อปแบบรูป iRecruit (4 ต.ค. 2569): แท็บ 6 อัน ไม่มีขั้นตอน 3 ขั้น + ยกเลิกข้อมูลผู้สมัคร
           (แทนใบประวัติเต็มหน้า 1 ต.ค.) · คนละโหมดของป๊อปตัวเดียวกับแท็บการติดต่อ */}
+      <ScrapCandidateDialog
+        row={scrapDetailId ? (scrapById.get(scrapDetailId) ?? null) : null}
+        orders={(() => {
+          const req = scrapDetailId ? scrapById.get(scrapDetailId)?.scrap?.request_no : null;
+          return req ? (scrapOrders[req.toUpperCase()] ?? []) : [];
+        })()}
+        onClose={() => setScrapDetailId(null)}
+        onSendAi={() => {
+          const id = scrapDetailId;
+          setScrapDetailId(null);
+          if (id) askSendAi([id]);
+        }}
+        onKeep={() => {
+          const id = scrapDetailId;
+          setScrapDetailId(null);
+          if (id) void keepForSelf([id]);
+        }}
+      />
+
       {profileApp ? (
         <ApplicantContactDialog
           mode="profile"

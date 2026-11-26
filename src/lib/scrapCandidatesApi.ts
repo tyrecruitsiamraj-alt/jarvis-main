@@ -1,5 +1,5 @@
 import { apiFetch } from './apiFetch';
-import { SCRAP_TO_CONTACT_MAX, type ScrapCandidateRow, type ScrapCounts, type ScrapToContactResult } from './scrapCandidates';
+import { SCRAP_TO_CONTACT_MAX, type ScrapCandidateRow, type ScrapCounts, type ScrapOrderView, type ScrapToContactResult } from './scrapCandidates';
 import { parseScrapVirtualId } from './scrapApplicants';
 
 /** รายชื่อจาก Scrap (17 พ.ย. 2569) — พังโยนข้อความไทยจาก server */
@@ -8,8 +8,14 @@ async function readError(r: Response): Promise<never> {
   throw new Error(data.message || `ระบบตอบ ${r.status}`);
 }
 
-export type ScrapCandidatesOfJob = { request_no: string | null; counts: ScrapCounts; rows: ScrapCandidateRow[] };
-export type ScrapCandidatesAll = { requests: Array<{ request_no: string; total: number }>; counts: ScrapCounts; rows: ScrapCandidateRow[] };
+/** `orders` = คำสั่ง Scrap ทุกครั้งต่อเลขใบขอ (ใคร · เมื่อไหร่ · ผล) — ป๊อปรายละเอียดคนจาก Scrap (26 พ.ย. 2569) */
+export type ScrapCandidatesOfJob = { request_no: string | null; counts: ScrapCounts; rows: ScrapCandidateRow[]; orders?: Record<string, ScrapOrderView[]> };
+export type ScrapCandidatesAll = {
+  requests: Array<{ request_no: string; total: number }>;
+  counts: ScrapCounts;
+  rows: ScrapCandidateRow[];
+  orders?: Record<string, ScrapOrderView[]>;
+};
 
 export async function fetchScrapCandidatesOfJob(jobId: string): Promise<ScrapCandidatesOfJob> {
   const r = await apiFetch(`/api/scrap-candidates?job=${encodeURIComponent(jobId)}`);

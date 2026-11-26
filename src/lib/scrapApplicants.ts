@@ -118,7 +118,8 @@ export function scrapRowAsApplication(s: ScrapCandidateRow, job?: JobInfo | null
     job_id: scrapRequestJobId(s.request_no),
     job_title: job?.title ?? undefined,
     unit_name: job?.unitName ?? undefined,
-    responsible_name: job?.recruiterName ?? undefined,
+    // คนนำเข้า = คนสั่ง Scrap (เจ้าของ 26 พ.ย. 2569 · เดิมใส่เจ้าหน้าที่สรรหาของใบขอ)
+    responsible_name: s.ordered_by ?? undefined,
     channel_label: scrapChannelLabel(s.platform),
     created_by_name: SO_SCRAPING_CREATED_BY,
     status: 'new',

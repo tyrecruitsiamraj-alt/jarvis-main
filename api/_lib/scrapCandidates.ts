@@ -12,15 +12,19 @@ import { lockAndFindRepeat } from './applicationRepeatGuard.js';
 import { parseStaffApplication, STAFF_INSERT_COLUMNS, STAFF_INSERT_VALUES, staffInsertParams } from '../../src/lib/staffApplicationInput.js';
 import { SO_SCRAPING_CREATED_BY } from '../../src/lib/soScrapingLeads.js';
 import { CALLED_SQL } from './applicantOverviewSql.js';
+import { loadStaffDisplay } from './staffDisplay.js';
 import {
   scrapAge,
   scrapChannelLabel,
   scrapDisplayName,
   scrapGender,
   scrapPhone10,
+  scrapBringerOf,
   scrapResultOf,
   scrapSplitName,
   type ScrapCandidateRow,
+  type ScrapOrderLite,
+  type ScrapOrderView,
   type ScrapInJarvis,
   type ScrapPlatform,
   type ScrapToContactResult,
@@ -141,12 +145,26 @@ function toRow(r: RawRow, inJarvis: Map<string, ScrapInJarvis>): ScrapCandidateR
 }
 
 /** รายชื่อของหลายใบขอ (เลขใบขอ) — ใบที่ไม่เคยสั่ง Scrap ได้ 0 แถว */
-export async function listScrapCandidates(requestNos: string[]): Promise<ScrapCandidateRow[]> {
+export async function listScrapCandidates(
+  requestNos: string[],
+): Promise<{ rows: ScrapCandidateRow[]; orders: Record<string, ScrapOrderView[]> }> {
   const raw = await loadRaw(requestNos);
   const phones = [...new Set(raw.map((r) => scrapPhone10(r.phone)).filter((p): p is string => Boolean(p)))];
   const jobIds = [...new Set(raw.map((r) => scrapJobIdOf(r.request_no)))];
-  const inJarvis = await inJarvisByPhone(jobIds, phones);
-  return raw.map((r) => toRow(r, inJarvis));
+  const reqs = [...new Set(raw.map((r) => r.request_no))];
+  const [inJarvis, ordersByReq, staffName] = await Promise.all([inJarvisByPhone(jobIds, phones), loadScrapOrdersMap(reqs), loadStaffDisplay()]);
+  const nameOf = (who: string | null) => (who ? (staffName(who.trim().toLowerCase()) ?? who.trim()) : null);
+  const rows = raw.map((r) => {
+    const row = toRow(r, inJarvis);
+    // คนนำเข้า = คนสั่ง Scrap (เจ้าของ 26 พ.ย. 2569) — ตัวเลือกเดียวกับตอนสร้างใบ (`scrapBringerOf`)
+    row.ordered_by = nameOf(scrapBringerOf(ordersByReq.get(r.request_no) ?? [], row.found_at));
+    return row;
+  });
+  const orders: Record<string, ScrapOrderView[]> = {};
+  for (const [req, list] of ordersByReq) {
+    orders[req] = list.map((o) => ({ by: nameOf(o.requested_by_name), status: o.status, created_at: o.created_at }));
+  }
+  return { rows, orders };
 }
 
 /** เลขใบขอที่ So Scraping มีรายชื่อ + ยอดรวม — ให้แท็บรวมรู้ว่าต้องอ่านใบไหน */
@@ -200,6 +218,29 @@ export async function listScrapCalledCounts(requestNos: readonly string[]): Prom
   return out;
 }
 
+const POSTINGS = tableInAppSchema('job_posting_requests');
+
+/** คำสั่ง Scrap ทุกครั้งของใบขอ (ใครสั่ง · สถานะ · เวลา) ต่อเลขใบขอ — ป๊อปรายละเอียด + คนนำเข้า */
+async function loadScrapOrdersMap(requestNos: string[]): Promise<Map<string, ScrapOrderLite[]>> {
+  const out = new Map<string, ScrapOrderLite[]>();
+  if (requestNos.length === 0) return out;
+  const { rows } = await dbQuery<{ request_no: string; requested_by_name: string | null; status: string; created_at: Date | string }>(
+    `select upper(request_no) as request_no, requested_by_name, status, created_at from ${POSTINGS}
+      where request_type = 'scraping' and upper(request_no) = any($1::text[]) order by created_at`,
+    [requestNos.map((r) => r.toUpperCase())],
+  );
+  for (const r of rows) {
+    const list = out.get(r.request_no) ?? [];
+    list.push({ requested_by_name: r.requested_by_name, status: r.status, created_at: new Date(r.created_at).toISOString() });
+    out.set(r.request_no, list);
+  }
+  return out;
+}
+
+export async function loadScrapOrders(requestNo: string): Promise<ScrapOrderLite[]> {
+  return (await loadScrapOrdersMap([requestNo])).get(requestNo.toUpperCase()) ?? [];
+}
+
 export type ScrapJobInfo = { id: string; title: string | null; unitName: string | null; recruiterName: string | null };
 
 /**
@@ -220,6 +261,12 @@ export async function addScrapToContact(
 ): Promise<ScrapToContactResult[]> {
   const raw = await loadRaw([requestNo], candidateIds);
   const byId = new Map(raw.map((r) => [r.candidate_id, r]));
+  // คนนำเข้า = คนสั่ง Scrap ใบขอนี้ (เจ้าของ 26 พ.ย. 2569) · ไม่ใช่เจ้าหน้าที่สรรหาของใบ
+  const [orders, staffName] = await Promise.all([loadScrapOrders(requestNo), loadStaffDisplay()]);
+  const bringerOf = (foundAt: string | null): string | null => {
+    const who = scrapBringerOf(orders, foundAt);
+    return who ? (staffName(who.toLowerCase()) ?? who) : null;
+  };
   const out: ScrapToContactResult[] = [];
   for (const id of candidateIds) {
     const r = byId.get(id);
@@ -244,7 +291,7 @@ export async function addScrapToContact(
         job_id: job.id,
         job_title: job.title,
         unit_name: job.unitName,
-        responsible_name: job.recruiterName,
+        responsible_name: bringerOf(r.found_at ? new Date(r.found_at).toISOString() : null),
         channel_label: scrapChannelLabel(row.platform),
       },
       { minimal: true },

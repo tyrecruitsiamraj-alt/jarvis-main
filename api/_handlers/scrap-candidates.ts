@@ -48,14 +48,14 @@ async function handler(req: AuthedReq, res: ApiRes) {
       }
       if (one(req.query?.all) === '1') {
         const reqs = (await listScrapRequestNos()).filter((r) => canSee(r.request_no));
-        const rows = await listScrapCandidates(reqs.map((r) => r.request_no));
-        return res.status(200).json({ requests: reqs, counts: countScrapResults(rows), rows });
+        const { rows, orders } = await listScrapCandidates(reqs.map((r) => r.request_no));
+        return res.status(200).json({ requests: reqs, counts: countScrapResults(rows), rows, orders });
       }
       const requestNo = requestNoFrom(String(one(req.query?.job) ?? ''));
       if (!requestNo) return res.status(200).json({ request_no: null, counts: countScrapResults([]), rows: [] });
       if (!canSee(requestNo)) return sendError(res, 403, 'Forbidden', 'ใบขอนี้อยู่นอก BU ของคุณ');
-      const rows = await listScrapCandidates([requestNo]);
-      return res.status(200).json({ request_no: requestNo, counts: countScrapResults(rows), rows });
+      const { rows, orders } = await listScrapCandidates([requestNo]);
+      return res.status(200).json({ request_no: requestNo, counts: countScrapResults(rows), rows, orders });
     }
 
     if (method !== 'POST') {

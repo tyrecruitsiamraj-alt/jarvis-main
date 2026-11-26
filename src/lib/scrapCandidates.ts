@@ -175,7 +175,12 @@ export type ScrapCandidateRow = {
   reasons: string[];
   found_at: string | null;
   in_jarvis: ScrapInJarvis;
+  /** คนสั่ง Scrap ที่พาคนนี้เข้ามา (ชื่อเล่น · `scrapBringerOf` · 26 พ.ย. 2569) = "คนนำเข้า" · ไม่มีคำสั่ง = null */
+  ordered_by?: string | null;
 };
+
+/** คำสั่ง Scrap หนึ่งครั้งของใบขอ — ป๊อปรายละเอียดคนจาก Scrap (ใคร · เมื่อไหร่ · ผล) */
+export type ScrapOrderView = { by: string | null; status: string; created_at: string };
 
 export type ScrapCounts = Record<ScrapResult, number> & { total: number };
 
@@ -210,3 +215,24 @@ export type ScrapToContactResult = {
   /** เหตุเป็นคำ (ข้าม/ใช้ใบเดิม) */
   note: string | null;
 };
+
+/**
+ * ═══ คนนำเข้าของรายชื่อ Scrap = คนสั่ง Scrap (เจ้าของ 26 พ.ย. 2569 Choice "คนสั่ง Scrap") ═══
+ * เดิมใส่เจ้าหน้าที่สรรหาของใบขอ (คุณปรัชญา คำสี ขึ้น "เล็ก" ทั้งที่เล็กไม่ได้สั่ง)
+ * ใบเดียวมีหลายคนสั่งได้ ⇒ เลือก: สั่งสำเร็จ/กำลังทำ ล่าสุดก่อนเจอคน → สั่งครั้งไหนก็ได้ล่าสุดก่อนเจอคน (ไม่นับยกเลิก) →
+ * ครั้งล่าสุดของใบ · ไม่มีคำสั่งเลย = null (ไม่เดาคนอื่นแทน) · คืน "คนสั่ง" ตามที่เก็บ (อีเมล) ผู้เรียกแปลงเป็นชื่อเล่น
+ */
+export type ScrapOrderLite = { requested_by_name: string | null; status: string; created_at: string };
+const SCRAP_ORDER_WORKED = new Set(['completed', 'in_progress', 'posted', 'filled']);
+
+export function scrapBringerOf(orders: readonly ScrapOrderLite[], foundAt: string | null): string | null {
+  const cutoff = foundAt ? Date.parse(foundAt) : Number.POSITIVE_INFINITY;
+  const named = orders
+    .filter((o) => (o.requested_by_name ?? '').trim() && o.status !== 'cancelled')
+    .map((o) => ({ ...o, t: Date.parse(o.created_at) }))
+    .filter((o) => Number.isFinite(o.t))
+    .sort((a, b) => b.t - a.t);
+  const before = named.filter((o) => o.t <= cutoff);
+  const pick = before.find((o) => SCRAP_ORDER_WORKED.has(o.status)) ?? before[0] ?? named[0];
+  return pick ? pick.requested_by_name!.trim() : null;
+}
