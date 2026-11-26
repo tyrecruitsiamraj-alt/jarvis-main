@@ -41,7 +41,7 @@ export const STUCK_PHASES: ReadonlyArray<{ key: StuckPhaseKey; label: string; to
 export const STUCK_REASON_LABEL: Record<StuckReasonKey, string> = {
   not_released: 'ยังไม่ประกาศ',
   not_posted: 'ประกาศแล้ว แต่ยังไม่ได้โพสต์',
-  no_apps: 'โพสต์แล้ว ยังไม่มีคนกรอก',
+  no_apps: 'โพสต์ ยังไม่มีคนกรอก',
   queued_not_called: 'มีชื่อในคิว AI ยังไม่โทร',
   names_not_called: 'มีชื่อ ยังไม่มีใครโทร',
   staff_not_calling: 'ตอบ AI ว่าสนใจ คนยังไม่โทรต่อ',

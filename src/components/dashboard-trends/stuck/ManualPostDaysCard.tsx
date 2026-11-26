@@ -71,7 +71,7 @@ export default function ManualPostDaysCard({
   const cells: Array<{ key: string; label: string; n: number | null; pct?: number | null; tone?: keyof typeof TONE; before: number | null; since?: string | null }> = [
     { key: 'jobs', label: 'ใบขอ', n: d ? d.total.jobs : null, before: prev ? prev.jobs : null, since: since(MANUAL_POSTED_SINCE) },
     { key: 'places', label: 'ทั้งหมด', n: split ? split.total : null, before: prev ? prev.places : null, since: since(MANUAL_POSTED_SINCE) },
-    { key: 'posted', label: 'โพสต์แล้ว', n: split ? split.posted : null, pct: split?.postedPct, tone: 'success', before: prev ? prev.posted : null, since: since(MANUAL_POSTED_SINCE) },
+    { key: 'posted', label: 'โพสต์', n: split ? split.posted : null, pct: split?.postedPct, tone: 'success', before: prev ? prev.posted : null, since: since(MANUAL_POSTED_SINCE) },
     { key: 'genlink', label: 'Gen link', n: split ? split.genlink : null, pct: split?.genlinkPct, before: prev ? prev.places - prev.posted : null, since: since(MANUAL_POSTED_SINCE) },
     { key: 'clicks', label: 'คลิก', n: d ? d.total.clicks : null, before: prev ? prev.clicks : null, since: since(MANUAL_POSTED_SINCE) },
     { key: 'applicants', label: 'กรอก', n: d ? d.total.applicants : null, tone: 'success', before: prev ? prev.applicants : null, since: since(MANUAL_POSTED_SINCE) },
@@ -114,7 +114,7 @@ export default function ManualPostDaysCard({
               <TableHead className="text-xs">วันที่</TableHead>
               <TableHead className="text-right text-xs">ใบขอ</TableHead>
               <TableHead className="text-right text-xs">ทั้งหมด</TableHead>
-              <TableHead className="text-right text-xs">โพสต์แล้ว</TableHead>
+              <TableHead className="text-right text-xs">โพสต์</TableHead>
               <TableHead className="text-right text-xs">Gen link</TableHead>
               <TableHead className="text-right text-xs">คลิก</TableHead>
               <TableHead className="text-right text-xs">กรอก</TableHead>
@@ -168,7 +168,7 @@ export default function ManualPostDaysCard({
         <div className="space-y-2 rounded-xl border border-border p-3" data-testid="manual-post-day-list">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-sm font-medium text-foreground">
-              {formatYmdTh(picked.day)} · {th(picked.jobs)} ใบขอ · ทั้งหมด {th(picked.places)} · โพสต์แล้ว {th(picked.posted)} · Gen link {th(picked.places - picked.posted)}
+              {formatYmdTh(picked.day)} · {th(picked.jobs)} ใบขอ · ทั้งหมด {th(picked.places)} · โพสต์ {th(picked.posted)} · Gen link {th(picked.places - picked.posted)}
             </p>
             <Button type="button" size="xs" variant="outline" onClick={() => setPick(null)}>
               ปิด
@@ -199,7 +199,7 @@ export default function ManualPostDaysCard({
                       {/* โพสต์แล้ว (มีลิงก์โพสต์ กดชื่อกลุ่มเปิดโพสต์) · Gen link (ยังไม่มีลิงก์โพสต์ ตัวเทา) — เจ้าของ 13 พ.ย. 2569 */}
                       <span className="text-xs tabular-nums">
                         <span className="text-foreground">ทั้งหมด {th(j.postUrls.length)} · </span>
-                        <span className={TONE.success.value}>โพสต์แล้ว {th(j.postUrls.filter(Boolean).length)}</span>
+                        <span className={TONE.success.value}>โพสต์ {th(j.postUrls.filter(Boolean).length)}</span>
                         <span className={DASH.sub}> · Gen link {th(j.postUrls.filter((u) => !u).length)}</span>
                       </span>
                       <span className="mt-0.5 flex flex-wrap gap-x-2 gap-y-0.5 text-xs">

@@ -114,7 +114,7 @@ describe('กันสั่งซ้ำ + สถานะที่ So Scraping 
     const at = '2026-10-20T09:30:00Z';
     expect(soStatusView({ status: 'pending', created_at: at }, now)).toMatchObject({ label: 'ส่งแล้ว รอระบบรับ', tone: 'warn', open: true });
     expect(soStatusView({ status: 'in_progress', created_at: at }, now)).toMatchObject({ label: 'กำลังทำ', tone: 'warn', open: true });
-    expect(soStatusView({ status: 'posted', created_at: at }, now)).toMatchObject({ label: 'โพสต์แล้ว', tone: 'success', open: false });
+    expect(soStatusView({ status: 'posted', created_at: at }, now)).toMatchObject({ label: 'โพสต์', tone: 'success', open: false });
     expect(soStatusView({ status: 'completed', created_at: at }, now)).toMatchObject({ label: 'เสร็จ', tone: 'success' });
     expect(soStatusView({ status: 'rejected', created_at: at }, now)).toMatchObject({ label: 'ไม่สำเร็จ', tone: 'danger', open: false }); // 4 พ.ย. 2569 ฉบับ 9 เดิม "ไม่รับงาน"
     expect(soStatusView({ status: 'pending', created_at: '2026-10-20T08:30:00Z' }, now)).toMatchObject({ waitLong: true, tone: 'danger' });
@@ -136,7 +136,7 @@ describe('ตามงานได้โดยไม่ต้องเปิด�
     expect(read('src/lib/boardFilters.ts')).toContain("key: 'so',");
   });
   it('แจ้งเตือนคนสั่งเมื่อ โพสต์แล้ว / เสร็จ / ไม่รับงาน — ครั้งเดียวต่อสถานะ · กดแล้วเปิดใบนั้น', () => {
-    expect(soNoticeTitle('content', 'posted')).toBe('สั่งโพสต์ · โพสต์แล้ว');
+    expect(soNoticeTitle('content', 'posted')).toBe('สั่งโพสต์ · โพสต์');
     expect(soNoticeTitle('scraping', 'rejected')).toBe('Scrap · ไม่สำเร็จ');
     expect(soNoticeTitle('content', 'in_progress')).toBeNull();
     const w = read('api/_lib/soScrapingNotices.ts');

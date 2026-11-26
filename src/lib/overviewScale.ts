@@ -1030,6 +1030,50 @@ export function scaleMonthTable(inp: ScaleInput, lv: ScaleLevel): ScaleMonthRow[
   }));
 }
 
+/* ═══ แนวโน้มรายสัปดาห์ Autopost · Scrap · Gen link · โพสต์ (เจ้าของ 26 พ.ย. 2569 "กราฟเส้น 3 เส้นรายเดือน"
+ * → รายเดือนมีข้อมูลแค่ 2 เดือน (ต.ค.–พ.ย.) ⇒ รายสัปดาห์ · "โพสต์เองก็ต้องแยกเป็น Gen link กับ โพสต์") ═══
+ * สัปดาห์เริ่มวันจันทร์ ตามปฏิทินกรุงเทพ · นับเฉพาะวันในช่วงที่เลือก (สัปดาห์หัว/ท้ายไม่ครบ = `partial`)
+ * โพสต์เริ่มนับ `MANUAL_POSTED_SINCE` — สัปดาห์ที่เริ่มก่อนวันนั้น = null (ยังไม่ได้นับ ไม่ใช่ 0)
+ */
+export type ScaleWeekRow = {
+  week: string;
+  label: string;
+  partial: boolean;
+  autopost: number;
+  scrap: number;
+  links: number;
+  manualPosted: number | null;
+};
+const mondayOf = (ymd: string): string => {
+  const d = new Date(`${ymd}T00:00:00Z`);
+  const dow = (d.getUTCDay() + 6) % 7;
+  d.setUTCDate(d.getUTCDate() - dow);
+  return d.toISOString().slice(0, 10);
+};
+export function scaleWeekTable(inp: ScaleInput, lv: ScaleLevel): ScaleWeekRow[] | null {
+  const sc = scopeOf(inp, { ...lv, day: null });
+  if (!sc.staff) return null;
+  const end = lastDayOf(inp);
+  if (scaleDayCount(inp) === 0) return [];
+  const out: ScaleWeekRow[] = [];
+  for (let wk = mondayOf(inp.from); wk <= end && out.length < 60; wk = addDays(wk, 7)) {
+    const from = wk < inp.from ? inp.from : wk;
+    const lastOfWeek = addDays(wk, 6);
+    const to = lastOfWeek > end ? end : lastOfWeek;
+    const work = scaleWork(sc.staff.filter((r) => r.day >= from && r.day <= to));
+    out.push({
+      week: wk,
+      label: `${Number(wk.slice(8, 10))} ${TH_MONTH[Number(wk.slice(5, 7)) - 1]}`,
+      partial: from !== wk || to !== lastOfWeek,
+      autopost: work.autopost,
+      scrap: work.scrap,
+      links: work.links,
+      manualPosted: wk < MANUAL_POSTED_SINCE ? null : work.manualPosted,
+    });
+  }
+  return out;
+}
+
 /* ═══ ตรงเกณฑ์ใบขอ ไล่ตามขั้น ═══ */
 export const SCALE_FIT_KEYS: readonly ScaleBoxKey[] = ['fitDistrict', 'fitProvince', 'fitRegion', 'fitFar', 'fitUnknown', 'fitAgeOut', 'fitGenderOut'];
 /**

@@ -39,7 +39,7 @@ export type StaffKindCounts = Record<StaffActivityKind, number>;
 /** ลำดับ + คำบนจอของแท็บงานรายคน (คำเดียวกับตารางรายคนของการสั่งงาน) */
 export const STAFF_PERSON_KINDS: ReadonlyArray<{ key: StaffActivityKind; label: string }> = [
   { key: 'links', label: 'Gen link' },
-  { key: 'manualPosted', label: 'โพสต์แล้ว' },
+  { key: 'manualPosted', label: 'โพสต์' },
   { key: 'scrap', label: 'Scrap' },
   { key: 'autopost', label: 'Autopost' },
   { key: 'contacts', label: 'ลงผลติดต่อ' },

@@ -12,8 +12,8 @@ import type { StuckRequest } from '@/lib/recruitStuck';
 export const POSTING_STATES = ['postedApps', 'postedEmpty', 'queued', 'publicOnly', 'linked', 'namesOnly', 'fulfilledPartial', 'prepared', 'untouched'] as const;
 export type PostingState = (typeof POSTING_STATES)[number];
 export const POSTING_STATE_LABEL: Record<PostingState, string> = {
-  postedApps: 'โพสต์แล้ว มีรายชื่อ',
-  postedEmpty: 'โพสต์แล้ว ยังไม่มีรายชื่อ',
+  postedApps: 'โพสต์ มีรายชื่อ',
+  postedEmpty: 'โพสต์ ยังไม่มีรายชื่อ',
   queued: 'รอ Autopost',
   publicOnly: 'ขึ้นหน้าประกาศอย่างเดียว',
   linked: 'สร้างลิงก์แล้ว ยังไม่พบโพสต์',

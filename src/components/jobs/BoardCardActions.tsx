@@ -111,7 +111,7 @@ export default function BoardCardActions({
       <Box testId="board-action-manual" title="โพสต์เอง" right={dash ? '—' : a!.manual.links === 0 ? 'ยังไม่มีลิงก์' : `${th(a!.manual.links)} ลิงก์`} onClick={() => onOpen('manual')}>
         <Cells
           cells={[
-            { label: 'โพสต์แล้ว', value: dash ? null : a!.manual.posted, tone: 'success' },
+            { label: 'โพสต์', value: dash ? null : a!.manual.posted, tone: 'success' },
             { label: 'Gen link', value: dash ? null : a!.manual.links - a!.manual.posted },
             { label: 'กรอก', value: dash ? null : a!.manual.applicants, tone: 'success' },
           ]}

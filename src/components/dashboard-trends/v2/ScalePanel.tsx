@@ -23,7 +23,8 @@ import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
-import { DASH, TONE } from '@/lib/designTokens';
+import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { CHART, DASH, TONE, type ToneKey } from '@/lib/designTokens';
 import type { RecruitAppFact, RecruitAppJob } from '@/lib/recruitOverviewTypes';
 import type { StuckRequest } from '@/lib/recruitStuck';
 import { flowOf, recruiterLabelOf } from '@/lib/recruitStuck';
@@ -70,6 +71,8 @@ import {
   scaleMoneyOf,
   scaleMonthFromParams,
   scaleMonthTable,
+  scaleWeekTable,
+  type ScaleWeekRow,
   scaleMonths,
   scaleNext,
   scalePenaltyRows,
@@ -386,6 +389,8 @@ export default function ScalePanel({ cohort, staff, staffError, requests, reques
   // เทียบเดือน: ช่วงที่ครอบตั้งแต่ 2 เดือน — กดเดือน = กราฟรายวันของเดือนนั้น
   const monthRows = React.useMemo(() => (scaleMonths({ from, to, today }).length >= 2 ? scaleMonthTable(input, level) : []), [input, level, from, to, today]);
   const month = monthRows.some((m) => m.month === urlMonth) ? urlMonth : null;
+  /** แนวโน้มรายสัปดาห์ Autopost · Scrap · Gen link · โพสต์ (เจ้าของ 26 พ.ย. 2569) — ช่วงที่ครอบตั้งแต่ 2 สัปดาห์ */
+  const weekRows = React.useMemo(() => scaleWeekTable(input, level), [input, level]);
 
   // คนของ BU ที่มีงานใน 60 วันล่าสุด — ตารางแยกตามคนขึ้นคนที่ช่วงนี้ไม่มีงานด้วย · อ่านไม่ได้ = ตารางแบบเดิม (เฉพาะคนที่มีงานในช่วง)
   const rosterEnd = scaleDays({ from, to, today }).at(-1) ?? today;
@@ -931,6 +936,88 @@ export default function ScalePanel({ cohort, staff, staffError, requests, reques
     );
   };
 
+  /* ── Autopost · Scrap · Gen link · โพสต์ ใช้มากขึ้นหรือน้อยลง รายสัปดาห์ (เจ้าของ 26 พ.ย. 2569) ── */
+  const WEEK_LINES: ReadonlyArray<{ key: keyof Pick<ScaleWeekRow, 'autopost' | 'scrap' | 'links' | 'manualPosted'>; label: string; tone: ToneKey }> = [
+    { key: 'autopost', label: 'Autopost', tone: 'info' },
+    { key: 'scrap', label: 'Scrap', tone: 'violet' },
+    { key: 'links', label: 'Gen link', tone: 'orange' },
+    { key: 'manualPosted', label: 'โพสต์', tone: 'teal' },
+  ];
+  const weekCard = (rows: ScaleWeekRow[]) => {
+    const labelOf = new Map(WEEK_LINES.map((l) => [l.key as string, l.label]));
+    return (
+      <Card className="min-w-0 space-y-3 rounded-2xl p-5" data-testid="scale-weeks">
+        <SectionTitle title="Autopost · Scrap · Gen link · โพสต์ รายสัปดาห์" right={[level.bu, level.who].filter(Boolean).join(' · ') || undefined} />
+        <div className="h-56 w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={rows} margin={{ top: 8, right: 12, bottom: 0, left: -12 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke={CHART.gridStroke} strokeOpacity={CHART.gridOpacity} />
+              <XAxis dataKey="label" tick={{ fontSize: 11, fill: CHART.axisFill }} />
+              <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: CHART.axisFill }} />
+              <Tooltip
+                {...CHART.tooltip}
+                cursor={CHART.cursorLine}
+                labelFormatter={(l) => `สัปดาห์เริ่ม ${String(l)}`}
+                formatter={(value: number | null, name: string) => [value == null ? 'ยังไม่ได้นับ' : fmt(Number(value)), labelOf.get(name) ?? name]}
+              />
+              {WEEK_LINES.map((l) => (
+                <Line key={l.key} type="monotone" dataKey={l.key} name={l.key} stroke={TONE[l.tone].hex} strokeWidth={2} dot={{ r: 3 }} activeDot={CHART.activeDot} connectNulls={false} />
+              ))}
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground" data-testid="scale-weeks-legend">
+          {WEEK_LINES.map((l) => (
+            <span key={l.key} className="inline-flex items-center gap-1.5">
+              <span className={cn('size-2.5 rounded-full', TONE[l.tone].dot)} aria-hidden />
+              {l.label}
+            </span>
+          ))}
+        </div>
+        <div className="overflow-x-auto rounded-xl border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>สัปดาห์เริ่ม</TableHead>
+                {WEEK_LINES.map((l) => (
+                  <TableHead key={l.key} className={th}>
+                    {l.label}
+                  </TableHead>
+                ))}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {rows.map((w, i) => {
+                const before = i > 0 ? rows[i - 1] : null;
+                return (
+                  <TableRow key={w.week} data-testid={`scale-week-${w.week}`}>
+                    <TableCell className="whitespace-nowrap">
+                      {w.label}
+                      {w.partial ? <span className="ml-1 text-xs text-muted-foreground">(ไม่ครบสัปดาห์)</span> : null}
+                    </TableCell>
+                    {WEEK_LINES.map((l) => {
+                      const v = w[l.key];
+                      const b = before ? before[l.key] : null;
+                      return (
+                        <TableCell key={l.key} className={td}>
+                          {v == null ? (
+                            <span className="text-xs text-muted-foreground">ยังไม่ได้นับ</span>
+                          ) : (
+                            <StackCell value={v} before={before && b != null ? b : undefined} sense="good" />
+                          )}
+                        </TableCell>
+                      );
+                    })}
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </div>
+      </Card>
+    );
+  };
+
   /* ── เทียบเดือน: แต่ละเดือนทำงานไปเท่าไหร่ ได้รายชื่อถึงไหน เทียบเดือนก่อนหน้า ── */
   const monthCard = () => (
     <Card className="min-w-0 space-y-3 rounded-2xl p-5" data-testid="scale-months">
@@ -1086,7 +1173,7 @@ export default function ScalePanel({ cohort, staff, staffError, requests, reques
                     <TableRow>
                       <TableHead>ใบขอ</TableHead>
                       <TableHead className={th}>Gen link</TableHead>
-                      <TableHead className={th}>โพสต์แล้ว</TableHead>
+                      <TableHead className={th}>โพสต์</TableHead>
                       <TableHead className={th}>Scrap</TableHead>
                       <TableHead className={th}>Autopost</TableHead>
                       <TableHead className={th}>คลิก</TableHead>
@@ -1450,6 +1537,7 @@ export default function ScalePanel({ cohort, staff, staffError, requests, reques
         detail()
       ) : (
         <>
+          {weekRows && weekRows.length >= 2 && !level.ch && !level.grp ? weekCard(weekRows) : null}
           {monthRows.length >= 2 ? monthCard() : null}
           {!level.ch && !level.grp ? chart() : null}
           {base()}

@@ -3714,7 +3714,7 @@
      "src": "src/components/jobs/JobBoardView.tsx:2197 / :2409"
     },
     {
-     "label": "กล่อง โพสต์เอง (ทำอะไรไปแล้ว · โพสต์แล้ว / Gen link / กรอก · คลิก)",
+     "label": "กล่อง โพสต์เอง (ทำอะไรไปแล้ว · โพสต์ / Gen link / กรอก · คลิก)",
      "action": "popup",
      "target": "ทำอะไรไปแล้ว ของกล่องลอย (แท็บโพสต์เองแท็บเดียว · ไม่มี Autopost/Scrap)",
      "api": "GET /api/job-post-actions?job=standalone:<ประเภท>",
@@ -4348,7 +4348,7 @@
     {
      "label": "Gen link / โพสต์ (แท็บย่อย)",
      "action": "filter",
-     "target": "ลิงก์ที่ยังไม่มีลิงก์โพสต์ / มีลิงก์โพสต์แล้ว",
+     "target": "ลิงก์ที่ยังไม่มีลิงก์โพสต์ / มีลิงก์โพสต์",
      "api": null,
      "effects": [],
      "when": "กล่อง โพสต์เอง",
@@ -7878,7 +7878,7 @@
      "src": "src/components/dashboard-trends/stuck/ManualPostDaysCard.tsx:151"
     },
     {
-     "label": "ชื่อกลุ่ม/ช่องทางที่โพสต์แล้ว (ลิงก์)",
+     "label": "ชื่อกลุ่ม/ช่องทางที่โพสต์ (ลิงก์)",
      "action": "external",
      "target": "URL โพสต์ (แท็บใหม่)",
      "api": null,

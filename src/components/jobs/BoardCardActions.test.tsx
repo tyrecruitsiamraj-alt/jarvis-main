@@ -15,7 +15,7 @@ describe('BoardCardActions', () => {
     for (const b of boxes) expect(b.children).toHaveLength(3);
     expect(shape(boxes[0])).toBe(shape(boxes[1]));
     expect(boxes[0].textContent).toContain('0เผยแพร่แล้ว');
-    expect(boxes[1].textContent).toContain('0โพสต์แล้ว');
+    expect(boxes[1].textContent).toContain('0โพสต์');
     expect(boxes[1].textContent).toContain('0Gen link');
     // Scrap เป็นช่องตัวเลขแบบเดียวกัน (เจ้าของ 20 พ.ย. 2569 "ทำไมไม่แจ้งเป็นตัวเลขเหมือนกับอันอื่นๆ")
     expect(shape(boxes[2])).toBe(shape(boxes[0]));

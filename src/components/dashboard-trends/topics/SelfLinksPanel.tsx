@@ -11,7 +11,7 @@ import type { ManualLinkRow } from '@/lib/jobPostActions';
 import { linkTotalsOf, linkTreeChildren } from '@/lib/recruitTopics';
 
 type LinkFilter = 'all' | 'posted' | 'gen';
-const FILTER_LABEL: Record<Exclude<LinkFilter, 'all'>, string> = { posted: 'โพสต์แล้ว', gen: 'Gen link' };
+const FILTER_LABEL: Record<Exclude<LinkFilter, 'all'>, string> = { posted: 'โพสต์', gen: 'Gen link' };
 const pct = (a: number, b: number) => (b > 0 ? `${((a / b) * 100).toFixed(1)}%` : '—');
 const PAD = ['pl-2', 'pl-7', 'pl-12', 'pl-16'];
 const same = (a: readonly string[], b: readonly string[]) => a.length === b.length && a.every((v, i) => v === b[i]);
@@ -36,9 +36,9 @@ export default function SelfLinksPanel({ rows, onOpenRequest }: { rows: readonly
   const pick = (f: LinkFilter) => setFilter((cur) => (cur === f ? 'all' : f));
 
   const boxes: Array<{ key: string; title: string; unit: string; total: number; parts: Array<{ f: Exclude<LinkFilter, 'all'>; label: string; n: number }> }> = [
-    { key: 'links', title: 'ลิงก์ทั้งหมด', unit: 'ลิงก์', total: rows.length, parts: [{ f: 'posted', label: 'โพสต์แล้ว', n: posted.length }, { f: 'gen', label: 'Gen link', n: gen.length }] },
-    { key: 'clicks', title: 'คลิก', unit: 'ครั้ง', total: p.clicks + g.clicks, parts: [{ f: 'posted', label: 'จากโพสต์แล้ว', n: p.clicks }, { f: 'gen', label: 'จาก Gen link', n: g.clicks }] },
-    { key: 'apps', title: 'กรอก', unit: 'คน', total: p.applicants + g.applicants, parts: [{ f: 'posted', label: 'จากโพสต์แล้ว', n: p.applicants }, { f: 'gen', label: 'จาก Gen link', n: g.applicants }] },
+    { key: 'links', title: 'ลิงก์ทั้งหมด', unit: 'ลิงก์', total: rows.length, parts: [{ f: 'posted', label: 'โพสต์', n: posted.length }, { f: 'gen', label: 'Gen link', n: gen.length }] },
+    { key: 'clicks', title: 'คลิก', unit: 'ครั้ง', total: p.clicks + g.clicks, parts: [{ f: 'posted', label: 'จากโพสต์', n: p.clicks }, { f: 'gen', label: 'จาก Gen link', n: g.clicks }] },
+    { key: 'apps', title: 'กรอก', unit: 'คน', total: p.applicants + g.applicants, parts: [{ f: 'posted', label: 'จากโพสต์', n: p.applicants }, { f: 'gen', label: 'จาก Gen link', n: g.applicants }] },
   ];
 
   const treeRows = (prefix: string[]): React.ReactNode[] =>
@@ -164,7 +164,7 @@ export default function SelfLinksPanel({ rows, onOpenRequest }: { rows: readonly
               <TableRow>
                 <TableHead className="text-right">กรอก</TableHead>
                 <TableHead>มาจากลิงก์ (กลุ่ม / ช่องทาง)</TableHead>
-                <TableHead>โพสต์แล้ว</TableHead>
+                <TableHead>โพสต์</TableHead>
                 <TableHead>เจ้าหน้าที่สรรหา</TableHead>
                 <TableHead>ใบขอ</TableHead>
                 <TableHead>วันที่สร้าง</TableHead>
@@ -183,7 +183,7 @@ export default function SelfLinksPanel({ rows, onOpenRequest }: { rows: readonly
                   <TableRow key={r.linkId}>
                     <TableCell className="text-right font-medium tabular-nums">{fmt(r.applicants)}</TableCell>
                     <TableCell className="max-w-72 whitespace-normal break-words">{r.place}</TableCell>
-                    <TableCell>{r.posted ? 'โพสต์แล้ว' : 'Gen link'}</TableCell>
+                    <TableCell>{r.posted ? 'โพสต์' : 'Gen link'}</TableCell>
                     <TableCell>{r.by}</TableCell>
                     <TableCell>
                       {onOpenRequest ? (

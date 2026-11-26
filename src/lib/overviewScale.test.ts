@@ -37,6 +37,7 @@ import {
   scaleInformedRows,
   scaleMoneyOf,
   scaleMonthTable,
+  scaleWeekTable,
   scaleMonths,
   scaleCancelReasons,
   scaleMonthFromParams,
@@ -678,6 +679,21 @@ describe('เทียบช่วงก่อน · เทียบเดือ
     expect([scalePrevDay(INPUT, '2026-11-20'), scalePrevDay(INPUT, '2026-11-01')]).toEqual(['2026-11-19', null]);
   });
 
+  it('รายสัปดาห์ Autopost · Scrap · Gen link · โพสต์ (เจ้าของ 26 พ.ย. 2569): เริ่มวันจันทร์ · รวมทุกสัปดาห์ = กล่องของทั้งช่วง · โพสต์ก่อน 13 พ.ย. = ยังไม่ได้นับ', () => {
+    const wide: ScaleInput = { ...INPUT, from: '2026-10-15', staff: [...STAFF, row(Q, 'คิว', 'LBD', '2026-10-20', { links: 3, autopost: 2, manualPosted: 4 })] };
+    const w = scaleWeekTable(wide, at())!;
+    expect(w[0]).toMatchObject({ week: '2026-10-12', label: '12 ต.ค.', partial: true });
+    expect(w.at(-1)).toMatchObject({ week: '2026-11-16', partial: true });
+    expect(w.find((x) => x.week === '2026-10-19')).toMatchObject({ links: 3, autopost: 2, manualPosted: null });
+    for (const [k, box] of [['autopost', 'wAutopost'], ['scrap', 'wScrap'], ['links', 'wLinks']] as const) {
+      expect([k, sumOf(w.map((x) => x[k]))]).toEqual([k, val(at(), box, wide)]);
+    }
+    // สัปดาห์ที่เริ่มตั้งแต่ 13 พ.ย. นับโพสต์ได้ · สัปดาห์ 9 พ.ย. เริ่มก่อน = ยังไม่ได้นับ
+    expect(w.find((x) => x.week === '2026-11-09')?.manualPosted).toBeNull();
+    expect(typeof w.find((x) => x.week === '2026-11-16')?.manualPosted).toBe('number');
+    expect(scaleWeekTable({ ...INPUT, staff: null }, at())).toBeNull();
+  });
+
   it('เทียบเดือน: แถวต่อเดือน (เดือนไม่ครบบอกช่วงวัน) รวมทุกเดือน = กล่องของทั้งช่วง · กดเดือน = วันของเดือนนั้น', () => {
     const wide: ScaleInput = { ...INPUT, from: '2026-10-15', cohort: [...COHORT, fact('app-55aa0c01', { createdAt: '2026-10-20T03:00:00.000Z' })], staff: [...STAFF, row(Q, 'คิว', 'LBD', '2026-10-20', { links: 3 })] };
     expect(scaleMonths(wide)).toEqual([
@@ -736,7 +752,7 @@ describe('ของที่ผู้ช่วย AI ต้องใช้ตอ
       expect(sumOf(rows.filter((r) => !r.started).map((r) => r.count))).toBe(val(lv, 'reqIdle'));
     }
     expect((scalePostingStates(INPUT, at()) ?? []).filter((r) => r.count > 0).map((r) => [r.label, r.started, r.count, r.positions, r.withNames])).toEqual([
-      ['โพสต์แล้ว มีรายชื่อ', true, 1, 2, 1],
+      ['โพสต์ มีรายชื่อ', true, 1, 2, 1],
       ['รอ Autopost', true, 1, 5, 0],
       ['ไม่พบหลักฐานการออกหาคน', false, 3, 6, 0],
     ]);

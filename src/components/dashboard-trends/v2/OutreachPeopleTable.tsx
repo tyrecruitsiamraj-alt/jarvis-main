@@ -17,7 +17,7 @@ const FUNNEL_LABEL: Record<keyof PersonFunnel, string> = { names: 'รายช�
 const COLS: Array<[keyof OutreachNumbers, string]> = [
   ['autopost', 'Autopost (ครั้งที่สั่ง)'],
   ['gen', 'โพสต์เอง · Gen link'],
-  ['posted', 'โพสต์เอง · โพสต์แล้ว'],
+  ['posted', 'โพสต์เอง · โพสต์'],
   ['scrap', 'Scrap (ใบ)'],
   ['clicks', 'คลิก'],
   ['applicants', 'กรอก'],

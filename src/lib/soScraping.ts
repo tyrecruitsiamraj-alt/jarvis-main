@@ -161,7 +161,7 @@ export const SO_WAIT_LONG_MS = 60 * 60_000;
 export const SO_STATUS_LABEL: Record<SoStatus, string> = {
   pending: 'ส่งแล้ว รอระบบรับ',
   in_progress: 'กำลังทำ',
-  posted: 'โพสต์แล้ว',
+  posted: 'โพสต์',
   completed: 'เสร็จ',
   filled: 'เสร็จ',
   cancelled: 'ยกเลิก',
@@ -200,7 +200,7 @@ export const SO_FACET_LABEL: Record<SoFacetValue, string> = {
   // 1 พ.ย. 2569 เจ้าของ "ต้องมีสถานะบอก และต้อง Filter ดูได้" — ใบที่ยังไม่เคยสั่งกรองได้ด้วย
   none: 'ยังไม่สั่ง',
   open: 'สั่งแล้วยังไม่เสร็จ',
-  done: 'โพสต์แล้ว / เสร็จ',
+  done: 'โพสต์ / เสร็จ',
   rejected: 'ไม่สำเร็จ',
 };
 export function soFacetValues(latest: ReadonlyArray<{ status: string }>): SoFacetValue[] {
@@ -217,7 +217,7 @@ export function soFacetValues(latest: ReadonlyArray<{ status: string }>): SoFace
 /** ข้อความแจ้งเตือนเมื่อสถานะเปลี่ยน — ไม่แจ้ง = null */
 export function soNoticeTitle(type: 'content' | 'scraping', status: string): string | null {
   const what = type === 'scraping' ? 'Scrap' : 'สั่งโพสต์';
-  if (status === 'posted') return `${what} · โพสต์แล้ว`;
+  if (status === 'posted') return `${what} · โพสต์`;
   if (status === 'completed') return `${what} · เสร็จ`;
   if (status === 'rejected') return `${what} · ไม่สำเร็จ`;
   return null;

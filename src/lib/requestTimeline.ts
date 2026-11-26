@@ -14,7 +14,7 @@ export type RequestEventKind = (typeof REQUEST_EVENT_KINDS)[number];
 /** คำบนจอ — งาน 4 ชนิดแรก + ลงผลติดต่อ ใช้คำเดียวกับแถว "งานที่ทำ" (`STAFF_PERSON_KINDS`) */
 export const REQUEST_EVENT_LABEL: Record<RequestEventKind, string> = {
   links: 'Gen link',
-  manualPosted: 'โพสต์แล้ว',
+  manualPosted: 'โพสต์',
   autopost: 'Autopost',
   scrap: 'Scrap',
   names: 'รายชื่อเข้า',

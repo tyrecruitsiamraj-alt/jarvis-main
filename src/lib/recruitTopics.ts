@@ -211,7 +211,7 @@ export function groupByDay<T>(items: readonly T[], dayOf: (t: T) => string | nul
 export function selfParts(rows: readonly ManualLinkRow[]): TopicPart[] {
   const posted = rows.filter((r) => r.posted).length;
   return [
-    { key: 'posted', label: 'โพสต์แล้ว', tone: 'success', value: posted },
+    { key: 'posted', label: 'โพสต์', tone: 'success', value: posted },
     { key: 'genlink', label: 'Gen link', tone: 'info', value: rows.length - posted },
   ];
 }

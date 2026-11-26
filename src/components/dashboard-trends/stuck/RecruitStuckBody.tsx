@@ -304,7 +304,7 @@ export default function RecruitStuckBody({
           n: sp ? sp.total : null,
           unit: 'ลิงก์ทั้งหมด',
           prev: comparable ? (posts.manualPrev?.places ?? null) : null,
-          note: sp && sp.total > 0 ? `โพสต์แล้ว ${sp.posted.toLocaleString('th-TH')} (${sp.postedPct}%) · Gen link ${sp.genlink.toLocaleString('th-TH')} (${sp.genlinkPct}%)` : null,
+          note: sp && sp.total > 0 ? `โพสต์ ${sp.posted.toLocaleString('th-TH')} (${sp.postedPct}%) · Gen link ${sp.genlink.toLocaleString('th-TH')} (${sp.genlinkPct}%)` : null,
         };
       })(),
     };

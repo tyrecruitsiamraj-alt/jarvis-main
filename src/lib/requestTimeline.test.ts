@@ -29,7 +29,7 @@ describe('buildRequestTimeline', () => {
       ['2026-11-03', 'ขอมา', 2, 'อัตรา', null, null, true],
       ['2026-11-04', 'ประกาศ', null, '', 'คิว', null, true],
       ['2026-11-04', 'Gen link', 3, 'ลิงก์', 'เจมส์', 'Facebook · Facebook Group', false],
-      ['2026-11-04', 'โพสต์แล้ว', 2, 'ครั้ง', 'เจมส์', 'Facebook · Facebook Group', false],
+      ['2026-11-04', 'โพสต์', 2, 'ครั้ง', 'เจมส์', 'Facebook · Facebook Group', false],
       ['2026-11-05', 'รายชื่อเข้า', 12, 'คน', null, 'Facebook · Facebook Group', false],
       ['2026-11-05', 'AI โทรแล้ว', 3, 'คน', 'AI', 'สนใจ', false],
       ['2026-11-07', 'ลงผลติดต่อ', 1, 'ครั้ง', 'แป๋ม', 'นัดได้', false],

@@ -40,7 +40,7 @@ const JOB_KINDS: ReadonlyArray<{ key: 'autopost' | 'scrap' | 'links' | 'manualPo
   { key: 'autopost', label: 'Autopost' },
   { key: 'scrap', label: 'Scrap' },
   { key: 'links', label: 'Gen link' },
-  { key: 'manualPosted', label: 'โพสต์แล้ว' },
+  { key: 'manualPosted', label: 'โพสต์' },
 ];
 const jobTotal = (jobs: readonly StaffPersonJob[], k: keyof Omit<StaffPersonJob, 'jobId' | 'label'>) => jobs.reduce((n, j) => n + j[k], 0);
 

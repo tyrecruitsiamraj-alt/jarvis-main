@@ -231,7 +231,7 @@ describe('แท็บ Scale ลง', () => {
     expect(within(box('wSum')).getByText('11')).toBeTruthy();
     const dayTable = screen.getByTestId('scale-day-table');
     expect(within(dayTable).getAllByRole('row').map(cells)).toEqual([
-      ['คน', 'BU', 'รวม', 'Gen link', 'โพสต์แล้ว', 'Scrap', 'Autopost', 'ลงผลติดต่อ', 'ลงนัด'],
+      ['คน', 'BU', 'รวม', 'Gen link', 'โพสต์', 'Scrap', 'Autopost', 'ลงผลติดต่อ', 'ลงนัด'],
       ['คิว', 'LBD', '7', '5', '0', '2', '0', '0', '0'],
       ['ฟอร์ด', 'LBA', '4', '4', '0', '0', '0', '0', '0'],
       ['รวม', '', '11', '9', '0', '2', '0', '0', '0'],
@@ -444,7 +444,7 @@ describe('แท็บ Scale ลง — ใบขอ: หาได้แล้�
         ['12 พ.ย. 2569', 'หาได้แล้ว', '1 อัตรา', '—', '—'],
       ]),
     );
-    expect(parts(screen.getByTestId('scale-request-work'))).toEqual(['รวม10', 'Gen link3', 'โพสต์แล้ว2', 'Scrap0', 'Autopost1', 'ลงผลติดต่อ4', 'ลงนัด1']);
+    expect(parts(screen.getByTestId('scale-request-work'))).toEqual(['รวม10', 'Gen link3', 'โพสต์2', 'Scrap0', 'Autopost1', 'ลงผลติดต่อ4', 'ลงนัด1']);
     expect(parts(screen.getByTestId('scale-request-chain'))).toEqual(['รายชื่อ12', 'AI โทรแล้ว10', 'AI สนใจ4', 'คนโทรต่อ ติดต่อได้2', 'นัดได้1', 'มา1', 'แจ้งเข้า0']);
     fireEvent.click(screen.getByTestId('scale-request-open'));
     expect(onOpenRequest).toHaveBeenCalledWith('siamraj-sql:OPL6911006');

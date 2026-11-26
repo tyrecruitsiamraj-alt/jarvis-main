@@ -243,7 +243,7 @@ describe('GET /api/exec-summary', () => {
     expect(real.body.errors).toEqual(['เลขที่ OPL6911006 มี 2 ใบ (ใบขอจริงกับใบขอชั่วคราวเลขซ้ำกัน) — ที่แสดงคือใบขอจริง · อีกใบดูด้วย request=siamraj-pre:OPL6911006']);
     const temp = await call({ request: 'siamraj-pre:OPL6911006' });
     expect(calls.timeline.at(-1)?.query).toEqual({ jobs: 'siamraj-pre:OPL6911006', events: '1' });
-    expect([temp.body.request?.['งานที่ทำ ตั้งแต่ขอ'], temp.body.request?.['ใบขอ (อัตรา ตามช่วง)'], temp.body.errors]).toEqual([{ รวม: 1, 'Gen link': 0, โพสต์แล้ว: 0, Scrap: 1, Autopost: 0, ลงผลติดต่อ: 0, ลงนัด: 0 }, { ยกมา: 0, ขอใหม่: 1, หาได้แล้ว: 0, ยกเลิก: 0, เหลือหา: 1 }, []]);
+    expect([temp.body.request?.['งานที่ทำ ตั้งแต่ขอ'], temp.body.request?.['ใบขอ (อัตรา ตามช่วง)'], temp.body.errors]).toEqual([{ รวม: 1, 'Gen link': 0, โพสต์: 0, Scrap: 1, Autopost: 0, ลงผลติดต่อ: 0, ลงนัด: 0 }, { ยกมา: 0, ขอใหม่: 1, หาได้แล้ว: 0, ยกเลิก: 0, เหลือหา: 1 }, []]);
   });
 
   it('ผู้ใช้ที่ล็อก BU เดียว = เริ่มที่ชั้น BU นั้น ขอ BU อื่นไม่ได้', async () => {

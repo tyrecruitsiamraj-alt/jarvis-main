@@ -14778,3 +14778,7 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 - ได้ผลโทร (`applyCallFollowupToQueueRow` · `api/_lib/callFollowup.ts`): แถว `match_rank` มีค่า retry → needs_human · declined/unresponsive/wrong_person → `stopOpenMatchOffers` ยกเลิกสายจับคู่ใบอื่นของเบอร์นี้ที่ยังไม่มีผล (ฐาน + Lumos)
 - ⚠️ "ใบที่เหมาะสุด" ตอนนี้ = ใบแรกที่จับคู่ถึงคนนั้น (ไม่ได้เทียบข้ามใบ)
 - เทสต์ท้าย `tests/api/callFollowup.test.ts` + `tests/api/matchErpArea2569-11-25.test.ts`
+
+### 26 พ.ย. 2569 (1) — คำ "โพสต์แล้ว" → "โพสต์" ทั้งระบบ · กราฟรายสัปดาห์ Autopost/Scrap/Gen link/โพสต์ ในแท็บ Scale ลง
+- เจ้าของ "เปลี่ยนคำว่าโพสต์แล้วเป็น โพสต์ พอและทั้งหมดเลยนะ" — กติกาใน `src/lib/uiWords.ts` (banned 'โพสต์แล้ว') · เปลี่ยน 28 จุดใน src (คอมเมนต์ไม่แตะ)
+- เจ้าของขอกราฟเส้นรายเดือน แต่ข้อมูลมีแค่ ต.ค.–พ.ย. ⇒ รายสัปดาห์ (เริ่มจันทร์) `scaleWeekTable` (`src/lib/overviewScale.ts`) · การ์ด `scale-weeks` ใน `ScalePanel.tsx` (กราฟ 4 เส้น + ตารางเพิ่ม/ลดจากสัปดาห์ก่อน) · โพสต์ สัปดาห์ที่เริ่มก่อน `MANUAL_POSTED_SINCE` = "ยังไม่ได้นับ" · รวมทุกสัปดาห์ = กล่องของช่วง (เทสต์ใน `overviewScale.test.ts`)
