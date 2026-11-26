@@ -1160,6 +1160,12 @@ const RmWorkspace: React.FC<{
       say(IRECRUIT_ADD_PENDING_REASON);
       return;
     }
+    // ไม่โทรทีละแถว (26 พ.ย. 2569) — ใบที่กดไว้แล้ว = ยกเลิกไม่โทร (กลับกล่องเดิม)
+    if (action === 'nocall') {
+      if (row.no_call_reason_id != null) void pickNoCall(null, [row.id]);
+      else askNoCall([row.id]);
+      return;
+    }
     // ส่ง AI โทรทีละแถว (4 ต.ค. 2569) — ผ่านป๊อปยืนยันรายชื่อเหมือนปุ่มรวม (ยิงสายจริง)
     if (action === 'ai') {
       askSendAi([row.id]);

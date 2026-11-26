@@ -84,7 +84,8 @@ describe('ปุ่มของแท็บการติดตาม', () => {
   });
 
   it('แท็บอื่น: ผู้สมัครแบบ iRecruit + ส่ง AI โทร (4 ต.ค. 2569) · ติดตามนัดหมายเหลือโทร + บันทึกผล', () => {
-    expect(RM_ROW_ACTIONS.candidates).toEqual(['bookmark', 'call', 'ai', 'view']);
+    // 26 พ.ย. 2569 + "ไม่โทร" ข้างส่ง AI โทร
+    expect(RM_ROW_ACTIONS.candidates).toEqual(['bookmark', 'call', 'nocall', 'ai', 'view']);
     // "เอาออกจากรายการ" ไม่เคยต่อกับระบบ — ถอดออก (QA 5 ต.ค. 2569)
     // 7 ต.ค. 2569: ถอดเก็บไปโทรเอง (ปุ่มที่กดไม่ได้ทุกแถวของใบคีย์เอง)
     expect(RM_ROW_ACTIONS.appointments).toEqual(['rule', 'irecruit']); // 23 พ.ย. 2569 เพิ่มผู้สมัคร (รอ API iRecruit)

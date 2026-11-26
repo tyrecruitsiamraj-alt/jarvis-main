@@ -1,6 +1,6 @@
 import React from 'react';
 import { SCREENING_LABEL, SCREENING_RESULTS, SCREENING_TONE, canRecordScreening, type ScreeningResult } from '@/lib/appointmentScreening';
-import { BookmarkPlus, Bot, Phone, PhoneCall, Eye, ClipboardCheck, ListChecks, UserMinus, Undo2, FileText, RotateCcw, Send, UserPlus } from 'lucide-react';
+import { BookmarkPlus, Bot, Phone, PhoneCall, PhoneOff, Eye, ClipboardCheck, ListChecks, UserMinus, Undo2, FileText, RotateCcw, Send, UserPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { appointmentTimeOf } from '@/lib/appointmentTime';
 import { cn } from '@/lib/utils';
@@ -185,6 +185,7 @@ function jobLine(r: PublicApplication): string | null {
 const ACTION_ICON: Record<RmRowAction, typeof Phone> = {
   bookmark: BookmarkPlus,
   call: Phone,
+  nocall: PhoneOff,
   ai: Bot,
   dial: PhoneCall,
   view: Eye,
@@ -695,6 +696,15 @@ const RmTable: React.FC<{
                             label = 'ส่ง AI ใหม่';
                           }
                         }
+                        // ไม่โทร (26 พ.ย. 2569) — ใบที่กดไว้แล้ว = ยกเลิกไม่โทร · คนจาก Scrap ที่ยังไม่มีใบ = กดไม่ได้
+                        if (a === 'nocall') {
+                          if (sw?.virtual) {
+                            disabled = true;
+                            label = 'ยังไม่มีใบสมัคร — กดส่ง AI โทรหรือเก็บไปโทรเองก่อน';
+                          } else if (r.no_call_reason_id != null) {
+                            label = 'ยกเลิกไม่โทร';
+                          }
+                        }
                         // ส่งเอกสาร (23 พ.ย. 2569) — ระบบปิด = กดไม่ได้พร้อมบอกเหตุ · เพิ่มผู้สมัครเข้า iRecruit = รอ API กดไม่ได้เสมอ
                         if (a === 'docs' && !docsEnabled) {
                           disabled = true;
@@ -709,7 +719,7 @@ const RmTable: React.FC<{
                         const resend = a === 'ai' && silentAi && !disabled;
                         // ปุ่มส่ง AI โทรมีคำเสมอ (QA 15 พ.ย. 2569) — เดิมเป็นไอคอนเปล่าวางติดปุ่มเก็บ Lead/ดูรายละเอียด กดสั่งโทรจริงพลาดได้
                         // แท็บการติดต่อ: ปุ่มมีคำทุกปุ่ม (แบบร่างรอบ 4 · 23 พ.ย. 2569) — โทร · ดำเนินการ · ส่งเอกสาร · ถอย Lead
-                        const worded = tab === 'contact' || (tab === 'appointments' && a === 'rule') || a === 'ai' || a === 'docs' || a === 'irecruit';
+                        const worded = tab === 'contact' || (tab === 'appointments' && a === 'rule') || a === 'ai' || a === 'nocall' || a === 'docs' || a === 'irecruit';
                         // ปุ่มกลมไม่มีกรอบ สีเทา แบบ iRecruit (rm-action-btn) — ใช้ Button ของ shadcn
                         return (
                           <Button
@@ -730,7 +740,7 @@ const RmTable: React.FC<{
                             }
                           >
                             <Icon aria-hidden />
-                            {worded ? (resend ? 'ส่ง AI ใหม่' : a === 'ai' ? 'ส่ง AI โทร' : a === 'rule' ? 'ลงผล' : tab === 'contact' ? rmRowActionLabel(tab, a) : RM_ROW_ACTION_LABEL[a]) : null}
+                            {worded ? (resend ? 'ส่ง AI ใหม่' : a === 'ai' ? 'ส่ง AI โทร' : a === 'nocall' ? (r.no_call_reason_id != null ? 'ยกเลิกไม่โทร' : 'ไม่โทร') : a === 'rule' ? 'ลงผล' : tab === 'contact' ? rmRowActionLabel(tab, a) : RM_ROW_ACTION_LABEL[a]) : null}
                           </Button>
                         );
                       })}

@@ -69,6 +69,12 @@ describe('ทุกทางเคารพไม่โทร', () => {
     expect(sql).not.toMatch(/\b(drop|delete|update)\b/i);
     expect(readFileSync('api/_handlers/registry.ts', 'utf8')).toContain("'/api/applicant-no-call': applicantNoCallHandler");
   });
+  it('ปุ่มไม่โทรในแถวอยู่ข้างส่ง AI โทร · กดไว้แล้วเป็นยกเลิกไม่โทร', async () => {
+    const { RM_ROW_ACTIONS } = await import('../../src/lib/recruitRm');
+    expect(RM_ROW_ACTIONS.candidates.indexOf('nocall')).toBe(RM_ROW_ACTIONS.candidates.indexOf('ai') - 1);
+    const ws = readFileSync('src/components/recruit-rm/RmWorkspace.tsx', 'utf8');
+    expect(ws).toContain("if (row.no_call_reason_id != null) void pickNoCall(null, [row.id]);");
+  });
   it('ปุ่มไม่โทรอยู่ก่อนเก็บไปโทรเอง', () => {
     const bar = readFileSync('src/components/recruit-rm/RmSearchBar.tsx', 'utf8');
     expect(bar.indexOf('data-testid="rm-no-call"')).toBeLessThan(bar.indexOf('{onHoldSelected ? ('));

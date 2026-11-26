@@ -10,7 +10,8 @@ describe('ปุ่มบนแถว ส่งเอกสาร / เพิ่
   it('แท็บการติดต่อมี "ส่งเอกสาร" · แท็บติดตามนัดหมายมี "เพิ่มผู้สมัคร" · แท็บอื่นไม่เปลี่ยน', () => {
     expect(RM_ROW_ACTIONS.contact).toEqual(['dial', 'view', 'docs', 'release']);
     expect(RM_ROW_ACTIONS.appointments).toEqual(['rule', 'irecruit']);
-    expect(RM_ROW_ACTIONS.candidates).toEqual(['bookmark', 'call', 'ai', 'view']);
+    // 26 พ.ย. 2569 + "ไม่โทร" ข้างส่ง AI โทร
+    expect(RM_ROW_ACTIONS.candidates).toEqual(['bookmark', 'call', 'nocall', 'ai', 'view']);
     expect(rmRowActionLabel('contact', 'docs')).toBe('ส่งเอกสาร');
     expect(RM_ROW_ACTION_LABEL.irecruit).toBe('เพิ่มผู้สมัคร');
   });

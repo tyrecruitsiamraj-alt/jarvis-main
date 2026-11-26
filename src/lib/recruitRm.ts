@@ -747,7 +747,7 @@ export const RM_TOOLBAR_LABEL: Record<RmToolbarKey, string> = {
 };
 
 /** ปุ่ม action ต่อแถว — จุดเดียวที่ระบบเดิมให้แต่ละแท็บต่างกัน */
-export type RmRowAction = 'bookmark' | 'call' | 'ai' | 'dial' | 'view' | 'rule' | 'remove' | 'release' | 'restore' | 'docs' | 'irecruit';
+export type RmRowAction = 'bookmark' | 'call' | 'nocall' | 'ai' | 'dial' | 'view' | 'rule' | 'remove' | 'release' | 'restore' | 'docs' | 'irecruit';
 
 /**
  * ⚠️ `call` กับ `dial` เป็นคนละเรื่อง — สับสนเมื่อไหร่ตัวเลขเวลารอโทรเพี้ยนทันที
@@ -757,7 +757,8 @@ export type RmRowAction = 'bookmark' | 'call' | 'ai' | 'dial' | 'view' | 'rule' 
  */
 export const RM_ROW_ACTIONS: Record<RmTab, RmRowAction[]> = {
   /** แบบ iRecruit (เก็บ Lead · โทร · ดูข้อมูล) + ส่ง AI โทร (เจ้าของ 4 ต.ค. 2569) — ส่ง AI ผ่านป๊อปยืนยันเสมอ */
-  candidates: ['bookmark', 'call', 'ai', 'view'],
+  /** 26 พ.ย. 2569 + "ไม่โทร" ข้างส่ง AI โทร (เจ้าของ "ปุ่มไม่โทรทำให้มันเป็นเหมือน ติดต่อสำเร็จ ไม่สำเร็จ … เอาไว้ข้างๆพวกนี้เลย") */
+  candidates: ['bookmark', 'call', 'nocall', 'ai', 'view'],
   /**
    * 🔴 แท็บการติดตามเหลือ 3 ปุ่ม (เจ้าของสั่ง 1 ต.ค. 2569):
    * *"ต้องมีแค่ ปุ่มโทรเพื่อ Stamp เวลา ปุ่มดูรายละเอียด และลบออกเพื่อส่งกลับไปหน้าผู้สมัคร"*
@@ -782,6 +783,8 @@ export const RM_ROW_ACTION_LABEL: Record<RmRowAction, string> = {
    * กดทีเดียวได้ทั้งคู่ (เส้น /api/application-call-choice choice=manual)
    */
   call: 'เก็บไปโทรเอง',
+  /** เลือกเหตุผล → ใบย้ายไปกล่องของเหตุผล · ใบที่กดไว้แล้วปุ่มเป็น "ยกเลิกไม่โทร" (26 พ.ย. 2569) */
+  nocall: 'ไม่โทร',
   ai: 'ส่ง AI โทร',
   /** กู้คืนใบที่ยกเลิกข้อมูล (135) — มุมมอง "ดูที่ยกเลิก" เท่านั้น */
   restore: 'กู้คืนเข้ารายชื่อหลัก',
