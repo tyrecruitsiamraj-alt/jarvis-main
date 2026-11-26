@@ -138,7 +138,9 @@ describe('ผลแมทที่คิดจากกองเดิม (To do
     expect(isBoardMatchFromOldPool(null)).toBe(true);
     // 17 พ.ย. 2569 เลื่อนเวลาตัด (วิธีจับคู่เปลี่ยน — เรียงตามความใกล้ · matchProximity)
     expect(isBoardMatchFromOldPool('2026-11-17T03:00:00Z')).toBe(true);
-    expect(isBoardMatchFromOldPool('2026-11-17T05:00:00Z')).toBe(false);
+    // 26 พ.ย. 2569 เลื่อนอีก (สถานที่ทำงาน ERP ขึ้นเว็บ 25 พ.ย. 22:45 · OPL6911035) — ผล 17 พ.ย. นับว่าเก่าแล้ว
+    expect(isBoardMatchFromOldPool('2026-11-17T05:00:00Z')).toBe(true);
+    expect(isBoardMatchFromOldPool('2026-11-25T16:00:00Z')).toBe(false);
   });
 
   it('worker สแกนเจอผลเก่า = เข้าคิวแมทใหม่ (ไม่วิเคราะห์สเปคซ้ำ) · เปิดใบดู = ดันหัวคิว โชว์ผลเดิมระหว่างรอ', () => {

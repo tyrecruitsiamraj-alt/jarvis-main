@@ -99,7 +99,9 @@ describe('ตัวจับคู่ใช้ของใหม่ + ผลเ�
     expect(readFileSync('api/_lib/boardCandidateMatcher.ts', 'utf8')).toContain('greenCount(matches) >= target');
   });
   it('ผลก่อนเปลี่ยนวิธีแมทใหม่ · ไม่ตั้งเวลาในอนาคต · คิดใหม่ทุก 24 ชม.', () => {
-    expect(new Date(BOARD_MATCH_POOL_SINCE).getTime()).toBe(new Date('2026-11-17T11:20:00+07:00').getTime());
+    // 26 พ.ย. 2569 เลื่อนตามกติกาสถานที่ทำงาน ERP (ขึ้นเว็บ 25 พ.ย. 22:45) — tests/api/matchStaleBlocked2569-11-26.test.ts
+    expect(new Date(BOARD_MATCH_POOL_SINCE).getTime()).toBe(new Date('2026-11-25T22:50:00+07:00').getTime());
+    expect(new Date(BOARD_MATCH_POOL_SINCE).getTime()).toBeLessThan(new Date('2026-11-26T12:00:00+07:00').getTime());
     expect(readFileSync('api/_lib/matchPrecomputeWorker.ts', 'utf8')).toContain('parseIntEnv(process.env.MATCH_PRECOMPUTE_STALE_HOURS, 24, 0)');
   });
 });

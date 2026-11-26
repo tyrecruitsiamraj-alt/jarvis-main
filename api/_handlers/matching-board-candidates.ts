@@ -11,6 +11,7 @@ import { getSiamrajSqlServerConfig } from '../_lib/siamrajSqlServer.js';
 import { searchErpPeople } from '../_lib/erpPeopleSearch.js';
 import { type BoardMatchResult } from '../_lib/boardCandidateMatcher.js';
 import { getStoredBoardMatch } from '../_lib/boardMatchStore.js';
+import { matchBlockersOf } from '../../src/lib/matchProximity.js';
 import {
   enqueuePrecomputeJobs,
   isMatchPrecomputeWorkerActive,
@@ -207,6 +208,26 @@ async function handler(req: AuthedReq, res: ApiRes) {
     const job = await getSiamrajUnitRequestById(jobId, await loadMatchingBuScope(req.user));
     if (!job) {
       return sendError(res, 404, 'Not found', 'ไม่พบใบขอ ERP');
+    }
+
+    // 🔴 ใบขอ ERP ขาดข้อมูล = ไม่โชว์ผลจับคู่เลย แม้มีผลเก่าเก็บไว้ (26 พ.ย. 2569 OPL6911035: ผลคิด 25 พ.ย. 20:46 ก่อนกติกา
+    //    "สถานที่ทำงาน (ที่อยู่เต็ม)" ขึ้นเว็บ 22:45 — ช่องมีแค่ชื่อบริษัท แต่จอยังโชว์ 38 คนจากผลเก่า)
+    const blocked = matchBlockersOf(job as Record<string, unknown>);
+    if (blocked.length > 0) {
+      res.setHeader?.('Cache-Control', 'no-store');
+      return res.status(200).json({
+        jobId,
+        request_no: (job as { request_no?: string | null }).request_no ?? null,
+        job_family_code: '',
+        job_family_label: '',
+        pool_size: 0,
+        shortlisted: 0,
+        matches: [],
+        blocked,
+        hidden_unavailable: 0,
+        computed_at: new Date().toISOString(),
+        from_store: false,
+      });
     }
 
     const stored = await getStoredBoardMatch(jobId);

@@ -16,6 +16,7 @@ import { listBoardMatchPool } from './boardCandidatesSql.js';
 import { listRecruitCandidatesByIds } from './recruitRegisterSql.js';
 import { getSiamrajUnitRequestById } from './siamrajUnitRequests.js';
 import { getStoredBoardMatch } from './boardMatchStore.js';
+import { matchBlockersOf } from '../../src/lib/matchProximity.js';
 import type { CallBatch } from '../../src/lib/callBatch.js';
 
 const BOARD_POOL_LIMIT = 4000;
@@ -35,6 +36,12 @@ async function dispatchBatch(batch: CallBatch): Promise<void> {
     return;
   }
   const jobRecord = job as Record<string, unknown>;
+  // 🔴 ใบขอ ERP ขาดข้อมูล (สถานที่ทำงาน · เพศ · อายุ · รายได้) = ไม่ปล่อยสาย แม้ชุดอนุมัติไว้ก่อนกติกา (26 พ.ย. 2569)
+  const blocked = matchBlockersOf(jobRecord);
+  if (blocked.length > 0) {
+    logInfo('call-batch.release.blocked', { batchId: batch.id, jobId: batch.jobId, blocked });
+    return;
+  }
 
   if (batch.channel === 'reminder') {
     const wanted = new Set(active.map((i) => Number(i.candidateRef)).filter(Number.isFinite));

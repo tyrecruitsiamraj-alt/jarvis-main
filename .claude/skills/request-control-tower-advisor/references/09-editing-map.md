@@ -14792,3 +14792,19 @@ Choice: ข้อ 5 "เหลือแค่ที่ยังไม่จบ" 
 - พักเบอร์: `suppressionReasonText` (`src/lib/callFollowupPolicy.ts`) + `listSuppressedPhoneMap` (`api/_lib/callFollowup.ts`) → `insertQueueItems` คืน `suppressedWhy` · ทุกเส้นใช้ `suppressedWhy.get(ref) ?? SUPPRESSED_REASON` · เดิมทุกคนขึ้น "แจ้งว่าไม่หางานแล้ว / เบอร์เสีย" ทั้งที่ 572 เบอร์เป็น "บอก AI ว่าไม่สนใจ" (LAO6910013) · ตัวกันเข้าคิวยังใช้ `listSuppressedPhones` เดิม · เทสต์ `tests/api/suppressionReason2569-11-26.test.ts`
 - ผลกดส่ง AI / เก็บไปโทรเอง: `summarizeCallChoice` เหตุละบรรทัด "• เหตุ (N คน): ชื่อ" เรียงคนมากก่อน · แถบแจ้ง `RmWorkspace` (`rm-notice`) และ `JobApplicantsDialog` ใช้ whitespace-pre-line (เจ้าของ "แยกกล่องเรื่องให้ชัดเจนดีไหม")
 - "ติดต่อได้" ของกล่องรายชื่อเข้ามาไปถึงไหน (`staffReachOf` · `recruitIntakeFlow.ts`) ใช้ `staffResultOf` ตัวเดียวกับแท็บ Scale ลง — เดิม 300 กับ 320 · นัดได้ 55 กับ 65
+
+### 26 พ.ย. 2569 (4) — "ไม่ได้ส่ง AI" แยกเป็นกล่องตามเรื่อง · ส่ง AI ได้เฉพาะกล่องที่ส่งได้
+- เจ้าของ *"ไม่เอาแยกกล่องใครกล่องมันไปเลยจบ ก็ไม่ต้องมีคำว่าไม่ส่ง Ai แล้วแต่แยกมาเลยว่าเรื่องไหนที่ไม่ส่ง Ai"* · Choice "พร้อมส่ง AI" · ใบขอปิดแล้ว = "เลือกใบขอที่ยังเปิด แล้วย้ายใบสมัครไป"
+- ใหม่ `src/lib/aiBlockReasons.ts`: ข้อความเหตุที่ตัวส่งไม่ส่ง **ชุดเดียว** (`AI_BLOCK_REASON` · `lumosDispatch.ts` ใช้ตัวนี้) + `aiBlockBoxOf` (ต้นข้อความ → กล่อง) · ต้นข้อความพักเบอร์มาจาก `SUPPRESSION_LEAD` / `SUPPRESSION_WRONG_NUMBER_LEAD` ใน `callFollowupPolicy.ts` · 🔴 แก้คำเหตุแล้วไม่แก้ที่นี่ = คนตกกล่อง "พร้อมส่ง AI"
+- `recruitRm.ts`: `RM_NOT_SENT_VIEWS` (พร้อมส่ง AI · ใบขอปิดแล้ว · ใบขอยังไม่ตั้งรายได้ · เบอร์ถูกพัก · เคยปฏิเสธงานนี้ · เบอร์โทรผิด · ได้งานแล้ว · AI เพิ่งเสนองาน · เก็บไปโทรเอง · ไม่มีชื่อ · ซ้ำ iRecruit · ยกเลิกสาย AI) แทน `not_sent` ใน `RM_LIST_VIEWS_SHOWN` · `notSentViewOf` · ลิงก์เก่า `?list=not_sent` → `ready` · `RM_AI_SEND_BLOCKED` + `aiSendBlockedReasonOf` = ตัวตัดสินเดียวของปุ่มรายแถว (`RmTable`) ปุ่มรวม (`RmSearchBar sendAiBlockedReason`) และป๊อปยืนยัน (`askSendAi` คัดคนที่ส่งไม่ได้ออก บอกในผล)
+- ใบขอปิดแล้ว: ป๊อปยืนยันเดิม (`aiUnbound` · `bindJobOptions`) ให้เลือกใบขอที่ยังเปิด → server ย้ายใบ (`application-call-choice.ts` bind_job) แล้วส่ง
+- `rmRowStatusOf`: บรรทัดบน = ชื่อกล่อง · บรรทัดล่าง = เหตุจริง (เบอร์พักบอกวันที่ AI โทรได้อีก) · แท็บ Scrap ใช้ชุดกล่องเดียวกัน (`scrapApplicants.ts`)
+- จดเหตุ: ย้าย `recordAiBlockReasons` ไป `api/_lib/aiBlockRecord.ts` · ปุ่มส่ง AI (`chooseAi`) จดด้วย (เดิมจดแค่ตัวส่งซ้ำ ⇒ คนกดแล้วติดเหตุ กล่องไม่เปลี่ยน)
+- หน้าภาพรวม `aiBlockOf` (`recruit-overview.ts`) ใช้ `aiBlockBoxOf` — เดิมหาคำ "พัก" เหตุพักเบอร์แบบใหม่ (26 พ.ย. (3)) ไม่มีคำนี้ นับผิดเป็น "เหตุอื่น"
+- เทสต์ `tests/api/aiNotSentBoxes2569-11-26.test.ts`
+
+### 26 พ.ย. 2569 (5) — ผลจับคู่เก่าของใบที่ ERP ขาดข้อมูล ไม่ขึ้นจอ ไม่ปล่อยสาย
+- เจ้าของ *"OPL6911035 ใบขอนี้ สถานที่ทำงาน (ที่อยู่เต็ม) ไม่มี แล้วทำไม match คนได้อะ"* — ช่องสถานที่ทำงานมีแค่ "บริษัท เอ็มจี เซลส์ (ประเทศไทย) จำกัด" · ผลจับคู่คิด 25 พ.ย. 20:46 ก่อนกติกาขึ้นเว็บ 22:45 แล้วไม่ถูกคิดใหม่ จอโชว์ 38 คนจากผลเก่า
+- `matching-board-candidates.ts`: เช็ก `matchBlockersOf(job)` ก่อนอ่านผลที่เก็บ — ขาด = ตอบผลว่าง + `blocked` (จอขึ้น "ไม่จับคู่ · ขาดในใบขอ ERP: …")
+- `callBatchDispatcher.ts`: ชุดโทรที่อนุมัติแล้วของใบที่ขาด = ไม่ปล่อย (log `call-batch.release.blocked`)
+- `BOARD_MATCH_POOL_SINCE` → 25 พ.ย. 22:50 — ผลก่อนกติกาทุกใบแมทใหม่ 1 รอบ (worker) · เทสต์ `tests/api/matchStaleBlocked2569-11-26.test.ts`

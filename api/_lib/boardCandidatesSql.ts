@@ -209,7 +209,9 @@ export function listBoardMatchPool(limit = 5000): Promise<BoardReadyCandidate[]>
  * 🔴 17 พ.ย. 2569 เลื่อนอีกครั้ง: วิธีจับคู่เปลี่ยน (เรียงตามความใกล้ · ตัดเพศ/อายุ · `matchProximity`) — ผลเก่าทุกใบแมทใหม่ 1 รอบ
  * ⚠️ ห้ามตั้งเวลาในอนาคต — ผลที่คิดใหม่ก่อนถึงเวลานี้จะถูกนับว่าเก่าแล้วแมทซ้ำวนทุกรอบสแกนจนเลยเวลา
  */
-export const BOARD_MATCH_POOL_SINCE = '2026-11-17T11:20:00+07:00';
+// 🔴 26 พ.ย. 2569 เลื่อนอีกครั้ง: ที่ตั้งงาน = "สถานที่ทำงาน (ที่อยู่เต็ม)" ของ ERP + ใบ ERP ขาดข้อมูลไม่จับคู่ (ขึ้นเว็บ 25 พ.ย. 22:45)
+//    ผลที่คิดก่อนนั้นยังโชว์คนของใบที่ควรถูกกัน (OPL6911035 คิด 20:46 โชว์ 38 คน) — แมทใหม่ทุกใบ 1 รอบ
+export const BOARD_MATCH_POOL_SINCE = '2026-11-25T22:50:00+07:00';
 
 export function isBoardMatchFromOldPool(computedAt: string | null | undefined): boolean {
   const t = new Date(String(computedAt ?? '')).getTime();
