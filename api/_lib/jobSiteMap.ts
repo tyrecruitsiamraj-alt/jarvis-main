@@ -12,6 +12,7 @@
 import { dbQuery } from './postgres.js';
 import { tableInAppSchema } from './schema.js';
 import { logError } from './logger.js';
+import { realignApplicationDepartments } from './applicationDepartment.js';
 
 const TABLE = tableInAppSchema('job_site_map');
 
@@ -46,6 +47,8 @@ export async function rememberJobSites(
     // ตารางยังไม่ migrate / ฐานสะดุด — ห้ามทำให้ feed ใบขอพัง
     logError('jobSiteMap.remember.skipped', e, { count: rows.length });
   }
+  // ชื่อที่ผูกใบขอ = BU ของใบขอเสมอ (27 พ.ย. 2569) — ปรับใบที่ติด BU ของคนคีย์ไว้ตอนยังไม่รู้ไซต์ (ล้มเงียบในตัว)
+  await realignApplicationDepartments(rows.map((r) => ({ jobId: r.id, siteCode: r.site })));
 }
 
 /**

@@ -1,4 +1,5 @@
 import { dbQuery, isPgUndefinedTable } from './postgres.js';
+import { logError, logInfo } from './logger.js';
 import { tableInAppSchema } from './schema.js';
 import { normalizeDepartmentCode } from './departmentScope.js';
 import { trendBuFromSiteCode } from '../../src/lib/trends/bu.js';
@@ -73,4 +74,33 @@ export async function resolveApplicationDepartment(input: {
 export async function staffEntryDepartmentFor(jobId: string | null | undefined, fallback: string | null): Promise<string | null> {
   if (!jobId?.trim()) return fallback;
   return (await resolveApplicationDepartment({ jobId })) ?? fallback;
+}
+
+/**
+ * ═══ ตัวเทียบรอบ ๆ: BU ของใบสมัครที่ผูกใบขอ = BU ของใบขอเสมอ (เจ้าของ 27 พ.ย. 2569 Choice "แก้ทั้งคู่") ═══
+ * เจอจริง: LAO6911033 (สถาปนิก โตโยต้า · LBA) — เจมส์ (LBD) คีย์ 26 พ.ย. ตอนระบบยังไม่มีรหัสไซต์ของใบนี้
+ * ⇒ `staffEntryDepartmentFor` ถอยไปแผนกคนคีย์ ได้ LBD · ฝั่ง LBD เห็นชื่อของใบ LBA (ทั้งระบบ 133 ชื่อ)
+ * กติกา "เขียนครั้งเดียวแล้วจบไม่ได้" ⇒ ทุกครั้งที่จดรหัสไซต์ของใบขอ (`rememberJobSites`) ปรับใบที่ BU ไม่ตรงให้ตรง
+ * แตะเฉพาะใบที่ผูกใบขอที่รู้ BU แล้ว และค่าไม่ตรงจริง · ล้มเงียบ (ห้ามทำให้ feed ใบขอพัง)
+ */
+export async function realignApplicationDepartments(jobs: ReadonlyArray<{ jobId: string; siteCode: string | null }>): Promise<number> {
+  const pairs = jobs
+    .map((j) => ({ jobId: j.jobId.trim(), bu: trendBuFromSiteCode(j.siteCode) }))
+    .filter((p): p is { jobId: string; bu: string } => Boolean(p.jobId && p.bu));
+  if (pairs.length === 0) return 0;
+  try {
+    const { rows } = await dbQuery<{ id: string }>(
+      `update ${tableInAppSchema('public_job_applications')} a
+          set department_code = t.bu, updated_at = now()
+         from unnest($1::text[], $2::text[]) as t(job_id, bu)
+        where a.job_id = t.job_id and a.department_code is distinct from t.bu
+        returning a.id::text as id`,
+      [pairs.map((p) => p.jobId), pairs.map((p) => p.bu)],
+    );
+    if (rows.length > 0) logInfo('applicationDepartment.realigned', { count: rows.length });
+    return rows.length;
+  } catch (e) {
+    logError('applicationDepartment.realign.skipped', e, { jobs: pairs.length });
+    return 0;
+  }
 }
