@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react';
-import { Bot, Eye, Phone } from 'lucide-react';
+import { ArrowRight, Bot, Eye, Phone } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -33,6 +34,8 @@ export type MatchPersonRow = {
 };
 
 const NEAR_TONE = ['success', 'info', 'neutral', 'warn', 'warn'] as const;
+/** หน้าการติดต่อ (คนที่เก็บไปโทรเองอยู่ที่นี่) — ลิงก์เดียวกับเมนู */
+const CONTACT_PAGE_PATH = '/jobs/board?view=contact';
 
 type Tab = 'todo' | 'called';
 
@@ -109,6 +112,13 @@ export default function MatchPeopleTable({
         >
           <Bot aria-hidden />
           ส่ง AI โทร{selectedCount > 0 ? ` (${selectedCount.toLocaleString('th-TH')})` : ''}
+        </Button>
+        {/* เก็บแล้วไปโทรต่อที่หน้าการติดต่อ (เจ้าของ 27 พ.ย. 2569 "เพิ่มปุ่มให้กดไปหน้าการติดต่อได้ที") */}
+        <Button size="xs" variant="ghost" asChild data-testid="match-go-contact">
+          <Link to={CONTACT_PAGE_PATH}>
+            ไปหน้าการติดต่อ
+            <ArrowRight aria-hidden />
+          </Link>
         </Button>
       </div>
       <div className="overflow-x-auto rounded-xl border border-border">

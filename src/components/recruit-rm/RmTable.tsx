@@ -1,6 +1,6 @@
 import React from 'react';
 import { SCREENING_LABEL, SCREENING_RESULTS, SCREENING_TONE, canRecordScreening, type ScreeningResult } from '@/lib/appointmentScreening';
-import { BookmarkPlus, Bot, ChevronDown, Phone, PhoneCall, PhoneOff, Eye, ClipboardCheck, ListChecks, UserMinus, Undo2, FileText, RotateCcw, Send, UserPlus } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown, BookmarkPlus, Bot, ChevronDown, Phone, PhoneCall, PhoneOff, Eye, ClipboardCheck, ListChecks, UserMinus, Undo2, FileText, RotateCcw, Send, UserPlus } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import type { NoCallReason } from '@/lib/applicantNoCall';
 import { Button } from '@/components/ui/button';
@@ -17,6 +17,7 @@ import {
   type AttendanceResult,
 } from '@/lib/appointmentAttendance';
 import { formatDateTimeTh, formatYmdTh, toYmdBangkok } from '@/lib/dateTh';
+import { rmBoxEnteredAt } from '@/lib/rmBoxEnteredAt';
 import {
   GENDER_LABEL,
   REFERRAL_SOURCE_LABEL,
@@ -127,6 +128,21 @@ function ChoiceCountdownChip({ r }: { r: PublicApplication; now: Date }) {
     <span className={cn('w-fit rounded-full border px-1.5 py-0.5 text-xs font-medium', TONE.warn.soft, TONE.warn.value)}>
       ปล่อยจาก {r.unclaimed_from_name || 'คนที่เก็บไว้'}
     </span>
+  );
+}
+
+/** ช่อง "เข้ากล่อง" — วันเวลาที่ชื่อเข้ากล่องที่อยู่ตอนนี้ (`rmBoxEnteredAt`) · บรรทัดล่าง = ผ่านมากี่วัน หรือปล่อยจากใคร */
+function BoxEnteredCell({ r, now }: { r: PublicApplication; now: Date }) {
+  const e = rmBoxEnteredAt(r);
+  return (
+    <td className="px-1.5 py-2 whitespace-nowrap" data-testid={`rm-entered-${r.id}`}>
+      <span className="flex flex-col gap-0.5">
+        <span className={cn('tabular-nums', DASH.cell)}>{e.at ? formatDateTimeTh(e.at) : EM_DASH}</span>
+        <span className={cn('text-xs tabular-nums', DASH.cellMuted)}>
+          {e.released ? `ปล่อยจาก ${r.unclaimed_from_name || 'คนที่เก็บไว้'}` : daysAppliedText(e.at, now)}
+        </span>
+      </span>
+    </td>
   );
 }
 
@@ -243,7 +259,13 @@ const RmTable: React.FC<{
    */
   noCallReasons?: readonly NoCallReason[];
   onNoCallPick?: (row: PublicApplication, reasonId: number) => void;
-}> = ({ tab, rows, selectedIds, onToggleRow, onToggleAll, onAction, docsEnabled = false, canReleaseOthers = false, holdByRef = {}, onAttendance, recruiterOf, areaOf, actionsOverride, unitOf, extraRows, extraRowCount = 0, scrapOf, noCallReasons = [], onNoCallPick }) => {
+  /**
+   * คอลัมน์ "เข้ากล่อง" กดเรียงได้ (เจ้าของ 27 พ.ย. 2569 "มากล่องนี้วันไหน" · Choice แบบ ข) — มี onEnteredSort = แสดงคอลัมน์
+   * เวลาคิดที่ `rmBoxEnteredAt.ts` ที่เดียว · กดหัวคอลัมน์วน ใหม่สุดก่อน → เก่าสุดก่อน → ลำดับเดิม
+   */
+  enteredSort?: 'desc' | 'asc' | null;
+  onEnteredSort?: () => void;
+}> = ({ tab, rows, selectedIds, onToggleRow, onToggleAll, onAction, docsEnabled = false, canReleaseOthers = false, holdByRef = {}, onAttendance, recruiterOf, areaOf, actionsOverride, unitOf, extraRows, extraRowCount = 0, scrapOf, noCallReasons = [], onNoCallPick, enteredSort = null, onEnteredSort }) => {
   const actions = actionsOverride ?? RM_ROW_ACTIONS[tab];
   /**
    * 🔴 แท็บผู้สมัครใช้ชุดคอลัมน์ที่เจ้าของสั่งเอง (30 ก.ย. 2569 · Choice "เอาตามที่ฉันสั่ง"):
@@ -337,7 +359,8 @@ const RmTable: React.FC<{
   /** แท็บติดตามนัดหมาย (แบบร่างรอบ 4 · เจ้าของ "ทำเลย" 23 พ.ย. 2569): ผู้สมัคร · หน่วยงาน·ใบขอ · นัด · สถานะ · ผลนัด · ทำงาน (ไม่มีที่อยู่/สมัคร) */
   const apptColumns = tab === 'appointments';
   const scrapColumn = ownerColumns && Boolean(scrapOf);
-  const colCount = 1 + (ownerColumns ? 11 : apptColumns ? 3 : 5) + (apptColumns ? 2 : 0) + (tab === 'contact' ? 1 : 0) + (scrapColumn ? 1 : 0) + 1;
+  const enteredColumn = ownerColumns && Boolean(onEnteredSort);
+  const colCount = 1 + (ownerColumns ? 11 : apptColumns ? 3 : 5) + (apptColumns ? 2 : 0) + (tab === 'contact' ? 1 : 0) + (scrapColumn ? 1 : 0) + (enteredColumn ? 1 : 0) + 1;
 
   return (
     <div className={cn('overflow-hidden rounded-xl border', DASH.card)}>
@@ -374,6 +397,14 @@ const RmTable: React.FC<{
                   <th className="px-1.5 py-2 font-medium">เพศ</th>
                   <th className="px-1.5 py-2 text-right font-medium">อายุ</th>
                   {scrapColumn ? <th className="min-w-36 px-1.5 py-2 font-medium">ผลประเมิน</th> : null}
+                  {enteredColumn ? (
+                    <th className="px-1 py-1 font-medium" aria-sort={enteredSort === 'desc' ? 'descending' : enteredSort === 'asc' ? 'ascending' : 'none'}>
+                      <Button type="button" variant="ghost" size="xs" onClick={onEnteredSort} data-testid="rm-sort-entered" className={cn(enteredSort && 'text-primary')}>
+                        เข้ากล่อง
+                        {enteredSort === 'desc' ? <ArrowDown aria-hidden /> : enteredSort === 'asc' ? <ArrowUp aria-hidden /> : <ArrowUpDown aria-hidden />}
+                      </Button>
+                    </th>
+                  ) : null}
                   <th className="px-1.5 py-2 font-medium">วันที่สมัคร</th>
                   {/* กว้างขั้นต่ำ — เดิมถูกบีบจนคำตกบรรทัดทีละคำ (เจ้าของ 25 พ.ย. 2569 "เรียงไม่สวยเลย") */}
                   <th className="min-w-40 px-1.5 py-2 font-medium">คำตอบกับ AI</th>
@@ -535,6 +566,7 @@ const RmTable: React.FC<{
                         {typeof r.age === 'number' ? r.age : EM_DASH}
                       </td>
                       {scrapColumn ? <ScrapResultCell w={scrapOf?.(r) ?? null} /> : null}
+                      {enteredColumn ? <BoxEnteredCell r={r} now={now} /> : null}
                       {/* วันที่สมัคร + ผ่านมาแล้วกี่วัน (เจ้าของ 16 ต.ค. 2569 "เอาวันที่สมัครมาด้วย") · วันที่ตามปฏิทินกรุงเทพ ห้าม .slice ตรง ๆ */}
                       <td className="px-1.5 py-2 whitespace-nowrap">
                         <span className="flex flex-col gap-0.5">

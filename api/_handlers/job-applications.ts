@@ -1978,14 +1978,17 @@ async function handler(req: AuthedReq, res: ApiRes) {
       }
       // เหตุที่ตัวส่งอัตโนมัติยังไม่ส่ง AI (169 · 28 ต.ค. 2569 "ทำไมไม่โทร") — อ่านไม่ได้ = ไม่มีเหตุ (จอใช้คำเดิม)
       try {
-        const { rows: blocks } = await dbQuery<{ id: string; ai_block_reason: string }>(
-          `select id::text, ai_block_reason from ${tbl} where id = any($1::uuid[]) and ai_block_reason is not null`,
+        const { rows: blocks } = await dbQuery<{ id: string; ai_block_reason: string; ai_block_at: Date | string | null }>(
+          `select id::text, ai_block_reason, ai_block_at from ${tbl} where id = any($1::uuid[]) and ai_block_reason is not null`,
           [items.map((i) => i.id)],
         );
-        const byId = new Map(blocks.map((b) => [b.id, b.ai_block_reason]));
+        const byId = new Map(blocks.map((b) => [b.id, b]));
         for (const item of items) {
-          const why = byId.get(String(item.id));
-          if (why) (item as Record<string, unknown>).ai_block_reason = why;
+          const hit = byId.get(String(item.id));
+          if (!hit) continue;
+          (item as Record<string, unknown>).ai_block_reason = hit.ai_block_reason;
+          // เวลาที่ตัวส่งจดเหตุ = เวลาเข้ากล่องส่ง AI ไม่ได้ (`rmBoxEnteredAt.ts` · 27 พ.ย. 2569)
+          if (hit.ai_block_at) (item as Record<string, unknown>).ai_block_at = new Date(hit.ai_block_at).toISOString();
         }
       } catch (e) {
         if (!isUndefinedColumn(e)) logError('job-applications: ai_block_reason', e);

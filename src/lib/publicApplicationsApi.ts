@@ -41,6 +41,8 @@ export type PublicApplication = {
   ai_answer?: { micro: import('@/lib/callMicroOutcome').CallMicroOutcome; at: string | null } | null;
   /** เหตุที่ตัวส่งอัตโนมัติยังไม่ส่ง AI (169 · 28 ต.ค. 2569) เช่น ใบขอยังไม่ตั้งรายได้ */
   ai_block_reason?: string | null;
+  /** เวลาที่ตัวส่งจดเหตุนั้น — เวลาเข้ากล่องส่ง AI ไม่ได้ (`rmBoxEnteredAt.ts`) */
+  ai_block_at?: string | null;
   /** เจ้าหน้าที่กด "ไม่โทร" (200 · 26 พ.ย. 2569 · `applicantNoCall.ts`) — box = กล่องที่ใบไปอยู่ */
   no_call_reason_id?: number | null;
   no_call_label?: string | null;

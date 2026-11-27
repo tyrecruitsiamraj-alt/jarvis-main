@@ -75,6 +75,7 @@ import {
   isInAppointmentChip,
   type AppointmentChip,
 } from '@/lib/appointmentBoard';
+import { sortByBoxEntered } from '@/lib/rmBoxEnteredAt';
 import { CONTACT_CHIPS, CONTACT_KPI_TONE, contactEquation, isInContactChip, type ContactChip } from '@/lib/recruitRm';
 import {
   RM_APPOINTMENT_SCOPES,
@@ -750,12 +751,19 @@ const RmWorkspace: React.FC<{
     return base.filter((r) => isInRmListView(r, listView));
   }, [rows, candidateRows, tab, keyword, listView, bucket, rmFilters, everyoneContact, jobAll, scrapMode, scrapBase, scrapPick, scrapView, scrapResult]);
 
+  /** หัวคอลัมน์ "เข้ากล่อง" (27 พ.ย. 2569 · `rmBoxEnteredAt.ts`) — null = ลำดับเดิมของกล่อง */
+  const [enteredSort, setEnteredSort] = useState<'desc' | 'asc' | null>(null);
+  const cycleEnteredSort = () => {
+    setEnteredSort((v) => (v === null ? 'desc' : v === 'desc' ? 'asc' : null));
+    setPage(1);
+  };
   const filtered = useMemo(() => {
     if (bucket) return baseFiltered;
     const out = applyApplicantFilters(baseFiltered, applicantFilterState, applicantFacts);
+    if (tab === 'candidates' && enteredSort) return sortByBoxEntered(out, enteredSort);
     // รายชื่อคนที่สนใจ: คนใกล้งานขึ้นก่อน ไม่ตัดใครทิ้ง (Choice 24 พ.ย. 2569) · ระดับเดียวกันคงลำดับเดิม
     return tab === 'candidates' && listView === 'interested' && areaOf ? sortByApplicantArea(out, areaOf) : out;
-  }, [bucket, baseFiltered, applicantFilterState, applicantFacts, tab, listView, areaOf]);
+  }, [bucket, baseFiltered, applicantFilterState, applicantFacts, tab, listView, areaOf, enteredSort]);
   const applicantFacets = useMemo(
     () => (bucket ? [] : buildApplicantFacets(baseFiltered, applicantFilterState, applicantFacts)),
     [bucket, baseFiltered, applicantFilterState, applicantFacts],
@@ -1815,6 +1823,8 @@ const RmWorkspace: React.FC<{
               <div className={tab === 'appointments' ? 'print:hidden' : undefined}>
               <RmTable
                 noCallReasons={noCallReasons}
+                enteredSort={enteredSort}
+                onEnteredSort={tab === 'candidates' && !bucket ? cycleEnteredSort : undefined}
                 onNoCallPick={(row, reasonId) => void pickNoCall(reasonId, [row.id])}
                 tab={tab}
                 rows={pageRows}
