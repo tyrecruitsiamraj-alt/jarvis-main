@@ -72,7 +72,7 @@ describe('ส่ง AI / ไม่ส่ง', () => {
 describe('ผู้รับผิดชอบ = ชื่อเล่นสายงานสรรหา (21 ต.ค. 2569 "เป็นชื่อเล่นของสรรหาดิ่")', () => {
   it('ฟอร์มขอรายชื่อสายงาน recruiter แล้วโชว์ชื่อเล่น · เก็บชื่อเต็มเหมือนเดิม', () => {
     const form = read('src/components/recruit-rm/AddApplicantDialog.tsx');
-    expect(form).toContain("fetchResponsibleNames('recruiter')");
+    expect(form).toContain("fetchResponsibleNames('online')"); // 27 พ.ย. 2569 คนนำเข้า = สายงานออนไลน์
     expect(form).toContain('label: u.label ?? u.name');
     expect(form).toContain('responsible_name: staff.find((u) => u.id === responsible)?.name ?? null,');
   });
