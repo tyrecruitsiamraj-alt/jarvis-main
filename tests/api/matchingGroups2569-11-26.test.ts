@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { MATCH_GROUPS, boardColumnShort, isSalaryOver, matchGroupOf } from '@/lib/matchingGroups';
+import { MATCH_GROUPS, isSalaryOver, matchGroupOf } from '@/lib/matchingGroups';
 import { filterAndSortMatchingJobs, matchGroupOfJob } from '@/lib/matchingListFilter';
 import type { JobRequest } from '@/types';
 
@@ -109,10 +109,11 @@ describe('หน้าจับคู่ 4 กล่อง (26 พ.ย. 2569)', 
     expect(table).toContain('onHoldOne(r.id)');
   });
 
-  it('ถังบนบอร์ดเป็นคำสั้น', () => {
-    expect(boardColumnShort('ไม่มีงาน')).toBe('รองาน');
-    expect(boardColumnShort('Re Use')).toBe('คนเก่า');
-    expect(boardColumnShort('To do')).toBeNull();
-    expect(boardColumnShort('Drop')).toBe('Drop');
+  // 27 พ.ย. 2569 เจ้าของ "บอกให้หน่อยว่าเอามาจากกล่องไหน" — คอลัมน์ "มาจากกล่อง" ชื่อตามบอร์ด (เลิกคำสั้น รองาน/คนเก่า)
+  it('คอลัมน์มาจากกล่อง ชื่อตามบอร์ด + นับต่อกล่อง', () => {
+    const table = readFileSync('src/components/matching/MatchPeopleTable.tsx', 'utf8');
+    expect(table).toContain('<TableHead>มาจากกล่อง</TableHead>');
+    expect(table).toContain('data-testid="match-box-counts"');
+    expect(readFileSync('src/pages/matching/MatchingPage.tsx', 'utf8')).toContain('box: m.column_label?.trim() || null,');
   });
 });

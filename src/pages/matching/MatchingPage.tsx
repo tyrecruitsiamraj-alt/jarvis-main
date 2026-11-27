@@ -49,7 +49,6 @@ import {
 } from '@/lib/matchingListFilter';
 import {
   MATCH_GROUPS,
-  boardColumnShort,
   isMatchGroup,
   isSalaryOver,
   matchGroupOf,
@@ -2360,7 +2359,7 @@ const MatchingPage: React.FC<{ embedded?: boolean; lockedJob?: JobRequest | null
 
   /**
    * คน 1 คนของ "คนของเรา" → 1 แถวในตารางโฉมใหม่ (26 พ.ย. 2569)
-   * "ตอนนี้" รวมสถานะที่โฉมเดิมเป็นป้ายแยก: รับไปตาม · สถานะการเสนอ · ติดใบขออื่น · ถังบนบอร์ด
+   * "ตอนนี้" รวมสถานะที่โฉมเดิมเป็นป้ายแยก: รับไปตาม · สถานะการเสนอ · ติดใบขออื่น · กล่องบนบอร์ดแยกเป็นคอลัมน์ "มาจากกล่อง" (27 พ.ย. 2569)
    */
   const boardPersonRowOf = (job: JobRequest, m: BoardCandidateMatch): MatchPersonRow => {
     const key = proposalKey('board', m.card_id);
@@ -2373,7 +2372,6 @@ const MatchingPage: React.FC<{ embedded?: boolean; lockedJob?: JobRequest | null
       hold ? `${hold.mine ? 'คุณ' : hold.heldByName || 'เจ้าหน้าที่อีกคน'} รับไปตาม` : null,
       proposed ? proposalStatusLabel(proposed.status) : null,
       elsewhere ? `ติดใบขอ ${elsewhere.request_no || elsewhere.job_id.slice(0, 8)}` : null,
-      boardColumnShort(m.column_label),
     ].filter((s): s is string => Boolean(s));
     return {
       id: m.card_id,
@@ -2384,6 +2382,8 @@ const MatchingPage: React.FC<{ embedded?: boolean; lockedJob?: JobRequest | null
       salary: m.required_salary,
       salaryOver: isSalaryOver(m.required_salary, job.total_income),
       state: state.join(' · ') || null,
+      // กล่องบนบอร์ด iRecruit ที่คนนี้อยู่ — ชื่อตรงตามบอร์ด (เจ้าของ 27 พ.ย. 2569 "บอกให้หน่อยว่าเอามาจากกล่องไหน")
+      box: m.column_label?.trim() || null,
       called: Boolean(lumosStatusByRef[boardPersonRef(m.card_id)]),
       selectable: Boolean(m.mobile),
       selected: lumosSelectedBoard.includes(m.card_id),

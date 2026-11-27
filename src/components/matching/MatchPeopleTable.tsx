@@ -25,6 +25,8 @@ export type MatchPersonRow = {
   salary: number | null;
   salaryOver: boolean;
   state: string | null;
+  /** กล่องบนบอร์ด iRecruit ที่คนนี้อยู่ (ไม่มีงาน · Re Use · Drop) — ชื่อตามบอร์ด ไม่ตั้งคำใหม่ */
+  box: string | null;
   called: boolean;
   /** มีเบอร์มือถือ — ไม่มี = ติ๊ก/เก็บ/ส่งไม่ได้ */
   selectable: boolean;
@@ -74,7 +76,9 @@ export default function MatchPeopleTable({
   const pickable = shown.filter((r) => r.selectable);
   const allOn = pickable.length > 0 && pickable.every((r) => r.selected);
   const someOn = !allOn && pickable.some((r) => r.selected);
-  const cols = tab === 'called' ? 9 : 8;
+  const cols = tab === 'called' ? 10 : 9;
+  /** มาจากกล่องไหนกี่คน (แท็บที่เปิดอยู่) — เรียงมากไปน้อย */
+  const boxCounts = [...shown.reduce((m, r) => m.set(r.box ?? 'ไม่รู้กล่อง', (m.get(r.box ?? 'ไม่รู้กล่อง') ?? 0) + 1), new Map<string, number>())].sort((a, b) => b[1] - a[1]);
   return (
     <div className="space-y-2" data-testid="match-people-table">
       <div className="flex flex-wrap items-center gap-2">
@@ -121,6 +125,11 @@ export default function MatchPeopleTable({
           </Link>
         </Button>
       </div>
+      {boxCounts.length > 0 ? (
+        <p className="text-xs text-muted-foreground" data-testid="match-box-counts">
+          มาจากกล่อง · {boxCounts.map(([b, n]) => `${b} ${n.toLocaleString('th-TH')}`).join(' · ')}
+        </p>
+      ) : null}
       <div className="overflow-x-auto rounded-xl border border-border">
         <Table className="min-w-[640px]">
           <TableHeader>
@@ -138,6 +147,7 @@ export default function MatchPeopleTable({
               <TableHead>บ้าน</TableHead>
               <TableHead>ใกล้งาน</TableHead>
               <TableHead>ขอเงินเดือน</TableHead>
+              <TableHead>มาจากกล่อง</TableHead>
               <TableHead>ตอนนี้</TableHead>
               {tab === 'called' ? <TableHead>ผลโทร</TableHead> : null}
               <TableHead className="text-right">ทำต่อ</TableHead>
@@ -188,6 +198,7 @@ export default function MatchPeopleTable({
                       {r.salary ? r.salary.toLocaleString('th-TH') : '—'}
                       {r.salaryOver ? ' · ขอเกิน' : ''}
                     </TableCell>
+                    <TableCell className="whitespace-nowrap" data-testid={`match-person-box-${r.id}`}>{r.box ?? 'ไม่รู้กล่อง'}</TableCell>
                     <TableCell className="text-muted-foreground">{r.state ?? '—'}</TableCell>
                     {tab === 'called' ? <TableCell className="min-w-40">{renderCall(r.id)}</TableCell> : null}
                     {/* ปุ่มบนแถวแบบหน้าผู้สมัคร (`RmTable`): เก็บไปโทรเอง (ไอคอน) · ส่ง AI โทร (มีคำ) · ดูรายละเอียด (ไอคอน) */}

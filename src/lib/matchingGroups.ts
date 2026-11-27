@@ -34,15 +34,6 @@ export function isSalaryOver(asked: number | null | undefined, offered: number |
   return Number.isFinite(a) && Number.isFinite(o) && o > 0 && a > o * SALARY_OVER_RATIO;
 }
 
-/** ถังบนบอร์ดแบบคำสั้นในตาราง — "To do"/ว่าง = ไม่ขึ้น · ไม่รู้จัก = ขึ้นตามที่บอร์ดเขียน */
-export function boardColumnShort(label: string | null | undefined): string | null {
-  const t = (label ?? '').trim().toLowerCase();
-  if (!t || t === 'to do') return null;
-  if (t === 'ไม่มีงาน') return 'รองาน';
-  if (t === 're use') return 'คนเก่า';
-  if (t === 'in process') return 'กำลังเสนอใบอื่น';
-  return (label ?? '').trim();
-}
 
 export function matchGroupOf(recommended: number, calls?: MatchCallCounts | null): MatchGroup {
   if ((calls?.needsHuman ?? 0) > 0) return 'needs_human';
