@@ -92,10 +92,11 @@ describe('ด่านโค้ด: ห้ามแต่งข้อมูล�
   });
 });
 
-describe('ใช้ได้เฉพาะ admin + supervisor · หน้าจอ', () => {
-  it('เส้นแชทตรวจบทบาทที่เซิร์ฟเวอร์ · ปุ่มแชทขึ้นเฉพาะสองบทบาทนี้', () => {
-    expect(read('api/_handlers/ai-chat.ts')).toContain("withAuth(handler, { roles: ['admin', 'supervisor'] })");
-    expect(read('src/App.tsx')).toMatch(/user\?\.role === "admin" \|\| user\?\.role === "supervisor" \? \(\s*<Suspense fallback=\{null\}>\s*<AiChat \/>/);
+// 27 พ.ย. 2569 เจ้าของ "ผู้ช่วย ให้ Staff ใช้ได้ด้วย" — opl/sale ยังไม่ได้
+describe('ใช้ได้ admin + supervisor + staff · หน้าจอ', () => {
+  it('เส้นแชทตรวจบทบาทที่เซิร์ฟเวอร์ · ปุ่มแชทขึ้นเฉพาะสามบทบาทนี้', () => {
+    expect(read('api/_handlers/ai-chat.ts')).toContain("withAuth(handler, { roles: ['admin', 'supervisor', 'staff'] })");
+    expect(read('src/App.tsx')).toMatch(/user\?\.role === "admin" \|\| user\?\.role === "supervisor" \|\| user\?\.role === "staff" \? \(\s*<Suspense fallback=\{null\}>\s*<AiChat \/>/);
   });
   it('กุญแจ OpenAI จากหน้าตั้งค่าเท่านั้น ไม่ถอยไป Ollama · nginx รอเส้นนี้ 95 วิ · โค้ดตัดเองที่ 85 วิ', () => {
     expect(read('src/lib/aiSettings.ts')).toContain("'assistant_chat'");

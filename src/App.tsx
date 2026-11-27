@@ -26,7 +26,7 @@ const PublicSkillQuizEntryPage = lazyPage(() => import("@/pages/public/PublicSki
 const ShortLinkRedirectPage = lazyPage(() => import("@/pages/public/ShortLinkRedirectPage"));
 // ผู้สมัครส่งเอกสารจากลิงก์ที่เจ้าหน้าที่ส่งให้ใน LINE (22 พ.ย. 2569) — โหลดแยก (OCR + ข้อมูลที่อยู่ทั้งประเทศ) ไม่ถ่วงหน้าอื่น
 const ApplicantDocumentsPage = lazyPage(() => import("@/pages/public/ApplicantDocumentsPage"));
-// ผู้ช่วย AI มุมขวาล่าง (13 พ.ย. 2569) — admin + supervisor · ทุกหน้าหลังล็อกอิน · โหลดแยก ไม่ถ่วงหน้าแรก
+// ผู้ช่วย AI มุมขวาล่าง (13 พ.ย. 2569) — admin + supervisor + staff (staff เพิ่ม 27 พ.ย. 2569) · ทุกหน้าหลังล็อกอิน · โหลดแยก ไม่ถ่วงหน้าแรก
 const AiChat = lazyPage(() => import("@/components/ai/AiChat"));
 const MagicLinkVerifyPage = lazyPage(() => import("@/pages/MagicLinkVerifyPage"));
 const ResetPasswordPage = lazyPage(() => import("@/pages/ResetPasswordPage"));
@@ -212,7 +212,7 @@ const ProtectedRoutes = () => {
           </PageErrorBoundary>
         </RequireRole>
       </AppLayout>
-      {user?.role === "admin" || user?.role === "supervisor" ? (
+      {user?.role === "admin" || user?.role === "supervisor" || user?.role === "staff" ? (
         <Suspense fallback={null}>
           <AiChat />
         </Suspense>

@@ -193,4 +193,5 @@ async function handler(req: AuthedReq, res: ApiRes) {
   }
 }
 
-export default withAuth(handler, { roles: ['admin', 'supervisor'] });
+// Staff ใช้ได้ด้วย (เจ้าของ 27 พ.ย. 2569 "ผู้ช่วย ให้ Staff ใช้ได้ด้วย") — อ่าน/เขียนผ่านสิทธิ์ของคนถามเอง (`runRead` ส่ง cookie เดิม · การ์ดให้คนกด)
+export default withAuth(handler, { roles: ['admin', 'supervisor', 'staff'] });
