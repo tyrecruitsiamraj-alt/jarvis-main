@@ -27,6 +27,7 @@ import { CheckCircle2, ClipboardList, Loader2, Lock, MapPin, Paperclip, PhoneCal
 import { LINE_BOT_CHANNEL, LINE_BOT_CHANNEL_LABEL, referralSourceOfChannel } from '@/lib/referralChannel';
 import PdpaConsentCheck from '@/components/shared/PdpaConsentCheck';
 import { PDPA_CONSENT_REQUIRED_MESSAGE, PDPA_CONSENT_TEXT_APPLICANT } from '@/lib/pdpaConsent';
+import { APPLY_FORM_FIELDS, type ApplyFormField } from '@/lib/applyForms';
 
 const MAX_DOC_MB = 3;
 const DOC_ACCEPT = '.pdf,.jpg,.jpeg,.png';
@@ -61,6 +62,8 @@ export type PublicApplyDialogProps = {
     channelLabel?: string | null;
     /** ฟอร์มมีช่องแนบเอกสาร — เลือกตอน Gen link (เจ้าของ 23 พ.ย. 2569) */
     attachDocuments?: boolean;
+    /** ช่องเสริมของฟอร์มที่เลือกตอน Gen link (27 พ.ย. 2569 · `applyForms.ts`) · ว่าง = ฟอร์มมาตรฐาน */
+    applyFields?: ApplyFormField[];
   } | null;
 };
 
@@ -131,6 +134,10 @@ const PublicApplyDialog: React.FC<PublicApplyDialogProps> = ({ open, job, onClos
   // ช่องแนบเอกสาร: ลิงก์ ตั้งค่า › ลิงก์หน้าสมัคร ที่ใส่ `doc=1` (27 ต.ค. 2569) หรือลิงก์ Gen ที่เลือก "มีช่องแนบเอกสาร" (23 พ.ย. 2569)
   const showDocument = applyLinkShowsDocument(searchParams) || posting?.attachDocuments === true;
   const [note, setNote] = useState('');
+  /** ช่องเสริมของฟอร์ม (27 พ.ย. 2569) — ไม่บังคับกรอก · ส่งไปเฉพาะช่องที่ฟอร์มมี (server กรองซ้ำ) */
+  const extraFields = new Set(posting?.applyFields ?? []);
+  const [extra, setExtra] = useState<Record<string, string>>({});
+  const setExtraField = (key: string, value: string) => setExtra((prev) => ({ ...prev, [key]: value }));
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -164,6 +171,7 @@ const PublicApplyDialog: React.FC<PublicApplyDialogProps> = ({ open, job, onClos
 
   const resetForm = () => {
     setConsent(false);
+    setExtra({});
     setTitlePrefix('นาย');
     setFirstName('');
     setLastName('');
@@ -277,6 +285,7 @@ const PublicApplyDialog: React.FC<PublicApplyDialogProps> = ({ open, job, onClos
           position_interest: (job ? publicJobPositionLabel(job) : posting?.title) || null,
           note: note.trim() || null,
           pdpa_consent: true,
+          ...(extraFields.size > 0 ? { extra } : {}),
         }),
       });
       if (!res.ok) {
@@ -590,6 +599,48 @@ const PublicApplyDialog: React.FC<PublicApplyDialogProps> = ({ open, job, onClos
                     </select>
                   )}
                 </Field>
+
+                {/* ช่องเสริมของฟอร์ม (27 พ.ย. 2569 · ตั้งค่า › แบบฟอร์มใบสมัคร) — ไม่บังคับกรอก · ลิงก์ฟอร์มมาตรฐานไม่มีส่วนนี้ */}
+                {APPLY_FORM_FIELDS.filter((f) => extraFields.has(f.key)).map((f) =>
+                  f.key === 'salary' ? (
+                    <Field key={f.key} label={`${f.label} (บาท)`}>
+                      <div className="grid grid-cols-2 gap-2">
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          value={extra.salaryMin ?? ''}
+                          onChange={(e) => setExtraField('salaryMin', e.target.value.replace(/[^\d,]/g, ''))}
+                          placeholder="ต่ำสุด เช่น 15,000"
+                          aria-label="เงินเดือนที่ต้องการ ต่ำสุด"
+                          className="jarvis-soft-field"
+                          data-testid="apply-extra-salaryMin"
+                        />
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          value={extra.salaryMax ?? ''}
+                          onChange={(e) => setExtraField('salaryMax', e.target.value.replace(/[^\d,]/g, ''))}
+                          placeholder="สูงสุด เช่น 20,000"
+                          aria-label="เงินเดือนที่ต้องการ สูงสุด"
+                          className="jarvis-soft-field"
+                          data-testid="apply-extra-salaryMax"
+                        />
+                      </div>
+                    </Field>
+                  ) : (
+                    <Field key={f.key} label={f.label}>
+                      <input
+                        type="text"
+                        value={extra[f.key] ?? ''}
+                        onChange={(e) => setExtraField(f.key, e.target.value)}
+                        placeholder={f.placeholder}
+                        maxLength={120}
+                        className="jarvis-soft-field"
+                        data-testid={`apply-extra-${f.key}`}
+                      />
+                    </Field>
+                  ),
+                )}
 
                 {showDocument ? (
                 <Field label={`แนบเอกสาร (PDF/รูป ≤ ${MAX_DOC_MB}MB)`}>

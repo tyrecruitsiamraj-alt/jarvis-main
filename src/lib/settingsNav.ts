@@ -31,6 +31,7 @@ export const SETTINGS_TAB_IDS = [
   'documents',
   'pdpaRequests',
   'applyLinks',
+  'applyForms',
   'lineIds',
   'autoMove',
   'health',
@@ -62,6 +63,7 @@ export const SETTINGS_TAB_LABEL: Record<SettingsTabId, string> = {
   documents: 'ส่งเอกสารผ่าน LINE',
   pdpaRequests: 'คำขอข้อมูลส่วนบุคคล',
   applyLinks: 'ลิงก์หน้าสมัคร',
+  applyForms: 'แบบฟอร์มใบสมัคร',
   lineIds: 'แอดไลน์ประจำ BU',
   autoMove: 'ย้ายใบสมัครอัตโนมัติ',
   health: 'สถานะระบบ',
@@ -88,6 +90,7 @@ export const SETTINGS_TAB_HINT: Record<SettingsTabId, string> = {
   documents: 'เปิดใช้ · LINE Login · ต้นฉบับเอกสาร 5 ฉบับ',
   pdpaRequests: 'ขอดู ขอแก้ ขอลบข้อมูล (PDPA) · โทรยืนยันตัวตนแล้วทำต่อ',
   applyLinks: 'ลิงก์ /apply แยก BU · ล็อกตำแหน่ง',
+  applyForms: 'ฟอร์มที่มีช่องเสริม เลือกได้ตอน Gen link',
   lineIds: 'ID LINE ที่ขึ้นท้ายข้อความประกาศ แยก BU',
   autoMove: 'ย้ายใบสมัครตามผลโทรอัตโนมัติ',
   health: 'ไฟสถานะ · สวิตช์ที่เปิดอยู่ · ของค้าง',
@@ -115,7 +118,7 @@ export const SETTINGS_GROUP_TABS: Record<SettingsGroupId, readonly SettingsTabId
   people: ['users', 'roles'],
   look: ['appearance', 'navMenu'],
   automation: ['lumosMode', 'callRetry', 'callScripts', 'aiSettings', 'callSuppression', 'autoMove', 'matchWeights', 'integrations', 'documents'],
-  data: ['workStatus', 'leadRules', 'cancelReasons', 'reference', 'applyLinks', 'lineIds', 'pdpaRequests'],
+  data: ['workStatus', 'leadRules', 'cancelReasons', 'reference', 'applyLinks', 'applyForms', 'lineIds', 'pdpaRequests'],
   monitor: ['health', 'audit'],
 };
 

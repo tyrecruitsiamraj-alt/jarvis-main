@@ -5,7 +5,7 @@ import PageHeader from '@/components/shared/PageHeader';
 import { useAuth } from '@/contexts/AuthContext';
 import { apiFetch } from '@/lib/apiFetch';
 import type { User, AuditLog } from '@/types';
-import { Users, Shield, Link2, MessageCircle, Database, FileText, Palette, ListChecks, ListOrdered, SlidersHorizontal, PhoneForwarded, Repeat, MoveRight, Activity,
+import { Users, Shield, Link2, ClipboardList, MessageCircle, Database, FileText, Palette, ListChecks, ListOrdered, SlidersHorizontal, PhoneForwarded, Repeat, MoveRight, Activity,
   MessageSquareText,
   Cpu,
   PhoneOff,
@@ -30,6 +30,7 @@ import CallSuppressionTab from '@/pages/settings/CallSuppressionTab';
 import IntegrationKeysTab from '@/pages/settings/IntegrationKeysTab';
 import CallRetryTab from '@/pages/settings/CallRetryTab';
 import ApplyLinksTab from '@/pages/settings/ApplyLinksTab';
+import ApplyFormsTab from '@/pages/settings/ApplyFormsTab';
 import LineIdsTab from '@/pages/settings/LineIdsTab';
 import PdpaRequestsTab from '@/pages/settings/PdpaRequestsTab';
 import DocumentsSettingsTab from '@/pages/settings/DocumentsSettingsTab';
@@ -124,6 +125,7 @@ const TAB_ICON: Record<SettingsTab, React.ElementType> = {
   documents: FileSignature,
   pdpaRequests: ShieldCheck,
   applyLinks: Link2,
+  applyForms: ClipboardList,
   lineIds: MessageCircle,
   autoMove: MoveRight,
   health: Activity,
@@ -860,6 +862,7 @@ const AdminSettings: React.FC = () => {
         {activeTab === 'lumosMode' && <LumosDispatchModeTab />}
         {activeTab === 'callRetry' && <CallRetryTab />}
         {activeTab === 'applyLinks' && <ApplyLinksTab />}
+        {activeTab === 'applyForms' && <ApplyFormsTab />}
         {activeTab === 'lineIds' && <LineIdsTab />}
         {activeTab === 'callScripts' && <CallScriptsTab />}
         {activeTab === 'aiSettings' && <AiSettingsTab />}

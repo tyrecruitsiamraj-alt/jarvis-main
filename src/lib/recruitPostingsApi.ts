@@ -157,6 +157,8 @@ export type CreatePostingBody = {
   responsibleUserId?: string | null;
   specificType?: string | null;
   formType?: string | null;
+  /** ฟอร์มสมัคร (27 พ.ย. 2569 · ตั้งค่า › แบบฟอร์มใบสมัคร) · null = ฟอร์มมาตรฐาน */
+  applyFormId?: number | null;
   channels?: Array<{ channelId?: string | null; label?: string | null; fbGroupId?: string | null }>;
 };
 
@@ -249,6 +251,8 @@ export type PublicPostingInfo = {
   channelLabel: string | null;
   /** ฟอร์มมีช่องแนบเอกสาร (เลือกตอน Gen link · 23 พ.ย. 2569) · ไม่มีค่า = ไม่มีช่อง */
   attachDocuments?: boolean;
+  /** ช่องเสริมของฟอร์มที่เลือกตอน Gen link (27 พ.ย. 2569) · [] = ฟอร์มมาตรฐาน */
+  applyFields?: import('./applyForms').ApplyFormField[];
   /** ใบงานรูปเดียวกับการ์ดหน้า /apply (6 ต.ค. 2569) · null = ใบไม่ผ่านด่าน/ไม่มีใบ ⇒ ใช้การ์ดประกาศ */
   job?: JobRequest | null;
 };

@@ -5,6 +5,7 @@ import { logWarn } from '../../_lib/logger.js';
 import { isSignedInViewer } from '../../_lib/auth.js';
 import { getLinkedPublicJob } from './jobs.js';
 import { isRequestClosedForApply } from '../../_lib/requestClosedForApply.js';
+import { applyFieldsOfPosting } from '../../_lib/applyForms.js';
 
 function getQuery(req: ApiReq, key: string): string {
   const v = (req as { query?: Record<string, unknown> }).query?.[key];
@@ -61,6 +62,12 @@ export default async function handler(req: ApiReq, res: ApiRes) {
       channelLabel: link.channelLabel,
       // ฟอร์มมีช่องแนบเอกสาร — เลือกตอน Gen link (เจ้าของ 23 พ.ย. 2569 "ต้องมีให้เลือกตอน Gen ว่าแนบเอกสารไหม") · ค่าเก่า/ไม่เลือก = ไม่มีช่อง
       attachDocuments: posting.formType === 'global',
+      // ช่องเสริมของฟอร์มที่เลือกตอน Gen link (27 พ.ย. 2569 · `applyForms.ts`) · [] = ฟอร์มมาตรฐาน
+      // อ่านไม่ได้ = ฟอร์มมาตรฐาน — ห้ามทำให้ลิงก์ล่ม (คนจริงกำลังจะสมัคร)
+      applyFields: await applyFieldsOfPosting(posting.id).catch((e: unknown) => {
+        logWarn('public-apply-link: อ่านฟอร์มไม่ขึ้น', { error: e instanceof Error ? e.message : String(e) });
+        return [];
+      }),
     });
   } catch (e) {
     return handleApiError(res, e, 'public-apply-link');

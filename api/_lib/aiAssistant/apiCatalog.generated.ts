@@ -253,6 +253,27 @@ export const API_CATALOG: ApiCatalogEntry[] = [
   "reachesPeople": false
  },
  {
+  "path": "/api/apply-forms",
+  "file": "api/_handlers/apply-forms.ts",
+  "methods": [
+   "GET",
+   "POST",
+   "PATCH",
+   "DELETE"
+  ],
+  "doc": "/api/apply-forms — แบบฟอร์มใบสมัครหลายแบบ (เจ้าของ 27 พ.ย. 2569 · migration 201 · ตรรกะ `api/_lib/applyForms.ts`)\nGET                                          → { forms } ทุกฟอร์ม (รวมที่เลิกใช้) — ป๊อป Gen link กรองตาม BU เอง\nPOST   { name, departmentCodes, fields }     → เพิ่มฟอร์ม (Supervisor ขึ้นไป)\nPATCH  { id, name?, departmentCodes?, fields?, active? } → แก้ / เลิกใช้ / กลับมาใช้ (Supervisor ขึ้นไป)\nDELETE ?id=                                  → ลบได้เฉพาะฟอร์มที่ยังไม่มีลิงก์ใช้ · มีแล้ว = 409 ให้กดเลิกใช้แทน\nทุกการเปลี่ยนจด audit_logs",
+  "query": [],
+  "body": [
+   "js",
+   "name",
+   "departmentCodes",
+   "fields",
+   "id",
+   "active"
+  ],
+  "reachesPeople": false
+ },
+ {
   "path": "/api/audit-logs",
   "file": "api/_handlers/audit-logs.ts",
   "methods": [
@@ -2268,6 +2289,7 @@ export const API_CATALOG: ApiCatalogEntry[] = [
    "specificType",
    "formType",
    "channels",
+   "applyFormId",
    "id",
    "status"
   ],

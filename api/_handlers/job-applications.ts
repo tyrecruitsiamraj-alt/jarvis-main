@@ -2005,6 +2005,21 @@ async function handler(req: AuthedReq, res: ApiRes) {
       } catch (e) {
         if (!isUndefinedColumn(e)) logError('job-applications: no_call', e);
       }
+      // คำตอบช่องเสริมของฟอร์ม (201 · 27 พ.ย. 2569 · `applyForms.ts`) — ป๊อปผู้สมัครโชว์ · ยังไม่รัน 201 = ไม่มีช่อง
+      try {
+        const { rows: extras } = await dbQuery<{ id: string; extra_answers: unknown }>(
+          `select id::text as id, extra_answers from ${tableInAppSchema('public_job_applications')}
+            where id = any($1::uuid[]) and extra_answers is not null`,
+          [items.map((i) => String(i.id))],
+        );
+        const byId = new Map(extras.map((x) => [x.id, x.extra_answers]));
+        for (const item of items) {
+          const ans = byId.get(String(item.id));
+          if (ans) (item as Record<string, unknown>).extra_answers = ans;
+        }
+      } catch (e) {
+        if (!isUndefinedColumn(e)) logError('job-applications: extra_answers', e);
+      }
       // ผลติดตามนัดล่าสุด (มา/ไม่มา/เลื่อน — migration 089) — แท็บนัดหมายโชว์ชิป/ปุ่ม
       const attendance = await loadLatestAttendanceByApplication(items.map((i) => i.id));
       for (const item of items) {

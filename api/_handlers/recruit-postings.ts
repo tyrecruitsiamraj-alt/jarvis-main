@@ -22,6 +22,7 @@ import {
 } from '../_lib/recruitPostings.js';
 import { auditFromAuthed } from '../_lib/audit.js';
 import { normalizeAppDepartmentCode } from '../../src/lib/departmentCodes.js';
+import { resolveApplyFormForBu, setPostingApplyForm } from '../_lib/applyForms.js';
 
 function isPlainObject(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
@@ -144,7 +145,10 @@ async function handler(req: AuthedReq, res: ApiRes) {
         createdByUserId: req.user?.sub ?? null,
         createdByName: req.user?.email ?? null,
       });
-      return res.status(201).json(created);
+      // ฟอร์มที่เลือกตอน Gen link (27 พ.ย. 2569 · `applyForms.ts`) — ตรวจว่าเปิดใช้ + BU ตรง · ไม่ผ่าน = ฟอร์มมาตรฐาน
+      const applyFormId = await resolveApplyFormForBu(body.applyFormId, departmentCode || null);
+      await setPostingApplyForm(created.id, applyFormId);
+      return res.status(201).json({ ...created, applyFormId });
     }
 
     if (method === 'PATCH') {

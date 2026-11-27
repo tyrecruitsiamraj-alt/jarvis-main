@@ -16,6 +16,8 @@ import { applicantClientIp, lockAndFindRepeat } from '../../_lib/applicationRepe
 import { repeatPublicMessage } from '../../../src/lib/applicationRepeat.js';
 import { recordApplicationConsent } from '../../_lib/applicationConsent.js';
 import { appBaseUrlOfRequest, getLineBotConfig, notifyLineBotApplicationCreated, verifyLineUser } from '../../_lib/lineBotSoWork.js';
+import { applyFieldsOfPosting } from '../../_lib/applyForms.js';
+import { sanitizeApplyExtra } from '../../../src/lib/applyForms.js';
 
 /** คอลัมน์ที่ยังไม่ถูก migrate — pg ตอบ 42703 */
 function isUndefinedColumn(e: unknown): boolean {
@@ -237,6 +239,16 @@ export default async function handler(req: ApiReq, res: ApiRes) {
     const id = 'id' in outcome ? outcome.id : null;
     if (!id) return sendError(res, 500, 'Failed to submit application');
     logPublicApply(req, 'public_application.submit', id, v);
+    // ช่องเสริมของฟอร์ม (27 พ.ย. 2569 · `applyForms.ts`) — เก็บเฉพาะช่องที่ฟอร์มของลิงก์มีจริง
+    // ทำหลังใบบันทึกแล้ว · พลาด = จด log ใบสมัครต้องไม่ล้ม
+    if (v.postingId && rawBody?.extra != null) {
+      try {
+        const extra = sanitizeApplyExtra(rawBody.extra, await applyFieldsOfPosting(v.postingId));
+        if (extra) await dbQuery(`update ${tbl} set extra_answers = $2::jsonb where id = $1`, [id, JSON.stringify(extra)]);
+      } catch (e) {
+        logWarn('public_apply.extra_failed', { applicationId: id, message: e instanceof Error ? e.message : String(e) });
+      }
+    }
     // ใบจาก LINE (ไม่มีลิงก์) = ผู้รับผิดชอบเป็นเจ้าหน้าที่สรรหาของใบขอ (เจ้าของ 19 พ.ย. 2569 · ใบเก่าแก้ใน migration 192)
     // ทำหลังใบบันทึกแล้ว — พลาดแค่จด log ใบสมัครต้องไม่ล้ม (หน้าภาพรวม/ใบประวัติยังถอยไปผู้สรรหาของใบขอให้อยู่ดี)
     if (!v.linkId && v.jobId && (lineUserId || /line ai/i.test(channelLabel ?? ''))) {

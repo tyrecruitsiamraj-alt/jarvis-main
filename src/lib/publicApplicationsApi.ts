@@ -118,6 +118,8 @@ export type PublicApplication = {
   job_title?: string;
   unit_name?: string;
   position_interest?: string;
+  /** คำตอบช่องเสริมของฟอร์มที่เลือกตอน Gen link (27 พ.ย. 2569 · `applyForms.ts`) */
+  extra_answers?: import('./applyForms').ApplyExtraAnswers | null;
   note?: string;
   status: ApplicationStatus;
   admin_note?: string;

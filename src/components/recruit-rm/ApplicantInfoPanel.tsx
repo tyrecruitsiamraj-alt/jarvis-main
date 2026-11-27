@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { applyExtraLines } from '@/lib/applyForms';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -351,6 +352,12 @@ const ApplicantInfoPanel: React.FC<{
           show(a.education)
         )}
       </Field>
+      {/* คำตอบช่องเสริมของฟอร์ม (27 พ.ย. 2569 · ตั้งค่า › แบบฟอร์มใบสมัคร) — อ่านอย่างเดียว · ใบฟอร์มมาตรฐานไม่มีบรรทัดเหล่านี้ */}
+      {applyExtraLines(a.extra_answers).map((line) => (
+        <Field key={line.label} label={line.label}>
+          {line.value}
+        </Field>
+      ))}
       <Field label="ประเภทใบขับขี่">
         {editing ? (
           <div className="space-y-1.5" role="group" aria-label="ประเภทใบขับขี่">

@@ -153,6 +153,7 @@ const PublicPostingApplyPage: React.FC = () => {
           // ช่องทางของลิงก์ — ฟอร์มล็อกช่อง "เห็นประกาศจากช่องทางไหน" ตามนี้ (6 ต.ค. 2569)
           channelLabel: info.channelLabel,
           attachDocuments: info.attachDocuments === true,
+          applyFields: Array.isArray(info.applyFields) ? info.applyFields : [],
         }}
       />
     </div>

@@ -23,7 +23,8 @@ describe('Gen link — เลือกแนบเอกสาร', () => {
   it('ใช้ ToggleGroup ของ shadcn · ค่าเริ่ม = ไม่ต้องแนบ · ส่งค่าไปกับประกาศ (form_type เดิม)', () => {
     expect(dialog).toContain("import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';");
     expect(dialog).toContain("useState<string>('rm')");
-    expect(dialog).toMatch(/formType,\n\s+};/);
+    // 27 พ.ย. 2569 มีช่องฟอร์มสมัครตามหลัง (applyFormId) — ยังส่ง formType ไปกับประกาศเหมือนเดิม
+    expect(dialog).toMatch(/\n\s+formType,\n/);
     expect(RM_FORM_TYPES.map((f) => f.label)).toEqual(['ไม่ต้องแนบ', 'ให้แนบเอกสาร']);
     expect(rmFormTypeLabel(undefined)).toBe('ไม่ต้องแนบ');
   });

@@ -39,6 +39,11 @@ import { isFacebookGroupChannel, jobBuOf, soGroupLinkKey, soGroupLinkLabel, soGr
 import { normalizeTrendBu } from '@/lib/trends/bu';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { APP_DEPARTMENT_CODES } from '@/lib/departmentCodes';
+import { applyFormsForBu, STANDARD_APPLY_FORM_NAME } from '@/lib/applyForms';
+import { useApplyForms } from '@/lib/applyFormsApi';
+
+/** ค่าในช่อง "ฟอร์ม" ของฟอร์มมาตรฐาน (Select ของ shadcn ใช้ค่าว่างไม่ได้) */
+const STANDARD_FORM_VALUE = 'standard';
 
 export type GenApplyLinkDialogProps = {
   /**
@@ -174,6 +179,9 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
    */
   const specificType = '';
   const [formType, setFormType] = useState<string>('rm');
+  /** ฟอร์มสมัครที่เลือก (27 พ.ย. 2569) — ค่าในช่อง Select · มาตรฐาน = STANDARD_FORM_VALUE */
+  const [applyFormPick, setApplyFormPick] = useState<string>(STANDARD_FORM_VALUE);
+  const { forms: applyForms } = useApplyForms();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [links, setLinks] = useState<Array<{ code: string; label: string | null }>>([]);
@@ -297,6 +305,10 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
     }
   };
 
+  // ฟอร์มสมัครของ BU นี้ (27 พ.ย. 2569) — เปลี่ยน BU แล้วฟอร์มที่เลือกไว้ใช้ไม่ได้ = กลับฟอร์มมาตรฐานเอง
+  const formOptions = applyFormsForBu(applyForms ?? [], job ? job.department_code ?? null : standaloneDept);
+  const applyFormValue = formOptions.some((f) => String(f.id) === applyFormPick) ? applyFormPick : STANDARD_FORM_VALUE;
+
   const submit = async () => {
     if (saving || missingGroup || missingBu) return;
     setSaving(true);
@@ -320,6 +332,8 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
         responsibleUserId: responsible.value || null,
         specificType: specificType || null,
         formType,
+        // ฟอร์มที่เลือก (27 พ.ย. 2569) · มาตรฐาน = null · server ตรวจ BU/เปิดใช้ซ้ำอีกชั้น
+        applyFormId: applyFormValue === STANDARD_FORM_VALUE ? null : Number(applyFormValue),
       };
       const created = await createRecruitPosting(body);
       // ลิงก์ที่ไม่มีรหัส = ลิงก์เสีย (/apply/p/undefined) ห้ามโชว์ให้คัดลอก (QA 5 ต.ค. 2569)
@@ -432,6 +446,27 @@ const GenApplyLinkDialog: React.FC<GenApplyLinkDialogProps> = ({
                       {APP_DEPARTMENT_CODES.map((bu) => (
                         <SelectItem key={bu} value={bu}>
                           {bu}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : null}
+              {/* ฟอร์มสมัคร (27 พ.ย. 2569 · ตั้งค่า › แบบฟอร์มใบสมัคร) — ขึ้นเฉพาะ BU ที่มีฟอร์มอื่นนอกจากมาตรฐาน */}
+              {formOptions.length > 0 ? (
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-muted-foreground" htmlFor="genlink-form">
+                    ฟอร์ม
+                  </label>
+                  <Select value={applyFormValue} onValueChange={setApplyFormPick}>
+                    <SelectTrigger id="genlink-form" data-testid="genlink-form">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={STANDARD_FORM_VALUE}>{STANDARD_APPLY_FORM_NAME}</SelectItem>
+                      {formOptions.map((f) => (
+                        <SelectItem key={f.id} value={String(f.id)}>
+                          {f.name}
                         </SelectItem>
                       ))}
                     </SelectContent>
