@@ -99,7 +99,6 @@ function preCheckReturnPath(jobId?: string | null): string {
 const PreCheckPage: React.FC<{ embedded?: boolean }> = ({ embedded = false }) => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [erpSearchQuery, setErpSearchQuery] = useState('');
   const [placeQuery, setPlaceQuery] = useState('');
   const [latText, setLatText] = useState('');
   const [lngText, setLngText] = useState('');
@@ -439,12 +438,7 @@ const PreCheckPage: React.FC<{ embedded?: boolean }> = ({ embedded = false }) =>
       if (byProject.length > 0) rowsBase = byProject;
     }
 
-    const erpQuery = erpSearchQuery.trim().toLowerCase();
-    if (erpQuery) {
-      const byErpQuery = rowsBase.filter((j) => unitRequestSearchBlob(j).includes(erpQuery));
-      rowsBase = byErpQuery;
-    }
-
+    // ช่อง "ค้นหา site / หน่วยงาน / สถานที่ทำงานจาก ERP" ถอดแล้ว (เจ้าของ 27 พ.ย. 2569 "เอาออก")
     if (appliedTextQuery) {
       const byText = rowsBase.filter((j) => unitRequestSearchBlob(j).includes(appliedTextQuery));
       if (byText.length > 0) rowsBase = byText;
@@ -458,7 +452,7 @@ const PreCheckPage: React.FC<{ embedded?: boolean }> = ({ embedded = false }) =>
       if (appliedCenter && jl && isLikelyThailandCoord(jl.lat, jl.lng)) {
         distanceKm = haversineKm(appliedCenter.lat, appliedCenter.lng, jl.lat, jl.lng);
       }
-      const searchMatched = Boolean(erpQuery || appliedTextQuery);
+      const searchMatched = Boolean(appliedTextQuery);
       const baseScore = (() => {
         if (distanceKm !== null) {
           // ใกล้มากได้คะแนนสูง และให้โบนัสงานด่วนเล็กน้อย
@@ -496,7 +490,7 @@ const PreCheckPage: React.FC<{ embedded?: boolean }> = ({ embedded = false }) =>
 
     // If radius is too strict and no rows match, show nearest rows anyway.
     return { rows: sortRows(rowsAll), fallbackFromRadius: true };
-  }, [appliedCenter, appliedTextQuery, allJobs, erpSearchQuery, projectFilter, radius]);
+  }, [appliedCenter, appliedTextQuery, allJobs, projectFilter, radius]);
 
   const filteredRows = precheckResult.rows;
 
@@ -741,16 +735,6 @@ const PreCheckPage: React.FC<{ embedded?: boolean }> = ({ embedded = false }) =>
             </div>
 
             <div className="space-y-2">
-              <label className="text-xs font-medium text-muted-foreground">ค้นหา site / หน่วยงาน / สถานที่ทำงานจาก ERP</label>
-              <SearchField
-                type="text"
-                placeholder='เช่น "กรุงศรี", "พระราม 3", "บางนา", "site A"'
-                value={erpSearchQuery}
-                onChange={(e) => setErpSearchQuery(e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-2">
               <label className="text-xs font-medium text-muted-foreground">ที่อยู่ผู้สมัคร</label>
               <div className="flex flex-col sm:flex-row gap-2">
                 <SearchField
@@ -942,7 +926,7 @@ const PreCheckPage: React.FC<{ embedded?: boolean }> = ({ embedded = false }) =>
                           ? `คะแนนความสำคัญของงาน ${score}/100 — คิดจากความใกล้จากจุดที่ค้นหา (ยิ่งใกล้ยิ่งสูง) + โบนัสงานด่วน`
                           : appliedCenter
                             ? `คะแนนความสำคัญของงาน ${score}/100 — คิดจากความด่วน (งานนี้ไม่มีพิกัด เทียบระยะทางไม่ได้)`
-                            : erpSearchQuery || appliedTextQuery
+                            : appliedTextQuery
                               ? `คะแนนความสำคัญของงาน ${score}/100 — คิดจากความเกี่ยวข้องกับคำค้น + ความด่วน`
                               : `คะแนนความสำคัญของงาน ${score}/100 — คิดจากความด่วนของงาน (${j.urgency === 'urgent' ? 'ด่วน' : 'ล่วงหน้า'})`
                       }

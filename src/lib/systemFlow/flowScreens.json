@@ -7372,15 +7372,6 @@
    "src": "src/pages/matching/PreCheckPage.tsx:99",
    "controls": [
     {
-     "label": "ค้นหา site / หน่วยงาน / สถานที่ทำงานจาก ERP (ช่องค้น)",
-     "action": "filter",
-     "target": "ลิสต์ใบงานเปิด (เห็นเฉพาะ BU ของบัญชี+BU ดูเพิ่ม)",
-     "api": null,
-     "effects": [],
-     "when": null,
-     "src": "src/pages/matching/PreCheckPage.tsx:746"
-    },
-    {
      "label": "ที่อยู่ผู้สมัคร (ช่อง) + ค้นหา",
      "action": "api",
      "target": "หาพิกัดแล้วเรียงงานใกล้สุด (ไม่ได้ = ค้นข้อความแทน) + แผนที่ Google embed",
@@ -11822,15 +11813,6 @@
      "effects": [],
      "when": "หน้าเต็ม (ไม่ใช่ฝังในงานสรรหา)",
      "src": "src/pages/matching/PreCheckPage.tsx:729"
-    },
-    {
-     "label": "ค้นหา site / หน่วยงาน / สถานที่ทำงานจาก ERP",
-     "action": "filter",
-     "target": "erpSearchQuery",
-     "api": null,
-     "effects": [],
-     "when": null,
-     "src": "src/pages/matching/PreCheckPage.tsx:746"
     },
     {
      "label": "ที่อยู่ผู้สมัคร + ค้นหา",
