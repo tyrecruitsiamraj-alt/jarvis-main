@@ -14,7 +14,7 @@ describe('แผนกของใบ iRecruit', () => {
     for (const guard of [
       "a.created_by_name = '${IRECRUIT_IMPORT_CREATED_BY}' and a.job_id is null",
       "nullif(btrim(a.department_code), '') is null",
-      "s.nd = 1 and s.k <> 'administrator'",
+      "s.nd = 1 and not s.multi and s.k <> 'administrator'", // 27 พ.ย. 2569 คนดูหลาย BU ไม่ติดป้าย
       'count(distinct btrim(u.department_code)) as nd',
       'coalesce(u.is_active, true)',
     ]) {

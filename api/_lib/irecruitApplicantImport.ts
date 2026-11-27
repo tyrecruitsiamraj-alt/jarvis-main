@@ -280,11 +280,14 @@ export async function runIrecruitImportOnce(): Promise<IrecruitImportRun> {
  * - จับได้เฉพาะชื่อที่ตรงผู้ใช้ที่ใช้งานอยู่และได้แผนกเดียว (ชื่อซ้ำคนละแผนก = ไม่เดา) · 'Administrator' ไม่นับ
  * - เติมเฉพาะใบที่ยังไม่มีแผนก (ไม่ทับของเดิม) · หาไม่เจอ = ว่างไว้ → ทุกแผนกเห็น (`job-applications` ด่าน BU)
  * วัด 10 พ.ย. 2569 (อ่านอย่างเดียว): จับได้ 785/799 ใบ — เจมส์·ว่าน = LBD · ใหม่·Kanyanat·ฟอร์ด·น้ำฝน = LBA
+ * 🔴 27 พ.ย. 2569 เจ้าของ "ใหม่ กับ เจมส์ ฉันเลือกว่าดูได้ทุก Bu มันต้องไม่ Stamp ว่า Bu ไหนสิ่" (Choice "ทุก BU เห็น")
+ *    ⇒ คนที่หน้าผู้ใช้งานตั้งให้ดูหลาย BU (`extra_department_codes`) = ไม่ติดป้าย ใบว่างไว้ทุก BU เห็น
  */
 export async function fillIrecruitDepartments(): Promise<number> {
   const { rows } = await dbQuery<{ id: string }>(
     `with staff as (
-       select lower(btrim(x.name)) as k, min(btrim(u.department_code)) as dept, count(distinct btrim(u.department_code)) as nd
+       select lower(btrim(x.name)) as k, min(btrim(u.department_code)) as dept, count(distinct btrim(u.department_code)) as nd,
+              bool_or(coalesce(array_length(u.extra_department_codes, 1), 0) > 0) as multi
          from ${tableInAppSchema('users')} u cross join lateral (values (u.nickname), (u.full_name)) as x(name)
         where coalesce(u.is_active, true) and nullif(btrim(x.name), '') is not null and nullif(btrim(u.department_code), '') is not null
         group by 1)
@@ -292,7 +295,7 @@ export async function fillIrecruitDepartments(): Promise<number> {
        from staff s
       where a.created_by_name = '${IRECRUIT_IMPORT_CREATED_BY}' and a.job_id is null
         and nullif(btrim(a.department_code), '') is null
-        and lower(btrim(a.responsible_name)) = s.k and s.nd = 1 and s.k <> 'administrator'
+        and lower(btrim(a.responsible_name)) = s.k and s.nd = 1 and not s.multi and s.k <> 'administrator'
       returning a.id::text as id`,
   );
   if (rows.length > 0) logInfo('irecruitImport.departmentFilled', { filled: rows.length });
