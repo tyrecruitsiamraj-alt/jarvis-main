@@ -2797,7 +2797,7 @@ const MatchingPage: React.FC<{ embedded?: boolean; lockedJob?: JobRequest | null
                     if (!classic) {
                       return (
                         <MatchPeopleTable
-                          rows={sortedBoard.map(({ m }) => boardPersonRowOf(jobDetail, m))}
+                          rows={sortedBoard.map(({ m }) => boardPersonRowOf(jobDetail, m)).filter((r) => !r.heldBy) /* เก็บไปโทรแล้ว = ออกจากหน้านี้ทันที ไปอยู่หน้าการติดต่อ (27 พ.ย. 2569 "ทำเหมือนหน้าการติดต่อ") */}
                           selectedCount={lumosSelectedCount}
                           busy={lumosSending || holdingSelf}
                           onHoldSelected={() => void holdSelectedForSelf()}

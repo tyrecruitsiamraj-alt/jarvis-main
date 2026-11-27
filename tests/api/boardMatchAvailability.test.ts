@@ -54,3 +54,28 @@ describe('board match availability', () => {
     expect(filterAvailableBoardMatches(undefined, JOB, ctx())).toEqual([]);
   });
 });
+
+// เจ้าของ 27 พ.ย. 2569: เก็บไปโทรแล้วหายจากหน้าจับคู่ · ไม่สนใจงานนี้/ติดต่อไม่ได้ ไม่จับคู่ใบเดิม · ไม่หางาน/ผิดคน ไม่จับคู่ทุกใบ
+import { isBoardCandidateAvailable as avail27 } from '../../src/lib/boardMatchAvailability';
+import { readFileSync as read27 } from 'node:fs';
+describe('ล็อกเก็บไปโทร + ผลโทร (27 พ.ย. 2569)', () => {
+  const base = { availableCardIds: new Set([11, 12, 13, 14]), activeJobByCardId: new Map<number, string>() };
+  const ctx = {
+    ...base,
+    heldCardIds: new Set([11]),
+    blockedJobsByCardId: new Map([[12, new Set(['siamraj-sql:OPL6911075'])]]),
+    blockedAllCardIds: new Set([13]),
+  };
+  it('ถือล็อก = ออกทุกใบ · ผลใบเดิม = ออกเฉพาะใบนั้น · ไม่หางาน = ออกทุกใบ', () => {
+    expect(avail27(11, 'siamraj-sql:OPL6911075', ctx)).toBe(false);
+    expect(avail27(12, 'siamraj-sql:OPL6911075', ctx)).toBe(false);
+    expect(avail27(12, 'siamraj-sql:OPL6911080', ctx)).toBe(true);
+    expect(avail27(13, 'siamraj-sql:OPL6911080', ctx)).toBe(false);
+    expect(avail27(14, 'siamraj-sql:OPL6911075', ctx)).toBe(true);
+  });
+  it('อ่านล็อกจากฐาน + หน้าจอกรองคนที่เพิ่งกดเก็บทันที', () => {
+    const src = read27('api/_lib/boardAvailability.ts', 'utf8');
+    expect(src).toContain("result_outcome in ('declined', 'no_answer', 'wrong_person')");
+    expect(read27('src/pages/matching/MatchingPage.tsx', 'utf8')).toContain('.filter((r) => !r.heldBy)');
+  });
+});

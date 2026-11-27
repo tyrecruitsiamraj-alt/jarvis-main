@@ -20,6 +20,15 @@ export type BoardAvailabilityContext = {
    * QA 17 ต.ค. 2569: ผลแมท 3 ก.ย. ติดป้าย "To do" ทั้งที่คนนั้นอยู่ Drop แล้ว ⇒ ทับด้วยถังปัจจุบันตอนเสิร์ฟ
    */
   columnLabelByCardId?: ReadonlyMap<number, string>;
+  /**
+   * เก็บไปโทรเองแล้ว (เจ้าของ 27 พ.ย. 2569 "ทำเหมือนหน้าการติดต่อเลย" · "หน้า match คนเก็บไปแล้วทำไมไม่หาย มันจะชนกับคนอื่น")
+   * มีคนถือล็อกอยู่ = ออกจากกองจับคู่ทุกใบ (อยู่หน้าการติดต่อของคนเก็บ) — ล็อกหมดอายุ/ปล่อย = กลับมา
+   */
+  heldCardIds?: ReadonlySet<number>;
+  /** ผลโทรที่ห้ามจับคู่ใบเดิม: ไม่สนใจงานนี้ · ติดต่อไม่ได้ (Choice 27 พ.ย. 2569) — card_id → ใบขอ */
+  blockedJobsByCardId?: ReadonlyMap<number, ReadonlySet<string>>;
+  /** ผลโทรที่ห้ามจับคู่ทุกใบ: ไม่หางานแล้ว · ผิดคน/เบอร์ผิด */
+  blockedAllCardIds?: ReadonlySet<number>;
 };
 
 /** ทับป้ายถังในผลแมทด้วยถังปัจจุบัน (pure) — ไม่รู้ถังปัจจุบัน = คงค่าเดิม */
@@ -42,6 +51,8 @@ export function isBoardCandidateAvailable(
   ctx: BoardAvailabilityContext,
 ): boolean {
   if (!ctx.availableCardIds.has(cardId)) return false;
+  if (ctx.heldCardIds?.has(cardId) || ctx.blockedAllCardIds?.has(cardId)) return false;
+  if (ctx.blockedJobsByCardId?.get(cardId)?.has(jobId)) return false;
   const activeJob = ctx.activeJobByCardId.get(cardId);
   if (activeJob != null && activeJob !== jobId) return false;
   return true;
