@@ -38,20 +38,22 @@ describe('ฟอนต์เดียวทั้งระบบ = Kanit', () =>
 
   it('🔴 โหลดฟอนต์ตัวเดียว (Kanit) จากไฟล์ในระบบ — ไม่ดึง Google ตอนเปิดหน้า (19 พ.ย. 2569 แบบ Knowa)', () => {
     const main = read('src/main.tsx');
-    for (const w of [300, 400, 500, 600, 700]) expect(main).toContain(`@fontsource/kanit/${w}.css`);
+    // 27 พ.ย. 2569 เจ้าของ "Kanit 4 ความหนา (300 / 400 / 500 / 600)" — 700 ห้ามโหลด
+    for (const w of [300, 400, 500, 600]) expect(main).toContain(`@fontsource/kanit/${w}.css`);
+    expect(main).not.toMatch(/@fontsource\/kanit\/(100|200|700|800|900)/);
     expect(css).not.toContain('fonts.googleapis.com');
     expect(read('index.html')).not.toMatch(/fonts\.(googleapis|gstatic)\.com/);
     expect(main).not.toMatch(/JetBrains|Instrument/);
     expect(JSON.parse(read('package.json')).dependencies['@fontsource/kanit']).toBeTruthy();
   });
 
-  it('🔴 ตัวหนังสือแบบ Knowa: ฐาน 16px · เนื้อความ 300 · ระยะตัวอักษร 0 · บรรทัด normal · b/strong 700 ของเบราว์เซอร์', () => {
+  it('🔴 ตัวหนังสือแบบ Knowa: ฐาน 16px · เนื้อความ 300 · ระยะตัวอักษร 0 · บรรทัด normal · b/strong/th 600 (27 พ.ย. 2569 ไม่เกิน 4 ความหนา)', () => {
     expect(css).not.toMatch(/font-size:\s*112\.5%/);
     const body = css.slice(css.indexOf('  body {'), css.indexOf('}', css.indexOf('  body {')));
     expect(body).toMatch(/font-weight:\s*300/);
     expect(body).toMatch(/letter-spacing:\s*0;/);
     expect(body).toMatch(/line-height:\s*normal/);
-    expect(css).not.toMatch(/b, strong \{\s*font-weight/);
+    expect(css).toMatch(/b, strong, th \{\s*font-weight: 600;/);
   });
 
   it('🔴 หัวข้อ h1–h5 คงขนาดเดิม (ฐาน 18px): text-lg = 20.25px/31.5px · text-3xl = 33.75px/40.5px · ไม่มีคลาส = 1.125em', () => {
@@ -300,9 +302,9 @@ describe('🔴 ทั้งระบบต้องไม่มีตัวห�
     expect(bad, `ไฟล์ที่ยังมีน้ำหนักเกิน medium:\n${bad.join('\n')}`).toEqual([]);
   });
 
-  it('🔴 `<b>` / `<strong>` ใช้ค่าของเบราว์เซอร์ (700) แบบ Knowa — ไม่ตั้งทับที่ CSS กลางแล้ว (เจ้าของ 19 พ.ย. 2569 ทับคำสั่ง 16 ก.ย.)', () => {
+  it('🔴 `<b>` / `<strong>` / `<th>` = 600 — Kanit 4 ความหนา 300/400/500/600 (เจ้าของ 27 พ.ย. 2569 ทับ 19 พ.ย. ที่ใช้ 700 ของเบราว์เซอร์)', () => {
     const css = read('src/index.css').replace(/\/\*[\s\S]*?\*\//g, '');
-    expect(css).not.toMatch(/b,\s*strong\s*\{[^}]*font-weight/);
+    expect(css).toMatch(/b, strong, th \{\s*font-weight: 600;\s*\}/);
   });
 
   it('CSS ของแถบเมนูล่างก็ต้องไม่เกิน 500', () => {
@@ -310,9 +312,10 @@ describe('🔴 ทั้งระบบต้องไม่มีตัวห�
     expect(css).not.toMatch(/font-weight:\s*(600|700|800|900)/);
   });
 
-  it('CSS กลางก็ต้องไม่หนาเกิน 500', () => {
+  it('CSS กลางไม่หนาเกิน 500 — ยกเว้นตัวหนา b/strong/th = 600 (ความหนาที่ 4 · 27 พ.ย. 2569)', () => {
     const css = read('src/index.css');
-    expect(css).not.toMatch(/font-weight:\s*(600|700|800|900)/);
+    expect(css).not.toMatch(/font-weight:\s*(700|800|900|bold)/);
+    expect(css.match(/font-weight:\s*600/g) ?? []).toHaveLength(1);
     expect(css).not.toMatch(/@apply[^;]*font-(bold|semibold)/);
   });
 });

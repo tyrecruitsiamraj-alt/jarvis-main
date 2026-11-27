@@ -3,8 +3,8 @@ import App from "./App.tsx";
 import "@fontsource/kanit/300.css";
 import "@fontsource/kanit/400.css";
 import "@fontsource/kanit/500.css";
+// Kanit 4 ความหนาเท่านั้น 300/400/500/600 (เจ้าของ 27 พ.ย. 2569) — ห้ามโหลด 700 เพิ่ม · ตัวหนา <b>/<strong>/<th> = 600 ที่ index.css
 import "@fontsource/kanit/600.css";
-import "@fontsource/kanit/700.css";
 import "./index.css";
 import { initTheme } from "./lib/theme";
 import { installStaleChunkReload } from "./lib/staleChunkReload";
