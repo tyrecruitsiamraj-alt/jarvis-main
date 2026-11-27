@@ -584,7 +584,7 @@ export default function ApplicantContactDialog({
                     <ChevronDown aria-hidden />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="start">
+                <DropdownMenuContent align="end">
                   <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">ไม่โทรเพราะ</DropdownMenuLabel>
                   {noCallReasons.map((x) => (
                     <DropdownMenuItem key={x.id} onSelect={() => void pickNoCall(x.id)} data-testid={`contact-nocall-reason-${x.id}`}>
