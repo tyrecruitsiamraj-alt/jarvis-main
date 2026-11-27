@@ -1,5 +1,4 @@
 import { applicantAreaOf, sortByApplicantArea, type ApplicantArea } from '@/lib/applicantArea';
-import NoCallDialog from '@/components/recruit-rm/NoCallDialog';
 import { isNoCallView, noCallViewOf, ownBoxReasons, type NoCallReason, type NoCallView } from '@/lib/applicantNoCall';
 import { fetchNoCallReasons, setApplicationNoCall } from '@/lib/applicantNoCallApi';
 import { jobBuOf } from '@/lib/soScraping';
@@ -845,23 +844,13 @@ const RmWorkspace: React.FC<{
       .catch(() => setNoCallReasons([]));
   }, []);
   useEffect(() => {
-    if (tab === 'candidates') loadNoCallReasons();
-  }, [tab, loadNoCallReasons]);
+    loadNoCallReasons();
+  }, [loadNoCallReasons]);
   const noCallChipsOf = (counts: Record<string, number>) =>
     ownBoxReasons(noCallReasons)
       .filter((r) => r.active || (counts[noCallViewOf(r.id)] ?? 0) > 0)
       .map((r) => ({ id: noCallViewOf(r.id), label: r.label }));
-  const [noCallIds, setNoCallIds] = useState<string[] | null>(null);
   const [noCallBusy, setNoCallBusy] = useState(false);
-  const askNoCall = (ids: string[]) => {
-    say(null);
-    const real = ids.filter((id) => !isScrapVirtualId(id));
-    if (real.length === 0) {
-      say('คนที่ยังไม่มีใบสมัคร กดส่ง AI โทรหรือเก็บไปโทรเองก่อน');
-      return;
-    }
-    setNoCallIds(real);
-  };
   const pickNoCall = async (reasonId: number | null, ids: string[]) => {
     if (noCallBusy) return;
     setNoCallBusy(true);
@@ -877,7 +866,6 @@ const RmWorkspace: React.FC<{
           .filter(Boolean)
           .join(' · '),
       );
-      setNoCallIds(null);
       setSelectedIds([]);
       load();
     } catch (e) {
@@ -1161,9 +1149,11 @@ const RmWorkspace: React.FC<{
       return;
     }
     // ไม่โทรทีละแถว (26 พ.ย. 2569) — ใบที่กดไว้แล้ว = ยกเลิกไม่โทร (กลับกล่องเดิม)
+    // เลือกเหตุผลผ่านเมนูบนปุ่มแล้ว (27 พ.ย. 2569 · `onNoCallPick`) — ทางนี้เหลือแค่ยกเลิก หรือแถวที่ยังเลือกไม่ได้
     if (action === 'nocall') {
       if (row.no_call_reason_id != null) void pickNoCall(null, [row.id]);
-      else askNoCall([row.id]);
+      else if (isScrapVirtualId(row.id)) say('คนที่ยังไม่มีใบสมัคร กดส่ง AI โทรหรือเก็บไปโทรเองก่อน');
+      else say('ยังโหลดเหตุผลไม่ได้ ลองรีเฟรชหน้า');
       return;
     }
     // ส่ง AI โทรทีละแถว (4 ต.ค. 2569) — ผ่านป๊อปยืนยันรายชื่อเหมือนปุ่มรวม (ยิงสายจริง)
@@ -1824,6 +1814,8 @@ const RmWorkspace: React.FC<{
               {tab === 'appointments' ? <AppointmentPrintSheet groups={printGroups} /> : null}
               <div className={tab === 'appointments' ? 'print:hidden' : undefined}>
               <RmTable
+                noCallReasons={noCallReasons}
+                onNoCallPick={(row, reasonId) => void pickNoCall(reasonId, [row.id])}
                 tab={tab}
                 rows={pageRows}
                 selectedIds={selectedIds}
@@ -1937,13 +1929,7 @@ const RmWorkspace: React.FC<{
 
       {/* ดูข้อมูลของแท็บผู้สมัคร = ป๊อปแบบรูป iRecruit (4 ต.ค. 2569): แท็บ 6 อัน ไม่มีขั้นตอน 3 ขั้น + ยกเลิกข้อมูลผู้สมัคร
           (แทนใบประวัติเต็มหน้า 1 ต.ค.) · คนละโหมดของป๊อปตัวเดียวกับแท็บการติดต่อ */}
-      <NoCallDialog
-        names={noCallIds ? noCallIds.map((id) => workRows.find((r) => r.id === id)?.full_name ?? id) : null}
-        reasons={noCallReasons}
-        busy={noCallBusy}
-        onPick={(reasonId) => noCallIds && void pickNoCall(reasonId, noCallIds)}
-        onClose={() => setNoCallIds(null)}
-      />
+
 
       <ScrapCandidateDialog
         row={scrapDetailId ? (scrapById.get(scrapDetailId) ?? null) : null}

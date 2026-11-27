@@ -3,7 +3,7 @@
  * ปุ่ม "ไม่โทร" + เหตุผล → ใบย้ายไปกล่องของเหตุผล (เจ้าของ 26 พ.ย. 2569
  * "เอาเป็นปุ่มคำว่าไม่โทรแล้วกัน แล้วเดี๋ยวพอเลือกเหตุผลจะได้โยนเข้ากล่องนั้นๆไป" · Choice "ตรง ทำเลย")
  */
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { isNoCallView, noCallTarget, noCallViewOf, ownBoxReasons, type NoCallReason } from '../../src/lib/applicantNoCall';
 import { aiSendBlockedReasonOf, isInRmListView, rmShownViewOf } from '../../src/lib/recruitRm';
@@ -86,10 +86,16 @@ describe('ทุกทางเคารพไม่โทร', () => {
 });
 
 describe('26 พ.ย. 2569 (ต่อ)', () => {
-  it('ป๊อปไม่โทรไม่มีส่วนจัดการเหตุผล — กดเหตุผลแล้วย้ายกล่องเลย', () => {
-    const d = readFileSync('src/components/recruit-rm/NoCallDialog.tsx', 'utf8');
-    expect(d).not.toContain('no-call-manage');
-    expect(d).not.toMatch(/createNoCallReason|updateNoCallReason/);
+  // 27 พ.ย. 2569 เจ้าของ "ปุ่มไม่โทรทำเป็น Dropdown ดีไหมเลือกเลยเลือกเสร็จก็ย้ายไปเลย" — ป๊อปถอดแล้ว เหลือเมนูบนปุ่มในแถว
+  it('ไม่โทร = เมนูเหตุผลบนปุ่มในแถว เลือกแล้วย้ายกล่องเลย · ไม่มีป๊อป ไม่มีส่วนจัดการเหตุผล', () => {
+    expect(existsSync('src/components/recruit-rm/NoCallDialog.tsx')).toBe(false);
+    const t = readFileSync('src/components/recruit-rm/RmTable.tsx', 'utf8');
+    expect(t).toContain('<DropdownMenu key={a}>');
+    expect(t).toContain('onSelect={() => onNoCallPick(r, x.id)}');
+    expect(t).not.toMatch(/createNoCallReason|updateNoCallReason/);
+    const w = readFileSync('src/components/recruit-rm/RmWorkspace.tsx', 'utf8');
+    expect(w).toContain('onNoCallPick={(row, reasonId) => void pickNoCall(reasonId, [row.id])}');
+    expect(w).not.toContain('NoCallDialog');
   });
   it('ย้ายชื่อออกจากการติดต่อได้เฉพาะชื่อที่ยังไม่เคยกดโทร (จอ + server)', () => {
     const h = readFileSync('api/_handlers/application-call-choice.ts', 'utf8');

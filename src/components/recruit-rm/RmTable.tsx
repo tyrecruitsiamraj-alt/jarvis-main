@@ -1,6 +1,8 @@
 import React from 'react';
 import { SCREENING_LABEL, SCREENING_RESULTS, SCREENING_TONE, canRecordScreening, type ScreeningResult } from '@/lib/appointmentScreening';
-import { BookmarkPlus, Bot, Phone, PhoneCall, PhoneOff, Eye, ClipboardCheck, ListChecks, UserMinus, Undo2, FileText, RotateCcw, Send, UserPlus } from 'lucide-react';
+import { BookmarkPlus, Bot, ChevronDown, Phone, PhoneCall, PhoneOff, Eye, ClipboardCheck, ListChecks, UserMinus, Undo2, FileText, RotateCcw, Send, UserPlus } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import type { NoCallReason } from '@/lib/applicantNoCall';
 import { Button } from '@/components/ui/button';
 import { appointmentTimeOf } from '@/lib/appointmentTime';
 import { cn } from '@/lib/utils';
@@ -235,7 +237,13 @@ const RmTable: React.FC<{
   extraRowCount?: number;
   /** แท็บ Scrap (25 พ.ย. 2569) — มี = คอลัมน์ "ผลประเมิน" ของ So Scraping (ผล · เหตุผล · เว็บ) ต่อจากอายุ */
   scrapOf?: (r: PublicApplication) => ScrapWorkRow | null;
-}> = ({ tab, rows, selectedIds, onToggleRow, onToggleAll, onAction, docsEnabled = false, canReleaseOthers = false, holdByRef = {}, onAttendance, recruiterOf, areaOf, actionsOverride, unitOf, extraRows, extraRowCount = 0, scrapOf }) => {
+  /**
+   * ปุ่ม "ไม่โทร" เป็นเมนูเลือกเหตุผลตรงปุ่ม (เจ้าของ 27 พ.ย. 2569 "ปุ่มไม่โทรทำเป็น Dropdown … เลือกเสร็จก็ย้ายไปเลย")
+   * เลือกแล้วเรียก `onNoCallPick` ทันที · ใบที่กดไม่โทรไว้แล้ว = ปุ่ม "ยกเลิกไม่โทร" ผ่าน `onAction` ตามเดิม
+   */
+  noCallReasons?: readonly NoCallReason[];
+  onNoCallPick?: (row: PublicApplication, reasonId: number) => void;
+}> = ({ tab, rows, selectedIds, onToggleRow, onToggleAll, onAction, docsEnabled = false, canReleaseOthers = false, holdByRef = {}, onAttendance, recruiterOf, areaOf, actionsOverride, unitOf, extraRows, extraRowCount = 0, scrapOf, noCallReasons = [], onNoCallPick }) => {
   const actions = actionsOverride ?? RM_ROW_ACTIONS[tab];
   /**
    * 🔴 แท็บผู้สมัครใช้ชุดคอลัมน์ที่เจ้าของสั่งเอง (30 ก.ย. 2569 · Choice "เอาตามที่ฉันสั่ง"):
@@ -731,6 +739,37 @@ const RmTable: React.FC<{
                         // ปุ่มส่ง AI โทรมีคำเสมอ (QA 15 พ.ย. 2569) — เดิมเป็นไอคอนเปล่าวางติดปุ่มเก็บ Lead/ดูรายละเอียด กดสั่งโทรจริงพลาดได้
                         // แท็บการติดต่อ: ปุ่มมีคำทุกปุ่ม (แบบร่างรอบ 4 · 23 พ.ย. 2569) — โทร · ดำเนินการ · ส่งเอกสาร · ถอย Lead
                         const worded = tab === 'contact' || (tab === 'appointments' && a === 'rule') || a === 'ai' || a === 'nocall' || a === 'docs' || a === 'irecruit';
+                        // ไม่โทร = เมนูเลือกเหตุผลตรงปุ่ม (27 พ.ย. 2569) — เลือกแล้วย้ายกล่องทันที ไม่มีป๊อปกลางจอ
+                        const activeNoCall = noCallReasons.filter((x) => x.active);
+                        if (a === 'nocall' && !disabled && r.no_call_reason_id == null && onNoCallPick && activeNoCall.length > 0) {
+                          return (
+                            <DropdownMenu key={a}>
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="xs"
+                                  title={label}
+                                  aria-label={`${label} — ${r.full_name}`}
+                                  className="rounded-full max-sm:min-h-9"
+                                  data-testid={`row-nocall-${r.id}`}
+                                >
+                                  <Icon aria-hidden />
+                                  ไม่โทร
+                                  <ChevronDown aria-hidden />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">ไม่โทรเพราะ</DropdownMenuLabel>
+                                {activeNoCall.map((x) => (
+                                  <DropdownMenuItem key={x.id} onSelect={() => onNoCallPick(r, x.id)} data-testid={`row-nocall-reason-${x.id}`}>
+                                    {x.label}
+                                  </DropdownMenuItem>
+                                ))}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          );
+                        }
                         // ปุ่มกลมไม่มีกรอบ สีเทา แบบ iRecruit (rm-action-btn) — ใช้ Button ของ shadcn
                         return (
                           <Button
