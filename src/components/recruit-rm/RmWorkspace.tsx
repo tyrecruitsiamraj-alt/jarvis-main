@@ -861,7 +861,7 @@ const RmWorkspace: React.FC<{
         [
           reasonId === null ? `ยกเลิกไม่โทร ${out.done} คน — กลับกล่องเดิม` : `ไม่โทร ${out.done} คน · ${label ?? ''}`.trim(),
           out.cancelledCalls > 0 ? `ยกเลิกสาย AI ที่ค้าง ${out.cancelledCalls} สาย` : null,
-          out.skipped > 0 ? `ข้าม ${out.skipped} คน (นอกแผนกของคุณ)` : null,
+          out.skipped > 0 ? `ข้าม ${out.skipped} คน (นอกแผนก หรือคนอื่นเก็บไว้)` : null,
         ]
           .filter(Boolean)
           .join(' · '),

@@ -8,13 +8,15 @@ import { tableInAppSchema } from './schema.js';
 import { logError } from './logger.js';
 import { loadStaffDisplay } from './staffDisplay.js';
 import { cancelLumosQueueItem } from './lumosDispatch.js';
+import { releaseApplicationCallHolds } from './candidateCallHolds.js';
 import { NO_CALL_BOXES, type NoCallBox, type NoCallReason } from '../../src/lib/applicantNoCall.js';
 
 const REASONS = tableInAppSchema('applicant_no_call_reasons');
 const APPS = tableInAppSchema('public_job_applications');
 const QUEUE = tableInAppSchema('lumos_dispatch_queue');
 
-type Actor = { id: string; name: string | null };
+/** canOthers = Admin/Supervisor ตั้งไม่โทรใบที่ลูกทีมเก็บไว้ได้ */
+type Actor = { id: string; name: string | null; canOthers?: boolean };
 type Row = { id: number; label: string; box: string; is_active: boolean; sort_order: number };
 const toReason = (r: Row): NoCallReason => ({
   id: r.id,
@@ -84,14 +86,34 @@ export async function setNoCall(ids: readonly string[], reasonId: number | null,
     const { rows } = await dbQuery<{ id: number }>(`select id from ${REASONS} where id = $1 and is_active`, [reasonId]);
     if (!rows[0]) throw new Error('ไม่พบเหตุผลนี้ หรือเลิกใช้แล้ว');
   }
-  const { rows } = await dbQuery<{ id: string }>(
+  /**
+   * ตั้งไม่โทร = ปลดคนเก็บ + ถอด Lead ไปพร้อมกัน (เจ้าของ 27 พ.ย. 2569 "ต้องย้ายไปตั้งแต่หน้าที่บอกว่าไม่โทรเลย")
+   * ⇒ กดจากแท็บการติดต่อ ชื่อย้ายไปกล่องของเหตุผลในแท็บผู้สมัครทันที แม้กดโทรไปแล้ว (ต่างจากถอย Lead ที่ห้ามหลังกดโทร)
+   * ใบที่คนอื่นเก็บไว้ ลูกทีมแตะไม่ได้ — DB ตัดสินด้วยเงื่อนไขใน WHERE แบบเดียวกับถอย Lead
+   */
+  const { rows } = await dbQuery<{ id: string; old_claim: string | null }>(
     reasonId === null
       ? `update ${APPS} set no_call_reason_id = null, no_call_at = null, no_call_by_name = null, updated_at = now()
-          where id = any($1::uuid[]) and no_call_reason_id is not null returning id::text as id`
-      : `update ${APPS} set no_call_reason_id = $2, no_call_at = now(), no_call_by_name = $3, updated_at = now()
-          where id = any($1::uuid[]) returning id::text as id`,
-    reasonId === null ? [ids] : [ids, reasonId, by.name],
+          where id = any($1::uuid[]) and no_call_reason_id is not null returning id::text as id, null::text as old_claim`
+      : `update ${APPS} a
+            set no_call_reason_id = $2, no_call_at = now(), no_call_by_name = $3,
+                claimed_by = null, claimed_by_name = null, claimed_at = null,
+                is_lead = false, lead_by = null, lead_by_name = null, lead_at = null,
+                updated_at = now()
+           from (select id, claimed_by from ${APPS} where id = any($1::uuid[]) for update) o
+          where a.id = o.id and ($4::boolean or o.claimed_by is null or o.claimed_by = $5::uuid)
+          returning a.id::text as id, o.claimed_by::text as old_claim`,
+    reasonId === null ? [ids] : [ids, reasonId, by.name, by.canOthers === true, by.id],
   );
+  // คืนล็อกเบอร์ของคนที่เคยเก็บ — ไม่คืน = คนอื่นเก็บไปโทรต่อแล้วล็อกไม่ได้ (แบบถอย Lead)
+  for (const r of rows) {
+    if (!r.old_claim) continue;
+    try {
+      await releaseApplicationCallHolds(r.id, r.old_claim);
+    } catch (e) {
+      logError('applicant-no-call.release_hold', e, { applicationId: r.id });
+    }
+  }
   let cancelledCalls = 0;
   if (reasonId !== null && rows.length > 0) {
     const { rows: open } = await dbQuery<{ job_ref: string; channel: 'interview' | 'reminder'; person_ref: string }>(

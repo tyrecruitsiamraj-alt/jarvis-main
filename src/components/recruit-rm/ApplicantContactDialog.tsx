@@ -1,6 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { CalendarCheck, CalendarX, Check, Loader2, Pencil, UserRound, X } from 'lucide-react';
+import { CalendarCheck, CalendarX, Check, ChevronDown, Loader2, Pencil, PhoneOff, UserRound, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { fetchNoCallReasons, setApplicationNoCall } from '@/lib/applicantNoCallApi';
+import type { NoCallReason } from '@/lib/applicantNoCall';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -188,6 +191,8 @@ export default function ApplicantContactDialog({
   const [cancelReason, setCancelReason] = useState('');
 
   const [reasons, setReasons] = useState<RecruitReason[]>([]);
+  /** เหตุผลปุ่ม "ไม่โทร" (ตัวเดียวกับแท็บผู้สมัคร) — แท็บการติดต่อมีปุ่มข้างติดต่อสำเร็จ/ไม่สำเร็จ (เจ้าของ 27 พ.ย. 2569) */
+  const [noCallReasons, setNoCallReasons] = useState<NoCallReason[]>([]);
   const [apptReasons, setApptReasons] = useState<RecruitReason[]>([]);
   const [openJobs, setOpenJobs] = useState<JobRequest[]>([]);
   const [logs, setLogs] = useState<ContactLog[]>([]);
@@ -259,6 +264,10 @@ export default function ApplicantContactDialog({
     void fetchRecruitReasons({ processCode: '2', outcomeCode: 'C' })
       .then((v) => !cancelled && setApptReasons(v))
       .catch(() => !cancelled && setApptReasons([]));
+    if (mode === 'contact')
+      void fetchNoCallReasons()
+        .then((v) => !cancelled && setNoCallReasons(v.filter((x) => x.active).sort((x, y) => x.sort - y.sort || x.id - y.id)))
+        .catch(() => !cancelled && setNoCallReasons([]));
     void fetchSiamrajUnitRequests(500)
       .then((v) => !cancelled && setOpenJobs(v))
       .catch(() => !cancelled && setOpenJobs([]));
@@ -405,6 +414,26 @@ export default function ApplicantContactDialog({
     }
   };
 
+  /** ไม่โทร = บันทึกทันที แล้วปิดป๊อป (ชื่อย้ายไปกล่องของเหตุผล) — เส้นเดียวกับปุ่มไม่โทรของแท็บผู้สมัคร */
+  const pickNoCall = async (reasonId: number) => {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const out = await setApplicationNoCall([a.id], reasonId);
+      if (out.done === 0) {
+        setError('คนอื่นเก็บชื่อนี้ไว้ — ให้คนเก็บหรือ Supervisor กดไม่โทร');
+        return;
+      }
+      onSaved();
+      onClose();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'บันทึกไม่โทรไม่สำเร็จ');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const save = async () => {
     if (busy) return;
     setError(null);
@@ -545,6 +574,26 @@ export default function ApplicantContactDialog({
             >
               <X aria-hidden /> ติดต่อไม่สำเร็จ
             </Button>
+            {/* 🔴 ไม่โทร (เจ้าของ 27 พ.ย. 2569 "ปุ่มไม่โทร เอาไปไว้หน้าติดต่อ ข้างๆกับพวก ติดต่อสำเร็จ ไม่สำเร็จ")
+                เลือกเหตุผล = บันทึกทันที ชื่อย้ายไปกล่องของเหตุผลในแท็บผู้สมัคร (ปลดคนเก็บที่ server) */}
+            {noCallReasons.length > 0 ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button type="button" size="sm" variant="outline" disabled={busy} data-testid="contact-nocall">
+                    <PhoneOff aria-hidden /> ไม่โทร
+                    <ChevronDown aria-hidden />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start">
+                  <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">ไม่โทรเพราะ</DropdownMenuLabel>
+                  {noCallReasons.map((x) => (
+                    <DropdownMenuItem key={x.id} onSelect={() => void pickNoCall(x.id)} data-testid={`contact-nocall-reason-${x.id}`}>
+                      {x.label}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : null}
           </StepHead>
           {contactFailPicked ? (
             <div className="border-t border-border/70 p-3">

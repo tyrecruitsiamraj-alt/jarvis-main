@@ -43,14 +43,15 @@ async function handler(req: AuthedReq, res: ApiRes) {
       const allowed: string[] = [];
       for (const r of rows) if (await isApplicationInWriteScope(req.user, r)) allowed.push(r.id);
       if (allowed.length === 0) return sendError(res, 403, 'Forbidden', 'ใบสมัครที่เลือกอยู่นอกแผนกของคุณ');
-      const out = await setNoCall(allowed, reasonId, actorOf(req));
+      const out = await setNoCall(allowed, reasonId, { ...actorOf(req), canOthers: canManage(req) });
       await auditFromAuthed(req, {
         action: reasonId === null ? 'application.no_call.clear' : 'application.no_call.set',
         entityType: 'job_application',
         entityId: allowed.length === 1 ? allowed[0] : `bulk:${allowed.length}`,
         after: { reasonId, ...out, outOfScope: rows.length - allowed.length },
       });
-      return res.status(200).json({ ...out, skipped: ids.length - allowed.length });
+      // ข้าม = นอกแผนก + (ตอนตั้ง) ใบที่คนอื่นเก็บไว้ ลูกทีมแตะไม่ได้
+      return res.status(200).json({ ...out, skipped: reasonId === null ? ids.length - allowed.length : ids.length - out.done });
     }
 
     if (!canManage(req)) return sendError(res, 403, 'Forbidden', 'แก้รายการเหตุผลได้เฉพาะ Supervisor ขึ้นไป');
