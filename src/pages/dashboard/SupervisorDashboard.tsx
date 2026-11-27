@@ -28,7 +28,7 @@ import {
 import { buildCohortDrillDown, type CohortDrillKpi } from '@/lib/dashboard/cohortDrillDown';
 import { isPrequestJob } from '@/lib/publicJobVisibility';
 import { LEAD_AMOUNT_LABEL, NO_STATUS_LABEL, buildCohortLeadPanel, buildStatusLeadPanel, filterLeadPanel } from '@/lib/dashboard/statusLeadPanel';
-import { WORK_STATUS_ADVANCE_ID, advanceStatusBoxId, isAdvanceStatusBoxId, jobInWorkStatusBox, parseWorkDoneBoxId, parseWorkTopTotalId } from '@/lib/dashboard/workStatusBox';
+import { WORK_STATUS_ADVANCE_ID, WORK_STATUS_DUE_ID, advanceStatusBoxId, isAdvanceStatusBoxId, jobInWorkStatusBox, parseWorkDoneBoxId, parseWorkTopTotalId } from '@/lib/dashboard/workStatusBox';
 import { buildWorkMonths, isAdvanceNotDueRecord } from '@/lib/dashboard/throughput';
 import { toYmdBangkok } from '@/lib/dateTh';
 import {
@@ -95,6 +95,8 @@ const COHORT_KPI_IDS: readonly CohortDrillKpi[] = ['total_requests', 'closed', '
 /** กล่องสถานะทำงาน → สถานะ (null = ทุกสถานะ) — 29 ต.ค. 2569 ใช้กับการ์ดเร่งด่วนตอนกดกล่อง */
 const WORK_STATUS_OF_KPI: Record<string, string | null> = {
   work_status_total: null,
+  /** ถึงวันแล้ว (27 พ.ย. 2569 · คงเหลือ = ถึงวันแล้ว + ล่วงหน้า) — ทุกสถานะที่ไม่ใช่ล่วงหน้า · `jobInWorkStatusBox` */
+  [WORK_STATUS_DUE_ID]: 'due',
   work_status_in_progress: 'in_progress',
   /** แถวล่วงหน้า (ยังไม่ถึงวันต้องการ · 22 พ.ย. 2569 · `workStatusBox.ts`) — กล่องแรกของแถว = ล่วงหน้าทุกสถานะ */
   [WORK_STATUS_ADVANCE_ID]: 'advance',

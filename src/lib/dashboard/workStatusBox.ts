@@ -32,9 +32,20 @@ export function workStatusBoxIdOf(job: JobRequest, today: Date = new Date()): st
   return isAdvanceNotDue(job, today) ? advanceStatusBoxId(status) : `work_status_${status}`;
 }
 
-/** ใบนี้นับอยู่ในกล่องนี้ไหม — กล่องรวมแถวล่วงหน้านับทุกสถานะของแถว */
+/**
+ * "ถึงวันแล้ว" = ใบที่ยังไม่ปิดและถึงวันต้องการคนแล้ว ทุกสถานะ (เจ้าของ 27 พ.ย. 2569 · คงเหลือ = ถึงวันแล้ว + ล่วงหน้า)
+ * กล่องนำของแถวสถานะ + ช่องซ้ายในกล่อง "คงเหลือ" · เลข = คงเหลือ − ล่วงหน้า (DashboardShell)
+ */
+export const WORK_STATUS_DUE_ID = 'work_status_due';
+export const WORK_STATUS_DUE_LABEL = 'ถึงวันแล้ว';
+/** กล่องรวมใบที่ยังไม่ปิดบนแถวบน (id เดิม `work_status_total`) */
+// คำบนจอชุดกลาง `uiWords.ts`: ยอดที่ยังต้องหา = "เหลือหา" (เจ้าของพิมพ์ "คงเหลือ" 27 พ.ย. — กติกา 31 ต.ค. ให้ใช้คำกลาง)
+export const WORK_REMAIN_LABEL = 'เหลือหา';
+
+/** ใบนี้นับอยู่ในกล่องนี้ไหม — กล่องรวมแถวล่วงหน้านับทุกสถานะของแถว · ถึงวันแล้ว = ทุกสถานะที่ไม่ใช่ล่วงหน้า */
 export function jobInWorkStatusBox(job: JobRequest, boxId: string, today: Date = new Date()): boolean {
   const own = workStatusBoxIdOf(job, today);
+  if (boxId === WORK_STATUS_DUE_ID) return !isAdvanceStatusBoxId(own);
   return boxId === WORK_STATUS_ADVANCE_ID ? isAdvanceStatusBoxId(own) : own === boxId;
 }
 

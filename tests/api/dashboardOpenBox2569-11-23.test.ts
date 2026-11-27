@@ -67,12 +67,13 @@ describe('🔴 กล่องสถานะบวกลงตัวกับ "
 
 describe('แถวบน 3 กล่อง ใบขอทั้งหมด · ปิดแล้ว · ยกเลิก · ยังไม่ปิดอยู่หัวแถวสถานะ (เจ้าของ 23 พ.ย. 2569 "ย้ายมาไว้กับพวก กำลังดำเนินการสรรหา")', () => {
   const shell = readFileSync('src/components/dashboard/analytics/DashboardShell.tsx', 'utf8');
-  it('ยังไม่ปิด = กล่องแรกของแถวสถานะ (id เดิม) · แถวบนไม่มียังไม่ปิด · ใบขอทั้งหมดสีเทา ไม่ตีกับยังไม่ปิด', () => {
-    expect(shell).toContain('const mainView = withOpen(top, list);');
+  // 27 พ.ย. 2569 เจ้าของ "ใบขอทั้งหมด > ปิดแล้ว > ยกเลิก > คงเหลือ" — กล่องรวมใบเปิดขึ้นแถวบนเป็นกล่องที่ 4 (แบ่งสองช่อง)
+  // แถวสถานะนำด้วย ถึงวันแล้ว · แถวล่วงหน้ายังนำด้วยกล่องรวมของแถวตามเดิม (`dashboardRemainSplit2569-11-27.test.ts`)
+  it('แถวบน 4 กล่อง (เหลือหาต่อท้าย) · แถวสถานะนำด้วยถึงวันแล้ว · ใบขอทั้งหมดสีเทา', () => {
+    expect(shell).toContain('const mainView = dueKpi ? { topRow: top, rows: [dueKpi, ...list.slice(1)] } : withOpen(top, list);');
     expect(shell).toContain('const advanceView = withOpen(advanceTop, advance);');
-    expect(shell).toContain('rows: [{ ...rows[0], label: WORK_OPEN_LABEL }, ...rows.slice(1)]');
-    expect(shell).not.toContain('remainHead');
-    expect(shell).toContain('lg:grid-cols-3" data-testid="dashboard-work-top"');
+    expect(shell).toContain('xl:grid-cols-4" data-testid="dashboard-work-top"');
+    expect(shell).toContain('{remainTile}');
     expect(shell).toContain("kpi.id === totalId ? 'neutral'");
   });
 });

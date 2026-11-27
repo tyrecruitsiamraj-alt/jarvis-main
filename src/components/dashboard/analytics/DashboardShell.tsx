@@ -13,7 +13,7 @@ import type { UnitRequestFilterState } from '@/hooks/useSiamrajUnitRequestFilter
 import type { DateRangeYmd } from '@/components/shared/DateRangeCalendarPicker';
 import DashboardFilterBar from './DashboardFilterBar';
 import DashboardWorkMonths from './DashboardWorkMonths';
-import { WORK_OPEN_LABEL, parseWorkDoneBoxId } from '@/lib/dashboard/workStatusBox';
+import { WORK_OPEN_LABEL, WORK_REMAIN_LABEL, WORK_STATUS_ADVANCE_LABEL, WORK_STATUS_DUE_ID, WORK_STATUS_DUE_LABEL, parseWorkDoneBoxId } from '@/lib/dashboard/workStatusBox';
 import type { WorkMonthRow } from '@/lib/dashboard/throughput';
 import DashboardKpiCard from './DashboardKpiCard';
 import DashboardChartSection from './DashboardChartSection';
@@ -384,14 +384,95 @@ const DashboardShell: React.FC<Props> = ({
                      */
                     const withOpen = (topRow: typeof list, rows: typeof list) =>
                       rows.length ? { topRow, rows: [{ ...rows[0], label: WORK_OPEN_LABEL }, ...rows.slice(1)] } : { topRow, rows };
-                    const mainView = withOpen(top, list);
+                    /**
+                     * ═══ คงเหลือ = ถึงวันแล้ว + ล่วงหน้า (เจ้าของ 27 พ.ย. 2569 · Choice "แบ่งสองช่องในกล่อง") ═══
+                     * > "ใบขอทั้งหมด > ปิดแล้ว > ยกเลิก > คงเหลือ · คงเหลือคือยอดของ ยังไม่ปิดทั้ง ถึงวันแล้ว กับ ล่วงหน้า"
+                     * แถวบนมี "คงเหลือ" ต่อท้าย (กล่องรวมเดิม `work_status_total`) แบ่งสองช่องในกล่อง กดแต่ละช่องดูใบได้
+                     * แถวสถานะนำด้วย "ถึงวันแล้ว" (`WORK_STATUS_DUE_ID` = คงเหลือ − ล่วงหน้า) ⇒ แถวสถานะบวกกันได้เลขหัวแถวเสมอ
+                     * ตัวตัดสินใบ = `jobInWorkStatusBox` ตัวเดิม (เลขกับรายการตอนกดเท่ากัน)
+                     */
+                    const remain = list[0];
+                    const advanceAll = advance[0];
+                    const dueKpi =
+                      remain && advanceAll
+                        ? {
+                            ...remain,
+                            id: WORK_STATUS_DUE_ID,
+                            label: WORK_STATUS_DUE_LABEL,
+                            value: Math.max(remain.value - advanceAll.value, 0),
+                            secondaryCount: Math.max((remain.secondaryCount ?? 0) - (advanceAll.secondaryCount ?? 0), 0),
+                            description: `ถึงวันที่ต้องการคนแล้ว · ยังไม่ปิด`,
+                          }
+                        : null;
+                    const mainView = dueKpi ? { topRow: top, rows: [dueKpi, ...list.slice(1)] } : withOpen(top, list);
                     const advanceView = withOpen(advanceTop, advance);
+                    const part = (kpi: (typeof list)[number], dot: string) => (
+                      <Button
+                        key={kpi.id}
+                        type="button"
+                        variant="outline"
+                        onClick={onKpiClick ? () => onKpiClick(kpi.id, kpi.label, kpi.secondaryCount ?? null) : undefined}
+                        aria-pressed={statusPick?.kpiId === kpi.id}
+                        className={cn(
+                          'h-auto min-w-0 flex-1 flex-col items-start gap-0 whitespace-normal rounded-xl bg-card px-3 py-2 text-left font-normal',
+                          statusPick?.kpiId === kpi.id && 'ring-2 ring-ring',
+                        )}
+                        data-testid={`dashboard-remain-part-${kpi.id}`}
+                      >
+                        <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                          <span className={cn('size-2 rounded-full', dot)} aria-hidden />
+                          {kpi.label}
+                        </span>
+                        <span className="text-xl font-medium tabular-nums text-foreground">
+                          {kpi.value.toLocaleString('th-TH')}
+                          <span className="ml-1 text-xs font-normal text-muted-foreground">
+                            · {(kpi.secondaryCount ?? 0).toLocaleString('th-TH')} ใบ
+                          </span>
+                        </span>
+                      </Button>
+                    );
+                    const remainTile =
+                      remain && dueKpi && advanceAll ? (
+                        <div className={cn('space-y-2 rounded-xl p-4', TONE.info.wash)} data-testid="dashboard-remain">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            onClick={onKpiClick ? () => onKpiClick(remain.id, WORK_REMAIN_LABEL, remain.secondaryCount ?? null) : undefined}
+                            aria-pressed={statusPick?.kpiId === remain.id}
+                            className={cn(
+                              'block h-auto w-full whitespace-normal p-0 text-left font-normal hover:bg-transparent',
+                              statusPick?.kpiId === remain.id && 'ring-2 ring-ring',
+                            )}
+                          >
+                            <span className="block text-sm text-slate-600 dark:text-slate-400">{WORK_REMAIN_LABEL}</span>
+                            <span className="mt-1.5 block text-4xl font-medium tracking-tight tabular-nums text-slate-900 dark:text-slate-100">
+                              {remain.value.toLocaleString('th-TH')}
+                              <span className="ml-1.5 text-sm font-normal text-slate-600 dark:text-slate-400">
+                                · {(remain.secondaryCount ?? 0).toLocaleString('th-TH')} ใบขอ
+                              </span>
+                            </span>
+                          </Button>
+                          {/* แถบแบ่งสองท่อนตามสัดส่วน ถึงวันแล้ว | ล่วงหน้า */}
+                          <div className="flex h-1.5 overflow-hidden rounded-full bg-slate-900/10 dark:bg-white/10" aria-hidden>
+                            <span className={cn('h-full', TONE.info.dot)} style={{ width: `${remain.value > 0 ? (dueKpi.value / remain.value) * 100 : 0}%` }} />
+                            <span className={cn('h-full', TONE.violet.dot)} style={{ width: `${remain.value > 0 ? (advanceAll.value / remain.value) * 100 : 0}%` }} />
+                          </div>
+                          <div className="flex items-stretch gap-1.5">
+                            {part(dueKpi, TONE.info.dot)}
+                            <span className="self-center text-sm text-muted-foreground" aria-hidden>
+                              +
+                            </span>
+                            {part({ ...advanceAll, label: WORK_STATUS_ADVANCE_LABEL }, TONE.violet.dot)}
+                          </div>
+                        </div>
+                      ) : null;
                     return (
                       <>
-                        {/* แถวบนสุด ใบขอทั้งหมด · ปิดแล้ว · ยกเลิก (เจ้าของ 23 พ.ย. 2569) · ใต้ลงมาแถวสถานะ นำด้วย ยังไม่ปิด */}
+                        {/* แถวบนสุด ใบขอทั้งหมด · ปิดแล้ว · ยกเลิก · คงเหลือ (เจ้าของ 23 + 27 พ.ย. 2569) · ใต้ลงมาแถวสถานะ นำด้วย ถึงวันแล้ว */}
                         {mainView.topRow.length ? (
-                          <div className="mb-3 grid grid-cols-2 gap-3 lg:grid-cols-3" data-testid="dashboard-work-top">
+                          <div className="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4" data-testid="dashboard-work-top">
                             {tiles(mainView.topRow, mainView.topRow[0]?.value ?? 0, mainView.topRow[0]?.id)}
+                            {remainTile}
                           </div>
                         ) : null}
                         <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">{tiles(mainView.rows, total)}</div>
